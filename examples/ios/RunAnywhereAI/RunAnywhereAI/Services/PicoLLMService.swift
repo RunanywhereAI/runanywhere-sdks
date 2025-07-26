@@ -110,7 +110,7 @@ class PicoLLMService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:
@@ -141,7 +141,7 @@ class PicoLLMService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:
@@ -228,7 +228,7 @@ extension PicoLLMService {
     // Dialog management
     func createDialog() async throws -> PicoLLMDialog {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:

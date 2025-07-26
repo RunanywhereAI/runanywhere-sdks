@@ -242,7 +242,7 @@ class CoreMLService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let model = model, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -259,7 +259,7 @@ class CoreMLService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized, let model = model, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // Real Core ML implementation would:

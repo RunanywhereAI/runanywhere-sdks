@@ -49,6 +49,8 @@ enum LLMError: LocalizedError {
             return "This model format is not supported by the selected framework."
         case .invalidModelPath:
             return "The model path is invalid or inaccessible."
+        case .modelLoadFailed(let reason, let framework):
+            return "Failed to load model with \(framework): \(reason)"
             
         case .noServiceSelected:
             return "No LLM service is selected. Please select a framework first."

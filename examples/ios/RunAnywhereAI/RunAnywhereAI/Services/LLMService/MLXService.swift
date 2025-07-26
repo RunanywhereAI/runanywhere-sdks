@@ -233,7 +233,7 @@ class MLXService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let model = mlxModel, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -250,7 +250,7 @@ class MLXService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized, let model = mlxModel, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // Real MLX implementation would be:

@@ -157,7 +157,7 @@ class BaseLLMService: LLMService {
             modelMemory: 0,
             contextMemory: 0,
             peakMemory: 0,
-            availableMemory: ProcessInfo.processInfo.physicalMemory,
+            availableMemory: Int64(ProcessInfo.processInfo.physicalMemory),
             memoryPressure: .normal,
             cacheSize: 0
         )
@@ -195,7 +195,7 @@ class BaseLLMService: LLMService {
         HealthCheckResult(
             isHealthy: isInitialized,
             frameworkVersion: frameworkInfo.version,
-            availableMemory: ProcessInfo.processInfo.physicalMemory,
+            availableMemory: Int64(ProcessInfo.processInfo.physicalMemory),
             modelLoaded: isInitialized,
             lastError: nil,
             diagnostics: [:]

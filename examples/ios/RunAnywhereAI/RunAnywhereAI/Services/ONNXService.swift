@@ -106,7 +106,7 @@ class ONNXService: BaseLLMService {
                 .quantization,
                 .openSource,
                 .offlineCapable,
-                .cloudCapable
+                .cloudFallback
             ]
         )
     }
@@ -210,7 +210,7 @@ class ONNXService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -227,7 +227,7 @@ class ONNXService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized, let config = config, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // Real ONNX Runtime implementation would be:

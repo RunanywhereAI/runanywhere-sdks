@@ -59,9 +59,9 @@ class ModelLoader: ObservableObject {
             switch format {
             case .gguf:
                 return try await loadGGUFModel(at: path, framework: framework)
-            case .onnxRuntime:
+            case .onnx, .onnxRuntime:
                 return try await loadONNXModel(at: path, framework: framework)
-            case .coreML:
+            case .coreML, .mlPackage:
                 return try await loadCoreMLModel(at: path, framework: framework)
             case .mlx:
                 return try await loadMLXModel(at: path, framework: framework)
@@ -71,7 +71,11 @@ class ModelLoader: ObservableObject {
                 return try await loadPTEModel(at: path, framework: framework)
             case .tflite:
                 return try await loadTFLiteModel(at: path, framework: framework)
-            case .other:
+            case .picoLLM:
+                return try await loadPicoLLMModel(at: path, framework: framework)
+            case .ggml:
+                return try await loadGGUFModel(at: path, framework: framework) // Use GGUF loader for GGML
+            case .pytorch, .safetensors, .other:
                 throw LLMError.unsupportedFormat
             }
         } catch {
@@ -290,6 +294,25 @@ class ModelLoader: ObservableObject {
         
         // Select the service
         await UnifiedLLMService.shared.selectService(named: tfliteService.name)
+        updateProgress(1.0, status: "Ready")
+        
+        return true
+    }
+    
+    private func loadPicoLLMModel(at path: String, framework: LLMFramework) async throws -> Bool {
+        updateProgress(0.1, status: "Loading picoLLM model...")
+        
+        // Get service from UnifiedLLMService
+        guard let service = await UnifiedLLMService.shared.availableServices.first(where: { $0.name == "picoLLM" }) else {
+            throw LLMError.serviceNotAvailable("picoLLM")
+        }
+        
+        // Load model
+        try await service.initialize(modelPath: path)
+        updateProgress(0.9, status: "Model loaded successfully")
+        
+        // Select the service
+        await UnifiedLLMService.shared.selectService(named: service.name)
         updateProgress(1.0, status: "Ready")
         
         return true

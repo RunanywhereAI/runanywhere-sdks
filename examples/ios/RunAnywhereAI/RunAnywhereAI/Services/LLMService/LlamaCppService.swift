@@ -128,7 +128,6 @@ class LlamaCppService: BaseLLMService {
     private var currentModelInfo: ModelInfo?
     private var llamaContext: LlamaCppContext?
     private var tokenizer: LlamaCppTokenizer?
-    override var maxContextLength: Int { 2048 }
     
     override func initialize(modelPath: String) async throws {
         // Verify model file exists
@@ -182,7 +181,7 @@ class LlamaCppService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let _ = llamaContext, let _ = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -199,7 +198,7 @@ class LlamaCppService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized, let _ = llamaContext, let tok = tokenizer else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // Real implementation would:

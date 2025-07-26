@@ -106,7 +106,7 @@ struct ONNXLegacyConfiguration: FrameworkConfiguration, Equatable {
 class FrameworkConfigurationManager: ObservableObject {
     static let shared = FrameworkConfigurationManager()
     
-    @Published var configurations: [LLMFramework: any FrameworkConfiguration] = [:]
+    @Published var configurations: [LLMFramework: any LLMFrameworkConfiguration] = [:]
     
     private let configsKey = "framework_configurations"
     
@@ -120,13 +120,13 @@ class FrameworkConfigurationManager: ObservableObject {
     }
     
     private func setDefaultConfigurations() {
-        configurations[.llamaCpp] = LlamaCppConfiguration()
-        configurations[.coreML] = CoreMLConfiguration()
-        configurations[.mlx] = MLXConfiguration()
-        configurations[.onnxRuntime] = ONNXConfiguration()
+        configurations[.llamaCpp] = LlamaCppConfiguration.default
+        configurations[.coreML] = CoreMLConfiguration.default
+        configurations[.mlx] = MLXConfiguration.default
+        configurations[.onnxRuntime] = ONNXConfiguration.default
     }
     
-    func configuration(for framework: LLMFramework) -> any FrameworkConfiguration {
+    func configuration(for framework: LLMFramework) -> any LLMFrameworkConfiguration {
         if let config = configurations[framework] {
             return config
         }
@@ -134,24 +134,21 @@ class FrameworkConfigurationManager: ObservableObject {
         // Return default configuration
         switch framework {
         case .llamaCpp:
-            return LlamaCppConfiguration()
+            return LlamaCppConfiguration.default
         case .coreML:
-            return CoreMLConfiguration()
+            return CoreMLConfiguration.default
         case .mlx:
-            return MLXConfiguration()
+            return MLXConfiguration.default
         case .onnxRuntime:
-            return ONNXConfiguration()
-        case .foundationModels:
-            // Return a generic configuration for Foundation Models
-            return GenericConfiguration(framework: framework)
+            return ONNXConfiguration.default
         default:
             // Return a generic configuration for other frameworks
-            return GenericConfiguration(framework: framework)
+            return GenericLLMConfiguration(framework: framework)
         }
     }
     
-    func updateConfiguration(_ config: any FrameworkConfiguration) {
-        configurations[config.framework] = config
+    func updateConfiguration(_ config: any LLMFrameworkConfiguration, for framework: LLMFramework) {
+        configurations[framework] = config
         saveConfigurations()
     }
     
@@ -174,6 +171,15 @@ struct GenericConfiguration: FrameworkConfiguration, Equatable {
     func apply(to service: LLMService) {
         // No specific configuration for generic frameworks
     }
+}
+
+// Generic configuration conforming to LLMFrameworkConfiguration
+struct GenericLLMConfiguration: LLMFrameworkConfiguration {
+    let framework: LLMFramework
+    let enableLogging = true
+    let logLevel = LogLevel.info
+    let performanceTracking = true
+    let memoryLimit: Int64? = nil
 }
 
 // MARK: - Configuration Views
@@ -231,7 +237,7 @@ struct LlamaCppConfigView: View {
             Toggle("Lock Memory", isOn: .constant(config.mlock))
         }
         .onChange(of: config) { newConfig in
-            configManager.updateConfiguration(newConfig)
+            configManager.updateConfiguration(newConfig, for: .llamaCpp)
         }
         .onAppear {
             if let loaded = configManager.configuration(for: .llamaCpp) as? LlamaCppConfiguration {
@@ -254,15 +260,25 @@ struct CoreMLConfigView: View {
             }
         }
         
-        Section("Performance") {
-            Toggle("Enable Low Precision", isOn: $config.enableLowPrecision)
-            Stepper("Max Concurrent Requests: \(config.maxConcurrentRequests)",
-                   value: $config.maxConcurrentRequests, in: 1...4)
-        }
-        
-        Section("Memory") {
-            TextField("Memory Key Path", text: $config.memoryKeyPath)
-                .autocapitalization(.none)
+        Section("Configuration") {
+            HStack {
+                Text("Allow Low Precision")
+                Spacer()
+                Text(config.allowLowPrecision ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Enable Batching")
+                Spacer()
+                Text(config.enableBatching ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Max Batch Size")
+                Spacer()
+                Text("\(config.maxBatchSize)")
+                    .foregroundColor(.secondary)
+            }
         }
         .onChange(of: config) { newConfig in
             configManager.updateConfiguration(newConfig)
@@ -280,23 +296,31 @@ struct MLXConfigView: View {
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
-        Section("Batch Processing") {
-            Stepper("Max Batch Size: \(config.maxBatchSize)",
-                   value: $config.maxBatchSize, in: 32...1024, step: 32)
-            Stepper("Stream Buffer Size: \(config.streamBufferSize)",
-                   value: $config.streamBufferSize, in: 256...4096, step: 256)
-        }
-        
-        Section("Optimization") {
-            Toggle("Use Memory Mapping", isOn: $config.useMemoryMapping)
-            Toggle("Metal Optimization", isOn: $config.metalOptimization)
-        }
-        
-        Section("Quantization") {
-            Stepper("Quantization Bits: \(config.quantizationBits)",
-                   value: $config.quantizationBits, in: 2...8)
-            Stepper("Group Size: \(config.groupSize)",
-                   value: $config.groupSize, in: 32...256, step: 32)
+        Section("Configuration") {
+            HStack {
+                Text("Device")
+                Spacer()
+                Text(String(describing: config.device))
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Lazy Evaluation")
+                Spacer()
+                Text(config.lazyEvaluation ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Unified Memory")
+                Spacer()
+                Text(config.unifiedMemory ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Custom Kernels")
+                Spacer()
+                Text(config.customKernels ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
         }
         .onChange(of: config) { newConfig in
             configManager.updateConfiguration(newConfig)
@@ -314,33 +338,37 @@ struct ONNXConfigView: View {
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
-        Section("Execution Provider") {
-            Picker("Provider", selection: $config.executionProvider) {
-                ForEach(ONNXConfiguration.ExecutionProvider.allCases, id: \.self) { provider in
-                    Text(provider.rawValue).tag(provider)
-                }
+        Section("Configuration") {
+            HStack {
+                Text("Execution Provider")
+                Spacer()
+                Text(String(describing: config.executionProvider))
+                    .foregroundColor(.secondary)
             }
-            .pickerStyle(SegmentedPickerStyle())
-        }
-        
-        Section("Graph Optimization") {
-            Picker("Optimization Level", selection: $config.graphOptimizationLevel) {
-                ForEach(ONNXConfiguration.GraphOptimizationLevel.allCases, id: \.self) { level in
-                    Text(level.rawValue).tag(level)
-                }
+            HStack {
+                Text("Graph Optimization Level")
+                Spacer()
+                Text("\(config.graphOptimizationLevel)")
+                    .foregroundColor(.secondary)
             }
-        }
-        
-        Section("Threading") {
-            Stepper("Inter-Op Threads: \(config.interOpNumThreads == 0 ? "Auto" : "\(config.interOpNumThreads)")",
-                   value: $config.interOpNumThreads, in: 0...16)
-            Stepper("Intra-Op Threads: \(config.intraOpNumThreads == 0 ? "Auto" : "\(config.intraOpNumThreads)")",
-                   value: $config.intraOpNumThreads, in: 0...16)
-        }
-        
-        Section("Advanced") {
-            Toggle("Enable Memory Pattern", isOn: $config.enableMemoryPattern)
-            Toggle("Enable Profiling", isOn: $config.enableProfiling)
+            HStack {
+                Text("Enable Profiling")
+                Spacer()
+                Text(config.enableProfiling ? "Yes" : "No")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Inter-Op Threads")
+                Spacer()
+                Text("\(config.interOpNumThreads)")
+                    .foregroundColor(.secondary)
+            }
+            HStack {
+                Text("Intra-Op Threads")
+                Spacer()
+                Text("\(config.intraOpNumThreads)")
+                    .foregroundColor(.secondary)
+            }
         }
         .onChange(of: config) { newConfig in
             configManager.updateConfiguration(newConfig)

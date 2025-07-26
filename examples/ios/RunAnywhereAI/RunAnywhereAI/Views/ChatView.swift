@@ -15,7 +15,7 @@ struct ChatView: View {
     @State private var showingExportView = false
     
     @MainActor
-    init(llmService: UnifiedLLMService = .shared) {
+    init(llmService: UnifiedLLMService? = nil) {
         _viewModel = StateObject(wrappedValue: ChatViewModel(llmService: llmService))
     }
     

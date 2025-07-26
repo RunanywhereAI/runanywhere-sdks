@@ -107,7 +107,7 @@ class TFLiteService: BaseLLMService {
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -124,7 +124,7 @@ class TFLiteService: BaseLLMService {
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:
