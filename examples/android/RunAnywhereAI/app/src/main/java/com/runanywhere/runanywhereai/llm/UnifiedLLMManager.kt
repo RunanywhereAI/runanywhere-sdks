@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.runanywhere.runanywhereai.llm.frameworks.MediaPipeService
 import com.runanywhere.runanywhereai.llm.frameworks.ONNXRuntimeService
+import com.runanywhere.runanywhereai.llm.frameworks.GeminiNanoService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -26,6 +27,17 @@ class UnifiedLLMManager(private val context: Context) {
         // Register available services
         services[LLMFramework.MEDIAPIPE] = MediaPipeService(context)
         services[LLMFramework.ONNX_RUNTIME] = ONNXRuntimeService(context)
+        
+        // Register Gemini Nano if available
+        try {
+            val geminiService = GeminiNanoService(context)
+            if (geminiService.isModelAvailable()) {
+                services[LLMFramework.GEMINI_NANO] = geminiService
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Gemini Nano not available on this device", e)
+        }
+        
         // Additional services can be registered here as they're implemented
     }
     
@@ -106,8 +118,10 @@ class UnifiedLLMManager(private val context: Context) {
      * Get recommended framework for device
      */
     fun getRecommendedFramework(): LLMFramework {
-        // Simple recommendation logic
+        // Recommendation logic based on device capabilities
         return when {
+            // Gemini Nano is highly optimized for supported devices
+            services.containsKey(LLMFramework.GEMINI_NANO) -> LLMFramework.GEMINI_NANO
             // MediaPipe is generally well-optimized for mobile
             services.containsKey(LLMFramework.MEDIAPIPE) -> LLMFramework.MEDIAPIPE
             // ONNX Runtime as fallback

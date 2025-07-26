@@ -73,6 +73,9 @@ dependencies {
     // ONNX Runtime
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
     
+    // Google AI SDK for Gemini Nano
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    
     // OkHttp for model downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     

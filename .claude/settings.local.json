@@ -9,7 +9,8 @@
       "Bash(touch:*)",
       "Bash(swift build)",
       "Bash(swift test)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

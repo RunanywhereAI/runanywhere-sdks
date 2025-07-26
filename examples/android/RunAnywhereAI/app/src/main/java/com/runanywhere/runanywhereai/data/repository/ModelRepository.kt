@@ -11,6 +11,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import android.os.Build
+import com.runanywhere.runanywhereai.llm.frameworks.GeminiNanoService
 
 /**
  * Repository for managing LLM models
@@ -32,7 +34,27 @@ class ModelRepository(private val context: Context) {
      * Get available models for download
      */
     fun getAvailableModels(): List<ModelInfo> {
-        return listOf(
+        val models = mutableListOf<ModelInfo>()
+        
+        // Add Gemini Nano if device supports it
+        if (checkGeminiNanoAvailability()) {
+            models.add(
+                ModelInfo(
+                    id = "gemini-nano",
+                    name = "Gemini Nano",
+                    description = "Google's on-device foundation model (3.25B parameters)",
+                    framework = LLMFramework.GEMINI_NANO,
+                    sizeBytes = 0, // System-managed
+                    downloadUrl = "", // System-managed
+                    fileName = "gemini-nano",
+                    quantization = "INT4",
+                    isDownloaded = true // Always available if supported
+                )
+            )
+        }
+        
+        // Add other models
+        models.addAll(listOf(
             ModelInfo(
                 id = "gemma-2b",
                 name = "Gemma 2B",
@@ -63,7 +85,9 @@ class ModelRepository(private val context: Context) {
                 fileName = "tinyllama-1.1b.onnx",
                 quantization = "FP16"
             )
-        )
+        ))
+        
+        return models
     }
     
     /**
@@ -72,9 +96,15 @@ class ModelRepository(private val context: Context) {
     suspend fun getDownloadedModels(): List<ModelInfo> = withContext(Dispatchers.IO) {
         val downloadedModels = mutableListOf<ModelInfo>()
         
+        // Add Gemini Nano if available (it's system-managed, not file-based)
+        getAvailableModels().find { it.framework == LLMFramework.GEMINI_NANO }?.let {
+            downloadedModels.add(it)
+        }
+        
+        // Add file-based models
         modelsDirectory.listFiles()?.forEach { file ->
             // Match with available models
-            getAvailableModels().find { it.fileName == file.name }?.let { modelInfo ->
+            getAvailableModels().find { it.fileName == file.name && it.framework != LLMFramework.GEMINI_NANO }?.let { modelInfo ->
                 downloadedModels.add(modelInfo.copy(
                     isDownloaded = true,
                     localPath = file.absolutePath
@@ -83,6 +113,25 @@ class ModelRepository(private val context: Context) {
         }
         
         downloadedModels
+    }
+    
+    /**
+     * Check if Gemini Nano is available on this device
+     */
+    private fun checkGeminiNanoAvailability(): Boolean {
+        // Check if device meets minimum requirements
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return false
+        }
+        
+        // Check with GeminiNanoService
+        return try {
+            val service = GeminiNanoService(context)
+            service.isModelAvailable()
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check Gemini Nano availability", e)
+            false
+        }
     }
     
     /**
