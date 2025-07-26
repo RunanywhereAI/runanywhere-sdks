@@ -17,7 +17,9 @@
       "Bash(diff:*)",
       "Bash(./run.sh)",
       "Bash(./swiftlint.sh:*)",
-      "Bash(swiftlint:*)"
+      "Bash(swiftlint:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:picovoice.ai)"
     ],
     "deny": []
   }

@@ -19,34 +19,32 @@ class UnifiedLLMService: ObservableObject {
     @Published var currentFramework: LLMFramework?
     @Published var currentModel: ModelInfo?
     
+    private let container = DependencyContainer.shared
+    
     private init() {
         setupServices()
+        observeServiceLifecycle()
     }
     
     private func setupServices() {
-        // Add all available services
-        var services: [LLMService] = [
-            MockLLMService(), // For testing
-            LlamaCppService(),
-            MLCService(),
-            ONNXService(),
-            ExecuTorchService(),
-            TFLiteService(),
-            PicoLLMService()
-        ]
-        
-        // Add iOS 15+ services
-        if #available(iOS 15.0, *) {
-            services.append(SwiftTransformersService())
-        }
-        
-        // Add iOS 17+ services
-        if #available(iOS 17.0, *) {
-            services.append(CoreMLService())
-            services.append(MLXService())
-        }
-        
-        availableServices = services
+        // Get all available services from the dependency container
+        availableServices = container.resolveAll(LLMService.self)
+    }
+    
+    private func observeServiceLifecycle() {
+        container.addObserver(ServiceLifecycleObserverImpl { [weak self] service, event in
+            Task { @MainActor in
+                switch event {
+                case .created:
+                    self?.availableServices.append(service)
+                case .removed:
+                    self?.availableServices.removeAll { $0 === service }
+                    if self?.currentService === service {
+                        self?.currentService = nil
+                    }
+                }
+            }
+        })
     }
     
     func selectService(named name: String) {
