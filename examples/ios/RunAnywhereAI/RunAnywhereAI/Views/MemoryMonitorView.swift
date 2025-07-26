@@ -37,7 +37,8 @@ struct MemoryMonitorView: View {
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(pressureGradient)
                                     .frame(
-                                        width: geometry.size.width * (Double(memoryManager.usedMemory) / Double(memoryManager.totalMemory)),
+                                        width: geometry.size.width *
+                                               (Double(memoryManager.usedMemory) / Double(memoryManager.totalMemory)),
                                         height: 30
                                     )
                                 

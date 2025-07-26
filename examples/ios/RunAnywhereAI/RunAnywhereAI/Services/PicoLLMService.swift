@@ -126,11 +126,11 @@ class PicoLLMService: LLMService {
         return ModelInfo(
             id: "picollm-model",
             name: "picoLLM Model",
-            size: getModelSize(),
             format: .other,
+            size: getModelSize(),
+            framework: .picoLLM,
             quantization: "Compressed",
-            contextLength: 2048,
-            framework: .picoLLM
+            contextLength: 2048
         )
     }
     

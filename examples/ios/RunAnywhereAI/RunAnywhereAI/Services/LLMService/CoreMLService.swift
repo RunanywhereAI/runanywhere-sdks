@@ -16,7 +16,7 @@ class TextGenerationInput: NSObject, MLFeatureProvider {
     let inputIds: MLMultiArray
     
     var featureNames: Set<String> {
-        return ["input_ids"]
+        ["input_ids"]
     }
     
     func featureValue(for featureName: String) -> MLFeatureValue? {
@@ -82,8 +82,8 @@ private class CoreMLTokenizer {
     }
     
     func decode(_ tokens: [Int32]) -> String {
-        return tokens.compactMap { tokenId in
-            return inverseVocab[Int(tokenId)] ?? "unk"
+        tokens.compactMap { tokenId in
+            inverseVocab[Int(tokenId)] ?? "unk"
         }.joined(separator: "")
     }
 }
@@ -97,47 +97,47 @@ class CoreMLService: LLMService {
         ModelInfo(
             id: "gpt2-coreml",
             name: "GPT2-CoreML.mlpackage",
-            size: "548MB",
             format: .coreML,
+            size: "548MB",
+            framework: .coreML,
             quantization: "Float16",
             contextLength: 1024,
-            framework: .coreML,
             downloadURL: URL(
                 string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip"
             )!,
+            description: "GPT-2 model converted to Core ML format with Neural Engine acceleration",
             minimumMemory: 1_000_000_000,
-            recommendedMemory: 2_000_000_000,
-            description: "GPT-2 model converted to Core ML format with Neural Engine acceleration"
+            recommendedMemory: 2_000_000_000
         ),
         ModelInfo(
             id: "distilgpt2-coreml",
             name: "DistilGPT2-CoreML.mlpackage",
-            size: "267MB",
             format: .coreML,
+            size: "267MB",
+            framework: .coreML,
             quantization: "Float16",
             contextLength: 1024,
-            framework: .coreML,
             downloadURL: URL(
                 string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip"
             )!,
+            description: "Smaller DistilGPT2 model optimized for mobile devices",
             minimumMemory: 500_000_000,
-            recommendedMemory: 1_000_000_000,
-            description: "Smaller DistilGPT2 model optimized for mobile devices"
+            recommendedMemory: 1_000_000_000
         ),
         ModelInfo(
             id: "openelm-270m-coreml",
             name: "OpenELM-270M.mlpackage",
-            size: "312MB",
             format: .coreML,
+            size: "312MB",
+            framework: .coreML,
             quantization: "Float16",
             contextLength: 2048,
-            framework: .coreML,
             downloadURL: URL(
                 string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip"
             )!,
+            description: "Apple's OpenELM 270M model optimized for on-device inference",
             minimumMemory: 400_000_000,
-            recommendedMemory: 800_000_000,
-            description: "Apple's OpenELM 270M model optimized for on-device inference"
+            recommendedMemory: 800_000_000
         )
     ]
     
@@ -175,14 +175,13 @@ class CoreMLService: LLMService {
                 model = try MLModel(contentsOf: modelURL, configuration: configuration)
             } else {
                 // For .mlmodel, compile first if needed
-                let compiledURL = try MLModel.compileModel(at: modelURL)
+                let compiledURL = try await MLModel.compileModel(at: modelURL)
                 model = try MLModel(contentsOf: compiledURL, configuration: configuration)
             }
             
             // Initialize tokenizer (in a real app, this would come from the model bundle)
             let tokenizerPath = modelURL.deletingLastPathComponent().appendingPathComponent("tokenizer.json").path
             tokenizer = try CoreMLTokenizer(vocabPath: tokenizerPath)
-            
         } catch {
             // Fallback to basic tokenizer if no tokenizer file found
             tokenizer = try CoreMLTokenizer(vocabPath: "")
@@ -190,7 +189,7 @@ class CoreMLService: LLMService {
         
         // Verify model has expected inputs/outputs
         guard let model = model else {
-            throw LLMError.modelLoadFailed
+            throw LLMError.initializationFailed("Failed to load Core ML model")
         }
         
         let description = model.modelDescription
@@ -298,7 +297,7 @@ class CoreMLService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModelInfo
+        currentModelInfo
     }
     
     func cleanup() {
@@ -319,6 +318,4 @@ class CoreMLService: LLMService {
     deinit {
         cleanup()
     }
-}
-
 }

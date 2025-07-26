@@ -46,41 +46,41 @@ class LlamaCppService: LLMService {
         ModelInfo(
             id: "tinyllama-1.1b-q4",
             name: "TinyLlama-1.1B-Q4_K_M.gguf",
-            size: "637MB",
             format: .gguf,
+            size: "637MB",
+            framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
-            framework: .llamaCpp,
             downloadURL: URL(string: "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf")!,
+            description: "TinyLlama 1.1B parameter model, 4-bit quantized",
             minimumMemory: 1_000_000_000,
-            recommendedMemory: 2_000_000_000,
-            description: "TinyLlama 1.1B parameter model, 4-bit quantized"
+            recommendedMemory: 2_000_000_000
         ),
         ModelInfo(
             id: "phi3-mini-q4",
             name: "Phi-3-mini-Q4_K_M.gguf",
-            size: "1.5GB",
             format: .gguf,
+            size: "1.5GB",
+            framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 4096,
-            framework: .llamaCpp,
             downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!,
+            description: "Microsoft Phi-3 mini model, optimized for mobile",
             minimumMemory: 2_000_000_000,
-            recommendedMemory: 3_000_000_000,
-            description: "Microsoft Phi-3 mini model, optimized for mobile"
+            recommendedMemory: 3_000_000_000
         ),
         ModelInfo(
             id: "qwen2.5-0.5b-q5",
             name: "Qwen2.5-0.5B-Q5_K_M.gguf",
-            size: "394MB",
             format: .gguf,
+            size: "394MB",
+            framework: .llamaCpp,
             quantization: "Q5_K_M",
             contextLength: 32768,
-            framework: .llamaCpp,
             downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q5_k_m.gguf")!,
+            description: "Qwen 2.5 0.5B model, great for quick responses",
             minimumMemory: 600_000_000,
-            recommendedMemory: 1_000_000_000,
-            description: "Qwen 2.5 0.5B model, great for quick responses"
+            recommendedMemory: 1_000_000_000
         )
     ]
     
@@ -140,7 +140,7 @@ class LlamaCppService: LLMService {
     }
     
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
-        guard isInitialized, let context = llamaContext, let tokenizer = tokenizer else {
+        guard isInitialized, let _ = llamaContext, let _ = tokenizer else {
             throw LLMError.notInitialized
         }
         
@@ -157,7 +157,7 @@ class LlamaCppService: LLMService {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isInitialized, let context = llamaContext, let tokenizer = tokenizer else {
+        guard isInitialized, let _ = llamaContext, let tok = tokenizer else {
             throw LLMError.notInitialized
         }
         
@@ -170,8 +170,8 @@ class LlamaCppService: LLMService {
         // 6. Continue until EOS or max tokens
         
         // For demonstration, simulate the real process:
-        let inputTokens = tokenizer.encode(prompt)
-        var generatedTokens: [Int32] = []
+        let _ = tok.encode(prompt)
+        let _ : [Int32] = []
         
         // Simulate intelligent response generation
         let responseTemplate = generateResponseTemplate(for: prompt, modelInfo: currentModelInfo)
@@ -264,13 +264,13 @@ private extension LlamaCppService {
         let magicData = fileHandle.readData(ofLength: 4)
         guard magicData.count == 4,
               String(data: magicData, encoding: .ascii) == "GGUF" else {
-            throw LLMError.invalidFormat
+            throw LLMError.unsupportedFormat
         }
         
         // Read version (next 4 bytes)
         let versionData = fileHandle.readData(ofLength: 4)
         guard versionData.count == 4 else {
-            throw LLMError.invalidFormat
+            throw LLMError.unsupportedFormat
         }
         
         let version = versionData.withUnsafeBytes { $0.load(as: UInt32.self) }

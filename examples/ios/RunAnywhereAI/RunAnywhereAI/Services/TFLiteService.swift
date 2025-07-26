@@ -16,28 +16,28 @@ class TFLiteService: LLMService {
         ModelInfo(
             id: "gemma-2b-tflite",
             name: "gemma-2b-it.tflite",
-            size: "1.4GB",
             format: .tflite,
+            size: "1.4GB",
+            framework: .tfLite,
             quantization: "INT8",
             contextLength: 8192,
-            framework: .tensorflowLite,
             downloadURL: URL(string: "https://huggingface.co/google/gemma-2b-it/resolve/main/gemma-2b-it-int8.tflite")!,
+            description: "Google Gemma 2B model quantized for TensorFlow Lite",
             minimumMemory: 2_000_000_000,
-            recommendedMemory: 3_000_000_000,
-            description: "Google Gemma 2B model quantized for TensorFlow Lite"
+            recommendedMemory: 3_000_000_000
         ),
         ModelInfo(
             id: "mobilechat-1b-tflite",
             name: "mobilechat-1b.tflite",
-            size: "680MB",
             format: .tflite,
+            size: "680MB",
+            framework: .tfLite,
             quantization: "INT8",
             contextLength: 2048,
-            framework: .tensorflowLite,
             downloadURL: URL(string: "https://huggingface.co/google/mobilechat-1b/resolve/main/mobilechat-1b-int8.tflite")!,
+            description: "Mobile-optimized chat model for TensorFlow Lite deployment",
             minimumMemory: 1_000_000_000,
-            recommendedMemory: 1_500_000_000,
-            description: "Mobile-optimized chat model for TensorFlow Lite deployment"
+            recommendedMemory: 1_500_000_000
         )
     ]
     
@@ -181,7 +181,11 @@ class TFLiteService: LLMService {
     // MARK: - Private Methods
     
     private func getModelSize() -> String {
-        let url = URL(fileURLWithPath: modelPath)
+        guard let modelInfo = currentModelInfo, let path = modelInfo.path else {
+            return "Unknown"
+        }
+        
+        let url = URL(fileURLWithPath: path)
         
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)

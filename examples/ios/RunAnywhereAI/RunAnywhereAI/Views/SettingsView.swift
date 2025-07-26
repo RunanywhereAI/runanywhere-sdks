@@ -87,7 +87,9 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                Link("GitHub Repository", destination: URL(string: "https://github.com/RunanywhereAI/sdks")!)
+                if let url = URL(string: "https://github.com/RunanywhereAI/sdks") {
+                    Link("GitHub Repository", destination: url)
+                }
             }
             
             Section {

@@ -64,41 +64,41 @@ class MLCService: LLMService {
         ModelInfo(
             id: "llama-3.2-1b-mlc",
             name: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-            size: "920MB",
             format: .mlc,
+            size: "920MB",
+            framework: .mlc,
             quantization: "q4f16_1",
             contextLength: 131072,
-            framework: .mlc,
             downloadURL: URL(string: "https://huggingface.co/mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC/resolve/main/Llama-3.2-1B-Instruct-q4f16_1-MLC.tar")!,
+            description: "Llama 3.2 1B model optimized for MLC with quantization",
             minimumMemory: 1_500_000_000,
-            recommendedMemory: 2_500_000_000,
-            description: "Llama 3.2 1B model optimized for MLC with quantization"
+            recommendedMemory: 2_500_000_000
         ),
         ModelInfo(
             id: "gemma-2b-mlc",
             name: "gemma-2b-it-q4f16_1-MLC",
-            size: "1.4GB",
             format: .mlc,
+            size: "1.4GB",
+            framework: .mlc,
             quantization: "q4f16_1",
             contextLength: 8192,
-            framework: .mlc,
             downloadURL: URL(string: "https://huggingface.co/mlc-ai/gemma-2b-it-q4f16_1-MLC/resolve/main/gemma-2b-it-q4f16_1-MLC.tar")!,
+            description: "Google Gemma 2B instruction-tuned model with MLC optimization",
             minimumMemory: 2_000_000_000,
-            recommendedMemory: 3_000_000_000,
-            description: "Google Gemma 2B instruction-tuned model with MLC optimization"
+            recommendedMemory: 3_000_000_000
         ),
         ModelInfo(
             id: "phi-3-mini-mlc",
             name: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-            size: "2.3GB",
             format: .mlc,
+            size: "2.3GB",
+            framework: .mlc,
             quantization: "q4f16_1",
             contextLength: 4096,
-            framework: .mlc,
             downloadURL: URL(string: "https://huggingface.co/mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC/resolve/main/Phi-3-mini-4k-instruct-q4f16_1-MLC.tar")!,
+            description: "Microsoft Phi-3 mini model with MLC cross-platform optimization",
             minimumMemory: 3_000_000_000,
-            recommendedMemory: 4_000_000_000,
-            description: "Microsoft Phi-3 mini model with MLC cross-platform optimization"
+            recommendedMemory: 4_000_000_000
         )
     ]
     
@@ -259,8 +259,12 @@ class MLCService: LLMService {
     // MARK: - Private Methods
     
     private func getModelSize() -> String {
+        guard let modelInfo = currentModelInfo, let path = modelInfo.path else {
+            return "Unknown"
+        }
+        
         // MLC models are typically directories
-        let url = URL(fileURLWithPath: modelPath)
+        let url = URL(fileURLWithPath: path)
         var totalSize: Int64 = 0
         
         if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {

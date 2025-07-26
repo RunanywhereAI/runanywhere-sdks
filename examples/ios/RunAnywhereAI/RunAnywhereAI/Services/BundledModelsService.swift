@@ -13,39 +13,36 @@ class BundledModelsService {
         ModelInfo(
             id: "test-llama-tiny",
             name: "Tiny Test Model (llama.cpp)",
-            size: "5 MB",
             format: .gguf,
+            size: "5 MB",
+            framework: .llamaCpp,
             quantization: "Q4_0",
             contextLength: 512,
-            framework: .llamaCpp,
             isLocal: true,
-            bundled: true,
             description: "Ultra-small test model for llama.cpp framework testing"
         ),
         
         ModelInfo(
             id: "test-coreml-tiny",
             name: "Tiny Test Model (Core ML)",
-            size: "10 MB",
             format: .coreML,
+            size: "10 MB",
+            framework: .coreML,
             quantization: "FP16",
             contextLength: 512,
-            framework: .coreML,
             isLocal: true,
-            bundled: true,
             description: "Small Core ML model for testing Apple Neural Engine"
         ),
         
         ModelInfo(
             id: "test-mlx-tiny",
             name: "Tiny Test Model (MLX)",
-            size: "8 MB",
             format: .mlx,
+            size: "8 MB",
+            framework: .mlx,
             quantization: "INT4",
             contextLength: 512,
-            framework: .mlx,
             isLocal: true,
-            bundled: true,
             description: "Compact MLX model optimized for Apple Silicon"
         ),
         
@@ -53,13 +50,12 @@ class BundledModelsService {
         ModelInfo(
             id: "demo-phi-mini",
             name: "Phi Mini Demo",
-            size: "150 MB",
             format: .gguf,
+            size: "150 MB",
+            framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
-            framework: .llamaCpp,
             isLocal: false,
-            bundled: true,
             downloadURL: URL(string: "https://huggingface.co/models/phi-mini-demo.gguf"),
             description: "Microsoft Phi mini model for demonstrations"
         ),
@@ -67,13 +63,12 @@ class BundledModelsService {
         ModelInfo(
             id: "demo-tinyllama",
             name: "TinyLlama 1.1B Demo",
-            size: "550 MB",
             format: .gguf,
+            size: "550 MB",
+            framework: .llamaCpp,
             quantization: "Q5_K_M",
             contextLength: 2048,
-            framework: .llamaCpp,
             isLocal: false,
-            bundled: true,
             downloadURL: URL(string: "https://huggingface.co/models/tinyllama-1.1b.gguf"),
             description: "Compact but capable language model"
         )
@@ -233,19 +228,18 @@ class BundledModelsService {
 // MARK: - Model Info Extensions
 
 extension ModelInfo {
-    init(id: String, name: String, size: String, format: ModelFormat,
-         quantization: String? = nil, contextLength: Int? = nil,
-         framework: LLMFramework, isLocal: Bool = false, bundled: Bool = false,
-         downloadURL: URL? = nil, description: String? = nil,
+    init(id: String, name: String, format: ModelFormat, size: String,
+         framework: LLMFramework, quantization: String? = nil, contextLength: Int? = nil,
+         isLocal: Bool = false, downloadURL: URL? = nil, description: String? = nil,
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
         self.id = id
         self.name = name
-        self.size = size
         self.format = format
+        self.size = size
+        self.framework = framework
         self.quantization = quantization
         self.contextLength = contextLength
-        self.framework = framework
         self.isLocal = isLocal
         self.path = nil
         self.downloadURL = downloadURL

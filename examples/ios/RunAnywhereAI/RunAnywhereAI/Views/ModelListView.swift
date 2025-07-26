@@ -20,9 +20,9 @@ struct ModelListView: View {
                     ServiceRow(
                         service: service,
                         isSelected: selectedService == service.name
-                    )                        {
+                    ) {
                             selectService(service)
-                        }
+                    }
                 }
             }
             

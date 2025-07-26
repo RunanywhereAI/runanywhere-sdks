@@ -145,11 +145,11 @@ class ExecuTorchService: LLMService {
         return ModelInfo(
             id: "executorch-model",
             name: "ExecuTorch Model",
-            size: getModelSize(),
             format: .pte,
+            size: getModelSize(),
+            framework: .execuTorch,
             quantization: "INT8",
-            contextLength: 2048,
-            framework: .execuTorch
+            contextLength: 2048
         )
     }
     

@@ -157,11 +157,11 @@ class SwiftTransformersService: LLMService {
         return ModelInfo(
             id: "swift-transformers-model",
             name: "Swift Transformers Model",
-            size: getModelSize(),
             format: .coreML,
+            size: getModelSize(),
+            framework: .swiftTransformers,
             quantization: "FP16",
-            contextLength: 2048,
-            framework: .swiftTransformers
+            contextLength: 2048
         )
     }
     

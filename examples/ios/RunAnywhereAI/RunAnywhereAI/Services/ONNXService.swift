@@ -96,41 +96,41 @@ class ONNXService: LLMService {
         ModelInfo(
             id: "phi-3-mini-onnx",
             name: "Phi-3-mini-4k-instruct.onnx",
-            size: "2.4GB",
             format: .onnx,
+            size: "2.4GB",
+            framework: .onnx,
             quantization: "FP16",
             contextLength: 4096,
-            framework: .onnx,
             downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32/phi3-mini-4k-instruct-cpu-int4-rtn-block-32.onnx")!,
+            description: "Microsoft Phi-3 mini model in ONNX format with INT4 quantization",
             minimumMemory: 3_000_000_000,
-            recommendedMemory: 4_000_000_000,
-            description: "Microsoft Phi-3 mini model in ONNX format with INT4 quantization"
+            recommendedMemory: 4_000_000_000
         ),
         ModelInfo(
             id: "llama-2-7b-onnx",
             name: "llama-2-7b-chat.onnx",
-            size: "3.5GB",
             format: .onnx,
+            size: "3.5GB",
+            framework: .onnx,
             quantization: "INT8",
             contextLength: 4096,
-            framework: .onnx,
             downloadURL: URL(string: "https://huggingface.co/microsoft/Llama-2-7b-chat-hf-onnx/resolve/main/Llama-2-7b-chat-hf-int8.onnx")!,
+            description: "Llama 2 7B chat model optimized with ONNX Runtime",
             minimumMemory: 4_000_000_000,
-            recommendedMemory: 6_000_000_000,
-            description: "Llama 2 7B chat model optimized with ONNX Runtime"
+            recommendedMemory: 6_000_000_000
         ),
         ModelInfo(
             id: "gpt2-onnx",
             name: "gpt2.onnx",
-            size: "548MB",
             format: .onnx,
+            size: "548MB",
+            framework: .onnx,
             quantization: "FP32",
             contextLength: 1024,
-            framework: .onnx,
             downloadURL: URL(string: "https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnx")!,
+            description: "GPT-2 model in ONNX format for cross-platform deployment",
             minimumMemory: 1_000_000_000,
-            recommendedMemory: 2_000_000_000,
-            description: "GPT-2 model in ONNX format for cross-platform deployment"
+            recommendedMemory: 2_000_000_000
         )
     ]
     
@@ -301,6 +301,10 @@ class ONNXService: LLMService {
     // MARK: - Private Methods
     
     private func getModelSize() -> String {
+        guard let modelPath = config?.modelPath else {
+            return "Unknown"
+        }
+        
         let url = URL(fileURLWithPath: modelPath)
         
         do {

@@ -82,9 +82,9 @@ struct ModelDownloadView: View {
                     ModelDownloadCard(
                         model: model,
                         isSelected: selectedModel?.id == model.id
-                    )                        {
+                    ) {
                             selectedModel = model
-                        }
+                    }
                 }
                 
                 if selectedModel != nil {
@@ -145,11 +145,11 @@ struct ModelDownloadView: View {
                 let destinationPath = try await modelManager.downloadModel(
                     from: model.url,
                     modelName: model.fileName
-                )                    { progress in
+                ) { progress in
                         Task { @MainActor in
                             downloadProgress = progress
                         }
-                    }
+                }
                 
                 // Create model info
                 let modelInfo = ModelInfo(
