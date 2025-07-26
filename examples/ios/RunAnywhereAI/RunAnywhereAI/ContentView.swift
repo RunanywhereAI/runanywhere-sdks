@@ -29,12 +29,20 @@ struct ContentView: View {
             .tag(1)
             
             NavigationView {
+                BenchmarkView()
+            }
+            .tabItem {
+                Label("Benchmark", systemImage: "speedometer")
+            }
+            .tag(2)
+            
+            NavigationView {
                 SettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(2)
+            .tag(3)
         }
     }
 }

@@ -43,6 +43,19 @@ enum ModelFormat: String, CaseIterable, Codable {
             return "bin"
         }
     }
+    
+    static func from(extension ext: String) -> ModelFormat {
+        switch ext.lowercased() {
+        case "gguf": return .gguf
+        case "onnx": return .onnx
+        case "mlpackage", "mlmodel": return .coreML
+        case "mlx": return .mlx
+        case "mlc": return .mlc
+        case "pte": return .pte
+        case "tflite": return .tflite
+        default: return .other
+        }
+    }
 }
 
 // MARK: - LLM Framework
@@ -62,6 +75,19 @@ enum LLMFramework: String, CaseIterable, Codable {
     var displayName: String {
         return rawValue
     }
+    
+    static func forFormat(_ format: ModelFormat) -> LLMFramework {
+        switch format {
+        case .gguf: return .llamaCpp
+        case .coreML: return .coreML
+        case .mlx: return .mlx
+        case .mlc: return .mlc
+        case .onnx: return .onnx
+        case .pte: return .execuTorch
+        case .tflite: return .tfLite
+        default: return .mock
+        }
+    }
 }
 
 // MARK: - Model Info
@@ -69,12 +95,14 @@ enum LLMFramework: String, CaseIterable, Codable {
 struct ModelInfo: Identifiable, Codable {
     let id: String
     let name: String
-    let path: String
+    var path: String?
     let format: ModelFormat
     let size: String
     let framework: LLMFramework
     let quantization: String?
     let contextLength: Int?
+    var isLocal: Bool = false
+    let downloadURL: URL?
     
     // Legacy support
     let description: String
@@ -83,12 +111,14 @@ struct ModelInfo: Identifiable, Codable {
     
     init(id: String = UUID().uuidString,
          name: String,
-         path: String = "",
+         path: String? = nil,
          format: ModelFormat,
          size: String,
          framework: LLMFramework,
          quantization: String? = nil,
          contextLength: Int? = nil,
+         isLocal: Bool = false,
+         downloadURL: URL? = nil,
          description: String = "",
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
@@ -100,6 +130,8 @@ struct ModelInfo: Identifiable, Codable {
         self.framework = framework
         self.quantization = quantization
         self.contextLength = contextLength
+        self.isLocal = isLocal
+        self.downloadURL = downloadURL
         self.description = description
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory

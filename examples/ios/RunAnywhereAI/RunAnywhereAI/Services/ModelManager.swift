@@ -57,22 +57,29 @@ class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
 
 // MARK: - Model Manager
 
-actor ModelManager {
+@MainActor
+class ModelManager: ObservableObject {
     static let shared = ModelManager()
     
-    private let documentsDirectory: URL
-    private let modelsDirectory: URL
+    @Published var downloadedModels: [ModelInfo] = []
+    @Published var availableModels: [ModelInfo] = []
+    
+    static let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+    static let modelsDirectory = documentsDirectory.appendingPathComponent("Models")
     
     private init() {
-        documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        modelsDirectory = documentsDirectory.appendingPathComponent("Models")
-        
         // Create models directory if it doesn't exist
-        try? FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(at: Self.modelsDirectory, withIntermediateDirectories: true)
+        
+        // Load bundled models
+        Task {
+            await loadBundledModels()
+            await refreshModelList()
+        }
     }
     
     func modelPath(for modelName: String) -> URL {
-        return modelsDirectory.appendingPathComponent(modelName)
+        return Self.modelsDirectory.appendingPathComponent(modelName)
     }
     
     func isModelDownloaded(_ modelName: String) -> Bool {
@@ -143,7 +150,7 @@ actor ModelManager {
     func listDownloadedModels() -> [String] {
         do {
             let contents = try FileManager.default.contentsOfDirectory(
-                at: modelsDirectory,
+                at: Self.modelsDirectory,
                 includingPropertiesForKeys: nil
             )
             return contents.map { $0.lastPathComponent }
@@ -165,12 +172,95 @@ actor ModelManager {
     func getAvailableSpace() -> Int64 {
         do {
             let attributes = try FileManager.default.attributesOfFileSystem(
-                forPath: documentsDirectory.path
+                forPath: Self.documentsDirectory.path
             )
             return attributes[.systemFreeSize] as? Int64 ?? 0
         } catch {
             return 0
         }
+    }
+    
+    // MARK: - Bundled Models Integration
+    
+    func loadBundledModels() async {
+        // Add bundled models to available models
+        availableModels = BundledModelsService.shared.bundledModels
+        
+        // Generate sample models if in debug mode
+        #if DEBUG
+        do {
+            try await BundledModelsService.shared.generateSampleModels()
+        } catch {
+            print("Failed to generate sample models: \(error)")
+        }
+        #endif
+    }
+    
+    func refreshModelList() async {
+        // Get all downloaded models
+        var models: [ModelInfo] = []
+        
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: Self.modelsDirectory,
+                includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
+            )
+            
+            for url in contents {
+                // Skip hidden files
+                if url.lastPathComponent.hasPrefix(".") { continue }
+                
+                // Determine model info from file
+                if let modelInfo = await createModelInfo(from: url) {
+                    models.append(modelInfo)
+                }
+            }
+        } catch {
+            print("Error listing models: \(error)")
+        }
+        
+        downloadedModels = models
+    }
+    
+    private func createModelInfo(from url: URL) async -> ModelInfo? {
+        let fileName = url.lastPathComponent
+        let fileExtension = url.pathExtension
+        
+        // Try to match with bundled models first
+        if let bundled = availableModels.first(where: { $0.id == url.deletingPathExtension().lastPathComponent }) {
+            var model = bundled
+            model.path = url.path
+            model.isLocal = true
+            return model
+        }
+        
+        // Create new model info from file
+        let format = ModelFormat.from(extension: fileExtension)
+        let framework = LLMFramework.forFormat(format)
+        
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = attributes?[.size] as? Int64 ?? 0
+        let sizeString = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+        
+        return ModelInfo(
+            id: UUID().uuidString,
+            name: fileName,
+            size: sizeString,
+            format: format,
+            framework: framework,
+            isLocal: true,
+            path: url.path
+        )
+    }
+    
+    func updateModelPath(modelId: String, path: String) async {
+        if let index = downloadedModels.firstIndex(where: { $0.id == modelId }) {
+            downloadedModels[index].path = path
+        }
+    }
+    
+    func addImportedModel(_ model: ModelInfo) async {
+        downloadedModels.append(model)
     }
     
     // MARK: - Model Verification
