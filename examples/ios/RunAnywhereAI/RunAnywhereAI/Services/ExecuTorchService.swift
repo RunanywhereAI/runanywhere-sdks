@@ -8,13 +8,14 @@ import Foundation
 // Note: ExecuTorch would need to be added as XCFramework
 // import ExecuTorch
 
-class ExecuTorchService: LLMProtocol {
+class ExecuTorchService: LLMService {
     var name: String = "ExecuTorch"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var module: Any? // Would be ETModule in real implementation
     private var modelPath: String = ""
-    private let tokenizer = SimpleTokenizer()
+    // private let tokenizer = SimpleTokenizer() // Commented out - SimpleTokenizer not implemented
     
     func initialize(modelPath: String) async throws {
         // Verify model exists

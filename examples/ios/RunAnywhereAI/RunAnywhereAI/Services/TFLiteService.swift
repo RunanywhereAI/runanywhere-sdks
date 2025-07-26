@@ -8,13 +8,14 @@ import Foundation
 // Note: TensorFlow Lite would need to be added via CocoaPods or SPM
 // import TensorFlowLite
 
-class TFLiteService: LLMProtocol {
+class TFLiteService: LLMService {
     var name: String = "TensorFlow Lite"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var interpreter: Any? // Would be Interpreter in real implementation
     private var modelPath: String = ""
-    private let tokenizer = SimpleTokenizer()
+    // private let tokenizer = SimpleTokenizer() // Commented out - SimpleTokenizer not implemented
     
     func initialize(modelPath: String) async throws {
         // Verify model exists

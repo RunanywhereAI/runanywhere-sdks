@@ -17,7 +17,8 @@ class CoreMLService: LLMService {
         ModelInfo(
             name: "GPT2-CoreML",
             size: "548MB",
-            framework: "Core ML",
+            format: .coreML,
+            framework: .coreML,
             quantization: "Float16",
             description: "GPT-2 model converted to Core ML format",
             minimumMemory: 1_000_000_000,
@@ -26,7 +27,8 @@ class CoreMLService: LLMService {
         ModelInfo(
             name: "DistilBERT-CoreML",
             size: "267MB",
-            framework: "Core ML",
+            format: .coreML,
+            framework: .coreML,
             quantization: "Float16",
             description: "DistilBERT model for text generation",
             minimumMemory: 500_000_000,

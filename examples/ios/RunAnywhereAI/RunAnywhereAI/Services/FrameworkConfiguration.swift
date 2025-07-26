@@ -5,7 +5,7 @@ import SwiftUI
 
 protocol FrameworkConfiguration: Codable {
     var framework: LLMFramework { get }
-    func apply(to service: LLMProtocol)
+    func apply(to service: LLMService)
 }
 
 // MARK: - llama.cpp Configuration
@@ -25,7 +25,7 @@ struct LlamaCppConfiguration: FrameworkConfiguration {
     var vocabOnly: Bool = false
     var embedding: Bool = false
     
-    func apply(to service: LLMProtocol) {
+    func apply(to service: LLMService) {
         // Apply configuration to llama.cpp service
         // In real implementation, this would configure the actual service
     }
@@ -48,7 +48,7 @@ struct CoreMLConfiguration: FrameworkConfiguration {
     var maxConcurrentRequests: Int = 1
     var memoryKeyPath: String = "auto"
     
-    func apply(to service: LLMProtocol) {
+    func apply(to service: LLMService) {
         // Apply configuration to Core ML service
     }
 }
@@ -65,7 +65,7 @@ struct MLXConfiguration: FrameworkConfiguration {
     var groupSize: Int = 64
     var streamBufferSize: Int = 1024
     
-    func apply(to service: LLMProtocol) {
+    func apply(to service: LLMService) {
         // Apply configuration to MLX service
     }
 }
@@ -95,7 +95,7 @@ struct ONNXConfiguration: FrameworkConfiguration {
     var enableMemoryPattern: Bool = true
     var enableProfiling: Bool = false
     
-    func apply(to service: LLMProtocol) {
+    func apply(to service: LLMService) {
         // Apply configuration to ONNX Runtime service
     }
 }
@@ -168,7 +168,7 @@ class FrameworkConfigurationManager: ObservableObject {
 struct GenericConfiguration: FrameworkConfiguration {
     let framework: LLMFramework
     
-    func apply(to service: LLMProtocol) {
+    func apply(to service: LLMService) {
         // No specific configuration for generic frameworks
     }
 }

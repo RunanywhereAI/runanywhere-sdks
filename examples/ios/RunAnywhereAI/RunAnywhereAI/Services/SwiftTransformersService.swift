@@ -10,9 +10,10 @@ import CoreML
 // import SwiftTransformers
 
 @available(iOS 15.0, *)
-class SwiftTransformersService: LLMProtocol {
+class SwiftTransformersService: LLMService {
     var name: String = "Swift Transformers"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var model: Any? // Would be LanguageModel in real implementation
     private var tokenizer: Any? // Would be GPT2Tokenizer in real implementation

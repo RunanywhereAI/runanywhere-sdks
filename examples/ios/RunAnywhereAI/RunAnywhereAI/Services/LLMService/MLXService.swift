@@ -16,7 +16,8 @@ class MLXService: LLMService {
         ModelInfo(
             name: "Mistral-7B-MLX-4bit",
             size: "3.8GB",
-            framework: "MLX",
+            format: .mlx,
+            framework: .mlx,
             quantization: "4-bit",
             description: "Mistral 7B optimized for Apple Silicon with MLX",
             minimumMemory: 6_000_000_000,
@@ -25,7 +26,8 @@ class MLXService: LLMService {
         ModelInfo(
             name: "Llama-3.2-3B-MLX-4bit",
             size: "1.7GB",
-            framework: "MLX",
+            format: .mlx,
+            framework: .mlx,
             quantization: "4-bit",
             description: "Llama 3.2 3B model with MLX acceleration",
             minimumMemory: 3_000_000_000,
@@ -34,7 +36,8 @@ class MLXService: LLMService {
         ModelInfo(
             name: "Gemma-2B-MLX",
             size: "1.2GB",
-            framework: "MLX",
+            format: .mlx,
+            framework: .mlx,
             quantization: "4-bit",
             description: "Google's Gemma 2B model for MLX",
             minimumMemory: 2_000_000_000,

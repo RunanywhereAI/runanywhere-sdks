@@ -8,9 +8,10 @@ import Foundation
 // Note: picoLLM would need to be added via CocoaPods or SPM
 // import PicoLLM
 
-class PicoLLMService: LLMProtocol {
+class PicoLLMService: LLMService {
     var name: String = "picoLLM"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var picoLLM: Any? // Would be PicoLLM instance in real implementation
     private let accessKey = "YOUR_PICOLLM_ACCESS_KEY" // Would be configured properly

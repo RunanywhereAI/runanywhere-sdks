@@ -8,14 +8,15 @@ import Foundation
 // Note: ONNX Runtime would need to be added via CocoaPods or SPM
 // import onnxruntime_objc
 
-class ONNXService: LLMProtocol {
+class ONNXService: LLMService {
     var name: String = "ONNX Runtime"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var session: Any? // Would be ORTSession in real implementation
     private var env: Any? // Would be ORTEnv in real implementation
     private var modelPath: String = ""
-    private let tokenizer = SimpleTokenizer()
+    // private let tokenizer = SimpleTokenizer() // TODO: Implement tokenizer
     
     func initialize(modelPath: String) async throws {
         // Verify model exists
@@ -178,7 +179,7 @@ extension ONNXService {
     enum QuantizationType {
         case dynamic
         case qat // Quantization-aware training
-        case static
+        case `static`
     }
     
     func loadQuantizedModel(path: String, quantizationType: QuantizationType) async throws {

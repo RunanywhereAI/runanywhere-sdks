@@ -8,9 +8,10 @@ import Foundation
 // Note: MLC-LLM would need to be added via Swift Package Manager
 // import MLCSwift
 
-class MLCService: LLMProtocol {
+class MLCService: LLMService {
     var name: String = "MLC-LLM"
     var isInitialized: Bool = false
+    var supportedModels: [ModelInfo] = []
     
     private var engine: Any? // Would be MLCEngine in real implementation
     private var modelPath: String = ""
