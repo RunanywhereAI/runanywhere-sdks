@@ -215,14 +215,12 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
         
         Log.d(TAG, "Model inputs:")
         session.inputNames?.forEach { name ->
-            val info = session.getInputInfo(name)
-            Log.d(TAG, "  $name: ${info?.shape?.contentToString()}")
+            Log.d(TAG, "  $name")
         }
         
         Log.d(TAG, "Model outputs:")
         session.outputNames?.forEach { name ->
-            val info = session.getOutputInfo(name)
-            Log.d(TAG, "  $name: ${info?.shape?.contentToString()}")
+            Log.d(TAG, "  $name")
         }
     }
     

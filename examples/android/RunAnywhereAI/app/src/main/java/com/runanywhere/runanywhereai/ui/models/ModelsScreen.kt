@@ -188,7 +188,7 @@ fun ModelCard(
                             label = { Text(formatBytes(model.sizeBytes)) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Default.Folder,
+                                    Icons.Default.AccountBox,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -226,7 +226,7 @@ fun ModelCard(
                         onClick = onDownload,
                         enabled = downloadProgress == null
                     ) {
-                        Icon(Icons.Default.GetApp, contentDescription = "Download")
+                        Icon(Icons.Default.Add, contentDescription = "Download")
                     }
                 }
             }

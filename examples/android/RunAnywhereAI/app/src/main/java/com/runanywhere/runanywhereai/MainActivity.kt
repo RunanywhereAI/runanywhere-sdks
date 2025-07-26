@@ -61,7 +61,7 @@ fun RunAnywhereApp() {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Folder, contentDescription = "Models") },
+                    icon = { Icon(Icons.Default.List, contentDescription = "Models") },
                     label = { Text("Models") },
                     selected = currentRoute == "models",
                     onClick = {
