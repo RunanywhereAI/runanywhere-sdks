@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -70,7 +71,7 @@ dependencies {
     implementation("com.google.mediapipe:tasks-genai:0.10.14")
     
     // ONNX Runtime
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.1")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
     
     // OkHttp for model downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -85,4 +86,8 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+detekt {
+    config.setFrom("$rootDir/detekt-config.yml")
 }
