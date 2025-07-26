@@ -10,8 +10,11 @@ import SwiftUI
 
 @MainActor
 class ModelListViewModel: ObservableObject {
+    static let shared = ModelListViewModel()
+    
     @Published var availableServices: [LLMService] = []
     @Published var currentService: LLMService?
+    @Published var downloadedModels: [ModelInfo] = []
     @Published var isLoading = false
     @Published var showError = false
     @Published var errorMessage = ""
@@ -20,6 +23,7 @@ class ModelListViewModel: ObservableObject {
     
     init() {
         loadServices()
+        loadDownloadedModels()
     }
     
     func loadServices() {
@@ -45,7 +49,7 @@ class ModelListViewModel: ObservableObject {
             // In a real implementation, this would download/load the model
             // For now, we'll simulate initialization
             if let service = currentService {
-                try await service.initialize(modelPath: model.name)
+                try await service.initialize(modelPath: model.path)
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -53,5 +57,64 @@ class ModelListViewModel: ObservableObject {
         }
         
         isLoading = false
+    }
+    
+    func loadDownloadedModels() {
+        Task {
+            let modelManager = ModelManager.shared
+            let modelFiles = await modelManager.listDownloadedModels()
+            
+            // Convert file names to ModelInfo
+            downloadedModels = modelFiles.compactMap { fileName in
+                let path = await modelManager.modelPath(for: fileName)
+                let size = await modelManager.getModelSize(fileName) ?? 0
+                
+                return ModelInfo(
+                    id: fileName,
+                    name: fileName.replacingOccurrences(of: ".gguf", with: "")
+                              .replacingOccurrences(of: ".mlpackage", with: "")
+                              .replacingOccurrences(of: ".onnx", with: ""),
+                    path: path.path,
+                    format: detectFormat(from: fileName),
+                    size: ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
+                    framework: frameworkForFormat(detectFormat(from: fileName))
+                )
+            }
+        }
+    }
+    
+    func addDownloadedModel(_ model: ModelInfo) {
+        downloadedModels.append(model)
+    }
+    
+    func addImportedModel(_ model: ModelInfo) {
+        downloadedModels.append(model)
+    }
+    
+    private func detectFormat(from fileName: String) -> ModelFormat {
+        if fileName.hasSuffix(".gguf") {
+            return .gguf
+        } else if fileName.hasSuffix(".mlpackage") || fileName.hasSuffix(".mlmodel") {
+            return .coreML
+        } else if fileName.hasSuffix(".onnx") {
+            return .onnx
+        } else {
+            return .other
+        }
+    }
+    
+    private func frameworkForFormat(_ format: ModelFormat) -> LLMFramework {
+        switch format {
+        case .gguf:
+            return .llamaCpp
+        case .coreML:
+            return .coreML
+        case .onnx:
+            return .onnx
+        case .mlx:
+            return .mlx
+        default:
+            return .mock
+        }
     }
 }

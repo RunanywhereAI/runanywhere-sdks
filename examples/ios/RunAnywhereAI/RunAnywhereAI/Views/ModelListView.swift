@@ -10,6 +10,8 @@ import SwiftUI
 struct ModelListView: View {
     @StateObject private var viewModel = ModelListViewModel()
     @State private var selectedService: String?
+    @State private var showingImportView = false
+    @State private var showingDownloadView = false
     
     var body: some View {
         List {
@@ -39,6 +41,25 @@ struct ModelListView: View {
         }
         .navigationTitle("Models")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button(action: {
+                        showingImportView = true
+                    }) {
+                        Label("Import Model", systemImage: "doc.badge.plus")
+                    }
+                    
+                    Button(action: {
+                        showingDownloadView = true
+                    }) {
+                        Label("Download Model", systemImage: "arrow.down.circle")
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
         .refreshable {
             await viewModel.refreshServices()
         }
@@ -46,6 +67,12 @@ struct ModelListView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(viewModel.errorMessage)
+        }
+        .sheet(isPresented: $showingImportView) {
+            ModelImportView()
+        }
+        .sheet(isPresented: $showingDownloadView) {
+            ModelDownloadView()
         }
         .onAppear {
             if selectedService == nil {
