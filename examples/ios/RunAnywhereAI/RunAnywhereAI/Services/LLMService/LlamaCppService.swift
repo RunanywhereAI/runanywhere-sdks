@@ -14,8 +14,8 @@ class LlamaCppService: LLMService {
     var supportedModels: [ModelInfo] = [
         ModelInfo(
             name: "TinyLlama-1.1B-Q4_K_M.gguf",
-            size: "637MB",
             format: .gguf,
+            size: "637MB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             description: "TinyLlama 1.1B parameter model, 4-bit quantized",
@@ -24,8 +24,8 @@ class LlamaCppService: LLMService {
         ),
         ModelInfo(
             name: "Phi-3-mini-Q4_K_M.gguf",
-            size: "1.5GB",
             format: .gguf,
+            size: "1.5GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             description: "Microsoft Phi-3 mini model, optimized for mobile",
@@ -34,8 +34,8 @@ class LlamaCppService: LLMService {
         ),
         ModelInfo(
             name: "Qwen2.5-0.5B-Q5_K_M.gguf",
-            size: "394MB",
             format: .gguf,
+            size: "394MB",
             framework: .llamaCpp,
             quantization: "Q5_K_M",
             description: "Qwen 2.5 0.5B model, great for quick responses",

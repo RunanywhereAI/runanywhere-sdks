@@ -14,8 +14,8 @@ protocol Tokenizer {
 // MARK: - Base Tokenizer Implementation
 
 class BaseTokenizer: Tokenizer {
-    private var vocabulary: [String: Int] = [:]
-    private var reverseVocabulary: [Int: String] = [:]
+    var vocabulary: [String: Int] = [:]
+    var reverseVocabulary: [Int: String] = [:]
     
     var vocabularySize: Int { vocabulary.count }
     var eosToken: Int { vocabulary["</s>"] ?? 0 }
@@ -116,7 +116,7 @@ class BPETokenizer: BaseTokenizer {
     }
     
     private func loadVocabulary(from path: String) throws {
-        let data = try String(contentsOfFile: path)
+        let data = try String(contentsOfFile: path, encoding: .utf8)
         let lines = data.components(separatedBy: .newlines)
         
         for (index, line) in lines.enumerated() {
@@ -128,7 +128,7 @@ class BPETokenizer: BaseTokenizer {
     }
     
     private func loadMerges(from path: String) throws {
-        let data = try String(contentsOfFile: path)
+        let data = try String(contentsOfFile: path, encoding: .utf8)
         let lines = data.components(separatedBy: .newlines)
         
         for line in lines.dropFirst() { // Skip header
@@ -265,7 +265,7 @@ class WordPieceTokenizer: BaseTokenizer {
     }
     
     private func loadVocabulary(from path: String) throws {
-        let data = try String(contentsOfFile: path)
+        let data = try String(contentsOfFile: path, encoding: .utf8)
         let lines = data.components(separatedBy: .newlines)
         
         for (index, token) in lines.enumerated() {
@@ -404,7 +404,7 @@ class TokenizerFactory {
                                         mergesPath: modelPath + "/merges.txt")) ?? BaseTokenizer()
             }
             
-        case .onnxRuntime, .tensorFlowLite:
+        case .onnx, .tfLite:
             // Often use WordPiece
             if FileManager.default.fileExists(atPath: modelPath + "/vocab.txt") {
                 return (try? WordPieceTokenizer(vocabPath: modelPath + "/vocab.txt")) ?? BaseTokenizer()

@@ -138,7 +138,7 @@ protocol ErrorRecoverable {
 
 // MARK: - Error Handling Extensions
 
-extension LLMProtocol {
+extension LLMService {
     func handleError(_ error: Error) -> LLMError {
         if let llmError = error as? LLMError {
             return llmError

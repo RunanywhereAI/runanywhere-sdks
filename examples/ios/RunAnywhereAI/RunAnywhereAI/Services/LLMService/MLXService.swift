@@ -15,8 +15,8 @@ class MLXService: LLMService {
     var supportedModels: [ModelInfo] = [
         ModelInfo(
             name: "Mistral-7B-MLX-4bit",
-            size: "3.8GB",
             format: .mlx,
+            size: "3.8GB",
             framework: .mlx,
             quantization: "4-bit",
             description: "Mistral 7B optimized for Apple Silicon with MLX",
@@ -25,8 +25,8 @@ class MLXService: LLMService {
         ),
         ModelInfo(
             name: "Llama-3.2-3B-MLX-4bit",
-            size: "1.7GB",
             format: .mlx,
+            size: "1.7GB",
             framework: .mlx,
             quantization: "4-bit",
             description: "Llama 3.2 3B model with MLX acceleration",
@@ -35,8 +35,8 @@ class MLXService: LLMService {
         ),
         ModelInfo(
             name: "Gemma-2B-MLX",
-            size: "1.2GB",
             format: .mlx,
+            size: "1.2GB",
             framework: .mlx,
             quantization: "4-bit",
             description: "Google's Gemma 2B model for MLX",

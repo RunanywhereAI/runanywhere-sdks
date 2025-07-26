@@ -252,15 +252,3 @@ extension ModelInfo {
 
 // MARK: - Model Format Extensions
 
-extension ModelFormat {
-    var fileExtension: String {
-        switch self {
-        case .gguf: return "gguf"
-        case .onnx: return "onnx"
-        case .coreML: return "mlpackage"
-        case .mlx: return "mlx"
-        case .tfLite: return "tflite"
-        case .other: return "bin"
-        }
-    }
-}

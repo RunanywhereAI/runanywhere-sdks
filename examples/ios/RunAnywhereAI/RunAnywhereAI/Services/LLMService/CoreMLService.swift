@@ -16,8 +16,8 @@ class CoreMLService: LLMService {
     var supportedModels: [ModelInfo] = [
         ModelInfo(
             name: "GPT2-CoreML",
-            size: "548MB",
             format: .coreML,
+            size: "548MB",
             framework: .coreML,
             quantization: "Float16",
             description: "GPT-2 model converted to Core ML format",
@@ -26,8 +26,8 @@ class CoreMLService: LLMService {
         ),
         ModelInfo(
             name: "DistilBERT-CoreML",
-            size: "267MB",
             format: .coreML,
+            size: "267MB",
             framework: .coreML,
             quantization: "Float16",
             description: "DistilBERT model for text generation",

@@ -10,7 +10,7 @@ import SwiftUI
 
 @MainActor
 class UnifiedLLMService: ObservableObject {
-    @MainActor static let shared = UnifiedLLMService()
+    static let shared = UnifiedLLMService()
     
     @Published var currentService: LLMService?
     @Published var availableServices: [LLMService] = []

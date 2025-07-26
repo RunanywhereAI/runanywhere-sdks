@@ -14,8 +14,9 @@ class MockLLMService: LLMService {
     var supportedModels: [ModelInfo] = [
         ModelInfo(
             name: "Mock Model",
+            format: .other,
             size: "10MB",
-            framework: "Mock",
+            framework: .mock,
             quantization: nil,
             description: "A mock model for testing",
             minimumMemory: 100_000_000,

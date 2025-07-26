@@ -422,6 +422,6 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 // MARK: - URL Extension
 
-extension URL: Identifiable {
+extension URL: @retroactive Identifiable {
     public var id: String { absoluteString }
 }

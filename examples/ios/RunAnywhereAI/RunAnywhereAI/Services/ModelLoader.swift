@@ -422,30 +422,3 @@ class ModelLoader: ObservableObject {
     }
 }
 
-// MARK: - Model Loading View Model Extension
-
-extension ModelListViewModel {
-    @MainActor
-    func loadModel(_ model: ModelInfo) async {
-        isLoading = true
-        loadingModel = model
-        
-        do {
-            let success = try await ModelLoader.shared.loadModel(
-                at: model.path,
-                format: model.format,
-                framework: model.framework
-            )
-            
-            if success {
-                selectedModel = model
-                errorMessage = nil
-            }
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        
-        isLoading = false
-        loadingModel = nil
-    }
-}

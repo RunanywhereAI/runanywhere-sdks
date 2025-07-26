@@ -75,7 +75,7 @@ struct ModelCompatibilityChecker {
     
     // MARK: - Format Compatibility
     
-    private static func checkFormatCompatibility(_ format: ModelFormat, framework: LLLFramework) -> (isCompatible: Bool, message: String) {
+    private static func checkFormatCompatibility(_ format: ModelFormat, framework: LLMFramework) -> (isCompatible: Bool, message: String) {
         let compatibleFormats: [LLMFramework: [ModelFormat]] = [
             .llamaCpp: [.gguf],
             .coreML: [.coreML],
