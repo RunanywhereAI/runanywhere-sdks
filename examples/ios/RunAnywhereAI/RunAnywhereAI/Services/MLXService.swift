@@ -17,7 +17,7 @@ class MLXService: LLMProtocol, MemoryAware {
     
     private var modelPath: String = ""
     // private var model: LLMModel?
-    // private var tokenizer: Tokenizer?
+    private var tokenizer: Tokenizer?
     private var kvCache: KVCache = KVCache()
     private let memoryQueue = DispatchQueue(label: "com.runanywhere.mlx.memory")
     private var currentMemoryUsage: Int64 = 0
@@ -63,6 +63,9 @@ class MLXService: LLMProtocol, MemoryAware {
         //     currentMemoryUsage = estimateMemoryUsage()
         // }
         
+        // Initialize tokenizer
+        tokenizer = TokenizerFactory.createForFramework(.mlx, modelPath: modelPath)
+        
         // Simulate initialization
         try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
         
@@ -93,7 +96,10 @@ class MLXService: LLMProtocol, MemoryAware {
         
         // In real implementation:
         // 1. Tokenize prompt
-        // let tokens = tokenizer.encode(prompt)
+        guard let tokenizer = tokenizer else {
+            throw LLMError.notInitialized
+        }
+        let tokens = tokenizer.encode(prompt)
         // var inputTokens = MLXArray(tokens)
         // 
         // 2. Initialize KV cache for efficiency
@@ -163,7 +169,7 @@ class MLXService: LLMProtocol, MemoryAware {
             // In real implementation:
             // model?.freeWeights()
             // model = nil
-            // tokenizer = nil
+            tokenizer = nil
             // 
             // // Force GPU memory cleanup
             // MLX.GPU.synchronize()

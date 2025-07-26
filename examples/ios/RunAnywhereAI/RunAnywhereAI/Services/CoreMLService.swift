@@ -14,7 +14,7 @@ class CoreMLService: LLMProtocol {
     
     private var model: MLModel?
     private var modelPath: String = ""
-    private var tokenizer: SimpleTokenizer?
+    private var tokenizer: Tokenizer?
     private let memoryQueue = DispatchQueue(label: "com.runanywhere.coreml.memory")
     private var currentMemoryUsage: Int64 = 0
     private var modelConfiguration: MLModelConfiguration?
@@ -57,7 +57,7 @@ class CoreMLService: LLMProtocol {
             }.value
             
             // Initialize tokenizer
-            tokenizer = SimpleTokenizer()
+            tokenizer = TokenizerFactory.createForFramework(.coreML, modelPath: modelPath)
             
             // Track memory usage
             currentMemoryUsage = estimateMemoryUsage()
@@ -91,7 +91,7 @@ class CoreMLService: LLMProtocol {
         }
         
         // Tokenize input
-        let inputTokens = tokenizer.encode(prompt)
+        let inputTokens = tokenizer.encode(prompt).map { Int32($0) }
         
         // Prepare input for Core ML model
         // Note: Actual implementation depends on model's input format
@@ -121,11 +121,11 @@ class CoreMLService: LLMProtocol {
             generatedTokens.append(nextToken)
             
             // Decode token to text
-            let text = tokenizer.decode([nextToken])
+            let text = tokenizer.decode([Int(nextToken)])
             onToken(text)
             
             // Check for end token
-            if nextToken == tokenizer.endToken {
+            if nextToken == Int32(tokenizer.eosToken) {
                 break
             }
             
@@ -403,60 +403,3 @@ private class CoreMLInput: NSObject, MLFeatureProvider {
     }
 }
 
-// MARK: - Simple Tokenizer
-
-private class SimpleTokenizer {
-    private var vocabulary: [String: Int32] = [:]
-    private var reverseVocabulary: [Int32: String] = [:]
-    let endToken: Int32 = 2
-    
-    init() {
-        // Build a simple vocabulary
-        // In real implementation, this would load from tokenizer config
-        buildVocabulary()
-    }
-    
-    func encode(_ text: String) -> [Int32] {
-        // Simple word-based tokenization
-        let words = text.lowercased().split(separator: " ")
-        return words.compactMap { vocabulary[String($0)] ?? vocabulary["<unk>"] }
-    }
-    
-    func decode(_ tokens: [Int32]) -> String {
-        return tokens.compactMap { reverseVocabulary[$0] }.joined(separator: " ")
-    }
-    
-    private func buildVocabulary() {
-        // Special tokens
-        let specialTokens = ["<pad>", "<unk>", "<eos>", "<bos>"]
-        for (index, token) in specialTokens.enumerated() {
-            vocabulary[token] = Int32(index)
-            reverseVocabulary[Int32(index)] = token
-        }
-        
-        // Common words (simplified)
-        let commonWords = [
-            "i", "you", "the", "a", "is", "are", "am", "to", "of", "and",
-            "in", "that", "have", "it", "for", "not", "on", "with", "he",
-            "as", "do", "at", "this", "but", "his", "by", "from", "they",
-            "we", "say", "her", "she", "or", "an", "will", "my", "one",
-            "all", "would", "there", "their", "what", "so", "up", "out",
-            "if", "about", "who", "get", "which", "go", "me", "when",
-            "make", "can", "like", "time", "no", "just", "him", "know",
-            "take", "people", "into", "year", "your", "good", "some",
-            "could", "them", "see", "other", "than", "then", "now", "look",
-            "only", "come", "its", "over", "think", "also", "back", "after",
-            "use", "two", "how", "our", "work", "first", "well", "way",
-            "even", "new", "want", "because", "any", "these", "give", "day",
-            "most", "us", "hello", "world", "ai", "model", "running", "core",
-            "ml", "apple", "silicon", "neural", "engine", "inference"
-        ]
-        
-        var nextId = Int32(specialTokens.count)
-        for word in commonWords {
-            vocabulary[word] = nextId
-            reverseVocabulary[nextId] = word
-            nextId += 1
-        }
-    }
-}

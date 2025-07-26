@@ -35,6 +35,7 @@ class LlamaCppService: LLMProtocol {
     private var modelPath: String = ""
     private let memoryQueue = DispatchQueue(label: "com.runanywhere.llamacpp.memory")
     private var currentMemoryUsage: Int64 = 0
+    private var tokenizer: Tokenizer?
     
     init() {
         self.modelPath = ""
@@ -86,6 +87,9 @@ class LlamaCppService: LLMProtocol {
         //     currentMemoryUsage = estimateMemoryUsage()
         // }
         
+        // Initialize tokenizer
+        tokenizer = TokenizerFactory.createForFramework(.llamaCpp, modelPath: modelPath)
+        
         // Simulate loading delay
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
         
@@ -114,8 +118,11 @@ class LlamaCppService: LLMProtocol {
             throw LLMError.notInitialized
         }
         
-        // Tokenize prompt (simplified for now)
-        let tokens = tokenize(prompt)
+        // Tokenize prompt using proper tokenizer
+        guard let tokenizer = tokenizer else {
+            throw LLMError.notInitialized
+        }
+        let tokens = tokenizer.encode(prompt)
         
         // In real implementation, this would:
         // 1. Create llama_batch
@@ -176,6 +183,7 @@ class LlamaCppService: LLMProtocol {
             
             currentMemoryUsage = 0
             isInitialized = false
+            tokenizer = nil
         }
     }
     
@@ -186,15 +194,24 @@ class LlamaCppService: LLMProtocol {
     // MARK: - Private Methods
     
     private func tokenize(_ text: String) -> [llama_token] {
-        // Simplified tokenization
-        // Real implementation would use llama_tokenize
+        // Use proper tokenizer if available
+        if let tokenizer = tokenizer {
+            return tokenizer.encode(text).map { llama_token($0) }
+        }
+        
+        // Fallback to simple tokenization
         return text.split(separator: " ").enumerated().map { index, _ in
             llama_token(index + 1)
         }
     }
     
     private func detokenize(_ tokens: [llama_token]) -> String {
-        // Real implementation would use llama_token_to_piece
+        // Use proper tokenizer if available
+        if let tokenizer = tokenizer {
+            return tokenizer.decode(tokens.map { Int($0) })
+        }
+        
+        // Fallback
         return tokens.map { "token_\($0)" }.joined(separator: " ")
     }
     
