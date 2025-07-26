@@ -201,7 +201,7 @@ class ExecuTorchService: LLMService {
 extension ExecuTorchService {
     // Model export utilities
     static func exportModelGuide() -> String {
-        return """
+        """
         To export a PyTorch model for ExecuTorch:
         
         1. Install ExecuTorch:
@@ -237,6 +237,6 @@ extension ExecuTorchService {
     
     func getProfilingResults() -> [String: Any]? {
         // In real implementation would return profiling data
-        return nil
+        nil
     }
 }

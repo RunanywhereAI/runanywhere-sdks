@@ -184,13 +184,13 @@ class BundledModelsService {
                 ]
             ],
             "rootModelIdentifier": "model.mlmodel"
-        ] as [String : Any]
+        ] as [String: Any]
         
         let manifestData = try JSONSerialization.data(withJSONObject: manifest)
         try manifestData.write(to: url.appendingPathComponent("Manifest.json"))
         
         // Create a simple model file (mock)
-        let modelData = Data((0..<1024*1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
+        let modelData = Data((0..<1024 * 1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
         try modelData.write(to: url.appendingPathComponent("model.mlmodel"))
     }
     
@@ -207,13 +207,13 @@ class BundledModelsService {
             "intermediate_size": 512,
             "vocab_size": 1000,
             "max_position_embeddings": modelInfo.contextLength ?? 512
-        ] as [String : Any]
+        ] as [String: Any]
         
         let configData = try JSONSerialization.data(withJSONObject: config, options: .prettyPrinted)
         try configData.write(to: url.appendingPathComponent("config.json"))
         
         // Create weights.npz (mock)
-        let weightsData = Data((0..<1024*1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
+        let weightsData = Data((0..<1024 * 1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
         try weightsData.write(to: url.appendingPathComponent("weights.npz"))
         
         // Create tokenizer.json (mock)
@@ -223,7 +223,7 @@ class BundledModelsService {
             "unk_token": "<unk>",
             "bos_token": "<s>",
             "eos_token": "</s>"
-        ] as [String : Any]
+        ] as [String: Any]
         
         let tokenizerData = try JSONSerialization.data(withJSONObject: tokenizer, options: .prettyPrinted)
         try tokenizerData.write(to: url.appendingPathComponent("tokenizer.json"))
@@ -256,4 +256,3 @@ extension ModelInfo {
 }
 
 // MARK: - Model Format Extensions
-

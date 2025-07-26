@@ -228,7 +228,7 @@ class SentencePieceTokenizer: BaseTokenizer {
     
     private func preprocessText(_ text: String) -> String {
         // Replace spaces with special character
-        return text.replacingOccurrences(of: " ", with: "▁")
+        text.replacingOccurrences(of: " ", with: "▁")
     }
     
     private func encodeAsPieces(_ text: String) -> [String] {
@@ -331,7 +331,7 @@ class WordPieceTokenizer: BaseTokenizer {
         
         while start < word.count {
             var end = word.count
-            var curSubstr: String? = nil
+            var curSubstr: String?
             
             while start < end {
                 let startIdx = word.index(word.startIndex, offsetBy: start)
@@ -400,7 +400,7 @@ class TokenizerFactory {
         case .coreML, .mlx:
             // These might bundle their own tokenizers
             if FileManager.default.fileExists(atPath: modelPath + "/tokenizer.json") {
-                return (try? BPETokenizer(vocabPath: modelPath + "/vocab.json", 
+                return (try? BPETokenizer(vocabPath: modelPath + "/vocab.json",
                                         mergesPath: modelPath + "/merges.txt")) ?? BaseTokenizer()
             }
             

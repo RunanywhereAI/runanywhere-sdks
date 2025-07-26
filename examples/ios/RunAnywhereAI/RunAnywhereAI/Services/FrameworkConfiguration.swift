@@ -260,7 +260,7 @@ struct CoreMLConfigView: View {
         
         Section("Performance") {
             Toggle("Enable Low Precision", isOn: $config.enableLowPrecision)
-            Stepper("Max Concurrent Requests: \(config.maxConcurrentRequests)", 
+            Stepper("Max Concurrent Requests: \(config.maxConcurrentRequests)",
                    value: $config.maxConcurrentRequests, in: 1...4)
         }
         
@@ -285,9 +285,9 @@ struct MLXConfigView: View {
     
     var body: some View {
         Section("Batch Processing") {
-            Stepper("Max Batch Size: \(config.maxBatchSize)", 
+            Stepper("Max Batch Size: \(config.maxBatchSize)",
                    value: $config.maxBatchSize, in: 32...1024, step: 32)
-            Stepper("Stream Buffer Size: \(config.streamBufferSize)", 
+            Stepper("Stream Buffer Size: \(config.streamBufferSize)",
                    value: $config.streamBufferSize, in: 256...4096, step: 256)
         }
         
@@ -297,9 +297,9 @@ struct MLXConfigView: View {
         }
         
         Section("Quantization") {
-            Stepper("Quantization Bits: \(config.quantizationBits)", 
+            Stepper("Quantization Bits: \(config.quantizationBits)",
                    value: $config.quantizationBits, in: 2...8)
-            Stepper("Group Size: \(config.groupSize)", 
+            Stepper("Group Size: \(config.groupSize)",
                    value: $config.groupSize, in: 32...256, step: 32)
         }
         .onChange(of: config) { newConfig in
@@ -336,9 +336,9 @@ struct ONNXConfigView: View {
         }
         
         Section("Threading") {
-            Stepper("Inter-Op Threads: \(config.interOpNumThreads == 0 ? "Auto" : "\(config.interOpNumThreads)")", 
+            Stepper("Inter-Op Threads: \(config.interOpNumThreads == 0 ? "Auto" : "\(config.interOpNumThreads)")",
                    value: $config.interOpNumThreads, in: 0...16)
-            Stepper("Intra-Op Threads: \(config.intraOpNumThreads == 0 ? "Auto" : "\(config.intraOpNumThreads)")", 
+            Stepper("Intra-Op Threads: \(config.intraOpNumThreads == 0 ? "Auto" : "\(config.intraOpNumThreads)")",
                    value: $config.intraOpNumThreads, in: 0...16)
         }
         

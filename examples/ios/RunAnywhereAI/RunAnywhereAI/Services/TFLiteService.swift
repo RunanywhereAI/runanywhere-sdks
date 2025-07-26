@@ -162,7 +162,7 @@ class TFLiteService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModelInfo
+        currentModelInfo
     }
     
     func cleanup() {
@@ -241,7 +241,7 @@ extension TFLiteService {
 
 extension TFLiteService {
     static func conversionGuide() -> String {
-        return """
+        """
         To convert a model to TensorFlow Lite:
         
         1. From TensorFlow/Keras:

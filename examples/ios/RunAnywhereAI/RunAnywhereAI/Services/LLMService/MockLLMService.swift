@@ -65,7 +65,7 @@ class MockLLMService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModel
+        currentModel
     }
     
     func cleanup() {

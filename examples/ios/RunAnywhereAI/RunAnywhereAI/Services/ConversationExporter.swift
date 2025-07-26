@@ -32,7 +32,6 @@ enum ExportFormat: String, CaseIterable {
 // MARK: - Conversation Exporter
 
 struct ConversationExporter {
-    
     static func exportConversation(_ conversation: Conversation, format: ExportFormat) -> Data? {
         switch format {
         case .markdown:
@@ -130,7 +129,7 @@ struct ConversationExporter {
             "exportDate": ISO8601DateFormatter().string(from: Date()),
             "version": "1.0",
             "conversations": conversations
-        ] as [String : Any]
+        ] as [String: Any]
         
         do {
             return try JSONSerialization.data(withJSONObject: exportData, options: .prettyPrinted)

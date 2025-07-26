@@ -150,7 +150,6 @@ class ConversationStore: ObservableObject {
             
             // Set current conversation to the most recent
             currentConversation = conversations.first
-            
         } catch {
             print("Error loading conversations: \(error)")
         }

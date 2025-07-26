@@ -238,7 +238,7 @@ class MLCService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModelInfo
+        currentModelInfo
     }
     
     func cleanup() {

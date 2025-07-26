@@ -34,7 +34,7 @@ private class LlamaCppTokenizer {
     
     func decode(_ tokens: [Int32]) -> String {
         // Real implementation would call llama_token_to_piece for each token
-        return tokens.dropFirst().map { "token_\($0)" }.joined(separator: " ")
+        tokens.dropFirst().map { "token_\($0)" }.joined(separator: " ")
     }
 }
 
@@ -58,7 +58,7 @@ class LlamaCppService: LLMService {
         ),
         ModelInfo(
             id: "phi3-mini-q4",
-            name: "Phi-3-mini-Q4_K_M.gguf", 
+            name: "Phi-3-mini-Q4_K_M.gguf",
             size: "1.5GB",
             format: .gguf,
             quantization: "Q4_K_M",
@@ -72,7 +72,7 @@ class LlamaCppService: LLMService {
         ModelInfo(
             id: "qwen2.5-0.5b-q5",
             name: "Qwen2.5-0.5B-Q5_K_M.gguf",
-            size: "394MB", 
+            size: "394MB",
             format: .gguf,
             quantization: "Q5_K_M",
             contextLength: 32768,
@@ -229,7 +229,7 @@ class LlamaCppService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModelInfo
+        currentModelInfo
     }
     
     func cleanup() {

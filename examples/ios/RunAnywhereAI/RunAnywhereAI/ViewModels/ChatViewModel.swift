@@ -71,7 +71,9 @@ class ChatViewModel: ObservableObject {
                 }
                 
                 let metrics = self.performanceMonitor.endMeasurement()
-                print("Generation completed - \(metrics.tokenCount) tokens at \(String(format: "%.1f", metrics.tokensPerSecond)) tokens/sec")
+                let metricsMessage = "Generation completed - \(metrics.tokenCount) tokens at " +
+                    "\(String(format: "%.1f", metrics.tokensPerSecond)) tokens/sec"
+                print(metricsMessage)
             } catch {
                 await MainActor.run {
                     self.error = error

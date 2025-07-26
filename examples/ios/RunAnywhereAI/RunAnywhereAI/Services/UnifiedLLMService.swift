@@ -32,7 +32,7 @@ class UnifiedLLMService: ObservableObject {
             ONNXService(),
             ExecuTorchService(),
             TFLiteService(),
-            PicoLLMService(),
+            PicoLLMService()
         ]
         
         // Add iOS 15+ services
@@ -93,8 +93,8 @@ class UnifiedLLMService: ObservableObject {
     }
     
     func loadModel(_ model: ModelInfo, framework: LLMFramework) async throws {
-        guard let service = availableServices.first(where: { 
-            $0.name == framework.displayName 
+        guard let service = availableServices.first(where: {
+            $0.name == framework.displayName
         }) else {
             throw LLMError.serviceNotAvailable(framework.displayName)
         }

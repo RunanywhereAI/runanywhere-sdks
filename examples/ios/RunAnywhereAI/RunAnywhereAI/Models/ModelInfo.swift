@@ -20,7 +20,7 @@ enum ModelFormat: String, CaseIterable, Codable {
     case other = "Other"
     
     var displayName: String {
-        return rawValue
+        rawValue
     }
     
     var fileExtension: String {
@@ -73,7 +73,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     case swiftTransformers = "Swift Transformers"
     
     var displayName: String {
-        return rawValue
+        rawValue
     }
     
     static func forFormat(_ format: ModelFormat) -> LLMFramework {
@@ -138,7 +138,7 @@ struct ModelInfo: Identifiable, Codable {
     }
     
     var displaySize: String {
-        return size
+        size
     }
     
     var isCompatible: Bool {

@@ -102,7 +102,9 @@ class CoreMLService: LLMService {
             quantization: "Float16",
             contextLength: 1024,
             framework: .coreML,
-            downloadURL: URL(string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip")!,
+            downloadURL: URL(
+                string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip"
+            )!,
             minimumMemory: 1_000_000_000,
             recommendedMemory: 2_000_000_000,
             description: "GPT-2 model converted to Core ML format with Neural Engine acceleration"
@@ -115,7 +117,9 @@ class CoreMLService: LLMService {
             quantization: "Float16",
             contextLength: 1024,
             framework: .coreML,
-            downloadURL: URL(string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip")!,
+            downloadURL: URL(
+                string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip"
+            )!,
             minimumMemory: 500_000_000,
             recommendedMemory: 1_000_000_000,
             description: "Smaller DistilGPT2 model optimized for mobile devices"
@@ -128,7 +132,9 @@ class CoreMLService: LLMService {
             quantization: "Float16",
             contextLength: 2048,
             framework: .coreML,
-            downloadURL: URL(string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip")!,
+            downloadURL: URL(
+                string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip"
+            )!,
             minimumMemory: 400_000_000,
             recommendedMemory: 800_000_000,
             description: "Apple's OpenELM 270M model optimized for on-device inference"
@@ -314,4 +320,5 @@ class CoreMLService: LLMService {
         cleanup()
     }
 }
+
 }

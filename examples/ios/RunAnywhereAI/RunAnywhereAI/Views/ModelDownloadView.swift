@@ -81,11 +81,10 @@ struct ModelDownloadView: View {
                 ForEach(availableModels) { model in
                     ModelDownloadCard(
                         model: model,
-                        isSelected: selectedModel?.id == model.id,
-                        onSelect: {
+                        isSelected: selectedModel?.id == model.id
+                    )                        {
                             selectedModel = model
                         }
-                    )
                 }
                 
                 if selectedModel != nil {
@@ -145,13 +144,12 @@ struct ModelDownloadView: View {
                 let modelManager = ModelManager.shared
                 let destinationPath = try await modelManager.downloadModel(
                     from: model.url,
-                    modelName: model.fileName,
-                    progress: { progress in
+                    modelName: model.fileName
+                )                    { progress in
                         Task { @MainActor in
                             downloadProgress = progress
                         }
                     }
-                )
                 
                 // Create model info
                 let modelInfo = ModelInfo(
@@ -170,7 +168,6 @@ struct ModelDownloadView: View {
                 await MainActor.run {
                     dismiss()
                 }
-                
             } catch {
                 await MainActor.run {
                     downloadError = error
@@ -245,7 +242,7 @@ struct DownloadableModel: Identifiable {
     let url: URL
     
     var fileName: String {
-        return url.lastPathComponent
+        url.lastPathComponent
     }
 }
 

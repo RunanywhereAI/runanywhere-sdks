@@ -194,7 +194,6 @@ struct ModelImportView: View {
                 await MainActor.run {
                     dismiss()
                 }
-                
             } catch {
                 await MainActor.run {
                     importError = error

@@ -409,7 +409,7 @@ class ModelLoader: ObservableObject {
     
     @available(iOS 17.0, *)
     private func compileMLModel(at url: URL) async throws -> URL {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             MLModel.compileModel(at: url) { result in
                 switch result {
                 case .success(let compiledURL):
@@ -421,4 +421,3 @@ class ModelLoader: ObservableObject {
         }
     }
 }
-

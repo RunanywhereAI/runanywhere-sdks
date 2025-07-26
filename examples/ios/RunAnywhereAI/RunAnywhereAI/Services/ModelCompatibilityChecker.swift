@@ -6,7 +6,6 @@ import UIKit
 // MARK: - Model Compatibility Checker
 
 struct ModelCompatibilityChecker {
-    
     // MARK: - Compatibility Result
     
     struct CompatibilityResult {

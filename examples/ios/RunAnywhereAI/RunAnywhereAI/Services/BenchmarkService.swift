@@ -22,7 +22,7 @@ struct BenchmarkResult: Identifiable {
     let cpuUsagePercent: Double
     let success: Bool
     let error: String?
-    let timestamp: Date = Date()
+    let timestamp = Date()
 }
 
 struct FrameworkBenchmark: Identifiable {
@@ -138,7 +138,6 @@ class BenchmarkService: ObservableObject {
                     
                     // Cleanup after each model
                     unifiedService.cleanup()
-                    
                 } catch {
                     // Record failure for all prompts
                     for prompt in prompts {
@@ -201,7 +200,7 @@ class BenchmarkService: ObservableObject {
             try await unifiedService.streamGenerate(
                 prompt: prompt.text,
                 options: options
-            ) { token in
+            ) { _ in
                 if !firstTokenReceived {
                     timeToFirstToken = Date().timeIntervalSince(startTime)
                     firstTokenReceived = true
@@ -232,7 +231,6 @@ class BenchmarkService: ObservableObject {
                 success: true,
                 error: nil
             )
-            
         } catch {
             return BenchmarkResult(
                 framework: framework,

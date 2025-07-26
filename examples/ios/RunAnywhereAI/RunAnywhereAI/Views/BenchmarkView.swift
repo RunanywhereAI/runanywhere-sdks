@@ -236,7 +236,7 @@ struct BenchmarkView: View {
                 }
                 
                 // New Benchmark Button
-                Button(action: { 
+                Button(action: {
                     benchmarkService.benchmarkResults = []
                     selectedModels = []
                 }) {

@@ -186,7 +186,7 @@ extension PicoLLMService {
         //     completion: picoLLM.completionTokenCount
         // )
         
-        return TokenUsage(prompt: 0, completion: 0)
+        TokenUsage(prompt: 0, completion: 0)
     }
 }
 
@@ -200,7 +200,7 @@ struct PicoLLMDialog {
     }
     
     func getContext() -> String {
-        return history.map { "\($0.role): \($0.content)" }.joined(separator: "\n")
+        history.map { "\($0.role): \($0.content)" }.joined(separator: "\n")
     }
 }
 
@@ -209,7 +209,7 @@ struct TokenUsage {
     let completion: Int
     
     var total: Int {
-        return prompt + completion
+        prompt + completion
     }
 }
 
@@ -217,7 +217,7 @@ struct TokenUsage {
 
 extension PicoLLMService {
     static func configurationGuide() -> String {
-        return """
+        """
         picoLLM Configuration:
         
         1. Get an access key from Picovoice Console

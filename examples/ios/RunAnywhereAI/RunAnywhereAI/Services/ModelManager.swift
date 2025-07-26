@@ -79,7 +79,7 @@ class ModelManager: ObservableObject {
     }
     
     func modelPath(for modelName: String) -> URL {
-        return Self.modelsDirectory.appendingPathComponent(modelName)
+        Self.modelsDirectory.appendingPathComponent(modelName)
     }
     
     func isModelDownloaded(_ modelName: String) -> Bool {

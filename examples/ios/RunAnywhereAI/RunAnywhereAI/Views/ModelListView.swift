@@ -19,22 +19,21 @@ struct ModelListView: View {
                 ForEach(viewModel.availableServices, id: \.name) { service in
                     ServiceRow(
                         service: service,
-                        isSelected: selectedService == service.name,
-                        onSelect: {
+                        isSelected: selectedService == service.name
+                    )                        {
                             selectService(service)
                         }
-                    )
                 }
             }
             
             if let currentService = viewModel.currentService {
                 Section("Available Models") {
                     ForEach(currentService.supportedModels) { model in
-                        ModelRow(model: model, onSelect: {
+                        ModelRow(model: model) {
                             Task {
                                 await viewModel.loadModel(model)
                             }
-                        })
+                        }
                     }
                 }
             }

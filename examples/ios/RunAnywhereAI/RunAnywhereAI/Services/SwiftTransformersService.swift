@@ -272,7 +272,7 @@ extension SwiftTransformersService {
 @available(iOS 15.0, *)
 extension SwiftTransformersService {
     static func conversionGuide() -> String {
-        return """
+        """
         Converting Models for Swift Transformers:
         
         1. From Hugging Face:

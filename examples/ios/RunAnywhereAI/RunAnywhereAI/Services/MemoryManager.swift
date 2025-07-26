@@ -174,7 +174,7 @@ class MemoryManager: ObservableObject {
     }
     
     func getMemoryStats() -> MemoryStats {
-        return MemoryStats(
+        MemoryStats(
             total: totalMemory,
             used: usedMemory,
             available: availableMemory,
@@ -183,7 +183,7 @@ class MemoryManager: ObservableObject {
     }
     
     func formatBytes(_ bytes: Int64) -> String {
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
+        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
     }
 }
 
@@ -196,11 +196,11 @@ struct MemoryStats {
     let pressure: MemoryManager.MemoryPressureLevel
     
     var usedPercentage: Double {
-        return Double(used) / Double(total) * 100
+        Double(used) / Double(total) * 100
     }
     
     var availablePercentage: Double {
-        return Double(available) / Double(total) * 100
+        Double(available) / Double(total) * 100
     }
 }
 

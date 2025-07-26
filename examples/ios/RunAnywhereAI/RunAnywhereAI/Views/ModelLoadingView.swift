@@ -223,9 +223,8 @@ struct ModelLoadingView_Previews: PreviewProvider {
                 size: "637 MB",
                 framework: .llamaCpp,
                 quantization: "Q4_K_M"
-            ),
-            onSuccess: {}
-        )
+            )
+        )            {}
         .previewLayout(.sizeThatFits)
         .background(Color.gray.opacity(0.3))
     }

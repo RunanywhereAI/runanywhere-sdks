@@ -82,8 +82,8 @@ private class ONNXTokenizer {
     }
     
     func decode(_ tokens: [Int64]) -> String {
-        return tokens.compactMap { tokenId in
-            return inverseVocab[Int(tokenId)]
+        tokens.compactMap { tokenId in
+            inverseVocab[Int(tokenId)]
         }.joined(separator: " ")
     }
 }
@@ -278,7 +278,7 @@ class ONNXService: LLMService {
     }
     
     func getModelInfo() -> ModelInfo? {
-        return currentModelInfo
+        currentModelInfo
     }
     
     func cleanup() {
