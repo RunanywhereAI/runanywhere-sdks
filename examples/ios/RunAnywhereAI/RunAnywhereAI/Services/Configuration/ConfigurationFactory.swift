@@ -11,7 +11,7 @@ import Foundation
 enum ConfigurationFactory {
     
     /// Create configuration for a specific framework
-    static func configuration(for framework: LLMFramework) -> FrameworkConfiguration {
+    static func configuration(for framework: LLMFramework) -> LLMFrameworkConfiguration {
         switch framework {
         case .foundationModels:
             return FoundationModelsConfiguration.default
@@ -39,7 +39,7 @@ enum ConfigurationFactory {
     }
     
     /// Convert configuration to dictionary for service configuration
-    static func toDictionary(_ configuration: FrameworkConfiguration) -> [String: Any] {
+    static func toDictionary(_ configuration: LLMFrameworkConfiguration) -> [String: Any] {
         var dict: [String: Any] = [
             "enableLogging": configuration.enableLogging,
             "logLevel": configuration.logLevel.rawValue,
@@ -135,7 +135,7 @@ enum ConfigurationFactory {
 }
 
 /// Mock configuration for testing
-struct MockConfiguration: FrameworkConfiguration {
+struct MockConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool

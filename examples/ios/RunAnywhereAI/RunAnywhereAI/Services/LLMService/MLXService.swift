@@ -96,11 +96,48 @@ private class MLXTokenizer {
 }
 
 @available(iOS 17.0, *)
-class MLXService: LLMService {
-    var name: String = "MLX"
-    var isInitialized: Bool = false
+class MLXService: BaseLLMService {
     
-    var supportedModels: [ModelInfo] = [
+    // MARK: - MLX Specific Capabilities
+    
+    override var supportsStreaming: Bool { true }
+    override var supportsQuantization: Bool { true }
+    override var supportsBatching: Bool { true }
+    override var supportsMultiModal: Bool { false }
+    override var quantizationFormats: [QuantizationFormat] { [.int4, .int8, .fp16] }
+    override var maxContextLength: Int { 131072 } // Depends on model
+    override var supportsCustomOperators: Bool { true }
+    override var hardwareAcceleration: [HardwareAcceleration] { [.gpu, .cpu, .metal, .mps] }
+    override var supportedFormats: [ModelFormat] { [.mlx, .safetensors] }
+    
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "MLX",
+            version: "0.6.0",
+            developer: "Apple Inc.",
+            description: "Apple's array framework for machine learning on Apple Silicon with unified memory",
+            website: URL(string: "https://ml-explore.github.io/mlx/"),
+            documentation: URL(string: "https://ml-explore.github.io/mlx/build/html/index.html"),
+            minimumOSVersion: "17.0",
+            requiredCapabilities: ["apple-silicon"],
+            optimizedFor: [.appleNeuralEngine, .metalPerformanceShaders, .memoryEfficient, .highThroughput],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .batching,
+                .customOperators,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "MLX" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "mistral-7b-mlx-4bit",
             name: "Mistral-7B-Instruct-v0.2-4bit",
@@ -140,13 +177,16 @@ class MLXService: LLMService {
             minimumMemory: 2_000_000_000,
             recommendedMemory: 3_000_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var currentModelInfo: ModelInfo?
     private var mlxModel: MLXModelWrapper?
     private var tokenizer: MLXTokenizer?
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Check if device supports MLX (A17 Pro/M3 or newer)
         guard isMLXSupported() else {
             throw LLMError.frameworkNotSupported
@@ -191,7 +231,7 @@ class MLXService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let model = mlxModel, let tokenizer = tokenizer else {
             throw LLMError.notInitialized
         }
@@ -204,7 +244,7 @@ class MLXService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -286,11 +326,11 @@ class MLXService: LLMService {
         return word
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // In real MLX implementation:
         // model?.cleanup()
         // MLX.clearCache()

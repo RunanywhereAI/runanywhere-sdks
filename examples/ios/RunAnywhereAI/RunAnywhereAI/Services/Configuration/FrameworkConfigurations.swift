@@ -9,7 +9,7 @@ import Foundation
 
 // MARK: - Base Configuration Protocol
 
-protocol FrameworkConfiguration {
+protocol LLMFrameworkConfiguration {
     var enableLogging: Bool { get }
     var logLevel: LogLevel { get }
     var performanceTracking: Bool { get }
@@ -18,7 +18,7 @@ protocol FrameworkConfiguration {
 
 // MARK: - Apple Foundation Models Configuration
 
-struct FoundationModelsConfiguration: FrameworkConfiguration {
+struct FoundationModelsConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -48,7 +48,7 @@ struct FoundationModelsConfiguration: FrameworkConfiguration {
 
 // MARK: - Core ML Configuration
 
-struct CoreMLConfiguration: FrameworkConfiguration {
+struct CoreMLConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -83,7 +83,7 @@ struct CoreMLConfiguration: FrameworkConfiguration {
 
 // MARK: - MLX Configuration
 
-struct MLXConfiguration: FrameworkConfiguration {
+struct MLXConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -117,7 +117,7 @@ struct MLXConfiguration: FrameworkConfiguration {
 
 // MARK: - MLC-LLM Configuration
 
-struct MLCConfiguration: FrameworkConfiguration {
+struct MLCConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -152,7 +152,7 @@ struct MLCConfiguration: FrameworkConfiguration {
 
 // MARK: - ONNX Runtime Configuration
 
-struct ONNXConfiguration: FrameworkConfiguration {
+struct ONNXConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -188,7 +188,7 @@ struct ONNXConfiguration: FrameworkConfiguration {
 
 // MARK: - ExecuTorch Configuration
 
-struct ExecuTorchConfiguration: FrameworkConfiguration {
+struct ExecuTorchConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -221,7 +221,7 @@ struct ExecuTorchConfiguration: FrameworkConfiguration {
 
 // MARK: - llama.cpp Configuration
 
-struct LlamaCppConfiguration: FrameworkConfiguration {
+struct LlamaCppConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -253,7 +253,7 @@ struct LlamaCppConfiguration: FrameworkConfiguration {
 
 // MARK: - TensorFlow Lite Configuration
 
-struct TFLiteConfiguration: FrameworkConfiguration {
+struct TFLiteConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -287,7 +287,7 @@ struct TFLiteConfiguration: FrameworkConfiguration {
 
 // MARK: - picoLLM Configuration
 
-struct PicoLLMConfiguration: FrameworkConfiguration {
+struct PicoLLMConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -320,7 +320,7 @@ struct PicoLLMConfiguration: FrameworkConfiguration {
 
 // MARK: - Swift Transformers Configuration
 
-struct SwiftTransformersConfiguration: FrameworkConfiguration {
+struct SwiftTransformersConfiguration: LLMFrameworkConfiguration {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool

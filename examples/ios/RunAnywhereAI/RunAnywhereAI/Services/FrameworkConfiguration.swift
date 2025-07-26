@@ -10,7 +10,7 @@ protocol FrameworkConfiguration: Codable {
 
 // MARK: - llama.cpp Configuration
 
-struct LlamaCppConfiguration: FrameworkConfiguration, Equatable {
+struct LlamaCppLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.llamaCpp
     
     var contextSize: Int32 = 2048
@@ -33,7 +33,7 @@ struct LlamaCppConfiguration: FrameworkConfiguration, Equatable {
 
 // MARK: - Core ML Configuration
 
-struct CoreMLConfiguration: FrameworkConfiguration, Equatable {
+struct CoreMLLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.coreML
     
     enum ComputeUnits: String, CaseIterable, Codable {
@@ -55,7 +55,7 @@ struct CoreMLConfiguration: FrameworkConfiguration, Equatable {
 
 // MARK: - MLX Configuration
 
-struct MLXConfiguration: FrameworkConfiguration, Equatable {
+struct MLXLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.mlx
     
     var maxBatchSize: Int = 256
@@ -72,8 +72,8 @@ struct MLXConfiguration: FrameworkConfiguration, Equatable {
 
 // MARK: - ONNX Runtime Configuration
 
-struct ONNXConfiguration: FrameworkConfiguration, Equatable {
-    let framework = LLMFramework.onnx
+struct ONNXLegacyConfiguration: FrameworkConfiguration, Equatable {
+    let framework = LLMFramework.onnxRuntime
     
     enum ExecutionProvider: String, CaseIterable, Codable {
         case cpu = "CPU"
@@ -123,7 +123,7 @@ class FrameworkConfigurationManager: ObservableObject {
         configurations[.llamaCpp] = LlamaCppConfiguration()
         configurations[.coreML] = CoreMLConfiguration()
         configurations[.mlx] = MLXConfiguration()
-        configurations[.onnx] = ONNXConfiguration()
+        configurations[.onnxRuntime] = ONNXConfiguration()
     }
     
     func configuration(for framework: LLMFramework) -> any FrameworkConfiguration {
@@ -139,7 +139,7 @@ class FrameworkConfigurationManager: ObservableObject {
             return CoreMLConfiguration()
         case .mlx:
             return MLXConfiguration()
-        case .onnx:
+        case .onnxRuntime:
             return ONNXConfiguration()
         case .foundationModels:
             // Return a generic configuration for Foundation Models
@@ -193,7 +193,7 @@ struct FrameworkConfigurationView: View {
                     CoreMLConfigView()
                 case .mlx:
                     MLXConfigView()
-                case .onnx:
+                case .onnxRuntime:
                     ONNXConfigView()
                 default:
                     Text("No configuration options available for \(framework.displayName)")
@@ -353,7 +353,7 @@ struct ONNXConfigView: View {
             configManager.updateConfiguration(newConfig)
         }
         .onAppear {
-            if let loaded = configManager.configuration(for: .onnx) as? ONNXConfiguration {
+            if let loaded = configManager.configuration(for: .onnxRuntime) as? ONNXConfiguration {
                 config = loaded
             }
         }

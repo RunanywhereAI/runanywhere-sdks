@@ -38,11 +38,49 @@ private class LlamaCppTokenizer {
     }
 }
 
-class LlamaCppService: LLMService {
-    var name: String = "llama.cpp"
-    var isInitialized: Bool = false
+class LlamaCppService: BaseLLMService {
     
-    var supportedModels: [ModelInfo] = [
+    // MARK: - llama.cpp Specific Capabilities
+    
+    override var supportsStreaming: Bool { true }
+    override var supportsQuantization: Bool { true }
+    override var supportsBatching: Bool { true }
+    override var supportsMultiModal: Bool { false }
+    override var quantizationFormats: [QuantizationFormat] { 
+        [.qInt8, .qInt4_0, .qInt4_1, .qInt5_0, .qInt5_1, .qInt2, .qInt3, .qInt4K, .qInt5K, .qInt6K] 
+    }
+    override var maxContextLength: Int { 32768 } // Depends on model
+    override var supportsCustomOperators: Bool { false }
+    override var hardwareAcceleration: [HardwareAcceleration] { [.metal, .cpu] }
+    override var supportedFormats: [ModelFormat] { [.gguf, .ggml] }
+    
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "llama.cpp",
+            version: "b3000+",
+            developer: "Georgi Gerganov",
+            description: "High-performance C++ inference engine for LLMs with extensive quantization support",
+            website: URL(string: "https://github.com/ggerganov/llama.cpp"),
+            documentation: URL(string: "https://github.com/ggerganov/llama.cpp/tree/master/examples"),
+            minimumOSVersion: "13.0",
+            requiredCapabilities: [],
+            optimizedFor: [.memoryEfficient, .cpuOptimized, .edgeDevice],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .batching,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "llama.cpp" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "tinyllama-1.1b-q4",
             name: "TinyLlama-1.1B-Q4_K_M.gguf",
@@ -82,14 +120,17 @@ class LlamaCppService: LLMService {
             minimumMemory: 600_000_000,
             recommendedMemory: 1_000_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var currentModelInfo: ModelInfo?
     private var llamaContext: LlamaCppContext?
     private var tokenizer: LlamaCppTokenizer?
     private let maxContextLength = 2048
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model file exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -139,7 +180,7 @@ class LlamaCppService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let _ = llamaContext, let _ = tokenizer else {
             throw LLMError.notInitialized
         }
@@ -152,7 +193,7 @@ class LlamaCppService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -228,11 +269,11 @@ class LlamaCppService: LLMService {
         return word
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // In real implementation, free llama.cpp resources:
         // if let context = llamaContext {
         //     llama_free(context.context)

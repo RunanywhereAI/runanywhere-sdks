@@ -188,6 +188,7 @@ protocol ServiceLifecycleObserver {
 }
 
 /// Service registration builder for fluent API
+@MainActor
 class ServiceRegistrationBuilder<T: LLMService> {
     private let container: DependencyContainer
     private let type: T.Type

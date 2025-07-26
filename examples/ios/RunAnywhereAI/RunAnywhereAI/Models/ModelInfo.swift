@@ -12,11 +12,17 @@ import Foundation
 enum ModelFormat: String, CaseIterable, Codable {
     case gguf = "GGUF"
     case onnx = "ONNX"
+    case onnxRuntime = "ONNX Runtime"
     case coreML = "CoreML"
+    case mlPackage = "mlpackage"
     case mlx = "MLX"
     case mlc = "MLC"
     case pte = "PTE"
     case tflite = "TFLite"
+    case ggml = "GGML"
+    case pytorch = "PyTorch"
+    case safetensors = "SafeTensors"
+    case picoLLM = "picoLLM"
     case other = "Other"
     
     var displayName: String {
@@ -29,7 +35,11 @@ enum ModelFormat: String, CaseIterable, Codable {
             return "gguf"
         case .onnx:
             return "onnx"
+        case .onnxRuntime:
+            return "onnxRuntime"
         case .coreML:
+            return "mlmodel"
+        case .mlPackage:
             return "mlpackage"
         case .mlx:
             return "mlx"
@@ -39,6 +49,14 @@ enum ModelFormat: String, CaseIterable, Codable {
             return "pte"
         case .tflite:
             return "tflite"
+        case .ggml:
+            return "ggml"
+        case .pytorch:
+            return "pt"
+        case .safetensors:
+            return "safetensors"
+        case .picoLLM:
+            return "picollm"
         case .other:
             return "bin"
         }
@@ -48,11 +66,17 @@ enum ModelFormat: String, CaseIterable, Codable {
         switch ext.lowercased() {
         case "gguf": return .gguf
         case "onnx": return .onnx
-        case "mlpackage", "mlmodel": return .coreML
+        case "onnxruntime", "ort": return .onnxRuntime
+        case "mlmodel": return .coreML
+        case "mlpackage": return .mlPackage
         case "mlx": return .mlx
         case "mlc": return .mlc
         case "pte": return .pte
         case "tflite": return .tflite
+        case "ggml": return .ggml
+        case "pt", "pth": return .pytorch
+        case "safetensors": return .safetensors
+        case "picollm": return .picoLLM
         default: return .other
         }
     }
@@ -67,9 +91,9 @@ enum LLMFramework: String, CaseIterable, Codable {
     case coreML = "Core ML"
     case mlx = "MLX"
     case mlc = "MLC-LLM"
-    case onnx = "ONNX Runtime"
+    case onnxRuntime = "ONNX Runtime"
     case execuTorch = "ExecuTorch"
-    case tfLite = "TensorFlow Lite"
+    case tensorFlowLite = "TensorFlow Lite"
     case picoLLM = "picoLLM"
     case swiftTransformers = "Swift Transformers"
     
@@ -79,13 +103,15 @@ enum LLMFramework: String, CaseIterable, Codable {
     
     static func forFormat(_ format: ModelFormat) -> LLMFramework {
         switch format {
-        case .gguf: return .llamaCpp
-        case .coreML: return .coreML
-        case .mlx: return .mlx
+        case .gguf, .ggml: return .llamaCpp
+        case .coreML, .mlPackage: return .coreML
+        case .mlx, .safetensors: return .mlx
         case .mlc: return .mlc
-        case .onnx: return .onnx
+        case .onnx, .onnxRuntime: return .onnxRuntime
         case .pte: return .execuTorch
-        case .tflite: return .tfLite
+        case .tflite: return .tensorFlowLite
+        case .picoLLM: return .picoLLM
+        case .pytorch: return .execuTorch
         default: return .mock
         }
     }

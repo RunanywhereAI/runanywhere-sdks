@@ -10,16 +10,82 @@ import CoreML
 // import SwiftTransformers
 
 @available(iOS 15.0, *)
-class SwiftTransformersService: LLMService {
-    var name: String = "Swift Transformers"
-    var isInitialized: Bool = false
-    var supportedModels: [ModelInfo] = []
+class SwiftTransformersService: BaseLLMService {
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "Swift Transformers",
+            version: "0.5.0",
+            developer: "Community/Hugging Face",
+            description: "Native Swift implementation of transformer models with Core ML backend",
+            website: URL(string: "https://github.com/huggingface/swift-transformers"),
+            documentation: URL(string: "https://huggingface.co/docs/swift-transformers"),
+            minimumOSVersion: "15.0",
+            requiredCapabilities: [],
+            optimizedFor: [.appleNeuralEngine, .metalPerformanceShaders, .lowLatency],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .swiftPackageManager,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "Swift Transformers" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
+                ModelInfo(
+                    id: "distilbert-base-uncased",
+                    name: "distilbert-base-uncased.mlpackage",
+                    format: .coreML,
+                    size: "265MB",
+                    framework: .swiftTransformers,
+                    quantization: "FP16",
+                    contextLength: 512,
+                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-distilbert-base-uncased/resolve/main/DistilBERT.mlpackage.zip")!,
+                    description: "DistilBERT model converted to Core ML for Swift Transformers",
+                    minimumMemory: 500_000_000,
+                    recommendedMemory: 800_000_000
+                ),
+                ModelInfo(
+                    id: "gpt2-swift",
+                    name: "gpt2.mlpackage",
+                    format: .coreML,
+                    size: "548MB",
+                    framework: .swiftTransformers,
+                    quantization: "FP16",
+                    contextLength: 1024,
+                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-gpt2/resolve/main/GPT2.mlpackage.zip")!,
+                    description: "GPT-2 model with native Swift tokenizer support",
+                    minimumMemory: 1_000_000_000,
+                    recommendedMemory: 1_500_000_000
+                ),
+                ModelInfo(
+                    id: "llama2-7b-chat-hf-swift",
+                    name: "llama2-7b-chat.mlpackage",
+                    format: .coreML,
+                    size: "3.5GB",
+                    framework: .swiftTransformers,
+                    quantization: "INT8",
+                    contextLength: 4096,
+                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-llama2-7b-chat/resolve/main/Llama2-7b-chat.mlpackage.zip")!,
+                    description: "Llama 2 7B chat model optimized for Core ML",
+                    minimumMemory: 4_000_000_000,
+                    recommendedMemory: 6_000_000_000
+                )
+            ]
+        }
+        set {}
+    }
     
     private var model: Any? // Would be LanguageModel in real implementation
     private var tokenizer: Any? // Would be GPT2Tokenizer in real implementation
     private var modelPath: String = ""
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -58,7 +124,7 @@ class SwiftTransformersService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized
         }
@@ -94,7 +160,7 @@ class SwiftTransformersService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -151,7 +217,7 @@ class SwiftTransformersService: LLMService {
         }
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         guard isInitialized else { return nil }
         
         return ModelInfo(
@@ -165,7 +231,7 @@ class SwiftTransformersService: LLMService {
         )
     }
     
-    func cleanup() {
+    override func cleanup() {
         model = nil
         tokenizer = nil
         isInitialized = false

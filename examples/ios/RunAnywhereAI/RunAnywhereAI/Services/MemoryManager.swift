@@ -185,6 +185,15 @@ class MemoryManager: ObservableObject {
     func formatBytes(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory)
     }
+    
+    // MARK: - Memory Cleanup
+    
+    func performCleanup() async {
+        // Trigger memory pressure handling
+        await MainActor.run {
+            handleMemoryWarning()
+        }
+    }
 }
 
 // MARK: - Memory Stats

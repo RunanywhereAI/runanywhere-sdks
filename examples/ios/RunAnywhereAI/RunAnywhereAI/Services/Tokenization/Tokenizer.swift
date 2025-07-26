@@ -404,7 +404,7 @@ class TokenizerFactory {
                                         mergesPath: modelPath + "/merges.txt")) ?? BaseTokenizer()
             }
             
-        case .onnx, .tfLite:
+        case .onnxRuntime, .tensorFlowLite:
             // Often use WordPiece
             if FileManager.default.fileExists(atPath: modelPath + "/vocab.txt") {
                 return (try? WordPieceTokenizer(vocabPath: modelPath + "/vocab.txt")) ?? BaseTokenizer()

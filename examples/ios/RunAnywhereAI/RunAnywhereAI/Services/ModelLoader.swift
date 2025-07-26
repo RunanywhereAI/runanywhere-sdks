@@ -59,7 +59,7 @@ class ModelLoader: ObservableObject {
             switch format {
             case .gguf:
                 return try await loadGGUFModel(at: path, framework: framework)
-            case .onnx:
+            case .onnxRuntime:
                 return try await loadONNXModel(at: path, framework: framework)
             case .coreML:
                 return try await loadCoreMLModel(at: path, framework: framework)
@@ -122,14 +122,14 @@ class ModelLoader: ObservableObject {
         loadingStatus = "Loading ONNX model..."
         
         // Verify ONNX format
-        guard path.hasSuffix(".onnx") else {
+        guard path.hasSuffix(".onnxRuntime") else {
             throw LLMError.unsupportedFormat
         }
         
         updateProgress(0.2, status: "Verifying ONNX model...")
         
         // Verify compatibility
-        guard framework == .onnx else {
+        guard framework == .onnxRuntime else {
             throw LLMError.inferenceError("ONNX models require ONNX Runtime framework")
         }
         
@@ -272,7 +272,7 @@ class ModelLoader: ObservableObject {
         updateProgress(0.2, status: "Verifying TFLite model...")
         
         // Verify compatibility
-        guard framework == .tfLite else {
+        guard framework == .tensorFlowLite else {
             throw LLMError.inferenceError("TFLite models require TensorFlow Lite framework")
         }
         
@@ -305,8 +305,8 @@ class ModelLoader: ObservableObject {
             guard path.hasSuffix(".gguf") else {
                 throw LLMError.unsupportedFormat
             }
-        case .onnx:
-            guard path.hasSuffix(".onnx") else {
+        case .onnxRuntime:
+            guard path.hasSuffix(".onnxRuntime") else {
                 throw LLMError.unsupportedFormat
             }
         case .coreML:

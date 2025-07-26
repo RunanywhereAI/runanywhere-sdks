@@ -89,11 +89,48 @@ private class CoreMLTokenizer {
 }
 
 @available(iOS 17.0, *)
-class CoreMLService: LLMService {
-    var name: String = "Core ML"
-    var isInitialized: Bool = false
+class CoreMLService: BaseLLMService {
     
-    var supportedModels: [ModelInfo] = [
+    // MARK: - Core ML Specific Capabilities
+    
+    override var supportsStreaming: Bool { true }
+    override var supportsQuantization: Bool { true }
+    override var supportsBatching: Bool { true }
+    override var supportsMultiModal: Bool { false } // Will be true with Vision models
+    override var quantizationFormats: [QuantizationFormat] { [.fp16, .int8] }
+    override var maxContextLength: Int { 2048 }
+    override var supportsCustomOperators: Bool { true }
+    override var hardwareAcceleration: [HardwareAcceleration] { [.neuralEngine, .gpu, .cpu] }
+    override var supportedFormats: [ModelFormat] { [.coreML, .mlPackage] }
+    
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "Core ML",
+            version: "6.0",
+            developer: "Apple Inc.",
+            description: "Apple's framework for on-device machine learning with Neural Engine optimization",
+            website: URL(string: "https://developer.apple.com/coreml/"),
+            documentation: URL(string: "https://developer.apple.com/documentation/coreml"),
+            minimumOSVersion: "17.0",
+            requiredCapabilities: ["coreml"],
+            optimizedFor: [.appleNeuralEngine, .metalPerformanceShaders, .lowLatency],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .customOperators,
+                .swiftPackageManager,
+                .lowPowerMode,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "Core ML" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "gpt2-coreml",
             name: "GPT2-CoreML.mlpackage",
@@ -139,14 +176,17 @@ class CoreMLService: LLMService {
             minimumMemory: 400_000_000,
             recommendedMemory: 800_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var model: MLModel?
     private var tokenizer: CoreMLTokenizer?
     private var currentModelInfo: ModelInfo?
     private let maxSequenceLength = 512
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model file exists and is valid
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -200,7 +240,7 @@ class CoreMLService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized, let model = model, let tokenizer = tokenizer else {
             throw LLMError.notInitialized
         }
@@ -213,7 +253,7 @@ class CoreMLService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -296,11 +336,11 @@ class CoreMLService: LLMService {
         return inputArray
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // Core ML models are automatically managed by the system
         // Just clear our references
         model = nil

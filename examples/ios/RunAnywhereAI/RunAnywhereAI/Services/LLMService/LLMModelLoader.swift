@@ -28,20 +28,6 @@ struct ModelConfiguration {
     )
 }
 
-/// Supported model formats
-enum ModelFormat: String, CaseIterable {
-    case gguf = "GGUF"
-    case onnx = "ONNX"
-    case coreML = "CoreML"
-    case mlPackage = "mlpackage"
-    case mlx = "MLX"
-    case tflite = "TFLite"
-    case pytorch = "PyTorch"
-    case safetensors = "SafeTensors"
-    case ggml = "GGML"
-    case picoLLM = "picoLLM"
-}
-
 /// Protocol for model loading capabilities
 protocol LLMModelLoader {
     /// Load a model from the specified path

@@ -74,7 +74,7 @@ class ModelListViewModel: ObservableObject {
                     id: fileName,
                     name: fileName.replacingOccurrences(of: ".gguf", with: "")
                               .replacingOccurrences(of: ".mlpackage", with: "")
-                              .replacingOccurrences(of: ".onnx", with: ""),
+                              .replacingOccurrences(of: ".onnxRuntime", with: ""),
                     path: path.path,
                     format: detectFormat(from: fileName),
                     size: ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
@@ -99,8 +99,8 @@ class ModelListViewModel: ObservableObject {
             return .gguf
         } else if fileName.hasSuffix(".mlpackage") || fileName.hasSuffix(".mlmodel") {
             return .coreML
-        } else if fileName.hasSuffix(".onnx") {
-            return .onnx
+        } else if fileName.hasSuffix(".onnxRuntime") {
+            return .onnxRuntime
         } else {
             return .other
         }
@@ -112,8 +112,8 @@ class ModelListViewModel: ObservableObject {
             return .llamaCpp
         case .coreML:
             return .coreML
-        case .onnx:
-            return .onnx
+        case .onnxRuntime:
+            return .onnxRuntime
         case .mlx:
             return .mlx
         default:

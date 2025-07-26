@@ -55,7 +55,7 @@ struct SettingsView: View {
             }
             
             Section("Framework Configuration") {
-                ForEach([LLMFramework.llamaCpp, .coreML, .mlx, .onnx], id: \.self) { framework in
+                ForEach([LLMFramework.llamaCpp, .coreML, .mlx, .onnxRuntime], id: \.self) { framework in
                     Button(action: {
                         selectedFramework = framework
                         showingFrameworkConfig = true

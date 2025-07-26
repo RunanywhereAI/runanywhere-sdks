@@ -172,7 +172,7 @@ extension LLMService {
     }
     
     /// Log memory usage
-    func logMemoryUsage(_ stats: MemoryStats) {
+    func logMemoryUsage(_ stats: LLMMemoryStats) {
         logDebug("Memory usage: \(stats.formattedTotal) (model: \(ByteCountFormatter.string(fromByteCount: stats.modelMemory, countStyle: .memory)), context: \(ByteCountFormatter.string(fromByteCount: stats.contextMemory, countStyle: .memory)))")
         
         if stats.memoryPressure != .normal {

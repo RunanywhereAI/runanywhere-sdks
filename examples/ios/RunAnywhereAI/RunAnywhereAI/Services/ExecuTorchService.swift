@@ -11,16 +11,82 @@ import UIKit
 // Note: ExecuTorch would need to be added as XCFramework
 // import ExecuTorch
 
-class ExecuTorchService: LLMService {
-    var name: String = "ExecuTorch"
-    var isInitialized: Bool = false
-    var supportedModels: [ModelInfo] = []
+class ExecuTorchService: BaseLLMService {
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "ExecuTorch",
+            version: "0.1.0",
+            developer: "Meta (PyTorch Team)",
+            description: "PyTorch's on-device AI stack for mobile and edge devices",
+            website: URL(string: "https://pytorch.org/executorch"),
+            documentation: URL(string: "https://pytorch.org/executorch/stable/index.html"),
+            minimumOSVersion: "13.0",
+            requiredCapabilities: [],
+            optimizedFor: [.edgeDevice, .lowLatency, .memoryEfficient, .cpuOptimized],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "ExecuTorch" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
+                ModelInfo(
+                    id: "llama3-2b-executorch",
+                    name: "llama3-2b-instruct.pte",
+                    format: .pte,
+                    size: "1.2GB",
+                    framework: .execuTorch,
+                    quantization: "INT8",
+                    contextLength: 8192,
+                    downloadURL: URL(string: "https://huggingface.co/pytorch/llama3-2b-executorch/resolve/main/llama3-2b-int8.pte")!,
+                    description: "Llama 3 2B model optimized for ExecuTorch with 4-bit quantization",
+                    minimumMemory: 2_000_000_000,
+                    recommendedMemory: 3_000_000_000
+                ),
+                ModelInfo(
+                    id: "gemma-2b-executorch",
+                    name: "gemma-2b.pte",
+                    format: .pte,
+                    size: "1.4GB",
+                    framework: .execuTorch,
+                    quantization: "INT4",
+                    contextLength: 8192,
+                    downloadURL: URL(string: "https://huggingface.co/google/gemma-2b-executorch/resolve/main/gemma-2b-int4.pte")!,
+                    description: "Google Gemma 2B model exported for ExecuTorch",
+                    minimumMemory: 2_000_000_000,
+                    recommendedMemory: 3_000_000_000
+                ),
+                ModelInfo(
+                    id: "mobilellm-125m-executorch",
+                    name: "mobilellm-125m.pte",
+                    format: .pte,
+                    size: "150MB",
+                    framework: .execuTorch,
+                    quantization: "INT8",
+                    contextLength: 2048,
+                    downloadURL: URL(string: "https://huggingface.co/facebook/mobilellm-125m-executorch/resolve/main/mobilellm-125m-int8.pte")!,
+                    description: "Ultra-lightweight LLM for mobile devices",
+                    minimumMemory: 300_000_000,
+                    recommendedMemory: 500_000_000
+                )
+            ]
+        }
+        set {}
+    }
     
     private var module: Any? // Would be ETModule in real implementation
     private var modelPath: String = ""
     // private let tokenizer = SimpleTokenizer() // Commented out - SimpleTokenizer not implemented
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -49,9 +115,9 @@ class ExecuTorchService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -62,13 +128,13 @@ class ExecuTorchService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:
@@ -139,7 +205,7 @@ class ExecuTorchService: LLMService {
         }
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         guard isInitialized else { return nil }
         
         return ModelInfo(
@@ -153,7 +219,7 @@ class ExecuTorchService: LLMService {
         )
     }
     
-    func cleanup() {
+    override func cleanup() {
         module = nil
         isInitialized = false
     }

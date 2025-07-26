@@ -8,17 +8,40 @@ import Foundation
 // Note: In a real implementation, you would import TensorFlow Lite:
 // import TensorFlowLite
 
-class TFLiteService: LLMService {
-    var name: String = "TensorFlow Lite"
-    var isInitialized: Bool = false
+class TFLiteService: BaseLLMService {
     
-    var supportedModels: [ModelInfo] = [
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "TensorFlow Lite",
+            version: "2.14.0",
+            developer: "Google",
+            description: "Mobile and embedded inference framework, now rebranded as LiteRT",
+            website: URL(string: "https://www.tensorflow.org/lite"),
+            documentation: URL(string: "https://www.tensorflow.org/lite/guide"),
+            minimumOSVersion: "13.0",
+            requiredCapabilities: [],
+            optimizedFor: [.memoryEfficient, .edgeDevice, .lowLatency],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
+    
+    override var name: String { "TensorFlow Lite" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "gemma-2b-tflite",
             name: "gemma-2b-it.tflite",
             format: .tflite,
             size: "1.4GB",
-            framework: .tfLite,
+            framework: .tensorFlowLite,
             quantization: "INT8",
             contextLength: 8192,
             downloadURL: URL(string: "https://huggingface.co/google/gemma-2b-it/resolve/main/gemma-2b-it-int8.tflite")!,
@@ -31,7 +54,7 @@ class TFLiteService: LLMService {
             name: "mobilechat-1b.tflite",
             format: .tflite,
             size: "680MB",
-            framework: .tfLite,
+            framework: .tensorFlowLite,
             quantization: "INT8",
             contextLength: 2048,
             downloadURL: URL(string: "https://huggingface.co/google/mobilechat-1b/resolve/main/mobilechat-1b-int8.tflite")!,
@@ -39,12 +62,15 @@ class TFLiteService: LLMService {
             minimumMemory: 1_000_000_000,
             recommendedMemory: 1_500_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var interpreter: Any? // Would be Interpreter in real implementation
     private var currentModelInfo: ModelInfo?
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -79,7 +105,7 @@ class TFLiteService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized
         }
@@ -92,7 +118,7 @@ class TFLiteService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -161,11 +187,11 @@ class TFLiteService: LLMService {
         }
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // In real TensorFlow Lite implementation:
         // interpreter?.cleanup()
         

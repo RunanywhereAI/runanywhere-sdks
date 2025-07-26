@@ -56,11 +56,33 @@ private enum MLCRole: String {
     case assistant = "assistant"
 }
 
-class MLCService: LLMService {
-    var name: String = "MLC-LLM"
-    var isInitialized: Bool = false
+class MLCService: BaseLLMService {
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "MLC-LLM",
+            version: "0.1.0",
+            developer: "MLC Team",
+            description: "Machine Learning Compilation for Large Language Models - Universal deployment solution",
+            website: URL(string: "https://llm.mlc.ai"),
+            documentation: URL(string: "https://llm.mlc.ai/docs/"),
+            minimumOSVersion: "13.0",
+            requiredCapabilities: [],
+            optimizedFor: [.edgeDevice, .memoryEfficient, .lowLatency, .highThroughput],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .openSource,
+                .offlineCapable
+            ]
+        )
+    }
     
-    var supportedModels: [ModelInfo] = [
+    override var name: String { "MLC-LLM" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "llama-3.2-1b-mlc",
             name: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
@@ -100,13 +122,16 @@ class MLCService: LLMService {
             minimumMemory: 3_000_000_000,
             recommendedMemory: 4_000_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var engine: Any? // Would be MLCEngine in real implementation
     private var config: MLCEngineConfig?
     private var currentModelInfo: ModelInfo?
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model directory exists (MLC models are typically directories)
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
@@ -146,9 +171,9 @@ class MLCService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         var result = ""
@@ -159,13 +184,13 @@ class MLCService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isInitialized, let config = config else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // Real MLC-LLM implementation would be:
@@ -237,11 +262,11 @@ class MLCService: LLMService {
         return word
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // In real MLC-LLM implementation:
         // engine?.cleanup()
         // MLCRuntime.clearCache()
@@ -285,7 +310,7 @@ extension MLCService {
     // Multi-LoRA support
     func loadLoRA(adapterPath: String) async throws {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:
@@ -299,7 +324,7 @@ extension MLCService {
         options: GenerationOptions
     ) async throws -> T {
         guard isInitialized else {
-            throw LLMError.notInitialized
+            throw LLMError.notInitialized()
         }
         
         // In real implementation:

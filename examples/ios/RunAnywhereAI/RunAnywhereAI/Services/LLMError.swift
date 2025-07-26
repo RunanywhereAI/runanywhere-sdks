@@ -7,11 +7,12 @@ import Foundation
 
 enum LLMError: LocalizedError {
     // Initialization errors
-    case notInitialized
+    case notInitialized(service: String? = nil)
     case initializationFailed(String)
     case modelNotFound
     case unsupportedFormat
     case invalidModelPath
+    case modelLoadFailed(reason: String, framework: String)
     
     // Service errors
     case noServiceSelected
@@ -94,6 +95,8 @@ enum LLMError: LocalizedError {
             return "Try using a different framework or convert the model to a supported format."
         case .invalidModelPath:
             return "Check the model path and ensure the app has permission to access it."
+        case .modelLoadFailed:
+            return "Ensure the model file is valid and compatible with the selected framework."
             
         case .noServiceSelected:
             return "Select a framework from the Models tab."

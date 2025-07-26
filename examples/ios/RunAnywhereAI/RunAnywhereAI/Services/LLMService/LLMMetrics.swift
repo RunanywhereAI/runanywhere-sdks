@@ -8,7 +8,7 @@
 import Foundation
 
 /// Performance metrics for LLM operations
-struct PerformanceMetrics {
+struct LLMPerformanceMetrics {
     let averageTokensPerSecond: Double
     let peakTokensPerSecond: Double
     let averageLatency: TimeInterval
@@ -20,6 +20,9 @@ struct PerformanceMetrics {
     let averageContextLength: Int
     let hardwareUtilization: HardwareUtilization
 }
+
+/// Type alias for backward compatibility
+typealias PerformanceMetrics = LLMPerformanceMetrics
 
 /// Hardware utilization metrics
 struct HardwareUtilization {
@@ -39,7 +42,7 @@ enum ThermalState: String {
 }
 
 /// Memory usage statistics
-struct MemoryStats {
+struct LLMMemoryStats {
     let modelMemory: Int64
     let contextMemory: Int64
     let peakMemory: Int64
@@ -64,6 +67,9 @@ enum MemoryPressure: String {
     case critical = "critical"
 }
 
+/// Type alias for backward compatibility
+typealias MemoryStats = LLMMemoryStats
+
 /// Benchmark results for model performance
 struct BenchmarkResults {
     let framework: String
@@ -82,10 +88,10 @@ struct BenchmarkResults {
 /// Protocol for metrics collection
 protocol LLMMetrics {
     /// Get current performance metrics
-    func getPerformanceMetrics() -> PerformanceMetrics
+    func getPerformanceMetrics() -> LLMPerformanceMetrics
     
     /// Get current memory usage
-    func getMemoryUsage() -> MemoryStats
+    func getMemoryUsage() -> LLMMemoryStats
     
     /// Get benchmark results
     func getBenchmarkResults() -> BenchmarkResults

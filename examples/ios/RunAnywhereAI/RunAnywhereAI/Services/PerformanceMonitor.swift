@@ -9,7 +9,7 @@ import Foundation
 import UIKit
 import os.log
 
-struct PerformanceMetrics {
+struct PerformanceTrackingMetrics {
     let totalTime: TimeInterval
     let timeToFirstToken: TimeInterval
     let tokensPerSecond: Double
@@ -45,13 +45,13 @@ class PerformanceMonitor {
         }
     }
     
-    func endMeasurement() -> PerformanceMetrics {
+    func endMeasurement() -> PerformanceTrackingMetrics {
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
         let timeToFirstToken = firstTokenTime > 0 ? firstTokenTime - startTime : 0
         let tokensPerSecond = tokenCount > 0 ? Double(tokenCount) / totalTime : 0
         
-        let metrics = PerformanceMetrics(
+        let metrics = PerformanceTrackingMetrics(
             totalTime: totalTime,
             timeToFirstToken: timeToFirstToken,
             tokensPerSecond: tokensPerSecond,

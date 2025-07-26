@@ -29,7 +29,7 @@ extension LLMError {
     /// Check if error is recoverable
     var isRecoverable: Bool {
         switch self {
-        case .notInitialized, .modelNotFound, .noServiceSelected,
+        case .notInitialized(_), .modelNotFound, .noServiceSelected,
              .downloadFailed, .networkUnavailable:
             return true
         case .initializationFailed, .unsupportedFormat, .frameworkNotSupported,
@@ -43,7 +43,7 @@ extension LLMError {
     /// Get error severity
     var severity: ErrorSeverity {
         switch self {
-        case .notInitialized, .noServiceSelected:
+        case .notInitialized(_), .noServiceSelected:
             return .warning
         case .modelNotFound, .unsupportedFormat, .invalidModelPath:
             return .error
@@ -59,8 +59,8 @@ extension LLMError {
     /// Get error category
     var category: ErrorCategory {
         switch self {
-        case .notInitialized, .initializationFailed, .modelNotFound,
-             .unsupportedFormat, .invalidModelPath:
+        case .notInitialized(_), .initializationFailed, .modelNotFound,
+             .unsupportedFormat, .invalidModelPath, .modelLoadFailed:
             return .initialization
         case .noServiceSelected, .serviceNotAvailable, .frameworkNotSupported:
             return .service

@@ -278,7 +278,7 @@ class ModelManager: ObservableObject {
             try verifyGGUFModel(at: path)
         case .coreML:
             try verifyCoreMLModel(at: path)
-        case .onnx:
+        case .onnxRuntime:
             try verifyONNXModel(at: path)
         case .mlx:
             try verifyMLXModel(at: path)

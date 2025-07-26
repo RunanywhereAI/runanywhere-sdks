@@ -88,51 +88,77 @@ private class ONNXTokenizer {
     }
 }
 
-class ONNXService: LLMService {
-    var name: String = "ONNX Runtime"
-    var isInitialized: Bool = false
+class ONNXService: BaseLLMService {
+    override var frameworkInfo: FrameworkInfo {
+        FrameworkInfo(
+            name: "ONNX Runtime",
+            version: "1.16.0",
+            developer: "Microsoft",
+            description: "Cross-platform, high-performance ML inference and training accelerator",
+            website: URL(string: "https://onnxruntime.ai"),
+            documentation: URL(string: "https://onnxruntime.ai/docs/"),
+            minimumOSVersion: "13.0",
+            requiredCapabilities: [],
+            optimizedFor: [.edgeDevice, .lowLatency, .cpuOptimized, .highThroughput],
+            features: [
+                .onDeviceInference,
+                .customModels,
+                .quantization,
+                .openSource,
+                .offlineCapable,
+                .cloudCapable
+            ]
+        )
+    }
     
-    var supportedModels: [ModelInfo] = [
+    override var name: String { "ONNX Runtime" }
+    
+    override var supportedModels: [ModelInfo] {
+        get {
+            [
         ModelInfo(
             id: "phi-3-mini-onnx",
-            name: "Phi-3-mini-4k-instruct.onnx",
-            format: .onnx,
+            name: "Phi-3-mini-4k-instruct.onnxRuntime",
+            format: .onnxRuntime,
             size: "2.4GB",
-            framework: .onnx,
+            framework: .onnxRuntime,
             quantization: "FP16",
             contextLength: 4096,
-            downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32/phi3-mini-4k-instruct-cpu-int4-rtn-block-32.onnx")!,
+            downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32/phi3-mini-4k-instruct-cpu-int4-rtn-block-32.onnxRuntime")!,
             description: "Microsoft Phi-3 mini model in ONNX format with INT4 quantization",
             minimumMemory: 3_000_000_000,
             recommendedMemory: 4_000_000_000
         ),
         ModelInfo(
             id: "llama-2-7b-onnx",
-            name: "llama-2-7b-chat.onnx",
-            format: .onnx,
+            name: "llama-2-7b-chat.onnxRuntime",
+            format: .onnxRuntime,
             size: "3.5GB",
-            framework: .onnx,
+            framework: .onnxRuntime,
             quantization: "INT8",
             contextLength: 4096,
-            downloadURL: URL(string: "https://huggingface.co/microsoft/Llama-2-7b-chat-hf-onnx/resolve/main/Llama-2-7b-chat-hf-int8.onnx")!,
+            downloadURL: URL(string: "https://huggingface.co/microsoft/Llama-2-7b-chat-hf-onnx/resolve/main/Llama-2-7b-chat-hf-int8.onnxRuntime")!,
             description: "Llama 2 7B chat model optimized with ONNX Runtime",
             minimumMemory: 4_000_000_000,
             recommendedMemory: 6_000_000_000
         ),
         ModelInfo(
             id: "gpt2-onnx",
-            name: "gpt2.onnx",
-            format: .onnx,
+            name: "gpt2.onnxRuntime",
+            format: .onnxRuntime,
             size: "548MB",
-            framework: .onnx,
+            framework: .onnxRuntime,
             quantization: "FP32",
             contextLength: 1024,
-            downloadURL: URL(string: "https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnx")!,
+            downloadURL: URL(string: "https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnxRuntime")!,
             description: "GPT-2 model in ONNX format for cross-platform deployment",
             minimumMemory: 1_000_000_000,
             recommendedMemory: 2_000_000_000
         )
-    ]
+            ]
+        }
+        set {}
+    }
     
     private var session: Any? // Would be ORTSession in real implementation
     private var env: Any? // Would be ORTEnv in real implementation
@@ -140,14 +166,14 @@ class ONNXService: LLMService {
     private var tokenizer: ONNXTokenizer?
     private var currentModelInfo: ModelInfo?
     
-    func initialize(modelPath: String) async throws {
+    override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
         }
         
         // Check if it's an ONNX model
-        guard modelPath.hasSuffix(".onnx") || modelPath.hasSuffix(".ort") else {
+        guard modelPath.hasSuffix(".onnxRuntime") || modelPath.hasSuffix(".ort") else {
             throw LLMError.unsupportedFormat
         }
         
@@ -182,7 +208,7 @@ class ONNXService: LLMService {
         isInitialized = true
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized
         }
@@ -195,7 +221,7 @@ class ONNXService: LLMService {
         return result
     }
     
-    func streamGenerate(
+    override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
@@ -277,11 +303,11 @@ class ONNXService: LLMService {
         return word
     }
     
-    func getModelInfo() -> ModelInfo? {
+    override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
     
-    func cleanup() {
+    override func cleanup() {
         // In real ONNX Runtime implementation:
         // session?.cleanup()
         // env?.cleanup()
@@ -340,7 +366,7 @@ extension ONNXService {
         // case .qat:
         //     try sessionOptions.setExecutionMode(.ortParallel)
         // case .static:
-        //     try sessionOptions.setOptimizedModelFilePath("model_optimized.onnx")
+        //     try sessionOptions.setOptimizedModelFilePath("model_optimized.onnxRuntime")
         // }
         // 
         // session = try ORTSession(env: env!, modelPath: path, sessionOptions: sessionOptions)

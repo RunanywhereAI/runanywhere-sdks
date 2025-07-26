@@ -84,11 +84,11 @@ struct ModelCompatibilityChecker {
             .coreML: [.coreML],
             .mlx: [.mlx],
             .mlc: [.mlc],
-            .onnx: [.onnx],
+            .onnxRuntime: [.onnxRuntime],
             .execuTorch: [.pte],
-            .tfLite: [.tflite],
-            .picoLLM: [.gguf, .onnx],
-            .swiftTransformers: [.coreML, .onnx],
+            .tensorFlowLite: [.tflite],
+            .picoLLM: [.gguf, .onnxRuntime],
+            .swiftTransformers: [.coreML, .onnxRuntime],
             .mock: ModelFormat.allCases
         ]
         
@@ -134,8 +134,8 @@ struct ModelCompatibilityChecker {
             .llamaCpp: ["Q4_0", "Q4_1", "Q4_K_S", "Q4_K_M", "Q5_0", "Q5_1", "Q5_K_S", "Q5_K_M", "Q8_0", "F16", "F32"],
             .coreML: ["FP16", "FP32", "INT8", "INT4"],
             .mlx: ["INT4", "INT8", "FP16"],
-            .onnx: ["INT8", "UINT8", "FP16", "FP32"],
-            .tfLite: ["INT8", "FP16", "FP32"],
+            .onnxRuntime: ["INT8", "UINT8", "FP16", "FP32"],
+            .tensorFlowLite: ["INT8", "FP16", "FP32"],
             .picoLLM: ["INT4", "INT8"],
             .execuTorch: ["INT8", "FP16"],
             .mlc: ["Q4", "Q8", "FP16"],
@@ -161,8 +161,8 @@ struct ModelCompatibilityChecker {
             .llamaCpp: 8192,
             .coreML: 2048,
             .mlx: 4096,
-            .onnx: 2048,
-            .tfLite: 1024,
+            .onnxRuntime: 2048,
+            .tensorFlowLite: 1024,
             .picoLLM: 512,
             .execuTorch: 2048,
             .mlc: 4096,
@@ -213,11 +213,11 @@ struct ModelCompatibilityChecker {
             }
             recommendations.append("MLX works best with INT4 or INT8 quantization on Apple Silicon")
             
-        case .onnx:
+        case .onnxRuntime:
             // ONNX Runtime checks
             recommendations.append("Enable CoreML execution provider for best performance on iOS")
             
-        case .tfLite:
+        case .tensorFlowLite:
             // TensorFlow Lite checks
             let size = parseSizeToBytes(model.size)
             if size > 500_000_000 { // > 500MB
