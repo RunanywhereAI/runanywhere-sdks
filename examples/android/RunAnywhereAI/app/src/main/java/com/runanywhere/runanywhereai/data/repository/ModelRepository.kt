@@ -135,6 +135,41 @@ class ModelRepository(private val context: Context) {
                 downloadUrl = "https://example.com/models/stablelm-2-zephyr-1_6b.Q4_0.gguf",
                 fileName = "stablelm-2-zephyr-1_6b.Q4_0.gguf",
                 quantization = "Q4_0"
+            ),
+            
+            // ExecuTorch models
+            ModelInfo(
+                id = "llama2-7b-executorch",
+                name = "Llama 2 7B (ExecuTorch)",
+                description = "Optimized Llama 2 7B for edge devices with PyTorch Edge",
+                framework = LLMFramework.EXECUTORCH,
+                sizeBytes = 3_800_000_000L,
+                downloadUrl = "https://example.com/models/llama2-7b.pte",
+                fileName = "llama2-7b.pte",
+                quantization = "INT8",
+                sha256Hash = "abc123def456..."
+            ),
+            ModelInfo(
+                id = "phi-3-mini-executorch",
+                name = "Phi-3 Mini (ExecuTorch)",
+                description = "Microsoft's efficient language model for mobile",
+                framework = LLMFramework.EXECUTORCH,
+                sizeBytes = 2_400_000_000L,
+                downloadUrl = "https://example.com/models/phi-3-mini.pte",
+                fileName = "phi-3-mini.pte",
+                quantization = "INT4",
+                sha256Hash = "789012xyz345..."
+            ),
+            ModelInfo(
+                id = "mobilellm-350m-executorch",
+                name = "MobileLLM 350M (ExecuTorch)",
+                description = "Ultra-lightweight model optimized for mobile inference",
+                framework = LLMFramework.EXECUTORCH,
+                sizeBytes = 200_000_000L,
+                downloadUrl = "https://example.com/models/mobilellm-350m.pte",
+                fileName = "mobilellm-350m.pte",
+                quantization = "INT8",
+                sha256Hash = "def789ghi012..."
             )
         ))
         

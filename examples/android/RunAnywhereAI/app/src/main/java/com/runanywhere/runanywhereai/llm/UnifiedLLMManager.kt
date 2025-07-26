@@ -7,6 +7,7 @@ import com.runanywhere.runanywhereai.llm.frameworks.ONNXRuntimeService
 import com.runanywhere.runanywhereai.llm.frameworks.GeminiNanoService
 import com.runanywhere.runanywhereai.llm.frameworks.TFLiteService
 import com.runanywhere.runanywhereai.llm.frameworks.LlamaCppService
+import com.runanywhere.runanywhereai.llm.frameworks.ExecuTorchService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -31,6 +32,7 @@ class UnifiedLLMManager(private val context: Context) {
         services[LLMFramework.ONNX_RUNTIME] = ONNXRuntimeService(context)
         services[LLMFramework.TFLITE] = TFLiteService(context)
         services[LLMFramework.LLAMA_CPP] = LlamaCppService(context)
+        services[LLMFramework.EXECUTORCH] = ExecuTorchService(context)
         
         // Register Gemini Nano if available
         try {
