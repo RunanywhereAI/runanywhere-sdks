@@ -26,3 +26,18 @@ target_link_libraries(llama-jni
 target_include_directories(llama-jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# MLC-LLM JNI library
+# Note: In a real implementation, you would integrate TVM runtime and MLC-LLM
+add_library(mlc-llm-jni SHARED
+    mlc_llm_jni.cpp
+)
+
+target_link_libraries(mlc-llm-jni
+    ${log-lib}
+    android
+)
+
+target_include_directories(mlc-llm-jni PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)

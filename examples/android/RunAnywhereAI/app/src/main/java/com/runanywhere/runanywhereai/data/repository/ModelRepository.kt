@@ -170,6 +170,41 @@ class ModelRepository(private val context: Context) {
                 fileName = "mobilellm-350m.pte",
                 quantization = "INT8",
                 sha256Hash = "def789ghi012..."
+            ),
+            
+            // MLC-LLM models
+            ModelInfo(
+                id = "llama2-7b-mlc",
+                name = "Llama 2 7B (MLC-LLM)",
+                description = "Hardware-accelerated Llama 2 with TVM optimization",
+                framework = LLMFramework.MLC_LLM,
+                sizeBytes = 3_500_000_000L,
+                downloadUrl = "https://example.com/models/llama2-7b-mlc.tar",
+                fileName = "llama2-7b-mlc.tar",
+                quantization = "q4f16_1",
+                sha256Hash = "mlc123abc..."
+            ),
+            ModelInfo(
+                id = "redpajama-3b-mlc",
+                name = "RedPajama 3B (MLC-LLM)",
+                description = "Open-source model optimized for mobile with MLC",
+                framework = LLMFramework.MLC_LLM,
+                sizeBytes = 1_800_000_000L,
+                downloadUrl = "https://example.com/models/redpajama-3b-mlc.tar",
+                fileName = "redpajama-3b-mlc.tar",
+                quantization = "q4f16_1",
+                sha256Hash = "mlc456def..."
+            ),
+            ModelInfo(
+                id = "vicuna-7b-mlc",
+                name = "Vicuna 7B (MLC-LLM)",
+                description = "Fine-tuned LLaMA model with OpenCL acceleration",
+                framework = LLMFramework.MLC_LLM,
+                sizeBytes = 3_600_000_000L,
+                downloadUrl = "https://example.com/models/vicuna-7b-mlc.tar",
+                fileName = "vicuna-7b-mlc.tar",
+                quantization = "q4f16_1",
+                sha256Hash = "mlc789ghi..."
             )
         ))
         
