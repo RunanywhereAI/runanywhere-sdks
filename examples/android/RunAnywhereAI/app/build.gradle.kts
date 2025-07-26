@@ -114,12 +114,14 @@ dependencies {
     // implementation("org.pytorch:executorch-backend-xnnpack:0.3.0")
     // implementation("org.pytorch:executorch-backend-vulkan:0.3.0")
     
-    // Android AI Core
-    implementation("com.google.android.gms:play-services-aicore:1.0.0")
+    // Android AI Core (Note: These dependencies are not yet published)
+    // TODO: Uncomment when AI Core SDK is publicly available
+    // implementation("com.google.android.gms:play-services-aicore:1.0.0")
     implementation("androidx.core:core-ktx:1.12.0")
     
-    // picoLLM
-    implementation("ai.picovoice:picollm-android:1.0.0")
+    // picoLLM (Note: Requires Picovoice account and SDK access)
+    // TODO: Uncomment when picoLLM SDK is available
+    // implementation("ai.picovoice:picollm-android:1.0.0")
     
     // Room database
     val roomVersion = "2.6.1"
@@ -129,6 +131,9 @@ dependencies {
     
     // Hilt for dependency injection
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    
+    // Security
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

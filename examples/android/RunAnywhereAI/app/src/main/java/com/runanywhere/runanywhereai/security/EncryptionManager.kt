@@ -14,6 +14,7 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
+import java.util.Base64
 
 @Singleton
 class EncryptionManager @Inject constructor(
@@ -72,6 +73,36 @@ class EncryptionManager @Inject constructor(
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         ) as EncryptedSharedPreferences
+    }
+    
+    /**
+     * Generic encrypt method for strings
+     */
+    fun encrypt(plaintext: String): String {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
+        
+        val iv = cipher.iv
+        val ciphertext = cipher.doFinal(plaintext.toByteArray())
+        
+        // Combine IV and ciphertext, then encode to Base64
+        val combined = iv + ciphertext
+        return Base64.getEncoder().encodeToString(combined)
+    }
+    
+    /**
+     * Generic decrypt method for strings
+     */
+    fun decrypt(encryptedData: String): String {
+        val combined = Base64.getDecoder().decode(encryptedData)
+        val iv = combined.sliceArray(0 until IV_LENGTH)
+        val ciphertext = combined.sliceArray(IV_LENGTH until combined.size)
+        
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val spec = GCMParameterSpec(TAG_LENGTH, iv)
+        cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), spec)
+        
+        return String(cipher.doFinal(ciphertext))
     }
     
     private fun getOrCreateSecretKey(): SecretKey {

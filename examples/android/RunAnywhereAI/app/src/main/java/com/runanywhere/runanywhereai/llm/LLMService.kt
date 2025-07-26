@@ -93,6 +93,17 @@ enum class ChatRole {
 }
 
 /**
+ * Reason why generation finished
+ */
+enum class FinishReason {
+    COMPLETED,
+    MAX_TOKENS,
+    STOP_SEQUENCE,
+    ERROR,
+    CANCELLED
+}
+
+/**
  * Performance metrics for generation
  */
 data class PerformanceMetrics(
