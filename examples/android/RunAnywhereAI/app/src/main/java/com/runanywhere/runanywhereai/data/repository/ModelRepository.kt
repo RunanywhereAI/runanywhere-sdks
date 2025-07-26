@@ -1,0 +1,209 @@
+package com.runanywhere.runanywhereai.data.repository
+
+import android.content.Context
+import android.util.Log
+import com.runanywhere.runanywhereai.llm.LLMFramework
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
+
+/**
+ * Repository for managing LLM models
+ */
+class ModelRepository(private val context: Context) {
+    companion object {
+        private const val TAG = "ModelRepository"
+        private const val MODELS_DIR = "llm_models"
+    }
+    
+    private val client = OkHttpClient()
+    private val modelsDirectory: File by lazy {
+        File(context.filesDir, MODELS_DIR).apply {
+            if (!exists()) mkdirs()
+        }
+    }
+    
+    /**
+     * Get available models for download
+     */
+    fun getAvailableModels(): List<ModelInfo> {
+        return listOf(
+            ModelInfo(
+                id = "gemma-2b",
+                name = "Gemma 2B",
+                description = "Google's efficient 2B parameter model",
+                framework = LLMFramework.MEDIAPIPE,
+                sizeBytes = 1_200_000_000L,
+                downloadUrl = "https://example.com/models/gemma-2b-it-gpu-int4.bin",
+                fileName = "gemma-2b-it-gpu-int4.bin",
+                quantization = "INT4"
+            ),
+            ModelInfo(
+                id = "phi-2",
+                name = "Phi-2",
+                description = "Microsoft's compact 2.7B model",
+                framework = LLMFramework.MEDIAPIPE,
+                sizeBytes = 1_500_000_000L,
+                downloadUrl = "https://example.com/models/phi-2-gpu-int4.bin",
+                fileName = "phi-2-gpu-int4.bin",
+                quantization = "INT4"
+            ),
+            ModelInfo(
+                id = "tinyllama",
+                name = "TinyLlama 1.1B",
+                description = "Compact Llama model for mobile",
+                framework = LLMFramework.ONNX_RUNTIME,
+                sizeBytes = 600_000_000L,
+                downloadUrl = "https://example.com/models/tinyllama-1.1b.onnx",
+                fileName = "tinyllama-1.1b.onnx",
+                quantization = "FP16"
+            )
+        )
+    }
+    
+    /**
+     * Get downloaded models
+     */
+    suspend fun getDownloadedModels(): List<ModelInfo> = withContext(Dispatchers.IO) {
+        val downloadedModels = mutableListOf<ModelInfo>()
+        
+        modelsDirectory.listFiles()?.forEach { file ->
+            // Match with available models
+            getAvailableModels().find { it.fileName == file.name }?.let { modelInfo ->
+                downloadedModels.add(modelInfo.copy(
+                    isDownloaded = true,
+                    localPath = file.absolutePath
+                ))
+            }
+        }
+        
+        downloadedModels
+    }
+    
+    /**
+     * Download a model with progress tracking
+     */
+    fun downloadModel(modelInfo: ModelInfo): Flow<DownloadProgress> = flow {
+        try {
+            val file = File(modelsDirectory, modelInfo.fileName)
+            
+            // Check if already downloaded
+            if (file.exists() && file.length() == modelInfo.sizeBytes) {
+                emit(DownloadProgress.Completed(file.absolutePath))
+                return@flow
+            }
+            
+            emit(DownloadProgress.Starting)
+            
+            // Build request
+            val request = Request.Builder()
+                .url(modelInfo.downloadUrl)
+                .build()
+            
+            // Execute download
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw Exception("Download failed: ${response.code}")
+                }
+                
+                val body = response.body ?: throw Exception("Empty response body")
+                val contentLength = body.contentLength()
+                
+                // Download with progress
+                body.byteStream().use { input ->
+                    FileOutputStream(file).use { output ->
+                        val buffer = ByteArray(8192)
+                        var totalBytesRead = 0L
+                        var bytesRead: Int
+                        
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            totalBytesRead += bytesRead
+                            
+                            val progress = if (contentLength > 0) {
+                                (totalBytesRead.toFloat() / contentLength)
+                            } else {
+                                0f
+                            }
+                            
+                            emit(DownloadProgress.InProgress(
+                                progress = progress,
+                                bytesDownloaded = totalBytesRead,
+                                totalBytes = contentLength
+                            ))
+                        }
+                    }
+                }
+            }
+            
+            emit(DownloadProgress.Completed(file.absolutePath))
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Download failed", e)
+            emit(DownloadProgress.Failed(e.message ?: "Unknown error"))
+        }
+    }
+    
+    /**
+     * Delete a downloaded model
+     */
+    suspend fun deleteModel(modelInfo: ModelInfo): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val file = File(modelsDirectory, modelInfo.fileName)
+            file.delete()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to delete model", e)
+            false
+        }
+    }
+    
+    /**
+     * Get model file path
+     */
+    fun getModelPath(fileName: String): String {
+        return File(modelsDirectory, fileName).absolutePath
+    }
+    
+    /**
+     * Check if model exists
+     */
+    fun isModelDownloaded(modelInfo: ModelInfo): Boolean {
+        val file = File(modelsDirectory, modelInfo.fileName)
+        return file.exists() && file.length() > 0
+    }
+}
+
+/**
+ * Model information
+ */
+data class ModelInfo(
+    val id: String,
+    val name: String,
+    val description: String,
+    val framework: LLMFramework,
+    val sizeBytes: Long,
+    val downloadUrl: String,
+    val fileName: String,
+    val quantization: String,
+    val isDownloaded: Boolean = false,
+    val localPath: String? = null
+)
+
+/**
+ * Download progress states
+ */
+sealed class DownloadProgress {
+    object Starting : DownloadProgress()
+    data class InProgress(
+        val progress: Float,
+        val bytesDownloaded: Long,
+        val totalBytes: Long
+    ) : DownloadProgress()
+    data class Completed(val filePath: String) : DownloadProgress()
+    data class Failed(val error: String) : DownloadProgress()
+}
