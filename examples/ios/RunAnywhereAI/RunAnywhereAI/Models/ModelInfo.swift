@@ -62,6 +62,7 @@ enum ModelFormat: String, CaseIterable, Codable {
 
 enum LLMFramework: String, CaseIterable, Codable {
     case mock = "Mock"
+    case foundationModels = "Foundation Models"
     case llamaCpp = "llama.cpp"
     case coreML = "Core ML"
     case mlx = "MLX"

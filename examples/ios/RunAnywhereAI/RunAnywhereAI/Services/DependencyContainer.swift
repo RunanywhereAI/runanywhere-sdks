@@ -164,8 +164,7 @@ final class DependencyContainer: ObservableObject {
         }
         
         if #available(iOS 18.0, *) {
-            // TODO: Register Foundation Models service when implemented
-            // register(FoundationModelsService.self) { FoundationModelsService() }
+            register(FoundationModelsService.self) { FoundationModelsService() }
         }
     }
     

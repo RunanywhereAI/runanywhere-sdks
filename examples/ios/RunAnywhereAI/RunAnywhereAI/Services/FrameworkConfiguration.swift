@@ -141,6 +141,9 @@ class FrameworkConfigurationManager: ObservableObject {
             return MLXConfiguration()
         case .onnx:
             return ONNXConfiguration()
+        case .foundationModels:
+            // Return a generic configuration for Foundation Models
+            return GenericConfiguration(framework: framework)
         default:
             // Return a generic configuration for other frameworks
             return GenericConfiguration(framework: framework)
