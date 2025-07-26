@@ -9,7 +9,11 @@
       "Bash(touch:*)",
       "Bash(swift build)",
       "Bash(swift test)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(xcodebuild:*)",
+      "Bash(xcrun simctl list:*)",
+      "Bash(xcrun simctl install:*)",
+      "Bash(xcrun simctl launch:*)"
     ],
     "deny": []
   }

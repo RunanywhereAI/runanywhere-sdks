@@ -23,6 +23,7 @@ class ChatViewModel: ObservableObject {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
     }
     
+    @MainActor
     init(llmService: UnifiedLLMService = .shared) {
         self.llmService = llmService
         addSystemMessage()

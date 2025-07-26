@@ -11,6 +11,7 @@ struct ChatView: View {
     @StateObject private var viewModel: ChatViewModel
     @FocusState private var isInputFocused: Bool
     
+    @MainActor
     init(llmService: UnifiedLLMService = .shared) {
         _viewModel = StateObject(wrappedValue: ChatViewModel(llmService: llmService))
     }
@@ -28,14 +29,15 @@ struct ChatView: View {
                         
                         if viewModel.isGenerating {
                             TypingIndicator()
-                                .id("typing")
                         }
                     }
                     .padding()
                 }
-                .onChange(of: viewModel.messages.count) { _ in
+                .onChange(of: viewModel.messages.count) { _, _ in
                     withAnimation {
-                        proxy.scrollTo(viewModel.messages.last?.id ?? "typing", anchor: .bottom)
+                        if let lastMessage = viewModel.messages.last {
+                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                        }
                     }
                 }
             }
