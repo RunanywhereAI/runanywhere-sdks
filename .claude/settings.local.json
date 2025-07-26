@@ -15,7 +15,9 @@
       "Bash(xcrun simctl install:*)",
       "Bash(xcrun simctl launch:*)",
       "Bash(diff:*)",
-      "Bash(./run.sh)"
+      "Bash(./run.sh)",
+      "Bash(./swiftlint.sh:*)",
+      "Bash(swiftlint:*)"
     ],
     "deny": []
   }
