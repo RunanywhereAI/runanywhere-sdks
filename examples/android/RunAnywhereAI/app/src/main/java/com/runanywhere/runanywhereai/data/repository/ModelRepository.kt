@@ -205,6 +205,43 @@ class ModelRepository(private val context: Context) {
                 fileName = "vicuna-7b-mlc.tar",
                 quantization = "q4f16_1",
                 sha256Hash = "mlc789ghi..."
+            ),
+            
+            // AI Core models (Android 14+)
+            ModelInfo(
+                id = "gemini-nano-aicore",
+                name = "Gemini Nano (AI Core)",
+                description = "Google's latest on-device AI Core model",
+                framework = LLMFramework.AI_CORE,
+                sizeBytes = 0, // System-managed
+                downloadUrl = "", // System-managed
+                fileName = "gemini-nano-aicore",
+                quantization = "INT8",
+                isDownloaded = checkAICoreAvailability()
+            ),
+            
+            // picoLLM models
+            ModelInfo(
+                id = "picollm-phi2",
+                name = "picoLLM Phi-2",
+                description = "Voice-optimized Phi-2 model",
+                framework = LLMFramework.PICOLLM,
+                sizeBytes = 1_600_000_000L,
+                downloadUrl = "https://example.com/models/phi-2-picollm.ppn",
+                fileName = "phi-2-picollm.ppn",
+                quantization = "INT8",
+                sha256Hash = "pico123abc..."
+            ),
+            ModelInfo(
+                id = "picollm-gemma",
+                name = "picoLLM Gemma",
+                description = "Voice-optimized Gemma model for edge devices",
+                framework = LLMFramework.PICOLLM,
+                sizeBytes = 1_300_000_000L,
+                downloadUrl = "https://example.com/models/gemma-2b-picollm.ppn",
+                fileName = "gemma-2b-picollm.ppn",
+                quantization = "INT8",
+                sha256Hash = "pico456def..."
             )
         ))
         
@@ -222,10 +259,19 @@ class ModelRepository(private val context: Context) {
             downloadedModels.add(it)
         }
         
+        // Add AI Core models if available (they're system-managed)
+        getAvailableModels().find { it.framework == LLMFramework.AI_CORE }?.let {
+            downloadedModels.add(it)
+        }
+        
         // Add file-based models
         modelsDirectory.listFiles()?.forEach { file ->
-            // Match with available models
-            getAvailableModels().find { it.fileName == file.name && it.framework != LLMFramework.GEMINI_NANO }?.let { modelInfo ->
+            // Match with available models (exclude system-managed frameworks)
+            getAvailableModels().find { 
+                it.fileName == file.name && 
+                it.framework != LLMFramework.GEMINI_NANO &&
+                it.framework != LLMFramework.AI_CORE
+            }?.let { modelInfo ->
                 downloadedModels.add(modelInfo.copy(
                     isDownloaded = true,
                     localPath = file.absolutePath
@@ -253,6 +299,20 @@ class ModelRepository(private val context: Context) {
             Log.w(TAG, "Failed to check Gemini Nano availability", e)
             false
         }
+    }
+    
+    /**
+     * Check if AI Core is available on this device
+     */
+    private fun checkAICoreAvailability(): Boolean {
+        // Check if device meets minimum requirements (Android 14+)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return false
+        }
+        
+        // Check for AI Core feature
+        return context.packageManager.hasSystemFeature("android.software.ai.core") ||
+               context.packageManager.hasSystemFeature("com.google.android.feature.AI_CORE")
     }
     
     /**
