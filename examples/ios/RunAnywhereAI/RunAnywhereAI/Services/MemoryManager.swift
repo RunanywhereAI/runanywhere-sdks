@@ -20,7 +20,7 @@ class MemoryManager: ObservableObject {
     @Published var usedMemory: Int64 = 0
     @Published var memoryPressure: MemoryPressureLevel = .normal
     
-    private let logger = Logger(subsystem: "com.runanywhere", category: "MemoryManager")
+    private let logger = Logger.shared
     private var memoryWarningObserver: NSObjectProtocol?
     private let updateQueue = DispatchQueue(label: "com.runanywhere.memory.update")
     private var updateTimer: Timer?
@@ -133,7 +133,7 @@ class MemoryManager: ObservableObject {
     // MARK: - Memory Warning Handling
     
     private func handleMemoryWarning() {
-        logger.warning("Received memory warning")
+        logger.log("Received memory warning", level: .warning, category: "MemoryManager")
         
         memoryPressure = .critical
         
@@ -173,8 +173,8 @@ class MemoryManager: ObservableObject {
         return availableMemory > size
     }
     
-    func getMemoryStats() -> MemoryStats {
-        MemoryStats(
+    func getMemoryStats() -> LocalMemoryStats {
+        LocalMemoryStats(
             total: totalMemory,
             used: usedMemory,
             available: availableMemory,
@@ -198,7 +198,7 @@ class MemoryManager: ObservableObject {
 
 // MARK: - Memory Stats
 
-struct MemoryStats {
+struct LocalMemoryStats {
     let total: Int64
     let used: Int64
     let available: Int64

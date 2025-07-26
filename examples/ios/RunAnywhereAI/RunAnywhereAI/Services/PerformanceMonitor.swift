@@ -21,20 +21,20 @@ class PerformanceMonitor {
     private var startTime: CFAbsoluteTime = 0
     private var firstTokenTime: CFAbsoluteTime = 0
     private var tokenCount = 0
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "Performance")
+    private let logger = Logger.shared
     
     func startMeasurement() {
         startTime = CFAbsoluteTimeGetCurrent()
         firstTokenTime = 0
         tokenCount = 0
-        logger.debug("Started performance measurement")
+        logger.log("Started performance measurement", level: .debug, category: "Performance")
     }
     
     func recordFirstToken() {
         if firstTokenTime == 0 {
             firstTokenTime = CFAbsoluteTimeGetCurrent()
             let ttft = firstTokenTime - startTime
-            logger.info("Time to first token: \(ttft, format: .fixed(precision: 3))s")
+            logger.log("Time to first token: \(ttft, format: .fixed(precision: 3))s", level: .info, category: "Performance")
         }
     }
     
@@ -59,14 +59,14 @@ class PerformanceMonitor {
             memoryUsed: getCurrentMemoryUsage()
         )
         
-        logger.info("""
+        logger.log("""
             Performance metrics:
             - Total time: \(metrics.totalTime, format: .fixed(precision: 2))s
             - Time to first token: \(metrics.timeToFirstToken, format: .fixed(precision: 3))s
             - Tokens/sec: \(metrics.tokensPerSecond, format: .fixed(precision: 1))
             - Token count: \(metrics.tokenCount)
             - Memory used: \(ByteCountFormatter.string(fromByteCount: Int64(metrics.memoryUsed), countStyle: .memory))
-            """)
+            """, level: .info, category: "Performance")
         
         return metrics
     }
@@ -91,7 +91,7 @@ class PerformanceMonitor {
 // Memory optimizer
 class MemoryOptimizer {
     static let shared = MemoryOptimizer()
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "Memory")
+    private let logger = Logger.shared
     
     private init() {
         setupMemoryWarningObserver()
@@ -107,7 +107,7 @@ class MemoryOptimizer {
     }
     
     @objc private func handleMemoryWarning() {
-        logger.warning("Received memory warning")
+        logger.log("Received memory warning", level: .warning, category: "Memory")
         clearCaches()
     }
     
@@ -121,7 +121,7 @@ class MemoryOptimizer {
             object: nil
         )
         
-        logger.info("Cleared caches due to memory pressure")
+        logger.log("Cleared caches due to memory pressure", level: .info, category: "Memory")
     }
     
     func getAvailableMemory() -> Int64 {

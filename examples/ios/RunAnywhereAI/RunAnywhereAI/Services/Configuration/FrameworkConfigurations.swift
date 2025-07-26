@@ -360,11 +360,26 @@ struct SwiftTransformersConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - Common Types
 
-enum LogLevel: String, CaseIterable {
-    case verbose = "VERBOSE"
-    case debug = "DEBUG"
-    case info = "INFO"
-    case warning = "WARNING"
-    case error = "ERROR"
-    case critical = "CRITICAL"
+enum LogLevel: Int, CaseIterable, Comparable {
+    case verbose = 0
+    case debug = 1
+    case info = 2
+    case warning = 3
+    case error = 4
+    case critical = 5
+    
+    static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+    
+    var stringValue: String {
+        switch self {
+        case .verbose: return "VERBOSE"
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .warning: return "WARNING"
+        case .error: return "ERROR"
+        case .critical: return "CRITICAL"
+        }
+    }
 }

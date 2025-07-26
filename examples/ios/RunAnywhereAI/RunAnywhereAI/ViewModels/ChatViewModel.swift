@@ -24,8 +24,8 @@ class ChatViewModel: ObservableObject {
     }
     
     @MainActor
-    init(llmService: UnifiedLLMService = .shared) {
-        self.llmService = llmService
+    init(llmService: UnifiedLLMService? = nil) {
+        self.llmService = llmService ?? .shared
         addSystemMessage()
     }
     

@@ -19,7 +19,7 @@ final class FoundationModelsService: LLMService {
     private var model: Any? // Would be FoundationModel instance
     private var configuration = FoundationModelsConfiguration.default
     private var currentModelInfo: ModelInfo?
-    private var modelState: ModelState = .unloaded
+    var modelState: ModelState = .unloaded
     private var metrics = ServiceMetrics()
     
     // MARK: - LLMService Protocol

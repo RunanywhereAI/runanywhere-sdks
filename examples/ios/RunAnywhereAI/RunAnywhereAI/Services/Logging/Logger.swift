@@ -214,7 +214,7 @@ struct LogEntry {
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
         let timestamp = formatter.string(from: timestamp)
         
-        return "\(timestamp) [\(level.rawValue.uppercased())] [\(category)] \(formattedMessage)"
+        return "\(timestamp) [\(level.stringValue)] [\(category)] \(formattedMessage)"
     }
 }
 

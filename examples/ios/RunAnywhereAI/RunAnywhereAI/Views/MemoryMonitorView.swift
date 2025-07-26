@@ -154,7 +154,7 @@ struct MemoryMonitorView: View {
     
     // MARK: - Computed Properties
     
-    private var memoryStats: MemoryStats {
+    private var memoryStats: LocalMemoryStats {
         memoryManager.getMemoryStats()
     }
     

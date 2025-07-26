@@ -128,7 +128,7 @@ class LlamaCppService: BaseLLMService {
     private var currentModelInfo: ModelInfo?
     private var llamaContext: LlamaCppContext?
     private var tokenizer: LlamaCppTokenizer?
-    private let maxContextLength = 2048
+    override var maxContextLength: Int { 2048 }
     
     override func initialize(modelPath: String) async throws {
         // Verify model file exists

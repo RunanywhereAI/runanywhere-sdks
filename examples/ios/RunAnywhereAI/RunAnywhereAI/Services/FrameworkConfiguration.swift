@@ -212,30 +212,23 @@ struct FrameworkConfigurationView: View {
 // MARK: - Framework-Specific Config Views
 
 struct LlamaCppConfigView: View {
-    @State private var config = LlamaCppConfiguration()
+    @State private var config = LlamaCppConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
         Section("Context Settings") {
-            Stepper("Context Size: \(config.contextSize)", value: $config.contextSize, in: 512...8192, step: 512)
-            Stepper("Batch Size: \(config.batchSize)", value: $config.batchSize, in: 128...2048, step: 128)
+            Stepper("Context Size: \(config.contextSize)", value: .constant(config.contextSize), in: 512...8192, step: 512)
+            Stepper("Batch Size: \(config.batchSize)", value: .constant(config.batchSize), in: 128...2048, step: 128)
         }
         
         Section("Performance") {
-            Stepper("Threads: \(config.threads)", value: $config.threads, in: 1...16)
-            Stepper("GPU Layers: \(config.gpuLayers)", value: $config.gpuLayers, in: 0...100)
+            Stepper("Threads: \(config.numberOfThreads)", value: .constant(config.numberOfThreads), in: 1...16)
+            Stepper("GPU Layers: \(config.numberOfGPULayers)", value: .constant(config.numberOfGPULayers), in: 0...100)
         }
         
         Section("Memory Options") {
-            Toggle("Use Memory Mapping", isOn: $config.useMMap)
-            Toggle("Lock Memory", isOn: $config.useMlock)
-            Toggle("NUMA Optimization", isOn: $config.numa)
-        }
-        
-        Section("Advanced") {
-            Toggle("F16 KV Cache", isOn: $config.f16KV)
-            Toggle("Logits All", isOn: $config.logitsAll)
-            Toggle("Embedding Mode", isOn: $config.embedding)
+            Toggle("Use Memory Mapping", isOn: .constant(config.mmap))
+            Toggle("Lock Memory", isOn: .constant(config.mlock))
         }
         .onChange(of: config) { newConfig in
             configManager.updateConfiguration(newConfig)
@@ -249,7 +242,7 @@ struct LlamaCppConfigView: View {
 }
 
 struct CoreMLConfigView: View {
-    @State private var config = CoreMLConfiguration()
+    @State private var config = CoreMLConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
@@ -283,7 +276,7 @@ struct CoreMLConfigView: View {
 }
 
 struct MLXConfigView: View {
-    @State private var config = MLXConfiguration()
+    @State private var config = MLXConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
@@ -317,7 +310,7 @@ struct MLXConfigView: View {
 }
 
 struct ONNXConfigView: View {
-    @State private var config = ONNXConfiguration()
+    @State private var config = ONNXConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
