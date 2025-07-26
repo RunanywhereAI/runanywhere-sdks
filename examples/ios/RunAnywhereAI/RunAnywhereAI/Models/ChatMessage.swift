@@ -7,21 +7,25 @@
 
 import Foundation
 
-enum MessageRole {
+enum MessageRole: String, Codable {
     case user
     case assistant
     case system
 }
 
-struct ChatMessage: Identifiable, Equatable {
-    let id = UUID()
+struct ChatMessage: Identifiable, Equatable, Codable {
+    let id: UUID
     let role: MessageRole
     var content: String
     let timestamp: Date
     
-    init(role: MessageRole, content: String, timestamp: Date = Date()) {
+    init(id: UUID = UUID(), role: MessageRole, content: String, timestamp: Date = Date()) {
+        self.id = id
         self.role = role
         self.content = content
         self.timestamp = timestamp
     }
 }
+
+// Type alias for consistency
+typealias Message = ChatMessage
