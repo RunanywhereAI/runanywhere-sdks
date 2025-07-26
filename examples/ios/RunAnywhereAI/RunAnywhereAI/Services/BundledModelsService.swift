@@ -236,7 +236,9 @@ extension ModelInfo {
     init(id: String, name: String, size: String, format: ModelFormat,
          quantization: String? = nil, contextLength: Int? = nil,
          framework: LLMFramework, isLocal: Bool = false, bundled: Bool = false,
-         downloadURL: URL? = nil, description: String? = nil) {
+         downloadURL: URL? = nil, description: String? = nil,
+         minimumMemory: Int64 = 2_000_000_000,
+         recommendedMemory: Int64 = 4_000_000_000) {
         self.id = id
         self.name = name
         self.size = size
@@ -247,6 +249,9 @@ extension ModelInfo {
         self.isLocal = isLocal
         self.path = nil
         self.downloadURL = downloadURL
+        self.description = description ?? ""
+        self.minimumMemory = minimumMemory
+        self.recommendedMemory = recommendedMemory
     }
 }
 

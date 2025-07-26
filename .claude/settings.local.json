@@ -14,7 +14,8 @@
       "Bash(xcrun simctl list:*)",
       "Bash(xcrun simctl install:*)",
       "Bash(xcrun simctl launch:*)",
-      "Bash(diff:*)"
+      "Bash(diff:*)",
+      "Bash(./run.sh)"
     ],
     "deny": []
   }

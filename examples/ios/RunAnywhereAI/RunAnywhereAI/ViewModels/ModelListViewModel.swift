@@ -49,7 +49,7 @@ class ModelListViewModel: ObservableObject {
             // In a real implementation, this would download/load the model
             // For now, we'll simulate initialization
             if let service = currentService {
-                try await service.initialize(modelPath: model.path)
+                try await service.initialize(modelPath: model.path ?? "")
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -65,11 +65,12 @@ class ModelListViewModel: ObservableObject {
             let modelFiles = await modelManager.listDownloadedModels()
             
             // Convert file names to ModelInfo
-            downloadedModels = modelFiles.compactMap { fileName in
+            var models: [ModelInfo] = []
+            for fileName in modelFiles {
                 let path = await modelManager.modelPath(for: fileName)
                 let size = await modelManager.getModelSize(fileName) ?? 0
                 
-                return ModelInfo(
+                let model = ModelInfo(
                     id: fileName,
                     name: fileName.replacingOccurrences(of: ".gguf", with: "")
                               .replacingOccurrences(of: ".mlpackage", with: "")
@@ -79,7 +80,9 @@ class ModelListViewModel: ObservableObject {
                     size: ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
                     framework: frameworkForFormat(detectFormat(from: fileName))
                 )
+                models.append(model)
             }
+            downloadedModels = models
         }
     }
     

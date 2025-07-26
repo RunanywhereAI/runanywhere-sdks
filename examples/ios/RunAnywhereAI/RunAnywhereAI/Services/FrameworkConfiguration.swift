@@ -10,7 +10,7 @@ protocol FrameworkConfiguration: Codable {
 
 // MARK: - llama.cpp Configuration
 
-struct LlamaCppConfiguration: FrameworkConfiguration {
+struct LlamaCppConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.llamaCpp
     
     var contextSize: Int32 = 2048
@@ -33,7 +33,7 @@ struct LlamaCppConfiguration: FrameworkConfiguration {
 
 // MARK: - Core ML Configuration
 
-struct CoreMLConfiguration: FrameworkConfiguration {
+struct CoreMLConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.coreML
     
     enum ComputeUnits: String, CaseIterable, Codable {
@@ -55,7 +55,7 @@ struct CoreMLConfiguration: FrameworkConfiguration {
 
 // MARK: - MLX Configuration
 
-struct MLXConfiguration: FrameworkConfiguration {
+struct MLXConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.mlx
     
     var maxBatchSize: Int = 256
@@ -72,7 +72,7 @@ struct MLXConfiguration: FrameworkConfiguration {
 
 // MARK: - ONNX Runtime Configuration
 
-struct ONNXConfiguration: FrameworkConfiguration {
+struct ONNXConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.onnx
     
     enum ExecutionProvider: String, CaseIterable, Codable {
@@ -165,7 +165,7 @@ class FrameworkConfigurationManager: ObservableObject {
 
 // MARK: - Generic Configuration
 
-struct GenericConfiguration: FrameworkConfiguration {
+struct GenericConfiguration: FrameworkConfiguration, Equatable {
     let framework: LLMFramework
     
     func apply(to service: LLMService) {

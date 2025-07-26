@@ -53,7 +53,7 @@ class MLXService: LLMService {
     func initialize(modelPath: String) async throws {
         // Check if device supports MLX (A17 Pro or newer)
         guard isMLXSupported() else {
-            throw LLMError.generationFailed("MLX requires A17 Pro or newer chip")
+            throw LLMError.frameworkNotSupported
         }
         
         // Simulate initialization

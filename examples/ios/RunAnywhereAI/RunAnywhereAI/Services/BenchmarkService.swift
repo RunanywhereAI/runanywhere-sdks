@@ -194,7 +194,8 @@ class BenchmarkService: ObservableObject {
                 temperature: 0.7,
                 topP: 0.9,
                 topK: 40,
-                repetitionPenalty: 1.1
+                repetitionPenalty: 1.1,
+                stopSequences: []
             )
             
             try await unifiedService.streamGenerate(

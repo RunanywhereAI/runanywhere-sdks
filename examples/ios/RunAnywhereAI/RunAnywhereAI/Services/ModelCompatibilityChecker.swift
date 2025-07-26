@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Model Compatibility Checker
 
@@ -19,6 +22,7 @@ struct ModelCompatibilityChecker {
     
     // MARK: - Check Compatibility
     
+    @MainActor
     static func checkCompatibility(model: ModelInfo, framework: LLMFramework) -> CompatibilityResult {
         var warnings: [String] = []
         var errors: [String] = []
@@ -103,10 +107,11 @@ struct ModelCompatibilityChecker {
     
     // MARK: - Memory Requirements
     
+    @MainActor
     private static func checkMemoryRequirements(model: ModelInfo) -> (isCompatible: Bool, hasWarning: Bool, message: String) {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         let usedMemory = MemoryManager.shared.getMemoryStats().used
-        let freeMemory = availableMemory - usedMemory
+        let freeMemory = Int64(availableMemory) - usedMemory
         
         // Parse model size to bytes
         let modelSizeBytes = parseSizeToBytes(model.size)
@@ -190,7 +195,8 @@ struct ModelCompatibilityChecker {
             if model.format == .coreML {
                 recommendations.append("Ensure Core ML model is optimized for your target devices")
             }
-            if let size = parseSizeToBytes(model.size), size > 1_000_000_000 { // > 1GB
+            let size = parseSizeToBytes(model.size)
+            if size > 1_000_000_000 { // > 1GB
                 warnings.append("Large Core ML models may have slower initial load times")
             }
             
@@ -214,7 +220,8 @@ struct ModelCompatibilityChecker {
             
         case .tfLite:
             // TensorFlow Lite checks
-            if let size = parseSizeToBytes(model.size), size > 500_000_000 { // > 500MB
+            let size = parseSizeToBytes(model.size)
+            if size > 500_000_000 { // > 500MB
                 warnings.append("Large TFLite models may have memory issues on older devices")
             }
             
@@ -246,6 +253,7 @@ struct ModelCompatibilityChecker {
         }
         
         // Device-specific recommendations
+        #if canImport(UIKit)
         let deviceModel = UIDevice.current.model
         if deviceModel.contains("iPad") {
             recommendations.append("iPad's larger memory allows for bigger models and longer contexts")
@@ -256,6 +264,13 @@ struct ModelCompatibilityChecker {
                 recommendations.append("Consider using smaller models for optimal performance")
             }
         }
+        #else
+        if ProcessInfo.processInfo.processorCount >= 6 {
+            recommendations.append("Your device supports efficient on-device inference")
+        } else {
+            recommendations.append("Consider using smaller models for optimal performance")
+        }
+        #endif
         
         // Framework optimization tips
         if framework == .coreML || framework == .mlx {

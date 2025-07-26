@@ -4,6 +4,9 @@
 //
 
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // Note: ExecuTorch would need to be added as XCFramework
 // import ExecuTorch
@@ -173,13 +176,17 @@ class ExecuTorchService: LLMService {
     }
     
     private func selectOptimalBackend() -> String {
-        let device = UIDevice.current
         let memorySize = ProcessInfo.processInfo.physicalMemory
         
+        #if canImport(UIKit)
+        let device = UIDevice.current
         // Check device capabilities
         if device.userInterfaceIdiom == .pad && memorySize > 8_000_000_000 {
             return "coreml" // Best for latest chips
-        } else if memorySize > 6_000_000_000 {
+        }
+        #endif
+        
+        if memorySize > 6_000_000_000 {
             return "metal" // Good GPU performance
         } else if memorySize > 4_000_000_000 {
             return "accelerate" // Optimized CPU

@@ -16,6 +16,8 @@ class UnifiedLLMService: ObservableObject {
     @Published var availableServices: [LLMService] = []
     @Published var isLoading = false
     @Published var error: Error?
+    @Published var currentFramework: LLMFramework?
+    @Published var currentModel: ModelInfo?
     
     private init() {
         setupServices()
@@ -88,5 +90,25 @@ class UnifiedLLMService: ObservableObject {
             self.error = error
             throw error
         }
+    }
+    
+    func loadModel(_ model: ModelInfo, framework: LLMFramework) async throws {
+        guard let service = availableServices.first(where: { 
+            $0.name == framework.displayName 
+        }) else {
+            throw LLMError.serviceNotAvailable(framework.displayName)
+        }
+        
+        currentService = service
+        currentFramework = framework
+        currentModel = model
+        try await service.initialize(modelPath: model.path ?? "")
+    }
+    
+    func cleanup() {
+        currentService?.cleanup()
+        currentService = nil
+        currentFramework = nil
+        currentModel = nil
     }
 }

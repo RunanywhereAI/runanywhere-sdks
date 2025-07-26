@@ -207,7 +207,7 @@ struct ModelRow: View {
             NavigationView {
                 ModelCompatibilityView(
                     model: model,
-                    framework: unifiedService.currentFramework ?? .mock
+                    framework: model.framework
                 )
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {

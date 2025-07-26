@@ -5,6 +5,9 @@
 
 import Foundation
 import os.log
+#if canImport(UIKit)
+import UIKit
+#endif
 
 // MARK: - Memory Manager
 
@@ -60,6 +63,7 @@ class MemoryManager: ObservableObject {
     
     private func setupMemoryMonitoring() {
         // Monitor memory warnings
+        #if canImport(UIKit)
         memoryWarningObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
@@ -67,10 +71,13 @@ class MemoryManager: ObservableObject {
         ) { [weak self] _ in
             self?.handleMemoryWarning()
         }
+        #endif
         
         // Start periodic memory updates
         updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
-            self?.updateMemoryStats()
+            Task { @MainActor in
+                self?.updateMemoryStats()
+            }
         }
         
         // Get total physical memory

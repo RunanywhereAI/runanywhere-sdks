@@ -245,11 +245,11 @@ class ModelManager: ObservableObject {
         return ModelInfo(
             id: UUID().uuidString,
             name: fileName,
-            size: sizeString,
+            path: url.path,
             format: format,
+            size: sizeString,
             framework: framework,
-            isLocal: true,
-            path: url.path
+            isLocal: true
         )
     }
     

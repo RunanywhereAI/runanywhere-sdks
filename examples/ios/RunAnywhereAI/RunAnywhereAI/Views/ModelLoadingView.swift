@@ -133,7 +133,7 @@ struct ModelLoadingView: View {
     private func loadModel() async {
         do {
             let success = try await loader.loadModel(
-                at: model.path,
+                at: model.path ?? "",
                 format: model.format,
                 framework: model.framework
             )
