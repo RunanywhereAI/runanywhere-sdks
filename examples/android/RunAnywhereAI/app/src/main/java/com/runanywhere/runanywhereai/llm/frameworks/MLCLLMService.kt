@@ -20,9 +20,17 @@ import java.io.File
 class MLCLLMService(private val context: Context) : LLMService {
     companion object {
         private const val TAG = "MLCLLMService"
+        private var nativeLibraryLoaded = false
         
         init {
-            System.loadLibrary("mlc-llm-jni")
+            try {
+                System.loadLibrary("mlc-llm-jni")
+                nativeLibraryLoaded = true
+                Log.d(TAG, "Native mlc-llm-jni library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(TAG, "Native mlc-llm-jni library not found - MLC-LLM functionality will be disabled", e)
+                nativeLibraryLoaded = false
+            }
         }
         
         @JvmStatic
@@ -61,11 +69,15 @@ class MLCLLMService(private val context: Context) : LLMService {
     
     override val name: String = "MLC-LLM"
     override val isInitialized: Boolean
-        get() = enginePtr != 0L
+        get() = nativeLibraryLoaded && enginePtr != 0L
     
     override suspend fun initialize(modelPath: String) {
         withContext(Dispatchers.IO) {
             try {
+                if (!nativeLibraryLoaded) {
+                    throw IllegalStateException("Native mlc-llm-jni library not available")
+                }
+                
                 // Verify model file exists
                 val modelFile = File(modelPath)
                 if (!modelFile.exists()) {
@@ -142,9 +154,9 @@ class MLCLLMService(private val context: Context) : LLMService {
         options: GenerationOptions
     ): GenerationResult {
         return withContext(Dispatchers.IO) {
-            if (!isInitialized) {
+            if (!nativeLibraryLoaded || !isInitialized) {
                 return@withContext GenerationResult(
-                    text = "",
+                    text = "MLC-LLM native library not available",
                     tokensGenerated = 0,
                     timeMs = 0,
                     tokensPerSecond = 0f
@@ -208,9 +220,9 @@ class MLCLLMService(private val context: Context) : LLMService {
         prompt: String,
         options: GenerationOptions
     ): Flow<GenerationResult> = flow {
-        if (!isInitialized) {
+        if (!nativeLibraryLoaded || !isInitialized) {
             emit(GenerationResult(
-                text = "",
+                text = "MLC-LLM native library not available",
                 tokensGenerated = 0,
                 timeMs = 0,
                 tokensPerSecond = 0f
@@ -324,7 +336,7 @@ class MLCLLMService(private val context: Context) : LLMService {
     override suspend fun release() {
         withContext(Dispatchers.IO) {
             try {
-                if (enginePtr != 0L) {
+                if (nativeLibraryLoaded && enginePtr != 0L) {
                     nativeReleaseEngine(enginePtr)
                     enginePtr = 0
                 }

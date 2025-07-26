@@ -30,14 +30,24 @@ class UnifiedLLMManager(private val context: Context) {
         registerServices()
     }
     
+    private fun tryRegisterService(framework: LLMFramework, serviceProvider: () -> LLMService) {
+        try {
+            val service = serviceProvider()
+            services[framework] = service
+            Log.d(TAG, "Successfully registered service: $framework")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to register service $framework - native dependencies may be missing", e)
+        }
+    }
+    
     private fun registerServices() {
         // Register available services
-        services[LLMFramework.MEDIAPIPE] = MediaPipeService(context)
-        services[LLMFramework.ONNX_RUNTIME] = ONNXRuntimeService(context)
-        services[LLMFramework.TFLITE] = TFLiteService(context)
-        services[LLMFramework.LLAMA_CPP] = LlamaCppService(context)
-        services[LLMFramework.EXECUTORCH] = ExecuTorchService(context)
-        services[LLMFramework.MLC_LLM] = MLCLLMService(context)
+        tryRegisterService(LLMFramework.MEDIAPIPE) { MediaPipeService(context) }
+        tryRegisterService(LLMFramework.ONNX_RUNTIME) { ONNXRuntimeService(context) }
+        tryRegisterService(LLMFramework.TFLITE) { TFLiteService(context) }
+        tryRegisterService(LLMFramework.LLAMA_CPP) { LlamaCppService(context) }
+        tryRegisterService(LLMFramework.EXECUTORCH) { ExecuTorchService(context) }
+        tryRegisterService(LLMFramework.MLC_LLM) { MLCLLMService(context) }
         
         // Register Gemini Nano if available
         try {
@@ -62,11 +72,7 @@ class UnifiedLLMManager(private val context: Context) {
         // Note: In production, the access key should be stored securely
         val picoAccessKey = "" // TODO: Add Picovoice access key
         if (picoAccessKey.isNotEmpty()) {
-            try {
-                services[LLMFramework.PICOLLM] = PicoLLMService(context, picoAccessKey)
-            } catch (e: Exception) {
-                Log.w(TAG, "picoLLM not available", e)
-            }
+            tryRegisterService(LLMFramework.PICOLLM) { PicoLLMService(context, picoAccessKey) }
         }
     }
     

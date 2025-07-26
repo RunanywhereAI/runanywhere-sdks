@@ -22,9 +22,17 @@ import java.io.File
 class LlamaCppService(private val context: Context) : LLMService {
     companion object {
         private const val TAG = "LlamaCppService"
+        private var nativeLibraryLoaded = false
         
         init {
-            System.loadLibrary("llama-jni")
+            try {
+                System.loadLibrary("llama-jni")
+                nativeLibraryLoaded = true
+                Log.d(TAG, "Native llama-jni library loaded successfully")
+            } catch (e: UnsatisfiedLinkError) {
+                Log.w(TAG, "Native llama-jni library not found - llama.cpp functionality will be disabled", e)
+                nativeLibraryLoaded = false
+            }
         }
         
         // Native methods
@@ -76,11 +84,15 @@ class LlamaCppService(private val context: Context) : LLMService {
     override val name: String = "llama.cpp"
     
     override val isInitialized: Boolean
-        get() = modelPtr != 0L
+        get() = nativeLibraryLoaded && modelPtr != 0L
     
     override suspend fun initialize(modelPath: String) {
         withContext(Dispatchers.IO) {
             try {
+                if (!nativeLibraryLoaded) {
+                    throw IllegalStateException("Native llama-jni library not available")
+                }
+                
                 release() // Clean up any existing instance
                 
                 val modelFile = File(modelPath)
@@ -125,9 +137,9 @@ class LlamaCppService(private val context: Context) : LLMService {
     
     override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
-            if (modelPtr == 0L) {
+            if (!nativeLibraryLoaded || modelPtr == 0L) {
                 return@withContext GenerationResult(
-                    text = "",
+                    text = "llama.cpp native library not available",
                     tokensGenerated = 0,
                     timeMs = 0,
                     tokensPerSecond = 0f
@@ -170,9 +182,9 @@ class LlamaCppService(private val context: Context) : LLMService {
     }
     
     override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
-        if (modelPtr == 0L) {
+        if (!nativeLibraryLoaded || modelPtr == 0L) {
             emit(GenerationResult(
-                text = "",
+                text = "llama.cpp native library not available",
                 tokensGenerated = 0,
                 timeMs = 0,
                 tokensPerSecond = 0f
@@ -229,7 +241,7 @@ class LlamaCppService(private val context: Context) : LLMService {
     
     override suspend fun release() {
         withContext(Dispatchers.IO) {
-            if (modelPtr != 0L) {
+            if (nativeLibraryLoaded && modelPtr != 0L) {
                 nativeFreeModel(modelPtr)
                 modelPtr = 0
             }
@@ -243,8 +255,8 @@ class LlamaCppService(private val context: Context) : LLMService {
      * Tokenize text using the loaded model's tokenizer
      */
     fun tokenize(text: String): IntArray {
-        if (modelPtr == 0L) {
-            throw IllegalStateException("Model not loaded")
+        if (!nativeLibraryLoaded || modelPtr == 0L) {
+            throw IllegalStateException("Native library not available or model not loaded")
         }
         return nativeTokenize(modelPtr, text)
     }
@@ -253,8 +265,8 @@ class LlamaCppService(private val context: Context) : LLMService {
      * Detokenize tokens back to text
      */
     fun detokenize(tokens: IntArray): String {
-        if (modelPtr == 0L) {
-            throw IllegalStateException("Model not loaded")
+        if (!nativeLibraryLoaded || modelPtr == 0L) {
+            throw IllegalStateException("Native library not available or model not loaded")
         }
         return nativeDetokenize(modelPtr, tokens)
     }
