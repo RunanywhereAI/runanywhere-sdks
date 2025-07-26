@@ -17,6 +17,20 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        externalNativeBuild {
+            cmake {
+                cppFlags += listOf("-std=c++17", "-O3")
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DBUILD_SHARED_LIBS=ON"
+                )
+            }
+        }
+        
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -43,6 +57,12 @@ android {
         checkDependencies = true
         warningsAsErrors = true
         baseline = file("lint-baseline.xml")
+    }
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 }
 
@@ -75,6 +95,12 @@ dependencies {
     
     // Google AI SDK for Gemini Nano
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    
+    // TensorFlow Lite
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
     
     // OkHttp for model downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")

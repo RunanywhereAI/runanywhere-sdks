@@ -13,6 +13,7 @@ import java.io.File
 import java.io.FileOutputStream
 import android.os.Build
 import com.runanywhere.runanywhereai.llm.frameworks.GeminiNanoService
+import java.security.MessageDigest
 
 /**
  * Repository for managing LLM models
@@ -104,6 +105,36 @@ class ModelRepository(private val context: Context) {
                 downloadUrl = "https://example.com/models/distilbert-qa.tflite",
                 fileName = "distilbert-qa.tflite",
                 quantization = "FLOAT16"
+            ),
+            ModelInfo(
+                id = "tinyllama-1.1b-q8",
+                name = "TinyLlama 1.1B Chat",
+                description = "Compact Llama model with chat template",
+                framework = LLMFramework.LLAMA_CPP,
+                sizeBytes = 650_000_000L,
+                downloadUrl = "https://example.com/models/tinyllama-1.1b-chat-v1.0.Q8_0.gguf",
+                fileName = "tinyllama-1.1b-chat-v1.0.Q8_0.gguf",
+                quantization = "Q8_0"
+            ),
+            ModelInfo(
+                id = "phi-2-q5",
+                name = "Phi-2 GGUF",
+                description = "Microsoft Phi-2 quantized for mobile",
+                framework = LLMFramework.LLAMA_CPP,
+                sizeBytes = 1_400_000_000L,
+                downloadUrl = "https://example.com/models/phi-2.Q5_K_M.gguf",
+                fileName = "phi-2.Q5_K_M.gguf",
+                quantization = "Q5_K_M"
+            ),
+            ModelInfo(
+                id = "stablelm-2-1.6b",
+                name = "StableLM 2 Zephyr 1.6B",
+                description = "Stability AI's efficient chat model",
+                framework = LLMFramework.LLAMA_CPP,
+                sizeBytes = 900_000_000L,
+                downloadUrl = "https://example.com/models/stablelm-2-zephyr-1_6b.Q4_0.gguf",
+                fileName = "stablelm-2-zephyr-1_6b.Q4_0.gguf",
+                quantization = "Q4_0"
             )
         ))
         
