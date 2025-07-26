@@ -5,6 +5,7 @@ import android.util.Log
 import com.runanywhere.runanywhereai.llm.frameworks.MediaPipeService
 import com.runanywhere.runanywhereai.llm.frameworks.ONNXRuntimeService
 import com.runanywhere.runanywhereai.llm.frameworks.GeminiNanoService
+import com.runanywhere.runanywhereai.llm.frameworks.TFLiteService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 
@@ -27,6 +28,7 @@ class UnifiedLLMManager(private val context: Context) {
         // Register available services
         services[LLMFramework.MEDIAPIPE] = MediaPipeService(context)
         services[LLMFramework.ONNX_RUNTIME] = ONNXRuntimeService(context)
+        services[LLMFramework.TFLITE] = TFLiteService(context)
         
         // Register Gemini Nano if available
         try {

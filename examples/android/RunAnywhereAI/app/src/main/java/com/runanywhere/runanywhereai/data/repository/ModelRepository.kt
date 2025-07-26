@@ -84,6 +84,26 @@ class ModelRepository(private val context: Context) {
                 downloadUrl = "https://example.com/models/tinyllama-1.1b.onnx",
                 fileName = "tinyllama-1.1b.onnx",
                 quantization = "FP16"
+            ),
+            ModelInfo(
+                id = "mobilenet-gpt2",
+                name = "MobileNet GPT-2",
+                description = "Lightweight GPT-2 variant for mobile",
+                framework = LLMFramework.TFLITE,
+                sizeBytes = 180_000_000L,
+                downloadUrl = "https://example.com/models/mobilenet-gpt2.tflite",
+                fileName = "mobilenet-gpt2.tflite",
+                quantization = "INT8"
+            ),
+            ModelInfo(
+                id = "distilbert-qa",
+                name = "DistilBERT QA",
+                description = "Question answering model",
+                framework = LLMFramework.TFLITE,
+                sizeBytes = 125_000_000L,
+                downloadUrl = "https://example.com/models/distilbert-qa.tflite",
+                fileName = "distilbert-qa.tflite",
+                quantization = "FLOAT16"
             )
         ))
         
