@@ -131,6 +131,8 @@ struct ModelRow: View {
     let model: ModelInfo
     let onSelect: () -> Void
     @State private var isLoading = false
+    @State private var showingCompatibility = false
+    @StateObject private var unifiedService = UnifiedLLMService.shared
     
     var body: some View {
         Button(action: {
@@ -183,12 +185,39 @@ struct ModelRow: View {
                             .foregroundColor(.orange)
                     }
                 }
+                
+                // Compatibility Check Button
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showingCompatibility = true
+                    }) {
+                        Label("Check Compatibility", systemImage: "checkmark.shield")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
+                }
             }
             .padding(.vertical, 4)
             .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!model.isCompatible || isLoading)
+        .sheet(isPresented: $showingCompatibility) {
+            NavigationView {
+                ModelCompatibilityView(
+                    model: model,
+                    framework: unifiedService.currentFramework ?? .mock
+                )
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            showingCompatibility = false
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

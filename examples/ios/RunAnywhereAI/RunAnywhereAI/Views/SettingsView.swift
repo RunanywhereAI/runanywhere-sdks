@@ -13,6 +13,8 @@ struct SettingsView: View {
     @AppStorage("topP") private var topP: Double = 0.95
     @AppStorage("topK") private var topK: Double = 40
     @AppStorage("showAdvancedSettings") private var showAdvancedSettings = false
+    @State private var showingFrameworkConfig = false
+    @State private var selectedFramework: LLMFramework?
     
     var body: some View {
         Form {
@@ -52,6 +54,24 @@ struct SettingsView: View {
                 }
             }
             
+            Section("Framework Configuration") {
+                ForEach([LLMFramework.llamaCpp, .coreML, .mlx, .onnx], id: \.self) { framework in
+                    Button(action: {
+                        selectedFramework = framework
+                        showingFrameworkConfig = true
+                    }) {
+                        HStack {
+                            Text(framework.displayName)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
+            
             Section("About") {
                 HStack {
                     Text("Version")
@@ -79,6 +99,11 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
+        .sheet(isPresented: $showingFrameworkConfig) {
+            if let framework = selectedFramework {
+                FrameworkConfigurationView(framework: framework)
+            }
+        }
     }
     
     private var deviceMemoryString: String {
