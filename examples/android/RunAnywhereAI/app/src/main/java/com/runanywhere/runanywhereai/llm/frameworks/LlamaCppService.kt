@@ -123,15 +123,22 @@ class LlamaCppService(private val context: Context) : LLMService {
         }
     }
     
-    override suspend fun generate(prompt: String, options: GenerationOptions): String {
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
             if (modelPtr == 0L) {
-                throw IllegalStateException("Service not initialized")
+                return@withContext GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
             
             try {
+                val startTime = System.currentTimeMillis()
+                
                 // Call native generation
-                nativeGenerate(
+                val response = nativeGenerate(
                     modelPtr,
                     prompt,
                     options.maxTokens,
@@ -139,45 +146,97 @@ class LlamaCppService(private val context: Context) : LLMService {
                     options.topP,
                     options.topK
                 )
+                
+                val endTime = System.currentTimeMillis()
+                val tokens = tokenize(response)
+                val tokensPerSecond = tokens.size.toFloat() / ((endTime - startTime) / 1000f)
+                
+                GenerationResult(
+                    text = response,
+                    tokensGenerated = tokens.size,
+                    timeMs = endTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Generation failed", e)
-                throw e
+                GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
         }
     }
     
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> = flow {
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
         if (modelPtr == 0L) {
-            throw IllegalStateException("Service not initialized")
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
+            return@flow
         }
         
         try {
+            val startTime = System.currentTimeMillis()
+            var accumulatedText = ""
+            var tokenCount = 0
+            
             // For now, we'll generate the full response and emit it in chunks
             // In a real implementation, this would stream tokens as they're generated
             val fullResponse = generate(prompt, options)
             
+            // If generation failed, emit the error result
+            if (fullResponse.text.isEmpty()) {
+                emit(fullResponse)
+                return@flow
+            }
+            
             // Emit response word by word to simulate streaming
-            val words = fullResponse.split(" ")
+            val words = fullResponse.text.split(" ")
             words.forEach { word ->
-                emit("$word ")
+                val chunk = "$word "
+                accumulatedText += chunk
+                tokenCount++
+                
+                val currentTime = System.currentTimeMillis()
+                val tokensPerSecond = tokenCount.toFloat() / ((currentTime - startTime) / 1000f)
+                
+                emit(GenerationResult(
+                    text = chunk,
+                    tokensGenerated = tokenCount,
+                    timeMs = currentTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                ))
+                
                 kotlinx.coroutines.delay(30) // Simulate generation delay
             }
         } catch (e: Exception) {
             Log.e(TAG, "Stream generation failed", e)
-            throw e
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
         }
     }
     
     override fun getModelInfo(): ModelInfo? = modelInfo
     
-    override fun release() {
-        if (modelPtr != 0L) {
-            nativeFreeModel(modelPtr)
-            modelPtr = 0
+    override suspend fun release() {
+        withContext(Dispatchers.IO) {
+            if (modelPtr != 0L) {
+                nativeFreeModel(modelPtr)
+                modelPtr = 0
+            }
+            currentModel = null
+            modelInfo = null
+            Log.d(TAG, "llama.cpp resources released")
         }
-        currentModel = null
-        modelInfo = null
-        Log.d(TAG, "llama.cpp resources released")
     }
     
     /**

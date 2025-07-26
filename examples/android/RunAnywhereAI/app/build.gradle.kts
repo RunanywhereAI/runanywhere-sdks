@@ -4,6 +4,8 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.detekt)
     id("kotlin-kapt")
+    // TODO: Add Hilt plugin when configured in project level build.gradle
+    // id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -19,15 +21,16 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++17", "-O3")
-                arguments += listOf(
-                    "-DANDROID_STL=c++_shared",
-                    "-DBUILD_SHARED_LIBS=ON"
-                )
-            }
-        }
+        // Native build disabled for now to focus on Kotlin implementation
+        // externalNativeBuild {
+        //     cmake {
+        //         cppFlags += listOf("-std=c++17", "-O3")
+        //         arguments += listOf(
+        //             "-DANDROID_STL=c++_shared",
+        //             "-DBUILD_SHARED_LIBS=ON"
+        //         )
+        //     }
+        // }
         
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
@@ -35,23 +38,138 @@ android {
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            
+            // Disable optimizations for faster builds
+            buildConfigField("boolean", "DEBUG_MODE", "true")
+            buildConfigField("String", "BUILD_TYPE", "\"debug\"")
+        }
+        
+        release {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // Build configuration fields
+            buildConfigField("boolean", "DEBUG_MODE", "false")
+            buildConfigField("String", "BUILD_TYPE", "\"release\"")
+            
+            // Optimization flags
+            isJniDebuggable = false
+            
+            // Using default debug signing for now
+        }
+        
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            
+            // Additional optimizations for benchmarking
+            buildConfigField("boolean", "BENCHMARK_MODE", "true")
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
         }
     }
+    
+    // Signing configurations
+    // Using default debug keystore for now
+    
+    // APK splits disabled for now to focus on basic functionality
+    // splits {
+    //     abi {
+    //         isEnable = true
+    //         reset()
+    //         include("armeabi-v7a", "arm64-v8a")  // Focus on ARM architectures for mobile
+    //         isUniversalApk = true  // Also generate a universal APK
+    //     }
+    //     
+    //     density {
+    //         isEnable = true
+    //         reset()
+    //         include("ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+    //     }
+    // }
+    
+    // Packaging options
+    packaging {
+        resources {
+            excludes += listOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/DEPENDENCIES",
+                "/META-INF/LICENSE",
+                "/META-INF/LICENSE.txt",
+                "/META-INF/NOTICE",
+                "/META-INF/NOTICE.txt",
+                "/META-INF/licenses/**",
+                "/META-INF/AL2.0",
+                "/META-INF/LGPL2.1",
+                "**/kotlin/**",
+                "kotlin/**",
+                "META-INF/kotlin/**",
+                "META-INF/*.kotlin_module"
+            )
+        }
+        
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+    
+    // Bundle configuration for Play Store
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+        
+        // Kotlin compiler optimizations
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-Xjvm-default=all"
+        )
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+        
+        // Disable unused features for smaller APK
+        aidl = false
+        renderScript = false
+        resValues = false
+        shaders = false
+        viewBinding = false
+        dataBinding = false
     }
     lint {
         abortOnError = true
@@ -59,12 +177,13 @@ android {
         warningsAsErrors = true
         baseline = file("lint-baseline.xml")
     }
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
+    // Native build disabled for now to focus on Kotlin implementation
+    // externalNativeBuild {
+    //     cmake {
+    //         path = file("src/main/cpp/CMakeLists.txt")
+    //         version = "3.22.1"
+    //     }
+    // }
 }
 
 dependencies {
@@ -130,6 +249,8 @@ dependencies {
     kapt("androidx.room:room-compiler:$roomVersion")
     
     // Hilt for dependency injection
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-compiler:2.48")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     
     // Security

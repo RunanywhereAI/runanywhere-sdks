@@ -163,8 +163,8 @@ fun SettingsScreen(
  */
 enum class SettingsTab(val title: String, val icon: ImageVector) {
     GENERATION("Generation", Icons.Default.Settings),
-    HARDWARE("Hardware", Icons.Default.Devices),
-    BATTERY("Battery", Icons.Default.BatteryChargingFull),
+    HARDWARE("Hardware", Icons.Default.Settings),
+    BATTERY("Battery", Icons.Default.Settings),
     PRIVACY("Privacy", Icons.Default.Lock),
     ADVANCED("Advanced", Icons.Default.Build)
 }

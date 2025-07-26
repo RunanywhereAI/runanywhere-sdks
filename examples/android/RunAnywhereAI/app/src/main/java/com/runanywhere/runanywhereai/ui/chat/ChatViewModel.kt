@@ -146,6 +146,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     
     override fun onCleared() {
         super.onCleared()
-        llmManager.release()
+        // Launch coroutine for suspend function
+        viewModelScope.launch {
+            llmManager.release()
+        }
     }
 }

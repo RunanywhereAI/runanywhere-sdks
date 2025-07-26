@@ -93,26 +93,46 @@ class GeminiNanoService(private val context: Context) : LLMService {
         }
     }
     
-    override suspend fun generate(prompt: String, options: GenerationOptions): String {
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
             val model = generativeModel ?: throw IllegalStateException("Service not initialized")
             
             try {
+                val startTime = System.currentTimeMillis()
+                
                 // For now, use the existing model instance
                 // In a real implementation, we'd update generation config
                 
                 // Generate response
                 val response = model.generateContent(prompt)
-                response.text ?: throw RuntimeException("Empty response from Gemini Nano")
+                val text = response.text ?: throw RuntimeException("Empty response from Gemini Nano")
+                
+                val endTime = System.currentTimeMillis()
+                val tokensPerSecond = text.length.toFloat() / ((endTime - startTime) / 1000f)
+                
+                GenerationResult(
+                    text = text,
+                    tokensGenerated = text.length, // Approximation based on character count
+                    timeMs = endTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Generation failed", e)
-                throw e
+                GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
         }
     }
     
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> = flow {
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
         val model = generativeModel ?: throw IllegalStateException("Service not initialized")
+        
+        val startTime = System.currentTimeMillis()
+        var accumulatedText = ""
         
         try {
             // For now, use the existing model instance
@@ -121,20 +141,39 @@ class GeminiNanoService(private val context: Context) : LLMService {
             // Stream generation
             val responseFlow = model.generateContentStream(prompt)
             responseFlow.collect { chunk ->
-                chunk.text?.let { emit(it) }
+                chunk.text?.let { chunkText ->
+                    accumulatedText += chunkText
+                    
+                    val currentTime = System.currentTimeMillis()
+                    val tokensPerSecond = accumulatedText.length.toFloat() / ((currentTime - startTime) / 1000f)
+                    
+                    emit(GenerationResult(
+                        text = chunkText,
+                        tokensGenerated = accumulatedText.length,
+                        timeMs = currentTime - startTime,
+                        tokensPerSecond = tokensPerSecond
+                    ))
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Stream generation failed", e)
-            throw e
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
         }
     }
     
     override fun getModelInfo(): ModelInfo? = modelInfo
     
-    override fun release() {
-        generativeModel = null
-        modelInfo = null
-        Log.d(TAG, "Gemini Nano resources released")
+    override suspend fun release() {
+        withContext(Dispatchers.IO) {
+            generativeModel = null
+            modelInfo = null
+            Log.d(TAG, "Gemini Nano resources released")
+        }
     }
     
     /**

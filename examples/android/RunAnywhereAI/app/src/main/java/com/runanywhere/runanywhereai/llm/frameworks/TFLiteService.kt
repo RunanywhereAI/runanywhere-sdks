@@ -93,11 +93,18 @@ class TFLiteService(private val context: Context) : LLMService {
         }
     }
     
-    override suspend fun generate(prompt: String, options: GenerationOptions): String {
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
-            val interp = interpreter ?: throw IllegalStateException("Service not initialized")
+            val interp = interpreter ?: return@withContext GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            )
             
             try {
+                val startTime = System.currentTimeMillis()
+                
                 // For demonstration, we'll implement a simplified generation
                 // In a real implementation, you'd need proper tokenization and decoding
                 
@@ -117,43 +124,94 @@ class TFLiteService(private val context: Context) : LLMService {
                 val outputTokens = decodeOutput(outputBuffer, options)
                 
                 // Convert tokens to text (simplified)
-                detokenizeSimple(outputTokens)
+                val response = detokenizeSimple(outputTokens)
+                
+                val endTime = System.currentTimeMillis()
+                val tokensPerSecond = outputTokens.size.toFloat() / ((endTime - startTime) / 1000f)
+                
+                GenerationResult(
+                    text = response,
+                    tokensGenerated = outputTokens.size,
+                    timeMs = endTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Generation failed", e)
-                throw e
+                GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
         }
     }
     
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> = flow {
-        val interp = interpreter ?: throw IllegalStateException("Service not initialized")
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
+        val interp = interpreter ?: run {
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
+            return@flow
+        }
         
         try {
+            val startTime = System.currentTimeMillis()
+            var tokenCount = 0
+            
             // For streaming, we would generate token by token
             // This is a simplified implementation
             val fullResponse = generate(prompt, options)
             
+            // If generation failed, emit the error result
+            if (fullResponse.text.isEmpty()) {
+                emit(fullResponse)
+                return@flow
+            }
+            
             // Emit the response in chunks to simulate streaming
-            val words = fullResponse.split(" ")
+            val words = fullResponse.text.split(" ")
             words.forEach { word ->
-                emit("$word ")
+                val chunk = "$word "
+                tokenCount++
+                
+                val currentTime = System.currentTimeMillis()
+                val tokensPerSecond = tokenCount.toFloat() / ((currentTime - startTime) / 1000f)
+                
+                emit(GenerationResult(
+                    text = chunk,
+                    tokensGenerated = tokenCount,
+                    timeMs = currentTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                ))
+                
                 kotlinx.coroutines.delay(50) // Simulate generation delay
             }
         } catch (e: Exception) {
             Log.e(TAG, "Stream generation failed", e)
-            throw e
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
         }
     }
     
     override fun getModelInfo(): ModelInfo? = modelInfo
     
-    override fun release() {
-        interpreter?.close()
-        interpreter = null
-        delegate?.close()
-        delegate = null
-        modelInfo = null
-        Log.d(TAG, "TFLite resources released")
+    override suspend fun release() {
+        withContext(Dispatchers.IO) {
+            interpreter?.close()
+            interpreter = null
+            delegate?.close()
+            delegate = null
+            modelInfo = null
+            Log.d(TAG, "TFLite resources released")
+        }
     }
     
     /**

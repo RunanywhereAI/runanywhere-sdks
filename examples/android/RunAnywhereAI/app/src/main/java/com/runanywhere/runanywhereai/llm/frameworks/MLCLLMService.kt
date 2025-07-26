@@ -140,13 +140,20 @@ class MLCLLMService(private val context: Context) : LLMService {
     override suspend fun generate(
         prompt: String,
         options: GenerationOptions
-    ): String {
+    ): GenerationResult {
         return withContext(Dispatchers.IO) {
             if (!isInitialized) {
-                throw IllegalStateException("Model not initialized")
+                return@withContext GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
             
             try {
+                val startTime = System.currentTimeMillis()
+                
                 // Build messages in OpenAI format
                 val messages = buildMessages(prompt)
                 
@@ -171,14 +178,28 @@ class MLCLLMService(private val context: Context) : LLMService {
                     .getJSONObject("message")
                     .getString("content")
                 
+                val endTime = System.currentTimeMillis()
+                val tokensGenerated = content.length // Approximation
+                val tokensPerSecond = tokensGenerated.toFloat() / ((endTime - startTime) / 1000f)
+                
                 // Add to conversation history
                 conversationHistory.add(ChatMessage(role = ChatRole.USER, content = prompt))
                 conversationHistory.add(ChatMessage(role = ChatRole.ASSISTANT, content = content))
                 
-                content
+                GenerationResult(
+                    text = content,
+                    tokensGenerated = tokensGenerated,
+                    timeMs = endTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                )
             } catch (e: Exception) {
                 Log.e(TAG, "Error during generation", e)
-                throw e
+                GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
         }
     }
@@ -186,14 +207,22 @@ class MLCLLMService(private val context: Context) : LLMService {
     override fun generateStream(
         prompt: String,
         options: GenerationOptions
-    ): Flow<String> = flow {
+    ): Flow<GenerationResult> = flow {
         if (!isInitialized) {
-            throw IllegalStateException("Model not initialized")
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
+            return@flow
         }
         
         try {
+            val startTime = System.currentTimeMillis()
             val messages = buildMessages(prompt)
             var accumulatedContent = ""
+            var tokenCount = 0
             
             // Add user message to history
             conversationHistory.add(ChatMessage(role = ChatRole.USER, content = prompt))
@@ -212,8 +241,18 @@ class MLCLLMService(private val context: Context) : LLMService {
                                 delta?.optString("content")?.let { content ->
                                     if (content.isNotEmpty()) {
                                         accumulatedContent += content
+                                        tokenCount++
+                                        
+                                        val currentTime = System.currentTimeMillis()
+                                        val tokensPerSecond = tokenCount.toFloat() / ((currentTime - startTime) / 1000f)
+                                        
                                         kotlinx.coroutines.runBlocking {
-                                            emit(accumulatedContent)
+                                            emit(GenerationResult(
+                                                text = content,
+                                                tokensGenerated = tokenCount,
+                                                timeMs = currentTime - startTime,
+                                                tokensPerSecond = tokensPerSecond
+                                            ))
                                         }
                                     }
                                 }
@@ -232,6 +271,14 @@ class MLCLLMService(private val context: Context) : LLMService {
                     
                     override fun onError(error: String) {
                         Log.e(TAG, "Stream error: $error")
+                        kotlinx.coroutines.runBlocking {
+                            emit(GenerationResult(
+                                text = "",
+                                tokensGenerated = 0,
+                                timeMs = 0,
+                                tokensPerSecond = 0f
+                            ))
+                        }
                     }
                 }
                 
@@ -245,7 +292,12 @@ class MLCLLMService(private val context: Context) : LLMService {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during streaming generation", e)
-            throw e
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
         }
     }
     
@@ -269,19 +321,21 @@ class MLCLLMService(private val context: Context) : LLMService {
         return messages
     }
     
-    override fun release() {
-        try {
-            if (enginePtr != 0L) {
-                nativeReleaseEngine(enginePtr)
-                enginePtr = 0
+    override suspend fun release() {
+        withContext(Dispatchers.IO) {
+            try {
+                if (enginePtr != 0L) {
+                    nativeReleaseEngine(enginePtr)
+                    enginePtr = 0
+                }
+                
+                conversationHistory.clear()
+                modelInfo = null
+                
+                Log.d(TAG, "MLC-LLM service released")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during cleanup", e)
             }
-            
-            conversationHistory.clear()
-            modelInfo = null
-            
-            Log.d(TAG, "MLC-LLM service released")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error during cleanup", e)
         }
     }
     
