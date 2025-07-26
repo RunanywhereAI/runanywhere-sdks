@@ -11,13 +11,16 @@ import Foundation
 // import MLXLLM
 
 @available(iOS 17.0, *)
-class MLXService: LLMProtocol {
+class MLXService: LLMProtocol, MemoryAware {
     var name: String = "MLX"
     var isInitialized: Bool = false
     
     private var modelPath: String = ""
     // private var model: LLMModel?
     // private var tokenizer: Tokenizer?
+    private var kvCache: KVCache = KVCache()
+    private let memoryQueue = DispatchQueue(label: "com.runanywhere.mlx.memory")
+    private var currentMemoryUsage: Int64 = 0
     
     func initialize(modelPath: String) async throws {
         // Verify file exists
@@ -35,18 +38,30 @@ class MLXService: LLMProtocol {
         
         self.modelPath = modelPath
         
+        // Check memory availability
+        try checkMemoryAvailability()
+        
         // In real implementation:
-        // 1. Load model configuration
-        // let config = try await ModelConfiguration.load(from: modelPath)
-        // 
-        // 2. Initialize model
-        // model = try LLMModel(configuration: config)
-        // 
-        // 3. Load weights
-        // try await model?.loadWeights(from: modelPath)
-        // 
-        // 4. Load tokenizer
-        // tokenizer = try await Tokenizer.load(from: modelPath)
+        // memoryQueue.sync {
+        //     // 1. Load model configuration
+        //     let config = try await ModelConfiguration.load(from: modelPath)
+        //     
+        //     // 2. Configure for available memory
+        //     config.useMemoryMapping = true
+        //     config.maxBatchSize = getOptimalBatchSize()
+        //     
+        //     // 3. Initialize model with unified memory
+        //     model = try LLMModel(configuration: config)
+        //     
+        //     // 4. Load weights efficiently
+        //     try await model?.loadWeights(from: modelPath, useMmap: true)
+        //     
+        //     // 5. Load tokenizer
+        //     tokenizer = try await Tokenizer.load(from: modelPath)
+        //     
+        //     // Track memory usage
+        //     currentMemoryUsage = estimateMemoryUsage()
+        // }
         
         // Simulate initialization
         try await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
@@ -141,12 +156,26 @@ class MLXService: LLMProtocol {
     }
     
     func cleanup() {
-        // In real implementation:
-        // model = nil
-        // tokenizer = nil
-        // Clear any GPU memory
-        
-        isInitialized = false
+        memoryQueue.sync {
+            // Clear KV cache first
+            kvCache.clear()
+            
+            // In real implementation:
+            // model?.freeWeights()
+            // model = nil
+            // tokenizer = nil
+            // 
+            // // Force GPU memory cleanup
+            // MLX.GPU.synchronize()
+            // MLX.GPU.clearCache()
+            
+            currentMemoryUsage = 0
+            isInitialized = false
+        }
+    }
+    
+    deinit {
+        cleanup()
     }
     
     // MARK: - Private Methods
@@ -168,12 +197,82 @@ class MLXService: LLMProtocol {
     }
 }
 
+// MARK: - Memory Management
+
+@available(iOS 17.0, *)
+extension MLXService {
+    private func checkMemoryAvailability() throws {
+        let memoryStats = MemoryManager.shared.getMemoryStats()
+        
+        // MLX needs at least 1.5GB free for efficient operation
+        let requiredMemory: Int64 = 1_500_000_000
+        
+        if memoryStats.available < requiredMemory {
+            throw LLMError.insufficientMemory
+        }
+    }
+    
+    private func estimateMemoryUsage() -> Int64 {
+        // MLX uses unified memory, so estimate based on model size
+        let url = URL(fileURLWithPath: modelPath)
+        var totalSize: Int64 = 0
+        
+        if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
+            for case let fileURL as URL in enumerator {
+                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                    totalSize += Int64(fileSize)
+                }
+            }
+        }
+        
+        // MLX is memory efficient due to unified memory
+        return Int64(Double(totalSize) * 1.1) // Only 10% overhead
+    }
+    
+    private func getOptimalBatchSize() -> Int {
+        let memoryStats = MemoryManager.shared.getMemoryStats()
+        
+        if memoryStats.available > 8_000_000_000 { // > 8GB
+            return 512
+        } else if memoryStats.available > 4_000_000_000 { // > 4GB
+            return 256
+        } else if memoryStats.available > 2_000_000_000 { // > 2GB
+            return 128
+        } else {
+            return 64 // Minimum batch size
+        }
+    }
+    
+    // MARK: - MemoryAware Protocol
+    
+    func reduceMemoryUsage() {
+        memoryQueue.sync {
+            // Clear KV cache to free memory
+            kvCache.clear()
+            
+            // In real implementation:
+            // // Reduce batch size
+            // model?.configuration.maxBatchSize = 32
+            // 
+            // // Clear GPU cache
+            // MLX.GPU.clearCache()
+        }
+    }
+    
+    func getEstimatedMemoryUsage() -> Int64 {
+        return memoryQueue.sync {
+            currentMemoryUsage
+        }
+    }
+}
+
 // MARK: - MLX-Specific Types (Placeholders)
 
 // These would come from the actual MLX framework
 private struct KVCache {
     var keys: [[Float]] = []
     var values: [[Float]] = []
+    private let maxCacheSize = 100 // Limit cache size for memory
     
     mutating func update(key: [Float], value: [Float], layer: Int) {
         if layer < keys.count {
@@ -183,11 +282,23 @@ private struct KVCache {
             keys.append(key)
             values.append(value)
         }
+        
+        // Trim cache if it grows too large
+        if keys.count > maxCacheSize {
+            keys.removeFirst()
+            values.removeFirst()
+        }
     }
     
     mutating func clear() {
-        keys.removeAll()
-        values.removeAll()
+        keys.removeAll(keepingCapacity: false)
+        values.removeAll(keepingCapacity: false)
+    }
+    
+    var memoryUsage: Int64 {
+        let keySize = keys.reduce(0) { $0 + $1.count * MemoryLayout<Float>.size }
+        let valueSize = values.reduce(0) { $0 + $1.count * MemoryLayout<Float>.size }
+        return Int64(keySize + valueSize)
     }
 }
 
