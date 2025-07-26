@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.detekt)
+    id("kotlin-kapt")
 }
 
 android {
@@ -107,6 +108,27 @@ dependencies {
     
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.11.0")
+    
+    // ExecuTorch runtime (Note: These are placeholder versions as ExecuTorch Android packages may not be published yet)
+    // implementation("org.pytorch:executorch-runtime:0.3.0")
+    // implementation("org.pytorch:executorch-backend-xnnpack:0.3.0")
+    // implementation("org.pytorch:executorch-backend-vulkan:0.3.0")
+    
+    // Android AI Core
+    implementation("com.google.android.gms:play-services-aicore:1.0.0")
+    implementation("androidx.core:core-ktx:1.12.0")
+    
+    // picoLLM
+    implementation("ai.picovoice:picollm-android:1.0.0")
+    
+    // Room database
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+    
+    // Hilt for dependency injection
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

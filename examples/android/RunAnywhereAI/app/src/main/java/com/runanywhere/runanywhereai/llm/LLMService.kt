@@ -17,12 +17,12 @@ interface LLMService {
     /**
      * Generate text based on the prompt
      */
-    suspend fun generate(prompt: String, options: GenerationOptions = GenerationOptions()): String
+    suspend fun generate(prompt: String, options: GenerationOptions = GenerationOptions()): GenerationResult
     
     /**
      * Stream generation results token by token
      */
-    fun generateStream(prompt: String, options: GenerationOptions = GenerationOptions()): Flow<String>
+    fun generateStream(prompt: String, options: GenerationOptions = GenerationOptions()): Flow<GenerationResult>
     
     /**
      * Get information about the loaded model
@@ -32,7 +32,7 @@ interface LLMService {
     /**
      * Release resources
      */
-    fun release()
+    suspend fun release()
 }
 
 /**
@@ -44,7 +44,9 @@ data class GenerationOptions(
     val topP: Float = 0.9f,
     val topK: Int = 40,
     val repetitionPenalty: Float = 1.1f,
-    val stopSequences: List<String> = emptyList()
+    val stopSequences: List<String> = emptyList(),
+    val presencePenalty: Float? = null,
+    val frequencyPenalty: Float? = null
 )
 
 /**
@@ -70,7 +72,8 @@ enum class LLMFramework {
     EXECUTORCH,
     MLC_LLM,
     GEMINI_NANO,
-    PICOLLM
+    PICOLLM,
+    AI_CORE
 }
 
 /**
