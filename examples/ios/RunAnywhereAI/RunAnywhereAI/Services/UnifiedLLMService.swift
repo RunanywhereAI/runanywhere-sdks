@@ -26,7 +26,17 @@ class UnifiedLLMService: ObservableObject {
         var services: [LLMService] = [
             MockLLMService(), // For testing
             LlamaCppService(),
+            MLCService(),
+            ONNXService(),
+            ExecuTorchService(),
+            TFLiteService(),
+            PicoLLMService(),
         ]
+        
+        // Add iOS 15+ services
+        if #available(iOS 15.0, *) {
+            services.append(SwiftTransformersService())
+        }
         
         // Add iOS 17+ services
         if #available(iOS 17.0, *) {

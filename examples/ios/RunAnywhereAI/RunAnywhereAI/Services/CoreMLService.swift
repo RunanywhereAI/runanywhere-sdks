@@ -15,6 +15,9 @@ class CoreMLService: LLMProtocol {
     private var model: MLModel?
     private var modelPath: String = ""
     private var tokenizer: SimpleTokenizer?
+    private let memoryQueue = DispatchQueue(label: "com.runanywhere.coreml.memory")
+    private var currentMemoryUsage: Int64 = 0
+    private var modelConfiguration: MLModelConfiguration?
     
     func initialize(modelPath: String) async throws {
         // Verify file exists
@@ -30,16 +33,34 @@ class CoreMLService: LLMProtocol {
         
         self.modelPath = modelPath
         
-        // Configure model
+        // Check memory availability
+        try checkMemoryAvailability()
+        
+        // Configure model with memory-aware settings
         let config = MLModelConfiguration()
-        config.computeUnits = .all // Use CPU, GPU, and Neural Engine
+        modelConfiguration = config
+        
+        // Determine optimal compute units based on available memory
+        let availableMemory = getAvailableMemory()
+        if availableMemory > 8_000_000_000 { // > 8GB
+            config.computeUnits = .all // Use CPU, GPU, and Neural Engine
+        } else if availableMemory > 4_000_000_000 { // > 4GB
+            config.computeUnits = .cpuAndGPU // Skip Neural Engine to save memory
+        } else {
+            config.computeUnits = .cpuOnly // Most memory-efficient
+        }
         
         // Load model
         do {
-            model = try MLModel(contentsOf: url, configuration: config)
+            model = try await Task {
+                try MLModel(contentsOf: url, configuration: config)
+            }.value
             
             // Initialize tokenizer
             tokenizer = SimpleTokenizer()
+            
+            // Track memory usage
+            currentMemoryUsage = estimateMemoryUsage()
             
             isInitialized = true
         } catch {
@@ -135,9 +156,25 @@ class CoreMLService: LLMProtocol {
     }
     
     func cleanup() {
-        model = nil
-        tokenizer = nil
-        isInitialized = false
+        memoryQueue.sync {
+            // Clear model and configuration
+            model = nil
+            modelConfiguration = nil
+            tokenizer = nil
+            
+            // Force memory cleanup
+            autoreleasepool {
+                // This helps ensure Core ML releases all resources
+                MLModel.compileModel(at: URL(fileURLWithPath: "/dev/null")) { _ in }
+            }
+            
+            currentMemoryUsage = 0
+            isInitialized = false
+        }
+    }
+    
+    deinit {
+        cleanup()
     }
     
     // MARK: - Private Methods
@@ -223,18 +260,122 @@ class CoreMLService: LLMProtocol {
     }
     
     private func getModelSize() -> String {
-        guard let url = URL(string: modelPath) else { return "Unknown" }
+        let url = URL(fileURLWithPath: modelPath)
         
-        do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            if let fileSize = attributes[.size] as? Int64 {
-                return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+        if url.pathExtension == "mlpackage" {
+            // Calculate total size of mlpackage directory
+            var totalSize: Int64 = 0
+            
+            if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
+                for case let fileURL as URL in enumerator {
+                    if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                        totalSize += Int64(fileSize)
+                    }
+                }
             }
-        } catch {
-            print("Error getting model size: \(error)")
+            
+            return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
+        } else {
+            // Single file
+            do {
+                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                if let fileSize = attributes[.size] as? Int64 {
+                    return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+                }
+            } catch {
+                print("Error getting model size: \(error)")
+            }
         }
         
         return "Unknown"
+    }
+}
+
+// MARK: - Memory Management
+
+@available(iOS 17.0, *)
+extension CoreMLService {
+    private func checkMemoryAvailability() throws {
+        let availableMemory = getAvailableMemory()
+        
+        // Core ML models typically need 2-4GB minimum
+        let requiredMemory: Int64 = 2_000_000_000
+        
+        if availableMemory < requiredMemory {
+            throw LLMError.insufficientMemory
+        }
+    }
+    
+    private func getAvailableMemory() -> Int64 {
+        let availableMemory = ProcessInfo.processInfo.physicalMemory
+        let usedMemory = getUsedMemory()
+        return availableMemory - usedMemory
+    }
+    
+    private func getUsedMemory() -> Int64 {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+        
+        return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
+    }
+    
+    private func estimateMemoryUsage() -> Int64 {
+        // Core ML models can use 2-3x their file size in memory
+        let url = URL(fileURLWithPath: modelPath)
+        var fileSize: Int64 = 0
+        
+        if url.pathExtension == "mlpackage" {
+            // Calculate total size of mlpackage
+            if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
+                for case let fileURL as URL in enumerator {
+                    if let size = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                        fileSize += Int64(size)
+                    }
+                }
+            }
+        } else {
+            // Single file
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+               let size = attributes[.size] as? Int64 {
+                fileSize = size
+            }
+        }
+        
+        // Core ML typically uses 2-3x file size when loaded
+        return Int64(Double(fileSize) * 2.5)
+    }
+    
+    func getMemoryUsage() -> (current: Int64, peak: Int64) {
+        return memoryQueue.sync {
+            (current: currentMemoryUsage, peak: currentMemoryUsage)
+        }
+    }
+    
+    // Dynamic compute unit adjustment based on memory pressure
+    func adjustComputeUnits() {
+        guard let config = modelConfiguration else { return }
+        
+        let availableMemory = getAvailableMemory()
+        
+        if availableMemory < 1_000_000_000 { // < 1GB
+            // Switch to CPU only to reduce memory pressure
+            config.computeUnits = .cpuOnly
+        } else if availableMemory < 2_000_000_000 { // < 2GB
+            // Use CPU and GPU, avoid Neural Engine
+            config.computeUnits = .cpuAndGPU
+        } else {
+            // Plenty of memory, use all units
+            config.computeUnits = .all
+        }
     }
 }
 

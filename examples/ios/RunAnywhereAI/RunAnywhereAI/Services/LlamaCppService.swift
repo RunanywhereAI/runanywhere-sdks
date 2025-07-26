@@ -32,19 +32,16 @@ class LlamaCppService: LLMProtocol {
     
     private var model: llama_model?
     private var context: llama_context?
-    private let modelPath: String
+    private var modelPath: String = ""
+    private let memoryQueue = DispatchQueue(label: "com.runanywhere.llamacpp.memory")
+    private var currentMemoryUsage: Int64 = 0
     
     init() {
         self.modelPath = ""
     }
     
     func initialize(modelPath: String) async throws {
-        // For now, simulate initialization
-        // In real implementation, this would:
-        // 1. Call llama_backend_init()
-        // 2. Load model with llama_load_model_from_file()
-        // 3. Create context with llama_new_context_with_model()
-        
+        // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
         }
@@ -53,6 +50,41 @@ class LlamaCppService: LLMProtocol {
         guard modelPath.hasSuffix(".gguf") else {
             throw LLMError.unsupportedFormat
         }
+        
+        self.modelPath = modelPath
+        
+        // Check memory availability before loading
+        try checkMemoryAvailability()
+        
+        // In real implementation:
+        // memoryQueue.sync {
+        //     // Initialize llama backend
+        //     llama_backend_init()
+        //     
+        //     // Load model with memory tracking
+        //     let params = llama_model_default_params()
+        //     params.use_mmap = true // Memory-mapped files for efficiency
+        //     params.use_mlock = false // Don't lock in RAM
+        //     
+        //     model = llama_load_model_from_file(modelPath, params)
+        //     guard model != nil else {
+        //         throw LLMError.initializationFailed("Failed to load model")
+        //     }
+        //     
+        //     // Create context with conservative settings
+        //     let ctxParams = llama_context_default_params()
+        //     ctxParams.n_ctx = min(2048, getAvailableContextSize())
+        //     ctxParams.n_batch = min(512, ctxParams.n_ctx / 4)
+        //     ctxParams.n_threads = min(4, ProcessInfo.processInfo.processorCount)
+        //     
+        //     context = llama_new_context_with_model(model, ctxParams)
+        //     guard context != nil else {
+        //         throw LLMError.initializationFailed("Failed to create context")
+        //     }
+        //     
+        //     // Track memory usage
+        //     currentMemoryUsage = estimateMemoryUsage()
+        // }
         
         // Simulate loading delay
         try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
@@ -119,7 +151,7 @@ class LlamaCppService: LLMProtocol {
         return ModelInfo(
             id: "llama-cpp-model",
             name: "GGUF Model",
-            size: "Unknown",
+            size: getModelSize(),
             format: .gguf,
             quantization: "Q4_K_M",
             contextLength: 2048,
@@ -128,14 +160,27 @@ class LlamaCppService: LLMProtocol {
     }
     
     func cleanup() {
-        // In real implementation:
-        // - llama_free(context)
-        // - llama_free_model(model)
-        // - llama_backend_free()
-        
-        model = nil
-        context = nil
-        isInitialized = false
+        memoryQueue.sync {
+            // Clean up llama.cpp resources
+            if let ctx = context {
+                // llama_free(ctx)
+                context = nil
+            }
+            
+            if let mdl = model {
+                // llama_free_model(mdl)
+                model = nil
+            }
+            
+            // llama_backend_free()
+            
+            currentMemoryUsage = 0
+            isInitialized = false
+        }
+    }
+    
+    deinit {
+        cleanup()
     }
     
     // MARK: - Private Methods
@@ -165,6 +210,94 @@ class LlamaCppService: LLMProtocol {
         // - llama_sample_token
         
         return llama_token.random(in: 1...llama_token(vocabSize))
+    }
+    
+    private func getModelSize() -> String {
+        let url = URL(fileURLWithPath: modelPath)
+        
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+            }
+        } catch {
+            print("Error getting model size: \(error)")
+        }
+        
+        return "Unknown"
+    }
+}
+
+// MARK: - Memory Management
+
+extension LlamaCppService {
+    private func checkMemoryAvailability() throws {
+        let availableMemory = ProcessInfo.processInfo.physicalMemory
+        let usedMemory = getUsedMemory()
+        let freeMemory = availableMemory - usedMemory
+        
+        // Require at least 2GB free for model loading
+        let requiredMemory: Int64 = 2_000_000_000
+        
+        if freeMemory < requiredMemory {
+            throw LLMError.insufficientMemory
+        }
+    }
+    
+    private func getUsedMemory() -> Int64 {
+        var info = mach_task_basic_info()
+        var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
+        
+        let result = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
+                task_info(mach_task_self_,
+                         task_flavor_t(MACH_TASK_BASIC_INFO),
+                         $0,
+                         &count)
+            }
+        }
+        
+        return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
+    }
+    
+    private func estimateMemoryUsage() -> Int64 {
+        // Estimate based on model size
+        let url = URL(fileURLWithPath: modelPath)
+        
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let fileSize = attributes[.size] as? Int64 {
+                // Model typically uses 1.2-1.5x file size in memory
+                return Int64(Double(fileSize) * 1.3)
+            }
+        } catch {
+            print("Error estimating memory: \(error)")
+        }
+        
+        return 0
+    }
+    
+    private func getAvailableContextSize() -> Int32 {
+        let availableMemory = ProcessInfo.processInfo.physicalMemory
+        let usedMemory = getUsedMemory()
+        let freeMemory = availableMemory - usedMemory
+        
+        // Conservative context size based on available memory
+        if freeMemory > 8_000_000_000 { // > 8GB free
+            return 4096
+        } else if freeMemory > 4_000_000_000 { // > 4GB free
+            return 2048
+        } else if freeMemory > 2_000_000_000 { // > 2GB free
+            return 1024
+        } else {
+            return 512 // Minimum context
+        }
+    }
+    
+    func getMemoryUsage() -> (current: Int64, peak: Int64) {
+        return memoryQueue.sync {
+            (current: currentMemoryUsage, peak: currentMemoryUsage)
+        }
     }
 }
 
