@@ -1,10 +1,5 @@
 // The Swift Programming Language
 // https://docs.swift.org/swift-book
 
-public class RunAnywhere {
-    public init() {}
-    
-    public func runAnywhere() async -> String {
-        return "Hello, World!"
-    }
-}
+// This file serves as the module entry point
+// All public APIs are defined in the Public directory

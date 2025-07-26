@@ -1,0 +1,120 @@
+name: iOS SDK CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test on macOS
+    runs-on: macos-14
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+    
+    - name: Cache Swift Package Manager
+      uses: actions/cache@v3
+      with:
+        path: .build
+        key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-spm-
+    
+    - name: Build SDK
+      run: |
+        swift build --configuration debug
+        swift build --configuration release
+    
+    - name: Run tests
+      run: swift test --enable-code-coverage
+    
+    - name: Generate coverage report
+      run: |
+        xcrun llvm-cov export \
+          .build/debug/RunAnywhereSDKPackageTests.xctest/Contents/MacOS/RunAnywhereSDKPackageTests \
+          -instr-profile=.build/debug/codecov/default.profdata \
+          -format=lcov > coverage.lcov
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.lcov
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: SwiftLint
+      run: |
+        if which swiftlint >/dev/null; then
+          swiftlint --strict
+        else
+          echo "SwiftLint not installed, downloading..."
+          brew install swiftlint
+          swiftlint --strict
+        fi
+  
+  build-platforms:
+    name: Build for ${{ matrix.platform }}
+    runs-on: macos-14
+    strategy:
+      matrix:
+        platform: [iOS, tvOS, watchOS, macOS]
+        include:
+          - platform: iOS
+            sdk: iphoneos
+            destination: "platform=iOS Simulator,name=iPhone 15,OS=17.2"
+          - platform: tvOS
+            sdk: appletvos
+            destination: "platform=tvOS Simulator,name=Apple TV,OS=17.2"
+          - platform: watchOS
+            sdk: watchos
+            destination: "platform=watchOS Simulator,name=Apple Watch Series 9 (45mm),OS=10.2"
+          - platform: macOS
+            sdk: macosx
+            destination: "platform=macOS"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+    
+    - name: Build for ${{ matrix.platform }}
+      run: |
+        xcodebuild build \
+          -scheme RunAnywhereSDK \
+          -sdk ${{ matrix.sdk }} \
+          -destination "${{ matrix.destination }}" \
+          -configuration Release \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO
+
+  documentation:
+    name: Build Documentation
+    runs-on: macos-14
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Select Xcode
+      run: sudo xcode-select -s /Applications/Xcode_15.2.app
+    
+    - name: Build documentation
+      run: |
+        xcodebuild docbuild \
+          -scheme RunAnywhereSDK \
+          -destination "platform=iOS Simulator,name=iPhone 15" \
+          -derivedDataPath ./build
+    
+    - name: Archive documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: build/Build/Products/Debug-iphonesimulator/RunAnywhereSDK.doccarchive

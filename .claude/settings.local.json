@@ -5,7 +5,11 @@
       "Bash(git add:*)",
       "Bash(./gradlew:*)",
       "Bash(ls:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(swift build)",
+      "Bash(swift test)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

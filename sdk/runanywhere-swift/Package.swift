@@ -1,31 +1,48 @@
-// swift-tools-version: 6.1
-// The swift-tools-version declares the minimum version of Swift required to build this package.
-
+// swift-tools-version: 5.9
 import PackageDescription
 
 let package = Package(
-    name: "RunAnywhere",
+    name: "RunAnywhereSDK",
+    platforms: [
+        .iOS(.v13),
+        .macOS(.v12),
+        .tvOS(.v13),
+        .watchOS(.v6)
+    ],
     products: [
-        // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "RunAnywhere",
-            targets: ["RunAnywhere"]),
+            name: "RunAnywhereSDK",
+            targets: ["RunAnywhereSDK"]
+        ),
+        .library(
+            name: "RunAnywhereSDKDynamic",
+            type: .dynamic,
+            targets: ["RunAnywhereSDK"]
+        )
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1")
     ],
     targets: [
-        // Targets are the basic building blocks of a package, defining a module or a test suite.
-        // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "RunAnywhere",
-            plugins: [
-                .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
-            ]
+            name: "RunAnywhereSDK",
+            dependencies: [
+                .product(name: "Crypto", package: "swift-crypto")
+            ],
+            path: "Sources/RunAnywhere",
+            swiftSettings: [
+                .define("SWIFT_PACKAGE")
+            ],
+            // SwiftLint plugin temporarily disabled for build
+            // plugins: [
+            //     .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
+            // ]
         ),
         .testTarget(
-            name: "RunAnywhereTests",
-            dependencies: ["RunAnywhere"]
-        ),
+            name: "RunAnywhereSDKTests",
+            dependencies: ["RunAnywhereSDK"],
+            path: "Tests/RunAnywhereTests"
+        )
     ]
 )
