@@ -176,7 +176,7 @@ fun ModelCard(
                             label = { Text(model.framework.name) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Default.Memory,
+                                    Icons.Default.Build,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -188,7 +188,7 @@ fun ModelCard(
                             label = { Text(formatBytes(model.sizeBytes)) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Default.Storage,
+                                    Icons.Default.Folder,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -200,7 +200,7 @@ fun ModelCard(
                             label = { Text(model.quantization) },
                             leadingIcon = {
                                 Icon(
-                                    Icons.Default.Speed,
+                                    Icons.Default.Settings,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -226,7 +226,7 @@ fun ModelCard(
                         onClick = onDownload,
                         enabled = downloadProgress == null
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Download")
+                        Icon(Icons.Default.GetApp, contentDescription = "Download")
                     }
                 }
             }

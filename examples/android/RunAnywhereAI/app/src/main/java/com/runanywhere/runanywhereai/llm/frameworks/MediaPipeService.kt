@@ -35,37 +35,33 @@ class MediaPipeService(private val context: Context) : LLMService {
     override val isInitialized: Boolean
         get() = llmInference != null
     
-    override suspend fun initialize(modelPath: String) = withContext(Dispatchers.IO) {
-        try {
-            release() // Clean up any existing instance
-            
-            // Find model info
-            val modelFile = File(modelPath)
-            currentModel = SUPPORTED_MODELS.find { it.fileName == modelFile.name }
-                ?: MediaPipeModel(modelFile.name, "Custom Model", modelFile.length())
-            
-            // Configure base options
-            val baseOptions = BaseOptions.builder()
-                .setModelAssetPath(modelPath)
-                .setDelegate(BaseOptions.Delegate.GPU) // Use GPU acceleration
-                .build()
-            
-            // Configure LLM options
-            val options = LlmInference.LlmInferenceOptions.builder()
-                .setBaseOptions(baseOptions)
-                .setMaxTokens(512)
-                .setMaxTopK(40)
-                .setTemperature(0.8f)
-                .setRandomSeed(42)
-                .build()
-            
-            // Create LLM inference instance
-            llmInference = LlmInference.createFromOptions(context, options)
-            
-            Log.d(TAG, "Model loaded successfully: ${currentModel?.displayName}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize MediaPipe model", e)
-            throw e
+    override suspend fun initialize(modelPath: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                release() // Clean up any existing instance
+                
+                // Find model info
+                val modelFile = File(modelPath)
+                currentModel = SUPPORTED_MODELS.find { it.fileName == modelFile.name }
+                    ?: MediaPipeModel(modelFile.name, "Custom Model", modelFile.length())
+                
+                // Configure base options
+                val baseOptions = BaseOptions.builder()
+                    .setModelAssetPath(modelPath)
+                    .build()
+                
+                // Configure LLM options - simplified for compatibility
+                val options = LlmInference.LlmInferenceOptions.builder()
+                    .build()
+                
+                // Create LLM inference instance
+                llmInference = LlmInference.createFromOptions(context, options)
+                
+                Log.d(TAG, "Model loaded successfully: ${currentModel?.displayName}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize MediaPipe model", e)
+                throw e
+            }
         }
     }
     
@@ -86,34 +82,15 @@ class MediaPipeService(private val context: Context) : LLMService {
     override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> = flow {
         val inference = llmInference ?: throw IllegalStateException("Service not initialized")
         
-        val responseBuilder = StringBuilder()
-        var lastEmittedLength = 0
-        
-        inference.generateResponseAsync(
-            prompt,
-            object : LlmInference.PartialResultListener {
-                override fun onPartialResult(partialResult: String) {
-                    // Emit only the new tokens
-                    if (partialResult.length > lastEmittedLength) {
-                        val newContent = partialResult.substring(lastEmittedLength)
-                        lastEmittedLength = partialResult.length
-                        // Note: Flow emission happens in callback, might need channel-based approach
-                        responseBuilder.append(newContent)
-                    }
-                }
-                
-                override fun onComplete() {
-                    // Generation complete
-                }
-                
-                override fun onError(error: RuntimeException) {
-                    Log.e(TAG, "Streaming generation error", error)
-                }
-            }
-        )
-        
-        // Emit accumulated response
-        emit(responseBuilder.toString())
+        try {
+            // For now, use non-streaming API and emit the full response
+            // MediaPipe streaming API seems to have changed
+            val response = inference.generateResponse(prompt)
+            emit(response)
+        } catch (e: Exception) {
+            Log.e(TAG, "Generation failed", e)
+            throw e
+        }
     }
     
     override fun getModelInfo(): ModelInfo? {

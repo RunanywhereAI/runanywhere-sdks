@@ -46,7 +46,6 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
             val sessionOptions = OrtSession.SessionOptions().apply {
                 // Add execution providers
                 addNnapi() // Android NNAPI
-                addCPU()   // CPU fallback
                 
                 // Optimization settings
                 setInterOpNumThreads(4)
@@ -103,7 +102,6 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
                 inputIds = inputIds + nextToken
                 
                 // Clean up tensors
-                outputs.forEach { it?.close() }
                 inputTensor.close()
             }
             
@@ -134,7 +132,6 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
             inputIds = inputIds + nextToken
             
             // Clean up
-            outputs.forEach { it?.close() }
             inputTensor.close()
         }
     }

@@ -50,7 +50,7 @@ fun RunAnywhereApp() {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Chat, contentDescription = "Chat") },
+                    icon = { Icon(Icons.Default.Email, contentDescription = "Chat") },
                     label = { Text("Chat") },
                     selected = currentRoute == "chat",
                     onClick = {
@@ -61,7 +61,7 @@ fun RunAnywhereApp() {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Storage, contentDescription = "Models") },
+                    icon = { Icon(Icons.Default.Folder, contentDescription = "Models") },
                     label = { Text("Models") },
                     selected = currentRoute == "models",
                     onClick = {
