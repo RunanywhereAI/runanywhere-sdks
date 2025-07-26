@@ -241,6 +241,17 @@ class ModelRepository(private val context: Context) {
                 }
             }
             
+            // Verify downloaded file if hash is provided
+            if (modelInfo.sha256Hash != null) {
+                emit(DownloadProgress.Verifying)
+                val isValid = verifyModelIntegrity(file, modelInfo.sha256Hash)
+                if (!isValid) {
+                    file.delete()
+                    emit(DownloadProgress.Failed("File verification failed. Hash mismatch."))
+                    return@flow
+                }
+            }
+            
             emit(DownloadProgress.Completed(file.absolutePath))
             
         } catch (e: Exception) {
@@ -276,6 +287,52 @@ class ModelRepository(private val context: Context) {
         val file = File(modelsDirectory, modelInfo.fileName)
         return file.exists() && file.length() > 0
     }
+    
+    /**
+     * Verify model file integrity using SHA-256 hash
+     */
+    private suspend fun verifyModelIntegrity(file: File, expectedHash: String): Boolean = 
+        withContext(Dispatchers.IO) {
+            try {
+                val calculatedHash = calculateSHA256(file)
+                calculatedHash.equals(expectedHash, ignoreCase = true)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to verify model integrity", e)
+                false
+            }
+        }
+    
+    /**
+     * Calculate SHA-256 hash of a file
+     */
+    private fun calculateSHA256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+    
+    /**
+     * Get device available memory
+     */
+    fun getAvailableMemory(): Long {
+        val runtime = Runtime.getRuntime()
+        return runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
+    }
+    
+    /**
+     * Check if device has enough memory for model
+     */
+    fun canLoadModel(modelInfo: ModelInfo): Boolean {
+        val requiredMemory = modelInfo.requiredRam ?: (modelInfo.sizeBytes * 2) // Estimate if not provided
+        val availableMemory = getAvailableMemory()
+        return availableMemory >= requiredMemory
+    }
 }
 
 /**
@@ -291,7 +348,10 @@ data class ModelInfo(
     val fileName: String,
     val quantization: String,
     val isDownloaded: Boolean = false,
-    val localPath: String? = null
+    val localPath: String? = null,
+    val sha256Hash: String? = null,  // SHA-256 hash for verification
+    val requiredRam: Long? = null,    // Estimated RAM requirement
+    val supportedDevices: List<String>? = null  // Device compatibility list
 )
 
 /**
@@ -304,6 +364,7 @@ sealed class DownloadProgress {
         val bytesDownloaded: Long,
         val totalBytes: Long
     ) : DownloadProgress()
+    object Verifying : DownloadProgress()
     data class Completed(val filePath: String) : DownloadProgress()
     data class Failed(val error: String) : DownloadProgress()
 }

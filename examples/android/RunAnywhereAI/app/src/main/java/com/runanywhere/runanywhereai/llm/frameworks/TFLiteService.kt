@@ -165,14 +165,7 @@ class TFLiteService(private val context: Context) : LLMService {
             val compatList = CompatibilityList()
             if (compatList.isDelegateSupportedOnThisDevice) {
                 Log.d(TAG, "Using GPU delegate")
-                GpuDelegate(
-                    GpuDelegate.Options().apply {
-                        setPrecisionLossAllowed(true)
-                        setInferencePreference(
-                            GpuDelegate.Options.INFERENCE_PREFERENCE_SUSTAINED_SPEED
-                        )
-                    }
-                )
+                GpuDelegate()
             } else {
                 // Try NNAPI delegate
                 createNnApiDelegate()
@@ -301,7 +294,7 @@ class TFLiteService(private val context: Context) : LLMService {
             tokens.add(sampledToken)
             
             // Stop if we hit a stop token (simplified)
-            if (sampledToken == 0) break
+            if (sampledToken == 0) return@repeat
         }
         
         return tokens

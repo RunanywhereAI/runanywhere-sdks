@@ -267,6 +267,13 @@ fun ModelCard(
                             color = MaterialTheme.colorScheme.error
                         )
                     }
+                    is DownloadProgress.Verifying -> {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        Text(
+                            text = "Verifying download...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
