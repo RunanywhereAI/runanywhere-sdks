@@ -154,7 +154,7 @@ struct ComparisonView: View {
         framework: LLMFramework,
         output: String,
         isGenerating: Bool,
-        metrics: PerformanceMetrics?,
+        metrics: ComparisonMetrics?,
         color: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -265,7 +265,7 @@ struct ComparisonView: View {
     
     private func performanceSummaryCard(
         framework: LLMFramework,
-        metrics: PerformanceMetrics?,
+        metrics: ComparisonMetrics?,
         color: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -498,8 +498,8 @@ struct PerformanceComparisonChart: View {
 struct MetricsComparisonTable: View {
     let frameworkA: LLMFramework
     let frameworkB: LLMFramework
-    let metricsA: PerformanceMetrics
-    let metricsB: PerformanceMetrics
+    let metricsA: ComparisonMetrics
+    let metricsB: ComparisonMetrics
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

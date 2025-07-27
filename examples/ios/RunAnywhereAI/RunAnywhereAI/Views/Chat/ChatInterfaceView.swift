@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ChatInterfaceView: View {
-    @StateObject private var viewModel = ChatViewModel()
+    @StateObject private var viewModel = ChatViewModelEnhanced()
     @State private var messageText = ""
     @State private var showingFrameworkPicker = false
     @State private var showingModelPicker = false

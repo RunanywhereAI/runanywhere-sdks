@@ -17,10 +17,10 @@ class BenchmarkSuite: ObservableObject {
     @Published var isRunning = false
     @Published var currentProgress: Double = 0.0
     @Published var currentBenchmark: String = ""
-    @Published var results: [BenchmarkResult] = []
+    @Published var results: [BenchmarkSuiteResult] = []
     
     // MARK: - Private Properties
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "Benchmark")
+    private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "Benchmark")
     private let queue = DispatchQueue(label: "com.runanywhere.benchmark", qos: .userInitiated)
     private var cancellables = Set<AnyCancellable>()
     
@@ -100,7 +100,7 @@ class BenchmarkSuite: ObservableObject {
                 for prompt in benchmarkPrompts {
                     var promptResults: [SingleBenchmarkResult] = []
                     
-                    for iteration in 0..<options.iterations {
+                    for _ in 0..<options.iterations {
                         let result = try await benchmarkSingle(
                             service: service,
                             prompt: prompt,
@@ -125,9 +125,14 @@ class BenchmarkSuite: ObservableObject {
                 logger.error("Failed to benchmark \(framework.displayName): \(error)")
                 // Record error result
                 results.append(
-                    BenchmarkResult(
+                    BenchmarkSuiteResult(
                         framework: framework,
-                        prompt: benchmarkPrompts.first!,
+                        prompt: BenchmarkTestPrompt(
+                            id: benchmarkPrompts.first!.id,
+                            text: benchmarkPrompts.first!.text,
+                            category: benchmarkPrompts.first!.category,
+                            expectedTokens: benchmarkPrompts.first!.expectedTokens
+                        ),
                         error: error.localizedDescription
                     )
                 )
@@ -158,7 +163,7 @@ class BenchmarkSuite: ObservableObject {
         // Measure generation
         try await service.streamGenerate(
             prompt: prompt.text,
-            options: GenerationOptions(maxTokens: 50, temperature: 0.7),
+            options: GenerationOptions(maxTokens: 50, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: []),
             onToken: { _ in
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
@@ -229,7 +234,7 @@ class BenchmarkSuite: ObservableObject {
     }
     
     /// Export benchmark results
-    func exportResults(format: ExportFormat) throws -> Data {
+    func exportResults(format: BenchmarkExportFormat) throws -> Data {
         switch format {
         case .json:
             return try JSONEncoder().encode(results)
@@ -242,28 +247,28 @@ class BenchmarkSuite: ObservableObject {
     
     // MARK: - Private Methods
     
-    private func initializeFramework(_ framework: LLMFramework) async throws -> LLMProtocol {
-        let unifiedService = UnifiedLLMService.shared
-        try await unifiedService.selectFramework(framework)
+    private func initializeFramework(_ framework: LLMFramework) async throws -> LLMService {
+        let unifiedService = await UnifiedLLMService.shared
+        await unifiedService.selectService(named: framework.displayName)
         
-        guard let service = unifiedService.currentService else {
+        guard let service = await unifiedService.currentService else {
             throw BenchmarkError.frameworkInitializationFailed
         }
         
         return service
     }
     
-    private func warmupFramework(service: LLMProtocol) async throws {
+    private func warmupFramework(service: LLMService) async throws {
         logger.debug("Warming up \(service.name)")
         
         _ = try await service.generate(
             prompt: "Hello",
-            options: GenerationOptions(maxTokens: 5, temperature: 0.1)
+            options: GenerationOptions(maxTokens: 5, temperature: 0.1, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: [])
         )
     }
     
     private func benchmarkSingle(
-        service: LLMProtocol,
+        service: LLMService,
         prompt: BenchmarkTestPrompt,
         framework: LLMFramework
     ) async throws -> SingleBenchmarkResult {
@@ -278,7 +283,11 @@ class BenchmarkSuite: ObservableObject {
             prompt: prompt.text,
             options: GenerationOptions(
                 maxTokens: prompt.expectedTokens,
-                temperature: 0.7
+                temperature: 0.7,
+                topP: 0.95,
+                topK: 40,
+                repetitionPenalty: 1.1,
+                stopSequences: []
             ),
             onToken: { token in
                 if firstTokenTime == nil {
@@ -308,14 +317,14 @@ class BenchmarkSuite: ObservableObject {
         _ results: [SingleBenchmarkResult],
         prompt: BenchmarkTestPrompt,
         framework: LLMFramework
-    ) -> BenchmarkResult {
+    ) -> BenchmarkSuiteResult {
         
         let totalTimes = results.map { $0.totalTime }
         let ttftTimes = results.map { $0.timeToFirstToken }
         let tpsSpeeds = results.map { $0.tokensPerSecond }
         let memoryUsages = results.map { $0.memoryUsed }
         
-        return BenchmarkResult(
+        return BenchmarkSuiteResult(
             framework: framework,
             prompt: prompt,
             avgTotalTime: totalTimes.reduce(0, +) / Double(totalTimes.count),
@@ -323,12 +332,12 @@ class BenchmarkSuite: ObservableObject {
             avgTokensPerSecond: tpsSpeeds.reduce(0, +) / Double(tpsSpeeds.count),
             minTokensPerSecond: tpsSpeeds.min() ?? 0,
             maxTokensPerSecond: tpsSpeeds.max() ?? 0,
-            avgMemoryUsed: memoryUsages.reduce(0, +) / Double(memoryUsages.count),
+            avgMemoryUsed: memoryUsages.reduce(0, +) / Int64(memoryUsages.count),
             sampleCount: results.count
         )
     }
     
-    private func cleanupFramework(_ service: LLMProtocol) async {
+    private func cleanupFramework(_ service: LLMService) async {
         // Framework cleanup if needed
         logger.debug("Cleaning up \(service.name)")
     }
@@ -392,13 +401,13 @@ class BenchmarkSuite: ObservableObject {
         
         for (framework, results) in groupedByFramework {
             let avgSpeed = results.map { $0.avgTokensPerSecond }.reduce(0, +) / Double(results.count)
-            let avgMemory = results.map { $0.avgMemoryUsed }.reduce(0, +) / Double(results.count)
+            let avgMemory = Double(results.map { $0.avgMemoryUsed }.reduce(0, +)) / Double(results.count)
             
             frameworkSummaries.append(
                 FrameworkSummary(
                     framework: framework,
                     averageSpeed: avgSpeed,
-                    averageMemory: avgMemory,
+                    averageMemory: Int64(avgMemory),
                     successRate: Double(results.filter { $0.error == nil }.count) / Double(results.count)
                 )
             )
@@ -511,7 +520,7 @@ struct SingleBenchmarkResult {
     let generatedText: String
 }
 
-struct BenchmarkResult: Codable {
+struct BenchmarkSuiteResult: Codable {
     let framework: LLMFramework
     let prompt: BenchmarkTestPrompt
     let avgTotalTime: TimeInterval
@@ -568,7 +577,7 @@ struct ComparisonResult {
 
 struct BenchmarkReport {
     let date: Date
-    let results: [BenchmarkResult]
+    let results: [BenchmarkSuiteResult]
     let summary: BenchmarkSummary
 }
 
@@ -588,10 +597,10 @@ struct FrameworkSummary {
 struct BenchmarkSession: Codable {
     let id: UUID
     let date: Date
-    let results: [BenchmarkResult]
+    let results: [BenchmarkSuiteResult]
 }
 
-enum ExportFormat {
+enum BenchmarkExportFormat {
     case json
     case csv
     case markdown

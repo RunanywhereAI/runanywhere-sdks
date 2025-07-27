@@ -93,7 +93,7 @@ struct PerformanceDashboardView: View {
                 
                 statusCard(
                     title: "Memory",
-                    value: "\(Int(performanceMonitor.currentMetrics.usagePercentage * 100))%",
+                    value: formatMemoryUsage(performanceMonitor.currentMetrics.memoryUsage, performanceMonitor.currentMetrics.availableMemory),
                     icon: "memorychip",
                     color: memoryStatusColor
                 )
@@ -128,10 +128,10 @@ struct PerformanceDashboardView: View {
             metricCard(
                 title: "Memory Usage",
                 value: ByteCountFormatter.string(
-                    fromByteCount: performanceMonitor.currentMetrics.currentUsage,
+                    fromByteCount: memoryProfiler.currentProfile.currentUsage,
                     countStyle: .memory
                 ),
-                trend: performanceMonitor.currentProfile.trend == .increasing ? .up : .down,
+                trend: memoryProfiler.currentProfile.trend == .increasing ? .up : .down,
                 change: memoryTrendString
             )
             
@@ -380,7 +380,8 @@ struct PerformanceDashboardView: View {
     }
     
     private var memoryStatusColor: Color {
-        let usage = performanceMonitor.currentMetrics.usagePercentage
+        let totalMemory = performanceMonitor.currentMetrics.memoryUsage + performanceMonitor.currentMetrics.availableMemory
+        let usage = totalMemory > 0 ? Double(performanceMonitor.currentMetrics.memoryUsage) / Double(totalMemory) : 0
         if usage > 0.9 { return .red }
         if usage > 0.75 { return .orange }
         return .green
@@ -414,8 +415,14 @@ struct PerformanceDashboardView: View {
         return Double.random(in: 20...50)
     }
     
+    private func formatMemoryUsage(_ used: Int64, _ available: Int64) -> String {
+        let total = used + available
+        let percentage = total > 0 ? Int(Double(used) / Double(total) * 100) : 0
+        return "\(percentage)%"
+    }
+    
     private var memoryTrendString: String {
-        switch performanceMonitor.currentProfile.trend {
+        switch memoryProfiler.currentProfile.trend {
         case .increasing: return "+5%"
         case .decreasing: return "-3%"
         case .stable: return "0%"

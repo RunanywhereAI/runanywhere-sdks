@@ -17,7 +17,7 @@ class ModelCompatibilityMatrix: ObservableObject {
     private let frameworkCapabilities: [LLMFramework: FrameworkCapability] = [
         .foundationModels: FrameworkCapability(
             supportedFormats: [.coreML],
-            supportedQuantizations: [.int2, .int4],
+            supportedQuantizations: [.q4_0],
             maxModelSize: 3_000_000_000,
             requiresSpecificModels: true,
             minimumOS: "18.0",
@@ -25,7 +25,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .coreML: FrameworkCapability(
             supportedFormats: [.coreML],
-            supportedQuantizations: [.float16, .int8, .int4],
+            supportedQuantizations: [.f16, .q8_0, .q4_0],
             maxModelSize: 15_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "11.0",
@@ -33,7 +33,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .mlx: FrameworkCapability(
             supportedFormats: [.mlx],
-            supportedQuantizations: [.q4_0, .q4_1, .q8_0],
+            supportedQuantizations: [.q4_0, .q4_K_M, .q8_0],
             maxModelSize: 30_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "17.0",
@@ -41,15 +41,15 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .mlc: FrameworkCapability(
             supportedFormats: [.mlc],
-            supportedQuantizations: [.q3f16_1, .q4f16_1],
+            supportedQuantizations: [.q3_K_M, .q4_K_M],
             maxModelSize: 20_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "14.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .onnx: FrameworkCapability(
+        .onnxRuntime: FrameworkCapability(
             supportedFormats: [.onnx],
-            supportedQuantizations: [.float32, .float16, .int8],
+            supportedQuantizations: [.f32, .f16, .q8_0],
             maxModelSize: 10_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "11.0",
@@ -57,7 +57,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .execuTorch: FrameworkCapability(
             supportedFormats: [.pte],
-            supportedQuantizations: [.int4, .int8],
+            supportedQuantizations: [.q4_0, .q8_0],
             maxModelSize: 15_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "12.0",
@@ -65,15 +65,15 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .llamaCpp: FrameworkCapability(
             supportedFormats: [.gguf],
-            supportedQuantizations: [.q2_k, .q3_k_s, .q3_k_m, .q3_k_l, .q4_0, .q4_1, .q4_k_s, .q4_k_m, .q5_0, .q5_1, .q5_k_s, .q5_k_m, .q6_k, .q8_0],
+            supportedQuantizations: [.q2_K, .q3_K_S, .q3_K_M, .q3_K_L, .q4_0, .q4_K_S, .q4_K_M, .q5_0, .q5_K_S, .q5_K_M, .q6_K, .q8_0],
             maxModelSize: 50_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "10.0",
             supportedArchitectures: ["arm64", "arm64e", "x86_64"]
         ),
-        .tfLite: FrameworkCapability(
+        .tensorFlowLite: FrameworkCapability(
             supportedFormats: [.tflite],
-            supportedQuantizations: [.float32, .float16, .int8],
+            supportedQuantizations: [.f32, .f16, .q8_0],
             maxModelSize: 5_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "11.0",
@@ -81,7 +81,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .picoLLM: FrameworkCapability(
             supportedFormats: [.picoLLM],
-            supportedQuantizations: [.x1, .x2, .x4, .x8],
+            supportedQuantizations: [.q4_0, .q8_0],
             maxModelSize: 2_000_000_000,
             requiresSpecificModels: true,
             minimumOS: "11.0",
