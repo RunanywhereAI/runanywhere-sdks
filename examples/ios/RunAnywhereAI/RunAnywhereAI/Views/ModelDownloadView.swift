@@ -7,39 +7,37 @@ import SwiftUI
 
 struct ModelDownloadView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedModel: DownloadableModel?
+    @StateObject private var downloadManager = ModelDownloadManager.shared
+    @State private var selectedModel: ModelInfo?
+    @State private var selectedFramework: LLMFramework = .coreML
     @State private var isDownloading = false
-    @State private var downloadProgress: Double = 0
+    @State private var downloadProgress: DownloadProgress?
     @State private var downloadError: Error?
     @State private var showingError = false
     
-    // Sample downloadable models
-    let availableModels = [
-        DownloadableModel(
-            id: "tinyllama-1.1b",
-            name: "TinyLlama 1.1B",
-            description: "Small but capable model, perfect for testing",
-            size: "550MB",
-            format: .gguf,
-            url: URL(string: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf")!
-        ),
-        DownloadableModel(
-            id: "phi-3-mini",
-            name: "Phi-3 Mini",
-            description: "Microsoft's efficient 3.8B parameter model",
-            size: "1.5GB",
-            format: .gguf,
-            url: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!
-        ),
-        DownloadableModel(
-            id: "llama-3.2-3b",
-            name: "Llama 3.2 3B",
-            description: "Meta's latest small language model",
-            size: "1.7GB",
-            format: .gguf,
-            url: URL(string: "https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct-GGUF/resolve/main/llama-3.2-3b-instruct-q4_k_m.gguf")!
-        )
-    ]
+    // Get models from centralized registry
+    private var availableModels: [ModelInfo] {
+        let registry = ModelURLRegistry.shared
+        let downloadInfos = registry.getAllModels(for: selectedFramework)
+        
+        return downloadInfos.map { info in
+            // Convert download info to ModelInfo for display
+            let format = getFormat(for: selectedFramework, name: info.name)
+            let size = estimateSize(for: info.name)
+            
+            return ModelInfo(
+                id: info.id,
+                name: info.name,
+                format: format,
+                size: size,
+                framework: selectedFramework,
+                downloadURL: info.url,
+                description: getDescription(for: info.id)
+            )
+        }
+    }
+    
+    private let frameworks: [LLMFramework] = [.coreML, .mlx, .onnxRuntime, .tensorFlowLite, .llamaCpp]
     
     var body: some View {
         NavigationView {
@@ -74,16 +72,32 @@ struct ModelDownloadView: View {
     private var modelSelectionView: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Framework Picker
+                Picker("Framework", selection: $selectedFramework) {
+                    ForEach(frameworks, id: \.self) { framework in
+                        Text(framework.displayName).tag(framework)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+                
                 Text("Select a model to download")
                     .font(.headline)
                     .padding(.top)
                 
-                ForEach(availableModels) { model in
-                    ModelDownloadCard(
-                        model: model,
-                        isSelected: selectedModel?.id == model.id
-                    ) {
+                if availableModels.isEmpty {
+                    Text("No models available for \(selectedFramework.displayName)")
+                        .foregroundColor(.secondary)
+                        .padding()
+                } else {
+                    ForEach(availableModels) { model in
+                        ModelDownloadCard(
+                            model: model,
+                            isSelected: selectedModel?.id == model.id,
+                            isDownloading: downloadManager.activeDownloads[model.id] != nil
+                        ) {
                             selectedModel = model
+                        }
                     }
                 }
                 
@@ -118,12 +132,13 @@ struct ModelDownloadView: View {
                     .foregroundColor(.secondary)
             }
             
-            ProgressView(value: downloadProgress) {
-                Text("\(Int(downloadProgress * 100))%")
-                    .font(.caption)
-            }
-            .progressViewStyle(LinearProgressViewStyle())
-            .padding(.horizontal, 40)
+            if let progress = downloadProgress {
+                ProgressView(value: progress.fractionCompleted) {
+                    Text(ModelDownloadManager.formatProgress(progress))
+                        .font(.caption)
+                }
+                .progressViewStyle(LinearProgressViewStyle())
+                .padding(.horizontal, 40)
             
             Text("Please keep the app open during download")
                 .font(.caption)
@@ -137,32 +152,28 @@ struct ModelDownloadView: View {
         guard let model = selectedModel else { return }
         
         isDownloading = true
-        downloadProgress = 0
         
         Task {
             do {
-                let modelManager = ModelManager.shared
-                let destinationPath = try await modelManager.downloadModel(
-                    from: model.url,
-                    modelName: model.fileName
+                let modelsDir = ModelManager.modelsDirectory.appendingPathComponent(model.framework.rawValue)
+                
+                let destinationURL = try await downloadManager.downloadModel(
+                    model,
+                    to: modelsDir
                 ) { progress in
-                        Task { @MainActor in
-                            downloadProgress = progress
-                        }
+                    Task { @MainActor in
+                        self.downloadProgress = progress
+                    }
                 }
                 
-                // Create model info
-                let modelInfo = ModelInfo(
-                    id: model.id,
-                    name: model.name,
-                    path: destinationPath.path,
-                    format: model.format,
-                    size: model.size,
-                    framework: .llamaCpp // Default to llama.cpp for GGUF
-                )
+                // Update model path
+                var downloadedModel = model
+                downloadedModel.path = destinationURL.path
+                downloadedModel.isLocal = true
                 
-                // Add to model list
-                await ModelListViewModel.shared.addDownloadedModel(modelInfo)
+                // Add to model manager
+                await ModelManager.shared.addImportedModel(downloadedModel)
+                await ModelManager.shared.refreshModelList()
                 
                 // Dismiss
                 await MainActor.run {
@@ -180,8 +191,9 @@ struct ModelDownloadView: View {
 }
 
 struct ModelDownloadCard: View {
-    let model: DownloadableModel
+    let model: ModelInfo
     let isSelected: Bool
+    let isDownloading: Bool
     let onSelect: () -> Void
     
     var body: some View {
@@ -205,7 +217,7 @@ struct ModelDownloadCard: View {
                         .font(.title2)
                 }
                 
-                Text(model.description)
+                Text(model.description ?? "")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)
@@ -216,6 +228,11 @@ struct ModelDownloadCard: View {
                         .foregroundColor(.secondary)
                     
                     Spacer()
+                    
+                    if isDownloading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
                 }
             }
             .padding()
@@ -233,16 +250,65 @@ struct ModelDownloadCard: View {
     }
 }
 
-struct DownloadableModel: Identifiable {
-    let id: String
-    let name: String
-    let description: String
-    let size: String
-    let format: ModelFormat
-    let url: URL
+// MARK: - Helper Methods
+
+extension ModelDownloadView {
+    private func getFormat(for framework: LLMFramework, name: String) -> ModelFormat {
+        switch framework {
+        case .coreML:
+            return name.contains(".mlpackage") ? .mlPackage : .coreML
+        case .mlx:
+            return .mlx
+        case .onnxRuntime:
+            return .onnxRuntime
+        case .tensorFlowLite:
+            return .tflite
+        case .llamaCpp:
+            return .gguf
+        default:
+            return .other
+        }
+    }
     
-    var fileName: String {
-        url.lastPathComponent
+    private func estimateSize(for name: String) -> String {
+        // Estimate based on model name patterns
+        if name.contains("7b") || name.contains("7B") {
+            return "3.5GB"
+        } else if name.contains("3b") || name.contains("3B") {
+            return "1.7GB"
+        } else if name.contains("2b") || name.contains("2B") {
+            return "1.2GB"
+        } else if name.contains("1b") || name.contains("1B") {
+            return "600MB"
+        } else if name.contains("gpt2") {
+            return "548MB"
+        } else if name.contains("distil") {
+            return "267MB"
+        }
+        return "1GB"
+    }
+    
+    private func getDescription(for modelId: String) -> String {
+        switch modelId {
+        case "gpt2-coreml":
+            return "GPT-2 model optimized for Core ML with Neural Engine acceleration"
+        case "distilgpt2-coreml":
+            return "Smaller, faster GPT-2 variant optimized for mobile devices"
+        case "openelm-270m-coreml":
+            return "Apple's efficient 270M parameter model for on-device inference"
+        case "mistral-7b-mlx-4bit":
+            return "Mistral 7B with 4-bit quantization for Apple Silicon"
+        case "llama-3.2-3b-mlx":
+            return "Meta's latest 3B model optimized for MLX"
+        case "phi-3-mini-onnx":
+            return "Microsoft's efficient small language model"
+        case "gemma-2b-tflite":
+            return "Google's Gemma 2B optimized for mobile deployment"
+        case "tinyllama-1.1b-gguf":
+            return "Compact 1.1B model perfect for testing"
+        default:
+            return "Language model for on-device inference"
+        }
     }
 }
 

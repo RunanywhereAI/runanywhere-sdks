@@ -72,6 +72,20 @@ struct SettingsView: View {
                 }
             }
             
+            Section("Model Management") {
+                NavigationLink(destination: ModelDownloadView()) {
+                    Label("Download Models", systemImage: "arrow.down.circle")
+                }
+                
+                NavigationLink(destination: ModelDownloadStatusView()) {
+                    Label("Download Manager", systemImage: "arrow.down.doc")
+                }
+                
+                NavigationLink(destination: ModelURLSettingsView()) {
+                    Label("Model URLs", systemImage: "link")
+                }
+            }
+            
             Section("About") {
                 HStack {
                     Text("Version")

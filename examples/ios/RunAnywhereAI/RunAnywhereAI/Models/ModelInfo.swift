@@ -36,7 +36,7 @@ enum ModelFormat: String, CaseIterable, Codable {
         case .onnx:
             return "onnx"
         case .onnxRuntime:
-            return "onnxRuntime"
+            return "ort"
         case .coreML:
             return "mlmodel"
         case .mlPackage:
