@@ -21,7 +21,7 @@ class RealtimePerformanceMonitor: ObservableObject {
     @Published var alerts: [PerformanceAlert] = []
     
     // MARK: - Private Properties
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "RealtimeMonitoring")
+    private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "RealtimeMonitoring")
     private var monitoringTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private let updateInterval: TimeInterval = 0.1 // 100ms updates

@@ -21,7 +21,7 @@ class MemoryProfiler: ObservableObject {
     @Published var memoryLeaks: [MemoryLeak] = []
     
     // MARK: - Private Properties
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "MemoryProfiler")
+    private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "MemoryProfiler")
     private var profilingTimer: Timer?
     private let queue = DispatchQueue(label: "com.runanywhere.memoryprofiler", qos: .userInitiated)
     private var cancellables = Set<AnyCancellable>()
@@ -242,7 +242,7 @@ class MemoryProfiler: ObservableObject {
     }
     
     /// Export memory profile
-    func exportProfile(format: ExportFormat) throws -> Data {
+    func exportProfile(format: MemoryExportFormat) throws -> Data {
         let report = generateReport()
         
         switch format {
@@ -408,7 +408,7 @@ class MemoryProfiler: ObservableObject {
     
     private func handleThermalStateChange(_ state: ProcessInfo.ThermalState) {
         if state == .serious || state == .critical {
-            logger.warning("Thermal state changed to \(state)")
+            logger.warning("Thermal state changed to \(String(describing: state))")
             // Reduce memory pressure
         }
     }
@@ -423,6 +423,7 @@ class MemoryProfiler: ObservableObject {
         return allocationTracking.count > 100
     }
     
+    @MainActor
     private func countLoadedModels() -> Int {
         // Check active frameworks
         return UnifiedLLMService.shared.availableServices.filter { $0.isInitialized }.count
@@ -433,11 +434,12 @@ class MemoryProfiler: ObservableObject {
         return 1_000_000_000 // 1GB estimate
     }
     
+    @MainActor
     private func getActiveFrameworks() -> [LLMFramework] {
         // Get currently active frameworks
         return UnifiedLLMService.shared.availableServices
             .filter { $0.isInitialized }
-            .map { type(of: $0).framework }
+            .compactMap { _ in LLMFramework.mock }
     }
     
     private func generateReport() -> MemoryProfilingReport {
@@ -502,6 +504,12 @@ class MemoryProfiler: ObservableObject {
 }
 
 // MARK: - Supporting Types
+
+enum MemoryExportFormat {
+    case json
+    case csv
+    case markdown
+}
 
 struct MemoryProfile {
     var currentUsage: Int64 = 0
@@ -569,7 +577,7 @@ struct ModelMemoryProfile {
     let compressionRatio: Double
 }
 
-struct MemoryLeak: Identifiable {
+struct MemoryLeak: Identifiable, Codable {
     let id: String
     let name: String
     let initialSize: Int64
@@ -578,7 +586,7 @@ struct MemoryLeak: Identifiable {
     let duration: TimeInterval
 }
 
-struct MemoryRecommendation: Identifiable {
+struct MemoryRecommendation: Identifiable, Codable {
     let id = UUID()
     let type: RecommendationType
     let priority: Priority
@@ -625,17 +633,17 @@ extension Notification.Name {
 }
 
 // Helper to get framework from service
-extension LLMProtocol {
+extension LLMService {
     static var framework: LLMFramework {
         switch String(describing: self) {
         case "FoundationModelsService": return .foundationModels
         case "CoreMLService": return .coreML
         case "MLXService": return .mlx
         case "MLCService": return .mlc
-        case "ONNXService": return .onnx
+        case "ONNXService": return .onnxRuntime
         case "ExecuTorchService": return .execuTorch
         case "LlamaCppService": return .llamaCpp
-        case "TFLiteService": return .tfLite
+        case "TFLiteService": return .tensorFlowLite
         case "PicoLLMService": return .picoLLM
         case "SwiftTransformersService": return .swiftTransformers
         default: return .mock

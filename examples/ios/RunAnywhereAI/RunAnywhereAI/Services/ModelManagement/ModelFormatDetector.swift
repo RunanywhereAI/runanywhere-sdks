@@ -122,7 +122,7 @@ class ModelFormatDetector {
             isValid = isValid && ggufValidation.isValid
             issues.append(contentsOf: ggufValidation.issues)
             
-        case .coreml:
+        case .coreML:
             let coremlValidation = try validateCoreML(at: url)
             isValid = isValid && coremlValidation.isValid
             issues.append(contentsOf: coremlValidation.issues)
@@ -157,7 +157,7 @@ class ModelFormatDetector {
         case "gguf":
             return .gguf
         case "mlmodel", "mlpackage":
-            return .coreml
+            return .coreML
         case "onnx":
             return .onnx
         case "tflite":
@@ -190,7 +190,7 @@ class ModelFormatDetector {
         
         // Special case for Core ML (zip/directory structure)
         if headerData.starts(with: [0x50, 0x4B]) { // PK (zip)
-            return .coreml
+            return .coreML
         }
         
         return nil
@@ -209,7 +209,7 @@ class ModelFormatDetector {
             
             if FileManager.default.fileExists(atPath: modelPath.path) ||
                FileManager.default.fileExists(atPath: metadataPath.path) {
-                return .coreml
+                return .coreML
             }
         }
         
@@ -222,7 +222,7 @@ class ModelFormatDetector {
         switch format {
         case .gguf:
             return try extractGGUFMetadata(from: url)
-        case .coreml:
+        case .coreML:
             return try extractCoreMLMetadata(from: url)
         case .onnx:
             return try extractONNXMetadata(from: url)
@@ -260,7 +260,7 @@ class ModelFormatDetector {
         let metadataURL = url.appendingPathComponent("metadata.json")
         
         if FileManager.default.fileExists(atPath: metadataURL.path) {
-            let data = try Data(contentsOf: metadataURL)
+            _ = try Data(contentsOf: metadataURL)
             // Parse metadata JSON
             // For demo, return placeholder
         }

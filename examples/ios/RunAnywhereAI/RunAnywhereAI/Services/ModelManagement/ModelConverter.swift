@@ -67,17 +67,17 @@ class ModelConverter: ObservableObject {
         
         // Perform conversion based on formats
         switch (sourceFormat, targetFormat) {
-        case (.gguf, .coreml):
+        case (.gguf, .coreML):
             return try await convertGGUFToCoreML(sourceURL, options: options)
         case (.gguf, .onnx):
             return try await convertGGUFToONNX(sourceURL, options: options)
-        case (.onnx, .coreml):
+        case (.onnx, .coreML):
             return try await convertONNXToCoreML(sourceURL, options: options)
         case (.onnx, .tflite):
             return try await convertONNXToTFLite(sourceURL, options: options)
-        case (.mlx, .coreml):
+        case (.mlx, .coreML):
             return try await convertMLXToCoreML(sourceURL, options: options)
-        case (.coreml, .gguf):
+        case (.coreML, .gguf):
             return try await convertCoreMLToGGUF(sourceURL, options: options)
         default:
             throw ConversionError.unsupportedConversion
@@ -87,12 +87,12 @@ class ModelConverter: ObservableObject {
     /// Check if conversion is supported
     func isConversionSupported(from source: ModelFormat, to target: ModelFormat) -> Bool {
         let supportedConversions: Set<ConversionPair> = [
-            ConversionPair(from: .gguf, to: .coreml),
+            ConversionPair(from: .gguf, to: .coreML),
             ConversionPair(from: .gguf, to: .onnx),
-            ConversionPair(from: .onnx, to: .coreml),
+            ConversionPair(from: .onnx, to: .coreML),
             ConversionPair(from: .onnx, to: .tflite),
-            ConversionPair(from: .mlx, to: .coreml),
-            ConversionPair(from: .coreml, to: .gguf)
+            ConversionPair(from: .mlx, to: .coreML),
+            ConversionPair(from: .coreML, to: .gguf)
         ]
         
         return supportedConversions.contains(ConversionPair(from: source, to: target))
@@ -112,7 +112,7 @@ class ModelConverter: ObservableObject {
     }
     
     /// Validate model before conversion
-    func validateModel(at url: URL, format: ModelFormat) async throws -> ModelValidation {
+    func validateModel(at url: URL, format: ModelFormat) async throws -> ModelValidationInfo {
         conversionStatus = "Validating model..."
         
         // Check file exists
@@ -128,7 +128,7 @@ class ModelConverter: ObservableObject {
         switch format {
         case .gguf:
             return try await validateGGUFModel(at: url, fileSize: fileSize)
-        case .coreml:
+        case .coreML:
             return try await validateCoreMLModel(at: url, fileSize: fileSize)
         case .onnx:
             return try await validateONNXModel(at: url, fileSize: fileSize)
@@ -138,6 +138,14 @@ class ModelConverter: ObservableObject {
             return try await validateTFLiteModel(at: url, fileSize: fileSize)
         case .pte:
             return try await validatePTEModel(at: url, fileSize: fileSize)
+        case .ggml, .pytorch, .safetensors, .picoLLM, .other, .onnxRuntime, .mlPackage, .mlc:
+            // For unsupported formats, return basic validation
+            return ModelValidationInfo(
+                isValid: false,
+                format: format,
+                fileSize: fileSize,
+                warnings: ["Validation not implemented for \(format.displayName) format"]
+            )
         }
     }
     
@@ -318,7 +326,7 @@ class ModelConverter: ObservableObject {
     
     // MARK: - Validation Methods
     
-    private func validateGGUFModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validateGGUFModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         // Check GGUF magic number
         guard let file = FileHandle(forReadingAtPath: url.path) else {
             throw ConversionError.cannotReadFile
@@ -328,7 +336,7 @@ class ModelConverter: ObservableObject {
         let magic = file.readData(ofLength: 4)
         let isValid = magic == Data([0x47, 0x47, 0x55, 0x46]) // "GGUF"
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
             format: .gguf,
             fileSize: fileSize,
@@ -336,23 +344,23 @@ class ModelConverter: ObservableObject {
         )
     }
     
-    private func validateCoreMLModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validateCoreMLModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         let isPackage = url.pathExtension == "mlpackage"
         let isModel = url.pathExtension == "mlmodel"
         let isValid = isPackage || isModel
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
-            format: .coreml,
+            format: .coreML,
             fileSize: fileSize,
             warnings: isValid ? [] : ["Invalid Core ML model format"]
         )
     }
     
-    private func validateONNXModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validateONNXModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         let isValid = url.pathExtension == "onnx"
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
             format: .onnx,
             fileSize: fileSize,
@@ -360,10 +368,10 @@ class ModelConverter: ObservableObject {
         )
     }
     
-    private func validateMLXModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validateMLXModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         let isValid = url.pathExtension == "safetensors"
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
             format: .mlx,
             fileSize: fileSize,
@@ -371,10 +379,10 @@ class ModelConverter: ObservableObject {
         )
     }
     
-    private func validateTFLiteModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validateTFLiteModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         let isValid = url.pathExtension == "tflite"
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
             format: .tflite,
             fileSize: fileSize,
@@ -382,10 +390,10 @@ class ModelConverter: ObservableObject {
         )
     }
     
-    private func validatePTEModel(at url: URL, fileSize: Int64) async throws -> ModelValidation {
+    private func validatePTEModel(at url: URL, fileSize: Int64) async throws -> ModelValidationInfo {
         let isValid = url.pathExtension == "pte"
         
-        return ModelValidation(
+        return ModelValidationInfo(
             isValid: isValid,
             format: .pte,
             fileSize: fileSize,
@@ -436,7 +444,7 @@ struct ConversionPair: Hashable {
     let to: ModelFormat
 }
 
-struct ModelValidation {
+struct ModelValidationInfo {
     let isValid: Bool
     let format: ModelFormat
     let fileSize: Int64

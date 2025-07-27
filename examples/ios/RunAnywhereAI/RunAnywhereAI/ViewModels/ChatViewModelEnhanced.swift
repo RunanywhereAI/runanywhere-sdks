@@ -60,12 +60,12 @@ class ChatViewModelEnhanced: ObservableObject {
         performanceMonitor.beginGeneration(framework: selectedFramework, prompt: prompt)
         
         // Create assistant message placeholder
-        let assistantMessage = ChatMessage(
+        var assistantMessage = ChatMessage(
             role: .assistant,
             content: "",
-            timestamp: Date(),
-            framework: selectedFramework
+            timestamp: Date()
         )
+        assistantMessage.framework = selectedFramework
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
         

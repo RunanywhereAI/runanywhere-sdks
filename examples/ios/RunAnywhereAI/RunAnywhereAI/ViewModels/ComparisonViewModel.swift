@@ -18,8 +18,8 @@ class ComparisonViewModel: ObservableObject {
     @Published var outputB = ""
     @Published var isGeneratingA = false
     @Published var isGeneratingB = false
-    @Published var metricsA: PerformanceMetrics?
-    @Published var metricsB: PerformanceMetrics?
+    @Published var metricsA: ComparisonMetrics?
+    @Published var metricsB: ComparisonMetrics?
     @Published var performanceDataA: [Double] = []
     @Published var performanceDataB: [Double] = []
     @Published var settings = ComparisonSettings()
@@ -159,7 +159,7 @@ class ComparisonViewModel: ObservableObject {
         
         do {
             // Switch to framework
-            try await unifiedService.selectFramework(framework)
+            unifiedService.selectService(named: framework.displayName)
             
             // Start monitoring
             performanceMonitor.beginGeneration(framework: framework, prompt: prompt)
@@ -202,7 +202,7 @@ class ComparisonViewModel: ObservableObject {
             let endTime = CFAbsoluteTimeGetCurrent()
             let endMemory = getMemoryUsage()
             
-            let metrics = PerformanceMetrics(
+            let metrics = ComparisonMetrics(
                 totalTime: endTime - startTime,
                 timeToFirstToken: firstTokenTime.map { $0 - startTime } ?? 0,
                 tokensPerSecond: Double(tokenCount) / (endTime - startTime),
@@ -278,5 +278,12 @@ struct ComparisonSettings {
     var autoRunBenchmarks: Bool = false
 }
 
-// Use the existing PerformanceTrackingMetrics renamed for clarity
-typealias PerformanceMetrics = PerformanceTrackingMetrics
+// MARK: - Supporting Types
+
+struct ComparisonMetrics {
+    let totalTime: TimeInterval
+    let timeToFirstToken: TimeInterval
+    let tokensPerSecond: Double
+    let tokenCount: Int
+    let memoryUsed: Int
+}

@@ -305,7 +305,7 @@ class ABTestingFramework: ObservableObject {
         // Run generation
         try await service.streamGenerate(
             prompt: prompt,
-            options: GenerationOptions(maxTokens: 100, temperature: 0.7),
+            options: GenerationOptions(maxTokens: 100, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: []),
             onToken: { _ in
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
@@ -325,17 +325,17 @@ class ABTestingFramework: ObservableObject {
         
         // Return primary metric based on configuration
         if variant.configuration["primaryMetric"] as? String == "speed" {
-            return .tokensPerSecond(tokensPerSecond)
+            return ABTestMetric(id: UUID(), timestamp: Date(), type: .tokensPerSecond(tokensPerSecond))
         } else if variant.configuration["primaryMetric"] as? String == "latency" {
-            return .timeToFirstToken(timeToFirstToken)
+            return ABTestMetric(id: UUID(), timestamp: Date(), type: .timeToFirstToken(timeToFirstToken))
         } else {
-            return .memoryUsage(memoryUsed)
+            return ABTestMetric(id: UUID(), timestamp: Date(), type: .memoryUsage(memoryUsed))
         }
     }
     
-    private func initializeFramework(_ framework: LLMFramework) async throws -> LLMProtocol {
+    private func initializeFramework(_ framework: LLMFramework) async throws -> LLMService {
         let unifiedService = UnifiedLLMService.shared
-        try await unifiedService.selectFramework(framework)
+        unifiedService.selectService(named: framework.displayName)
         
         guard let service = unifiedService.currentService else {
             throw ABTestError.frameworkInitializationFailed

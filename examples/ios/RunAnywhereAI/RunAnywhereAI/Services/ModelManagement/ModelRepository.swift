@@ -38,57 +38,52 @@ class ModelRepository: ObservableObject {
         ModelInfo(
             id: "llama-3.2-3b-instruct",
             name: "Llama 3.2 3B Instruct",
-            size: 1_700_000_000,
             format: .gguf,
-            quantization: .q4_k_m,
+            size: "1.7GB",
             framework: .llamaCpp,
+            quantization: "Q4_K_M",
             contextLength: 8192,
-            downloadURL: "https://huggingface.co/TheBloke/Llama-3.2-3B-Instruct-GGUF/resolve/main/llama-3.2-3b-instruct.Q4_K_M.gguf",
-            requirements: .gb4Plus
+            downloadURL: URL(string: "https://huggingface.co/TheBloke/Llama-3.2-3B-Instruct-GGUF/resolve/main/llama-3.2-3b-instruct.Q4_K_M.gguf")!
         ),
         ModelInfo(
             id: "mistral-7b-instruct",
             name: "Mistral 7B Instruct v0.3",
-            size: 3_800_000_000,
             format: .gguf,
-            quantization: .q4_0,
+            size: "3.8GB",
             framework: .llamaCpp,
+            quantization: "Q4_0",
             contextLength: 32768,
-            downloadURL: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/mistral-7b-instruct-v0.3.Q4_0.gguf",
-            requirements: .gb8Plus
+            downloadURL: URL(string: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/mistral-7b-instruct-v0.3.Q4_0.gguf")!
         ),
         ModelInfo(
             id: "phi-3-mini-coreml",
             name: "Phi-3 Mini 4k",
-            size: 2_700_000_000,
-            format: .coreml,
-            quantization: .int4,
+            format: .coreML,
+            size: "2.7GB",
             framework: .coreML,
+            quantization: "INT4",
             contextLength: 4096,
-            downloadURL: "https://huggingface.co/apple/coreml-phi-3-mini/resolve/main/phi-3-mini-4k-instruct.mlpackage.zip",
-            requirements: .gb6Plus
+            downloadURL: URL(string: "https://huggingface.co/apple/coreml-phi-3-mini/resolve/main/phi-3-mini-4k-instruct.mlpackage.zip")!
         ),
         ModelInfo(
             id: "tinyllama-1.1b",
             name: "TinyLlama 1.1B",
-            size: 640_000_000,
             format: .gguf,
-            quantization: .q5_k_m,
+            size: "640MB",
             framework: .llamaCpp,
+            quantization: "Q5_K_M",
             contextLength: 2048,
-            downloadURL: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q5_K_M.gguf",
-            requirements: .anyDevice
+            downloadURL: URL(string: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q5_K_M.gguf")!
         ),
         ModelInfo(
             id: "qwen2.5-1.5b-mlx",
             name: "Qwen2.5 1.5B Instruct",
-            size: 900_000_000,
             format: .mlx,
-            quantization: .q4_0,
+            size: "900MB",
             framework: .mlx,
+            quantization: "Q4_0",
             contextLength: 32768,
-            downloadURL: "https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit/resolve/main/model.safetensors",
-            requirements: .gb4Plus
+            downloadURL: URL(string: "https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit/resolve/main/model.safetensors")!
         )
     ]
     
@@ -126,8 +121,8 @@ class ModelRepository: ObservableObject {
         }
         
         // Create download URL
-        guard let downloadURL = URL(string: model.downloadURL) else {
-            throw ModelError.invalidDownloadURL
+        guard let downloadURL = model.downloadURL else {
+            throw ModelError.invalidFile
         }
         
         // Create destination path
@@ -182,7 +177,7 @@ class ModelRepository: ObservableObject {
     /// Delete downloaded model
     func deleteModel(_ model: ModelInfo) throws {
         guard let modelPath = getModelPath(for: model) else {
-            throw ModelError.modelNotFound
+            throw ModelError.invalidFile
         }
         
         try fileManager.removeItem(at: modelPath)
@@ -307,59 +302,6 @@ enum QuantizationType: String, Codable, CaseIterable {
     }
 }
 
-enum ModelError: LocalizedError {
-    case invalidDownloadURL
-    case downloadFailed
-    case modelNotFound
-    case insufficientStorage
-    case conversionFailed
-    case unsupportedFormat
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidDownloadURL:
-            return "Invalid download URL"
-        case .downloadFailed:
-            return "Failed to download model"
-        case .modelNotFound:
-            return "Model not found"
-        case .insufficientStorage:
-            return "Insufficient storage space"
-        case .conversionFailed:
-            return "Failed to convert model"
-        case .unsupportedFormat:
-            return "Unsupported model format"
-        }
-    }
-}
+// Using ModelError from ModelManager.swift
 
-enum DeviceRequirement: String, Codable {
-    case anyDevice = "any"
-    case gb4Plus = "4gb"
-    case gb6Plus = "6gb"
-    case gb8Plus = "8gb"
-    
-    func isSatisfied() -> Bool {
-        let memory = ProcessInfo.processInfo.physicalMemory
-        
-        switch self {
-        case .anyDevice:
-            return true
-        case .gb4Plus:
-            return memory >= 4_000_000_000
-        case .gb6Plus:
-            return memory >= 6_000_000_000
-        case .gb8Plus:
-            return memory >= 8_000_000_000
-        }
-    }
-    
-    var description: String {
-        switch self {
-        case .anyDevice: return "Any Device"
-        case .gb4Plus: return "4GB+ RAM"
-        case .gb6Plus: return "6GB+ RAM"
-        case .gb8Plus: return "8GB+ RAM"
-        }
-    }
-}
+// DeviceRequirement removed - using ModelInfo's isCompatible property instead
