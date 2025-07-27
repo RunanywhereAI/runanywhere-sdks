@@ -15,7 +15,7 @@ class ChatViewModelEnhanced: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isGenerating = false
     @Published var selectedFramework: LLMFramework = .llamaCpp
-    @Published var selectedModel: ModelInfo?
+    @Published var selectedModel: RunAnywhereAI.ModelInfo?
     @Published var currentTokensPerSecond: Double?
     @Published var settings = ChatSettings()
     @Published var currentInput = ""
@@ -72,7 +72,7 @@ class ChatViewModelEnhanced: ObservableObject {
         generationTask = Task {
             do {
                 // Switch framework if needed
-                try await unifiedService.selectFramework(selectedFramework)
+                unifiedService.selectService(named: selectedFramework.displayName)
                 
                 if settings.streamResponses {
                     // Stream generation
@@ -137,13 +137,8 @@ class ChatViewModelEnhanced: ObservableObject {
     func switchFramework(_ framework: LLMFramework) async {
         selectedFramework = framework
         
-        do {
-            try await unifiedService.selectFramework(framework)
-            logger.log("Switched to \(framework.displayName)", level: .info, category: "Chat")
-        } catch {
-            logger.log("Failed to switch framework: \(error)", level: .error, category: "Chat")
-            self.error = error
-        }
+        unifiedService.selectService(named: framework.displayName)
+        logger.log("Switched to \(framework.displayName)", level: .info, category: "Chat")
     }
     
     // MARK: - Private Methods
@@ -172,9 +167,11 @@ class ChatViewModelEnhanced: ObservableObject {
     private func streamGeneration(prompt: String, messageIndex: Int) async throws {
         let options = GenerationOptions(
             maxTokens: settings.maxTokens,
-            temperature: settings.temperature,
-            topP: settings.topP,
-            topK: settings.topK
+            temperature: Float(settings.temperature),
+            topP: Float(settings.topP ?? 0.95),
+            topK: settings.topK ?? 40,
+            repetitionPenalty: 1.1,
+            stopSequences: []
         )
         
         var generatedTokens: [String] = []
@@ -207,7 +204,7 @@ class ChatViewModelEnhanced: ObservableObject {
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
         
-        messages[messageIndex].generationMetrics = GenerationMetrics(
+        messages[messageIndex].generationMetrics = EnhancedGenerationMetrics(
             tokenCount: generatedTokens.count,
             totalTime: totalTime,
             tokensPerSecond: Double(generatedTokens.count) / totalTime,
@@ -215,12 +212,14 @@ class ChatViewModelEnhanced: ObservableObject {
         )
     }
     
-    private func generateResponse(prompt: String) async throws -> (text: String, metrics: GenerationMetrics) {
+    private func generateResponse(prompt: String) async throws -> (text: String, metrics: EnhancedGenerationMetrics) {
         let options = GenerationOptions(
             maxTokens: settings.maxTokens,
-            temperature: settings.temperature,
-            topP: settings.topP,
-            topK: settings.topK
+            temperature: Float(settings.temperature),
+            topP: Float(settings.topP ?? 0.95),
+            topK: settings.topK ?? 40,
+            repetitionPenalty: 1.1,
+            stopSequences: []
         )
         
         let startTime = CFAbsoluteTimeGetCurrent()
@@ -236,7 +235,7 @@ class ChatViewModelEnhanced: ObservableObject {
         // Estimate token count (rough approximation)
         let estimatedTokens = response.split(separator: " ").count
         
-        let metrics = GenerationMetrics(
+        let metrics = EnhancedGenerationMetrics(
             tokenCount: estimatedTokens,
             totalTime: totalTime,
             tokensPerSecond: Double(estimatedTokens) / totalTime,
@@ -249,7 +248,7 @@ class ChatViewModelEnhanced: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct GenerationMetrics {
+struct EnhancedGenerationMetrics {
     let tokenCount: Int
     let totalTime: TimeInterval
     let tokensPerSecond: Double

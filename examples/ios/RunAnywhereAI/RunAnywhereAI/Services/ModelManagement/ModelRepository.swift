@@ -285,39 +285,25 @@ class ModelRepository: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct ModelInfo: Identifiable, Codable {
-    let id: String
-    let name: String
-    let size: Int64
-    let format: ModelFormat
-    let quantization: QuantizationType
-    let framework: LLMFramework
-    let contextLength: Int
-    let downloadURL: String
-    let requirements: DeviceRequirement
+enum QuantizationType: String, Codable, CaseIterable {
+    case none = "none"
+    case q2_K = "Q2_K"
+    case q3_K_S = "Q3_K_S"
+    case q3_K_M = "Q3_K_M"
+    case q3_K_L = "Q3_K_L"
+    case q4_0 = "Q4_0"
+    case q4_K_S = "Q4_K_S"
+    case q4_K_M = "Q4_K_M"
+    case q5_0 = "Q5_0"
+    case q5_K_S = "Q5_K_S"
+    case q5_K_M = "Q5_K_M"
+    case q6_K = "Q6_K"
+    case q8_0 = "Q8_0"
+    case f16 = "F16"
+    case f32 = "F32"
     
-    var formattedSize: String {
-        ByteCountFormatter.string(fromByteCount: size, countStyle: .binary)
-    }
-}
-
-enum ModelFormat: String, Codable, CaseIterable {
-    case gguf
-    case coreml
-    case mlx
-    case onnx
-    case tflite
-    case pte // ExecuTorch
-    
-    var fileExtension: String {
-        switch self {
-        case .gguf: return "gguf"
-        case .coreml: return "mlpackage"
-        case .mlx: return "safetensors"
-        case .onnx: return "onnx"
-        case .tflite: return "tflite"
-        case .pte: return "pte"
-        }
+    var displayName: String {
+        rawValue
     }
 }
 
