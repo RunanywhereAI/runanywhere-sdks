@@ -234,7 +234,6 @@ class ComparisonViewModel: ObservableObject {
                     abTesting.recordMetric(testId: activeTest.id, variant: variant, metric: metric)
                 }
             }
-            
         } catch {
             logger.log("Generation failed for \(framework.displayName): \(error)", level: .error, category: "Comparison")
             

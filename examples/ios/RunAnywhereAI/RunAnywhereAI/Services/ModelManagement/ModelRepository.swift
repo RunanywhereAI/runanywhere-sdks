@@ -130,7 +130,7 @@ class ModelRepository: ObservableObject {
         
         // Start download
         return try await withCheckedThrowingContinuation { continuation in
-            let task = urlSession.downloadTask(with: downloadURL) { [weak self] tempURL, response, error in
+            let task = urlSession.downloadTask(with: downloadURL) { [weak self] tempURL, _, error in
                 guard let self = self else { return }
                 
                 if let error = error {
@@ -198,7 +198,7 @@ class ModelRepository: ObservableObject {
     
     /// Check if model is downloaded
     func isModelDownloaded(_ model: ModelInfo) -> Bool {
-        return getModelPath(for: model) != nil
+        getModelPath(for: model) != nil
     }
     
     /// Get storage size used by models

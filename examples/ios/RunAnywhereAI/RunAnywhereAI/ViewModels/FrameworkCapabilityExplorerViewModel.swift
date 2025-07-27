@@ -3,7 +3,6 @@ import Combine
 
 @MainActor
 class FrameworkCapabilityExplorerViewModel: ObservableObject {
-    
     func getCapabilities(for framework: LLMFramework) -> FrameworkCapabilities {
         switch framework {
         case .mock:

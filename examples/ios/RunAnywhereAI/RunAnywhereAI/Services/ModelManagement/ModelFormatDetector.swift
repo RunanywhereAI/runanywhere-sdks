@@ -17,7 +17,7 @@ class ModelFormatDetector {
         .gguf: [0x47, 0x47, 0x55, 0x46], // "GGUF"
         .onnx: [0x08, 0x01], // ONNX protobuf header
         .tflite: [0x54, 0x46, 0x4C, 0x33], // "TFL3"
-        .pte: [0x50, 0x54, 0x45, 0x31], // "PTE1" (PyTorch Edge)
+        .pte: [0x50, 0x54, 0x45, 0x31] // "PTE1" (PyTorch Edge)
     ]
     
     // MARK: - Public Methods
@@ -277,7 +277,7 @@ class ModelFormatDetector {
     
     private func extractONNXMetadata(from url: URL) throws -> ModelMetadata {
         // ONNX uses protobuf, simplified extraction for demo
-        return ModelMetadata(
+        ModelMetadata(
             architecture: "ONNX",
             parameters: nil,
             quantization: "Default",

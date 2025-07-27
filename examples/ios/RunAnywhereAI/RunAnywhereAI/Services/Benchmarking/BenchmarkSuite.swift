@@ -65,7 +65,6 @@ class BenchmarkSuite: ObservableObject {
         frameworks: [LLMFramework] = LLMFramework.allCases,
         options: BenchmarkOptions = .default
     ) async throws {
-        
         guard !isRunning else {
             throw BenchmarkError.alreadyRunning
         }
@@ -120,7 +119,6 @@ class BenchmarkSuite: ObservableObject {
                 
                 // Cleanup
                 await cleanupFramework(service)
-                
             } catch {
                 logger.error("Failed to benchmark \(framework.displayName): \(error)")
                 // Record error result
@@ -163,14 +161,13 @@ class BenchmarkSuite: ObservableObject {
         // Measure generation
         try await service.streamGenerate(
             prompt: prompt.text,
-            options: GenerationOptions(maxTokens: 50, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: []),
-            onToken: { _ in
+            options: GenerationOptions(maxTokens: 50, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: [])
+        )            { _ in
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
                 }
                 tokenCount += 1
             }
-        )
         
         let endTime = CFAbsoluteTimeGetCurrent()
         
@@ -189,7 +186,6 @@ class BenchmarkSuite: ObservableObject {
         _ framework2: LLMFramework,
         prompt: String? = nil
     ) async throws -> ComparisonResult {
-        
         let testPrompt = prompt ?? benchmarkPrompts.first { $0.category == .reasoning }!.text
         
         // Initialize both frameworks
@@ -230,7 +226,7 @@ class BenchmarkSuite: ObservableObject {
     /// Get benchmark history
     func getBenchmarkHistory() -> [BenchmarkSession] {
         // Load from persistent storage
-        return loadBenchmarkHistory()
+        loadBenchmarkHistory()
     }
     
     /// Export benchmark results
@@ -272,7 +268,6 @@ class BenchmarkSuite: ObservableObject {
         prompt: BenchmarkTestPrompt,
         framework: LLMFramework
     ) async throws -> SingleBenchmarkResult {
-        
         let memoryBefore = getMemoryUsage()
         let startTime = CFAbsoluteTimeGetCurrent()
         var firstTokenTime: CFAbsoluteTime?
@@ -288,14 +283,13 @@ class BenchmarkSuite: ObservableObject {
                 topK: 40,
                 repetitionPenalty: 1.1,
                 stopSequences: []
-            ),
-            onToken: { token in
+            )
+        )            { token in
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
                 }
                 tokens.append(token)
             }
-        )
         
         let endTime = CFAbsoluteTimeGetCurrent()
         let memoryAfter = getMemoryUsage()
@@ -318,7 +312,6 @@ class BenchmarkSuite: ObservableObject {
         prompt: BenchmarkTestPrompt,
         framework: LLMFramework
     ) -> BenchmarkSuiteResult {
-        
         let totalTimes = results.map { $0.totalTime }
         let ttftTimes = results.map { $0.timeToFirstToken }
         let tpsSpeeds = results.map { $0.tokensPerSecond }
@@ -344,7 +337,7 @@ class BenchmarkSuite: ObservableObject {
     
     private func determineWinner(_ r1: SingleBenchmarkResult, _ r2: SingleBenchmarkResult) -> LLMFramework {
         // Simple scoring: higher tokens/second wins
-        return r1.tokensPerSecond > r2.tokensPerSecond ? r1.framework : r2.framework
+        r1.tokensPerSecond > r2.tokensPerSecond ? r1.framework : r2.framework
     }
     
     private func getMemoryUsage() -> Int64 {
@@ -468,7 +461,7 @@ class BenchmarkSuite: ObservableObject {
     
     private func loadBenchmarkHistory() -> [BenchmarkSession] {
         // Load from UserDefaults or file system
-        return []
+        []
     }
     
     private func saveBenchmarkReport(_ report: BenchmarkReport) {

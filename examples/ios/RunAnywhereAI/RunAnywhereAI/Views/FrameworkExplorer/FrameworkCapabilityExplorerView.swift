@@ -209,7 +209,7 @@ struct FrameworkCard: View {
                     .foregroundColor(isSelected ? .white : .primary)
                 
                 HStack(spacing: 4) {
-                    ForEach(capabilities.topFeatures.prefix(3), id: \.self) { feature in
+                    ForEach(capabilities.topFeatures.prefix(3), id: \.self) { _ in
                         Image(systemName: "star.fill")
                             .font(.system(size: 8))
                             .foregroundColor(isSelected ? .white : .orange)

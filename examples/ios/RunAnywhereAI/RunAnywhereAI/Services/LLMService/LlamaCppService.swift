@@ -39,15 +39,14 @@ private class LlamaCppTokenizer {
 }
 
 class LlamaCppService: BaseLLMService {
-    
     // MARK: - llama.cpp Specific Capabilities
     
     override var supportsStreaming: Bool { true }
     override var supportsQuantization: Bool { true }
     override var supportsBatching: Bool { true }
     override var supportsMultiModal: Bool { false }
-    override var quantizationFormats: [QuantizationFormat] { 
-        [.qInt8, .qInt4_0, .qInt4_1, .qInt5_0, .qInt5_1, .qInt2, .qInt3, .qInt4K, .qInt5K, .qInt6K] 
+    override var quantizationFormats: [QuantizationFormat] {
+        [.qInt8, .qInt4_0, .qInt4_1, .qInt5_0, .qInt5_1, .qInt2, .qInt3, .qInt4K, .qInt5K, .qInt6K]
     }
     override var maxContextLength: Int { 32768 } // Depends on model
     override var supportsCustomOperators: Bool { false }
@@ -210,8 +209,8 @@ class LlamaCppService: BaseLLMService {
         // 6. Continue until EOS or max tokens
         
         // For demonstration, simulate the real process:
-        let _ = tok.encode(prompt)
-        let _ : [Int32] = []
+        _ = tok.encode(prompt)
+        let _: [Int32] = []
         
         // Simulate intelligent response generation
         let responseTemplate = generateResponseTemplate(for: prompt, modelInfo: currentModelInfo)

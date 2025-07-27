@@ -118,7 +118,6 @@ class ModelCompatibilityMatrix: ObservableObject {
         framework: LLMFramework,
         device: DeviceInfo? = nil
     ) -> CompatibilityResult {
-        
         guard let capability = frameworkCapabilities[framework] else {
             return CompatibilityResult(
                 isCompatible: false,
@@ -232,7 +231,6 @@ class ModelCompatibilityMatrix: ObservableObject {
         for model: ModelInfo,
         preferences: FrameworkPreferences = .default
     ) -> LLMFramework? {
-        
         let compatibleFrameworks = getCompatibleFrameworks(for: model)
             .filter { $0.result.isCompatible }
         
@@ -352,7 +350,7 @@ class ModelCompatibilityMatrix: ObservableObject {
     }
     
     private func isNativeFramework(_ framework: LLMFramework) -> Bool {
-        return [.foundationModels, .coreML, .mlx].contains(framework)
+        [.foundationModels, .coreML, .mlx].contains(framework)
     }
     
     private func parseSizeString(_ sizeString: String) -> Int64 {

@@ -83,7 +83,6 @@ class ChatViewModelEnhanced: ObservableObject {
                     messages[messageIndex].content = response.text
                     messages[messageIndex].generationMetrics = response.metrics
                 }
-                
             } catch {
                 await MainActor.run {
                     self.error = error

@@ -73,8 +73,8 @@ class ModelConversionWizardViewModel: ObservableObject {
     }
     
     var canStartConversion: Bool {
-        selectedModelFile != nil && 
-        targetFormat != nil && 
+        selectedModelFile != nil &&
+        targetFormat != nil &&
         targetFormat != detectedFormat &&
         !isConverting
     }
@@ -178,7 +178,7 @@ class ModelConversionWizardViewModel: ObservableObject {
             withIntermediateDirectories: true
         )
         
-        let outputFileName = sourceFile.deletingPathExtension().lastPathComponent + 
+        let outputFileName = sourceFile.deletingPathExtension().lastPathComponent +
                            "_converted." + options.targetFormat.fileExtension
         let outputPath = outputDirectory.appendingPathComponent(outputFileName)
         

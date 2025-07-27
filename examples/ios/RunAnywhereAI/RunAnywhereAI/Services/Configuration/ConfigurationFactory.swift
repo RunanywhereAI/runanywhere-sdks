@@ -9,7 +9,6 @@ import Foundation
 
 /// Factory for creating framework-specific configurations
 enum ConfigurationFactory {
-    
     /// Create configuration for a specific framework
     static func configuration(for framework: LLMFramework) -> LLMFrameworkConfiguration {
         switch framework {

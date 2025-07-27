@@ -39,7 +39,6 @@ class ABTestingFramework: ObservableObject {
         variantB: TestVariant,
         config: ABTestConfiguration = .default
     ) -> ABTest {
-        
         let test = ABTest(
             id: UUID(),
             name: name,
@@ -140,8 +139,8 @@ class ABTestingFramework: ObservableObject {
     
     /// Analyze test results
     func analyzeResults(for testId: UUID) -> ABTestResults? {
-        let test = completedTests.first(where: { $0.id == testId }) ??
-                   activeTests.first(where: { $0.id == testId })
+        let test = completedTests.first { $0.id == testId }??
+                   activeTests.first { $0.id == testId }
         
         guard let test = test else { return nil }
         
@@ -153,7 +152,6 @@ class ABTestingFramework: ObservableObject {
         for metrics: [ABTestMetric],
         confidence: Double = 0.95
     ) -> ConfidenceInterval {
-        
         let values = metrics.compactMap { metric -> Double? in
             switch metric.type {
             case .tokensPerSecond(let value):
@@ -195,7 +193,6 @@ class ABTestingFramework: ObservableObject {
         testPrompts: [String],
         duration: TimeInterval
     ) async throws -> AutomatedTestResults {
-        
         guard frameworks.count >= 2 else {
             throw ABTestError.insufficientVariants
         }
@@ -293,7 +290,6 @@ class ABTestingFramework: ObservableObject {
         variant: TestVariant,
         prompt: String
     ) async throws -> ABTestMetric {
-        
         // Initialize framework
         let service = try await initializeFramework(variant.framework)
         
@@ -305,14 +301,13 @@ class ABTestingFramework: ObservableObject {
         // Run generation
         try await service.streamGenerate(
             prompt: prompt,
-            options: GenerationOptions(maxTokens: 100, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: []),
-            onToken: { _ in
+            options: GenerationOptions(maxTokens: 100, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: [])
+        )            { _ in
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
                 }
                 tokenCount += 1
             }
-        )
         
         let endTime = CFAbsoluteTimeGetCurrent()
         let endMemory = getMemoryUsage()
@@ -416,9 +411,9 @@ class ABTestingFramework: ObservableObject {
         let count = sorted.count
         
         if count % 2 == 0 {
-            return (sorted[count/2 - 1] + sorted[count/2]) / 2
+            return (sorted[count / 2 - 1] + sorted[count / 2]) / 2
         } else {
-            return sorted[count/2]
+            return sorted[count / 2]
         }
     }
     
@@ -432,7 +427,6 @@ class ABTestingFramework: ObservableObject {
         groupA: [ABTestMetric],
         groupB: [ABTestMetric]
     ) -> StatisticalSignificance {
-        
         // Simplified t-test implementation
         let valuesA = extractValues(from: groupA)
         let valuesB = extractValues(from: groupB)
@@ -462,7 +456,7 @@ class ABTestingFramework: ObservableObject {
     }
     
     private func extractValues(from metrics: [ABTestMetric]) -> [Double] {
-        return metrics.compactMap { metric in
+        metrics.compactMap { metric in
             switch metric.type {
             case .tokensPerSecond(let value):
                 return value
@@ -480,7 +474,7 @@ class ABTestingFramework: ObservableObject {
     
     private func normalCDF(_ x: Double) -> Double {
         // Simplified normal CDF approximation
-        return 0.5 * (1 + erf(x / sqrt(2)))
+        0.5 * (1 + erf(x / sqrt(2)))
     }
     
     private func shouldAutoComplete(_ test: ABTest) -> Bool {
@@ -656,10 +650,10 @@ class ABTestPersistenceManager {
     }
     
     func loadActiveTests() -> [ABTest] {
-        return []
+        []
     }
     
     func loadCompletedTests() -> [ABTest] {
-        return []
+        []
     }
 }

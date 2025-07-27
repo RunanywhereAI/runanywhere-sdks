@@ -432,28 +432,28 @@ struct PerformanceDashboardView: View {
     // MARK: - Helper Methods
     
     private func getActiveModelsCount() -> Int {
-        return UnifiedLLMService.shared.availableServices.filter { $0.isInitialized }.count
+        UnifiedLLMService.shared.availableServices.filter { $0.isInitialized }.count
     }
     
     private func getTotalGenerations() -> Int {
         // Placeholder - would track actual generations
-        return 142
+        142
     }
     
     private func getRecentGenerations() -> Int {
         // Placeholder - would track recent generations
-        return 23
+        23
     }
     
     private func getTokensPerSecondData() -> [Double] {
         // Get last N performance snapshots
-        return performanceMonitor.performanceHistory.suffix(50).map { _ in
+        performanceMonitor.performanceHistory.suffix(50).map { _ in
             Double.random(in: 20...50)
         }
     }
     
     private func getMemoryUsageData() -> [MemorySnapshot] {
-        return memoryProfiler.memorySnapshots.suffix(50)
+        memoryProfiler.memorySnapshots.suffix(50)
     }
     
     private func priorityIcon(_ priority: MemoryRecommendation.Priority) -> String {

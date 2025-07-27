@@ -10,7 +10,6 @@ import Foundation
 // MARK: - Extended Error Types
 
 extension LLMError {
-    
     /// Create error with additional context
     static func withContext(
         _ error: LLMError,
@@ -29,7 +28,7 @@ extension LLMError {
     /// Check if error is recoverable
     var isRecoverable: Bool {
         switch self {
-        case .notInitialized(_), .modelNotFound, .noServiceSelected,
+        case .notInitialized, .modelNotFound, .noServiceSelected,
              .downloadFailed, .networkUnavailable:
             return true
         case .initializationFailed, .unsupportedFormat, .frameworkNotSupported,
@@ -43,7 +42,7 @@ extension LLMError {
     /// Get error severity
     var severity: ErrorSeverity {
         switch self {
-        case .notInitialized(_), .noServiceSelected:
+        case .notInitialized, .noServiceSelected:
             return .warning
         case .modelNotFound, .unsupportedFormat, .invalidModelPath:
             return .error
@@ -59,7 +58,7 @@ extension LLMError {
     /// Get error category
     var category: ErrorCategory {
         switch self {
-        case .notInitialized(_), .initializationFailed, .modelNotFound,
+        case .notInitialized, .initializationFailed, .modelNotFound,
              .unsupportedFormat, .invalidModelPath, .modelLoadFailed:
             return .initialization
         case .noServiceSelected, .serviceNotAvailable, .frameworkNotSupported:

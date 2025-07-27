@@ -309,7 +309,6 @@ struct ComparisonView: View {
                 // Detailed metrics comparison
                 if let metricsA = viewModel.metricsA,
                    let metricsB = viewModel.metricsB {
-                    
                     MetricsComparisonTable(
                         frameworkA: viewModel.frameworkA,
                         frameworkB: viewModel.frameworkB,
@@ -408,7 +407,7 @@ struct PerformanceComparisonChart: View {
     let frameworkB: LLMFramework
     
     var body: some View {
-        GeometryReader { geometry in
+        GeometryReader { _ in
             ZStack {
                 // Background
                 RoundedRectangle(cornerRadius: 12)
@@ -522,7 +521,7 @@ struct MetricsComparisonTable: View {
             Divider()
             
             // Rows
-            metricRow("Tokens/Second", 
+            metricRow("Tokens/Second",
                      valueA: String(format: "%.1f", metricsA.tokensPerSecond),
                      valueB: String(format: "%.1f", metricsB.tokensPerSecond),
                      higherIsBetter: true)

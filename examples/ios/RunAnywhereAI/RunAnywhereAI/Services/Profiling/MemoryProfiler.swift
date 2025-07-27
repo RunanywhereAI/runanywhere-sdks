@@ -75,7 +75,6 @@ class MemoryProfiler: ObservableObject {
         name: String,
         operation: () async throws -> T
     ) async throws -> (result: T, profile: OperationMemoryProfile) {
-        
         let startMemory = getCurrentMemoryUsage()
         let startTime = CFAbsoluteTimeGetCurrent()
         
@@ -108,7 +107,6 @@ class MemoryProfiler: ObservableObject {
                 """)
             
             return (result, profile)
-            
         } catch {
             endAllocationTracking(id: allocationId)
             throw error
@@ -120,7 +118,6 @@ class MemoryProfiler: ObservableObject {
         framework: LLMFramework,
         modelSize: Int64
     ) -> ModelMemoryTracking {
-        
         let tracking = ModelMemoryTracking(
             framework: framework,
             expectedSize: modelSize,
@@ -323,16 +320,16 @@ class MemoryProfiler: ObservableObject {
     
     private func getWiredMemory() -> Int64 {
         // Simplified - would need vm_statistics for accurate value
-        return getCurrentMemoryUsage() / 4
+        getCurrentMemoryUsage() / 4
     }
     
     private func getCompressedMemory() -> Int64 {
         // Simplified - would need vm_statistics for accurate value
-        return getCurrentMemoryUsage() / 10
+        getCurrentMemoryUsage() / 10
     }
     
     private func getLargestAllocation() -> AllocationInfo? {
-        return allocationTracking.values.max { $0.currentSize < $1.currentSize }
+        allocationTracking.values.max { $0.currentSize < $1.currentSize }
     }
     
     private func getPeakMemory(since startTime: CFAbsoluteTime) -> Int64 {
@@ -345,7 +342,7 @@ class MemoryProfiler: ObservableObject {
     
     private func getAllocations(for id: String) -> [AllocationDetail] {
         // Simplified - would track actual allocations
-        return []
+        []
     }
     
     private func beginAllocationTracking(id: String, name: String) {
@@ -420,22 +417,22 @@ class MemoryProfiler: ObservableObject {
     
     private func hasHighFragmentation() -> Bool {
         // Simplified check - would need detailed allocation info
-        return allocationTracking.count > 100
+        allocationTracking.count > 100
     }
     
     private func countLoadedModels() -> Int {
         // Check active frameworks
-        return 1 // Simplified implementation
+        1 // Simplified implementation
     }
     
     private func estimateModelMemory() -> Int64 {
         // Estimate based on typical model sizes
-        return 1_000_000_000 // 1GB estimate
+        1_000_000_000 // 1GB estimate
     }
     
     private func getActiveFrameworks() -> [LLMFramework] {
         // Get currently active frameworks
-        return [LLMFramework.mock] // Simplified implementation
+        [LLMFramework.mock] // Simplified implementation
     }
     
     private func generateReport() -> MemoryProfilingReport {

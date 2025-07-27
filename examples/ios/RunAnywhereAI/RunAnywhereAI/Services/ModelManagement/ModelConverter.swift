@@ -47,7 +47,6 @@ class ModelConverter: ObservableObject {
         targetFormat: ModelFormat,
         options: ConversionOptions = .default
     ) async throws -> URL {
-        
         guard sourceFormat != targetFormat else {
             throw ConversionError.sameFormat
         }
