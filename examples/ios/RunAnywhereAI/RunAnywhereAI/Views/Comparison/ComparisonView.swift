@@ -2,7 +2,7 @@
 //  ComparisonView.swift
 //  RunAnywhereAI
 //
-//  Created by Assistant on 7/27/25.
+//  Created by Sanchit Monga on 7/27/25.
 //
 
 import SwiftUI

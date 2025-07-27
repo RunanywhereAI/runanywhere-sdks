@@ -2,7 +2,7 @@
 //  ModelCompatibilityMatrix.swift
 //  RunAnywhereAI
 //
-//  Created by Assistant on 7/27/25.
+//  Created by Sanchit Monga on 7/27/25.
 //
 
 import Foundation
@@ -89,7 +89,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         ),
         .swiftTransformers: FrameworkCapability(
             supportedFormats: [.coreML],
-            supportedQuantizations: [.float16, .int8],
+            supportedQuantizations: [.f16, .q8_0],
             maxModelSize: 10_000_000_000,
             requiresSpecificModels: false,
             minimumOS: "15.0",
@@ -99,15 +99,15 @@ class ModelCompatibilityMatrix: ObservableObject {
     
     /// Model architecture compatibility
     private let modelArchitectureSupport: [ModelArchitecture: Set<LLMFramework>] = [
-        .llama: [.llamaCpp, .mlx, .mlc, .coreML, .onnx, .execuTorch, .tfLite],
-        .mistral: [.llamaCpp, .mlx, .mlc, .coreML, .onnx],
-        .phi: [.llamaCpp, .coreML, .mlx, .onnx],
+        .llama: [.llamaCpp, .mlx, .mlc, .coreML, .onnxRuntime, .execuTorch, .tensorFlowLite],
+        .mistral: [.llamaCpp, .mlx, .mlc, .coreML, .onnxRuntime],
+        .phi: [.llamaCpp, .coreML, .mlx, .onnxRuntime],
         .qwen: [.llamaCpp, .mlx, .mlc],
-        .gemma: [.tfLite, .coreML, .onnx],
-        .gpt2: [.swiftTransformers, .coreML, .onnx],
-        .bert: [.coreML, .onnx, .tfLite],
-        .t5: [.onnx, .tfLite],
-        .custom: [.coreML, .onnx]
+        .gemma: [.tensorFlowLite, .coreML, .onnxRuntime],
+        .gpt2: [.swiftTransformers, .coreML, .onnxRuntime],
+        .bert: [.coreML, .onnxRuntime, .tensorFlowLite],
+        .t5: [.onnxRuntime, .tensorFlowLite],
+        .custom: [.coreML, .onnxRuntime]
     ]
     
     // MARK: - Public Methods
@@ -137,16 +137,20 @@ class ModelCompatibilityMatrix: ObservableObject {
         }
         
         // Check quantization support
-        if !capability.supportedQuantizations.contains(model.quantization) {
-            return CompatibilityResult(
-                isCompatible: false,
-                reason: "Quantization \(model.quantization.rawValue) not supported by \(framework.displayName)",
-                warnings: []
-            )
+        if let quantization = model.quantization {
+            if let quantType = QuantizationType(rawValue: quantization),
+               !capability.supportedQuantizations.contains(quantType) {
+                return CompatibilityResult(
+                    isCompatible: false,
+                    reason: "Quantization \(quantization) not supported by \(framework.displayName)",
+                    warnings: []
+                )
+            }
         }
         
         // Check model size
-        if model.size > capability.maxModelSize {
+        let sizeInBytes = parseSizeString(model.size)
+        if sizeInBytes > capability.maxModelSize {
             return CompatibilityResult(
                 isCompatible: false,
                 reason: "Model too large for \(framework.displayName)",
@@ -167,7 +171,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                 )
             }
             
-            if !device.requirements.isSatisfied() {
+            if !device.isSatisfied() {
                 return CompatibilityResult(
                     isCompatible: false,
                     reason: "Device doesn't meet memory requirements",
@@ -190,7 +194,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         // Generate warnings
         var warnings: [String] = []
         
-        if model.size > capability.maxModelSize / 2 {
+        if sizeInBytes > capability.maxModelSize / 2 {
             warnings.append("Model uses over 50% of maximum supported size")
         }
         
@@ -248,7 +252,7 @@ class ModelCompatibilityMatrix: ObservableObject {
             }
             
             if preferences.preferLowestMemory {
-                score *= 1.0 / (compatibility.performance.estimatedMemoryUsage / 1_000_000_000.0)
+                score *= 1.0 / (Double(compatibility.performance.estimatedMemoryUsage) / 1_000_000_000.0)
             }
             
             return (compatibility, score)
@@ -304,9 +308,9 @@ class ModelCompatibilityMatrix: ObservableObject {
             .llamaCpp: 40,
             .coreML: 45,
             .mlc: 55,
-            .onnx: 35,
+            .onnxRuntime: 35,
             .execuTorch: 38,
-            .tfLite: 30,
+            .tensorFlowLite: 30,
             .picoLLM: 25,
             .swiftTransformers: 40
         ]
@@ -314,25 +318,29 @@ class ModelCompatibilityMatrix: ObservableObject {
         let base = basePerformance[framework] ?? 30
         
         // Adjust for model size
-        let sizeMultiplier = 3_000_000_000.0 / Double(model.size)
+        let sizeInBytes = parseSizeString(model.size)
+        let sizeMultiplier = 3_000_000_000.0 / Double(sizeInBytes)
         
         // Adjust for quantization
         let quantizationMultiplier: Double
-        switch model.quantization {
-        case .int2, .q2_k, .x1, .x2:
-            quantizationMultiplier = 2.0
-        case .int4, .q4_0, .q4_1, .q4_k_s, .q4_k_m, .x4:
-            quantizationMultiplier = 1.5
-        case .int8, .q8_0, .x8:
-            quantizationMultiplier = 1.2
-        default:
+        if let quantizationString = model.quantization {
+            // Parse quantization string to determine multiplier
+            if quantizationString.lowercased().contains("q2") || quantizationString.contains("int2") {
+                quantizationMultiplier = 2.0
+            } else if quantizationString.lowercased().contains("q4") || quantizationString.contains("int4") {
+                quantizationMultiplier = 1.5
+            } else if quantizationString.lowercased().contains("q8") || quantizationString.contains("int8") {
+                quantizationMultiplier = 1.2
+            } else {
+                quantizationMultiplier = 1.0
+            }
+        } else {
             quantizationMultiplier = 1.0
         }
         
         let estimatedSpeed = base * sizeMultiplier * quantizationMultiplier
         
-        // Parse size string to get numeric value in bytes
-        let sizeInBytes = parseSizeString(model.size)
+        // Parse size string is already done above
         let estimatedMemory = Int64(Double(sizeInBytes) / quantizationMultiplier)
         
         return PerformanceEstimate(
@@ -427,7 +435,13 @@ struct CompatibilityReport {
 struct DeviceInfo {
     let model: String
     let memory: Int64
-    let requirements: DeviceRequirement
+    let minimumMemory: Int64
+    let recommendedMemory: Int64
+    
+    func isSatisfied() -> Bool {
+        let availableMemory = ProcessInfo.processInfo.physicalMemory
+        return availableMemory >= minimumMemory
+    }
 }
 
 enum ModelArchitecture: String, CaseIterable {
@@ -442,7 +456,4 @@ enum ModelArchitecture: String, CaseIterable {
     case custom
 }
 
-extension ModelFormat {
-    static let mlc = ModelFormat(rawValue: "mlc")!
-    static let picoLLM = ModelFormat(rawValue: "picoLLM")!
-}
+// ModelFormat extensions removed - already defined in ModelInfo.swift

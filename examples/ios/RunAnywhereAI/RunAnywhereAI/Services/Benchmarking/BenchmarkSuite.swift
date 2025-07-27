@@ -2,7 +2,7 @@
 //  BenchmarkSuite.swift
 //  RunAnywhereAI
 //
-//  Created by Assistant on 7/27/25.
+//  Created by Sanchit Monga on 7/27/25.
 //
 
 import Foundation
@@ -26,31 +26,31 @@ class BenchmarkSuite: ObservableObject {
     
     // Benchmark configurations
     private let benchmarkPrompts = [
-        BenchmarkPrompt(
+        BenchmarkTestPrompt(
             id: "simple",
             text: "Hello, how are you?",
             category: .simple,
             expectedTokens: 20
         ),
-        BenchmarkPrompt(
+        BenchmarkTestPrompt(
             id: "reasoning",
             text: "Explain the concept of quantum computing in simple terms.",
             category: .reasoning,
             expectedTokens: 150
         ),
-        BenchmarkPrompt(
+        BenchmarkTestPrompt(
             id: "coding",
             text: "Write a Swift function to sort an array of integers using merge sort.",
             category: .coding,
             expectedTokens: 200
         ),
-        BenchmarkPrompt(
+        BenchmarkTestPrompt(
             id: "creative",
             text: "Write a short story about a robot learning to paint.",
             category: .creative,
             expectedTokens: 300
         ),
-        BenchmarkPrompt(
+        BenchmarkTestPrompt(
             id: "analysis",
             text: "Analyze the pros and cons of renewable energy sources.",
             category: .analysis,
@@ -201,13 +201,13 @@ class BenchmarkSuite: ObservableObject {
         // Run benchmarks in parallel
         async let result1 = benchmarkSingle(
             service: service1,
-            prompt: BenchmarkPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
+            prompt: BenchmarkTestPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
             framework: framework1
         )
         
         async let result2 = benchmarkSingle(
             service: service2,
-            prompt: BenchmarkPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
+            prompt: BenchmarkTestPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
             framework: framework2
         )
         
@@ -264,7 +264,7 @@ class BenchmarkSuite: ObservableObject {
     
     private func benchmarkSingle(
         service: LLMProtocol,
-        prompt: BenchmarkPrompt,
+        prompt: BenchmarkTestPrompt,
         framework: LLMFramework
     ) async throws -> SingleBenchmarkResult {
         
@@ -306,7 +306,7 @@ class BenchmarkSuite: ObservableObject {
     
     private func aggregateResults(
         _ results: [SingleBenchmarkResult],
-        prompt: BenchmarkPrompt,
+        prompt: BenchmarkTestPrompt,
         framework: LLMFramework
     ) -> BenchmarkResult {
         
@@ -469,7 +469,7 @@ class BenchmarkSuite: ObservableObject {
 
 // MARK: - Supporting Types
 
-struct BenchmarkPrompt {
+struct BenchmarkTestPrompt {
     let id: String
     let text: String
     let category: PromptCategory
@@ -513,7 +513,7 @@ struct SingleBenchmarkResult {
 
 struct BenchmarkResult: Codable {
     let framework: LLMFramework
-    let prompt: BenchmarkPrompt
+    let prompt: BenchmarkTestPrompt
     let avgTotalTime: TimeInterval
     let avgTimeToFirstToken: TimeInterval
     let avgTokensPerSecond: Double
@@ -523,7 +523,7 @@ struct BenchmarkResult: Codable {
     let sampleCount: Int
     let error: String?
     
-    init(framework: LLMFramework, prompt: BenchmarkPrompt, error: String) {
+    init(framework: LLMFramework, prompt: BenchmarkTestPrompt, error: String) {
         self.framework = framework
         self.prompt = prompt
         self.avgTotalTime = 0
@@ -536,7 +536,7 @@ struct BenchmarkResult: Codable {
         self.error = error
     }
     
-    init(framework: LLMFramework, prompt: BenchmarkPrompt, avgTotalTime: TimeInterval, avgTimeToFirstToken: TimeInterval, avgTokensPerSecond: Double, minTokensPerSecond: Double, maxTokensPerSecond: Double, avgMemoryUsed: Int64, sampleCount: Int) {
+    init(framework: LLMFramework, prompt: BenchmarkTestPrompt, avgTotalTime: TimeInterval, avgTimeToFirstToken: TimeInterval, avgTokensPerSecond: Double, minTokensPerSecond: Double, maxTokensPerSecond: Double, avgMemoryUsed: Int64, sampleCount: Int) {
         self.framework = framework
         self.prompt = prompt
         self.avgTotalTime = avgTotalTime
@@ -614,8 +614,8 @@ enum BenchmarkError: LocalizedError {
     }
 }
 
-// Make BenchmarkPrompt Codable
-extension BenchmarkPrompt: Codable {
+// Make BenchmarkTestPrompt Codable
+extension BenchmarkTestPrompt: Codable {
     enum CodingKeys: String, CodingKey {
         case id, text, category, expectedTokens
     }
