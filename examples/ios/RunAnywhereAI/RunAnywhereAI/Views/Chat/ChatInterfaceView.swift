@@ -40,7 +40,11 @@ struct ChatInterfaceView: View {
                     .background(Color(.systemGroupedBackground))
                     .onChange(of: viewModel.messages.count) { _ in
                         withAnimation {
-                            proxy.scrollTo(viewModel.messages.last?.id ?? "typing", anchor: .bottom)
+                            if let lastMessage = viewModel.messages.last {
+                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                            } else {
+                                proxy.scrollTo("typing", anchor: .bottom)
+                            }
                         }
                     }
                 }
@@ -156,7 +160,8 @@ struct ChatInterfaceView: View {
         messageText = ""
         
         Task {
-            await viewModel.sendMessage(text)
+            viewModel.currentInput = text
+            await viewModel.sendMessage()
         }
     }
 }
@@ -182,7 +187,7 @@ struct MessageBubbleView: View {
                     .cornerRadius(16)
                 
                 // Metadata
-                if let metrics = message.generationMetrics {
+                if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
                     HStack(spacing: 8) {
                         if let framework = message.framework {
                             Text(framework.displayName)
@@ -255,43 +260,51 @@ struct FrameworkPickerView: View {
     @StateObject private var compatibility = ModelCompatibilityMatrix.shared
     
     var body: some View {
+        navigationWrapper
+    }
+    
+    private var navigationWrapper: some View {
         NavigationView {
-            List {
-                ForEach(LLMFramework.allCases, id: \.self) { framework in
-                    Button(action: {
-                        selectedFramework = framework
-                        dismiss()
-                    }) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(framework.displayName)
-                                    .foregroundColor(.primary)
-                                
-                                Text(framework.description)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if framework == selectedFramework {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.accentColor)
-                            }
+            frameworkList
+                .navigationTitle("Select Framework")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
+                            dismiss()
                         }
-                        .padding(.vertical, 4)
                     }
                 }
+        }
+    }
+    
+    private var frameworkList: some View {
+        List {
+            ForEach(Array(LLMFramework.allCases), id: \.self) { framework in
+                frameworkButton(framework)
             }
-            .navigationTitle("Select Framework")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+        }
+    }
+    
+    private func frameworkButton(_ framework: LLMFramework) -> some View {
+        Button(action: {
+            selectedFramework = framework
+            dismiss()
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(framework.displayName)
+                        .foregroundColor(.primary)
+                }
+                
+                Spacer()
+                
+                if framework == selectedFramework {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
                 }
             }
+            .padding(.vertical, 4)
         }
     }
 }
@@ -304,87 +317,110 @@ struct ModelPickerView: View {
     @StateObject private var repository = ModelRepository.shared
     
     var body: some View {
+        modelNavigationView
+            .task {
+                repository.refreshAvailableModels()
+            }
+    }
+    
+    private var modelNavigationView: some View {
         NavigationView {
-            List {
-                Section("Downloaded Models") {
-                    ForEach(repository.downloadedModels) { model in
-                        Button(action: {
-                            selectedModel = model
+            modelList
+                .navigationTitle("Select Model")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Done") {
                             dismiss()
-                        }) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(model.name)
-                                        .foregroundColor(.primary)
-                                    
-                                    HStack {
-                                        Text(model.formattedSize)
-                                        Text("•")
-                                        Text(model.quantization.displayName)
-                                    }
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                                }
-                                
-                                Spacer()
-                                
-                                if model.id == selectedModel?.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundColor(.accentColor)
-                                }
-                            }
-                            .padding(.vertical, 4)
                         }
                     }
+                }
+        }
+    }
+    
+    private var modelList: some View {
+        List {
+            downloadedModelsSection
+            availableModelsSection
+        }
+    }
+    
+    private var downloadedModelsSection: some View {
+        Section("Downloaded Models") {
+            ForEach(repository.downloadedModels) { model in
+                downloadedModelButton(model)
+            }
+        }
+    }
+    
+    private var availableModelsSection: some View {
+        Section("Available Models") {
+            ForEach(repository.availableModels.filter { !repository.isModelDownloaded($0) }) { model in
+                availableModelRow(model)
+            }
+        }
+    }
+    
+    private func downloadedModelButton(_ model: ModelInfo) -> some View {
+        Button(action: {
+            selectedModel = model
+            dismiss()
+        }) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.name)
+                        .foregroundColor(.primary)
+                    
+                    HStack {
+                        Text(model.displaySize)
+                        Text("•")
+                        Text(model.quantization ?? "Unknown")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.secondary)
                 }
                 
-                Section("Available Models") {
-                    ForEach(repository.availableModels.filter { !repository.isModelDownloaded($0) }) { model in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(model.name)
-                                
-                                HStack {
-                                    Text(model.formattedSize)
-                                    Text("•")
-                                    Text(model.requirements.description)
-                                }
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            Button(action: {
-                                Task {
-                                    try await repository.downloadModel(model)
-                                }
-                            }) {
-                                if let progress = repository.downloadProgress[model.id] {
-                                    ProgressView(value: progress)
-                                        .frame(width: 50)
-                                } else {
-                                    Image(systemName: "arrow.down.circle")
-                                }
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                Spacer()
+                
+                if model.id == selectedModel?.id {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.accentColor)
                 }
             }
-            .navigationTitle("Select Model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+            .padding(.vertical, 4)
+        }
+    }
+    
+    private func availableModelRow(_ model: ModelInfo) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.name)
+                
+                HStack {
+                    Text(model.displaySize)
+                    Text("•")
+                    Text(model.description)
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            }
+            
+            Spacer()
+            
+            Button(action: {
+                Task {
+                    try await repository.downloadModel(model)
+                }
+            }) {
+                if let progress = repository.downloadProgress[model.id] {
+                    ProgressView(value: progress)
+                        .frame(width: 50)
+                } else {
+                    Image(systemName: "arrow.down.circle")
                 }
             }
         }
-        .task {
-            repository.refreshAvailableModels()
-        }
+        .padding(.vertical, 4)
     }
 }
 
