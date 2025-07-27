@@ -65,7 +65,9 @@ final class DependencyContainer: ObservableObject {
         
         // Try to create from factory
         if let factory = factories[key] {
-            let service = factory() as! T
+            guard let service = factory() as? T else {
+                return nil
+            }
             
             // Apply configuration if available
             if let config = configurations[key] {

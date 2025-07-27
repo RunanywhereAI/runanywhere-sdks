@@ -12,10 +12,10 @@ extension ChatMessage {
     var framework: LLMFramework?
     var generationMetrics: GenerationMetrics?
     var isError: Bool
-    
-    init(id: UUID = UUID(), 
-         role: MessageRole, 
-         content: String, 
+
+    init(id: UUID = UUID(),
+         role: MessageRole,
+         content: String,
          timestamp: Date = Date(),
          framework: LLMFramework? = nil,
          generationMetrics: GenerationMetrics? = nil,
