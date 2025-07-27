@@ -8,7 +8,7 @@
 import Foundation
 
 /// Model compatibility matrix for determining which models work with which frameworks
-class ModelCompatibilityMatrix {
+class ModelCompatibilityMatrix: ObservableObject {
     static let shared = ModelCompatibilityMatrix()
     
     // MARK: - Compatibility Data
@@ -16,7 +16,7 @@ class ModelCompatibilityMatrix {
     /// Framework capabilities
     private let frameworkCapabilities: [LLMFramework: FrameworkCapability] = [
         .foundationModels: FrameworkCapability(
-            supportedFormats: [.coreml],
+            supportedFormats: [.coreML],
             supportedQuantizations: [.int2, .int4],
             maxModelSize: 3_000_000_000,
             requiresSpecificModels: true,
@@ -24,7 +24,7 @@ class ModelCompatibilityMatrix {
             supportedArchitectures: ["arm64e"]
         ),
         .coreML: FrameworkCapability(
-            supportedFormats: [.coreml],
+            supportedFormats: [.coreML],
             supportedQuantizations: [.float16, .int8, .int4],
             maxModelSize: 15_000_000_000,
             requiresSpecificModels: false,
@@ -88,7 +88,7 @@ class ModelCompatibilityMatrix {
             supportedArchitectures: ["arm64", "arm64e"]
         ),
         .swiftTransformers: FrameworkCapability(
-            supportedFormats: [.coreml],
+            supportedFormats: [.coreML],
             supportedQuantizations: [.float16, .int8],
             maxModelSize: 10_000_000_000,
             requiresSpecificModels: false,
@@ -330,18 +330,45 @@ class ModelCompatibilityMatrix {
         }
         
         let estimatedSpeed = base * sizeMultiplier * quantizationMultiplier
-        let estimatedMemory = Int64(Double(model.size) / quantizationMultiplier)
+        
+        // Parse size string to get numeric value in bytes
+        let sizeInBytes = parseSizeString(model.size)
+        let estimatedMemory = Int64(Double(sizeInBytes) / quantizationMultiplier)
         
         return PerformanceEstimate(
             estimatedTokensPerSecond: estimatedSpeed,
             estimatedMemoryUsage: estimatedMemory,
-            estimatedLoadTime: Double(model.size) / 500_000_000, // 500MB/s
+            estimatedLoadTime: Double(sizeInBytes) / 500_000_000, // 500MB/s
             score: estimatedSpeed / 100.0
         )
     }
     
     private func isNativeFramework(_ framework: LLMFramework) -> Bool {
         return [.foundationModels, .coreML, .mlx].contains(framework)
+    }
+    
+    private func parseSizeString(_ sizeString: String) -> Int64 {
+        // Parse size strings like "1.7GB", "3.5G", "500MB", etc.
+        let cleanString = sizeString.uppercased().replacingOccurrences(of: " ", with: "")
+        
+        // Extract numeric value
+        let scanner = Scanner(string: cleanString)
+        var value: Double = 0
+        scanner.scanDouble(&value)
+        
+        // Check for unit suffix
+        let remaining = cleanString.dropFirst(scanner.currentIndex.utf16Offset(in: cleanString))
+        
+        var multiplier: Double = 1
+        if remaining.hasPrefix("GB") || remaining.hasPrefix("G") {
+            multiplier = 1_000_000_000
+        } else if remaining.hasPrefix("MB") || remaining.hasPrefix("M") {
+            multiplier = 1_000_000
+        } else if remaining.hasPrefix("KB") || remaining.hasPrefix("K") {
+            multiplier = 1_000
+        }
+        
+        return Int64(value * multiplier)
     }
 }
 

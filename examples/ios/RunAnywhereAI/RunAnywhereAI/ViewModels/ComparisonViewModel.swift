@@ -167,7 +167,11 @@ class ComparisonViewModel: ObservableObject {
             // Generate
             let options = GenerationOptions(
                 maxTokens: settings.maxTokens,
-                temperature: settings.temperature
+                temperature: Float(settings.temperature),
+                topP: 0.95,
+                topK: 40,
+                repetitionPenalty: 1.1,
+                stopSequences: []
             )
             
             try await unifiedService.streamGenerate(

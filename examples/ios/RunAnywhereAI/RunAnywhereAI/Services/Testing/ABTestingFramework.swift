@@ -19,7 +19,7 @@ class ABTestingFramework: ObservableObject {
     @Published var currentTestResults: ABTestResults?
     
     // MARK: - Private Properties
-    private let logger = Logger(subsystem: "com.runanywhere.ai", category: "ABTesting")
+    private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "ABTesting")
     private let queue = DispatchQueue(label: "com.runanywhere.abtesting", qos: .userInitiated)
     private var cancellables = Set<AnyCancellable>()
     private let persistenceManager = ABTestPersistenceManager()
@@ -324,9 +324,9 @@ class ABTestingFramework: ObservableObject {
         let memoryUsed = endMemory - startMemory
         
         // Return primary metric based on configuration
-        if variant.configuration["primaryMetric"] as? String == "speed" {
+        if variant.configuration["primaryMetric"] == "speed" {
             return ABTestMetric(id: UUID(), timestamp: Date(), type: .tokensPerSecond(tokensPerSecond))
-        } else if variant.configuration["primaryMetric"] as? String == "latency" {
+        } else if variant.configuration["primaryMetric"] == "latency" {
             return ABTestMetric(id: UUID(), timestamp: Date(), type: .timeToFirstToken(timeToFirstToken))
         } else {
             return ABTestMetric(id: UUID(), timestamp: Date(), type: .memoryUsage(memoryUsed))
@@ -334,10 +334,10 @@ class ABTestingFramework: ObservableObject {
     }
     
     private func initializeFramework(_ framework: LLMFramework) async throws -> LLMService {
-        let unifiedService = UnifiedLLMService.shared
-        unifiedService.selectService(named: framework.displayName)
+        let unifiedService = await UnifiedLLMService.shared
+        await unifiedService.selectService(named: framework.displayName)
         
-        guard let service = unifiedService.currentService else {
+        guard let service = await unifiedService.currentService else {
             throw ABTestError.frameworkInitializationFailed
         }
         

@@ -155,7 +155,7 @@ class RealtimePerformanceMonitor: ObservableObject {
     }
     
     /// Export performance data
-    func exportPerformanceData(format: ExportFormat) throws -> Data {
+    func exportPerformanceData(format: PerformanceExportFormat) throws -> Data {
         let report = generateReport()
         
         switch format {
@@ -371,7 +371,7 @@ class RealtimePerformanceMonitor: ObservableObject {
         currentMetrics.thermalState = state
         
         if state == .serious || state == .critical {
-            logger.warning("Thermal state changed to \(thermalStateString(state))")
+            logger.warning("Thermal state changed to \(self.thermalStateString(state))")
         }
     }
     
@@ -518,4 +518,10 @@ struct PerformanceReport: Codable {
     let averageFrameRate: Double
     let alertCount: Int
     let snapshots: [PerformanceSnapshot]
+}
+
+enum PerformanceExportFormat {
+    case json
+    case csv
+    case markdown
 }
