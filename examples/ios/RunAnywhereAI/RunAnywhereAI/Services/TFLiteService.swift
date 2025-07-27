@@ -9,7 +9,6 @@ import Foundation
 // import TensorFlowLite
 
 class TFLiteService: BaseLLMService {
-    
     override var frameworkInfo: FrameworkInfo {
         FrameworkInfo(
             name: "TensorFlow Lite",

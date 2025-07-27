@@ -8,7 +8,6 @@
 import Foundation
 
 class MockLLMService: LLMService {
-    
     // MARK: - Properties
     
     private var currentModel: ModelInfo?

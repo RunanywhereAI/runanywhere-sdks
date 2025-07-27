@@ -90,7 +90,6 @@ private class CoreMLTokenizer {
 
 @available(iOS 17.0, *)
 class CoreMLService: BaseLLMService {
-    
     // MARK: - Core ML Specific Capabilities
     
     override var supportsStreaming: Bool { true }

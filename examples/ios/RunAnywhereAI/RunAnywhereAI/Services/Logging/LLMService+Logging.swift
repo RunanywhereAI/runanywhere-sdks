@@ -10,7 +10,6 @@ import Foundation
 // MARK: - LLM Service Logging Extension
 
 extension LLMService {
-    
     /// Get framework from service name
     var framework: LLMFramework? {
         switch name.lowercased() {
@@ -147,7 +146,6 @@ extension LLMService {
 // MARK: - Structured Logging
 
 extension LLMService {
-    
     /// Log model loading event
     func logModelLoading(path: String, format: ModelFormat) {
         logInfo("Loading model: \(path) (format: \(format.rawValue))")

@@ -10,7 +10,6 @@ import Foundation
 /// Base class providing default implementations for LLM services
 /// This helps existing services migrate to the new protocol structure
 class BaseLLMService: LLMService {
-    
     // MARK: - Properties to be overridden
     
     var frameworkInfo: FrameworkInfo {

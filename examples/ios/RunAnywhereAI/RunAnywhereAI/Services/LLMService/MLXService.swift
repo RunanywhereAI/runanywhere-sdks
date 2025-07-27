@@ -97,7 +97,6 @@ private class MLXTokenizer {
 
 @available(iOS 17.0, *)
 class MLXService: BaseLLMService {
-    
     // MARK: - MLX Specific Capabilities
     
     override var supportsStreaming: Bool { true }

@@ -443,7 +443,7 @@ struct LiveMetrics {
     var cpuUsage: Double = 0
     var thermalState: ProcessInfo.ThermalState = .nominal
     var batteryLevel: Float = 1.0
-    var frameRate: Double? = nil
+    var frameRate: Double?
     var currentTokensPerSecond: Double = 0
     var timeToFirstToken: TimeInterval = 0
 }

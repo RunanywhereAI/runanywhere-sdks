@@ -13,7 +13,6 @@ import UIKit
 /// is not yet publicly available. This shows how it would be integrated.
 @available(iOS 18.0, *)
 final class FoundationModelsService: LLMService {
-    
     // MARK: - Properties
     
     private var model: Any? // Would be FoundationModel instance
@@ -124,7 +123,6 @@ final class FoundationModelsService: LLMService {
             
             logModelLoaded(info: currentModelInfo!, duration: 1.0)
             metrics.successfulLoads += 1
-            
         } catch {
             modelState = .failed(error: error)
             metrics.failedLoads += 1
@@ -233,7 +231,6 @@ final class FoundationModelsService: LLMService {
             metrics.successfulGenerations += 1
             
             return response
-            
         } catch {
             generationState = .failed(error: error)
             metrics.failedGenerations += 1
@@ -274,7 +271,6 @@ final class FoundationModelsService: LLMService {
                     
                     tracker.end(framework: .foundationModels)
                     continuation.finish()
-                    
                 } catch {
                     continuation.finish(throwing: error)
                 }
