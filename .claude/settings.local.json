@@ -19,7 +19,8 @@
       "Bash(./swiftlint.sh:*)",
       "Bash(swiftlint:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:picovoice.ai)"
+      "WebFetch(domain:picovoice.ai)",
+      "Bash(swiftc:*)"
     ],
     "deny": []
   }
