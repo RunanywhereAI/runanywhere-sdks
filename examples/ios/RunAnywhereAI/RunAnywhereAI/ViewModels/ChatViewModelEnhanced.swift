@@ -20,45 +20,45 @@ class ChatViewModelEnhanced: ObservableObject {
     @Published var settings = ChatSettings()
     @Published var currentInput = ""
     @Published var error: Error?
-    
+
     // MARK: - Private Properties
     private let unifiedService = UnifiedLLMService.shared
     private let performanceMonitor = RealtimePerformanceMonitor.shared
     private let logger = Logger.shared
     private var cancellables = Set<AnyCancellable>()
     private var generationTask: Task<Void, Never>?
-    
+
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
     }
-    
+
     // MARK: - Initialization
     init() {
         setupSubscriptions()
         addWelcomeMessage()
     }
-    
+
     // MARK: - Public Methods
-    
+
     func sendMessage() async {
         guard canSend else { return }
-        
+
         let userMessage = ChatMessage(
             role: .user,
             content: currentInput,
             timestamp: Date()
         )
         messages.append(userMessage)
-        
+
         let prompt = currentInput
         currentInput = ""
         isGenerating = true
         error = nil
         currentTokensPerSecond = nil
-        
+
         // Start performance monitoring
         performanceMonitor.beginGeneration(framework: selectedFramework, prompt: prompt)
-        
+
         // Create assistant message placeholder
         var assistantMessage = ChatMessage(
             role: .assistant,
@@ -68,12 +68,12 @@ class ChatViewModelEnhanced: ObservableObject {
         assistantMessage.framework = selectedFramework
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
-        
+
         generationTask = Task {
             do {
                 // Switch framework if needed
                 unifiedService.selectService(named: selectedFramework.displayName)
-                
+
                 if settings.streamResponses {
                     // Stream generation
                     try await streamGeneration(prompt: prompt, messageIndex: messageIndex)
@@ -93,17 +93,17 @@ class ChatViewModelEnhanced: ObservableObject {
                 }
                 logger.log("Generation failed: \(error)", level: .error, category: "Chat")
             }
-            
+
             // End monitoring
             performanceMonitor.endGeneration()
-            
+
             await MainActor.run {
                 self.isGenerating = false
                 self.currentTokensPerSecond = nil
             }
         }
     }
-    
+
     func clearChat() {
         generationTask?.cancel()
         messages.removeAll()
@@ -112,36 +112,36 @@ class ChatViewModelEnhanced: ObservableObject {
         isGenerating = false
         error = nil
     }
-    
+
     func stopGeneration() {
         generationTask?.cancel()
         isGenerating = false
     }
-    
+
     func regenerateLastMessage() async {
         guard messages.count >= 2 else { return }
-        
+
         // Remove last assistant message
         if messages.last?.role == .assistant {
             messages.removeLast()
         }
-        
+
         // Get last user message
         if let lastUserMessage = messages.last(where: { $0.role == .user }) {
             currentInput = lastUserMessage.content
             await sendMessage()
         }
     }
-    
+
     func switchFramework(_ framework: LLMFramework) async {
         selectedFramework = framework
-        
+
         unifiedService.selectService(named: framework.displayName)
         logger.log("Switched to \(framework.displayName)", level: .info, category: "Chat")
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupSubscriptions() {
         // Monitor performance metrics
         performanceMonitor.$currentMetrics
@@ -153,7 +153,7 @@ class ChatViewModelEnhanced: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private func addWelcomeMessage() {
         let welcomeMessage = ChatMessage(
             role: .assistant,
@@ -162,7 +162,7 @@ class ChatViewModelEnhanced: ObservableObject {
         )
         messages.append(welcomeMessage)
     }
-    
+
     private func streamGeneration(prompt: String, messageIndex: Int) async throws {
         let options = GenerationOptions(
             maxTokens: settings.maxTokens,
@@ -172,25 +172,25 @@ class ChatViewModelEnhanced: ObservableObject {
             repetitionPenalty: 1.1,
             stopSequences: []
         )
-        
+
         var generatedTokens: [String] = []
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
         try await unifiedService.streamGenerate(
             prompt: prompt,
             options: options
         ) { [weak self] token in
             guard let self = self else { return }
-            
+
             // Record token
             self.performanceMonitor.recordToken(token)
             generatedTokens.append(token)
-            
+
             Task { @MainActor in
                 if messageIndex < self.messages.count {
                     self.messages[messageIndex].content += token
                 }
-                
+
                 // Update metrics
                 let elapsed = CFAbsoluteTimeGetCurrent() - startTime
                 if elapsed > 0 {
@@ -198,11 +198,11 @@ class ChatViewModelEnhanced: ObservableObject {
                 }
             }
         }
-        
+
         // Final metrics
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
-        
+
         messages[messageIndex].generationMetrics = EnhancedGenerationMetrics(
             tokenCount: generatedTokens.count,
             totalTime: totalTime,
@@ -210,7 +210,7 @@ class ChatViewModelEnhanced: ObservableObject {
             timeToFirstToken: performanceMonitor.currentMetrics.timeToFirstToken
         )
     }
-    
+
     private func generateResponse(prompt: String) async throws -> (text: String, metrics: EnhancedGenerationMetrics) {
         let options = GenerationOptions(
             maxTokens: settings.maxTokens,
@@ -220,27 +220,27 @@ class ChatViewModelEnhanced: ObservableObject {
             repetitionPenalty: 1.1,
             stopSequences: []
         )
-        
+
         let startTime = CFAbsoluteTimeGetCurrent()
-        
+
         let response = try await unifiedService.generate(
             prompt: prompt,
             options: options
         )
-        
+
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
-        
+
         // Estimate token count (rough approximation)
         let estimatedTokens = response.split(separator: " ").count
-        
+
         let metrics = EnhancedGenerationMetrics(
             tokenCount: estimatedTokens,
             totalTime: totalTime,
             tokensPerSecond: Double(estimatedTokens) / totalTime,
             timeToFirstToken: 0
         )
-        
+
         return (response, metrics)
     }
 }

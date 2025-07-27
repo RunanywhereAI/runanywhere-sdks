@@ -4,20 +4,20 @@ struct FrameworkCapabilityExplorerView: View {
     @StateObject private var viewModel = FrameworkCapabilityExplorerViewModel()
     @State private var selectedFramework: LLMFramework?
     @State private var showComparison = false
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 headerSection
-                
+
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         frameworkGridSection
-                        
+
                         if let framework = selectedFramework {
                             frameworkDetailSection(framework)
                         }
-                        
+
                         if showComparison {
                             comparisonSection
                         }
@@ -35,17 +35,17 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private var headerSection: some View {
         VStack(spacing: 12) {
             Image(systemName: "cpu.fill")
                 .font(.system(size: 40))
                 .foregroundColor(.blue)
-            
+
             Text("LLM Framework Capabilities")
                 .font(.title2)
                 .fontWeight(.bold)
-            
+
             Text("Explore the unique features and capabilities of each framework")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -54,7 +54,7 @@ struct FrameworkCapabilityExplorerView: View {
         .padding()
         .background(Color.blue.opacity(0.1))
     }
-    
+
     private var frameworkGridSection: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
             ForEach(LLMFramework.allCases, id: \.self) { framework in
@@ -68,14 +68,14 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private func frameworkDetailSection(_ framework: LLMFramework) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: framework.iconName)
                     .font(.title2)
                     .foregroundColor(.blue)
-                
+
                 VStack(alignment: .leading) {
                     Text(framework.displayName)
                         .font(.headline)
@@ -83,10 +83,10 @@ struct FrameworkCapabilityExplorerView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
             }
-            
+
             capabilitiesDetailSection(framework)
             performanceMetricsSection(framework)
             useCasesSection(framework)
@@ -96,15 +96,15 @@ struct FrameworkCapabilityExplorerView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
-    
+
     private func capabilitiesDetailSection(_ framework: LLMFramework) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Capabilities")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             let capabilities = viewModel.getCapabilities(for: framework)
-            
+
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
                 CapabilityRow(title: "Streaming", supported: capabilities.supportsStreaming)
                 CapabilityRow(title: "Quantization", supported: capabilities.supportsQuantization)
@@ -115,15 +115,15 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private func performanceMetricsSection(_ framework: LLMFramework) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Performance Profile")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             let metrics = viewModel.getPerformanceProfile(for: framework)
-            
+
             VStack(spacing: 4) {
                 MetricBar(title: "Speed", value: metrics.speed, color: .green)
                 MetricBar(title: "Memory Efficiency", value: metrics.memoryEfficiency, color: .blue)
@@ -132,15 +132,15 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private func useCasesSection(_ framework: LLMFramework) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Best Use Cases")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             let useCases = viewModel.getUseCases(for: framework)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(useCases, id: \.self) { useCase in
                     HStack {
@@ -155,15 +155,15 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private func codeExampleSection(_ framework: LLMFramework) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Quick Example")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             let example = viewModel.getCodeExample(for: framework)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(example)
                     .font(.system(.caption, design: .monospaced))
@@ -173,13 +173,13 @@ struct FrameworkCapabilityExplorerView: View {
             }
         }
     }
-    
+
     private var comparisonSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Framework Comparison Matrix")
                 .font(.headline)
                 .fontWeight(.bold)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 ComparisonMatrix(frameworks: LLMFramework.allCases, viewModel: viewModel)
             }
@@ -195,19 +195,19 @@ struct FrameworkCard: View {
     let capabilities: FrameworkCapabilities
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
                 Image(systemName: framework.iconName)
                     .font(.system(size: 30))
                     .foregroundColor(isSelected ? .white : .blue)
-                
+
                 Text(framework.displayName)
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(isSelected ? .white : .primary)
-                
+
                 HStack(spacing: 4) {
                     ForEach(capabilities.topFeatures.prefix(3), id: \.self) { _ in
                         Image(systemName: "star.fill")
@@ -227,7 +227,7 @@ struct FrameworkCard: View {
 struct CapabilityRow: View {
     let title: String
     let supported: Bool
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
@@ -245,7 +245,7 @@ struct MetricBar: View {
     let title: String
     let value: Double
     let color: Color
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
@@ -256,13 +256,13 @@ struct MetricBar: View {
                     .font(.caption)
                     .fontWeight(.medium)
             }
-            
+
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
                         .fill(color.opacity(0.2))
                         .frame(height: 4)
-                    
+
                     Rectangle()
                         .fill(color)
                         .frame(width: geometry.size.width * value, height: 4)
@@ -276,7 +276,7 @@ struct MetricBar: View {
 struct ComparisonMatrix: View {
     let frameworks: [LLMFramework]
     let viewModel: FrameworkCapabilityExplorerViewModel
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Header row
@@ -285,7 +285,7 @@ struct ComparisonMatrix: View {
                     .font(.caption)
                     .fontWeight(.bold)
                     .frame(width: 100, alignment: .leading)
-                
+
                 ForEach(frameworks, id: \.self) { framework in
                     Text(framework.displayName)
                         .font(.caption)
@@ -294,22 +294,22 @@ struct ComparisonMatrix: View {
                         .rotationEffect(.degrees(-45))
                 }
             }
-            
+
             Divider()
-            
+
             // Capability rows
             let features = ["Streaming", "Quantization", "Batching", "Multi-Modal", "GPU Accel", "Custom Models"]
-            
+
             ForEach(features, id: \.self) { feature in
                 HStack(spacing: 12) {
                     Text(feature)
                         .font(.caption)
                         .frame(width: 100, alignment: .leading)
-                    
+
                     ForEach(frameworks, id: \.self) { framework in
                         let capabilities = viewModel.getCapabilities(for: framework)
                         let supported = getFeatureSupport(feature: feature, capabilities: capabilities)
-                        
+
                         Image(systemName: supported ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .foregroundColor(supported ? .green : .red)
                             .font(.caption)
@@ -320,7 +320,7 @@ struct ComparisonMatrix: View {
         }
         .padding()
     }
-    
+
     private func getFeatureSupport(feature: String, capabilities: FrameworkCapabilities) -> Bool {
         switch feature {
         case "Streaming": return capabilities.supportsStreaming

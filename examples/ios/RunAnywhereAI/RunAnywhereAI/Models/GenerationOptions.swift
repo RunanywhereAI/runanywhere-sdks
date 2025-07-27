@@ -14,7 +14,7 @@ struct GenerationOptions {
     var topK: Int
     var repetitionPenalty: Float
     var stopSequences: [String]
-    
+
     static let `default` = GenerationOptions(
         maxTokens: 150,
         temperature: 0.7,

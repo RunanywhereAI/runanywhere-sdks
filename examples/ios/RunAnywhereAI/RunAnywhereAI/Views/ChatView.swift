@@ -13,12 +13,12 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @State private var showingConversationList = false
     @State private var showingExportView = false
-    
+
     @MainActor
     init(llmService: UnifiedLLMService? = nil) {
         _viewModel = StateObject(wrappedValue: ChatViewModel(llmService: llmService))
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Messages list
@@ -29,7 +29,7 @@ struct ChatView: View {
                             MessageBubble(message: message)
                                 .id(message.id)
                         }
-                        
+
                         if viewModel.isGenerating {
                             TypingIndicator()
                         }
@@ -44,9 +44,9 @@ struct ChatView: View {
                     }
                 }
             }
-            
+
             Divider()
-            
+
             // Input bar
             HStack(spacing: 12) {
                 TextField("Type a message...", text: $viewModel.currentInput)
@@ -57,7 +57,7 @@ struct ChatView: View {
                             await viewModel.sendMessage()
                         }
                     }
-                
+
                 Button(action: {
                     Task {
                         await viewModel.sendMessage()
@@ -82,7 +82,7 @@ struct ChatView: View {
                     Image(systemName: "sidebar.left")
                 }
             }
-            
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(action: {
@@ -90,16 +90,16 @@ struct ChatView: View {
                     }) {
                         Label("New Chat", systemImage: "square.and.pencil")
                     }
-                    
+
                     Button(action: {
                         showingExportView = true
                     }) {
                         Label("Export Chat", systemImage: "square.and.arrow.up")
                     }
                     .disabled(viewModel.messages.isEmpty)
-                    
+
                     Divider()
-                    
+
                     Button(action: viewModel.clearChat) {
                         Label("Clear Chat", systemImage: "trash")
                     }
@@ -127,7 +127,7 @@ struct ChatView: View {
             saveCurrentConversation()
         }
     }
-    
+
     private func loadCurrentConversation() {
         if let conversation = conversationStore.currentConversation {
             viewModel.messages = conversation.messages
@@ -137,51 +137,51 @@ struct ChatView: View {
             viewModel.messages = []
         }
     }
-    
+
     private func newConversation() {
         let conversation = conversationStore.createConversation()
         viewModel.messages = []
     }
-    
+
     private func saveCurrentConversation() {
         guard var conversation = conversationStore.currentConversation else { return }
-        
+
         conversation.messages = viewModel.messages
         conversation.framework = UnifiedLLMService.shared.currentFramework
         conversation.modelInfo = UnifiedLLMService.shared.currentModel
-        
+
         conversationStore.updateConversation(conversation)
     }
 }
 
 struct MessageBubble: View {
     let message: ChatMessage
-    
+
     var body: some View {
         HStack {
             if message.role == .user {
                 Spacer()
             }
-            
+
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 Text(message.content)
                     .padding(12)
                     .background(backgroundColor)
                     .foregroundColor(textColor)
                     .cornerRadius(16)
-                
+
                 Text(message.timestamp, style: .time)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: alignment)
-            
+
             if message.role == .assistant {
                 Spacer()
             }
         }
     }
-    
+
     private var backgroundColor: Color {
         switch message.role {
         case .user:
@@ -192,7 +192,7 @@ struct MessageBubble: View {
             return Color.orange.opacity(0.2)
         }
     }
-    
+
     private var textColor: Color {
         switch message.role {
         case .user:
@@ -201,7 +201,7 @@ struct MessageBubble: View {
             return .primary
         }
     }
-    
+
     private var alignment: Alignment {
         message.role == .user ? .trailing : .leading
     }
@@ -209,7 +209,7 @@ struct MessageBubble: View {
 
 struct TypingIndicator: View {
     @State private var animationAmount = 0.0
-    
+
     var body: some View {
         HStack {
             HStack(spacing: 4) {
@@ -231,7 +231,7 @@ struct TypingIndicator: View {
             .padding(.vertical, 10)
             .background(Color(.secondarySystemBackground))
             .cornerRadius(16)
-            
+
             Spacer()
         }
         .onAppear {

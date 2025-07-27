@@ -37,9 +37,9 @@ class ExecuTorchService: BaseLLMService {
             ]
         )
     }
-    
+
     override var name: String { "ExecuTorch" }
-    
+
     override var supportedModels: [ModelInfo] {
         get {
             [
@@ -86,51 +86,51 @@ class ExecuTorchService: BaseLLMService {
         }
         set {}
     }
-    
+
     private var module: Any? // Would be ETModule in real implementation
     private var modelPath: String = ""
     // private let tokenizer = SimpleTokenizer() // Commented out - SimpleTokenizer not implemented
-    
+
     override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
         }
-        
+
         // Check if it's a PTE (PyTorch Edge) model
         guard modelPath.hasSuffix(".pte") else {
             throw LLMError.unsupportedFormat
         }
-        
+
         self.modelPath = modelPath
-        
+
         // In real implementation:
         // module = try ETModule(contentsOf: modelPath)
-        // 
+        //
         // // Configure execution
         // module?.executionConfig = ETExecutionConfig(
         //     backend: selectOptimalBackend(),
         //     numThreads: ProcessInfo.processInfo.processorCount,
         //     enableProfiling: false
         // )
-        
+
         // Simulate initialization
         try await Task.sleep(nanoseconds: 1_000_000_000)
-        
+
         isInitialized = true
     }
-    
+
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // Coming Soon - ExecuTorch (PyTorch Mobile)
         // ExecuTorch is currently in beta/preview status (July 2025)
         // Expected production-ready: Q4 2025/Q1 2026
         return "🚧 Coming Soon - ExecuTorch (PyTorch Mobile)\n\nExecuTorch is Meta's on-device AI framework for mobile inference. This framework is currently in beta/preview status and not recommended for production use.\n\nExpected production-ready: Q4 2025/Q1 2026\n\nFeatures coming soon:\n• Optimized PyTorch model execution\n• .pte (PyTorch Edge) format support\n• CPU/GPU/NPU backend selection\n• Memory-efficient inference\n• Model quantization support"
     }
-    
+
     override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -139,28 +139,28 @@ class ExecuTorchService: BaseLLMService {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // In real implementation:
         // let inputIds = tokenizer.encode(prompt)
-        // 
+        //
         // // Create input tensors
         // let inputTensor = ETTensor(
         //     data: inputIds,
         //     shape: [1, inputIds.count],
         //     dtype: .int64
         // )
-        // 
+        //
         // var generatedIds: [Int64] = []
         // var currentInput = inputTensor
-        // 
+        //
         // for _ in 0..<options.maxTokens {
         //     // Forward pass
         //     let outputs = try await module.forward([currentInput])
-        //     
+        //
         //     guard let logits = outputs.first else {
         //         throw ETError.forwardFailed
         //     }
-        //     
+        //
         //     // Sample next token
         //     let nextToken = sampleFromLogits(
         //         logits,
@@ -168,18 +168,18 @@ class ExecuTorchService: BaseLLMService {
         //         topP: options.topP,
         //         topK: options.topK
         //     )
-        //     
+        //
         //     generatedIds.append(nextToken)
-        //     
+        //
         //     // Decode token
         //     let text = tokenizer.decode([nextToken])
         //     onToken(text)
-        //     
+        //
         //     // Check for end
         //     if nextToken == tokenizer.eosTokenId {
         //         break
         //     }
-        //     
+        //
         //     // Update input
         //     let allTokens = inputIds + generatedIds
         //     currentInput = ETTensor(
@@ -188,7 +188,7 @@ class ExecuTorchService: BaseLLMService {
         //         dtype: .int64
         //     )
         // }
-        
+
         // Simulate ExecuTorch generation
         let responseTokens = [
             "I", "'m", " powered", " by", " ExecuTorch", ",",
@@ -197,20 +197,20 @@ class ExecuTorchService: BaseLLMService {
             " This", " provides", " optimized", " execution", " of",
             " PyTorch", " models", " on", " mobile", " devices", "."
         ]
-        
+
         for (index, token) in responseTokens.prefix(options.maxTokens).enumerated() {
             try await Task.sleep(nanoseconds: 35_000_000) // 35ms per token
             onToken(token)
-            
+
             if token.contains(".") && index > 10 {
                 break
             }
         }
     }
-    
+
     override func getModelInfo() -> ModelInfo? {
         guard isInitialized else { return nil }
-        
+
         return ModelInfo(
             id: "executorch-model",
             name: "ExecuTorch Model",
@@ -221,17 +221,17 @@ class ExecuTorchService: BaseLLMService {
             contextLength: 2048
         )
     }
-    
+
     override func cleanup() {
         module = nil
         isInitialized = false
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func getModelSize() -> String {
         let url = URL(fileURLWithPath: modelPath)
-        
+
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             if let fileSize = attributes[.size] as? Int64 {
@@ -240,13 +240,13 @@ class ExecuTorchService: BaseLLMService {
         } catch {
             print("Error getting model size: \(error)")
         }
-        
+
         return "Unknown"
     }
-    
+
     private func selectOptimalBackend() -> String {
         let memorySize = ProcessInfo.processInfo.physicalMemory
-        
+
         #if canImport(UIKit)
         let device = UIDevice.current
         // Check device capabilities
@@ -254,7 +254,7 @@ class ExecuTorchService: BaseLLMService {
             return "coreml" // Best for latest chips
         }
         #endif
-        
+
         if memorySize > 6_000_000_000 {
             return "metal" // Good GPU performance
         } else if memorySize > 4_000_000_000 {
@@ -272,38 +272,38 @@ extension ExecuTorchService {
     static func exportModelGuide() -> String {
         """
         To export a PyTorch model for ExecuTorch:
-        
+
         1. Install ExecuTorch:
            pip install executorch
-        
+
         2. Export your model:
            ```python
            import torch
            from executorch.exir import to_edge
-           
+
            # Load your model
            model = YourModel()
            model.eval()
-           
+
            # Create example input
            example_input = torch.randn(1, 512)
-           
+
            # Export to ExecuTorch
            edge_program = to_edge(model, (example_input,))
-           
+
            # Save
            with open('model.pte', 'wb') as f:
                edge_program.write(f)
            ```
         """
     }
-    
+
     // Profiling support
     func enableProfiling() {
         // In real implementation:
         // module?.executionConfig.enableProfiling = true
     }
-    
+
     func getProfilingResults() -> [String: Any]? {
         // In real implementation would return profiling data
         nil

@@ -13,7 +13,7 @@ struct TokenizerConfig: Codable {
     let postProcessor: PostProcessorConfig?
     let decoder: DecoderConfig?
     let model: ModelConfig
-    
+
     enum CodingKeys: String, CodingKey {
         case version
         case truncation
@@ -31,7 +31,7 @@ struct TruncationConfig: Codable {
     let maxLength: Int
     let strategy: String
     let direction: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case maxLength = "max_length"
         case strategy
@@ -43,7 +43,7 @@ struct PaddingConfig: Codable {
     let padId: Int?
     let padToken: String?
     let padToMultipleOf: Int?
-    
+
     enum CodingKeys: String, CodingKey {
         case padId = "pad_id"
         case padToken = "pad_token"
@@ -59,7 +59,7 @@ struct AddedToken: Codable {
     let rstrip: Bool?
     let normalized: Bool?
     let special: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case content
@@ -79,7 +79,7 @@ struct PreTokenizerConfig: Codable {
     let type: String
     let addPrefixSpace: Bool?
     let trim_offsets: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case type
         case addPrefixSpace = "add_prefix_space"
@@ -103,7 +103,7 @@ struct ModelConfig: Codable {
     let continuingSubwordPrefix: String?
     let endOfWordSuffix: String?
     let fuseUnk: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case type
         case vocab
@@ -124,20 +124,20 @@ class TokenizerConfigLoader {
         let decoder = JSONDecoder()
         return try decoder.decode(TokenizerConfig.self, from: data)
     }
-    
+
     static func loadVocabulary(from path: String) throws -> [String: Int] {
         let url = URL(fileURLWithPath: path)
         let data = try Data(contentsOf: url)
-        
+
         // Try to decode as JSON first
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Int] {
             return json
         }
-        
+
         // Try text format (one token per line)
         let content = try String(contentsOf: url, encoding: .utf8)
         var vocab: [String: Int] = [:]
-        
+
         content.enumerateLines { line, _ in
             let components = line.components(separatedBy: "\t")
             if components.count == 2,
@@ -148,22 +148,22 @@ class TokenizerConfigLoader {
                 vocab[line] = vocab.count
             }
         }
-        
+
         return vocab
     }
-    
+
     static func loadMerges(from path: String) throws -> [(String, String)] {
         let url = URL(fileURLWithPath: path)
         let content = try String(contentsOf: url, encoding: .utf8)
         var merges: [(String, String)] = []
-        
+
         content.enumerateLines { line, _ in
             let components = line.components(separatedBy: " ")
             if components.count == 2 {
                 merges.append((components[0], components[1]))
             }
         }
-        
+
         return merges
     }
 }
@@ -185,36 +185,36 @@ struct SpecialTokens {
     let clsTokenId: Int?
     let maskToken: String?
     let maskTokenId: Int?
-    
+
     init(from config: TokenizerConfig) {
         // Extract special tokens from added_tokens
         var specialTokensMap: [String: Int] = [:]
-        
+
         if let addedTokens = config.addedTokens {
             for token in addedTokens where token.special == true {
                 specialTokensMap[token.content] = token.id
             }
         }
-        
+
         // Common special token patterns
         self.padToken = specialTokensMap.keys.first { $0.contains("pad") } ?? "<pad>"
         self.padTokenId = specialTokensMap[padToken] ?? 0
-        
+
         self.bosToken = specialTokensMap.keys.first { $0.contains("<s>") || $0.contains("bos") } ?? "<s>"
         self.bosTokenId = specialTokensMap[bosToken] ?? 1
-        
+
         self.eosToken = specialTokensMap.keys.first { $0.contains("</s>") || $0.contains("eos") || $0.contains("endoftext") } ?? "</s>"
         self.eosTokenId = specialTokensMap[eosToken] ?? 2
-        
+
         self.unkToken = config.model.unkToken ?? specialTokensMap.keys.first { $0.contains("unk") } ?? "<unk>"
         self.unkTokenId = specialTokensMap[unkToken] ?? 3
-        
+
         self.sepToken = specialTokensMap.keys.first { $0.contains("[SEP]") || $0.contains("sep") }
         self.sepTokenId = sepToken.flatMap { specialTokensMap[$0] }
-        
+
         self.clsToken = specialTokensMap.keys.first { $0.contains("[CLS]") || $0.contains("cls") }
         self.clsTokenId = clsToken.flatMap { specialTokensMap[$0] }
-        
+
         self.maskToken = specialTokensMap.keys.first { $0.contains("[MASK]") || $0.contains("mask") }
         self.maskTokenId = maskToken.flatMap { specialTokensMap[$0] }
     }

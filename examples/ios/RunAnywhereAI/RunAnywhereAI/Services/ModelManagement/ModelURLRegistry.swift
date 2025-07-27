@@ -6,12 +6,12 @@ import Foundation
 /// This provides a single place to manage and update model URLs
 class ModelURLRegistry {
     static let shared = ModelURLRegistry()
-    
+
     private init() {}
-    
+
     // MARK: - Core ML Models
-    
-    let coreMLModels = [
+
+    let coreMLModels: [ModelDownloadInfo] = [
         // Core ML models for LLMs typically require authentication on HuggingFace
         // Users should add their own models via custom URLs after obtaining access
         // Example format for adding custom Core ML models:
@@ -23,17 +23,17 @@ class ModelURLRegistry {
         //     requiresUnzip: true
         // )
     ]
-    
+
     // MARK: - MLX Models
-    
-    let mlxModels = [
+
+    let mlxModels: [ModelDownloadInfo] = [
         // MLX models are typically distributed as git repositories with multiple files
         // Recommended approach: git clone https://huggingface.co/mlx-community/model-name
         // Then point the app to the cloned directory
     ]
-    
+
     // MARK: - ONNX Runtime Models
-    
+
     let onnxModels = [
         ModelDownloadInfo(
             id: "phi-3-mini-onnx",
@@ -43,16 +43,16 @@ class ModelURLRegistry {
             requiresUnzip: false
         )
     ]
-    
+
     // MARK: - TensorFlow Lite Models
-    
-    let tfliteModels = [
+
+    let tfliteModels: [ModelDownloadInfo] = [
         // TFLite models typically require manual download from TensorFlow Hub or Kaggle
         // Add custom URLs after downloading models locally
     ]
-    
+
     // MARK: - llama.cpp Models (GGUF format)
-    
+
     let llamaCppModels = [
         ModelDownloadInfo(
             id: "tinyllama-1.1b-gguf",
@@ -83,9 +83,9 @@ class ModelURLRegistry {
             requiresUnzip: false
         )
     ]
-    
+
     // MARK: - Tokenizer Files
-    
+
     let tokenizerFiles = [
         TokenizerDownloadInfo(
             modelId: "gpt2",
@@ -119,9 +119,9 @@ class ModelURLRegistry {
         )
         // Note: Llama tokenizer requires authentication
     ]
-    
+
     // MARK: - Convenience Methods
-    
+
     func getAllModels(for framework: LLMFramework) -> [ModelDownloadInfo] {
         switch framework {
         case .coreML:
@@ -138,36 +138,36 @@ class ModelURLRegistry {
             return []
         }
     }
-    
+
     func getModelInfo(id: String) -> ModelDownloadInfo? {
         let allModels = coreMLModels + mlxModels + onnxModels + tfliteModels + llamaCppModels
         return allModels.first { $0.id == id }
     }
-    
+
     func getTokenizerFiles(for modelId: String) -> [TokenizerFile] {
-        return tokenizerFiles.first { $0.modelId == modelId }?.files ?? []
+        tokenizerFiles.first { $0.modelId == modelId }?.files ?? []
     }
-    
+
     // MARK: - Custom Model URLs
-    
+
     private var customModels: [ModelDownloadInfo] = []
-    
+
     func addCustomModel(_ model: ModelDownloadInfo) {
         customModels.append(model)
     }
-    
+
     func removeCustomModel(id: String) {
         customModels.removeAll { $0.id == id }
     }
-    
+
     func getCustomModels() -> [ModelDownloadInfo] {
-        return customModels
+        customModels
     }
 }
 
 // MARK: - Supporting Types
 
-struct ModelDownloadInfo: Codable {
+struct ModelDownloadInfo: Codable, Identifiable {
     let id: String
     let name: String
     let url: URL
@@ -175,7 +175,7 @@ struct ModelDownloadInfo: Codable {
     let requiresUnzip: Bool
     let requiresAuth: Bool
     let alternativeURLs: [URL]
-    
+
     init(id: String, name: String, url: URL, sha256: String? = nil, requiresUnzip: Bool, requiresAuth: Bool = false, alternativeURLs: [URL] = []) {
         self.id = id
         self.name = name
@@ -205,7 +205,7 @@ extension ModelURLRegistry {
         // This would need to be implemented with proper storage
         // For now, it's a placeholder for the API
     }
-    
+
     /// Load custom URLs from a configuration file
     func loadCustomURLs(from url: URL) throws {
         let data = try Data(contentsOf: url)
@@ -213,7 +213,7 @@ extension ModelURLRegistry {
         let customURLs = try decoder.decode([ModelDownloadInfo].self, from: data)
         customModels = customURLs
     }
-    
+
     /// Save current URL registry to a file
     func saveRegistry(to url: URL) throws {
         let allModels = [
@@ -224,7 +224,7 @@ extension ModelURLRegistry {
             "llamaCpp": llamaCppModels,
             "custom": customModels
         ]
-        
+
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         let data = try encoder.encode(allModels)

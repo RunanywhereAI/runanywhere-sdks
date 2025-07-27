@@ -5,13 +5,13 @@ struct ModelQuantizationView: View {
     @State private var showFilePicker = false
     @State private var showAlert = false
     @State private var alertMessage = ""
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
                     headerSection
-                    
+
                     if viewModel.selectedModel != nil {
                         modelInfoSection
                         quantizationOptionsSection
@@ -20,11 +20,11 @@ struct ModelQuantizationView: View {
                     } else {
                         modelSelectionSection
                     }
-                    
+
                     if viewModel.isQuantizing {
                         quantizationProgressSection
                     }
-                    
+
                     if !viewModel.quantizedModels.isEmpty {
                         quantizedModelsSection
                     }
@@ -45,24 +45,24 @@ struct ModelQuantizationView: View {
             }
         }
     }
-    
+
     private var headerSection: some View {
         VStack(spacing: 12) {
             Image(systemName: "shippingbox.fill")
                 .font(.system(size: 50))
                 .foregroundColor(.green)
-            
+
             Text("Model Quantization")
                 .font(.title)
                 .fontWeight(.bold)
-            
+
             Text("Reduce model size and improve inference speed through quantization")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
     }
-    
+
     private var modelSelectionSection: some View {
         VStack(spacing: 16) {
             Button(action: {
@@ -72,10 +72,10 @@ struct ModelQuantizationView: View {
                     Image(systemName: "doc.badge.plus")
                         .font(.system(size: 40))
                         .foregroundColor(.green)
-                    
+
                     Text("Select Model to Quantize")
                         .font(.headline)
-                    
+
                     Text("Choose a model file for quantization")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -92,13 +92,13 @@ struct ModelQuantizationView: View {
             ) { result in
                 viewModel.handleModelSelection(result)
             }
-            
+
             Text("Supported formats: GGUF, ONNX, PyTorch, TensorFlow")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
     }
-    
+
     private var modelInfoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -113,7 +113,7 @@ struct ModelQuantizationView: View {
                 .font(.caption)
                 .foregroundColor(.blue)
             }
-            
+
             if let modelInfo = viewModel.modelInfo {
                 VStack(alignment: .leading, spacing: 8) {
                     InfoRow(title: "Name", value: modelInfo.name)
@@ -128,12 +128,12 @@ struct ModelQuantizationView: View {
         .background(Color.blue.opacity(0.1))
         .cornerRadius(12)
     }
-    
+
     private var quantizationOptionsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Quantization Settings")
                 .font(.headline)
-            
+
             VStack(spacing: 12) {
                 quantizationTypeSection
                 precisionSettingsSection
@@ -144,13 +144,13 @@ struct ModelQuantizationView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(12)
     }
-    
+
     private var quantizationTypeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Quantization Type")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
                 ForEach(QuantizationMethod.allCases, id: \.self) { type in
                     QuantizationTypeCard(
@@ -163,13 +163,13 @@ struct ModelQuantizationView: View {
             }
         }
     }
-    
+
     private var precisionSettingsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Target Precision")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             VStack(spacing: 4) {
                 HStack {
                     Text("Bits")
@@ -182,14 +182,14 @@ struct ModelQuantizationView: View {
                     .pickerStyle(SegmentedPickerStyle())
                     .frame(width: 150)
                 }
-                
+
                 HStack {
                     Text("Quality vs Size")
                     Spacer()
                     Slider(value: $viewModel.qualityVsSize, in: 0...1)
                         .frame(width: 150)
                 }
-                
+
                 HStack {
                     Text("Calibration Dataset")
                     Spacer()
@@ -203,13 +203,13 @@ struct ModelQuantizationView: View {
             }
         }
     }
-    
+
     private var advancedOptionsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Advanced Options")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            
+
             VStack(spacing: 4) {
                 Toggle("Use symmetric quantization", isOn: $viewModel.useSymmetricQuantization)
                 Toggle("Preserve embeddings", isOn: $viewModel.preserveEmbeddings)
@@ -218,12 +218,12 @@ struct ModelQuantizationView: View {
             }
         }
     }
-    
+
     private var previewSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quantization Preview")
                 .font(.headline)
-            
+
             VStack(spacing: 8) {
                 EstimateRow(
                     title: "Estimated Size",
@@ -231,26 +231,26 @@ struct ModelQuantizationView: View {
                     quantized: viewModel.estimatedSize,
                     unit: "MB"
                 )
-                
+
                 EstimateRow(
                     title: "Inference Speed",
                     original: "1.0x",
                     quantized: "\(String(format: "%.1f", viewModel.estimatedSpeedup))x",
                     unit: ""
                 )
-                
+
                 EstimateRow(
                     title: "Memory Usage",
                     original: viewModel.originalMemory,
                     quantized: viewModel.estimatedMemory,
                     unit: "MB"
                 )
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Quality Impact")
                         .font(.caption)
                         .fontWeight(.medium)
-                    
+
                     QualityImpactBar(impact: viewModel.estimatedQualityImpact)
                 }
             }
@@ -259,7 +259,7 @@ struct ModelQuantizationView: View {
         .background(Color.orange.opacity(0.1))
         .cornerRadius(12)
     }
-    
+
     private var quantizeButtonSection: some View {
         Button(action: {
             viewModel.startQuantization()
@@ -281,12 +281,12 @@ struct ModelQuantizationView: View {
         }
         .disabled(!viewModel.canStartQuantization || viewModel.isQuantizing)
     }
-    
+
     private var quantizationProgressSection: some View {
         VStack(spacing: 12) {
             ProgressView(value: viewModel.quantizationProgress)
                 .progressViewStyle(LinearProgressViewStyle())
-            
+
             Text(viewModel.quantizationStatus)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -295,12 +295,12 @@ struct ModelQuantizationView: View {
         .background(Color.gray.opacity(0.1))
         .cornerRadius(8)
     }
-    
+
     private var quantizedModelsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Quantized Models")
                 .font(.headline)
-            
+
             ForEach(viewModel.quantizedModels, id: \.id) { model in
                 QuantizedModelCard(model: model) {
                     viewModel.exportModel(model)
@@ -319,19 +319,19 @@ struct QuantizationTypeCard: View {
     let type: QuantizationMethod
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: type.iconName)
                     .font(.title2)
                     .foregroundColor(isSelected ? .white : .green)
-                
+
                 Text(type.rawValue)
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(isSelected ? .white : .primary)
-                
+
                 Text(type.description)
                     .font(.system(size: 10))
                     .foregroundColor(isSelected ? .white : .secondary)
@@ -348,7 +348,7 @@ struct QuantizationTypeCard: View {
 struct InfoRow: View {
     let title: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(title)
@@ -367,7 +367,7 @@ struct EstimateRow: View {
     let original: String
     let quantized: String
     let unit: String
-    
+
     var body: some View {
         HStack {
             Text(title)
@@ -385,14 +385,14 @@ struct EstimateRow: View {
 
 struct QualityImpactBar: View {
     let impact: Double // 0.0 = no impact, 1.0 = high impact
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Rectangle()
                     .fill(Color.gray.opacity(0.2))
                     .frame(height: 6)
-                
+
                 Rectangle()
                     .fill(impactColor)
                     .frame(width: geometry.size.width * impact, height: 6)
@@ -411,7 +411,7 @@ struct QualityImpactBar: View {
             }
         )
     }
-    
+
     private var impactColor: Color {
         if impact < 0.3 {
             return .green
@@ -427,14 +427,14 @@ struct QuantizedModelCard: View {
     let model: QuantizedModelInfo
     let onExport: () -> Void
     let onDelete: () -> Void
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 HStack {
                     Text("\(model.quantizationType.rawValue)")
                     Text("•")
@@ -445,14 +445,14 @@ struct QuantizedModelCard: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             HStack(spacing: 12) {
                 Button("Export") { onExport() }
                     .font(.caption)
                     .foregroundColor(.blue)
-                
+
                 Button("Delete") { onDelete() }
                     .font(.caption)
                     .foregroundColor(.red)

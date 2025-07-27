@@ -12,13 +12,13 @@ struct ComparisonView: View {
     @State private var prompt = ""
     @State private var showingSettings = false
     @State private var selectedTab = 0
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 // Framework selectors
                 frameworkSelectors
-                
+
                 // Tab selector
                 Picker("View Mode", selection: $selectedTab) {
                     Text("Side by Side").tag(0)
@@ -27,7 +27,7 @@ struct ComparisonView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding()
-                
+
                 // Content based on selected tab
                 Group {
                     switch selectedTab {
@@ -41,7 +41,7 @@ struct ComparisonView: View {
                         EmptyView()
                     }
                 }
-                
+
                 // Input area
                 inputArea
             }
@@ -59,9 +59,9 @@ struct ComparisonView: View {
             }
         }
     }
-    
+
     // MARK: - Subviews
-    
+
     private var frameworkSelectors: some View {
         HStack(spacing: 16) {
             // Framework A selector
@@ -69,7 +69,7 @@ struct ComparisonView: View {
                 Text("Framework A")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 Menu {
                     ForEach(LLMFramework.allCases, id: \.self) { framework in
                         Button(framework.displayName) {
@@ -88,17 +88,17 @@ struct ComparisonView: View {
                     .cornerRadius(8)
                 }
             }
-            
+
             Image(systemName: "arrow.left.arrow.right")
                 .font(.title2)
                 .foregroundColor(.secondary)
-            
+
             // Framework B selector
             VStack(alignment: .leading, spacing: 4) {
                 Text("Framework B")
                     .font(.caption)
                     .foregroundColor(.secondary)
-                
+
                 Menu {
                     ForEach(LLMFramework.allCases, id: \.self) { framework in
                         Button(framework.displayName) {
@@ -121,7 +121,7 @@ struct ComparisonView: View {
         .padding()
         .background(Color(.secondarySystemBackground))
     }
-    
+
     private var sideBySideView: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -134,9 +134,9 @@ struct ComparisonView: View {
                     color: .blue
                 )
                 .frame(width: geometry.size.width / 2)
-                
+
                 Divider()
-                
+
                 // Framework B output
                 outputView(
                     framework: viewModel.frameworkB,
@@ -149,7 +149,7 @@ struct ComparisonView: View {
             }
         }
     }
-    
+
     private func outputView(
         framework: LLMFramework,
         output: String,
@@ -163,9 +163,9 @@ struct ComparisonView: View {
                 Text(framework.displayName)
                     .font(.caption)
                     .fontWeight(.semibold)
-                
+
                 Spacer()
-                
+
                 if let metrics = metrics {
                     HStack(spacing: 4) {
                         Image(systemName: "speedometer")
@@ -179,7 +179,7 @@ struct ComparisonView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
             .background(color.opacity(0.1))
-            
+
             // Output content
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
@@ -192,7 +192,7 @@ struct ComparisonView: View {
                             .foregroundColor(.secondary)
                             .italic()
                     }
-                    
+
                     if isGenerating {
                         HStack {
                             ProgressView()
@@ -205,7 +205,7 @@ struct ComparisonView: View {
                 }
                 .padding()
             }
-            
+
             // Footer with stats
             if let metrics = metrics {
                 VStack(alignment: .leading, spacing: 4) {
@@ -214,7 +214,7 @@ struct ComparisonView: View {
                         Spacer()
                         Label("\(String(format: "%.2fs", metrics.totalTime))", systemImage: "clock")
                     }
-                    
+
                     HStack {
                         Label("\(String(format: "%.3fs", metrics.timeToFirstToken)) TTFT", systemImage: "timer")
                         Spacer()
@@ -230,7 +230,7 @@ struct ComparisonView: View {
         }
         .background(Color(.systemBackground))
     }
-    
+
     private var performanceView: some View {
         VStack(spacing: 16) {
             // Real-time performance charts
@@ -242,7 +242,7 @@ struct ComparisonView: View {
             )
             .frame(height: 200)
             .padding()
-            
+
             // Performance summary
             HStack(spacing: 20) {
                 performanceSummaryCard(
@@ -250,7 +250,7 @@ struct ComparisonView: View {
                     metrics: viewModel.metricsA,
                     color: .blue
                 )
-                
+
                 performanceSummaryCard(
                     framework: viewModel.frameworkB,
                     metrics: viewModel.metricsB,
@@ -258,11 +258,11 @@ struct ComparisonView: View {
                 )
             }
             .padding()
-            
+
             Spacer()
         }
     }
-    
+
     private func performanceSummaryCard(
         framework: LLMFramework,
         metrics: ComparisonMetrics?,
@@ -272,7 +272,7 @@ struct ComparisonView: View {
             Text(framework.displayName)
                 .font(.headline)
                 .foregroundColor(color)
-            
+
             if let metrics = metrics {
                 VStack(alignment: .leading, spacing: 8) {
                     statRow("Speed", value: "\(String(format: "%.1f", metrics.tokensPerSecond)) t/s")
@@ -291,7 +291,7 @@ struct ComparisonView: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
-    
+
     private func statRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
@@ -302,7 +302,7 @@ struct ComparisonView: View {
         }
         .font(.caption)
     }
-    
+
     private var metricsView: some View {
         ScrollView {
             VStack(spacing: 16) {
@@ -315,17 +315,17 @@ struct ComparisonView: View {
                         metricsA: metricsA,
                         metricsB: metricsB
                     )
-                    
+
                     // Winner summary
                     if let winner = viewModel.determineWinner() {
                         VStack(spacing: 8) {
                             Image(systemName: "trophy.fill")
                                 .font(.largeTitle)
                                 .foregroundColor(.yellow)
-                            
+
                             Text("\(winner.displayName) performs better")
                                 .font(.headline)
-                            
+
                             Text("Based on speed and efficiency metrics")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -343,7 +343,7 @@ struct ComparisonView: View {
             .padding()
         }
     }
-    
+
     private var inputArea: some View {
         VStack(spacing: 12) {
             // Prompt input
@@ -353,7 +353,7 @@ struct ComparisonView: View {
                     .padding(8)
                     .background(Color(.tertiarySystemBackground))
                     .cornerRadius(8)
-                
+
                 Button(action: runComparison) {
                     Image(systemName: "play.fill")
                         .foregroundColor(.white)
@@ -363,7 +363,7 @@ struct ComparisonView: View {
                 }
                 .disabled(prompt.isEmpty || viewModel.isGenerating)
             }
-            
+
             // Quick prompts
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -386,12 +386,12 @@ struct ComparisonView: View {
         .padding()
         .background(Color(.secondarySystemBackground))
     }
-    
+
     // MARK: - Actions
-    
+
     private func runComparison() {
         guard !prompt.isEmpty else { return }
-        
+
         Task {
             await viewModel.runComparison(prompt: prompt)
         }
@@ -405,14 +405,14 @@ struct PerformanceComparisonChart: View {
     let dataB: [Double]
     let frameworkA: LLMFramework
     let frameworkB: LLMFramework
-    
+
     var body: some View {
         GeometryReader { _ in
             ZStack {
                 // Background
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color(.tertiarySystemBackground))
-                
+
                 // Chart
                 VStack {
                     HStack {
@@ -430,7 +430,7 @@ struct PerformanceComparisonChart: View {
                         }
                     }
                     .padding()
-                    
+
                     // Line chart
                     Canvas { context, size in
                         drawChart(
@@ -445,13 +445,13 @@ struct PerformanceComparisonChart: View {
             }
         }
     }
-    
+
     private func drawChart(context: GraphicsContext, size: CGSize, dataA: [Double], dataB: [Double]) {
         guard !dataA.isEmpty || !dataB.isEmpty else { return }
-        
+
         let maxValue = max(dataA.max() ?? 0, dataB.max() ?? 0, 1)
         let xStep = size.width / CGFloat(max(dataA.count, dataB.count, 1) - 1)
-        
+
         // Draw grid lines
         for i in 0...4 {
             let y = size.height * CGFloat(i) / 4
@@ -463,31 +463,31 @@ struct PerformanceComparisonChart: View {
                 with: .color(.secondary.opacity(0.2))
             )
         }
-        
+
         // Draw data lines
         if !dataA.isEmpty {
             drawLine(context: context, size: size, data: dataA, maxValue: maxValue, color: .blue)
         }
-        
+
         if !dataB.isEmpty {
             drawLine(context: context, size: size, data: dataB, maxValue: maxValue, color: .green)
         }
     }
-    
+
     private func drawLine(context: GraphicsContext, size: CGSize, data: [Double], maxValue: Double, color: Color) {
         var path = Path()
-        
+
         for (index, value) in data.enumerated() {
             let x = CGFloat(index) * size.width / CGFloat(data.count - 1)
             let y = size.height - (CGFloat(value / maxValue) * size.height)
-            
+
             if index == 0 {
                 path.move(to: CGPoint(x: x, y: y))
             } else {
                 path.addLine(to: CGPoint(x: x, y: y))
             }
         }
-        
+
         context.stroke(path, with: .color(color), lineWidth: 2)
     }
 }
@@ -499,7 +499,7 @@ struct MetricsComparisonTable: View {
     let frameworkB: LLMFramework
     let metricsA: ComparisonMetrics
     let metricsB: ComparisonMetrics
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -517,34 +517,34 @@ struct MetricsComparisonTable: View {
             .fontWeight(.semibold)
             .padding()
             .background(Color(.secondarySystemBackground))
-            
+
             Divider()
-            
+
             // Rows
             metricRow("Tokens/Second",
-                     valueA: String(format: "%.1f", metricsA.tokensPerSecond),
-                     valueB: String(format: "%.1f", metricsB.tokensPerSecond),
-                     higherIsBetter: true)
-            
+                      valueA: String(format: "%.1f", metricsA.tokensPerSecond),
+                      valueB: String(format: "%.1f", metricsB.tokensPerSecond),
+                      higherIsBetter: true)
+
             metricRow("Time to First Token",
-                     valueA: String(format: "%.3fs", metricsA.timeToFirstToken),
-                     valueB: String(format: "%.3fs", metricsB.timeToFirstToken),
-                     higherIsBetter: false)
-            
+                      valueA: String(format: "%.3fs", metricsA.timeToFirstToken),
+                      valueB: String(format: "%.3fs", metricsB.timeToFirstToken),
+                      higherIsBetter: false)
+
             metricRow("Memory Usage",
-                     valueA: ByteCountFormatter.string(fromByteCount: Int64(metricsA.memoryUsed), countStyle: .memory),
-                     valueB: ByteCountFormatter.string(fromByteCount: Int64(metricsB.memoryUsed), countStyle: .memory),
-                     higherIsBetter: false)
-            
+                      valueA: ByteCountFormatter.string(fromByteCount: Int64(metricsA.memoryUsed), countStyle: .memory),
+                      valueB: ByteCountFormatter.string(fromByteCount: Int64(metricsB.memoryUsed), countStyle: .memory),
+                      higherIsBetter: false)
+
             metricRow("Total Time",
-                     valueA: String(format: "%.2fs", metricsA.totalTime),
-                     valueB: String(format: "%.2fs", metricsB.totalTime),
-                     higherIsBetter: false)
-            
+                      valueA: String(format: "%.2fs", metricsA.totalTime),
+                      valueB: String(format: "%.2fs", metricsB.totalTime),
+                      higherIsBetter: false)
+
             metricRow("Token Count",
-                     valueA: "\(metricsA.tokenCount)",
-                     valueB: "\(metricsB.tokenCount)",
-                     higherIsBetter: nil)
+                      valueA: "\(metricsA.tokenCount)",
+                      valueB: "\(metricsB.tokenCount)",
+                      higherIsBetter: nil)
         }
         .background(Color(.systemBackground))
         .cornerRadius(8)
@@ -553,17 +553,17 @@ struct MetricsComparisonTable: View {
                 .stroke(Color(.separator), lineWidth: 1)
         )
     }
-    
+
     private func metricRow(_ label: String, valueA: String, valueB: String, higherIsBetter: Bool?) -> some View {
         HStack {
             Text(label)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            
+
             Text(valueA)
                 .frame(maxWidth: .infinity)
                 .fontWeight(isBetter(valueA: valueA, valueB: valueB, higherIsBetter: higherIsBetter) ? .semibold : .regular)
                 .foregroundColor(isBetter(valueA: valueA, valueB: valueB, higherIsBetter: higherIsBetter) ? .blue : .primary)
-            
+
             Text(valueB)
                 .frame(maxWidth: .infinity)
                 .fontWeight(isBetter(valueA: valueB, valueB: valueA, higherIsBetter: higherIsBetter) ? .semibold : .regular)
@@ -573,14 +573,14 @@ struct MetricsComparisonTable: View {
         .padding()
         .background(Color(.systemBackground))
     }
-    
+
     private func isBetter(valueA: String, valueB: String, higherIsBetter: Bool?) -> Bool {
         guard let higherIsBetter = higherIsBetter else { return false }
-        
+
         // Extract numeric values for comparison
         let numA = Double(valueA.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0
         let numB = Double(valueB.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()) ?? 0
-        
+
         return higherIsBetter ? numA > numB : numA < numB
     }
 }
@@ -590,19 +590,19 @@ struct MetricsComparisonTable: View {
 struct ComparisonSettingsView: View {
     @Binding var settings: ComparisonSettings
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             Form {
                 Section("Generation") {
                     Stepper("Max Tokens: \(settings.maxTokens)", value: $settings.maxTokens, in: 50...500, step: 50)
-                    
+
                     VStack(alignment: .leading) {
                         Text("Temperature: \(String(format: "%.2f", settings.temperature))")
                         Slider(value: $settings.temperature, in: 0...2, step: 0.1)
                     }
                 }
-                
+
                 Section("Comparison") {
                     Toggle("Synchronize Start", isOn: $settings.synchronizeStart)
                     Toggle("Show Real-time Metrics", isOn: $settings.showRealtimeMetrics)

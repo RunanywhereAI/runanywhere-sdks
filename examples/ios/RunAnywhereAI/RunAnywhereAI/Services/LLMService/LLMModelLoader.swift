@@ -16,7 +16,7 @@ struct ModelConfiguration {
     let batchSize: Int
     let useGPU: Bool
     let customOptions: [String: Any]
-    
+
     static let `default` = ModelConfiguration(
         modelPath: "",
         format: .gguf,
@@ -32,22 +32,22 @@ struct ModelConfiguration {
 protocol LLMModelLoader {
     /// Load a model from the specified path
     func loadModel(_ path: String) async throws
-    
+
     /// Unload the currently loaded model
     func unloadModel() async throws
-    
+
     /// Preload a model with specific configuration
     func preloadModel(_ config: ModelConfiguration) async throws
-    
+
     /// Get supported model formats
     var supportedFormats: [ModelFormat] { get }
-    
+
     /// Check if a model format is supported
     func isFormatSupported(_ format: ModelFormat) -> Bool
-    
+
     /// Get current model state
     var modelState: ModelState { get }
-    
+
     /// Validate model before loading
     func validateModel(at path: String) async throws -> ModelValidation
 }

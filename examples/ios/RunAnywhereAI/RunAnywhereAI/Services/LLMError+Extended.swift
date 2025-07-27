@@ -24,7 +24,7 @@ extension LLMError {
             additionalInfo: additionalInfo
         )
     }
-    
+
     /// Check if error is recoverable
     var isRecoverable: Bool {
         switch self {
@@ -38,7 +38,7 @@ extension LLMError {
             return true
         }
     }
-    
+
     /// Get error severity
     var severity: ErrorSeverity {
         switch self {
@@ -54,7 +54,7 @@ extension LLMError {
             return .error
         }
     }
-    
+
     /// Get error category
     var category: ErrorCategory {
         switch self {
@@ -84,7 +84,7 @@ struct ErrorContext {
     let framework: String?
     let operation: String?
     let additionalInfo: [String: Any]?
-    
+
     init(
         error: LLMError,
         framework: String? = nil,
@@ -97,7 +97,7 @@ struct ErrorContext {
         self.operation = operation
         self.additionalInfo = additionalInfo
     }
-    
+
     /// Convert to dictionary for logging
     var asDictionary: [String: Any] {
         var dict: [String: Any] = [
@@ -106,19 +106,19 @@ struct ErrorContext {
             "category": error.category.rawValue,
             "severity": error.severity.rawValue
         ]
-        
+
         if let framework = framework {
             dict["framework"] = framework
         }
-        
+
         if let operation = operation {
             dict["operation"] = operation
         }
-        
+
         if let info = additionalInfo {
             dict["additionalInfo"] = info
         }
-        
+
         return dict
     }
 }
@@ -148,21 +148,21 @@ class DefaultErrorRecoveryStrategy: ErrorRecoverable {
     func canRecover(from error: LLMError) -> Bool {
         error.isRecoverable
     }
-    
+
     func attemptRecovery(from error: LLMError) async throws {
         switch error {
         case .notInitialized:
             // Attempt to reinitialize with default model
             throw error // Placeholder - actual implementation depends on service
-            
+
         case .networkUnavailable:
             // Wait and retry
             try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
-            
+
         case .insufficientMemory:
             // Trigger memory cleanup
             await MemoryManager.shared.performCleanup()
-            
+
         default:
             throw error
         }
@@ -180,7 +180,7 @@ protocol ErrorReporter {
 /// Default error reporter for logging
 class LoggingErrorReporter: ErrorReporter {
     static let shared = LoggingErrorReporter()
-    
+
     func report(_ context: ErrorContext) {
         print("[LLM Error] \(context.error.category) - \(context.error.localizedDescription)")
         if let framework = context.framework {
@@ -190,7 +190,7 @@ class LoggingErrorReporter: ErrorReporter {
             print("  Operation: \(operation)")
         }
     }
-    
+
     func reportBatch(_ contexts: [ErrorContext]) {
         contexts.forEach { report($0) }
     }
@@ -202,19 +202,19 @@ class LoggingErrorReporter: ErrorReporter {
 struct AggregatedError: LocalizedError {
     let errors: [Error]
     let primaryError: Error
-    
+
     init(errors: [Error]) {
         self.errors = errors
         self.primaryError = errors.first ?? LLMError.unknown("No errors provided")
     }
-    
+
     var errorDescription: String? {
         if errors.count == 1 {
             return primaryError.localizedDescription
         }
         return "Multiple errors occurred: \(errors.map { $0.localizedDescription }.joined(separator: "; "))"
     }
-    
+
     var recoverySuggestion: String? {
         if let llmError = primaryError as? LLMError {
             return llmError.recoverySuggestion

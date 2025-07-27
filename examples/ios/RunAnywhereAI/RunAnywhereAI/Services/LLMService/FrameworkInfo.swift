@@ -39,31 +39,31 @@ enum FrameworkFeature: String, CaseIterable {
     case onDeviceInference = "On-Device Inference"
     case cloudFallback = "Cloud Fallback"
     case hybridExecution = "Hybrid Execution"
-    
+
     // Model Support
     case multiModal = "Multi-Modal Support"
     case customModels = "Custom Models"
     case pretrainedModels = "Pre-trained Models"
     case modelConversion = "Model Conversion"
-    
+
     // Performance
     case quantization = "Quantization"
     case pruning = "Model Pruning"
     case caching = "Response Caching"
     case batching = "Batch Processing"
-    
+
     // Advanced Features
     case fineTuning = "Fine-Tuning"
     case federatedLearning = "Federated Learning"
     case differentialPrivacy = "Differential Privacy"
     case customOperators = "Custom Operators"
-    
+
     // Integration
     case swiftPackageManager = "Swift Package Manager"
     case cocoaPods = "CocoaPods Support"
     case xcframework = "XCFramework"
     case openSource = "Open Source"
-    
+
     // Specialized
     case voiceOptimized = "Voice Optimized"
     case visionOptimized = "Vision Optimized"

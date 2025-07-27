@@ -13,20 +13,20 @@ struct ModelImportView: View {
     @State private var showingError = false
     @State private var importedModelName = ""
     @State private var selectedFormat: ModelFormat = .gguf
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
                 Text("Import Local Model")
                     .font(.largeTitle)
                     .padding(.top)
-                
+
                 Text("Select a model file from your device to import it into the app.")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
-                
+
                 // Format selector
                 Picker("Model Format", selection: $selectedFormat) {
                     ForEach(ModelFormat.allCases, id: \.self) { format in
@@ -35,15 +35,15 @@ struct ModelImportView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
-                
+
                 // Format description
                 Text(formatDescription)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.horizontal)
-                
+
                 Spacer()
-                
+
                 // Import button
                 Button(action: {
                     isImporting = true
@@ -57,19 +57,19 @@ struct ModelImportView: View {
                         .cornerRadius(10)
                 }
                 .padding(.horizontal)
-                
+
                 // Model name field (shown after file selection)
                 if !importedModelName.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Model Name")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         TextField("Enter model name", text: $importedModelName)
                             .textFieldStyle(RoundedBorderTextFieldStyle())
                     }
                     .padding(.horizontal)
-                    
+
                     Button(action: importModel) {
                         Text("Import Model")
                             .font(.headline)
@@ -81,7 +81,7 @@ struct ModelImportView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+
                 Spacer()
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -108,7 +108,7 @@ struct ModelImportView: View {
             }
         }
     }
-    
+
     private var formatDescription: String {
         switch selectedFormat {
         case .gguf:
@@ -123,7 +123,7 @@ struct ModelImportView: View {
             return "Select a model format to see description."
         }
     }
-    
+
     private func contentTypes(for format: ModelFormat) -> [UTType] {
         switch format {
         case .gguf:
@@ -139,31 +139,31 @@ struct ModelImportView: View {
             return [.data]
         }
     }
-    
+
     private func handleFileSelection(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            
+
             // Suggest a name based on the file
             let suggestedName = url.deletingPathExtension().lastPathComponent
             importedModelName = suggestedName
-            
+
             // Store the URL for later import
             selectedFileURL = url
-            
+
         case .failure(let error):
             importError = error
             showingError = true
         }
     }
-    
+
     @State private var selectedFileURL: URL?
-    
+
     private func importModel() {
         guard let url = selectedFileURL,
               !importedModelName.isEmpty else { return }
-        
+
         Task {
             do {
                 // Import the model
@@ -173,7 +173,7 @@ struct ModelImportView: View {
                     as: importedModelName + "." + selectedFormat.fileExtension,
                     format: selectedFormat
                 )
-                
+
                 // Create model info
                 let modelInfo = ModelInfo(
                     id: UUID().uuidString,
@@ -186,10 +186,10 @@ struct ModelImportView: View {
                     ),
                     framework: frameworkForFormat(selectedFormat)
                 )
-                
+
                 // Add to model list
                 await ModelListViewModel.shared.addImportedModel(modelInfo)
-                
+
                 // Dismiss
                 await MainActor.run {
                     dismiss()
@@ -202,7 +202,7 @@ struct ModelImportView: View {
             }
         }
     }
-    
+
     private func frameworkForFormat(_ format: ModelFormat) -> LLMFramework {
         switch format {
         case .gguf:

@@ -9,7 +9,7 @@ enum ConversionFormat: String, CaseIterable {
     case mlx = "MLX"
     case pytorch = "PyTorch"
     case tflite = "TFLite"
-    
+
     var iconName: String {
         switch self {
         case .gguf: return "cube.fill"
@@ -50,19 +50,19 @@ class ModelConversionWizardViewModel: ObservableObject {
     @Published var quantizationLevel: QuantizationLevel = .none
     @Published var optimizationTarget: ConversionOptimizationTarget = .balanced
     @Published var preserveMetadata: Bool = true
-    
+
     @Published var isConverting: Bool = false
     @Published var conversionProgress: Double = 0.0
     @Published var conversionStatus: String = ""
     @Published var conversionResult: ConversionResult?
-    
+
     private let modelConverter = ModelConverter()
     private let formatDetector = ModelFormatDetector()
     private var cancellables = Set<AnyCancellable>()
-    
+
     var formattedFileSize: String {
         guard let file = selectedModelFile else { return "Unknown" }
-        
+
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
             let fileSize = attributes[.size] as? Int64 ?? 0
@@ -71,14 +71,14 @@ class ModelConversionWizardViewModel: ObservableObject {
             return "Unknown"
         }
     }
-    
+
     var canStartConversion: Bool {
         selectedModelFile != nil &&
-        targetFormat != nil &&
-        targetFormat != detectedFormat &&
-        !isConverting
+            targetFormat != nil &&
+            targetFormat != detectedFormat &&
+            !isConverting
     }
-    
+
     func handleFileSelection(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
@@ -89,34 +89,34 @@ class ModelConversionWizardViewModel: ObservableObject {
             print("File selection failed: \(error)")
         }
     }
-    
+
     func clearSelection() {
         selectedModelFile = nil
         detectedFormat = nil
         targetFormat = nil
         conversionResult = nil
     }
-    
+
     func selectTargetFormat(_ format: ConversionFormat) {
         guard canConvertTo(format) else { return }
         targetFormat = format
     }
-    
+
     func canConvertTo(_ format: ConversionFormat) -> Bool {
         guard let sourceFormat = detectedFormat else { return false }
         return sourceFormat != format
     }
-    
+
     func startConversion() {
         guard let sourceFile = selectedModelFile,
               let sourceFormat = detectedFormat,
               let targetFormat = targetFormat else { return }
-        
+
         isConverting = true
         conversionProgress = 0.0
         conversionStatus = "Initializing conversion..."
         conversionResult = nil
-        
+
         let conversionOptions = ModelConversionOptions(
             sourceFormat: sourceFormat,
             targetFormat: targetFormat,
@@ -124,7 +124,7 @@ class ModelConversionWizardViewModel: ObservableObject {
             optimizationTarget: optimizationTarget,
             preserveMetadata: preserveMetadata
         )
-        
+
         Task {
             do {
                 // Simulate conversion process
@@ -132,7 +132,7 @@ class ModelConversionWizardViewModel: ObservableObject {
                     sourceFile: sourceFile,
                     options: conversionOptions
                 )
-                
+
                 conversionResult = ConversionResult(
                     success: true,
                     outputPath: outputPath,
@@ -145,11 +145,11 @@ class ModelConversionWizardViewModel: ObservableObject {
                     error: error.localizedDescription
                 )
             }
-            
+
             isConverting = false
         }
     }
-    
+
     private func detectFormat(for url: URL) {
         Task {
             do {
@@ -165,48 +165,48 @@ class ModelConversionWizardViewModel: ObservableObject {
             }
         }
     }
-    
+
     private func performSimulatedConversion(
         sourceFile: URL,
         options: ModelConversionOptions
     ) async throws -> String {
         let outputDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("ConvertedModels")
-        
+
         try FileManager.default.createDirectory(
             at: outputDirectory,
             withIntermediateDirectories: true
         )
-        
+
         let outputFileName = sourceFile.deletingPathExtension().lastPathComponent +
-                           "_converted." + options.targetFormat.fileExtension
+            "_converted." + options.targetFormat.fileExtension
         let outputPath = outputDirectory.appendingPathComponent(outputFileName)
-        
+
         conversionProgress = 0.1
         conversionStatus = "Analyzing source model..."
         try await Task.sleep(nanoseconds: 500_000_000)
-        
+
         conversionProgress = 0.3
         conversionStatus = "Setting up conversion pipeline..."
         try await Task.sleep(nanoseconds: 500_000_000)
-        
+
         conversionProgress = 0.5
         conversionStatus = "Converting model format..."
         try await Task.sleep(nanoseconds: 1_000_000_000)
-        
+
         if options.quantizationLevel != .none {
             conversionProgress = 0.7
             conversionStatus = "Applying quantization..."
             try await Task.sleep(nanoseconds: 500_000_000)
         }
-        
+
         conversionProgress = 0.9
         conversionStatus = "Optimizing for \(options.optimizationTarget.rawValue.lowercased())..."
         try await Task.sleep(nanoseconds: 500_000_000)
-        
+
         conversionProgress = 1.0
         conversionStatus = "Conversion completed!"
-        
+
         let conversionData = """
         Model Conversion Simulation
         Source: \(sourceFile.lastPathComponent)
@@ -214,9 +214,9 @@ class ModelConversionWizardViewModel: ObservableObject {
         Quantization: \(options.quantizationLevel.rawValue)
         Optimization: \(options.optimizationTarget.rawValue)
         """.data(using: .utf8) ?? Data()
-        
+
         try conversionData.write(to: outputPath)
-        
+
         return outputPath.path
     }
 }
@@ -241,7 +241,7 @@ extension ConversionFormat {
         case .tflite: return "tflite"
         }
     }
-    
+
     static func from(modelFormat: ModelFormat) -> ConversionFormat? {
         switch modelFormat {
         case .gguf: return .gguf

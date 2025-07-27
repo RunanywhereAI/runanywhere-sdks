@@ -33,7 +33,7 @@ private struct MLCEngineConfig {
     let maxSequenceLength: Int
     let temperature: Float
     let topP: Float
-    
+
     init(modelPath: String, modelLib: String = "model_iphone", device: MLCDevice = .auto) {
         self.modelPath = modelPath
         self.modelLib = modelLib
@@ -92,133 +92,133 @@ class MLCService: BaseLLMService {
             ]
         )
     }
-    
+
     override var name: String { "MLC-LLM" }
-    
+
     override var supportedModels: [ModelInfo] {
         get {
             [
-        ModelInfo(
-            id: "llama-3.2-1b-mlc",
-            name: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-            format: .mlc,
-            size: "920MB",
-            framework: .mlc,
-            quantization: "q4f16_1",
-            contextLength: 131072,
-            downloadURL: URL(string: "https://huggingface.co/mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC/resolve/main/Llama-3.2-1B-Instruct-q4f16_1-MLC.tar")!,
-            description: "Llama 3.2 1B model optimized for MLC with quantization",
-            minimumMemory: 1_500_000_000,
-            recommendedMemory: 2_500_000_000
-        ),
-        ModelInfo(
-            id: "gemma-2b-mlc",
-            name: "gemma-2b-it-q4f16_1-MLC",
-            format: .mlc,
-            size: "1.4GB",
-            framework: .mlc,
-            quantization: "q4f16_1",
-            contextLength: 8192,
-            downloadURL: URL(string: "https://huggingface.co/mlc-ai/gemma-2b-it-q4f16_1-MLC/resolve/main/gemma-2b-it-q4f16_1-MLC.tar")!,
-            description: "Google Gemma 2B instruction-tuned model with MLC optimization",
-            minimumMemory: 2_000_000_000,
-            recommendedMemory: 3_000_000_000
-        ),
-        ModelInfo(
-            id: "phi-3-mini-mlc",
-            name: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-            format: .mlc,
-            size: "2.3GB",
-            framework: .mlc,
-            quantization: "q4f16_1",
-            contextLength: 4096,
-            downloadURL: URL(string: "https://huggingface.co/mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC/resolve/main/Phi-3-mini-4k-instruct-q4f16_1-MLC.tar")!,
-            description: "Microsoft Phi-3 mini model with MLC cross-platform optimization",
-            minimumMemory: 3_000_000_000,
-            recommendedMemory: 4_000_000_000
-        )
+                ModelInfo(
+                    id: "llama-3.2-1b-mlc",
+                    name: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+                    format: .mlc,
+                    size: "920MB",
+                    framework: .mlc,
+                    quantization: "q4f16_1",
+                    contextLength: 131072,
+                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC/resolve/main/Llama-3.2-1B-Instruct-q4f16_1-MLC.tar")!,
+                    description: "Llama 3.2 1B model optimized for MLC with quantization",
+                    minimumMemory: 1_500_000_000,
+                    recommendedMemory: 2_500_000_000
+                ),
+                ModelInfo(
+                    id: "gemma-2b-mlc",
+                    name: "gemma-2b-it-q4f16_1-MLC",
+                    format: .mlc,
+                    size: "1.4GB",
+                    framework: .mlc,
+                    quantization: "q4f16_1",
+                    contextLength: 8192,
+                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/gemma-2b-it-q4f16_1-MLC/resolve/main/gemma-2b-it-q4f16_1-MLC.tar")!,
+                    description: "Google Gemma 2B instruction-tuned model with MLC optimization",
+                    minimumMemory: 2_000_000_000,
+                    recommendedMemory: 3_000_000_000
+                ),
+                ModelInfo(
+                    id: "phi-3-mini-mlc",
+                    name: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
+                    format: .mlc,
+                    size: "2.3GB",
+                    framework: .mlc,
+                    quantization: "q4f16_1",
+                    contextLength: 4096,
+                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC/resolve/main/Phi-3-mini-4k-instruct-q4f16_1-MLC.tar")!,
+                    description: "Microsoft Phi-3 mini model with MLC cross-platform optimization",
+                    minimumMemory: 3_000_000_000,
+                    recommendedMemory: 4_000_000_000
+                )
             ]
         }
         set {}
     }
-    
+
     private var engine: Any? // Would be MLCEngine in real implementation
     private var config: MLCEngineConfig?
     private var currentModelInfo: ModelInfo?
-    
+
     override func initialize(modelPath: String) async throws {
         // Verify model directory exists (MLC models are typically directories)
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
         }
-        
+
         // Check if it's a directory or tar file
         let isDirectory = (try? FileManager.default.attributesOfItem(atPath: modelPath)[.type] as? FileAttributeType) == .typeDirectory
         let isTarFile = modelPath.hasSuffix(".tar") || modelPath.hasSuffix(".tar.gz")
-        
+
         guard isDirectory || isTarFile else {
             throw LLMError.unsupportedFormat
         }
-        
+
         await MainActor.run {
             currentModelInfo = supportedModels.first { modelInfo in
                 modelPath.contains(modelInfo.name) || modelPath.contains(modelInfo.id)
             }
         }
-        
+
         #if canImport(MLCSwift)
         // REAL MLC-LLM initialization when framework is available
         print("MLC-LLM framework available - initializing real engine")
-        
+
         // Extract tar if needed
         var actualModelPath = modelPath
         if isTarFile {
             // Extract to temp directory
             actualModelPath = try await extractTarFile(modelPath)
         }
-        
+
         // Initialize MLC engine with configuration
         let config = MLCEngineConfig(
             modelPath: actualModelPath,
             modelLib: "model_iphone",
             device: .auto
         )
-        
+
         engine = try await MLCEngine(config: config)
         print("✅ MLC-LLM engine initialized successfully")
         #else
         // MLC-LLM not available - simulate initialization
         print("⚠️ MLC-LLM framework not available - using simulation")
         print("To use real MLC-LLM, follow manual integration steps in the code comments")
-        
+
         // Simulate realistic MLC initialization time
         try await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds
         #endif
-        
+
         // Create configuration
         config = MLCEngineConfig(modelPath: modelPath, device: .auto)
-        
+
         print("MLC-LLM Engine initialized successfully:")
         print("- Model: \(modelPath)")
         print("- Device: Auto-detection (CPU/GPU)")
         print("- Cross-platform optimization: Enabled")
-        
+
         isInitialized = true
     }
-    
+
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         var result = ""
         try await streamGenerate(prompt: prompt, options: options) { token in
             result += token
         }
-        
+
         return result
     }
-    
+
     override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -227,13 +227,13 @@ class MLCService: BaseLLMService {
         guard isInitialized, let config = config else {
             throw LLMError.notInitialized()
         }
-        
+
         #if canImport(MLCSwift)
         // REAL MLC-LLM implementation when framework is available
         guard let engine = self.engine else {
             throw LLMError.notInitialized()
         }
-        
+
         // Use actual MLC-LLM streaming API
         let request = MLCChatCompletionRequest(
             messages: [MLCChatMessage(role: .user, content: prompt)],
@@ -242,7 +242,7 @@ class MLCService: BaseLLMService {
             stream: true,
             topP: options.topP
         )
-        
+
         for try await chunk in engine.streamChatCompletion(request) {
             if let content = chunk.choices.first?.delta.content {
                 onToken(content)
@@ -258,30 +258,30 @@ class MLCService: BaseLLMService {
         //     stream: true,
         //     topP: options.topP
         // )
-        // 
+        //
         // for try await chunk in engine!.streamChatCompletion(request) {
         //     if let content = chunk.choices.first?.delta.content {
         //         onToken(content)
         //     }
         // }
-        
+
         // For demonstration, simulate MLC-LLM's cross-platform generation:
         let responseTemplate = generateMLCResponse(for: prompt, modelInfo: currentModelInfo)
         let responseWords = responseTemplate.components(separatedBy: .whitespacesAndNewlines)
-        
+
         for (index, word) in responseWords.enumerated() {
             // MLC-LLM is optimized for various devices with good performance
             let delay = word.count > 8 ? 55_000_000 : 35_000_000 // 55ms or 35ms
             try await Task.sleep(nanoseconds: UInt64(delay))
-            
+
             // Apply MLC-specific processing
             let processedWord = applyMLCSampling(word, options: options, config: config)
             onToken(processedWord + " ")
-            
+
             if index >= options.maxTokens - 1 {
                 break
             }
-            
+
             // Simulate MLC's efficient cross-device optimization
             if index > 0 && index % 12 == 0 {
                 try await Task.sleep(nanoseconds: 15_000_000) // 15ms optimization pause
@@ -289,12 +289,12 @@ class MLCService: BaseLLMService {
         }
         #endif
     }
-    
+
     // MARK: - Private MLC Helper Methods
-    
+
     private func generateMLCResponse(for prompt: String, modelInfo: ModelInfo?) -> String {
         let modelName = modelInfo?.name ?? "MLC model"
-        
+
         // MLC-LLM emphasizes cross-platform deployment and universal optimization
         if prompt.lowercased().contains("deployment") || prompt.lowercased().contains("platform") {
             return "MLC-LLM with \(modelName) enables universal deployment of large language models across different platforms and hardware. This framework provides automatic optimization for various devices while maintaining consistent performance and quality."
@@ -306,7 +306,7 @@ class MLCService: BaseLLMService {
             return "Responding with \(modelName) via MLC-LLM framework. This cross-platform solution provides universal model deployment with automatic hardware optimization, enabling high-performance inference across diverse computing environments."
         }
     }
-    
+
     private func applyMLCSampling(_ word: String, options: GenerationOptions, config: MLCEngineConfig) -> String {
         // MLC supports advanced sampling with cross-platform consistency
         if options.temperature > 0.8 {
@@ -319,37 +319,37 @@ class MLCService: BaseLLMService {
         }
         return word
     }
-    
+
     override func getModelInfo() -> ModelInfo? {
         currentModelInfo
     }
-    
+
     override func cleanup() {
         // In real MLC-LLM implementation:
         // engine?.cleanup()
         // MLCRuntime.clearCache()
-        
+
         engine = nil
         config = nil
         currentModelInfo = nil
         isInitialized = false
     }
-    
+
     deinit {
         cleanup()
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func getModelSize() -> String {
         guard let modelInfo = currentModelInfo, let path = modelInfo.path else {
             return "Unknown"
         }
-        
+
         // MLC models are typically directories
         let url = URL(fileURLWithPath: path)
         var totalSize: Int64 = 0
-        
+
         if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
             for case let fileURL as URL in enumerator {
                 if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
@@ -357,7 +357,7 @@ class MLCService: BaseLLMService {
                 }
             }
         }
-        
+
         return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 }
@@ -371,30 +371,30 @@ extension MLCService {
         let tempDir = FileManager.default.temporaryDirectory
             .appendingPathComponent("mlc_models")
             .appendingPathComponent(UUID().uuidString)
-        
+
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
-        
+
         // Extract tar file (simplified - in real app use proper tar extraction)
         let task = Process()
         task.launchPath = "/usr/bin/tar"
         task.arguments = ["-xzf", tarPath, "-C", tempDir.path]
         task.launch()
         task.waitUntilExit()
-        
+
         return tempDir.path
     }
     #endif
-    
+
     // Multi-LoRA support
     func loadLoRA(adapterPath: String) async throws {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // In real implementation:
         // try await engine?.loadLoRA(adapterPath)
     }
-    
+
     // JSON mode generation
     func generateJSON<T: Codable>(
         prompt: String,
@@ -404,7 +404,7 @@ extension MLCService {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // In real implementation:
         // let request = ChatCompletionRequest(
         //     model: modelPath,
@@ -415,12 +415,12 @@ extension MLCService {
         //     responseFormat: .json,
         //     jsonSchema: JSONSchema(type: schema)
         // )
-        // 
+        //
         // let response = try await engine.chatCompletion(request)
         // let jsonString = response.choices.first?.message.content ?? "{}"
-        // 
+        //
         // return try JSONDecoder().decode(T.self, from: jsonString.data(using: .utf8)!)
-        
+
         // For now, return a mock response
         throw LLMError.notImplemented
     }

@@ -16,7 +16,7 @@ struct GenerationRequest {
     let images: [Data]?
     let stopSequences: [String]
     let seed: Int?
-    
+
     init(
         prompt: String,
         systemPrompt: String? = nil,
@@ -48,11 +48,11 @@ struct GenerationResponse {
     let totalTokens: Int
     let finishReason: FinishReason
     let metadata: [String: Any]
-    
+
     var formattedSpeed: String {
         String(format: "%.1f tokens/s", tokensPerSecond)
     }
-    
+
     var formattedTime: String {
         String(format: "%.2fs", totalTime)
     }
@@ -71,16 +71,16 @@ enum FinishReason: String {
 protocol LLMInference {
     /// Generate text synchronously
     func generate(_ request: GenerationRequest) async throws -> GenerationResponse
-    
+
     /// Stream generation with token callback
     func streamGenerate(_ request: GenerationRequest) -> AsyncThrowingStream<String, Error>
-    
+
     /// Cancel ongoing generation
     func cancelGeneration() async
-    
+
     /// Check if model is ready for inference
     var isReadyForInference: Bool { get }
-    
+
     /// Get current generation state
     var generationState: GenerationState { get }
 }

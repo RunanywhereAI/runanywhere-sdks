@@ -24,11 +24,11 @@ enum ModelFormat: String, CaseIterable, Codable {
     case safetensors = "SafeTensors"
     case picoLLM = "picoLLM"
     case other = "Other"
-    
+
     var displayName: String {
         rawValue
     }
-    
+
     var fileExtension: String {
         switch self {
         case .gguf:
@@ -61,7 +61,7 @@ enum ModelFormat: String, CaseIterable, Codable {
             return "bin"
         }
     }
-    
+
     static func from(extension ext: String) -> ModelFormat {
         switch ext.lowercased() {
         case "gguf": return .gguf
@@ -96,11 +96,11 @@ enum LLMFramework: String, CaseIterable, Codable {
     case tensorFlowLite = "TensorFlow Lite"
     case picoLLM = "picoLLM"
     case swiftTransformers = "Swift Transformers"
-    
+
     var displayName: String {
         rawValue
     }
-    
+
     static func forFormat(_ format: ModelFormat) -> LLMFramework {
         switch format {
         case .gguf, .ggml: return .llamaCpp
@@ -130,12 +130,12 @@ struct ModelInfo: Identifiable, Codable {
     let contextLength: Int?
     var isLocal: Bool = false
     let downloadURL: URL?
-    
+
     // Legacy support
     let description: String
     let minimumMemory: Int64
     let recommendedMemory: Int64
-    
+
     init(id: String = UUID().uuidString,
          name: String,
          path: String? = nil,
@@ -163,11 +163,11 @@ struct ModelInfo: Identifiable, Codable {
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory
     }
-    
+
     var displaySize: String {
         size
     }
-    
+
     var isCompatible: Bool {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return availableMemory >= minimumMemory

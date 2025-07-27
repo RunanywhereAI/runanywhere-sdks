@@ -11,40 +11,40 @@ import SwiftUI
 @MainActor
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
-    
+
     @Published var availableServices: [LLMService] = []
     @Published var currentService: LLMService?
     @Published var downloadedModels: [ModelInfo] = []
     @Published var isLoading = false
     @Published var showError = false
     @Published var errorMessage = ""
-    
+
     private let llmService = UnifiedLLMService.shared
-    
+
     init() {
         loadServices()
         loadDownloadedModels()
     }
-    
+
     func loadServices() {
         availableServices = llmService.availableServices
         currentService = llmService.currentService
     }
-    
+
     func refreshServices() async {
         // In a real app, this might check for new services or download models
         loadServices()
     }
-    
+
     func selectService(_ service: LLMService) {
         currentService = service
         llmService.selectService(named: service.name)
     }
-    
+
     func loadModel(_ model: ModelInfo) async {
         isLoading = true
         showError = false
-        
+
         do {
             // In a real implementation, this would download/load the model
             // For now, we'll simulate initialization
@@ -55,26 +55,26 @@ class ModelListViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             showError = true
         }
-        
+
         isLoading = false
     }
-    
+
     func loadDownloadedModels() {
         Task {
             let modelManager = ModelManager.shared
             let modelFiles = await modelManager.listDownloadedModels()
-            
+
             // Convert file names to ModelInfo
             var models: [ModelInfo] = []
             for fileName in modelFiles {
                 let path = await modelManager.modelPath(for: fileName)
                 let size = await modelManager.getModelSize(fileName) ?? 0
-                
+
                 let model = ModelInfo(
                     id: fileName,
                     name: fileName.replacingOccurrences(of: ".gguf", with: "")
-                              .replacingOccurrences(of: ".mlpackage", with: "")
-                              .replacingOccurrences(of: ".onnxRuntime", with: ""),
+                        .replacingOccurrences(of: ".mlpackage", with: "")
+                        .replacingOccurrences(of: ".onnxRuntime", with: ""),
                     path: path.path,
                     format: detectFormat(from: fileName),
                     size: ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
@@ -85,15 +85,15 @@ class ModelListViewModel: ObservableObject {
             downloadedModels = models
         }
     }
-    
+
     func addDownloadedModel(_ model: ModelInfo) {
         downloadedModels.append(model)
     }
-    
+
     func addImportedModel(_ model: ModelInfo) {
         downloadedModels.append(model)
     }
-    
+
     private func detectFormat(from fileName: String) -> ModelFormat {
         if fileName.hasSuffix(".gguf") {
             return .gguf
@@ -105,7 +105,7 @@ class ModelListViewModel: ObservableObject {
             return .other
         }
     }
-    
+
     private func frameworkForFormat(_ format: ModelFormat) -> LLMFramework {
         switch format {
         case .gguf:

@@ -14,21 +14,21 @@ class ChatViewModel: ObservableObject {
     @Published var isGenerating = false
     @Published var currentInput = ""
     @Published var error: Error?
-    
+
     private let llmService: UnifiedLLMService
     private var generationTask: Task<Void, Never>?
     private let performanceMonitor = PerformanceMonitor()
-    
+
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
     }
-    
+
     @MainActor
     init(llmService: UnifiedLLMService? = nil) {
         self.llmService = llmService ?? .shared
         addSystemMessage()
     }
-    
+
     private func addSystemMessage() {
         let systemMessage = ChatMessage(
             role: .system,
@@ -36,25 +36,25 @@ class ChatViewModel: ObservableObject {
         )
         messages.append(systemMessage)
     }
-    
+
     func sendMessage() async {
         guard canSend else { return }
-        
+
         let userMessage = ChatMessage(role: .user, content: currentInput)
         messages.append(userMessage)
-        
+
         let prompt = currentInput
         currentInput = ""
         isGenerating = true
         error = nil
-        
+
         // Create assistant message that we'll update with streaming tokens
         let assistantMessage = ChatMessage(role: .assistant, content: "")
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
-        
+
         performanceMonitor.startMeasurement()
-        
+
         generationTask = Task {
             do {
                 try await llmService.streamGenerate(
@@ -69,7 +69,7 @@ class ChatViewModel: ObservableObject {
                         }
                     }
                 }
-                
+
                 let metrics = self.performanceMonitor.endMeasurement()
                 let metricsMessage = "Generation completed - \(metrics.tokenCount) tokens at " +
                     "\(String(format: "%.1f", metrics.tokensPerSecond)) tokens/sec"
@@ -82,13 +82,13 @@ class ChatViewModel: ObservableObject {
                     }
                 }
             }
-            
+
             await MainActor.run {
                 self.isGenerating = false
             }
         }
     }
-    
+
     func clearChat() {
         generationTask?.cancel()
         messages.removeAll()
@@ -97,7 +97,7 @@ class ChatViewModel: ObservableObject {
         isGenerating = false
         error = nil
     }
-    
+
     func stopGeneration() {
         generationTask?.cancel()
         isGenerating = false

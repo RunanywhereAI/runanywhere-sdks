@@ -18,7 +18,7 @@ struct ChatMessage: Identifiable, Equatable, Codable {
     let role: MessageRole
     var content: String
     let timestamp: Date
-    
+
     init(id: UUID = UUID(), role: MessageRole, content: String, timestamp: Date = Date()) {
         self.id = id
         self.role = role

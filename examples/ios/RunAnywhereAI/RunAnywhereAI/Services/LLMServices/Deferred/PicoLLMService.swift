@@ -33,9 +33,9 @@ class PicoLLMService: BaseLLMService {
             ]
         )
     }
-    
+
     override var name: String { "picoLLM" }
-    
+
     override var supportedModels: [ModelInfo] {
         get {
             [
@@ -82,47 +82,47 @@ class PicoLLMService: BaseLLMService {
         }
         set {}
     }
-    
+
     private var picoLLM: Any? // Would be PicoLLM instance in real implementation
     private let accessKey = "YOUR_PICOLLM_ACCESS_KEY" // Would be configured properly
     private var modelPath: String = ""
-    
+
     override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw LLMError.modelNotFound
         }
-        
+
         // picoLLM uses proprietary model format
         guard modelPath.hasSuffix(".pllm") || modelPath.hasSuffix(".picollm") else {
             throw LLMError.unsupportedFormat
         }
-        
+
         self.modelPath = modelPath
-        
+
         // In real implementation:
         // picoLLM = try PicoLLM(
         //     accessKey: accessKey,
         //     modelPath: modelPath,
         //     device: "auto" // Automatically select best hardware
         // )
-        
+
         // Simulate initialization
         try await Task.sleep(nanoseconds: 900_000_000)
-        
+
         isInitialized = true
     }
-    
+
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // Coming Soon - PicoLLM (Requires License)
         // PicoLLM is a proprietary SDK requiring licensing agreement
         return "🔐 Coming Soon - PicoLLM (Requires License)\n\nPicoLLM is Picovoice's ultra-compressed LLM framework optimized for edge devices with minimal memory footprint.\n\nStatus: Requires licensing agreement with Picovoice\n\nFeatures coming soon:\n• Ultra-low memory footprint (100MB+ models)\n• .pllm compressed model format\n• Real-time voice applications\n• Cross-platform inference\n• Dialog management\n• Proprietary X-bit quantization\n\nTo enable: Contact Picovoice for licensing and access key"
     }
-    
+
     override func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -131,7 +131,7 @@ class PicoLLMService: BaseLLMService {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // In real implementation:
         // let generateOptions = PicoLLMGenerateOptions(
         //     completionTokenLimit: options.maxTokens,
@@ -139,7 +139,7 @@ class PicoLLMService: BaseLLMService {
         //     topP: options.topP,
         //     stream: true
         // )
-        // 
+        //
         // try picoLLM.generate(
         //     prompt: prompt,
         //     options: generateOptions,
@@ -149,7 +149,7 @@ class PicoLLMService: BaseLLMService {
         //         }
         //     }
         // )
-        
+
         // Simulate picoLLM generation
         let responseTokens = [
             "I", "'m", " powered", " by", " picoLLM", ",", " a",
@@ -159,23 +159,23 @@ class PicoLLMService: BaseLLMService {
             " for", " edge", " devices", " and", " embedded",
             " systems", "."
         ]
-        
+
         for (index, token) in responseTokens.prefix(options.maxTokens).enumerated() {
             try await Task.sleep(nanoseconds: 30_000_000) // 30ms per token (optimized)
             onToken(token)
-            
+
             if token.contains(".") && index > 10 {
                 break
             }
         }
     }
-    
+
     override func getModelInfo() -> ModelInfo? {
         guard isInitialized else { return nil }
-        
+
         // In real implementation:
         // return picoLLM?.modelInfo
-        
+
         return ModelInfo(
             id: "picollm-model",
             name: "picoLLM Model",
@@ -186,17 +186,17 @@ class PicoLLMService: BaseLLMService {
             contextLength: 2048
         )
     }
-    
+
     override func cleanup() {
         picoLLM = nil
         isInitialized = false
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func getModelSize() -> String {
         let url = URL(fileURLWithPath: modelPath)
-        
+
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             if let fileSize = attributes[.size] as? Int64 {
@@ -205,7 +205,7 @@ class PicoLLMService: BaseLLMService {
         } catch {
             print("Error getting model size: \(error)")
         }
-        
+
         return "Unknown"
     }
 }
@@ -218,19 +218,19 @@ extension PicoLLMService {
         guard isInitialized else {
             throw LLMError.notInitialized()
         }
-        
+
         // In real implementation:
         // return try picoLLM.createDialog()
-        
+
         return PicoLLMDialog()
     }
-    
+
     // Interrupt generation
     func interrupt() {
         // In real implementation:
         // picoLLM?.interrupt()
     }
-    
+
     // Token usage tracking
     func getUsage() -> TokenUsage {
         // In real implementation:
@@ -238,7 +238,7 @@ extension PicoLLMService {
         //     prompt: picoLLM.promptTokenCount,
         //     completion: picoLLM.completionTokenCount
         // )
-        
+
         TokenUsage(prompt: 0, completion: 0)
     }
 }
@@ -247,11 +247,11 @@ extension PicoLLMService {
 
 struct PicoLLMDialog {
     private var history: [(role: String, content: String)] = []
-    
+
     mutating func addMessage(role: String, content: String) {
         history.append((role: role, content: content))
     }
-    
+
     func getContext() -> String {
         history.map { "\($0.role): \($0.content)" }.joined(separator: "\n")
     }
@@ -260,7 +260,7 @@ struct PicoLLMDialog {
 struct TokenUsage {
     let prompt: Int
     let completion: Int
-    
+
     var total: Int {
         prompt + completion
     }
@@ -272,17 +272,17 @@ extension PicoLLMService {
     static func configurationGuide() -> String {
         """
         picoLLM Configuration:
-        
+
         1. Get an access key from Picovoice Console
         2. Add to your app's Info.plist or environment
         3. Download compressed models from Picovoice
-        
+
         Features:
         - Ultra-low memory footprint
         - Fast inference on edge devices
         - Built-in dialog management
         - Cross-platform support
-        
+
         Best for:
         - Resource-constrained devices
         - Real-time applications

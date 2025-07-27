@@ -12,7 +12,7 @@ struct ModelListView: View {
     @State private var selectedService: String?
     @State private var showingImportView = false
     @State private var showingDownloadView = false
-    
+
     var body: some View {
         List {
             Section("Available Services") {
@@ -21,11 +21,11 @@ struct ModelListView: View {
                         service: service,
                         isSelected: selectedService == service.name
                     ) {
-                            selectService(service)
+                        selectService(service)
                     }
                 }
             }
-            
+
             if let currentService = viewModel.currentService {
                 Section("Available Models") {
                     ForEach(currentService.supportedModels) { model in
@@ -48,7 +48,7 @@ struct ModelListView: View {
                     }) {
                         Label("Import Model", systemImage: "doc.badge.plus")
                     }
-                    
+
                     Button(action: {
                         showingDownloadView = true
                     }) {
@@ -82,7 +82,7 @@ struct ModelListView: View {
             }
         }
     }
-    
+
     private func selectService(_ service: LLMService) {
         selectedService = service.name
         viewModel.selectService(service)
@@ -93,7 +93,7 @@ struct ServiceRow: View {
     let service: LLMService
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         Button(action: onSelect) {
             HStack {
@@ -101,7 +101,7 @@ struct ServiceRow: View {
                     Text(service.name)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     if service.isInitialized {
                         Label("Ready", systemImage: "checkmark.circle.fill")
                             .font(.caption)
@@ -112,9 +112,9 @@ struct ServiceRow: View {
                             .foregroundColor(.orange)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.blue)
@@ -132,7 +132,7 @@ struct ModelRow: View {
     @State private var isLoading = false
     @State private var showingCompatibility = false
     @StateObject private var unifiedService = UnifiedLLMService.shared
-    
+
     var body: some View {
         Button(action: {
             isLoading = true
@@ -143,9 +143,9 @@ struct ModelRow: View {
                     Text(model.name)
                         .font(.headline)
                         .foregroundColor(.primary)
-                    
+
                     Spacer()
-                    
+
                     if isLoading {
                         ProgressView()
                             .scaleEffect(0.8)
@@ -159,21 +159,21 @@ struct ModelRow: View {
                             .cornerRadius(8)
                     }
                 }
-                
+
                 Text(model.description)
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .lineLimit(2)
-                
+
                 HStack {
                     if let quantization = model.quantization {
                         Label(quantization, systemImage: "square.compress")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     if model.isCompatible {
                         Label("Compatible", systemImage: "checkmark.circle")
                             .font(.caption2)
@@ -184,7 +184,7 @@ struct ModelRow: View {
                             .foregroundColor(.orange)
                     }
                 }
-                
+
                 // Compatibility Check Button
                 HStack {
                     Spacer()

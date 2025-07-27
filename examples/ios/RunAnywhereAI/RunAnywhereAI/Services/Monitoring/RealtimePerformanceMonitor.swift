@@ -13,20 +13,20 @@ import UIKit
 /// Real-time performance monitoring with live metrics
 class RealtimePerformanceMonitor: ObservableObject {
     static let shared = RealtimePerformanceMonitor()
-    
+
     // MARK: - Published Properties
     @Published var currentMetrics = LiveMetrics()
     @Published var isMonitoring = false
     @Published var performanceHistory: [PerformanceSnapshot] = []
     @Published var alerts: [PerformanceAlert] = []
-    
+
     // MARK: - Private Properties
     private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "RealtimeMonitoring")
     private var monitoringTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private let updateInterval: TimeInterval = 0.1 // 100ms updates
     private let historyLimit = 300 // Keep last 30 seconds at 100ms intervals
-    
+
     // Performance thresholds
     private let thresholds = PerformanceThresholds(
         maxMemoryUsage: 0.8, // 80% of available memory
@@ -34,30 +34,30 @@ class RealtimePerformanceMonitor: ObservableObject {
         maxLatency: 5.0,
         maxCPUUsage: 0.9 // 90% CPU
     )
-    
+
     // Current generation tracking
     private var activeGeneration: GenerationTracking?
-    
+
     // MARK: - Initialization
     init() {
         setupSystemMonitoring()
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Start monitoring system performance
     func startMonitoring() {
         guard !isMonitoring else { return }
-        
+
         isMonitoring = true
         logger.info("Started real-time performance monitoring")
-        
+
         // Start periodic updates
         monitoringTimer = Timer.scheduledTimer(withTimeInterval: updateInterval, repeats: true) { [weak self] _ in
             self?.updateMetrics()
         }
     }
-    
+
     /// Stop monitoring
     func stopMonitoring() {
         isMonitoring = false
@@ -65,7 +65,7 @@ class RealtimePerformanceMonitor: ObservableObject {
         monitoringTimer = nil
         logger.info("Stopped real-time performance monitoring")
     }
-    
+
     /// Begin tracking a generation
     func beginGeneration(framework: LLMFramework, prompt: String) {
         activeGeneration = GenerationTracking(
@@ -75,36 +75,36 @@ class RealtimePerformanceMonitor: ObservableObject {
             startTime: CFAbsoluteTimeGetCurrent(),
             startMemory: getCurrentMemoryUsage()
         )
-        
+
         logger.debug("Started tracking generation for \(framework.displayName)")
     }
-    
+
     /// Record token generation
     func recordToken(_ token: String) {
         guard var generation = activeGeneration else { return }
-        
+
         if generation.firstTokenTime == nil {
             generation.firstTokenTime = CFAbsoluteTimeGetCurrent()
             currentMetrics.timeToFirstToken = generation.firstTokenTime! - generation.startTime
         }
-        
+
         generation.tokenCount += 1
         generation.tokens.append(token)
         activeGeneration = generation
-        
+
         // Update live metrics
         let elapsed = CFAbsoluteTimeGetCurrent() - generation.startTime
         currentMetrics.currentTokensPerSecond = Double(generation.tokenCount) / elapsed
     }
-    
+
     /// End generation tracking
     func endGeneration() {
         guard let generation = activeGeneration else { return }
-        
+
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - generation.startTime
         let endMemory = getCurrentMemoryUsage()
-        
+
         // Create performance summary
         let summary = GenerationSummary(
             id: generation.id,
@@ -117,31 +117,31 @@ class RealtimePerformanceMonitor: ObservableObject {
             promptLength: generation.prompt.count,
             responseLength: generation.tokens.joined().count
         )
-        
+
         // Log summary
         logGenerationSummary(summary)
-        
+
         // Check for performance issues
         checkPerformanceThresholds(summary)
-        
+
         // Clear active generation
         activeGeneration = nil
-        
+
         // Reset current metrics
         currentMetrics.currentTokensPerSecond = 0
         currentMetrics.timeToFirstToken = 0
     }
-    
+
     /// Get performance report
     func generateReport(timeRange: TimeInterval = 300) -> PerformanceReport {
         let cutoffTime = Date().timeIntervalSince1970 - timeRange
         let relevantHistory = performanceHistory.filter { $0.timestamp.timeIntervalSince1970 > cutoffTime }
-        
+
         // Calculate statistics
         let memoryUsages = relevantHistory.map { $0.memoryUsage }
         let cpuUsages = relevantHistory.map { $0.cpuUsage }
         let frameRates = relevantHistory.compactMap { $0.frameRate }
-        
+
         return PerformanceReport(
             timeRange: timeRange,
             averageMemoryUsage: average(memoryUsages),
@@ -153,11 +153,11 @@ class RealtimePerformanceMonitor: ObservableObject {
             snapshots: relevantHistory
         )
     }
-    
+
     /// Export performance data
     func exportPerformanceData(format: PerformanceExportFormat) throws -> Data {
         let report = generateReport()
-        
+
         switch format {
         case .json:
             return try JSONEncoder().encode(report)
@@ -167,9 +167,9 @@ class RealtimePerformanceMonitor: ObservableObject {
             return generateMarkdown(from: report).data(using: .utf8)!
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupSystemMonitoring() {
         // Monitor app lifecycle
         NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
@@ -177,20 +177,20 @@ class RealtimePerformanceMonitor: ObservableObject {
                 self?.startMonitoring()
             }
             .store(in: &cancellables)
-        
+
         NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
             .sink { [weak self] _ in
                 self?.stopMonitoring()
             }
             .store(in: &cancellables)
-        
+
         // Monitor memory warnings
         NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)
             .sink { [weak self] _ in
                 self?.handleMemoryWarning()
             }
             .store(in: &cancellables)
-        
+
         // Monitor thermal state
         ProcessInfo.processInfo.publisher(for: \.thermalState)
             .sink { [weak self] state in
@@ -198,7 +198,7 @@ class RealtimePerformanceMonitor: ObservableObject {
             }
             .store(in: &cancellables)
     }
-    
+
     private func updateMetrics() {
         // Update system metrics
         currentMetrics.memoryUsage = getCurrentMemoryUsage()
@@ -207,7 +207,7 @@ class RealtimePerformanceMonitor: ObservableObject {
         currentMetrics.thermalState = ProcessInfo.processInfo.thermalState
         currentMetrics.batteryLevel = UIDevice.current.batteryLevel
         currentMetrics.frameRate = getFrameRate()
-        
+
         // Create snapshot
         let snapshot = PerformanceSnapshot(
             timestamp: Date(),
@@ -216,21 +216,21 @@ class RealtimePerformanceMonitor: ObservableObject {
             frameRate: currentMetrics.frameRate,
             activeFramework: activeGeneration?.framework
         )
-        
+
         // Update history
         performanceHistory.append(snapshot)
         if performanceHistory.count > historyLimit {
             performanceHistory.removeFirst()
         }
-        
+
         // Check for issues
         checkSystemHealth()
     }
-    
+
     private func getCurrentMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(
@@ -241,21 +241,21 @@ class RealtimePerformanceMonitor: ObservableObject {
                 )
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
-    
+
     private func getAvailableMemory() -> Int64 {
         let totalMemory = ProcessInfo.processInfo.physicalMemory
         let usedMemory = getCurrentMemoryUsage()
         return Int64(totalMemory) - usedMemory
     }
-    
+
     private func getCurrentCPUUsage() -> Double {
         var cpuInfo: processor_info_array_t!
         var numCpuInfo: mach_msg_type_number_t = 0
         var numCpus: natural_t = 0
-        
+
         let result = host_processor_info(
             mach_host_self(),
             PROCESSOR_CPU_LOAD_INFO,
@@ -263,13 +263,13 @@ class RealtimePerformanceMonitor: ObservableObject {
             &cpuInfo,
             &numCpuInfo
         )
-        
+
         guard result == KERN_SUCCESS else { return 0 }
-        
+
         // Simplified CPU calculation
         return Double.random(in: 0.1...0.3) // Placeholder
     }
-    
+
     private func getFrameRate() -> Double {
         // Get main screen refresh rate
         if #available(iOS 15.0, *) {
@@ -278,10 +278,10 @@ class RealtimePerformanceMonitor: ObservableObject {
             return 60.0
         }
     }
-    
+
     private func checkSystemHealth() {
         let memoryUsageRatio = Double(currentMetrics.memoryUsage) / Double(ProcessInfo.processInfo.physicalMemory)
-        
+
         // Check memory threshold
         if memoryUsageRatio > thresholds.maxMemoryUsage {
             createAlert(
@@ -290,7 +290,7 @@ class RealtimePerformanceMonitor: ObservableObject {
                 message: "Memory usage at \(Int(memoryUsageRatio * 100))%"
             )
         }
-        
+
         // Check CPU threshold
         if currentMetrics.cpuUsage > thresholds.maxCPUUsage {
             createAlert(
@@ -299,7 +299,7 @@ class RealtimePerformanceMonitor: ObservableObject {
                 message: "CPU usage at \(Int(currentMetrics.cpuUsage * 100))%"
             )
         }
-        
+
         // Check thermal state
         if currentMetrics.thermalState == .serious || currentMetrics.thermalState == .critical {
             createAlert(
@@ -309,7 +309,7 @@ class RealtimePerformanceMonitor: ObservableObject {
             )
         }
     }
-    
+
     private func checkPerformanceThresholds(_ summary: GenerationSummary) {
         // Check tokens per second
         if summary.tokensPerSecond < thresholds.minTokensPerSecond {
@@ -319,7 +319,7 @@ class RealtimePerformanceMonitor: ObservableObject {
                 message: "Low token generation speed: \(String(format: "%.1f", summary.tokensPerSecond)) tokens/sec"
             )
         }
-        
+
         // Check latency
         if summary.timeToFirstToken > thresholds.maxLatency {
             createAlert(
@@ -329,7 +329,7 @@ class RealtimePerformanceMonitor: ObservableObject {
             )
         }
     }
-    
+
     private func createAlert(type: AlertType, severity: AlertSeverity, message: String) {
         let alert = PerformanceAlert(
             id: UUID(),
@@ -338,13 +338,13 @@ class RealtimePerformanceMonitor: ObservableObject {
             message: message,
             timestamp: Date()
         )
-        
+
         alerts.append(alert)
-        
+
         // Keep only recent alerts
         let cutoff = Date().addingTimeInterval(-300) // 5 minutes
         alerts = alerts.filter { $0.timestamp > cutoff }
-        
+
         // Log alert
         switch severity {
         case .info:
@@ -355,26 +355,26 @@ class RealtimePerformanceMonitor: ObservableObject {
             logger.error("Performance critical: \(message)")
         }
     }
-    
+
     private func handleMemoryWarning() {
         createAlert(
             type: .memoryWarning,
             severity: .critical,
             message: "System memory warning received"
         )
-        
+
         // Clear caches
         NotificationCenter.default.post(name: .clearModelCaches, object: nil)
     }
-    
+
     private func handleThermalStateChange(_ state: ProcessInfo.ThermalState) {
         currentMetrics.thermalState = state
-        
+
         if state == .serious || state == .critical {
             logger.warning("Thermal state changed to \(self.thermalStateString(state))")
         }
     }
-    
+
     private func logGenerationSummary(_ summary: GenerationSummary) {
         logger.info("""
             Generation completed:
@@ -386,17 +386,17 @@ class RealtimePerformanceMonitor: ObservableObject {
             - Memory used: \(ByteCountFormatter.string(fromByteCount: summary.memoryUsed, countStyle: .memory))
             """)
     }
-    
+
     private func average(_ values: [Double]) -> Double {
         guard !values.isEmpty else { return 0 }
         return values.reduce(0, +) / Double(values.count)
     }
-    
+
     private func average(_ values: [Int64]) -> Int64 {
         guard !values.isEmpty else { return 0 }
         return values.reduce(0, +) / Int64(values.count)
     }
-    
+
     private func thermalStateString(_ state: ProcessInfo.ThermalState) -> String {
         switch state {
         case .nominal: return "Nominal"
@@ -406,31 +406,31 @@ class RealtimePerformanceMonitor: ObservableObject {
         @unknown default: return "Unknown"
         }
     }
-    
+
     private func generateCSV(from report: PerformanceReport) -> String {
         var csv = "Timestamp,Memory Usage,CPU Usage,Frame Rate\n"
-        
+
         for snapshot in report.snapshots {
             csv += "\(snapshot.timestamp.timeIntervalSince1970),"
             csv += "\(snapshot.memoryUsage),"
             csv += "\(snapshot.cpuUsage),"
             csv += "\(snapshot.frameRate ?? 0)\n"
         }
-        
+
         return csv
     }
-    
+
     private func generateMarkdown(from report: PerformanceReport) -> String {
         var markdown = "# Performance Report\n\n"
         markdown += "Time Range: \(Int(report.timeRange))s\n\n"
-        
+
         markdown += "## Summary\n\n"
         markdown += "- Average Memory: \(ByteCountFormatter.string(fromByteCount: report.averageMemoryUsage, countStyle: .memory))\n"
         markdown += "- Peak Memory: \(ByteCountFormatter.string(fromByteCount: report.peakMemoryUsage, countStyle: .memory))\n"
         markdown += "- Average CPU: \(String(format: "%.1f", report.averageCPUUsage * 100))%\n"
         markdown += "- Peak CPU: \(String(format: "%.1f", report.peakCPUUsage * 100))%\n"
         markdown += "- Alert Count: \(report.alertCount)\n"
-        
+
         return markdown
     }
 }

@@ -7,9 +7,9 @@ struct ModelURLSettingsView: View {
     @State private var customModelName = ""
     @State private var customModelId = ""
     @State private var showingExportSheet = false
-    
+
     private let registry = ModelURLRegistry.shared
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -21,30 +21,30 @@ struct ModelURLSettingsView: View {
                     }
                     .pickerStyle(SegmentedPickerStyle())
                 }
-                
+
                 Section(header: Text("Available Models")) {
                     ForEach(registry.getAllModels(for: selectedFramework), id: \.id) { model in
                         ModelURLRow(model: model)
                     }
                 }
-                
+
                 Section(header: Text("Custom Models")) {
                     ForEach(registry.getCustomModels(), id: \.id) { model in
                         ModelURLRow(model: model, isCustom: true)
                     }
-                    
+
                     Button(action: {
                         showingAddCustomURL = true
                     }) {
                         Label("Add Custom Model URL", systemImage: "plus.circle")
                     }
                 }
-                
+
                 Section {
                     Button(action: exportURLRegistry) {
                         Label("Export URL Registry", systemImage: "square.and.arrow.up")
                     }
-                    
+
                     Button(action: loadCustomURLs) {
                         Label("Import URL Registry", systemImage: "square.and.arrow.down")
                     }
@@ -64,12 +64,12 @@ struct ModelURLSettingsView: View {
             }
         }
     }
-    
+
     private func addCustomModel() {
         guard !customModelId.isEmpty,
               !customModelName.isEmpty,
               let url = URL(string: customURLText) else { return }
-        
+
         let model = ModelDownloadInfo(
             id: customModelId,
             name: customModelName,
@@ -77,16 +77,16 @@ struct ModelURLSettingsView: View {
             sha256: nil,
             requiresUnzip: customModelName.contains(".zip") || customModelName.contains(".tar.gz")
         )
-        
+
         registry.addCustomModel(model)
-        
+
         // Reset fields
         customModelId = ""
         customModelName = ""
         customURLText = ""
         showingAddCustomURL = false
     }
-    
+
     private func exportURLRegistry() {
         do {
             let exportURL = FileManager.default.temporaryDirectory.appendingPathComponent("model_urls.json")
@@ -96,14 +96,14 @@ struct ModelURLSettingsView: View {
             print("Failed to export: \(error)")
         }
     }
-    
+
     private func loadCustomURLs() {
         // This would show a document picker in a real implementation
         print("Import functionality would show document picker")
     }
-    
+
     private func getExportURL() -> URL {
-        return FileManager.default.temporaryDirectory.appendingPathComponent("model_urls.json")
+        FileManager.default.temporaryDirectory.appendingPathComponent("model_urls.json")
     }
 }
 
@@ -111,15 +111,15 @@ struct ModelURLRow: View {
     let model: ModelDownloadInfo
     var isCustom: Bool = false
     @State private var showingCopyAlert = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(model.name)
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 if isCustom {
                     Text("Custom")
                         .font(.caption)
@@ -129,28 +129,28 @@ struct ModelURLRow: View {
                         .cornerRadius(4)
                 }
             }
-            
+
             Text(model.url.absoluteString)
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
-            
+
             HStack {
                 if model.requiresUnzip {
                     Label("Requires Unzip", systemImage: "archivebox")
                         .font(.caption2)
                         .foregroundColor(.orange)
                 }
-                
+
                 if model.sha256 != nil {
                     Label("Verified", systemImage: "checkmark.shield")
                         .font(.caption2)
                         .foregroundColor(.green)
                 }
-                
+
                 Spacer()
-                
+
                 Button(action: {
                     UIPasteboard.general.string = model.url.absoluteString
                     showingCopyAlert = true
@@ -174,21 +174,21 @@ struct AddCustomURLView: View {
     @Binding var urlText: String
     let onSave: () -> Void
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Model Information")) {
                     TextField("Model ID", text: $modelId)
                         .autocapitalization(.none)
-                    
+
                     TextField("Model Name", text: $modelName)
-                    
+
                     TextField("Download URL", text: $urlText)
                         .autocapitalization(.none)
                         .keyboardType(.URL)
                 }
-                
+
                 Section {
                     Text("Tips:")
                         .font(.headline)
@@ -207,7 +207,7 @@ struct AddCustomURLView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
                         onSave()
@@ -217,16 +217,6 @@ struct AddCustomURLView: View {
             }
         }
     }
-}
-
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct ModelURLSettingsView_Previews: PreviewProvider {

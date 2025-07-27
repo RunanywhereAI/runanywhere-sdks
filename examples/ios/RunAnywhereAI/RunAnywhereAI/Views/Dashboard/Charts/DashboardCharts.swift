@@ -13,7 +13,7 @@ import Charts
 @available(iOS 16.0, *)
 struct TokensPerSecondChart: View {
     let data: [Double]
-    
+
     var body: some View {
         Chart(Array(data.enumerated()), id: \.offset) { index, value in
             LineMark(
@@ -22,7 +22,7 @@ struct TokensPerSecondChart: View {
             )
             .foregroundStyle(.blue.gradient)
             .interpolationMethod(.catmullRom)
-            
+
             AreaMark(
                 x: .value("Time", index),
                 y: .value("Tokens/Sec", value)
@@ -42,7 +42,7 @@ struct TokensPerSecondChart: View {
 @available(iOS 16.0, *)
 struct MemoryUsageChart: View {
     let data: [MemorySnapshot]
-    
+
     var body: some View {
         Chart(data, id: \.timestamp) { snapshot in
             LineMark(
@@ -51,7 +51,7 @@ struct MemoryUsageChart: View {
             )
             .foregroundStyle(.purple.gradient)
             .interpolationMethod(.catmullRom)
-            
+
             AreaMark(
                 x: .value("Time", snapshot.timestamp),
                 y: .value("Memory", Double(snapshot.usedMemory) / 1_000_000_000)
@@ -86,10 +86,10 @@ struct MemoryUsageChart: View {
 @available(iOS 16.0, *)
 struct FrameworkPerformanceChart: View {
     let results: [BenchmarkSuiteResult]
-    
+
     private var aggregatedData: [(framework: LLMFramework, speed: Double, memory: Double)] {
         let grouped = Dictionary(grouping: results) { $0.framework }
-        
+
         return grouped.compactMap { framework, results in
             let avgSpeed = results.map { $0.avgTokensPerSecond }.reduce(0, +) / Double(results.count)
             let avgMemory = Double(results.map { $0.avgMemoryUsed }.reduce(0, +)) / Double(results.count) / 1_000_000_000
@@ -97,7 +97,7 @@ struct FrameworkPerformanceChart: View {
         }
         .sorted { $0.speed > $1.speed }
     }
-    
+
     var body: some View {
         Chart(aggregatedData, id: \.framework) { data in
             BarMark(
@@ -140,7 +140,7 @@ struct FrameworkPerformanceChart: View {
 struct LegacyLineChart: View {
     let data: [Double]
     let title: String
-    
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
@@ -152,17 +152,17 @@ struct LegacyLineChart: View {
                             .frame(height: 1)
                     }
                 }
-                
+
                 // Line chart
                 if !data.isEmpty {
                     Path { path in
                         let maxValue = data.max() ?? 1
                         let xStep = geometry.size.width / CGFloat(data.count - 1)
-                        
+
                         for (index, value) in data.enumerated() {
                             let x = CGFloat(index) * xStep
                             let y = geometry.size.height - (CGFloat(value / maxValue) * geometry.size.height)
-                            
+
                             if index == 0 {
                                 path.move(to: CGPoint(x: x, y: y))
                             } else {
@@ -171,26 +171,26 @@ struct LegacyLineChart: View {
                         }
                     }
                     .stroke(Color.blue, lineWidth: 2)
-                    
+
                     // Area fill
                     Path { path in
                         let maxValue = data.max() ?? 1
                         let xStep = geometry.size.width / CGFloat(data.count - 1)
-                        
+
                         path.move(to: CGPoint(x: 0, y: geometry.size.height))
-                        
+
                         for (index, value) in data.enumerated() {
                             let x = CGFloat(index) * xStep
                             let y = geometry.size.height - (CGFloat(value / maxValue) * geometry.size.height)
                             path.addLine(to: CGPoint(x: x, y: y))
                         }
-                        
+
                         path.addLine(to: CGPoint(x: geometry.size.width, y: geometry.size.height))
                         path.closeSubpath()
                     }
                     .fill(Color.blue.opacity(0.1))
                 }
-                
+
                 // Title
                 VStack {
                     HStack {
@@ -213,24 +213,24 @@ struct PerformanceGauge: View {
     let value: Double // 0.0 to 1.0
     let title: String
     let color: Color
-    
+
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
                 Circle()
                     .stroke(Color.gray.opacity(0.2), lineWidth: 10)
-                
+
                 Circle()
                     .trim(from: 0, to: value)
                     .stroke(color.gradient, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.spring(), value: value)
-                
+
                 VStack(spacing: 4) {
                     Text("\(Int(value * 100))%")
                         .font(.title2)
                         .fontWeight(.bold)
-                    
+
                     Text(title)
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -246,22 +246,22 @@ struct PerformanceGauge: View {
 struct SparklineChart: View {
     let data: [Double]
     let color: Color
-    
+
     var body: some View {
         GeometryReader { geometry in
             Path { path in
                 guard !data.isEmpty else { return }
-                
+
                 let maxValue = data.max() ?? 1
                 let minValue = data.min() ?? 0
                 let range = maxValue - minValue
                 let xStep = geometry.size.width / CGFloat(data.count - 1)
-                
+
                 for (index, value) in data.enumerated() {
                     let x = CGFloat(index) * xStep
                     let normalizedValue = range > 0 ? (value - minValue) / range : 0.5
                     let y = geometry.size.height - (normalizedValue * geometry.size.height * 0.8) - geometry.size.height * 0.1
-                    
+
                     if index == 0 {
                         path.move(to: CGPoint(x: x, y: y))
                     } else {
@@ -283,7 +283,7 @@ struct ComparisonBarChart: View {
     let labelB: String
     let colorA: Color
     let colorB: Color
-    
+
     var body: some View {
         GeometryReader { geometry in
             VStack(alignment: .leading, spacing: 12) {
@@ -292,39 +292,39 @@ struct ComparisonBarChart: View {
                     Text(labelA)
                         .font(.caption)
                         .frame(width: 80, alignment: .leading)
-                    
+
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.gray.opacity(0.2))
                             .frame(height: 20)
-                        
+
                         RoundedRectangle(cornerRadius: 4)
                             .fill(colorA.gradient)
                             .frame(width: barWidth(for: dataA, in: geometry.size.width - 120), height: 20)
                     }
-                    
+
                     Text(String(format: "%.1f", dataA))
                         .font(.caption)
                         .fontWeight(.medium)
                         .frame(width: 40, alignment: .trailing)
                 }
-                
+
                 // Bar B
                 HStack {
                     Text(labelB)
                         .font(.caption)
                         .frame(width: 80, alignment: .leading)
-                    
+
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.gray.opacity(0.2))
                             .frame(height: 20)
-                        
+
                         RoundedRectangle(cornerRadius: 4)
                             .fill(colorB.gradient)
                             .frame(width: barWidth(for: dataB, in: geometry.size.width - 120), height: 20)
                     }
-                    
+
                     Text(String(format: "%.1f", dataB))
                         .font(.caption)
                         .fontWeight(.medium)
@@ -333,7 +333,7 @@ struct ComparisonBarChart: View {
             }
         }
     }
-    
+
     private func barWidth(for value: Double, in maxWidth: CGFloat) -> CGFloat {
         let maxValue = max(dataA, dataB, 1)
         return CGFloat(value / maxValue) * maxWidth

@@ -10,9 +10,9 @@ import Foundation
 /// Model compatibility matrix for determining which models work with which frameworks
 class ModelCompatibilityMatrix: ObservableObject {
     static let shared = ModelCompatibilityMatrix()
-    
+
     // MARK: - Compatibility Data
-    
+
     /// Framework capabilities
     private let frameworkCapabilities: [LLMFramework: FrameworkCapability] = [
         .foundationModels: FrameworkCapability(
@@ -96,7 +96,7 @@ class ModelCompatibilityMatrix: ObservableObject {
             supportedArchitectures: ["arm64", "arm64e"]
         )
     ]
-    
+
     /// Model architecture compatibility
     private let modelArchitectureSupport: [ModelArchitecture: Set<LLMFramework>] = [
         .llama: [.llamaCpp, .mlx, .mlc, .coreML, .onnxRuntime, .execuTorch, .tensorFlowLite],
@@ -109,9 +109,9 @@ class ModelCompatibilityMatrix: ObservableObject {
         .t5: [.onnxRuntime, .tensorFlowLite],
         .custom: [.coreML, .onnxRuntime]
     ]
-    
+
     // MARK: - Public Methods
-    
+
     /// Check if a model is compatible with a framework
     func isCompatible(
         model: ModelInfo,
@@ -125,7 +125,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                 warnings: []
             )
         }
-        
+
         // Check format support
         if !capability.supportedFormats.contains(model.format) {
             return CompatibilityResult(
@@ -134,7 +134,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                 warnings: []
             )
         }
-        
+
         // Check quantization support
         if let quantization = model.quantization {
             if let quantType = QuantizationType(rawValue: quantization),
@@ -146,7 +146,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                 )
             }
         }
-        
+
         // Check model size
         let sizeInBytes = parseSizeString(model.size)
         if sizeInBytes > capability.maxModelSize {
@@ -156,12 +156,12 @@ class ModelCompatibilityMatrix: ObservableObject {
                 warnings: []
             )
         }
-        
+
         // Check device requirements
         if let device = device {
             let osVersion = ProcessInfo.processInfo.operatingSystemVersion
             let currentOSString = "\(osVersion.majorVersion).\(osVersion.minorVersion)"
-            
+
             if currentOSString.compare(capability.minimumOS, options: .numeric) == .orderedAscending {
                 return CompatibilityResult(
                     isCompatible: false,
@@ -169,7 +169,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                     warnings: []
                 )
             }
-            
+
             if !device.isSatisfied() {
                 return CompatibilityResult(
                     isCompatible: false,
@@ -178,7 +178,7 @@ class ModelCompatibilityMatrix: ObservableObject {
                 )
             }
         }
-        
+
         // Check architecture support
         if let architecture = getModelArchitecture(from: model.id),
            let supportedFrameworks = modelArchitectureSupport[architecture],
@@ -189,29 +189,29 @@ class ModelCompatibilityMatrix: ObservableObject {
                 warnings: []
             )
         }
-        
+
         // Generate warnings
         var warnings: [String] = []
-        
+
         if sizeInBytes > capability.maxModelSize / 2 {
             warnings.append("Model uses over 50% of maximum supported size")
         }
-        
+
         if capability.requiresSpecificModels {
             warnings.append("Framework requires specifically optimized models")
         }
-        
+
         return CompatibilityResult(
             isCompatible: true,
             reason: "Compatible",
             warnings: warnings
         )
     }
-    
+
     /// Get all compatible frameworks for a model
     func getCompatibleFrameworks(for model: ModelInfo) -> [FrameworkCompatibility] {
         var compatibilities: [FrameworkCompatibility] = []
-        
+
         for framework in LLMFramework.allCases {
             let result = isCompatible(model: model, framework: framework)
             compatibilities.append(
@@ -222,10 +222,10 @@ class ModelCompatibilityMatrix: ObservableObject {
                 )
             )
         }
-        
+
         return compatibilities.sorted { $0.performance.score > $1.performance.score }
     }
-    
+
     /// Get recommended framework for a model
     func getRecommendedFramework(
         for model: ModelInfo,
@@ -233,51 +233,51 @@ class ModelCompatibilityMatrix: ObservableObject {
     ) -> LLMFramework? {
         let compatibleFrameworks = getCompatibleFrameworks(for: model)
             .filter { $0.result.isCompatible }
-        
+
         guard !compatibleFrameworks.isEmpty else { return nil }
-        
+
         // Apply preferences
         let scored = compatibleFrameworks.map { compatibility -> (FrameworkCompatibility, Double) in
             var score = compatibility.performance.score
-            
+
             // Adjust score based on preferences
             if preferences.preferNative && isNativeFramework(compatibility.framework) {
                 score *= 1.5
             }
-            
+
             if preferences.preferFastestInference {
                 score *= compatibility.performance.estimatedTokensPerSecond / 50.0
             }
-            
+
             if preferences.preferLowestMemory {
                 score *= 1.0 / (Double(compatibility.performance.estimatedMemoryUsage) / 1_000_000_000.0)
             }
-            
+
             return (compatibility, score)
         }
-        
+
         return scored.max { $0.1 < $1.1 }?.0.framework
     }
-    
+
     /// Create compatibility report
     func generateCompatibilityReport(for models: [ModelInfo]) -> CompatibilityReport {
         var matrix: [[Bool]] = []
         var details: [String: [CompatibilityResult]] = [:]
-        
+
         for model in models {
             var row: [Bool] = []
             var modelDetails: [CompatibilityResult] = []
-            
+
             for framework in LLMFramework.allCases {
                 let result = isCompatible(model: model, framework: framework)
                 row.append(result.isCompatible)
                 modelDetails.append(result)
             }
-            
+
             matrix.append(row)
             details[model.id] = modelDetails
         }
-        
+
         return CompatibilityReport(
             models: models,
             frameworks: LLMFramework.allCases,
@@ -286,9 +286,9 @@ class ModelCompatibilityMatrix: ObservableObject {
             generatedAt: Date()
         )
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func getModelArchitecture(from modelId: String) -> ModelArchitecture? {
         for architecture in ModelArchitecture.allCases {
             if modelId.lowercased().contains(architecture.rawValue.lowercased()) {
@@ -297,7 +297,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         }
         return nil
     }
-    
+
     private func estimatePerformance(model: ModelInfo, framework: LLMFramework) -> PerformanceEstimate {
         // Base performance scores (tokens/second)
         let basePerformance: [LLMFramework: Double] = [
@@ -312,13 +312,13 @@ class ModelCompatibilityMatrix: ObservableObject {
             .picoLLM: 25,
             .swiftTransformers: 40
         ]
-        
+
         let base = basePerformance[framework] ?? 30
-        
+
         // Adjust for model size
         let sizeInBytes = parseSizeString(model.size)
         let sizeMultiplier = 3_000_000_000.0 / Double(sizeInBytes)
-        
+
         // Adjust for quantization
         let quantizationMultiplier: Double
         if let quantizationString = model.quantization {
@@ -335,12 +335,12 @@ class ModelCompatibilityMatrix: ObservableObject {
         } else {
             quantizationMultiplier = 1.0
         }
-        
+
         let estimatedSpeed = base * sizeMultiplier * quantizationMultiplier
-        
+
         // Parse size string is already done above
         let estimatedMemory = Int64(Double(sizeInBytes) / quantizationMultiplier)
-        
+
         return PerformanceEstimate(
             estimatedTokensPerSecond: estimatedSpeed,
             estimatedMemoryUsage: estimatedMemory,
@@ -348,23 +348,23 @@ class ModelCompatibilityMatrix: ObservableObject {
             score: estimatedSpeed / 100.0
         )
     }
-    
+
     private func isNativeFramework(_ framework: LLMFramework) -> Bool {
         [.foundationModels, .coreML, .mlx].contains(framework)
     }
-    
+
     private func parseSizeString(_ sizeString: String) -> Int64 {
         // Parse size strings like "1.7GB", "3.5G", "500MB", etc.
         let cleanString = sizeString.uppercased().replacingOccurrences(of: " ", with: "")
-        
+
         // Extract numeric value
         let scanner = Scanner(string: cleanString)
         var value: Double = 0
         scanner.scanDouble(&value)
-        
+
         // Check for unit suffix
         let remaining = cleanString.dropFirst(scanner.currentIndex.utf16Offset(in: cleanString))
-        
+
         var multiplier: Double = 1
         if remaining.hasPrefix("GB") || remaining.hasPrefix("G") {
             multiplier = 1_000_000_000
@@ -373,7 +373,7 @@ class ModelCompatibilityMatrix: ObservableObject {
         } else if remaining.hasPrefix("KB") || remaining.hasPrefix("K") {
             multiplier = 1_000
         }
-        
+
         return Int64(value * multiplier)
     }
 }
@@ -413,7 +413,7 @@ struct FrameworkPreferences {
     let preferFastestInference: Bool
     let preferLowestMemory: Bool
     let preferCrossplatform: Bool
-    
+
     static let `default` = FrameworkPreferences(
         preferNative: true,
         preferFastestInference: true,
@@ -435,7 +435,7 @@ struct DeviceInfo {
     let memory: Int64
     let minimumMemory: Int64
     let recommendedMemory: Int64
-    
+
     func isSatisfied() -> Bool {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return availableMemory >= minimumMemory

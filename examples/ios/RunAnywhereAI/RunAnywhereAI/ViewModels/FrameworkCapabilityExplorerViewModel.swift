@@ -15,7 +15,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["Testing", "Development", "Prototyping"]
             )
-            
+
         case .llamaCpp:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -26,7 +26,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["GGUF Support", "Metal Acceleration", "Low Memory"]
             )
-            
+
         case .coreML:
             return FrameworkCapabilities(
                 supportsStreaming: false,
@@ -37,7 +37,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["Neural Engine", "Apple Integration", "Optimization"]
             )
-            
+
         case .mlx:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -48,7 +48,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["Unified Memory", "NumPy-like", "Auto Differentiation"]
             )
-            
+
         case .onnxRuntime:
             return FrameworkCapabilities(
                 supportsStreaming: false,
@@ -59,7 +59,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["Cross-platform", "Multiple Providers", "Industry Standard"]
             )
-            
+
         case .execuTorch:
             return FrameworkCapabilities(
                 supportsStreaming: false,
@@ -70,7 +70,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["PyTorch Ecosystem", "4-bit Quantization", "Edge Optimized"]
             )
-            
+
         case .tensorFlowLite:
             return FrameworkCapabilities(
                 supportsStreaming: false,
@@ -81,7 +81,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["TensorFlow Ecosystem", "Delegate System", "Model Toolkit"]
             )
-            
+
         case .picoLLM:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -92,7 +92,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: false,
                 topFeatures: ["Ultra Compression", "Voice Optimized", "Real-time"]
             )
-            
+
         case .swiftTransformers:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -103,7 +103,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["Native Swift", "Hugging Face", "Type Safety"]
             )
-            
+
         case .mlc:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -114,7 +114,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: true,
                 topFeatures: ["TVM Compilation", "Hardware Agnostic", "OpenAI API"]
             )
-            
+
         case .foundationModels:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -127,7 +127,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             )
         }
     }
-    
+
     func getPerformanceProfile(for framework: LLMFramework) -> PerformanceProfile {
         switch framework {
         case .mock:
@@ -154,7 +154,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return PerformanceProfile(speed: 0.9, memoryEfficiency: 0.9, modelSizeSupport: 0.5, easeOfUse: 0.95)
         }
     }
-    
+
     func getUseCases(for framework: LLMFramework) -> [String] {
         switch framework {
         case .mock:
@@ -181,7 +181,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return ["iOS 18+ applications", "Privacy-focused apps", "System-integrated AI"]
         }
     }
-    
+
     func getCodeExample(for framework: LLMFramework) -> String {
         switch framework {
         case .mock:
@@ -288,7 +288,7 @@ extension LLMFramework {
         case .foundationModels: return "apple.logo"
         }
     }
-    
+
     var description: String {
         switch self {
         case .mock: return "Testing and development framework"

@@ -7,7 +7,7 @@ struct BenchmarkView: View {
     @State private var selectedModels: Set<String> = []
     @State private var showingResults = false
     @State private var selectedMetric: BenchmarkService.BenchmarkMetric = .tokensPerSecond
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -31,9 +31,9 @@ struct BenchmarkView: View {
             }
         }
     }
-    
+
     // MARK: - Setup View
-    
+
     private var setupView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -41,7 +41,7 @@ struct BenchmarkView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Select Frameworks")
                         .font(.headline)
-                    
+
                     ForEach(LLMFramework.allCases, id: \.self) { framework in
                         HStack {
                             Image(systemName: benchmarkService.selectedFrameworks.contains(framework) ? "checkmark.circle.fill" : "circle")
@@ -62,12 +62,12 @@ struct BenchmarkView: View {
                 .padding()
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(10)
-                
+
                 // Model Selection
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Select Models")
                         .font(.headline)
-                    
+
                     if modelManager.downloadedModels.isEmpty {
                         Text("No models downloaded. Please download models first.")
                             .foregroundColor(.secondary)
@@ -99,12 +99,12 @@ struct BenchmarkView: View {
                 .padding()
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(10)
-                
+
                 // Prompt Categories
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Prompt Categories")
                         .font(.headline)
-                    
+
                     ForEach(["short", "medium", "long"], id: \.self) { category in
                         HStack {
                             Image(systemName: benchmarkService.selectedPromptCategories.contains(category) ? "checkmark.circle.fill" : "circle")
@@ -125,7 +125,7 @@ struct BenchmarkView: View {
                 .padding()
                 .background(Color.secondary.opacity(0.1))
                 .cornerRadius(10)
-                
+
                 // Run Button
                 Button(action: runBenchmark) {
                     HStack {
@@ -143,9 +143,9 @@ struct BenchmarkView: View {
             .padding()
         }
     }
-    
+
     // MARK: - Running View
-    
+
     private var runningView: some View {
         VStack(spacing: 30) {
             ProgressView(value: benchmarkService.currentProgress) {
@@ -153,42 +153,42 @@ struct BenchmarkView: View {
                     .font(.headline)
             }
             .progressViewStyle(LinearProgressViewStyle())
-            
+
             Text(benchmarkService.currentStatus)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
+
             Text("\(Int(benchmarkService.currentProgress * 100))%")
                 .font(.largeTitle)
                 .bold()
         }
         .padding(40)
     }
-    
+
     // MARK: - Results View
-    
+
     private var resultsView: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Metric Selector
                 Picker("Metric", selection: $selectedMetric) {
                     ForEach([BenchmarkService.BenchmarkMetric.tokensPerSecond,
-                            .timeToFirstToken,
-                            .memoryUsage,
-                            .successRate], id: \.self) { metric in
+                             .timeToFirstToken,
+                             .memoryUsage,
+                             .successRate], id: \.self) { metric in
                         Text(metric.name).tag(metric)
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
-                
+
                 // Chart
                 if #available(iOS 16.0, *) {
                     chartView
                         .frame(height: 300)
                         .padding()
                 }
-                
+
                 // Detailed Results
                 ForEach(benchmarkService.benchmarkResults) { benchmark in
                     VStack(alignment: .leading, spacing: 10) {
@@ -200,7 +200,7 @@ struct BenchmarkView: View {
                                 .font(.caption)
                                 .foregroundColor(benchmark.successRate > 0.8 ? .green : .orange)
                         }
-                        
+
                         HStack(spacing: 20) {
                             VStack(alignment: .leading) {
                                 Text("Avg Tokens/s")
@@ -210,7 +210,7 @@ struct BenchmarkView: View {
                                     .font(.title3)
                                     .bold()
                             }
-                            
+
                             VStack(alignment: .leading) {
                                 Text("Time to 1st Token")
                                     .font(.caption)
@@ -219,7 +219,7 @@ struct BenchmarkView: View {
                                     .font(.title3)
                                     .bold()
                             }
-                            
+
                             VStack(alignment: .leading) {
                                 Text("Avg Memory")
                                     .font(.caption)
@@ -234,7 +234,7 @@ struct BenchmarkView: View {
                     .background(Color.secondary.opacity(0.1))
                     .cornerRadius(10)
                 }
-                
+
                 // New Benchmark Button
                 Button(action: {
                     benchmarkService.benchmarkResults = []
@@ -254,9 +254,9 @@ struct BenchmarkView: View {
             .padding()
         }
     }
-    
+
     // MARK: - Chart View
-    
+
     @available(iOS 16.0, *)
     private var chartView: some View {
         Chart {
@@ -291,17 +291,17 @@ struct BenchmarkView: View {
             }
         }
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func runBenchmark() {
         let models = modelManager.downloadedModels.filter { selectedModels.contains($0.id) }
-        
+
         Task {
             await benchmarkService.runBenchmark(models: models)
         }
     }
-    
+
     private func formatValue(_ value: Double, metric: BenchmarkService.BenchmarkMetric) -> String {
         switch metric {
         case .tokensPerSecond:

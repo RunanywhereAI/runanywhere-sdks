@@ -30,7 +30,8 @@
       "WebFetch(domain:pytorch.org)",
       "WebFetch(domain:docs.pytorch.org)",
       "Bash(grep:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(od:*)"
     ],
     "deny": []
   }

@@ -10,7 +10,7 @@ import SwiftUI
 @main
 struct RunAnywhereAIApp: App {
     @StateObject private var modelManager = ModelManager.shared
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -21,12 +21,12 @@ struct RunAnywhereAIApp: App {
                 }
         }
     }
-    
+
     private func initializeBundledModels() async {
         do {
             // Generate sample models for testing
             try await BundledModelsService.shared.generateSampleModels()
-            
+
             // Refresh model list
             await modelManager.refreshModelList()
         } catch {

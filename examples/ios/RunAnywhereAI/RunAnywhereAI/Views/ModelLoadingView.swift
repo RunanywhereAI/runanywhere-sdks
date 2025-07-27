@@ -10,9 +10,9 @@ struct ModelLoadingView: View {
     @Binding var isPresented: Bool
     let model: ModelInfo
     let onSuccess: () -> Void
-    
+
     @State private var hasStartedLoading = false
-    
+
     var body: some View {
         VStack(spacing: 24) {
             // Header
@@ -21,30 +21,30 @@ struct ModelLoadingView: View {
                     .font(.system(size: 50))
                     .foregroundColor(.blue)
                     .symbolEffect(.pulse, options: .repeating)
-                
+
                 Text("Loading Model")
                     .font(.title2)
                     .fontWeight(.semibold)
-                
+
                 Text(model.name)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
-            
+
             // Progress
             VStack(spacing: 12) {
                 ProgressView(value: loader.loadingProgress)
                     .progressViewStyle(LinearProgressViewStyle())
                     .frame(height: 8)
                     .scaleEffect(x: 1, y: 2, anchor: .center)
-                
+
                 HStack {
                     Text(loader.loadingStatus)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Spacer()
-                    
+
                     Text("\(Int(loader.loadingProgress * 100))%")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -52,7 +52,7 @@ struct ModelLoadingView: View {
                 }
             }
             .padding(.horizontal)
-            
+
             // Model Info
             VStack(alignment: .leading, spacing: 8) {
                 ModelInfoRow(label: "Format", value: model.format.displayName)
@@ -65,19 +65,19 @@ struct ModelLoadingView: View {
             .padding()
             .background(Color.gray.opacity(0.1))
             .cornerRadius(12)
-            
+
             // Error Display
             if let error = loader.error {
                 VStack(spacing: 8) {
                     Label("Loading Failed", systemImage: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
                         .font(.headline)
-                    
+
                     Text(error.localizedDescription)
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                    
+
                     if let llmError = error as? LLMError,
                        let recovery = llmError.recoverySuggestion {
                         Text(recovery)
@@ -90,7 +90,7 @@ struct ModelLoadingView: View {
                 .background(Color.red.opacity(0.1))
                 .cornerRadius(12)
             }
-            
+
             // Actions
             HStack(spacing: 16) {
                 if loader.error != nil {
@@ -101,7 +101,7 @@ struct ModelLoadingView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                
+
                 Button(loader.isLoading ? "Cancel" : "Close") {
                     if loader.isLoading {
                         // In real implementation, would cancel the loading task
@@ -129,7 +129,7 @@ struct ModelLoadingView: View {
             }
         }
     }
-    
+
     private func loadModel() async {
         do {
             let success = try await loader.loadModel(
@@ -137,7 +137,7 @@ struct ModelLoadingView: View {
                 format: model.format,
                 framework: model.framework
             )
-            
+
             if success {
                 withAnimation {
                     onSuccess()
@@ -155,15 +155,15 @@ struct ModelLoadingView: View {
 private struct ModelInfoRow: View {
     let label: String
     let value: String
-    
+
     var body: some View {
         HStack {
             Text(label)
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             Spacer()
-            
+
             Text(value)
                 .font(.caption)
                 .fontWeight(.medium)
@@ -177,7 +177,7 @@ struct ModelLoadingModifier: ViewModifier {
     @Binding var isLoading: Bool
     let model: ModelInfo?
     let onSuccess: () -> Void
-    
+
     func body(content: Content) -> some View {
         content
             .overlay(
@@ -185,7 +185,7 @@ struct ModelLoadingModifier: ViewModifier {
                     if isLoading, let model = model {
                         Color.black.opacity(0.4)
                             .ignoresSafeArea()
-                        
+
                         ModelLoadingView(
                             isPresented: $isLoading,
                             model: model,

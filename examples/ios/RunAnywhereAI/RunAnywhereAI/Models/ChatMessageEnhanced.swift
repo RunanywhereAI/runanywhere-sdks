@@ -21,7 +21,7 @@ extension ChatMessage {
             objc_setAssociatedObject(self, &frameworkKey, newValue, .OBJC_ASSOCIATION_RETAIN)
         }
     }
-    
+
     var generationMetrics: Any? {
         get {
             objc_getAssociatedObject(self, &metricsKey)
@@ -30,7 +30,7 @@ extension ChatMessage {
             objc_setAssociatedObject(self, &metricsKey, newValue, .OBJC_ASSOCIATION_RETAIN)
         }
     }
-    
+
     var isError: Bool {
         get {
             objc_getAssociatedObject(self, &errorKey) as? Bool ?? false

@@ -11,25 +11,25 @@ import Foundation
 protocol LLMService: AnyObject, LLMCapabilities, LLMModelLoader, LLMInference, LLMMetrics {
     /// Framework information
     var frameworkInfo: FrameworkInfo { get }
-    
+
     /// Service name (legacy support)
     var name: String { get }
-    
+
     /// Initialization state (legacy support)
     var isInitialized: Bool { get }
-    
+
     /// Supported models (legacy support)
     var supportedModels: [ModelInfo] { get }
-    
+
     /// Get current model information
     func getModelInfo() -> ModelInfo?
-    
+
     /// Clean up resources
     func cleanup()
-    
+
     /// Service-specific configuration
     func configure(_ options: [String: Any]) throws
-    
+
     /// Health check
     func healthCheck() async -> HealthCheckResult
 }
@@ -50,14 +50,14 @@ extension LLMService {
     func initialize(modelPath: String) async throws {
         try await loadModel(modelPath)
     }
-    
+
     /// Legacy generate method mapped to new inference protocol
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         let request = GenerationRequest(prompt: prompt, options: options)
         let response = try await generate(request)
         return response.text
     }
-    
+
     /// Legacy stream generate mapped to new inference protocol
     func streamGenerate(
         prompt: String,

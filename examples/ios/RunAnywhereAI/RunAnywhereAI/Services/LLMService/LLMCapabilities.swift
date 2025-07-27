@@ -11,25 +11,25 @@ import Foundation
 protocol LLMCapabilities {
     /// Whether the framework supports streaming generation
     var supportsStreaming: Bool { get }
-    
+
     /// Whether the framework supports model quantization
     var supportsQuantization: Bool { get }
-    
+
     /// Whether the framework supports batch processing
     var supportsBatching: Bool { get }
-    
+
     /// Whether the framework supports multi-modal inputs (text, image, audio)
     var supportsMultiModal: Bool { get }
-    
+
     /// Available quantization formats
     var quantizationFormats: [QuantizationFormat] { get }
-    
+
     /// Maximum context length supported
     var maxContextLength: Int { get }
-    
+
     /// Whether the framework supports custom operators
     var supportsCustomOperators: Bool { get }
-    
+
     /// Hardware acceleration options
     var hardwareAcceleration: [HardwareAcceleration] { get }
 }

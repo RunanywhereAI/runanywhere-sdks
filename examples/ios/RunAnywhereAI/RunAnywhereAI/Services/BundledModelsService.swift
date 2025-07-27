@@ -4,9 +4,9 @@ import Foundation
 
 class BundledModelsService {
     static let shared = BundledModelsService()
-    
+
     private init() {}
-    
+
     // Pre-defined sample models that come with the app
     let bundledModels: [ModelInfo] = [
         // Tiny test models for each framework
@@ -21,7 +21,7 @@ class BundledModelsService {
             isLocal: true,
             description: "Ultra-small test model for llama.cpp framework testing"
         ),
-        
+
         ModelInfo(
             id: "test-coreml-tiny",
             name: "Tiny Test Model (Core ML)",
@@ -33,7 +33,7 @@ class BundledModelsService {
             isLocal: true,
             description: "Small Core ML model for testing Apple Neural Engine"
         ),
-        
+
         ModelInfo(
             id: "test-mlx-tiny",
             name: "Tiny Test Model (MLX)",
@@ -45,7 +45,7 @@ class BundledModelsService {
             isLocal: true,
             description: "Compact MLX model optimized for Apple Silicon"
         ),
-        
+
         // Medium demo models
         ModelInfo(
             id: "demo-phi-mini",
@@ -59,7 +59,7 @@ class BundledModelsService {
             downloadURL: URL(string: "https://huggingface.co/models/phi-mini-demo.gguf"),
             description: "Microsoft Phi mini model for demonstrations"
         ),
-        
+
         ModelInfo(
             id: "demo-tinyllama",
             name: "TinyLlama 1.1B Demo",
@@ -73,54 +73,54 @@ class BundledModelsService {
             description: "Compact but capable language model"
         )
     ]
-    
+
     // Copy bundled models to app's documents directory
     func installBundledModels() async throws {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let modelsDirectory = documentsURL.appendingPathComponent("Models")
-        
+
         // Create models directory if it doesn't exist
         try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-        
+
         for model in bundledModels where model.isLocal {
             let destinationURL = modelsDirectory.appendingPathComponent("\(model.id).\(model.format.fileExtension)")
-            
+
             // Skip if already installed
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 continue
             }
-            
+
             // In a real app, these files would be in the app bundle
             if let bundleURL = Bundle.main.url(forResource: model.id, withExtension: model.format.fileExtension) {
                 try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
-                
+
                 // Update model path
                 await ModelManager.shared.updateModelPath(modelId: model.id, path: destinationURL.path)
             }
         }
     }
-    
+
     // Generate sample model files for testing
     func generateSampleModels() async throws {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         let modelsDirectory = documentsURL.appendingPathComponent("Models")
-        
+
         try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
-        
+
         // Generate tiny GGUF file
         let ggufModel = bundledModels.first { $0.id == "test-llama-tiny" }!
         try await generateGGUFSample(
             at: modelsDirectory.appendingPathComponent("\(ggufModel.id).gguf"),
             modelInfo: ggufModel
         )
-        
+
         // Generate tiny Core ML model package
         let coreMLModel = bundledModels.first { $0.id == "test-coreml-tiny" }!
         try await generateCoreMLSample(
             at: modelsDirectory.appendingPathComponent("\(coreMLModel.id).mlpackage"),
             modelInfo: coreMLModel
         )
-        
+
         // Generate tiny MLX model directory
         let mlxModel = bundledModels.first { $0.id == "test-mlx-tiny" }!
         try await generateMLXSample(
@@ -128,23 +128,23 @@ class BundledModelsService {
             modelInfo: mlxModel
         )
     }
-    
+
     private func generateGGUFSample(at url: URL, modelInfo: ModelInfo) async throws {
         // GGUF file format has a specific header
         var data = Data()
-        
+
         // GGUF magic number
         data.append(contentsOf: [0x47, 0x47, 0x55, 0x46]) // "GGUF"
-        
+
         // Version
         data.append(contentsOf: withUnsafeBytes(of: UInt32(3).littleEndian) { Array($0) })
-        
+
         // Tensor count (simplified)
         data.append(contentsOf: withUnsafeBytes(of: UInt64(10).littleEndian) { Array($0) })
-        
+
         // Metadata count
         data.append(contentsOf: withUnsafeBytes(of: UInt64(5).littleEndian) { Array($0) })
-        
+
         // Add some mock metadata
         // This is a simplified version - real GGUF has complex metadata
         let metadata = [
@@ -154,19 +154,19 @@ class BundledModelsService {
             "llama.context_length": String(modelInfo.contextLength ?? 512),
             "llama.embedding_length": "128"
         ]
-        
+
         // Add random data to reach target size (5MB)
         let targetSize = 5 * 1024 * 1024 // 5MB
         let randomData = Data((0..<targetSize).map { _ in UInt8.random(in: 0...255) })
         data.append(randomData)
-        
+
         try data.write(to: url)
     }
-    
+
     private func generateCoreMLSample(at url: URL, modelInfo: ModelInfo) async throws {
         // Create mlpackage directory structure
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        
+
         // Create manifest.json
         let manifest = [
             "fileFormatVersion": "1.0.0",
@@ -180,19 +180,19 @@ class BundledModelsService {
             ],
             "rootModelIdentifier": "model.mlmodel"
         ] as [String: Any]
-        
+
         let manifestData = try JSONSerialization.data(withJSONObject: manifest)
         try manifestData.write(to: url.appendingPathComponent("Manifest.json"))
-        
+
         // Create a simple model file (mock)
         let modelData = Data((0..<1024 * 1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
         try modelData.write(to: url.appendingPathComponent("model.mlmodel"))
     }
-    
+
     private func generateMLXSample(at url: URL, modelInfo: ModelInfo) async throws {
         // Create MLX model directory
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-        
+
         // Create config.json
         let config = [
             "model_type": "mlx_lm",
@@ -203,14 +203,14 @@ class BundledModelsService {
             "vocab_size": 1000,
             "max_position_embeddings": modelInfo.contextLength ?? 512
         ] as [String: Any]
-        
+
         let configData = try JSONSerialization.data(withJSONObject: config, options: .prettyPrinted)
         try configData.write(to: url.appendingPathComponent("config.json"))
-        
+
         // Create weights.npz (mock)
         let weightsData = Data((0..<1024 * 1024).map { _ in UInt8.random(in: 0...255) }) // 1MB
         try weightsData.write(to: url.appendingPathComponent("weights.npz"))
-        
+
         // Create tokenizer.json (mock)
         let tokenizer = [
             "type": "BPE",
@@ -219,7 +219,7 @@ class BundledModelsService {
             "bos_token": "<s>",
             "eos_token": "</s>"
         ] as [String: Any]
-        
+
         let tokenizerData = try JSONSerialization.data(withJSONObject: tokenizer, options: .prettyPrinted)
         try tokenizerData.write(to: url.appendingPathComponent("tokenizer.json"))
     }

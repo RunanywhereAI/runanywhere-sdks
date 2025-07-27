@@ -11,19 +11,19 @@ import Combine
 /// Model repository for managing LLM model downloads, caching, and lifecycle
 class ModelRepository: ObservableObject {
     static let shared = ModelRepository()
-    
+
     // MARK: - Published Properties
     @Published var availableModels: [ModelInfo] = []
     @Published var downloadedModels: [ModelInfo] = []
     @Published var downloadProgress: [String: Double] = [:]
     @Published var isRefreshing = false
-    
+
     // MARK: - Private Properties
     private let fileManager = FileManager.default
     private let urlSession: URLSession
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
     private var cancellables = Set<AnyCancellable>()
-    
+
     // Model directory structure
     private var modelsDirectory: URL {
         let documentsPath = fileManager.urls(
@@ -32,7 +32,7 @@ class ModelRepository: ObservableObject {
         ).first!
         return documentsPath.appendingPathComponent("Models")
     }
-    
+
     // MARK: - Model Catalog
     private let modelCatalog = [
         ModelInfo(
@@ -86,24 +86,24 @@ class ModelRepository: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/mlx-community/Qwen2.5-1.5B-Instruct-4bit/resolve/main/model.safetensors")!
         )
     ]
-    
+
     // MARK: - Initialization
     init() {
         let config = URLSessionConfiguration.default
         config.allowsCellularAccess = false
         config.isDiscretionary = true
         urlSession = URLSession(configuration: config)
-        
+
         setupModelDirectory()
         loadDownloadedModels()
     }
-    
+
     // MARK: - Public Methods
-    
+
     /// Refresh available models from catalog
     func refreshAvailableModels() {
         isRefreshing = true
-        
+
         // Simulate network delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self else { return }
@@ -111,7 +111,7 @@ class ModelRepository: ObservableObject {
             self.isRefreshing = false
         }
     }
-    
+
     /// Download a model
     func downloadModel(_ model: ModelInfo) async throws -> URL {
         // Check if already downloaded
@@ -119,92 +119,92 @@ class ModelRepository: ObservableObject {
            fileManager.fileExists(atPath: existingPath.path) {
             return existingPath
         }
-        
+
         // Create download URL
         guard let downloadURL = model.downloadURL else {
             throw ModelError.invalidFile
         }
-        
+
         // Create destination path
         let destinationPath = try createModelPath(for: model)
-        
+
         // Start download
         return try await withCheckedThrowingContinuation { continuation in
             let task = urlSession.downloadTask(with: downloadURL) { [weak self] tempURL, _, error in
                 guard let self = self else { return }
-                
+
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
                 }
-                
+
                 guard let tempURL = tempURL else {
                     continuation.resume(throwing: ModelError.downloadFailed)
                     return
                 }
-                
+
                 do {
                     // Move file to destination
                     try self.fileManager.moveItem(at: tempURL, to: destinationPath)
-                    
+
                     // Update downloaded models
                     DispatchQueue.main.async {
                         self.loadDownloadedModels()
                         self.downloadProgress[model.id] = nil
                     }
-                    
+
                     continuation.resume(returning: destinationPath)
                 } catch {
                     continuation.resume(throwing: error)
                 }
             }
-            
+
             // Track progress
             downloadTasks[model.id] = task
             observeDownloadProgress(for: task, modelId: model.id)
-            
+
             task.resume()
         }
     }
-    
+
     /// Cancel download
     func cancelDownload(for modelId: String) {
         downloadTasks[modelId]?.cancel()
         downloadTasks[modelId] = nil
         downloadProgress[modelId] = nil
     }
-    
+
     /// Delete downloaded model
     func deleteModel(_ model: ModelInfo) throws {
         guard let modelPath = getModelPath(for: model) else {
             throw ModelError.invalidFile
         }
-        
+
         try fileManager.removeItem(at: modelPath)
         loadDownloadedModels()
     }
-    
+
     /// Get path for downloaded model
     func getModelPath(for model: ModelInfo) -> URL? {
         let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.rawValue)
         let modelFile = frameworkDir.appendingPathComponent("\(model.id).\(model.format.fileExtension)")
-        
+
         if fileManager.fileExists(atPath: modelFile.path) {
             return modelFile
         }
-        
+
         return nil
     }
-    
+
     /// Check if model is downloaded
     func isModelDownloaded(_ model: ModelInfo) -> Bool {
         getModelPath(for: model) != nil
     }
-    
+
     /// Get storage size used by models
     func getStorageUsed() -> Int64 {
         var totalSize: Int64 = 0
-        
+
         if let enumerator = fileManager.enumerator(
             at: modelsDirectory,
             includingPropertiesForKeys: [.fileSizeKey],
@@ -216,10 +216,10 @@ class ModelRepository: ObservableObject {
                 }
             }
         }
-        
+
         return totalSize
     }
-    
+
     /// Clear model cache
     func clearCache() throws {
         if fileManager.fileExists(atPath: modelsDirectory.path) {
@@ -228,15 +228,15 @@ class ModelRepository: ObservableObject {
         setupModelDirectory()
         loadDownloadedModels()
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupModelDirectory() {
         try? fileManager.createDirectory(
             at: modelsDirectory,
             withIntermediateDirectories: true
         )
-        
+
         // Create framework subdirectories
         for framework in LLMFramework.allCases {
             let frameworkDir = modelsDirectory.appendingPathComponent(framework.rawValue)
@@ -246,33 +246,33 @@ class ModelRepository: ObservableObject {
             )
         }
     }
-    
+
     private func loadDownloadedModels() {
         var downloaded: [ModelInfo] = []
-        
+
         for model in modelCatalog {
             if isModelDownloaded(model) {
                 downloaded.append(model)
             }
         }
-        
+
         DispatchQueue.main.async {
             self.downloadedModels = downloaded
         }
     }
-    
+
     private func createModelPath(for model: ModelInfo) throws -> URL {
         let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.rawValue)
         return frameworkDir.appendingPathComponent("\(model.id).\(model.format.fileExtension)")
     }
-    
+
     private func observeDownloadProgress(for task: URLSessionDownloadTask, modelId: String) {
         let observation = task.progress.observe(\.fractionCompleted) { [weak self] progress, _ in
             DispatchQueue.main.async {
                 self?.downloadProgress[modelId] = progress.fractionCompleted
             }
         }
-        
+
         // Store observation
         observation.invalidate()
     }
@@ -296,7 +296,7 @@ enum QuantizationType: String, Codable, CaseIterable {
     case q8_0 = "Q8_0"
     case f16 = "F16"
     case f32 = "F32"
-    
+
     var displayName: String {
         rawValue
     }

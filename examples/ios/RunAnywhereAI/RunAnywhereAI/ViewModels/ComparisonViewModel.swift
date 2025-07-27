@@ -23,7 +23,7 @@ class ComparisonViewModel: ObservableObject {
     @Published var performanceDataA: [Double] = []
     @Published var performanceDataB: [Double] = []
     @Published var settings = ComparisonSettings()
-    
+
     // MARK: - Private Properties
     private let unifiedService = UnifiedLLMService.shared
     private let performanceMonitor = RealtimePerformanceMonitor.shared
@@ -32,7 +32,7 @@ class ComparisonViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var taskA: Task<Void, Never>?
     private var taskB: Task<Void, Never>?
-    
+
     let quickPrompts = [
         "Hello, how are you?",
         "Explain quantum computing",
@@ -40,18 +40,18 @@ class ComparisonViewModel: ObservableObject {
         "What is 2+2?",
         "Tell me a joke"
     ]
-    
+
     var isGenerating: Bool {
         isGeneratingA || isGeneratingB
     }
-    
+
     // MARK: - Initialization
     init() {
         setupSubscriptions()
     }
-    
+
     // MARK: - Public Methods
-    
+
     func runComparison(prompt: String) async {
         // Reset outputs
         outputA = ""
@@ -60,32 +60,32 @@ class ComparisonViewModel: ObservableObject {
         metricsB = nil
         performanceDataA.removeAll()
         performanceDataB.removeAll()
-        
+
         // Create A/B test if enabled
         if settings.autoRunBenchmarks {
             let variantA = TestVariant(id: UUID(), name: frameworkA.displayName, framework: frameworkA, configuration: [:])
             let variantB = TestVariant(id: UUID(), name: frameworkB.displayName, framework: frameworkB, configuration: [:])
-            
+
             let test = abTesting.createTest(
                 name: "Manual Comparison",
                 description: "Comparing \(frameworkA.displayName) vs \(frameworkB.displayName)",
                 variantA: variantA,
                 variantB: variantB
             )
-            
+
             do {
                 try await abTesting.startTest(test.id)
             } catch {
                 logger.log("Failed to start A/B test: \(error)", level: .error, category: "Comparison")
             }
         }
-        
+
         // Run generations
         if settings.synchronizeStart {
             // Start both at the same time
             async let resultA = generateWithFramework(frameworkA, prompt: prompt, isA: true)
             async let resultB = generateWithFramework(frameworkB, prompt: prompt, isA: false)
-            
+
             _ = await (resultA, resultB)
         } else {
             // Run sequentially
@@ -93,30 +93,30 @@ class ComparisonViewModel: ObservableObject {
             await generateWithFramework(frameworkB, prompt: prompt, isA: false)
         }
     }
-    
+
     func determineWinner() -> LLMFramework? {
         guard let metricsA = metricsA, let metricsB = metricsB else { return nil }
-        
+
         // Simple scoring based on speed and efficiency
         let scoreA = metricsA.tokensPerSecond / (Double(metricsA.memoryUsed) / 1_000_000_000)
         let scoreB = metricsB.tokensPerSecond / (Double(metricsB.memoryUsed) / 1_000_000_000)
-        
+
         if abs(scoreA - scoreB) < 0.1 {
             return nil // Too close to call
         }
-        
+
         return scoreA > scoreB ? frameworkA : frameworkB
     }
-    
+
     func stopGeneration() {
         taskA?.cancel()
         taskB?.cancel()
         isGeneratingA = false
         isGeneratingB = false
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func setupSubscriptions() {
         // Monitor performance metrics if enabled
         if settings.showRealtimeMetrics {
@@ -124,7 +124,7 @@ class ComparisonViewModel: ObservableObject {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] metrics in
                     guard let self = self else { return }
-                    
+
                     if metrics.currentTokensPerSecond > 0 {
                         if self.isGeneratingA {
                             self.performanceDataA.append(metrics.currentTokensPerSecond)
@@ -143,27 +143,27 @@ class ComparisonViewModel: ObservableObject {
                 .store(in: &cancellables)
         }
     }
-    
+
     private func generateWithFramework(_ framework: LLMFramework, prompt: String, isA: Bool) async {
         if isA {
             isGeneratingA = true
         } else {
             isGeneratingB = true
         }
-        
+
         let startTime = CFAbsoluteTimeGetCurrent()
         let startMemory = getMemoryUsage()
         var firstTokenTime: CFAbsoluteTime?
         var tokenCount = 0
         var generatedText = ""
-        
+
         do {
             // Switch to framework
             unifiedService.selectService(named: framework.displayName)
-            
+
             // Start monitoring
             performanceMonitor.beginGeneration(framework: framework, prompt: prompt)
-            
+
             // Generate
             let options = GenerationOptions(
                 maxTokens: settings.maxTokens,
@@ -173,20 +173,20 @@ class ComparisonViewModel: ObservableObject {
                 repetitionPenalty: 1.1,
                 stopSequences: []
             )
-            
+
             try await unifiedService.streamGenerate(
                 prompt: prompt,
                 options: options
             ) { [weak self] token in
                 guard let self = self else { return }
-                
+
                 if firstTokenTime == nil {
                     firstTokenTime = CFAbsoluteTimeGetCurrent()
                 }
-                
+
                 tokenCount += 1
                 generatedText += token
-                
+
                 Task { @MainActor in
                     if isA {
                         self.outputA = generatedText
@@ -194,18 +194,18 @@ class ComparisonViewModel: ObservableObject {
                         self.outputB = generatedText
                     }
                 }
-                
+
                 // Record for performance tracking
                 self.performanceMonitor.recordToken(token)
             }
-            
+
             // End monitoring
             performanceMonitor.endGeneration()
-            
+
             // Calculate final metrics
             let endTime = CFAbsoluteTimeGetCurrent()
             let endMemory = getMemoryUsage()
-            
+
             let metrics = ComparisonMetrics(
                 totalTime: endTime - startTime,
                 timeToFirstToken: firstTokenTime.map { $0 - startTime } ?? 0,
@@ -213,13 +213,13 @@ class ComparisonViewModel: ObservableObject {
                 tokenCount: tokenCount,
                 memoryUsed: Int(endMemory - startMemory)
             )
-            
+
             if isA {
                 metricsA = metrics
             } else {
                 metricsB = metrics
             }
-            
+
             // Record A/B test metric
             if settings.autoRunBenchmarks {
                 let metric = ABTestMetric(
@@ -227,7 +227,7 @@ class ComparisonViewModel: ObservableObject {
                     timestamp: Date(),
                     type: .tokensPerSecond(metrics.tokensPerSecond)
                 )
-                
+
                 // Record to appropriate variant
                 if let activeTest = abTesting.activeTests.last {
                     let variant = isA ? activeTest.variantA : activeTest.variantB
@@ -236,7 +236,7 @@ class ComparisonViewModel: ObservableObject {
             }
         } catch {
             logger.log("Generation failed for \(framework.displayName): \(error)", level: .error, category: "Comparison")
-            
+
             let errorText = "Error: \(error.localizedDescription)"
             if isA {
                 outputA = errorText
@@ -244,18 +244,18 @@ class ComparisonViewModel: ObservableObject {
                 outputB = errorText
             }
         }
-        
+
         if isA {
             isGeneratingA = false
         } else {
             isGeneratingB = false
         }
     }
-    
+
     private func getMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(
@@ -266,7 +266,7 @@ class ComparisonViewModel: ObservableObject {
                 )
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
 }

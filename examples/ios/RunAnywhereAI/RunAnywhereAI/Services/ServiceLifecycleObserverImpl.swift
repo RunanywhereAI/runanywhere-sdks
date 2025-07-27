@@ -16,15 +16,15 @@ enum ServiceLifecycleEvent {
 /// Simple implementation of ServiceLifecycleObserver
 class ServiceLifecycleObserverImpl: ServiceLifecycleObserver {
     private let handler: (LLMService, ServiceLifecycleEvent) -> Void
-    
+
     init(handler: @escaping (LLMService, ServiceLifecycleEvent) -> Void) {
         self.handler = handler
     }
-    
+
     func serviceCreated(_ service: LLMService) {
         handler(service, .created)
     }
-    
+
     func serviceRemoved(_ service: LLMService) {
         handler(service, .removed)
     }

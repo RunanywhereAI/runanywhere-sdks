@@ -23,18 +23,18 @@ struct FoundationModelsConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // Foundation Models specific
     let useSystemCache: Bool
     let privacyMode: PrivacyMode
     let systemIntegration: Bool
-    
+
     enum PrivacyMode: Equatable {
         case standard
         case enhanced
         case maximum
     }
-    
+
     static let `default` = FoundationModelsConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -53,21 +53,21 @@ struct CoreMLConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // Core ML specific
     let computeUnits: MLComputeUnits
     let allowLowPrecision: Bool
     let enableBatching: Bool
     let maxBatchSize: Int
     let useFlexibleShapes: Bool
-    
+
     enum MLComputeUnits: String, CaseIterable, Equatable {
         case cpuOnly = "CPU Only"
         case cpuAndGPU = "CPU & GPU"
         case cpuAndNeuralEngine = "CPU & Neural Engine"
         case all = "All"
     }
-    
+
     static let `default` = CoreMLConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -88,20 +88,20 @@ struct MLXConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // MLX specific
     let device: MLXDevice
     let lazyEvaluation: Bool
     let unifiedMemory: Bool
     let customKernels: Bool
     let seed: Int?
-    
+
     enum MLXDevice: Equatable {
         case cpu
         case gpu
         case automatic
     }
-    
+
     static let `default` = MLXConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -122,21 +122,21 @@ struct MLCConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // MLC specific
     let backend: MLCBackend
     let optimizationLevel: Int
     let useWebGPU: Bool
     let openAICompatible: Bool
     let compilationCache: Bool
-    
+
     enum MLCBackend: Equatable {
         case metal
         case webGPU
         case cuda
         case vulkan
     }
-    
+
     static let `default` = MLCConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -157,14 +157,14 @@ struct ONNXConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // ONNX specific
     let executionProvider: ONNXExecutionProvider
     let graphOptimizationLevel: Int
     let enableProfiling: Bool
     let interOpNumThreads: Int
     let intraOpNumThreads: Int
-    
+
     enum ONNXExecutionProvider: Equatable {
         case cpu
         case coreML
@@ -172,7 +172,7 @@ struct ONNXConfiguration: LLMFrameworkConfiguration, Equatable {
         case cuda
         case tensorRT
     }
-    
+
     static let `default` = ONNXConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -193,20 +193,20 @@ struct ExecuTorchConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // ExecuTorch specific
     let quantizationBits: Int
     let backend: ExecuTorchBackend
     let enableDynamicShapes: Bool
     let customOperatorPath: String?
-    
+
     enum ExecuTorchBackend: Equatable {
         case xnnpack
         case metal
         case coreML
         case custom(String)
     }
-    
+
     static let `default` = ExecuTorchConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -226,7 +226,7 @@ struct LlamaCppConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // llama.cpp specific
     let useMetalAcceleration: Bool
     let contextSize: Int
@@ -235,7 +235,7 @@ struct LlamaCppConfiguration: LLMFrameworkConfiguration, Equatable {
     let numberOfGPULayers: Int
     let mmap: Bool
     let mlock: Bool
-    
+
     static let `default` = LlamaCppConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -258,13 +258,13 @@ struct TFLiteConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // TFLite specific
     let delegate: TFLiteDelegate
     let numberOfThreads: Int
     let allowFP16: Bool
     let enableXNNPACK: Bool
-    
+
     enum TFLiteDelegate: Equatable {
         case none
         case metal
@@ -272,7 +272,7 @@ struct TFLiteConfiguration: LLMFrameworkConfiguration, Equatable {
         case gpu
         case nnapi
     }
-    
+
     static let `default` = TFLiteConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -292,20 +292,20 @@ struct PicoLLMConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // picoLLM specific
     let compressionLevel: CompressionLevel
     let voiceOptimized: Bool
     let realTimeMode: Bool
     let apiKey: String?
-    
+
     enum CompressionLevel: Equatable {
         case standard
         case high
         case ultra
         case custom(bits: Int)
     }
-    
+
     static let `default` = PicoLLMConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -325,19 +325,19 @@ struct SwiftTransformersConfiguration: LLMFrameworkConfiguration, Equatable {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     // Swift Transformers specific
     let modelSource: ModelSource
     let tokenizerType: TokenizerType
     let cacheDirectory: URL?
     let downloadTimeout: TimeInterval
-    
+
     enum ModelSource: Equatable {
         case huggingFace
         case local
         case custom(URL)
     }
-    
+
     enum TokenizerType: Equatable {
         case auto
         case gpt2
@@ -345,7 +345,7 @@ struct SwiftTransformersConfiguration: LLMFrameworkConfiguration, Equatable {
         case llama
         case custom(String)
     }
-    
+
     static let `default` = SwiftTransformersConfiguration(
         enableLogging: true,
         logLevel: .info,
@@ -367,11 +367,11 @@ enum LogLevel: Int, CaseIterable, Comparable {
     case warning = 3
     case error = 4
     case critical = 5
-    
+
     static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
-    
+
     var stringValue: String {
         switch self {
         case .verbose: return "VERBOSE"

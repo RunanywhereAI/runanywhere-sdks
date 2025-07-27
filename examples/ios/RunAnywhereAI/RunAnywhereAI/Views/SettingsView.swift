@@ -15,7 +15,7 @@ struct SettingsView: View {
     @AppStorage("showAdvancedSettings") private var showAdvancedSettings = false
     @State private var showingFrameworkConfig = false
     @State private var selectedFramework: LLMFramework?
-    
+
     var body: some View {
         Form {
             Section("Generation Settings") {
@@ -25,17 +25,17 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                     Slider(value: $temperature, in: 0...2, step: 0.1)
                 }
-                
+
                 VStack(alignment: .leading) {
                     Text("Max Tokens: \(Int(maxTokens))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Slider(value: $maxTokens, in: 10...500, step: 10)
                 }
-                
+
                 Toggle("Show Advanced Settings", isOn: $showAdvancedSettings)
             }
-            
+
             if showAdvancedSettings {
                 Section("Advanced Settings") {
                     VStack(alignment: .leading) {
@@ -44,7 +44,7 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                         Slider(value: $topP, in: 0...1, step: 0.05)
                     }
-                    
+
                     VStack(alignment: .leading) {
                         Text("Top K: \(Int(topK))")
                             .font(.caption)
@@ -53,7 +53,7 @@ struct SettingsView: View {
                     }
                 }
             }
-            
+
             Section("Framework Configuration") {
                 ForEach([LLMFramework.llamaCpp, .coreML, .mlx, .onnxRuntime], id: \.self) { framework in
                     Button(action: {
@@ -71,21 +71,21 @@ struct SettingsView: View {
                     }
                 }
             }
-            
+
             Section("Model Management") {
                 NavigationLink(destination: ModelDownloadView()) {
                     Label("Download Models", systemImage: "arrow.down.circle")
                 }
-                
+
                 NavigationLink(destination: ModelDownloadStatusView()) {
                     Label("Download Manager", systemImage: "arrow.down.doc")
                 }
-                
+
                 NavigationLink(destination: ModelURLSettingsView()) {
                     Label("Model URLs", systemImage: "link")
                 }
             }
-            
+
             Section("About") {
                 HStack {
                     Text("Version")
@@ -93,19 +93,19 @@ struct SettingsView: View {
                     Text("1.0.0")
                         .foregroundColor(.secondary)
                 }
-                
+
                 HStack {
                     Text("Device Memory")
                     Spacer()
                     Text(deviceMemoryString)
                         .foregroundColor(.secondary)
                 }
-                
+
                 if let url = URL(string: "https://github.com/RunanywhereAI/sdks") {
                     Link("GitHub Repository", destination: url)
                 }
             }
-            
+
             Section {
                 Button("Reset to Defaults") {
                     resetToDefaults()
@@ -121,12 +121,12 @@ struct SettingsView: View {
             }
         }
     }
-    
+
     private var deviceMemoryString: String {
         let memory = ProcessInfo.processInfo.physicalMemory
         return ByteCountFormatter.string(fromByteCount: Int64(memory), countStyle: .memory)
     }
-    
+
     private func resetToDefaults() {
         temperature = 0.7
         maxTokens = 150

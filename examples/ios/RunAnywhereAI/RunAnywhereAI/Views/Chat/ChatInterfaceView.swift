@@ -14,13 +14,13 @@ struct ChatInterfaceView: View {
     @State private var showingModelPicker = false
     @State private var showingSettings = false
     @FocusState private var isTextFieldFocused: Bool
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 // Framework selector bar
                 frameworkSelectorBar
-                
+
                 // Chat messages
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -29,7 +29,7 @@ struct ChatInterfaceView: View {
                                 MessageBubbleView(message: message)
                                     .id(message.id)
                             }
-                            
+
                             if viewModel.isGenerating {
                                 TypingIndicatorView()
                                     .id("typing")
@@ -48,7 +48,7 @@ struct ChatInterfaceView: View {
                         }
                     }
                 }
-                
+
                 // Input area
                 inputArea
             }
@@ -72,9 +72,9 @@ struct ChatInterfaceView: View {
             }
         }
     }
-    
+
     // MARK: - Subviews
-    
+
     private var frameworkSelectorBar: some View {
         HStack {
             // Framework button
@@ -90,7 +90,7 @@ struct ChatInterfaceView: View {
                 .background(Color(.tertiarySystemBackground))
                 .cornerRadius(8)
             }
-            
+
             // Model button
             Button(action: { showingModelPicker = true }) {
                 HStack {
@@ -104,9 +104,9 @@ struct ChatInterfaceView: View {
                 .background(Color(.tertiarySystemBackground))
                 .cornerRadius(8)
             }
-            
+
             Spacer()
-            
+
             // Performance metrics
             if viewModel.isGenerating {
                 HStack(spacing: 8) {
@@ -115,7 +115,7 @@ struct ChatInterfaceView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     ProgressView()
                         .scaleEffect(0.8)
                 }
@@ -125,7 +125,7 @@ struct ChatInterfaceView: View {
         .padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
     }
-    
+
     private var inputArea: some View {
         HStack(alignment: .bottom, spacing: 8) {
             // Text field
@@ -138,7 +138,7 @@ struct ChatInterfaceView: View {
                 .onSubmit {
                     sendMessage()
                 }
-            
+
             // Send button
             Button(action: sendMessage) {
                 Image(systemName: "arrow.up.circle.fill")
@@ -150,15 +150,15 @@ struct ChatInterfaceView: View {
         .padding()
         .background(Color(.secondarySystemBackground))
     }
-    
+
     // MARK: - Actions
-    
+
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
-        
+
         let text = messageText
         messageText = ""
-        
+
         Task {
             viewModel.currentInput = text
             await viewModel.sendMessage()
@@ -170,13 +170,13 @@ struct ChatInterfaceView: View {
 
 struct MessageBubbleView: View {
     let message: ChatMessage
-    
+
     var body: some View {
         HStack {
             if message.role == .user {
                 Spacer()
             }
-            
+
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 // Message content
                 Text(message.content)
@@ -185,7 +185,7 @@ struct MessageBubbleView: View {
                     .background(message.role == .user ? Color.accentColor : Color(.tertiarySystemBackground))
                     .foregroundColor(message.role == .user ? .white : .primary)
                     .cornerRadius(16)
-                
+
                 // Metadata
                 if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
                     HStack(spacing: 8) {
@@ -194,15 +194,15 @@ struct MessageBubbleView: View {
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Text("\(metrics.tokenCount) tokens")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        
+
                         Text("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        
+
                         Text(message.timestamp.formatted(date: .omitted, time: .shortened))
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -210,7 +210,7 @@ struct MessageBubbleView: View {
                 }
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.role == .user ? .trailing : .leading)
-            
+
             if message.role == .assistant {
                 Spacer()
             }
@@ -222,7 +222,7 @@ struct MessageBubbleView: View {
 
 struct TypingIndicatorView: View {
     @State private var animating = false
-    
+
     var body: some View {
         HStack {
             HStack(spacing: 4) {
@@ -243,7 +243,7 @@ struct TypingIndicatorView: View {
             .padding(.vertical, 8)
             .background(Color(.tertiarySystemBackground))
             .cornerRadius(16)
-            
+
             Spacer()
         }
         .onAppear {
@@ -258,11 +258,11 @@ struct FrameworkPickerView: View {
     @Binding var selectedFramework: LLMFramework
     @Environment(\.dismiss) private var dismiss
     @StateObject private var compatibility = ModelCompatibilityMatrix.shared
-    
+
     var body: some View {
         navigationWrapper
     }
-    
+
     private var navigationWrapper: some View {
         NavigationView {
             frameworkList
@@ -277,7 +277,7 @@ struct FrameworkPickerView: View {
                 }
         }
     }
-    
+
     private var frameworkList: some View {
         List {
             ForEach(Array(LLMFramework.allCases), id: \.self) { framework in
@@ -285,7 +285,7 @@ struct FrameworkPickerView: View {
             }
         }
     }
-    
+
     private func frameworkButton(_ framework: LLMFramework) -> some View {
         Button(action: {
             selectedFramework = framework
@@ -296,9 +296,9 @@ struct FrameworkPickerView: View {
                     Text(framework.displayName)
                         .foregroundColor(.primary)
                 }
-                
+
                 Spacer()
-                
+
                 if framework == selectedFramework {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.accentColor)
@@ -315,14 +315,14 @@ struct ModelPickerView: View {
     @Binding var selectedModel: ModelInfo?
     @Environment(\.dismiss) private var dismiss
     @StateObject private var repository = ModelRepository.shared
-    
+
     var body: some View {
         modelNavigationView
             .task {
                 repository.refreshAvailableModels()
             }
     }
-    
+
     private var modelNavigationView: some View {
         NavigationView {
             modelList
@@ -337,14 +337,14 @@ struct ModelPickerView: View {
                 }
         }
     }
-    
+
     private var modelList: some View {
         List {
             downloadedModelsSection
             availableModelsSection
         }
     }
-    
+
     private var downloadedModelsSection: some View {
         Section("Downloaded Models") {
             ForEach(repository.downloadedModels) { model in
@@ -352,7 +352,7 @@ struct ModelPickerView: View {
             }
         }
     }
-    
+
     private var availableModelsSection: some View {
         Section("Available Models") {
             ForEach(repository.availableModels.filter { !repository.isModelDownloaded($0) }) { model in
@@ -360,7 +360,7 @@ struct ModelPickerView: View {
             }
         }
     }
-    
+
     private func downloadedModelButton(_ model: ModelInfo) -> some View {
         Button(action: {
             selectedModel = model
@@ -370,7 +370,7 @@ struct ModelPickerView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.name)
                         .foregroundColor(.primary)
-                    
+
                     HStack {
                         Text(model.displaySize)
                         Text("•")
@@ -379,9 +379,9 @@ struct ModelPickerView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 if model.id == selectedModel?.id {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.accentColor)
@@ -390,12 +390,12 @@ struct ModelPickerView: View {
             .padding(.vertical, 4)
         }
     }
-    
+
     private func availableModelRow(_ model: ModelInfo) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.name)
-                
+
                 HStack {
                     Text(model.displaySize)
                     Text("•")
@@ -404,9 +404,9 @@ struct ModelPickerView: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             Button(action: {
                 Task {
                     try await repository.downloadModel(model)
@@ -429,7 +429,7 @@ struct ModelPickerView: View {
 struct ChatSettingsView: View {
     @Binding var settings: ChatSettings
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -442,15 +442,15 @@ struct ChatSettingsView: View {
                             .frame(width: 80)
                             .multilineTextAlignment(.trailing)
                     }
-                    
+
                     VStack(alignment: .leading) {
                         Text("Temperature: \(String(format: "%.2f", settings.temperature))")
                         Slider(value: $settings.temperature, in: 0...2, step: 0.1)
                     }
-                    
+
                     Toggle("Stream Responses", isOn: $settings.streamResponses)
                 }
-                
+
                 Section("Performance") {
                     Toggle("Show Metrics", isOn: $settings.showMetrics)
                     Toggle("Enable Profiling", isOn: $settings.enableProfiling)

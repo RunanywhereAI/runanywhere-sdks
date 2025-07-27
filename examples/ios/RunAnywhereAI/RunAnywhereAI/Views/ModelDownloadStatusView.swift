@@ -3,7 +3,7 @@ import SwiftUI
 struct ModelDownloadStatusView: View {
     @StateObject private var downloadManager = ModelDownloadManager.shared
     @State private var showingDownloadView = false
-    
+
     var body: some View {
         NavigationView {
             VStack {
@@ -26,21 +26,21 @@ struct ModelDownloadStatusView: View {
             }
         }
     }
-    
+
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Image(systemName: "arrow.down.circle")
                 .font(.system(size: 60))
                 .foregroundColor(.gray)
-            
+
             Text("No Active Downloads")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             Text("Tap + to download models")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             Button(action: { showingDownloadView = true }) {
                 Text("Browse Models")
                     .foregroundColor(.white)
@@ -52,7 +52,7 @@ struct ModelDownloadStatusView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
+
     private var activeDownloadsList: some View {
         List {
             ForEach(Array(downloadManager.activeDownloads.keys), id: \.self) { modelId in
@@ -72,7 +72,7 @@ struct ModelDownloadStatusView: View {
                     )
                 }
             }
-            
+
             if !downloadManager.downloadQueue.isEmpty {
                 Section(header: Text("Queued")) {
                     ForEach(downloadManager.downloadQueue) { model in
@@ -84,9 +84,9 @@ struct ModelDownloadStatusView: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            
+
                             Spacer()
-                            
+
                             Image(systemName: "clock")
                                 .foregroundColor(.orange)
                         }
@@ -104,17 +104,17 @@ struct DownloadProgressRow: View {
     let onPause: () -> Void
     let onResume: () -> Void
     let onCancel: () -> Void
-    
+
     @State private var isPaused = false
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(modelId)
                     .font(.headline)
-                
+
                 Spacer()
-                
+
                 HStack(spacing: 12) {
                     Button(action: {
                         if isPaused {
@@ -128,7 +128,7 @@ struct DownloadProgressRow: View {
                             .font(.title2)
                             .foregroundColor(.blue)
                     }
-                    
+
                     Button(action: onCancel) {
                         Image(systemName: "xmark.circle")
                             .font(.title2)
@@ -136,23 +136,23 @@ struct DownloadProgressRow: View {
                     }
                 }
             }
-            
+
             ProgressView(value: progress.fractionCompleted) {
                 Text(ModelDownloadManager.formatProgress(progress))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .progressViewStyle(LinearProgressViewStyle())
-            
+
             HStack {
                 if progress.downloadSpeed > 0 {
                     Label(formatSpeed(progress.downloadSpeed), systemImage: "speedometer")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 if let timeRemaining = progress.estimatedTimeRemaining {
                     Label(formatTime(timeRemaining), systemImage: "clock")
                         .font(.caption2)
@@ -162,13 +162,13 @@ struct DownloadProgressRow: View {
         }
         .padding(.vertical, 4)
     }
-    
+
     private func formatSpeed(_ bytesPerSecond: Double) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .binary
         return "\(formatter.string(fromByteCount: Int64(bytesPerSecond)))/s"
     }
-    
+
     private func formatTime(_ seconds: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
         formatter.unitsStyle = .abbreviated

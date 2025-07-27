@@ -12,18 +12,18 @@ import os.log
 /// Comprehensive benchmark suite for LLM frameworks
 class BenchmarkSuite: ObservableObject {
     static let shared = BenchmarkSuite()
-    
+
     // MARK: - Published Properties
     @Published var isRunning = false
     @Published var currentProgress: Double = 0.0
     @Published var currentBenchmark: String = ""
     @Published var results: [BenchmarkSuiteResult] = []
-    
+
     // MARK: - Private Properties
     private let logger = os.Logger(subsystem: "com.runanywhere.ai", category: "Benchmark")
     private let queue = DispatchQueue(label: "com.runanywhere.benchmark", qos: .userInitiated)
     private var cancellables = Set<AnyCancellable>()
-    
+
     // Benchmark configurations
     private let benchmarkPrompts = [
         BenchmarkTestPrompt(
@@ -57,9 +57,9 @@ class BenchmarkSuite: ObservableObject {
             expectedTokens: 250
         )
     ]
-    
+
     // MARK: - Public Methods
-    
+
     /// Run full benchmark suite
     func runFullBenchmark(
         frameworks: [LLMFramework] = LLMFramework.allCases,
@@ -68,55 +68,55 @@ class BenchmarkSuite: ObservableObject {
         guard !isRunning else {
             throw BenchmarkError.alreadyRunning
         }
-        
+
         isRunning = true
         currentProgress = 0.0
         results.removeAll()
-        
+
         defer {
             isRunning = false
             currentProgress = 1.0
         }
-        
+
         let totalTests = frameworks.count * benchmarkPrompts.count * options.iterations
         var completedTests = 0
-        
+
         logger.info("Starting benchmark suite with \(frameworks.count) frameworks")
-        
+
         for framework in frameworks {
             currentBenchmark = "Testing \(framework.displayName)"
-            
+
             do {
                 // Initialize framework
                 let service = try await initializeFramework(framework)
-                
+
                 // Warmup
                 if options.includeWarmup {
                     _ = try await warmupFramework(service: service)
                 }
-                
+
                 // Run benchmarks
                 for prompt in benchmarkPrompts {
                     var promptResults: [SingleBenchmarkResult] = []
-                    
+
                     for _ in 0..<options.iterations {
                         let result = try await benchmarkSingle(
                             service: service,
                             prompt: prompt,
                             framework: framework
                         )
-                        
+
                         promptResults.append(result)
-                        
+
                         completedTests += 1
                         currentProgress = Double(completedTests) / Double(totalTests)
                     }
-                    
+
                     // Aggregate results
                     let aggregated = aggregateResults(promptResults, prompt: prompt, framework: framework)
                     results.append(aggregated)
                 }
-                
+
                 // Cleanup
                 await cleanupFramework(service)
             } catch {
@@ -136,41 +136,41 @@ class BenchmarkSuite: ObservableObject {
                 )
             }
         }
-        
+
         // Generate report
         generateReport()
     }
-    
+
     /// Run quick benchmark for specific framework
     func runQuickBenchmark(framework: LLMFramework) async throws -> QuickBenchmarkResult {
         let service = try await initializeFramework(framework)
-        
+
         defer {
             Task {
                 await cleanupFramework(service)
             }
         }
-        
+
         // Use simple prompt for quick test
         let prompt = benchmarkPrompts.first { $0.category == .simple }!
-        
+
         let startTime = CFAbsoluteTimeGetCurrent()
         var firstTokenTime: CFAbsoluteTime?
         var tokenCount = 0
-        
+
         // Measure generation
         try await service.streamGenerate(
             prompt: prompt.text,
             options: GenerationOptions(maxTokens: 50, temperature: 0.7, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: [])
-        )            { _ in
-                if firstTokenTime == nil {
-                    firstTokenTime = CFAbsoluteTimeGetCurrent()
-                }
-                tokenCount += 1
+        ) { _ in
+            if firstTokenTime == nil {
+                firstTokenTime = CFAbsoluteTimeGetCurrent()
             }
-        
+            tokenCount += 1
+        }
+
         let endTime = CFAbsoluteTimeGetCurrent()
-        
+
         return QuickBenchmarkResult(
             framework: framework,
             totalTime: endTime - startTime,
@@ -179,7 +179,7 @@ class BenchmarkSuite: ObservableObject {
             tokensPerSecond: Double(tokenCount) / (endTime - startTime)
         )
     }
-    
+
     /// Compare two frameworks head-to-head
     func compareFrameworks(
         _ framework1: LLMFramework,
@@ -187,33 +187,33 @@ class BenchmarkSuite: ObservableObject {
         prompt: String? = nil
     ) async throws -> ComparisonResult {
         let testPrompt = prompt ?? benchmarkPrompts.first { $0.category == .reasoning }!.text
-        
+
         // Initialize both frameworks
         let service1 = try await initializeFramework(framework1)
         let service2 = try await initializeFramework(framework2)
-        
+
         defer {
             Task {
                 await cleanupFramework(service1)
                 await cleanupFramework(service2)
             }
         }
-        
+
         // Run benchmarks in parallel
         async let result1 = benchmarkSingle(
             service: service1,
             prompt: BenchmarkTestPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
             framework: framework1
         )
-        
+
         async let result2 = benchmarkSingle(
             service: service2,
             prompt: BenchmarkTestPrompt(id: "custom", text: testPrompt, category: .custom, expectedTokens: 100),
             framework: framework2
         )
-        
+
         let (r1, r2) = try await (result1, result2)
-        
+
         return ComparisonResult(
             framework1: framework1,
             framework2: framework2,
@@ -222,13 +222,13 @@ class BenchmarkSuite: ObservableObject {
             winner: determineWinner(r1, r2)
         )
     }
-    
+
     /// Get benchmark history
     func getBenchmarkHistory() -> [BenchmarkSession] {
         // Load from persistent storage
         loadBenchmarkHistory()
     }
-    
+
     /// Export benchmark results
     func exportResults(format: BenchmarkExportFormat) throws -> Data {
         switch format {
@@ -240,29 +240,29 @@ class BenchmarkSuite: ObservableObject {
             return generateMarkdown().data(using: .utf8)!
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func initializeFramework(_ framework: LLMFramework) async throws -> LLMService {
         let unifiedService = await UnifiedLLMService.shared
         await unifiedService.selectService(named: framework.displayName)
-        
+
         guard let service = await unifiedService.currentService else {
             throw BenchmarkError.frameworkInitializationFailed
         }
-        
+
         return service
     }
-    
+
     private func warmupFramework(service: LLMService) async throws {
         logger.debug("Warming up \(service.name)")
-        
+
         _ = try await service.generate(
             prompt: "Hello",
             options: GenerationOptions(maxTokens: 5, temperature: 0.1, topP: 0.95, topK: 40, repetitionPenalty: 1.1, stopSequences: [])
         )
     }
-    
+
     private func benchmarkSingle(
         service: LLMService,
         prompt: BenchmarkTestPrompt,
@@ -272,7 +272,7 @@ class BenchmarkSuite: ObservableObject {
         let startTime = CFAbsoluteTimeGetCurrent()
         var firstTokenTime: CFAbsoluteTime?
         var tokens: [String] = []
-        
+
         // Measure generation
         try await service.streamGenerate(
             prompt: prompt.text,
@@ -284,16 +284,16 @@ class BenchmarkSuite: ObservableObject {
                 repetitionPenalty: 1.1,
                 stopSequences: []
             )
-        )            { token in
-                if firstTokenTime == nil {
-                    firstTokenTime = CFAbsoluteTimeGetCurrent()
-                }
-                tokens.append(token)
+        ) { token in
+            if firstTokenTime == nil {
+                firstTokenTime = CFAbsoluteTimeGetCurrent()
             }
-        
+            tokens.append(token)
+        }
+
         let endTime = CFAbsoluteTimeGetCurrent()
         let memoryAfter = getMemoryUsage()
-        
+
         return SingleBenchmarkResult(
             framework: framework,
             promptId: prompt.id,
@@ -306,7 +306,7 @@ class BenchmarkSuite: ObservableObject {
             generatedText: tokens.joined()
         )
     }
-    
+
     private func aggregateResults(
         _ results: [SingleBenchmarkResult],
         prompt: BenchmarkTestPrompt,
@@ -316,7 +316,7 @@ class BenchmarkSuite: ObservableObject {
         let ttftTimes = results.map { $0.timeToFirstToken }
         let tpsSpeeds = results.map { $0.tokensPerSecond }
         let memoryUsages = results.map { $0.memoryUsed }
-        
+
         return BenchmarkSuiteResult(
             framework: framework,
             prompt: prompt,
@@ -329,21 +329,21 @@ class BenchmarkSuite: ObservableObject {
             sampleCount: results.count
         )
     }
-    
+
     private func cleanupFramework(_ service: LLMService) async {
         // Framework cleanup if needed
         logger.debug("Cleaning up \(service.name)")
     }
-    
+
     private func determineWinner(_ r1: SingleBenchmarkResult, _ r2: SingleBenchmarkResult) -> LLMFramework {
         // Simple scoring: higher tokens/second wins
         r1.tokensPerSecond > r2.tokensPerSecond ? r1.framework : r2.framework
     }
-    
+
     private func getMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(
@@ -354,15 +354,15 @@ class BenchmarkSuite: ObservableObject {
                 )
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
-    
+
     private func getCPUUsage() -> Double {
         var cpuInfo: processor_info_array_t!
         var numCpuInfo: mach_msg_type_number_t = 0
         var numCpus: natural_t = 0
-        
+
         let result = host_processor_info(
             mach_host_self(),
             PROCESSOR_CPU_LOAD_INFO,
@@ -370,32 +370,32 @@ class BenchmarkSuite: ObservableObject {
             &cpuInfo,
             &numCpuInfo
         )
-        
+
         guard result == KERN_SUCCESS else { return 0 }
-        
+
         return 0 // Simplified for demo
     }
-    
+
     private func generateReport() {
         let report = BenchmarkReport(
             date: Date(),
             results: results,
             summary: generateSummary()
         )
-        
+
         // Save report
         saveBenchmarkReport(report)
     }
-    
+
     private func generateSummary() -> BenchmarkSummary {
         let groupedByFramework = Dictionary(grouping: results) { $0.framework }
-        
+
         var frameworkSummaries: [FrameworkSummary] = []
-        
+
         for (framework, results) in groupedByFramework {
             let avgSpeed = results.map { $0.avgTokensPerSecond }.reduce(0, +) / Double(results.count)
             let avgMemory = Double(results.map { $0.avgMemoryUsed }.reduce(0, +)) / Double(results.count)
-            
+
             frameworkSummaries.append(
                 FrameworkSummary(
                     framework: framework,
@@ -405,17 +405,17 @@ class BenchmarkSuite: ObservableObject {
                 )
             )
         }
-        
+
         return BenchmarkSummary(
             frameworkSummaries: frameworkSummaries.sorted { $0.averageSpeed > $1.averageSpeed },
             fastestFramework: frameworkSummaries.max { $0.averageSpeed < $1.averageSpeed }?.framework,
             mostEfficientFramework: frameworkSummaries.min { $0.averageMemory < $1.averageMemory }?.framework
         )
     }
-    
+
     private func generateCSV() -> Data {
         var csv = "Framework,Prompt,Avg Time,Avg TTFT,Avg TPS,Min TPS,Max TPS,Avg Memory\n"
-        
+
         for result in results {
             csv += "\(result.framework.rawValue),"
             csv += "\(result.prompt.id),"
@@ -426,16 +426,16 @@ class BenchmarkSuite: ObservableObject {
             csv += "\(result.maxTokensPerSecond),"
             csv += "\(result.avgMemoryUsed)\n"
         }
-        
+
         return csv.data(using: .utf8)!
     }
-    
+
     private func generateMarkdown() -> String {
         var markdown = "# Benchmark Results\n\n"
         markdown += "Date: \(Date().formatted())\n\n"
-        
+
         markdown += "## Summary\n\n"
-        
+
         let summary = generateSummary()
         if let fastest = summary.fastestFramework {
             markdown += "- **Fastest Framework**: \(fastest.displayName)\n"
@@ -443,11 +443,11 @@ class BenchmarkSuite: ObservableObject {
         if let efficient = summary.mostEfficientFramework {
             markdown += "- **Most Memory Efficient**: \(efficient.displayName)\n"
         }
-        
+
         markdown += "\n## Detailed Results\n\n"
         markdown += "| Framework | Prompt | Avg TPS | Avg TTFT | Avg Memory |\n"
         markdown += "|-----------|--------|---------|----------|------------|\n"
-        
+
         for result in results {
             markdown += "| \(result.framework.displayName) "
             markdown += "| \(result.prompt.id) "
@@ -455,15 +455,15 @@ class BenchmarkSuite: ObservableObject {
             markdown += "| \(String(format: "%.2f", result.avgTimeToFirstToken))s "
             markdown += "| \(ByteCountFormatter.string(fromByteCount: result.avgMemoryUsed, countStyle: .memory)) |\n"
         }
-        
+
         return markdown
     }
-    
+
     private func loadBenchmarkHistory() -> [BenchmarkSession] {
         // Load from UserDefaults or file system
         []
     }
-    
+
     private func saveBenchmarkReport(_ report: BenchmarkReport) {
         // Save to persistent storage
     }
@@ -492,7 +492,7 @@ struct BenchmarkOptions {
     let includeWarmup: Bool
     let measureMemory: Bool
     let measureCPU: Bool
-    
+
     static let `default` = BenchmarkOptions(
         iterations: 3,
         includeWarmup: true,
@@ -524,7 +524,7 @@ struct BenchmarkSuiteResult: Codable {
     let avgMemoryUsed: Int64
     let sampleCount: Int
     let error: String?
-    
+
     init(framework: LLMFramework, prompt: BenchmarkTestPrompt, error: String) {
         self.framework = framework
         self.prompt = prompt
@@ -537,7 +537,7 @@ struct BenchmarkSuiteResult: Codable {
         self.sampleCount = 0
         self.error = error
     }
-    
+
     init(framework: LLMFramework, prompt: BenchmarkTestPrompt, avgTotalTime: TimeInterval, avgTimeToFirstToken: TimeInterval, avgTokensPerSecond: Double, minTokensPerSecond: Double, maxTokensPerSecond: Double, avgMemoryUsed: Int64, sampleCount: Int) {
         self.framework = framework
         self.prompt = prompt
@@ -603,7 +603,7 @@ enum BenchmarkError: LocalizedError {
     case alreadyRunning
     case frameworkInitializationFailed
     case benchmarkFailed(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .alreadyRunning:
@@ -621,7 +621,7 @@ extension BenchmarkTestPrompt: Codable {
     enum CodingKeys: String, CodingKey {
         case id, text, category, expectedTokens
     }
-    
+
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -630,7 +630,7 @@ extension BenchmarkTestPrompt: Codable {
         category = PromptCategory(rawValue: categoryString) ?? .custom
         expectedTokens = try container.decode(Int.self, forKey: .expectedTokens)
     }
-    
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
@@ -642,7 +642,7 @@ extension BenchmarkTestPrompt: Codable {
 
 extension PromptCategory: RawRepresentable {
     typealias RawValue = String
-    
+
     init?(rawValue: String) {
         switch rawValue {
         case "simple": self = .simple
@@ -654,7 +654,7 @@ extension PromptCategory: RawRepresentable {
         default: return nil
         }
     }
-    
+
     var rawValue: String {
         switch self {
         case .simple: return "simple"

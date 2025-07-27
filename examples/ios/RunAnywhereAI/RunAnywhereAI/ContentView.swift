@@ -9,7 +9,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var selectedTab = 0
-    
+
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationView {
@@ -19,7 +19,7 @@ struct ContentView: View {
                 Label("Chat", systemImage: "message")
             }
             .tag(0)
-            
+
             NavigationView {
                 ModelListView()
             }
@@ -27,7 +27,7 @@ struct ContentView: View {
                 Label("Models", systemImage: "cube")
             }
             .tag(1)
-            
+
             NavigationView {
                 BenchmarkView()
             }
@@ -35,7 +35,7 @@ struct ContentView: View {
                 Label("Benchmark", systemImage: "speedometer")
             }
             .tag(2)
-            
+
             NavigationView {
                 SettingsView()
             }

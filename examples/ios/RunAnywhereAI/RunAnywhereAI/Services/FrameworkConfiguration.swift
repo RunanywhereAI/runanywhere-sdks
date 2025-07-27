@@ -12,7 +12,7 @@ protocol FrameworkConfiguration: Codable {
 
 struct LlamaCppLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.llamaCpp
-    
+
     var contextSize: Int32 = 2048
     var batchSize: Int32 = 512
     var threads: Int32 = 4
@@ -24,7 +24,7 @@ struct LlamaCppLegacyConfiguration: FrameworkConfiguration, Equatable {
     var logitsAll: Bool = false
     var vocabOnly: Bool = false
     var embedding: Bool = false
-    
+
     func apply(to service: LLMService) {
         // Apply configuration to llama.cpp service
         // In real implementation, this would configure the actual service
@@ -35,19 +35,19 @@ struct LlamaCppLegacyConfiguration: FrameworkConfiguration, Equatable {
 
 struct CoreMLLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.coreML
-    
+
     enum ComputeUnits: String, CaseIterable, Codable {
         case cpuOnly = "CPU Only"
         case cpuAndGPU = "CPU & GPU"
         case all = "All (CPU, GPU & Neural Engine)"
         case cpuAndNeuralEngine = "CPU & Neural Engine"
     }
-    
+
     var computeUnits: ComputeUnits = .all
     var enableLowPrecision: Bool = true
     var maxConcurrentRequests: Int = 1
     var memoryKeyPath: String = "auto"
-    
+
     func apply(to service: LLMService) {
         // Apply configuration to Core ML service
     }
@@ -57,14 +57,14 @@ struct CoreMLLegacyConfiguration: FrameworkConfiguration, Equatable {
 
 struct MLXLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.mlx
-    
+
     var maxBatchSize: Int = 256
     var useMemoryMapping: Bool = true
     var metalOptimization: Bool = true
     var quantizationBits: Int = 4
     var groupSize: Int = 64
     var streamBufferSize: Int = 1024
-    
+
     func apply(to service: LLMService) {
         // Apply configuration to MLX service
     }
@@ -74,27 +74,27 @@ struct MLXLegacyConfiguration: FrameworkConfiguration, Equatable {
 
 struct ONNXLegacyConfiguration: FrameworkConfiguration, Equatable {
     let framework = LLMFramework.onnxRuntime
-    
+
     enum ExecutionProvider: String, CaseIterable, Codable {
         case cpu = "CPU"
         case coreML = "CoreML"
         case xnnpack = "XNNPACK"
     }
-    
+
     enum GraphOptimizationLevel: String, CaseIterable, Codable {
         case disabled = "Disabled"
         case basic = "Basic"
         case extended = "Extended"
         case all = "All"
     }
-    
+
     var executionProvider: ExecutionProvider = .coreML
     var graphOptimizationLevel: GraphOptimizationLevel = .all
     var interOpNumThreads: Int = 0 // 0 = auto
     var intraOpNumThreads: Int = 0 // 0 = auto
     var enableMemoryPattern: Bool = true
     var enableProfiling: Bool = false
-    
+
     func apply(to service: LLMService) {
         // Apply configuration to ONNX Runtime service
     }
@@ -105,32 +105,32 @@ struct ONNXLegacyConfiguration: FrameworkConfiguration, Equatable {
 @MainActor
 class FrameworkConfigurationManager: ObservableObject {
     static let shared = FrameworkConfigurationManager()
-    
+
     @Published var configurations: [LLMFramework: any LLMFrameworkConfiguration] = [:]
-    
+
     private let configsKey = "framework_configurations"
-    
+
     init() {
         loadConfigurations()
-        
+
         // Set defaults if not loaded
         if configurations.isEmpty {
             setDefaultConfigurations()
         }
     }
-    
+
     private func setDefaultConfigurations() {
         configurations[.llamaCpp] = LlamaCppConfiguration.default
         configurations[.coreML] = CoreMLConfiguration.default
         configurations[.mlx] = MLXConfiguration.default
         configurations[.onnxRuntime] = ONNXConfiguration.default
     }
-    
+
     func configuration(for framework: LLMFramework) -> any LLMFrameworkConfiguration {
         if let config = configurations[framework] {
             return config
         }
-        
+
         // Return default configuration
         switch framework {
         case .llamaCpp:
@@ -146,17 +146,17 @@ class FrameworkConfigurationManager: ObservableObject {
             return GenericLLMConfiguration(framework: framework)
         }
     }
-    
+
     func updateConfiguration(_ config: any LLMFrameworkConfiguration, for framework: LLMFramework) {
         configurations[framework] = config
         saveConfigurations()
     }
-    
+
     private func loadConfigurations() {
         // Load from UserDefaults
         // In a real app, this would properly decode the configurations
     }
-    
+
     private func saveConfigurations() {
         // Save to UserDefaults
         // In a real app, this would properly encode the configurations
@@ -167,7 +167,7 @@ class FrameworkConfigurationManager: ObservableObject {
 
 struct GenericConfiguration: FrameworkConfiguration, Equatable {
     let framework: LLMFramework
-    
+
     func apply(to service: LLMService) {
         // No specific configuration for generic frameworks
     }
@@ -188,7 +188,7 @@ struct FrameworkConfigurationView: View {
     let framework: LLMFramework
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -220,18 +220,18 @@ struct FrameworkConfigurationView: View {
 struct LlamaCppConfigView: View {
     @State private var config = LlamaCppConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
-    
+
     var body: some View {
         Section("Context Settings") {
             Stepper("Context Size: \(config.contextSize)", value: .constant(config.contextSize), in: 512...8192, step: 512)
             Stepper("Batch Size: \(config.batchSize)", value: .constant(config.batchSize), in: 128...2048, step: 128)
         }
-        
+
         Section("Performance") {
             Stepper("Threads: \(config.numberOfThreads)", value: .constant(config.numberOfThreads), in: 1...16)
             Stepper("GPU Layers: \(config.numberOfGPULayers)", value: .constant(config.numberOfGPULayers), in: 0...100)
         }
-        
+
         Section("Memory Options") {
             Toggle("Use Memory Mapping", isOn: .constant(config.mmap))
             Toggle("Lock Memory", isOn: .constant(config.mlock))
@@ -251,7 +251,7 @@ struct CoreMLConfigView: View {
     @State private var enableBatching = CoreMLConfiguration.default.enableBatching
     @State private var maxBatchSize = CoreMLConfiguration.default.maxBatchSize
     @StateObject private var configManager = FrameworkConfigurationManager.shared
-    
+
     var body: some View {
         Section("Compute Units") {
             Picker("Compute Units", selection: $computeUnits) {
@@ -260,7 +260,7 @@ struct CoreMLConfigView: View {
                 }
             }
         }
-        
+
         Section("Configuration") {
             HStack {
                 Text("Allow Low Precision")
@@ -294,7 +294,7 @@ struct CoreMLConfigView: View {
             }
         }
     }
-    
+
     private func saveConfiguration() {
         let config = CoreMLConfiguration(
             enableLogging: true,
@@ -314,7 +314,7 @@ struct CoreMLConfigView: View {
 struct MLXConfigView: View {
     @State private var config = MLXConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
-    
+
     var body: some View {
         Section("Configuration") {
             HStack {
@@ -354,7 +354,7 @@ struct MLXConfigView: View {
 struct ONNXConfigView: View {
     @State private var config = ONNXConfiguration.default
     @StateObject private var configManager = FrameworkConfigurationManager.shared
-    
+
     var body: some View {
         Section("Configuration") {
             HStack {

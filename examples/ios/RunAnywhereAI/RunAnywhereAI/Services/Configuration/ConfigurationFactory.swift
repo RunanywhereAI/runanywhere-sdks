@@ -36,7 +36,7 @@ enum ConfigurationFactory {
             return MockConfiguration.default
         }
     }
-    
+
     /// Convert configuration to dictionary for service configuration
     static func toDictionary(_ configuration: LLMFrameworkConfiguration) -> [String: Any] {
         var dict: [String: Any] = [
@@ -44,25 +44,25 @@ enum ConfigurationFactory {
             "logLevel": configuration.logLevel.rawValue,
             "performanceTracking": configuration.performanceTracking
         ]
-        
+
         if let memoryLimit = configuration.memoryLimit {
             dict["memoryLimit"] = memoryLimit
         }
-        
+
         // Add framework-specific properties
         switch configuration {
         case let config as FoundationModelsConfiguration:
             dict["useSystemCache"] = config.useSystemCache
             dict["privacyMode"] = String(describing: config.privacyMode)
             dict["systemIntegration"] = config.systemIntegration
-            
+
         case let config as CoreMLConfiguration:
             dict["computeUnits"] = String(describing: config.computeUnits)
             dict["allowLowPrecision"] = config.allowLowPrecision
             dict["enableBatching"] = config.enableBatching
             dict["maxBatchSize"] = config.maxBatchSize
             dict["useFlexibleShapes"] = config.useFlexibleShapes
-            
+
         case let config as MLXConfiguration:
             dict["device"] = String(describing: config.device)
             dict["lazyEvaluation"] = config.lazyEvaluation
@@ -71,21 +71,21 @@ enum ConfigurationFactory {
             if let seed = config.seed {
                 dict["seed"] = seed
             }
-            
+
         case let config as MLCConfiguration:
             dict["backend"] = String(describing: config.backend)
             dict["optimizationLevel"] = config.optimizationLevel
             dict["useWebGPU"] = config.useWebGPU
             dict["openAICompatible"] = config.openAICompatible
             dict["compilationCache"] = config.compilationCache
-            
+
         case let config as ONNXConfiguration:
             dict["executionProvider"] = String(describing: config.executionProvider)
             dict["graphOptimizationLevel"] = config.graphOptimizationLevel
             dict["enableProfiling"] = config.enableProfiling
             dict["interOpNumThreads"] = config.interOpNumThreads
             dict["intraOpNumThreads"] = config.intraOpNumThreads
-            
+
         case let config as ExecuTorchConfiguration:
             dict["quantizationBits"] = config.quantizationBits
             dict["backend"] = String(describing: config.backend)
@@ -93,7 +93,7 @@ enum ConfigurationFactory {
             if let customPath = config.customOperatorPath {
                 dict["customOperatorPath"] = customPath
             }
-            
+
         case let config as LlamaCppConfiguration:
             dict["useMetalAcceleration"] = config.useMetalAcceleration
             dict["contextSize"] = config.contextSize
@@ -102,13 +102,13 @@ enum ConfigurationFactory {
             dict["numberOfGPULayers"] = config.numberOfGPULayers
             dict["mmap"] = config.mmap
             dict["mlock"] = config.mlock
-            
+
         case let config as TFLiteConfiguration:
             dict["delegate"] = String(describing: config.delegate)
             dict["numberOfThreads"] = config.numberOfThreads
             dict["allowFP16"] = config.allowFP16
             dict["enableXNNPACK"] = config.enableXNNPACK
-            
+
         case let config as PicoLLMConfiguration:
             dict["compressionLevel"] = String(describing: config.compressionLevel)
             dict["voiceOptimized"] = config.voiceOptimized
@@ -116,7 +116,7 @@ enum ConfigurationFactory {
             if let apiKey = config.apiKey {
                 dict["apiKey"] = apiKey
             }
-            
+
         case let config as SwiftTransformersConfiguration:
             dict["modelSource"] = String(describing: config.modelSource)
             dict["tokenizerType"] = String(describing: config.tokenizerType)
@@ -124,11 +124,11 @@ enum ConfigurationFactory {
                 dict["cacheDirectory"] = cacheDir.path
             }
             dict["downloadTimeout"] = config.downloadTimeout
-            
+
         default:
             break
         }
-        
+
         return dict
     }
 }
@@ -139,11 +139,11 @@ struct MockConfiguration: LLMFrameworkConfiguration {
     let logLevel: LogLevel
     let performanceTracking: Bool
     let memoryLimit: Int64?
-    
+
     let simulateDelay: Bool
     let delayRange: ClosedRange<Double>
     let errorRate: Double
-    
+
     static let `default` = MockConfiguration(
         enableLogging: true,
         logLevel: .debug,

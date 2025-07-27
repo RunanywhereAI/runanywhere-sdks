@@ -49,11 +49,11 @@ struct LLMMemoryStats {
     let availableMemory: Int64
     let memoryPressure: MemoryPressure
     let cacheSize: Int64
-    
+
     var totalMemory: Int64 {
         modelMemory + contextMemory
     }
-    
+
     var formattedTotal: String {
         ByteCountFormatter.string(fromByteCount: totalMemory, countStyle: .memory)
     }
@@ -89,22 +89,22 @@ struct BenchmarkResults {
 protocol LLMMetrics {
     /// Get current performance metrics
     func getPerformanceMetrics() -> LLMPerformanceMetrics
-    
+
     /// Get current memory usage
     func getMemoryUsage() -> LLMMemoryStats
-    
+
     /// Get benchmark results
     func getBenchmarkResults() -> BenchmarkResults
-    
+
     /// Reset metrics collection
     func resetMetrics()
-    
+
     /// Export metrics data
     func exportMetrics() -> Data?
-    
+
     /// Subscribe to metrics updates
     func subscribeToMetrics(_ handler: @escaping (MetricsUpdate) -> Void) -> UUID
-    
+
     /// Unsubscribe from metrics updates
     func unsubscribeFromMetrics(_ id: UUID)
 }

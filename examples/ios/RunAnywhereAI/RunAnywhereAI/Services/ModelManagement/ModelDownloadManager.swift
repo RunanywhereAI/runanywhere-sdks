@@ -12,7 +12,7 @@ enum ModelDownloadError: LocalizedError {
     case invalidChecksum
     case unzipFailed
     case cancelled
-    
+
     var errorDescription: String? {
         switch self {
         case .noDownloadURL:
@@ -47,21 +47,21 @@ struct DownloadProgress {
 @MainActor
 class ModelDownloadManager: NSObject, ObservableObject {
     static let shared = ModelDownloadManager()
-    
+
     // MARK: - Published Properties
-    
+
     @Published var activeDownloads: [String: DownloadProgress] = [:]
     @Published var downloadQueue: [ModelInfo] = []
     @Published var isDownloading = false
-    
+
     // MARK: - Private Properties
-    
+
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
     private var progressHandlers: [String: (DownloadProgress) -> Void] = [:]
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
     private var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
-    
+
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
@@ -69,33 +69,29 @@ class ModelDownloadManager: NSObject, ObservableObject {
         config.allowsCellularAccess = false // Don't use cellular for large downloads
         config.isDiscretionary = true // Allow system to schedule downloads
         config.sessionSendsLaunchEvents = true // Background downloads
-        
+
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
-    
+
     private lazy var backgroundSession: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: "com.runanywhereai.modeldownloads")
         config.isDiscretionary = true
         config.sessionSendsLaunchEvents = true
-        
+
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
-    
+
     // MARK: - Public Methods
-    
+
     /// Download a model with progress tracking
     func downloadModel(
-        _ modelInfo: ModelInfo,
+        _ downloadInfo: ModelDownloadInfo,
         progress: @escaping (DownloadProgress) -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
-        guard let downloadInfo = ModelURLRegistry.shared.getModelInfo(id: modelInfo.id) else {
-            completion(.failure(ModelDownloadError.noDownloadURL))
-            return
-        }
-        
         // Check storage before starting
-        let estimatedSize = parseSize(modelInfo.size)
+        // Estimate size from filename if not provided
+        let estimatedSize: Int64 = 100_000_000 // Default 100MB
         if !hasEnoughStorage(for: estimatedSize) {
             let available = getAvailableStorage()
             completion(.failure(ModelDownloadError.insufficientStorage(
@@ -104,21 +100,21 @@ class ModelDownloadManager: NSObject, ObservableObject {
             )))
             return
         }
-        
+
         // Setup download
-        let downloadId = modelInfo.id
+        let downloadId = downloadInfo.id
         progressHandlers[downloadId] = progress
         completionHandlers[downloadId] = completion
         downloadStartTimes[downloadId] = Date()
-        
+
         // Create download task
         let task = session.downloadTask(with: downloadInfo.url)
         downloadTasks[downloadId] = task
-        
+
         // Start download
         task.resume()
         isDownloading = true
-        
+
         // Add to active downloads
         activeDownloads[downloadId] = DownloadProgress(
             bytesWritten: 0,
@@ -128,14 +124,14 @@ class ModelDownloadManager: NSObject, ObservableObject {
             downloadSpeed: 0
         )
     }
-    
+
     /// Download a model to a specific directory
     func downloadModel(
         _ modelInfo: ModelInfo,
         to directory: URL,
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
-        return try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             downloadModel(modelInfo, progress: progress) { result in
                 switch result {
                 case .success(let tempURL):
@@ -157,7 +153,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
             }
         }
     }
-    
+
     /// Batch download multiple models
     func downloadModels(
         _ models: [ModelInfo],
@@ -166,72 +162,79 @@ class ModelDownloadManager: NSObject, ObservableObject {
     ) {
         var results: [String: Result<URL, Error>] = [:]
         let group = DispatchGroup()
-        
+
         for model in models {
             group.enter()
-            downloadModel(model, progress: { downloadProgress in
+            // Get download info from registry
+            guard let downloadInfo = ModelURLRegistry.shared.getModelInfo(id: model.id) else {
+                results[model.id] = .failure(ModelDownloadError.noDownloadURL)
+                group.leave()
+                continue
+            }
+
+            downloadModel(downloadInfo, progress: { downloadProgress in
                 progress(model.id, downloadProgress)
             }) { result in
                 results[model.id] = result
                 group.leave()
             }
         }
-        
+
         group.notify(queue: .main) {
             completion(results)
         }
     }
-    
+
     /// Cancel a download
     func cancelDownload(_ modelId: String) {
         downloadTasks[modelId]?.cancel()
         cleanup(downloadId: modelId)
-        
+
         if let handler = completionHandlers[modelId] {
             handler(.failure(ModelDownloadError.cancelled))
         }
     }
-    
+
     /// Cancel all downloads
     func cancelAllDownloads() {
         for (modelId, _) in downloadTasks {
             cancelDownload(modelId)
         }
     }
-    
+
     /// Pause a download
     func pauseDownload(_ modelId: String) {
         downloadTasks[modelId]?.suspend()
     }
-    
+
     /// Resume a paused download
     func resumeDownload(_ modelId: String) {
         downloadTasks[modelId]?.resume()
     }
-    
+
     // MARK: - Tokenizer Downloads
-    
+
     /// Download tokenizer files for a model
     func downloadTokenizers(
         for modelId: String,
         to directory: URL
     ) async throws {
         let tokenizerFiles = ModelURLRegistry.shared.getTokenizerFiles(for: modelId)
-        
+
         for file in tokenizerFiles {
             let (localURL, _) = try await session.download(from: file.url)
             let destinationURL = directory.appendingPathComponent(file.name)
-            
+
             if FileManager.default.fileExists(atPath: destinationURL.path) {
                 try FileManager.default.removeItem(at: destinationURL)
             }
-            
+
             try FileManager.default.moveItem(at: localURL, to: destinationURL)
         }
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func moveAndProcessModel(
         from tempURL: URL,
         modelInfo: ModelInfo,
@@ -242,11 +245,11 @@ class ModelDownloadManager: NSObject, ObservableObject {
             at: directory,
             withIntermediateDirectories: true
         )
-        
+
         let downloadInfo = ModelURLRegistry.shared.getModelInfo(id: modelInfo.id)
         let fileName = downloadInfo?.name ?? modelInfo.name
         var finalURL = directory.appendingPathComponent(fileName)
-        
+
         // Process based on file type
         if downloadInfo?.requiresUnzip == true {
             finalURL = try await unzipModel(from: tempURL, to: directory)
@@ -257,72 +260,60 @@ class ModelDownloadManager: NSObject, ObservableObject {
             }
             try FileManager.default.moveItem(at: tempURL, to: finalURL)
         }
-        
+
         // Verify checksum if available
         if let expectedHash = downloadInfo?.sha256 {
             try await verifyChecksum(of: finalURL, expectedHash: expectedHash)
         }
-        
+
         // Download tokenizers if it's a model that needs them
         if shouldDownloadTokenizers(for: modelInfo) {
             try await downloadTokenizers(for: modelInfo.id, to: directory)
         }
-        
+
         return finalURL
     }
-    
+
     private func unzipModel(from zipURL: URL, to directory: URL) async throws -> URL {
-        // Use system unzip for .zip files
+        // Use FileManager for unzipping on iOS
         if zipURL.pathExtension == "zip" {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-            process.arguments = ["-o", zipURL.path, "-d", directory.path]
-            
-            try process.run()
-            process.waitUntilExit()
-            
-            if process.terminationStatus != 0 {
-                throw ModelDownloadError.unzipFailed
-            }
-            
-            // Find the extracted model file
-            let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            if let modelFile = contents.first(where: { $0.pathExtension == "mlpackage" || $0.pathExtension == "mlmodel" }) {
-                return modelFile
-            }
+            // For now, just copy the file since iOS doesn't have Process
+            // In a real app, you'd use a zip library like ZIPFoundation
+            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
+            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
+
+            // TODO: Implement proper unzipping using a library like ZIPFoundation
+            throw ModelDownloadError.unzipFailed
         }
-        
-        // Use tar for .tar.gz files
+
+        // Handle tar.gz files
         if zipURL.pathExtension == "gz" || zipURL.lastPathComponent.contains(".tar.gz") {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-            process.arguments = ["-xzf", zipURL.path, "-C", directory.path]
-            
-            try process.run()
-            process.waitUntilExit()
-            
-            if process.terminationStatus != 0 {
-                throw ModelDownloadError.unzipFailed
-            }
-            
+            // For now, just copy the file since iOS doesn't have Process
+            // In a real app, you'd use a compression library
+            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
+            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
+
+            // TODO: Implement proper tar.gz extraction using a library
+            throw ModelDownloadError.unzipFailed
+
             // Find the extracted directory
             let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             return contents.first ?? directory
         }
-        
+
         throw ModelDownloadError.unzipFailed
     }
-    
+
     private func verifyChecksum(of fileURL: URL, expectedHash: String) async throws {
         let data = try Data(contentsOf: fileURL)
         let hash = SHA256.hash(data: data)
         let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
-        
+
         guard hashString == expectedHash else {
             throw ModelDownloadError.invalidChecksum
         }
     }
-    
+
     private func shouldDownloadTokenizers(for model: ModelInfo) -> Bool {
         // Determine if this model type typically needs separate tokenizer files
         switch model.framework {
@@ -334,10 +325,10 @@ class ModelDownloadManager: NSObject, ObservableObject {
             return false
         }
     }
-    
+
     private func parseSize(_ sizeString: String) -> Int64 {
         let formatter = ByteCountFormatter()
-        
+
         // Try common formats
         if sizeString.hasSuffix("GB") {
             let value = Double(sizeString.dropLast(2).trimmingCharacters(in: .whitespaces)) ?? 0
@@ -346,15 +337,15 @@ class ModelDownloadManager: NSObject, ObservableObject {
             let value = Double(sizeString.dropLast(2).trimmingCharacters(in: .whitespaces)) ?? 0
             return Int64(value * 1_000_000)
         }
-        
+
         return 1_000_000_000 // Default 1GB
     }
-    
+
     private func hasEnoughStorage(for size: Int64) -> Bool {
         let available = getAvailableStorage()
         return available > size * 2 // Require 2x space for safety
     }
-    
+
     private func getAvailableStorage() -> Int64 {
         do {
             let home = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -364,7 +355,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
             return 0
         }
     }
-    
+
     private func cleanup(downloadId: String) {
         downloadTasks.removeValue(forKey: downloadId)
         progressHandlers.removeValue(forKey: downloadId)
@@ -372,7 +363,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         downloadStartTimes.removeValue(forKey: downloadId)
         lastBytesWritten.removeValue(forKey: downloadId)
         activeDownloads.removeValue(forKey: downloadId)
-        
+
         if downloadTasks.isEmpty {
             isDownloading = false
         }
@@ -381,8 +372,8 @@ class ModelDownloadManager: NSObject, ObservableObject {
 
 // MARK: - URLSession Delegate
 
-extension ModelDownloadManager: URLSessionDownloadDelegate {
-    func urlSession(
+extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
+    nonisolated func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
@@ -390,14 +381,14 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
         guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
             return
         }
-        
+
         // Move to temporary location to prevent deletion
         let tempDir = FileManager.default.temporaryDirectory
         let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
-        
+
         do {
             try FileManager.default.moveItem(at: location, to: tempURL)
-            
+
             DispatchQueue.main.async {
                 self.completionHandlers[modelId]?(.success(tempURL))
                 self.cleanup(downloadId: modelId)
@@ -409,8 +400,8 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
             }
         }
     }
-    
-    func urlSession(
+
+    nonisolated func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
         didWriteData bytesWritten: Int64,
@@ -420,20 +411,20 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
         guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
             return
         }
-        
+
         let fractionCompleted = totalBytesExpectedToWrite > 0
             ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
             : 0
-        
+
         // Calculate download speed
         let now = Date()
         let elapsed = now.timeIntervalSince(downloadStartTimes[modelId] ?? now)
         let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
-        
+
         // Estimate time remaining
         let bytesRemaining = totalBytesExpectedToWrite - totalBytesWritten
         let estimatedTime = speed > 0 ? TimeInterval(Double(bytesRemaining) / speed) : nil
-        
+
         let progress = DownloadProgress(
             bytesWritten: totalBytesWritten,
             totalBytes: totalBytesExpectedToWrite,
@@ -441,14 +432,14 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
             estimatedTimeRemaining: estimatedTime,
             downloadSpeed: speed
         )
-        
+
         DispatchQueue.main.async {
             self.activeDownloads[modelId] = progress
             self.progressHandlers[modelId]?(progress)
         }
     }
-    
-    func urlSession(
+
+    nonisolated func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         didCompleteWithError error: Error?
@@ -457,7 +448,7 @@ extension ModelDownloadManager: URLSessionDownloadDelegate {
               let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
             return
         }
-        
+
         if let error = error {
             DispatchQueue.main.async {
                 self.completionHandlers[modelId]?(.failure(ModelDownloadError.networkError(error)))
@@ -474,18 +465,18 @@ extension ModelDownloadManager {
     static func formatProgress(_ progress: DownloadProgress) -> String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .binary
-        
+
         let downloaded = formatter.string(fromByteCount: progress.bytesWritten)
         let total = formatter.string(fromByteCount: progress.totalBytes)
         let percent = Int(progress.fractionCompleted * 100)
-        
+
         var result = "\(downloaded) / \(total) (\(percent)%)"
-        
+
         if progress.downloadSpeed > 0 {
             let speed = formatter.string(fromByteCount: Int64(progress.downloadSpeed))
             result += " - \(speed)/s"
         }
-        
+
         if let timeRemaining = progress.estimatedTimeRemaining {
             let formatter = DateComponentsFormatter()
             formatter.unitsStyle = .abbreviated
@@ -494,7 +485,7 @@ extension ModelDownloadManager {
                 result += " - \(timeString) remaining"
             }
         }
-        
+
         return result
     }
 }
