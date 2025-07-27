@@ -18,7 +18,7 @@ protocol LLMFrameworkConfiguration {
 
 // MARK: - Apple Foundation Models Configuration
 
-struct FoundationModelsConfiguration: LLMFrameworkConfiguration {
+struct FoundationModelsConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -29,7 +29,7 @@ struct FoundationModelsConfiguration: LLMFrameworkConfiguration {
     let privacyMode: PrivacyMode
     let systemIntegration: Bool
     
-    enum PrivacyMode {
+    enum PrivacyMode: Equatable {
         case standard
         case enhanced
         case maximum
@@ -48,7 +48,7 @@ struct FoundationModelsConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - Core ML Configuration
 
-struct CoreMLConfiguration: LLMFrameworkConfiguration {
+struct CoreMLConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -61,11 +61,11 @@ struct CoreMLConfiguration: LLMFrameworkConfiguration {
     let maxBatchSize: Int
     let useFlexibleShapes: Bool
     
-    enum MLComputeUnits {
-        case cpuOnly
-        case cpuAndGPU
-        case cpuAndNeuralEngine
-        case all
+    enum MLComputeUnits: String, CaseIterable, Equatable {
+        case cpuOnly = "CPU Only"
+        case cpuAndGPU = "CPU & GPU"
+        case cpuAndNeuralEngine = "CPU & Neural Engine"
+        case all = "All"
     }
     
     static let `default` = CoreMLConfiguration(
@@ -83,7 +83,7 @@ struct CoreMLConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - MLX Configuration
 
-struct MLXConfiguration: LLMFrameworkConfiguration {
+struct MLXConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -96,7 +96,7 @@ struct MLXConfiguration: LLMFrameworkConfiguration {
     let customKernels: Bool
     let seed: Int?
     
-    enum MLXDevice {
+    enum MLXDevice: Equatable {
         case cpu
         case gpu
         case automatic
@@ -117,7 +117,7 @@ struct MLXConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - MLC-LLM Configuration
 
-struct MLCConfiguration: LLMFrameworkConfiguration {
+struct MLCConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -130,7 +130,7 @@ struct MLCConfiguration: LLMFrameworkConfiguration {
     let openAICompatible: Bool
     let compilationCache: Bool
     
-    enum MLCBackend {
+    enum MLCBackend: Equatable {
         case metal
         case webGPU
         case cuda
@@ -152,7 +152,7 @@ struct MLCConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - ONNX Runtime Configuration
 
-struct ONNXConfiguration: LLMFrameworkConfiguration {
+struct ONNXConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -165,7 +165,7 @@ struct ONNXConfiguration: LLMFrameworkConfiguration {
     let interOpNumThreads: Int
     let intraOpNumThreads: Int
     
-    enum ONNXExecutionProvider {
+    enum ONNXExecutionProvider: Equatable {
         case cpu
         case coreML
         case metal
@@ -188,7 +188,7 @@ struct ONNXConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - ExecuTorch Configuration
 
-struct ExecuTorchConfiguration: LLMFrameworkConfiguration {
+struct ExecuTorchConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -200,7 +200,7 @@ struct ExecuTorchConfiguration: LLMFrameworkConfiguration {
     let enableDynamicShapes: Bool
     let customOperatorPath: String?
     
-    enum ExecuTorchBackend {
+    enum ExecuTorchBackend: Equatable {
         case xnnpack
         case metal
         case coreML
@@ -221,7 +221,7 @@ struct ExecuTorchConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - llama.cpp Configuration
 
-struct LlamaCppConfiguration: LLMFrameworkConfiguration {
+struct LlamaCppConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -253,7 +253,7 @@ struct LlamaCppConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - TensorFlow Lite Configuration
 
-struct TFLiteConfiguration: LLMFrameworkConfiguration {
+struct TFLiteConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -265,7 +265,7 @@ struct TFLiteConfiguration: LLMFrameworkConfiguration {
     let allowFP16: Bool
     let enableXNNPACK: Bool
     
-    enum TFLiteDelegate {
+    enum TFLiteDelegate: Equatable {
         case none
         case metal
         case coreML
@@ -287,7 +287,7 @@ struct TFLiteConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - picoLLM Configuration
 
-struct PicoLLMConfiguration: LLMFrameworkConfiguration {
+struct PicoLLMConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -299,7 +299,7 @@ struct PicoLLMConfiguration: LLMFrameworkConfiguration {
     let realTimeMode: Bool
     let apiKey: String?
     
-    enum CompressionLevel {
+    enum CompressionLevel: Equatable {
         case standard
         case high
         case ultra
@@ -320,7 +320,7 @@ struct PicoLLMConfiguration: LLMFrameworkConfiguration {
 
 // MARK: - Swift Transformers Configuration
 
-struct SwiftTransformersConfiguration: LLMFrameworkConfiguration {
+struct SwiftTransformersConfiguration: LLMFrameworkConfiguration, Equatable {
     let enableLogging: Bool
     let logLevel: LogLevel
     let performanceTracking: Bool
@@ -332,13 +332,13 @@ struct SwiftTransformersConfiguration: LLMFrameworkConfiguration {
     let cacheDirectory: URL?
     let downloadTimeout: TimeInterval
     
-    enum ModelSource {
+    enum ModelSource: Equatable {
         case huggingFace
         case local
         case custom(URL)
     }
     
-    enum TokenizerType {
+    enum TokenizerType: Equatable {
         case auto
         case gpt2
         case bert

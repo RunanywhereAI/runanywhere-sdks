@@ -236,9 +236,7 @@ struct LlamaCppConfigView: View {
             Toggle("Use Memory Mapping", isOn: .constant(config.mmap))
             Toggle("Lock Memory", isOn: .constant(config.mlock))
         }
-        .onChange(of: config) { newConfig in
-            configManager.updateConfiguration(newConfig, for: .llamaCpp)
-        }
+        // Configuration is read-only in this view
         .onAppear {
             if let loaded = configManager.configuration(for: .llamaCpp) as? LlamaCppConfiguration {
                 config = loaded
@@ -248,13 +246,16 @@ struct LlamaCppConfigView: View {
 }
 
 struct CoreMLConfigView: View {
-    @State private var config = CoreMLConfiguration.default
+    @State private var computeUnits = CoreMLConfiguration.default.computeUnits
+    @State private var allowLowPrecision = CoreMLConfiguration.default.allowLowPrecision
+    @State private var enableBatching = CoreMLConfiguration.default.enableBatching
+    @State private var maxBatchSize = CoreMLConfiguration.default.maxBatchSize
     @StateObject private var configManager = FrameworkConfigurationManager.shared
     
     var body: some View {
         Section("Compute Units") {
-            Picker("Compute Units", selection: $config.computeUnits) {
-                ForEach(CoreMLConfiguration.ComputeUnits.allCases, id: \.self) { unit in
+            Picker("Compute Units", selection: $computeUnits) {
+                ForEach(CoreMLConfiguration.MLComputeUnits.allCases, id: \.self) { unit in
                     Text(unit.rawValue).tag(unit)
                 }
             }
@@ -264,30 +265,49 @@ struct CoreMLConfigView: View {
             HStack {
                 Text("Allow Low Precision")
                 Spacer()
-                Text(config.allowLowPrecision ? "Yes" : "No")
+                Text(allowLowPrecision ? "Yes" : "No")
                     .foregroundColor(.secondary)
             }
             HStack {
                 Text("Enable Batching")
                 Spacer()
-                Text(config.enableBatching ? "Yes" : "No")
+                Text(enableBatching ? "Yes" : "No")
                     .foregroundColor(.secondary)
             }
             HStack {
                 Text("Max Batch Size")
                 Spacer()
-                Text("\(config.maxBatchSize)")
+                Text("\(maxBatchSize)")
                     .foregroundColor(.secondary)
             }
         }
-        .onChange(of: config) { newConfig in
-            configManager.updateConfiguration(newConfig)
-        }
+        .onChange(of: computeUnits) { _ in saveConfiguration() }
+        .onChange(of: allowLowPrecision) { _ in saveConfiguration() }
+        .onChange(of: enableBatching) { _ in saveConfiguration() }
+        .onChange(of: maxBatchSize) { _ in saveConfiguration() }
         .onAppear {
             if let loaded = configManager.configuration(for: .coreML) as? CoreMLConfiguration {
-                config = loaded
+                computeUnits = loaded.computeUnits
+                allowLowPrecision = loaded.allowLowPrecision
+                enableBatching = loaded.enableBatching
+                maxBatchSize = loaded.maxBatchSize
             }
         }
+    }
+    
+    private func saveConfiguration() {
+        let config = CoreMLConfiguration(
+            enableLogging: true,
+            logLevel: .info,
+            performanceTracking: true,
+            memoryLimit: nil,
+            computeUnits: computeUnits,
+            allowLowPrecision: allowLowPrecision,
+            enableBatching: enableBatching,
+            maxBatchSize: maxBatchSize,
+            useFlexibleShapes: true
+        )
+        configManager.updateConfiguration(config, for: .coreML)
     }
 }
 
@@ -322,9 +342,7 @@ struct MLXConfigView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .onChange(of: config) { newConfig in
-            configManager.updateConfiguration(newConfig)
-        }
+        // Configuration is read-only in this view
         .onAppear {
             if let loaded = configManager.configuration(for: .mlx) as? MLXConfiguration {
                 config = loaded
@@ -370,9 +388,7 @@ struct ONNXConfigView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .onChange(of: config) { newConfig in
-            configManager.updateConfiguration(newConfig)
-        }
+        // Configuration is read-only in this view
         .onAppear {
             if let loaded = configManager.configuration(for: .onnxRuntime) as? ONNXConfiguration {
                 config = loaded

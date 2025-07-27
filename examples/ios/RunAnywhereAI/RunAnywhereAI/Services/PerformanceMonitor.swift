@@ -34,7 +34,7 @@ class PerformanceMonitor {
         if firstTokenTime == 0 {
             firstTokenTime = CFAbsoluteTimeGetCurrent()
             let ttft = firstTokenTime - startTime
-            logger.log("Time to first token: \(ttft, format: .fixed(precision: 3))s", level: .info, category: "Performance")
+            logger.log("Time to first token: \(String(format: "%.3f", ttft))s", level: .info, category: "Performance")
         }
     }
     
@@ -61,9 +61,9 @@ class PerformanceMonitor {
         
         logger.log("""
             Performance metrics:
-            - Total time: \(metrics.totalTime, format: .fixed(precision: 2))s
-            - Time to first token: \(metrics.timeToFirstToken, format: .fixed(precision: 3))s
-            - Tokens/sec: \(metrics.tokensPerSecond, format: .fixed(precision: 1))
+            - Total time: \(String(format: "%.2f", metrics.totalTime))s
+            - Time to first token: \(String(format: "%.3f", metrics.timeToFirstToken))s
+            - Tokens/sec: \(String(format: "%.1f", metrics.tokensPerSecond))
             - Token count: \(metrics.tokenCount)
             - Memory used: \(ByteCountFormatter.string(fromByteCount: Int64(metrics.memoryUsed), countStyle: .memory))
             """, level: .info, category: "Performance")
