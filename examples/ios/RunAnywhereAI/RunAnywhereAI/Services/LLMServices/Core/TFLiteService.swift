@@ -8,6 +8,8 @@ import Foundation
 // TensorFlow Lite import - available via CocoaPods
 #if canImport(TensorFlowLite)
 import TensorFlowLite
+#elseif canImport(TFLiteSwift_TensorFlowLite)
+import TFLiteSwift_TensorFlowLite
 #else
 // TensorFlow Lite not available - using mock implementation
 // Install via CocoaPods: pod 'TensorFlowLiteSwift'
@@ -71,7 +73,11 @@ class TFLiteService: BaseLLMService {
         set {}
     }
     
+    #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)
+    private var interpreter: Interpreter?
+    #else
     private var interpreter: Any? // Would be Interpreter in real implementation
+    #endif
     private var currentModelInfo: ModelInfo?
     
     override func initialize(modelPath: String) async throws {
@@ -91,7 +97,7 @@ class TFLiteService: BaseLLMService {
             }
         }
         
-        #if canImport(TensorFlowLite)
+        #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)
         // REAL TensorFlow Lite implementation
         print("TensorFlow Lite framework available - loading real interpreter")
         
@@ -101,13 +107,9 @@ class TFLiteService: BaseLLMService {
             options.threadCount = min(ProcessInfo.processInfo.processorCount, 4) // Limit threads for mobile
             
             // Try to add Metal delegate for GPU acceleration
-            do {
-                let metalDelegate = MetalDelegate()
-                options.addDelegate(metalDelegate)
-                print("✅ Metal GPU delegate added for acceleration")
-            } catch {
-                print("⚠️ Metal delegate not available, using CPU: \(error)")
-            }
+            // Note: Metal delegate requires separate import
+            // For now, using CPU-only mode
+            print("⚠️ Using CPU mode (Metal delegate requires additional setup)")
             
             // Load the model
             interpreter = try Interpreter(modelPath: modelPath, options: options)
@@ -125,7 +127,7 @@ class TFLiteService: BaseLLMService {
                 print("- Input type: \(inputTensor.dataType)")
                 print("- Output shape: \(outputTensor.shape)")
                 print("- Output type: \(outputTensor.dataType)")
-                print("- Thread count: \(options.threadCount)")
+                print("- Thread count: \(options.threadCount ?? 1)")
             }
             
         } catch {
@@ -167,7 +169,7 @@ class TFLiteService: BaseLLMService {
             throw LLMError.notInitialized()
         }
         
-        #if canImport(TensorFlowLite)
+        #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)
         guard let interpreter = self.interpreter else {
             throw LLMError.notInitialized()
         }
@@ -188,7 +190,7 @@ class TFLiteService: BaseLLMService {
             let inputIds = words.enumerated().map { Int32($0.offset + 1) }
             
             // Prepare input data based on tensor shape
-            let inputData = try createTensorInput(tokens: inputIds, shape: inputTensor.shape.dimensions)
+            let inputData = try createTensorInput(tokens: inputIds, shape: inputTensor.shape.dimensions.map { Int32($0) })
             try interpreter.copy(inputData, toInputAt: 0)
             
             // Run inference for each token generation step
@@ -266,7 +268,7 @@ class TFLiteService: BaseLLMService {
     
     // MARK: - TensorFlow Lite Helper Methods
     
-    #if canImport(TensorFlowLite)
+    #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)
     private func createTensorInput(tokens: [Int32], shape: [Int32]) throws -> Data {
         // Create input data that matches the expected tensor shape
         let batchSize = Int(shape[0])

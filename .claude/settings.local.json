@@ -29,7 +29,8 @@
       "Bash(export:*)",
       "WebFetch(domain:pytorch.org)",
       "WebFetch(domain:docs.pytorch.org)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cat:*)"
     ],
     "deny": []
   }

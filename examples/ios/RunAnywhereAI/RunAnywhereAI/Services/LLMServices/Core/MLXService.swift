@@ -247,7 +247,7 @@ class MLXService: BaseLLMService {
     }
     
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
-        guard isInitialized, let model = mlxModel, let tokenizer = tokenizer else {
+        guard isInitialized, mlxModel != nil, tokenizer != nil else {
             throw LLMError.notInitialized()
         }
         
@@ -264,14 +264,11 @@ class MLXService: BaseLLMService {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isInitialized, let model = mlxModel, let tokenizer = tokenizer else {
+        guard isInitialized, let _ = mlxModel, let tokenizer = tokenizer else {
             throw LLMError.notInitialized()
         }
         
         #if canImport(MLX)
-        guard let model = mlxModel, let tokenizer = tokenizer else {
-            throw LLMError.notInitialized()
-        }
         
         do {
             // REAL MLX implementation using Apple's MLX framework
@@ -292,7 +289,7 @@ class MLXService: BaseLLMService {
             // MLX generation loop with GPU acceleration
             for step in 0..<min(options.maxTokens, 20) { // Limit for demo
                 // Use MLX for efficient computation on Apple Silicon
-                let output = try await performMLXForward(input: currentInput, model: model)
+                let output = try await performMLXForward(input: currentInput, model: mlxModel!)
                 
                 // Sample next token using MLX operations
                 let nextToken = try sampleMLXToken(from: output, temperature: options.temperature, step: step)
@@ -335,17 +332,17 @@ class MLXService: BaseLLMService {
     // MARK: - MLX Implementation Helper Methods
     
     #if canImport(MLX)
-    private func createMLXArray(from tokens: [Int32]) throws -> MLXArray {
+    private func createMLXArray(from tokens: [Int32]) throws -> MLX.MLXArray {
         // Create MLX array from tokens for GPU computation
         // MLX arrays are the fundamental data structure for Apple Silicon computation
         let shape = [1, tokens.count] // Batch size 1, sequence length
         
         // Convert tokens to MLX array
         let data = tokens.map { Int($0) }
-        return MLXArray(data, dtype: .int32).reshaped(shape)
+        return MLX.MLXArray(data).reshaped(shape)
     }
     
-    private func performMLXForward(input: MLXArray, model: MLXModelWrapper) async throws -> MLXArray {
+    private func performMLXForward(input: MLX.MLXArray, model: MLXModelWrapper) async throws -> MLX.MLXArray {
         // In a real implementation, this would:
         // 1. Load the actual MLX model weights
         // 2. Perform forward pass through transformer layers
@@ -358,12 +355,12 @@ class MLXService: BaseLLMService {
         
         // Simulate transformer forward pass with MLX operations
         // This would normally involve embeddings, attention, and MLP layers
-        let logits = MLXArray.ones([batchSize, sequenceLength, vocabSize], dtype: .float32)
+        let logits = MLX.ones([batchSize, sequenceLength, vocabSize])
         
         return logits
     }
     
-    private func sampleMLXToken(from logits: MLXArray, temperature: Float, step: Int) throws -> Int32 {
+    private func sampleMLXToken(from logits: MLX.MLXArray, temperature: Float, step: Int) throws -> Int32 {
         // Use MLX for efficient sampling on Apple Silicon
         // In real implementation, this would apply temperature and top-p sampling
         
