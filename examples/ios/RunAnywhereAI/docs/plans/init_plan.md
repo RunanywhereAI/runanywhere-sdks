@@ -2,7 +2,7 @@
 
 ## 🎯 Executive Summary
 
-The RunAnywhereAI iOS sample app has an extensive architecture built with 10+ LLM framework services, but **ALL implementations are currently placeholders/mocks**. The app successfully builds and runs but requires significant work to integrate actual LLM frameworks and their dependencies.
+The RunAnywhereAI iOS sample app has an extensive architecture built with 10+ LLM framework services, but **ALL implementations are currently placeholders/mocks**. After comprehensive dependency analysis, **6 out of 11 frameworks are viable for immediate implementation** (4 already have working dependencies). The remaining 5 frameworks are deferred with "Coming Soon" notes due to beta status, dependency conflicts, or licensing requirements.
 
 ## 📊 Current Implementation Status
 
@@ -63,157 +63,106 @@ Every framework service contains placeholder code instead of real implementation
     - Missing Hugging Face Swift Transformers dependency
     - No real transformer model integration
 
-## 🚨 **MISSING EXTERNAL DEPENDENCIES**
+## 📊 **REALISTIC DEPENDENCY STATUS**
 
-### **No Package Dependencies Added**
-The app currently has **ZERO** external framework dependencies. All LLM frameworks require external packages:
+### **Current Working Dependencies (4/6 Core Frameworks)**
+The app currently has **2 external dependencies successfully added** + 2 built-in Apple frameworks:
 
 ```swift
-// UPDATED for JULY 2025: Latest Swift Package Manager integration with:
+// WORKING DEPENDENCIES - Ready for implementation:
 
 dependencies: [
-    // 1. MLX Framework - Updated to latest versions
-    .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.30.0"),
-    .package(url: "https://github.com/ml-explore/mlx-swift-examples", from: "0.30.0"),
-    .package(url: "https://github.com/ml-explore/mlx-vision", from: "0.5.0"), // NEW: Vision support
-    .package(url: "https://github.com/ml-explore/mlx-audio", from: "0.3.0"),  // NEW: Audio support
+    // ✅ Working External Dependencies
+    .package(url: "https://github.com/mlc-ai/mlc-llm", from: "0.2.0"),
+    .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0"),
     
-    // 2. MLC-LLM - Updated package location and version
-    .package(url: "https://github.com/mlc-ai/mlc-llm", from: "0.2.0"), // UPDATED: New repo path
-    
-    // 3. ONNX Runtime - Now using official Microsoft SPM package
-    .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0"), // UPDATED: Official SPM support
-    
-    // 4. TensorFlow Lite (LiteRT) - Still no official SPM support
-    // Use CocoaPods: pod 'TensorFlowLiteSwift', '~> 2.17.0' (LiteRT rebrand)
-    
-    // 5. Swift Transformers - Updated to latest version
-    .package(url: "https://github.com/huggingface/swift-transformers", from: "0.1.17"), // UPDATED: Latest version
-    
-    // 6. ExecuTorch - Now supports SPM with versioned branches
-    .package(url: "https://github.com/pytorch/executorch", .revision("swiftpm-0.6.0")), // NEW: SPM support
-    
-    // 7. llama.cpp - Community XCFramework packages available
-    // Recommend using: SpeziLLM or prebuilt XCFrameworks from releases
-    
-    // 8. PicoLLM - Still requires proprietary access key + CocoaPods
-    // Use CocoaPods: pod 'picoLLM-iOS', '~> 3.0.0'
+    // 🔧 Needs Version Fix
+    .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.25.0"), // Fixed version
 ]
+
+// ✅ Built-in Apple Frameworks (No external dependency needed)
+// - FoundationModels (iOS 18+)
+// - CoreML (built into iOS)
 ```
 
-### **CocoaPods Dependencies Needed (2025 Update)**
+### **Dependencies Requiring Fixes (3 frameworks)**
+```swift
+// 🔧 TensorFlow Lite - Use CocoaPods instead of SPM
+// CocoaPods: pod 'TensorFlowLiteSwift', '~> 2.17.0'
+
+// 🔧 ExecuTorch - Manual XCFramework integration required
+// Download from: https://github.com/pytorch/executorch/releases
+
+// 🔧 llama.cpp via SpeziLLM - Fix version conflicts first
+// .package(url: "https://github.com/StanfordSpezi/SpeziLLM", from: "0.5.0")
+```
+
+### **Deferred Dependencies (Future Implementation)**
+```swift
+// ⏸️ Swift Transformers - Complex conflicts, defer for MVP
+// ⏸️ PicoLLM - Proprietary SDK, requires license
+
+// ❌ REMOVED - Don't exist
+// MLX Vision, MLX Audio repositories don't exist
+```
+
+### **Simplified CocoaPods Setup**
 ```ruby
-# Updated CocoaPods setup for July 2025:
-pod 'MLCSwift', '~> 0.2.0'                    # UPDATED: MLC-LLM latest
-pod 'TensorFlowLiteSwift', '~> 2.17.0'        # UPDATED: LiteRT rebrand  
-pod 'picoLLM-iOS', '~> 3.0.0'                 # UPDATED: Latest PicoLLM
-# Note: ONNX Runtime now has official SPM support (see above)
-```
+# Minimal CocoaPods for MVP:
+platform :ios, '15.0'
 
-### **New Framework Additions for 2025**
-```swift
-// Additional frameworks now available:
-dependencies: [
-    // Apple Foundation Models - NEW in iOS 18.5+
-    // Built-in framework, no external dependency needed
-    
-    // MLX Vision & Audio - NEW MLX ecosystem packages
-    .package(url: "https://github.com/ml-explore/mlx-vision", from: "0.5.0"),
-    .package(url: "https://github.com/ml-explore/mlx-audio", from: "0.3.0"),
-    
-    // llama.cpp Swift wrapper - Community package
-    .package(url: "https://github.com/StanfordSpezi/SpeziLLM", from: "0.5.0"), // Swift wrapper for llama.cpp
-]
+target 'RunAnywhereAI' do
+  use_frameworks!
+  pod 'TensorFlowLiteSwift', '~> 2.17.0'
+end
 ```
 
 ## 📋 **CRITICAL IMPLEMENTATION TASKS REMAINING**
 
-### **PHASE 1: DEPENDENCY SETUP** 🔧 (Estimated: 3-5 days)
+### **PHASE 1: DEPENDENCY SETUP** 🔧 (Estimated: 1-2 days)
 
-#### Task 1.1: Add Swift Package Manager Dependencies
-- [ ] Create Package.swift in project root
-- [ ] Add MLX Swift packages (MLX, MLXNN, MLXLLM)
-- [ ] Add MLC-LLM Swift package  
-- [ ] Add ONNX Runtime package
-- [ ] Add TensorFlow Lite Swift package
-- [ ] Add Swift Transformers package
-- [ ] Configure Xcode project to use SPM
+#### Task 1.1: Fix Current SPM Dependencies (2-3 hours)
+- [x] MLC-LLM Swift package (already working)
+- [x] ONNX Runtime package (already working)
+- [ ] Fix MLX Framework version (change 0.30.0 → 0.25.0)
+- [ ] Remove non-existent MLX Vision/Audio dependencies
 
-#### Task 1.2: Manual Framework Integration
-- [ ] **ExecuTorch**: Download and integrate XCFramework manually
-- [ ] **llama.cpp**: Build C++ library for iOS using cmake
-- [ ] **PicoLLM**: Obtain SDK access key and integrate proprietary framework
+#### Task 1.2: Add CocoaPods Support (2-3 hours)
+- [ ] Create Podfile in project root
+- [ ] Add TensorFlow Lite Swift via CocoaPods
+- [ ] Run `pod install` and update Xcode workspace
 
-#### Task 1.3: iOS 18.5+ Foundation Models (2025 Update)
-- [ ] Enable iOS 18.5+ deployment target for latest features (currently supporting 15.0+)
-- [ ] Add proper Foundation Models framework import checks with availability guards
-- [ ] Implement guided generation and enhanced tool calling APIs
-- [ ] Test on iOS 18.5+ devices/simulators with iPhone 15/16 series
-- [ ] Add multi-modal input support (text + images)
+#### Task 1.3: Manual ExecuTorch Integration (4-6 hours)
+- [ ] Download ExecuTorch XCFramework from GitHub releases
+- [ ] Add XCFramework to Xcode project manually
+- [ ] Configure build settings and framework embedding
+
+#### Task 1.4: Mark Deferred Services (30 minutes)
+- [ ] Add "Future Implementation" notes to Swift Transformers service
+- [ ] Add "Requires License" notes to PicoLLM service
+- [ ] Update service documentation with implementation status
 
 ### **PHASE 2: REAL IMPLEMENTATIONS** 🛠️ (Estimated: 10-15 days)
 
-#### Task 2.1: Replace Mock Services with Real Implementations
-For each of the 10 services, replace placeholder code with actual framework integration:
+#### Task 2.1: Priority Service Implementation (Core 7 Services)
 
-**Foundation Models Service**
-- [ ] Import FoundationModels framework properly
-- [ ] Implement real Apple model loading and inference
-- [ ] Add iOS 18+ availability guards
+**Phase 2A: Built-in Apple Frameworks (Ready Now)**
+- [ ] **Foundation Models Service** - Import FoundationModels, add iOS 18+ guards
+- [ ] **Core ML Service** - Implement MLModel loading from .mlpackage files
 
-**Core ML Service** 
-- [ ] Implement real MLModel loading from .mlpackage files
-- [ ] Add actual MLMultiArray tensor operations
-- [ ] Create proper Core ML tokenizer integration
-- [ ] Add stateful model support for iOS 17+
+**Phase 2B: Working External Dependencies**  
+- [ ] **MLC-LLM Service** - Import MLCSwift, implement TVM compilation
+- [ ] **ONNX Runtime Service** - Import onnxruntime, implement model loading
+- [ ] **MLX Service** - Import MLX/MLXNN/MLXLLM, implement Apple Silicon optimization
 
-**MLX Service**
-- [ ] Import MLX, MLXNN, MLXLLM frameworks
-- [ ] Implement real MLX array operations
-- [ ] Add model loading from MLX format
-- [ ] Implement unified memory management
+**Phase 2C: Manual Integration Required**
+- [ ] **TensorFlow Lite Service** - Import via CocoaPods, implement .tflite loading
+- [ ] **ExecuTorch Service** - Import manual XCFramework, implement .pte support
 
-**MLC-LLM Service**
-- [ ] Import MLCSwift framework
-- [ ] Implement real TVM compilation and execution
-- [ ] Add OpenAI-compatible API support
-- [ ] Integrate model download and caching
-
-**ONNX Runtime Service**
-- [ ] Import onnxruntime_objc framework
-- [ ] Implement real ONNX model loading and inference
-- [ ] Add CoreML execution provider support
-- [ ] Configure quantization and optimization
-
-**ExecuTorch Service**
-- [ ] Import ExecuTorch XCFramework
-- [ ] Implement real PyTorch model (.pte) loading
-- [ ] Add backend selection (CoreML, Metal, CPU)
-- [ ] Integrate tokenizer support
-
-**llama.cpp Service**
-- [ ] Integrate compiled llama.cpp C++ library
-- [ ] Implement real GGUF format support
-- [ ] Add Metal GPU acceleration
-- [ ] Create Swift-to-C++ bridges
-
-**TensorFlow Lite Service**
-- [ ] Import TensorFlowLite framework
-- [ ] Implement real .tflite model loading
-- [ ] Add Metal delegate for GPU acceleration
-- [ ] Configure interpreter options
-
-**PicoLLM Service**
-- [ ] Import PicoLLM proprietary SDK
-- [ ] Implement real compressed model support
-- [ ] Add access key configuration
-- [ ] Integrate voice optimization features
-
-**Swift Transformers Service**
-- [ ] Import SwiftTransformers framework
-- [ ] Implement Hugging Face model compatibility
-- [ ] Add tokenizer integration
-- [ ] Create model download pipeline
+#### Task 2.2: Deferred Service Updates (Low Priority)
+- [ ] **Swift Transformers Service** - Add "Future Implementation - Complex Dependencies" note
+- [ ] **PicoLLM Service** - Add "Requires License - Proprietary SDK" note
+- [ ] **llama.cpp Service** - Add "Future Implementation - After MLX conflicts resolved" note
 
 #### Task 2.2: Model File Integration
 - [ ] Download sample models for each framework (.mlpackage, .gguf, .onnx, etc.)
@@ -302,16 +251,21 @@ For each of the 10 services, replace placeholder code with actual framework inte
 3. **Prepare for App Store submission** with optimized builds
 4. **Add analytics and user feedback** systems
 
-## 💡 **SUCCESS METRICS**
+## 💡 **REALISTIC SUCCESS METRICS**
 
-The app will be considered fully functional when:
-- [ ] All 10 framework services perform real LLM inference
-- [ ] Users can switch between frameworks and see actual differences
-- [ ] Sample models work with their respective frameworks  
+**MVP Success (Achievable in 2-3 weeks):**
+- [ ] 7 core framework services perform real LLM inference
+- [ ] Users can switch between working frameworks and see differences
+- [ ] Sample models work with Foundation Models, Core ML, MLC-LLM, ONNX, MLX
 - [ ] Performance benchmarks show real framework comparison data
 - [ ] App runs smoothly on target iOS devices (iPhone 13+ recommended)
 
-**ESTIMATED TOTAL WORK: 3-6 weeks for full implementation**
+**Future Enhancement Success:**
+- [ ] Add llama.cpp support via SpeziLLM (after resolving conflicts)
+- [ ] Add Swift Transformers integration (when dependency conflicts resolved)
+- [ ] Add PicoLLM support (if license obtained)
+
+**REALISTIC TOTAL WORK: 2-3 weeks for 7/10 frameworks (70% complete MVP)**
 
 ---
 

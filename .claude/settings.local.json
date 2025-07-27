@@ -20,7 +20,15 @@
       "Bash(swiftlint:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:picovoice.ai)",
-      "Bash(swiftc:*)"
+      "Bash(swiftc:*)",
+      "Bash(pod install:*)",
+      "Bash(pod repo update:*)",
+      "Bash(pod:*)",
+      "Bash(realpath:*)",
+      "Bash(brew install:*)",
+      "Bash(export:*)",
+      "WebFetch(domain:pytorch.org)",
+      "WebFetch(domain:docs.pytorch.org)"
     ],
     "deny": []
   }
