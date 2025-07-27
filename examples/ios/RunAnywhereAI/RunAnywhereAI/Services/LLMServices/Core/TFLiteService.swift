@@ -79,6 +79,7 @@ class TFLiteService: BaseLLMService {
     private var interpreter: Any? // Would be Interpreter in real implementation
     #endif
     private var currentModelInfo: ModelInfo?
+    private var realTokenizer: Tokenizer?  // Real tokenizer from TokenizerFactory
     
     override func initialize(modelPath: String) async throws {
         // Verify model exists
@@ -139,6 +140,16 @@ class TFLiteService: BaseLLMService {
         throw LLMError.frameworkNotSupported
         #endif
         
+        // Try to load real tokenizer using TokenizerFactory
+        let modelDirectory = URL(fileURLWithPath: modelPath).deletingLastPathComponent().path
+        realTokenizer = TokenizerFactory.createForFramework(.tensorFlowLite, modelPath: modelDirectory)
+        
+        if !(realTokenizer is BaseTokenizer) {
+            print("✅ Loaded real tokenizer for TensorFlow Lite model")
+        } else {
+            print("⚠️ Using basic tokenizer for TensorFlow Lite")
+        }
+        
         print("TensorFlow Lite Interpreter initialized:")
         print("- Model: \(modelPath)")
         print("- Metal GPU delegate: Enabled")
@@ -185,9 +196,19 @@ class TFLiteService: BaseLLMService {
             print("Input tensor shape: \(inputTensor.shape)")
             print("Output tensor shape: \(outputTensor.shape)")
             
-            // Create simple tokenization (in real app, use proper tokenizer)
-            let words = prompt.components(separatedBy: .whitespacesAndNewlines)
-            let inputIds = words.enumerated().map { Int32($0.offset + 1) }
+            // Create tokenization using real tokenizer if available
+            let inputIds: [Int32]
+            if let realTokenizer = realTokenizer {
+                // Use real tokenizer
+                let intTokens = realTokenizer.encode(prompt)
+                inputIds = intTokens.map { Int32($0) }
+                print("TFLite: Processing \(inputIds.count) input tokens (real tokenizer)")
+            } else {
+                // Fallback to simple tokenization
+                let words = prompt.components(separatedBy: .whitespacesAndNewlines)
+                inputIds = words.enumerated().map { Int32($0.offset + 1) }
+                print("TFLite: Processing \(inputIds.count) input tokens (basic tokenizer)")
+            }
             
             // Prepare input data based on tensor shape
             let inputData = try createTensorInput(tokens: inputIds, shape: inputTensor.shape.dimensions.map { Int32($0) })
@@ -259,6 +280,7 @@ class TFLiteService: BaseLLMService {
         
         interpreter = nil
         currentModelInfo = nil
+        realTokenizer = nil
         isInitialized = false
     }
     

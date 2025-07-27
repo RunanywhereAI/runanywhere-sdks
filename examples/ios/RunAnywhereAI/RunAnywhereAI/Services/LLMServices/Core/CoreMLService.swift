@@ -183,6 +183,7 @@ class CoreMLService: BaseLLMService {
     
     private var model: MLModel?
     private var tokenizer: CoreMLTokenizer?
+    private var realTokenizer: Tokenizer?  // Real tokenizer from TokenizerFactory
     private var currentModelInfo: ModelInfo?
     private let maxSequenceLength = 512
     
@@ -234,12 +235,15 @@ class CoreMLService: BaseLLMService {
                 print("✅ Compiled and loaded .mlmodel successfully")
             }
             
-            // Try to load real tokenizer
-            let tokenizerPath = modelURL.deletingLastPathComponent().appendingPathComponent("tokenizer.json").path
-            do {
-                tokenizer = try CoreMLTokenizer(vocabPath: tokenizerPath)
-                print("✅ Loaded model-specific tokenizer")
-            } catch {
+            // Try to load real tokenizer using TokenizerFactory
+            let modelDirectory = modelURL.deletingLastPathComponent().path
+            realTokenizer = TokenizerFactory.createForFramework(.coreML, modelPath: modelDirectory)
+            
+            if !(realTokenizer is BaseTokenizer) {
+                // Using real tokenizer
+                print("✅ Loaded real tokenizer for Core ML model")
+                tokenizer = try CoreMLTokenizer(vocabPath: "")  // Keep for interface compatibility
+            } else {
                 // Fallback to basic tokenizer
                 tokenizer = try CoreMLTokenizer(vocabPath: "")
                 print("⚠️ Using basic tokenizer (no model-specific tokenizer found)")
@@ -286,8 +290,17 @@ class CoreMLService: BaseLLMService {
         }
         
         // Real Core ML implementation with autoregressive generation
-        let inputTokens = tokenizer.encode(prompt)
-        print("Core ML: Processing \(inputTokens.count) input tokens")
+        let inputTokens: [Int32]
+        if let realTokenizer = realTokenizer {
+            // Use real tokenizer
+            let intTokens = realTokenizer.encode(prompt)
+            inputTokens = intTokens.map { Int32($0) }
+            print("Core ML: Processing \(inputTokens.count) input tokens (real tokenizer)")
+        } else {
+            // Fallback to basic tokenizer
+            inputTokens = tokenizer.encode(prompt)
+            print("Core ML: Processing \(inputTokens.count) input tokens (basic tokenizer)")
+        }
         
         // Track generated tokens for autoregressive generation
         var allTokens = inputTokens
@@ -342,7 +355,12 @@ class CoreMLService: BaseLLMService {
                 generatedTokens.append(nextToken)
                 
                 // Decode and emit token
-                let decodedText = tokenizer.decode([nextToken])
+                let decodedText: String
+                if let realTokenizer = realTokenizer {
+                    decodedText = realTokenizer.decode([Int(nextToken)])
+                } else {
+                    decodedText = tokenizer.decode([nextToken])
+                }
                 onToken(decodedText)
                 
                 // Core ML inference timing (Neural Engine is quite fast)
@@ -470,6 +488,7 @@ class CoreMLService: BaseLLMService {
         // Just clear our references
         model = nil
         tokenizer = nil
+        realTokenizer = nil
         currentModelInfo = nil
         isInitialized = false
         

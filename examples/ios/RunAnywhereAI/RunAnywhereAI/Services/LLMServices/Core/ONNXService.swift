@@ -168,6 +168,7 @@ class ONNXService: BaseLLMService {
     private var env: Any? // Would be ORTEnv in real implementation
     private var config: ONNXSessionConfig?
     private var tokenizer: ONNXTokenizer?
+    private var realTokenizer: Tokenizer?  // Real tokenizer from TokenizerFactory
     private var currentModelInfo: ModelInfo?
     
     override func initialize(modelPath: String) async throws {
@@ -246,6 +247,18 @@ class ONNXService: BaseLLMService {
         
         // Create configuration and tokenizer
         config = ONNXSessionConfig(modelPath: modelPath)
+        
+        // Try to load real tokenizer using TokenizerFactory
+        let modelDirectory = URL(fileURLWithPath: modelPath).deletingLastPathComponent().path
+        realTokenizer = TokenizerFactory.createForFramework(.onnxRuntime, modelPath: modelDirectory)
+        
+        if !(realTokenizer is BaseTokenizer) {
+            print("✅ Loaded real tokenizer for ONNX model")
+        } else {
+            print("⚠️ Using basic tokenizer for ONNX")
+        }
+        
+        // Keep ONNXTokenizer for compatibility
         tokenizer = ONNXTokenizer()
         
         print("ONNX Runtime Session initialized successfully:")
@@ -289,8 +302,17 @@ class ONNXService: BaseLLMService {
             print("🔥 Starting ONNX Runtime inference")
             
             // Tokenize input
-            let inputTokens = tokenizer.encode(prompt)
-            print("Input tokens: \(inputTokens.count)")
+            let inputTokens: [Int64]
+            if let realTokenizer = realTokenizer {
+                // Use real tokenizer
+                let intTokens = realTokenizer.encode(prompt)
+                inputTokens = intTokens.map { Int64($0) }
+                print("Input tokens: \(inputTokens.count) (real tokenizer)")
+            } else {
+                // Fallback to basic tokenizer
+                inputTokens = tokenizer.encode(prompt)
+                print("Input tokens: \(inputTokens.count) (basic tokenizer)")
+            }
             
             // Get input/output names
             let inputNames = try session.inputNames()
@@ -434,6 +456,7 @@ class ONNXService: BaseLLMService {
         env = nil
         config = nil
         tokenizer = nil
+        realTokenizer = nil
         currentModelInfo = nil
         isInitialized = false
     }

@@ -190,6 +190,7 @@ class MLXService: BaseLLMService {
     private var currentModelInfo: ModelInfo?
     private var mlxModel: MLXModelWrapper?
     private var tokenizer: MLXTokenizer?
+    private var realTokenizer: Tokenizer?  // Real tokenizer from TokenizerFactory
     
     override func initialize(modelPath: String) async throws {
         // Check if device supports MLX (A17 Pro/M3 or newer)
@@ -235,6 +236,16 @@ class MLXService: BaseLLMService {
         // Initialize wrapper and tokenizer
         mlxModel = try MLXModelWrapper(modelDirectory: modelPath)
         if let model = mlxModel {
+            // Try to load real tokenizer using TokenizerFactory
+            realTokenizer = TokenizerFactory.createForFramework(.mlx, modelPath: modelPath)
+            
+            if !(realTokenizer is BaseTokenizer) {
+                print("✅ Loaded real tokenizer for MLX model")
+            } else {
+                print("⚠️ Using basic tokenizer for MLX")
+            }
+            
+            // Keep MLXTokenizer for compatibility
             tokenizer = try MLXTokenizer(tokenizerPath: model.tokenizerPath)
         }
         
@@ -275,8 +286,17 @@ class MLXService: BaseLLMService {
             print("🔥 Starting MLX inference with Apple Silicon optimization")
             
             // Tokenize input
-            let inputTokens = tokenizer.encode(prompt)
-            print("MLX: Processing \(inputTokens.count) input tokens")
+            let inputTokens: [Int32]
+            if let realTokenizer = realTokenizer {
+                // Use real tokenizer
+                let intTokens = realTokenizer.encode(prompt)
+                inputTokens = intTokens.map { Int32($0) }
+                print("MLX: Processing \(inputTokens.count) input tokens (real tokenizer)")
+            } else {
+                // Fallback to basic tokenizer
+                inputTokens = tokenizer.encode(prompt)
+                print("MLX: Processing \(inputTokens.count) input tokens (basic tokenizer)")
+            }
             
             // Create MLX arrays for computation
             let inputArray = try createMLXArray(from: inputTokens)
@@ -296,7 +316,12 @@ class MLXService: BaseLLMService {
                 generatedTokens.append(nextToken)
                 
                 // Decode token to text
-                let text = tokenizer.decode([nextToken])
+                let text: String
+                if let realTokenizer = realTokenizer {
+                    text = realTokenizer.decode([Int(nextToken)])
+                } else {
+                    text = tokenizer.decode([nextToken])
+                }
                 
                 // Send to UI
                 await MainActor.run {

@@ -369,6 +369,9 @@ enum TokenizerType {
     case bpe(vocabPath: String, mergesPath: String)
     case sentencePiece(modelPath: String)
     case wordPiece(vocabPath: String)
+    case realBPE(configPath: String)
+    case realSentencePiece(modelPath: String)
+    case realWordPiece(vocabPath: String)
 }
 
 class TokenizerFactory {
@@ -385,36 +388,104 @@ class TokenizerFactory {
             
         case .wordPiece(let vocabPath):
             return try WordPieceTokenizer(vocabPath: vocabPath)
+            
+        case .realBPE(let configPath):
+            return try RealBPETokenizer(configPath: configPath)
+            
+        case .realSentencePiece(let modelPath):
+            return try RealSentencePieceTokenizer(modelPath: modelPath)
+            
+        case .realWordPiece(let vocabPath):
+            return try RealWordPieceTokenizer(vocabPath: vocabPath)
         }
     }
     
     static func createForFramework(_ framework: LLMFramework, modelPath: String) -> Tokenizer {
-        // Determine tokenizer type based on framework and model
+        // First try to load real tokenizers with proper model files
+        
+        // Check for tokenizer.json (most modern models)
+        let tokenizerJsonPath = "\(modelPath)/tokenizer.json"
+        if FileManager.default.fileExists(atPath: tokenizerJsonPath) {
+            do {
+                let config = try TokenizerConfigLoader.load(from: tokenizerJsonPath)
+                
+                switch config.model.type.lowercased() {
+                case "bpe":
+                    return try RealBPETokenizer(configPath: tokenizerJsonPath)
+                case "unigram", "sentencepiece":
+                    return try RealSentencePieceTokenizer(modelPath: tokenizerJsonPath)
+                case "wordpiece":
+                    return try RealWordPieceTokenizer(configPath: tokenizerJsonPath)
+                default:
+                    break
+                }
+            } catch {
+                print("Failed to load tokenizer.json: \(error)")
+            }
+        }
+        
+        // Framework-specific tokenizer detection
         switch framework {
         case .llamaCpp:
             // llama.cpp typically uses SentencePiece
-            if FileManager.default.fileExists(atPath: modelPath + ".tokenizer") {
-                return (try? SentencePieceTokenizer(modelPath: modelPath + ".tokenizer")) ?? BaseTokenizer()
+            let spPaths = [
+                "\(modelPath)/tokenizer.model",
+                "\(modelPath)/spiece.model",
+                "\(modelPath).tokenizer"
+            ]
+            
+            for path in spPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    return (try? RealSentencePieceTokenizer(modelPath: path)) ?? BaseTokenizer()
+                }
             }
             
         case .coreML, .mlx:
-            // These might bundle their own tokenizers
-            if FileManager.default.fileExists(atPath: modelPath + "/tokenizer.json") {
-                return (try? BPETokenizer(vocabPath: modelPath + "/vocab.json",
-                                        mergesPath: modelPath + "/merges.txt")) ?? BaseTokenizer()
+            // These might use BPE tokenizers
+            if FileManager.default.fileExists(atPath: "\(modelPath)/vocab.json") &&
+               FileManager.default.fileExists(atPath: "\(modelPath)/merges.txt") {
+                return (try? RealBPETokenizer(vocabPath: "\(modelPath)/vocab.json",
+                                            mergesPath: "\(modelPath)/merges.txt")) ?? BaseTokenizer()
             }
             
         case .onnxRuntime, .tensorFlowLite:
-            // Often use WordPiece
-            if FileManager.default.fileExists(atPath: modelPath + "/vocab.txt") {
-                return (try? WordPieceTokenizer(vocabPath: modelPath + "/vocab.txt")) ?? BaseTokenizer()
+            // Often use WordPiece for BERT-style models
+            let vocabPaths = [
+                "\(modelPath)/vocab.txt",
+                "\(modelPath)/bert_vocab.txt"
+            ]
+            
+            for path in vocabPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    return (try? RealWordPieceTokenizer(vocabPath: path)) ?? BaseTokenizer()
+                }
             }
+            
+        case .foundationModels:
+            // Apple's models might have their own format
+            // For now, use base tokenizer
+            break
             
         default:
             break
         }
         
         // Fallback to base tokenizer
+        print("Warning: No suitable tokenizer found for \(framework), using base tokenizer")
+        return BaseTokenizer()
+    }
+    
+    /// Creates the best available tokenizer for a given model directory
+    static func createBestTokenizer(modelPath: String) -> Tokenizer {
+        // Try each framework's expected tokenizer format
+        for framework in LLMFramework.allCases {
+            let tokenizer = createForFramework(framework, modelPath: modelPath)
+            if !(tokenizer is BaseTokenizer) {
+                print("Found tokenizer for framework: \(framework)")
+                return tokenizer
+            }
+        }
+        
         return BaseTokenizer()
     }
 }
