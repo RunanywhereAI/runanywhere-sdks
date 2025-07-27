@@ -98,7 +98,9 @@ class ModelQuantizationViewModel: ObservableObject {
         case .success(let urls):
             guard let url = urls.first else { return }
             selectedModel = url
-            analyzeModel(url)
+            Task {
+                await analyzeModel(url)
+            }
         case .failure(let error):
             print("Model selection failed: \(error)")
         }
@@ -136,17 +138,17 @@ class ModelQuantizationViewModel: ObservableObject {
         quantizedModels.removeAll { $0.id == model.id }
     }
     
-    private func analyzeModel(_ url: URL) {
+    private func analyzeModel(_ url: URL) async {
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
             let fileSize = attributes[.size] as? Int64 ?? 0
             let sizeInMB = Double(fileSize) / (1024 * 1024)
             
-            let format = try? formatDetector.detectFormat(for: url)
+            let format = try? await formatDetector.detectFormat(at: url)
             
             modelInfo = ModelQuantizationInfo(
                 name: url.lastPathComponent,
-                format: format?.rawValue ?? "Unknown",
+                format: format?.format.rawValue ?? "Unknown",
                 sizeInMB: sizeInMB,
                 parameters: estimateParameters(sizeInMB: sizeInMB),
                 precision: "FP32",
