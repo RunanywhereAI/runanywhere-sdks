@@ -12,81 +12,24 @@ class ModelURLRegistry {
     // MARK: - Core ML Models
     
     let coreMLModels = [
-        ModelDownloadInfo(
-            id: "gpt2-coreml",
-            name: "GPT2-CoreML.mlpackage",
-            url: URL(string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip")!,
-            sha256: nil, // Add SHA256 hashes for verification
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "distilgpt2-coreml",
-            name: "DistilGPT2-CoreML.mlpackage",
-            url: URL(string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "openelm-270m-coreml",
-            name: "OpenELM-270M.mlpackage",
-            url: URL(string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "openelm-450m-coreml",
-            name: "OpenELM-450M.mlpackage",
-            url: URL(string: "https://huggingface.co/apple/OpenELM-450M-Instruct/resolve/main/OpenELM-450M-Instruct-coreml.zip")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "bert-base-coreml",
-            name: "BERT-Base.mlpackage",
-            url: URL(string: "https://huggingface.co/coreml-community/bert-base-uncased/resolve/main/BERT.mlpackage.zip")!,
-            sha256: nil,
-            requiresUnzip: true
-        )
+        // Core ML models for LLMs typically require authentication on HuggingFace
+        // Users should add their own models via custom URLs after obtaining access
+        // Example format for adding custom Core ML models:
+        // ModelDownloadInfo(
+        //     id: "your-model-id",
+        //     name: "YourModel.mlpackage",
+        //     url: URL(string: "https://your-url/model.mlpackage.zip")!,
+        //     sha256: nil,
+        //     requiresUnzip: true
+        // )
     ]
     
     // MARK: - MLX Models
     
     let mlxModels = [
-        ModelDownloadInfo(
-            id: "mistral-7b-mlx-4bit",
-            name: "Mistral-7B-Instruct-v0.2-4bit",
-            url: URL(string: "https://huggingface.co/mlx-community/Mistral-7B-Instruct-v0.2-4bit/resolve/main/mistral-7b-instruct-v0.2-4bit.tar.gz")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "llama-3.2-3b-mlx",
-            name: "Llama-3.2-3B-Instruct-4bit",
-            url: URL(string: "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit/resolve/main/llama-3.2-3b-instruct-4bit.tar.gz")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "gemma-2b-mlx",
-            name: "gemma-2b-it-4bit",
-            url: URL(string: "https://huggingface.co/mlx-community/gemma-2b-it-4bit/resolve/main/gemma-2b-it-4bit.tar.gz")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "phi-3-mini-mlx",
-            name: "phi-3-mini-4k-instruct-4bit",
-            url: URL(string: "https://huggingface.co/mlx-community/phi-3-mini-4k-instruct-4bit/resolve/main/phi-3-mini-4k-instruct-4bit.tar.gz")!,
-            sha256: nil,
-            requiresUnzip: true
-        ),
-        ModelDownloadInfo(
-            id: "qwen2-0.5b-mlx",
-            name: "Qwen2-0.5B-Instruct-4bit",
-            url: URL(string: "https://huggingface.co/mlx-community/Qwen2-0.5B-Instruct-4bit/resolve/main/qwen2-0.5b-instruct-4bit.tar.gz")!,
-            sha256: nil,
-            requiresUnzip: true
-        )
+        // MLX models are typically distributed as git repositories with multiple files
+        // Recommended approach: git clone https://huggingface.co/mlx-community/model-name
+        // Then point the app to the cloned directory
     ]
     
     // MARK: - ONNX Runtime Models
@@ -94,36 +37,8 @@ class ModelURLRegistry {
     let onnxModels = [
         ModelDownloadInfo(
             id: "phi-3-mini-onnx",
-            name: "phi3-mini-4k-instruct.onnx",
+            name: "phi3-mini-4k-instruct-cpu-int4.onnx",
             url: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32/phi3-mini-4k-instruct-cpu-int4-rtn-block-32.onnx")!,
-            sha256: nil,
-            requiresUnzip: false
-        ),
-        ModelDownloadInfo(
-            id: "llama-2-7b-onnx",
-            name: "llama-2-7b-chat.onnx",
-            url: URL(string: "https://huggingface.co/microsoft/Llama-2-7b-chat-hf-onnx/resolve/main/Llama-2-7b-chat-hf-int8.onnx")!,
-            sha256: nil,
-            requiresUnzip: false
-        ),
-        ModelDownloadInfo(
-            id: "gpt2-onnx",
-            name: "gpt2.onnx",
-            url: URL(string: "https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnx")!,
-            sha256: nil,
-            requiresUnzip: false
-        ),
-        ModelDownloadInfo(
-            id: "distilbert-onnx",
-            name: "distilbert-base.onnx",
-            url: URL(string: "https://huggingface.co/onnx-community/distilbert-base-uncased/resolve/main/model.onnx")!,
-            sha256: nil,
-            requiresUnzip: false
-        ),
-        ModelDownloadInfo(
-            id: "t5-small-onnx",
-            name: "t5-small.onnx",
-            url: URL(string: "https://huggingface.co/onnx-community/t5-small/resolve/main/model.onnx")!,
             sha256: nil,
             requiresUnzip: false
         )
@@ -132,28 +47,8 @@ class ModelURLRegistry {
     // MARK: - TensorFlow Lite Models
     
     let tfliteModels = [
-        ModelDownloadInfo(
-            id: "gemma-2b-tflite",
-            name: "gemma-2b-it.tflite",
-            url: URL(string: "https://www.kaggle.com/api/v1/models/google/gemma/tfLite/gemma-2b-it-gpu-int4/1/download/gemma-2b-it-gpu-int4.tflite")!,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: true // Kaggle requires authentication
-        ),
-        ModelDownloadInfo(
-            id: "mobilebert-tflite",
-            name: "mobilebert.tflite",
-            url: URL(string: "https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1?lite-format=tflite")!,
-            sha256: nil,
-            requiresUnzip: false
-        ),
-        ModelDownloadInfo(
-            id: "albert-lite-tflite",
-            name: "albert_lite_base.tflite",
-            url: URL(string: "https://tfhub.dev/tensorflow/lite-model/albert_lite_base/squadv1/1?lite-format=tflite")!,
-            sha256: nil,
-            requiresUnzip: false
-        )
+        // TFLite models typically require manual download from TensorFlow Hub or Kaggle
+        // Add custom URLs after downloading models locally
     ]
     
     // MARK: - llama.cpp Models (GGUF format)
@@ -221,16 +116,8 @@ class ModelURLRegistry {
                     url: URL(string: "https://huggingface.co/bert-base-uncased/resolve/main/vocab.txt")!
                 )
             ]
-        ),
-        TokenizerDownloadInfo(
-            modelId: "llama",
-            files: [
-                TokenizerFile(
-                    name: "tokenizer.model",
-                    url: URL(string: "https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer.model")!
-                )
-            ]
         )
+        // Note: Llama tokenizer requires authentication
     ]
     
     // MARK: - Convenience Methods

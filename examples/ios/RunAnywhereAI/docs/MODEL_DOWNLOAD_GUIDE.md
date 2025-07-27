@@ -185,29 +185,56 @@ The download manager handles:
 - Verify model format matches framework
 - Check model architecture compatibility
 
-## Example URLs
+## Currently Available Models
 
-Here are some working model URLs for testing:
+Based on verification, here are the models with working download URLs:
 
-### Core ML
-```
-https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip
-```
+### ONNX Runtime
+- **Phi-3 Mini** (CPU INT4 optimized)
+  - ID: `phi-3-mini-onnx`
+  - Size: ~236MB
+  - Direct download available
 
-### MLX
-```
-https://huggingface.co/mlx-community/gemma-2b-it-4bit/resolve/main/gemma-2b-it-4bit.tar.gz
-```
+### GGUF (llama.cpp) - All verified working
+- **TinyLlama 1.1B** - Compact model perfect for testing
+- **Phi-3 Mini** - Microsoft's efficient model in GGUF format
+- **Llama 3.2 3B** - Meta's latest small language model
+- **Mistral 7B** - Popular open-source model
 
-### ONNX
-```
-https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnx
-```
+### Tokenizers (Working)
+- **GPT-2** tokenizer files (tokenizer.json, vocab.json, merges.txt)
+- **BERT** tokenizer files (tokenizer.json, vocab.txt)
 
-### GGUF (llama.cpp)
-```
-https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-```
+## Important Notes
+
+### Authentication Required
+Many models on HuggingFace now require authentication:
+- Core ML models from `coreml-community`
+- MLX models (distributed as git repositories)
+- Meta's Llama models
+- Some ONNX and TensorFlow Lite models
+
+### Recommended Approach
+
+1. **For GGUF models**: Use the pre-configured URLs (all verified working)
+2. **For Core ML/MLX models**: 
+   - Clone the repository: `git clone https://huggingface.co/mlx-community/model-name`
+   - Use the Model Import feature to add the downloaded directory
+3. **For authenticated models**:
+   - Download manually after logging into HuggingFace
+   - Add via Custom URLs in Settings → Model URLs
+
+### Adding Custom Models
+
+1. Go to Settings → Model URLs
+2. Tap "Add Custom Model URL"
+3. Enter:
+   - Model ID (unique)
+   - Model Name (with extension)
+   - Direct download URL
+4. Save
+
+The app will handle downloading, unzipping (if needed), and organizing the files.
 
 ## Security
 
