@@ -8,15 +8,15 @@ enum QuantizationCalibrationDataset: String, CaseIterable {
     case large = "Large (100K samples)"
 }
 
-enum QuantizationType: String, CaseIterable {
-    case static = "Static"
+enum QuantizationMethod: String, CaseIterable {
+    case `static` = "Static"
     case dynamic = "Dynamic"
     case qat = "QAT"
     case ptq = "PTQ"
     
     var iconName: String {
         switch self {
-        case .static: return "speedometer"
+        case .`static`: return "speedometer"
         case .dynamic: return "gauge"
         case .qat: return "graduationcap.fill"
         case .ptq: return "wand.and.rays"
@@ -25,7 +25,7 @@ enum QuantizationType: String, CaseIterable {
     
     var description: String {
         switch self {
-        case .static: return "Fixed quantization"
+        case .`static`: return "Fixed quantization"
         case .dynamic: return "Runtime quantization"
         case .qat: return "Quantization-aware training"
         case .ptq: return "Post-training quantization"
@@ -37,7 +37,7 @@ enum QuantizationType: String, CaseIterable {
 class ModelQuantizationViewModel: ObservableObject {
     @Published var selectedModel: URL?
     @Published var modelInfo: ModelQuantizationInfo?
-    @Published var selectedQuantizationType: QuantizationType = .ptq
+    @Published var selectedQuantizationType: QuantizationMethod = .ptq
     @Published var targetBits: Int = 8
     @Published var qualityVsSize: Double = 0.5
     @Published var calibrationDataset: QuantizationCalibrationDataset = .small
@@ -110,7 +110,7 @@ class ModelQuantizationViewModel: ObservableObject {
         quantizationResult = nil
     }
     
-    func selectQuantizationType(_ type: QuantizationType) {
+    func selectQuantizationType(_ type: QuantizationMethod) {
         selectedQuantizationType = type
     }
     
@@ -233,7 +233,7 @@ struct QuantizedModelInfo {
     let id: UUID
     let name: String
     let originalPath: String
-    let quantizationType: QuantizationType
+    let quantizationType: QuantizationMethod
     let targetBits: Int
     let size: Int
     let compressionRatio: Double

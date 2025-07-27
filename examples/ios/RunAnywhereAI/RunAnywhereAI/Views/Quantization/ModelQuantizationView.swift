@@ -118,7 +118,7 @@ struct ModelQuantizationView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     InfoRow(title: "Name", value: modelInfo.name)
                     InfoRow(title: "Format", value: modelInfo.format)
-                    InfoRow(title: "Size", value: modelInfo.size)
+                    InfoRow(title: "Size", value: "\(Int(modelInfo.sizeInMB)) MB")
                     InfoRow(title: "Parameters", value: modelInfo.parameters)
                     InfoRow(title: "Precision", value: modelInfo.precision)
                 }
@@ -152,7 +152,7 @@ struct ModelQuantizationView: View {
                 .fontWeight(.semibold)
             
             LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 8) {
-                ForEach(QuantizationType.allCases, id: \.self) { type in
+                ForEach(QuantizationMethod.allCases, id: \.self) { type in
                     QuantizationTypeCard(
                         type: type,
                         isSelected: viewModel.selectedQuantizationType == type
@@ -316,7 +316,7 @@ struct ModelQuantizationView: View {
 }
 
 struct QuantizationTypeCard: View {
-    let type: QuantizationType
+    let type: QuantizationMethod
     let isSelected: Bool
     let action: () -> Void
     
@@ -465,13 +465,6 @@ struct QuantizedModelCard: View {
     }
 }
 
-
-enum QuantizationCalibrationDataset: String, CaseIterable {
-    case none = "None"
-    case small = "Small (1K samples)"
-    case medium = "Medium (10K samples)"
-    case large = "Large (100K samples)"
-}
 
 #Preview {
     ModelQuantizationView()

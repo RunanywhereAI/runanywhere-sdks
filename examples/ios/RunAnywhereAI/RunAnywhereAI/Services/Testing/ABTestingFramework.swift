@@ -139,10 +139,8 @@ class ABTestingFramework: ObservableObject {
     
     /// Analyze test results
     func analyzeResults(for testId: UUID) -> ABTestResults? {
-        let test = completedTests.first { $0.id == testId }??
-                   activeTests.first { $0.id == testId }
-        
-        guard let test = test else { return nil }
+        guard let test = completedTests.first(where: { $0.id == testId }) ??
+                         activeTests.first(where: { $0.id == testId }) else { return nil }
         
         return generateResults(for: test)
     }

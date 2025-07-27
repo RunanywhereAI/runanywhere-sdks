@@ -55,11 +55,11 @@ struct ModelLoadingView: View {
             
             // Model Info
             VStack(alignment: .leading, spacing: 8) {
-                InfoRow(label: "Format", value: model.format.displayName)
-                InfoRow(label: "Framework", value: model.framework.displayName)
-                InfoRow(label: "Size", value: model.size)
+                ModelInfoRow(label: "Format", value: model.format.displayName)
+                ModelInfoRow(label: "Framework", value: model.framework.displayName)
+                ModelInfoRow(label: "Size", value: model.size)
                 if let quantization = model.quantization {
-                    InfoRow(label: "Quantization", value: quantization)
+                    ModelInfoRow(label: "Quantization", value: quantization)
                 }
             }
             .padding()
@@ -152,7 +152,7 @@ struct ModelLoadingView: View {
 
 // MARK: - Info Row
 
-private struct InfoRow: View {
+private struct ModelInfoRow: View {
     let label: String
     let value: String
     
