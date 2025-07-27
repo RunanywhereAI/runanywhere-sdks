@@ -28,7 +28,8 @@
       "Bash(brew install:*)",
       "Bash(export:*)",
       "WebFetch(domain:pytorch.org)",
-      "WebFetch(domain:docs.pytorch.org)"
+      "WebFetch(domain:docs.pytorch.org)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

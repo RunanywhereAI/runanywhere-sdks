@@ -2,11 +2,26 @@
 //  MLCService.swift
 //  RunAnywhereAI
 //
+//  ⏸️ DEFERRED SERVICE - REQUIRES MANUAL INTEGRATION
+//  MLC-LLM does not support Swift Package Manager.
+//  To integrate: Build from source or use pre-built packages.
+//  See: https://github.com/mlc-ai/mlc-llm/tree/main/ios
+//
 
 import Foundation
 
-// Note: In a real implementation, you would import MLC-LLM Swift:
-// import MLCSwift
+// MLC-LLM Swift import - checking if available
+#if canImport(MLCSwift)
+import MLCSwift
+#else
+// MLC-LLM not available - requires manual integration
+// NOTE: MLC-LLM does not support Swift Package Manager
+// To integrate MLC-LLM in your iOS app:
+// 1. Build from source: https://github.com/mlc-ai/mlc-llm/tree/main/ios
+// 2. Add MLCChat.xcframework to your project manually
+// 3. Or use pre-built packages from MLC releases
+// Alternative: Use MLX framework which has SPM support and similar capabilities
+#endif
 
 // MARK: - MLC Engine Configuration
 
@@ -151,14 +166,34 @@ class MLCService: BaseLLMService {
             }
         }
         
-        // Real MLC-LLM initialization would be:
-        // 1. Extract tar if needed
-        // 2. let config = MLCEngineConfig(modelPath: modelPath, modelLib: "model_iphone")
-        // 3. engine = try await MLCEngine(config: config)
-        // 4. Verify model compilation for current device
+        #if canImport(MLCSwift)
+        // REAL MLC-LLM initialization when framework is available
+        print("MLC-LLM framework available - initializing real engine")
+        
+        // Extract tar if needed
+        var actualModelPath = modelPath
+        if isTarFile {
+            // Extract to temp directory
+            actualModelPath = try await extractTarFile(modelPath)
+        }
+        
+        // Initialize MLC engine with configuration
+        let config = MLCEngineConfig(
+            modelPath: actualModelPath,
+            modelLib: "model_iphone",
+            device: .auto
+        )
+        
+        engine = try await MLCEngine(config: config)
+        print("✅ MLC-LLM engine initialized successfully")
+        #else
+        // MLC-LLM not available - simulate initialization
+        print("⚠️ MLC-LLM framework not available - using simulation")
+        print("To use real MLC-LLM, follow manual integration steps in the code comments")
         
         // Simulate realistic MLC initialization time
         try await Task.sleep(nanoseconds: 2_500_000_000) // 2.5 seconds
+        #endif
         
         // Create configuration
         config = MLCEngineConfig(modelPath: modelPath, device: .auto)
@@ -193,6 +228,28 @@ class MLCService: BaseLLMService {
             throw LLMError.notInitialized()
         }
         
+        #if canImport(MLCSwift)
+        // REAL MLC-LLM implementation when framework is available
+        guard let engine = self.engine else {
+            throw LLMError.notInitialized()
+        }
+        
+        // Use actual MLC-LLM streaming API
+        let request = MLCChatCompletionRequest(
+            messages: [MLCChatMessage(role: .user, content: prompt)],
+            temperature: options.temperature,
+            maxTokens: options.maxTokens,
+            stream: true,
+            topP: options.topP
+        )
+        
+        for try await chunk in engine.streamChatCompletion(request) {
+            if let content = chunk.choices.first?.delta.content {
+                onToken(content)
+            }
+        }
+        #else
+        // MLC-LLM not available - using demo implementation
         // Real MLC-LLM implementation would be:
         // let request = MLCChatCompletionRequest(
         //     messages: [MLCChatMessage(role: .user, content: prompt)],
@@ -230,6 +287,7 @@ class MLCService: BaseLLMService {
                 try await Task.sleep(nanoseconds: 15_000_000) // 15ms optimization pause
             }
         }
+        #endif
     }
     
     // MARK: - Private MLC Helper Methods
@@ -307,6 +365,26 @@ class MLCService: BaseLLMService {
 // MARK: - MLC-Specific Extensions
 
 extension MLCService {
+    #if canImport(MLCSwift)
+    // Helper method to extract tar files for MLC models
+    private func extractTarFile(_ tarPath: String) async throws -> String {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mlc_models")
+            .appendingPathComponent(UUID().uuidString)
+        
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        
+        // Extract tar file (simplified - in real app use proper tar extraction)
+        let task = Process()
+        task.launchPath = "/usr/bin/tar"
+        task.arguments = ["-xzf", tarPath, "-C", tempDir.path]
+        task.launch()
+        task.waitUntilExit()
+        
+        return tempDir.path
+    }
+    #endif
+    
     // Multi-LoRA support
     func loadLoRA(adapterPath: String) async throws {
         guard isInitialized else {

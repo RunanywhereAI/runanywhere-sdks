@@ -2,6 +2,11 @@
 //  PicoLLMService.swift
 //  RunAnywhereAI
 //
+//  ⏸️ DEFERRED SERVICE - REQUIRES LICENSE
+//  Status: Proprietary SDK requiring licensing agreement with Picovoice
+//  Reason: Commercial license required, not open source
+//  To enable: Contact Picovoice for licensing and access key
+//
 
 import Foundation
 
@@ -113,26 +118,9 @@ class PicoLLMService: BaseLLMService {
             throw LLMError.notInitialized()
         }
         
-        // In real implementation:
-        // let generateOptions = PicoLLMGenerateOptions(
-        //     completionTokenLimit: options.maxTokens,
-        //     temperature: options.temperature,
-        //     topP: options.topP
-        // )
-        // 
-        // let completion = try picoLLM.generate(
-        //     prompt: prompt,
-        //     options: generateOptions
-        // )
-        // 
-        // return completion.text
-        
-        var result = ""
-        try await streamGenerate(prompt: prompt, options: options) { token in
-            result += token
-        }
-        
-        return result
+        // Coming Soon - PicoLLM (Requires License)
+        // PicoLLM is a proprietary SDK requiring licensing agreement
+        return "🔐 Coming Soon - PicoLLM (Requires License)\n\nPicoLLM is Picovoice's ultra-compressed LLM framework optimized for edge devices with minimal memory footprint.\n\nStatus: Requires licensing agreement with Picovoice\n\nFeatures coming soon:\n• Ultra-low memory footprint (100MB+ models)\n• .pllm compressed model format\n• Real-time voice applications\n• Cross-platform inference\n• Dialog management\n• Proprietary X-bit quantization\n\nTo enable: Contact Picovoice for licensing and access key"
     }
     
     override func streamGenerate(

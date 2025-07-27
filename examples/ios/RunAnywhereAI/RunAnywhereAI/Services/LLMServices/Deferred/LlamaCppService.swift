@@ -4,6 +4,11 @@
 //
 //  Created by Sanchit Monga on 7/26/25.
 //
+//  ⏸️ DEFERRED SERVICE - DEPENDENCY CONFLICTS
+//  Status: Version conflicts with MLX Examples dependency
+//  Reason: llama.cpp via SpeziLLM blocked by MLX Examples version issues
+//  Resolution: After fixing MLX Examples version conflicts
+//
 
 import Foundation
 
@@ -183,12 +188,9 @@ class LlamaCppService: BaseLLMService {
             throw LLMError.notInitialized()
         }
         
-        var result = ""
-        try await streamGenerate(prompt: prompt, options: options) { token in
-            result += token
-        }
-        
-        return result
+        // Coming Soon - llama.cpp (GGUF Models)
+        // llama.cpp integration blocked by dependency conflicts with MLX Examples
+        return "⚙️ Coming Soon - llama.cpp (GGUF Models)\n\nllama.cpp is a high-performance C++ inference engine for LLMs with extensive quantization support and GGUF format compatibility.\n\nStatus: Version conflicts with MLX Examples dependency\n\nFeatures coming soon:\n• GGUF model format support\n• Advanced quantization (Q4_K_M, Q5_K_M, Q8_0)\n• CPU-optimized inference\n• Metal GPU acceleration\n• Large context windows (32K+ tokens)\n• Open-source community models\n\nResolution: After fixing MLX Examples version conflicts"
     }
     
     override func streamGenerate(

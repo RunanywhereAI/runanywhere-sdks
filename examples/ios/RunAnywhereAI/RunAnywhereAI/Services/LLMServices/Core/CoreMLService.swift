@@ -210,21 +210,44 @@ class CoreMLService: BaseLLMService {
         configuration.computeUnits = .all // Use Neural Engine, GPU, and CPU
         
         do {
-            // For .mlpackage, load directly
-            if modelPath.hasSuffix(".mlpackage") {
-                model = try MLModel(contentsOf: modelURL, configuration: configuration)
+            print("Loading Core ML model: \(modelPath)")
+            
+            // Check device capabilities for optimal configuration
+            if await isNeuralEngineAvailable() {
+                configuration.computeUnits = .all // Neural Engine + GPU + CPU
+                print("Neural Engine detected - using accelerated inference")
             } else {
-                // For .mlmodel, compile first if needed
-                let compiledURL = try await MLModel.compileModel(at: modelURL)
-                model = try MLModel(contentsOf: compiledURL, configuration: configuration)
+                configuration.computeUnits = .cpuAndGPU // Fallback to CPU + GPU
+                print("Using CPU + GPU inference")
             }
             
-            // Initialize tokenizer (in a real app, this would come from the model bundle)
+            // REAL Core ML model loading
+            if modelPath.hasSuffix(".mlpackage") {
+                // Load .mlpackage directly (preferred format)
+                model = try MLModel(contentsOf: modelURL, configuration: configuration)
+                print("✅ Loaded .mlpackage model successfully")
+            } else {
+                // Compile .mlmodel if needed, then load
+                print("Compiling .mlmodel...")
+                let compiledURL = try await MLModel.compileModel(at: modelURL)
+                model = try MLModel(contentsOf: compiledURL, configuration: configuration)
+                print("✅ Compiled and loaded .mlmodel successfully")
+            }
+            
+            // Try to load real tokenizer
             let tokenizerPath = modelURL.deletingLastPathComponent().appendingPathComponent("tokenizer.json").path
-            tokenizer = try CoreMLTokenizer(vocabPath: tokenizerPath)
+            do {
+                tokenizer = try CoreMLTokenizer(vocabPath: tokenizerPath)
+                print("✅ Loaded model-specific tokenizer")
+            } catch {
+                // Fallback to basic tokenizer
+                tokenizer = try CoreMLTokenizer(vocabPath: "")
+                print("⚠️ Using basic tokenizer (no model-specific tokenizer found)")
+            }
+            
         } catch {
-            // Fallback to basic tokenizer if no tokenizer file found
-            tokenizer = try CoreMLTokenizer(vocabPath: "")
+            print("❌ Core ML model loading failed: \(error)")
+            throw LLMError.modelLoadFailed(reason: "Failed to load Core ML model: \(error.localizedDescription)", framework: "Core ML")
         }
         
         // Verify model has expected inputs/outputs
@@ -455,6 +478,30 @@ class CoreMLService: BaseLLMService {
         Task {
             await Task.yield()
         }
+    }
+    
+    private func isNeuralEngineAvailable() async -> Bool {
+        // Check if device has Neural Engine (A11 and later)
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let modelName = String(bytes: Data(bytes: &systemInfo.machine, count: Int(_SYS_NAMELEN)), encoding: .ascii)?.trimmingCharacters(in: .controlCharacters) ?? ""
+        
+        // Neural Engine available on A11+ (iPhone X+) and all M-series chips
+        let neuralEngineDevices = [
+            "iPhone10", "iPhone11", "iPhone12", "iPhone13", "iPhone14", "iPhone15", "iPhone16", "iPhone17", // iPhone X+
+            "iPad8", "iPad11", "iPad12", "iPad13", "iPad14", "iPad16", // iPad Pro with A12X+
+            "arm64" // M-series Macs
+        ]
+        
+        let hasNeuralEngine = neuralEngineDevices.contains { modelName.contains($0) }
+        
+        if hasNeuralEngine {
+            print("🧠 Neural Engine available on device: \(modelName)")
+        } else {
+            print("⚠️ Neural Engine not available on device: \(modelName)")
+        }
+        
+        return hasNeuralEngine
     }
     
     deinit {

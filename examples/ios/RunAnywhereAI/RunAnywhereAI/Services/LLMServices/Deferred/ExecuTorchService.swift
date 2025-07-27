@@ -2,6 +2,11 @@
 //  ExecuTorchService.swift
 //  RunAnywhereAI
 //
+//  ⏸️ DEFERRED SERVICE - NOT PRODUCTION READY
+//  Status: ExecuTorch is in beta/preview (July 2025)
+//  Expected production-ready: Q4 2025/Q1 2026
+//  Reason: Explicitly marked as not recommended for production use by Meta
+//
 
 import Foundation
 #if canImport(UIKit)
@@ -120,12 +125,10 @@ class ExecuTorchService: BaseLLMService {
             throw LLMError.notInitialized()
         }
         
-        var result = ""
-        try await streamGenerate(prompt: prompt, options: options) { token in
-            result += token
-        }
-        
-        return result
+        // Coming Soon - ExecuTorch (PyTorch Mobile)
+        // ExecuTorch is currently in beta/preview status (July 2025)
+        // Expected production-ready: Q4 2025/Q1 2026
+        return "🚧 Coming Soon - ExecuTorch (PyTorch Mobile)\n\nExecuTorch is Meta's on-device AI framework for mobile inference. This framework is currently in beta/preview status and not recommended for production use.\n\nExpected production-ready: Q4 2025/Q1 2026\n\nFeatures coming soon:\n• Optimized PyTorch model execution\n• .pte (PyTorch Edge) format support\n• CPU/GPU/NPU backend selection\n• Memory-efficient inference\n• Model quantization support"
     }
     
     override func streamGenerate(

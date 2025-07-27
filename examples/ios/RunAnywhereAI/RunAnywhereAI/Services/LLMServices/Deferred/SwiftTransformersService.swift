@@ -2,6 +2,11 @@
 //  SwiftTransformersService.swift
 //  RunAnywhereAI
 //
+//  ⏸️ DEFERRED SERVICE - DEPENDENCY CONFLICTS
+//  Status: Complex dependency tree conflicts with other frameworks
+//  Reason: Hugging Face ecosystem integration has version conflicts
+//  Resolution: When dependency conflicts resolved or using isolated integration
+//
 
 import Foundation
 import CoreML
