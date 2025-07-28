@@ -14,7 +14,6 @@ struct UnifiedModelRow: View {
     let onDownload: (ModelInfo) -> Void
     let viewModel: ModelListViewModel
 
-    @State private var isLoading = false
     @State private var showingNoURLAlert = false
     @State private var showingDownloadConfirmation = false
     @State private var selectedModelInfo: ModelInfo?
@@ -200,7 +199,7 @@ struct UnifiedModelRow: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
-                    // Load button for local models or Coming Soon for unsupported types
+                    // Show status for local models
                     if isModelDownloaded {
                         if !effectiveModelType.supportedInChat {
                             // Coming Soon badge for unsupported model types
@@ -214,37 +213,11 @@ struct UnifiedModelRow: View {
                                     .foregroundColor(.orange)
                             }
                             .padding(.horizontal, 8)
-                        } else if isLoading {
-                            HStack(spacing: 4) {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                Text("Loading...")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(15)
                         } else {
-                            Button(action: {
-                                Task {
-                                    isLoading = true
-                                    await viewModel.loadModel(model)
-                                    isLoading = false
-                                }
-                            }) {
-                                Text("Load")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 6)
-                                    .background(model.isCompatible ? Color.blue : Color.gray)
-                                    .cornerRadius(15)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .disabled(!model.isCompatible || isLoading)
+                            // Ready to use indicator
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.green)
                         }
                     }
                 }

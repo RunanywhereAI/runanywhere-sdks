@@ -17,10 +17,14 @@ class ChatViewModelEnhanced: ObservableObject {
     @Published var selectedFramework: LLMFramework = .mlx
     @Published var selectedModel: RunAnywhereAI.ModelInfo? {
         didSet {
-            if let model = selectedModel {
-                Task {
-                    await loadSelectedModel(model)
+            if oldValue?.id != selectedModel?.id {
+                // Model changed, unload the previous model
+                if oldValue != nil {
+                    Task {
+                        await unloadCurrentModel()
+                    }
                 }
+                // Don't load the new model yet - wait for first message
             }
         }
     }
@@ -56,46 +60,92 @@ class ChatViewModelEnhanced: ObservableObject {
     func sendMessage() async {
         guard canSend else { return }
         
-        // Check if model is loaded
-        guard let service = unifiedService.currentService else {
+        // Check if model is selected
+        guard let model = selectedModel else {
             let errorMessage = ChatMessage(
                 role: .assistant, 
-                content: "Please select a framework and model before chatting.",
+                content: "Please select a model before chatting.",
                 timestamp: Date()
             )
             messages.append(errorMessage)
             return
         }
         
-        // Check model state
-        switch service.modelState {
-        case .unloaded:
-            let errorMessage = ChatMessage(
-                role: .assistant, 
-                content: "Please wait for the model to load before chatting.",
-                timestamp: Date()
-            )
-            messages.append(errorMessage)
-            return
-        case .loading:
-            let errorMessage = ChatMessage(
-                role: .assistant, 
-                content: "Model is still loading. Please wait...",
-                timestamp: Date()
-            )
-            messages.append(errorMessage)
-            return
-        case .failed(let error):
-            let errorMessage = ChatMessage(
-                role: .assistant, 
-                content: "Model failed to load: \(error.localizedDescription)",
-                timestamp: Date()
-            )
-            messages.append(errorMessage)
-            return
-        case .loaded:
-            // Model is ready, continue with message
-            break
+        // Ensure the service is selected for the current framework
+        unifiedService.selectService(named: selectedFramework.displayName)
+        
+        // Check if model is loaded, if not, load it now (lazy loading)
+        if let service = unifiedService.currentService {
+            switch service.modelState {
+            case .unloaded:
+                // Load the model now
+                await MainActor.run {
+                    isLoadingModel = true
+                    modelLoadingProgress = "Loading \(model.name)..."
+                }
+                
+                do {
+                    try await loadSelectedModel(model)
+                } catch {
+                    let errorMessage = ChatMessage(
+                        role: .assistant, 
+                        content: "Failed to load model: \(error.localizedDescription)",
+                        timestamp: Date()
+                    )
+                    messages.append(errorMessage)
+                    return
+                }
+                
+            case .loading:
+                let errorMessage = ChatMessage(
+                    role: .assistant, 
+                    content: "Model is still loading. Please wait...",
+                    timestamp: Date()
+                )
+                messages.append(errorMessage)
+                return
+                
+            case .failed(let error):
+                // Try to reload the model
+                await MainActor.run {
+                    isLoadingModel = true
+                    modelLoadingProgress = "Retrying to load \(model.name)..."
+                }
+                
+                do {
+                    try await loadSelectedModel(model)
+                } catch {
+                    let errorMessage = ChatMessage(
+                        role: .assistant, 
+                        content: "Model failed to load: \(error.localizedDescription)",
+                        timestamp: Date()
+                    )
+                    messages.append(errorMessage)
+                    return
+                }
+                
+            case .loaded:
+                // Model is ready, continue with message
+                break
+            }
+        } else {
+            // No service available for this framework - try to load the model which will create the service
+            await MainActor.run {
+                isLoadingModel = true
+                modelLoadingProgress = "Initializing \(selectedFramework.displayName) service..."
+            }
+            
+            do {
+                try await loadSelectedModel(model)
+            } catch {
+                let errorMessage = ChatMessage(
+                    role: .assistant, 
+                    content: "Failed to initialize \(selectedFramework.displayName): \(error.localizedDescription)",
+                    timestamp: Date()
+                )
+                messages.append(errorMessage)
+                return
+            }
         }
 
         let userMessage = ChatMessage(
@@ -136,13 +186,19 @@ class ChatViewModelEnhanced: ObservableObject {
 
         generationTask = Task {
             do {
+                print("📝 Starting generation for prompt: \(prompt)")
+                print("📱 Framework: \(selectedFramework.displayName)")
+                print("🤖 Model: \(selectedModel?.name ?? "unknown")")
+                
                 // Switch framework if needed
                 unifiedService.selectService(named: selectedFramework.displayName)
 
                 if settings.streamResponses {
+                    print("🌊 Using streaming generation")
                     // Stream generation
                     try await streamGeneration(prompt: prompt, messageIndex: messageIndex)
                 } else {
+                    print("📦 Using non-streaming generation")
                     // Non-streaming generation
                     let response = try await generateResponse(prompt: prompt)
                     messages[messageIndex].content = response.text
@@ -163,11 +219,32 @@ class ChatViewModelEnhanced: ObservableObject {
                 await MainActor.run {
                     self.error = error
                     if messageIndex < self.messages.count {
-                        self.messages[messageIndex].content = "Error: \(error.localizedDescription)"
+                        // Provide detailed error information
+                        var errorMessage = "❌ Generation failed:\n"
+                        errorMessage += "\(error.localizedDescription)\n\n"
+                        
+                        // Add framework-specific details
+                        errorMessage += "Framework: \(self.selectedFramework.displayName)\n"
+                        if let model = self.selectedModel {
+                            errorMessage += "Model: \(model.name)\n"
+                        }
+                        
+                        // Add error type details
+                        if let llmError = error as? LLMError {
+                            errorMessage += "Error type: \(llmError)\n"
+                        }
+                        
+                        errorMessage += "\nPlease check:\n"
+                        errorMessage += "• Model is properly downloaded\n"
+                        errorMessage += "• Device supports \(self.selectedFramework.displayName)\n"
+                        errorMessage += "• Sufficient memory available"
+                        
+                        self.messages[messageIndex].content = errorMessage
                         self.messages[messageIndex].isError = true
                     }
                 }
-                logger.log("Generation failed: \(error)", level: .error, category: "Chat")
+                logger.log("Generation failed with error: \(error)", level: .error, category: "Chat")
+                logger.log("Error details - Framework: \(selectedFramework.displayName), Model: \(selectedModel?.name ?? "none")", level: .error, category: "Chat")
             }
 
             // End monitoring
@@ -246,22 +323,25 @@ class ChatViewModelEnhanced: ObservableObject {
         messages.append(welcomeMessage)
     }
     
-    private func loadSelectedModel(_ model: RunAnywhereAI.ModelInfo) async {
+    private func unloadCurrentModel() async {
+        // Unload the current model to free memory
+        if let service = unifiedService.currentService {
+            logger.info("Unloading current model to free memory")
+            service.cleanup()
+            
+            await MainActor.run {
+                // Update UI to show model is no longer loaded
+                isLoadingModel = false
+                modelLoadingProgress = ""
+            }
+        }
+    }
+    
+    private func loadSelectedModel(_ model: RunAnywhereAI.ModelInfo) async throws {
         await MainActor.run {
             isLoadingModel = true
             modelLoadingProgress = "Loading \(model.name)..."
             error = nil
-        }
-        
-        // Switch to the correct framework
-        unifiedService.selectService(named: selectedFramework.displayName)
-        
-        // Get the model path - check if model already has a path set
-        let modelPath: String
-        if let existingPath = model.path, !existingPath.isEmpty {
-            modelPath = existingPath
-        } else {
-            modelPath = ModelManager.shared.modelPath(for: model.name, framework: selectedFramework).path
         }
         
         do {
@@ -269,23 +349,9 @@ class ChatViewModelEnhanced: ObservableObject {
                 modelLoadingProgress = "Initializing \(selectedFramework.displayName) service..."
             }
             
-            // Initialize the service if needed
-            if let service = unifiedService.currentService {
-                switch service.modelState {
-                case .unloaded:
-                    await MainActor.run {
-                        modelLoadingProgress = "Loading model into memory..."
-                    }
-                    try await service.initialize(modelPath: modelPath)
-                case .loaded:
-                    // Model already loaded, just update UI
-                    await MainActor.run {
-                        modelLoadingProgress = "Model already loaded"
-                    }
-                default:
-                    break
-                }
-            }
+            // Use the unified service's loadModel method which handles service creation
+            NSLog("🚀 ChatViewModel calling unifiedService.loadModel with model: %@, framework: %@", model.name, selectedFramework.displayName)
+            try await unifiedService.loadModel(model, framework: selectedFramework)
             
             logger.info("Successfully loaded model: \(model.name)")
             
@@ -303,14 +369,8 @@ class ChatViewModelEnhanced: ObservableObject {
                 self.error = error
                 isLoadingModel = false
                 modelLoadingProgress = ""
-                // Show error message in chat
-                let errorMessage = ChatMessage(
-                    role: .assistant,
-                    content: "Failed to load model: This model format is not supported by the selected framework. Please try selecting another model or check if the model file exists.",
-                    timestamp: Date()
-                )
-                messages.append(errorMessage)
             }
+            throw error
         }
     }
 
@@ -324,6 +384,10 @@ class ChatViewModelEnhanced: ObservableObject {
             stopSequences: []
         )
 
+        print("🚀 Starting stream generation with options:")
+        print("   - Max tokens: \(options.maxTokens)")
+        print("   - Temperature: \(options.temperature)")
+        
         var generatedTokens: [String] = []
         let startTime = CFAbsoluteTimeGetCurrent()
 
@@ -333,6 +397,8 @@ class ChatViewModelEnhanced: ObservableObject {
         ) { [weak self] token in
             guard let self = self else { return }
 
+            print("🔤 Received token: '\(token)'")
+            
             // Record token
             self.performanceMonitor.recordToken(token)
             generatedTokens.append(token)
@@ -340,6 +406,7 @@ class ChatViewModelEnhanced: ObservableObject {
             Task { @MainActor in
                 if messageIndex < self.messages.count {
                     self.messages[messageIndex].content += token
+                    print("📝 Updated message content, length: \(self.messages[messageIndex].content.count)")
                 }
 
                 // Update metrics

@@ -382,12 +382,11 @@ class ModelDownloadManager: NSObject, ObservableObject {
             }
         }
 
-        // Handle tar.gz files - for now, just return the original file
-        // In a production app, you might want to add support for tar.gz extraction
+        // Handle tar.gz files
         if zipURL.pathExtension == "gz" || zipURL.lastPathComponent.contains(".tar.gz") {
-            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
-            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
-            return destinationURL
+            // Extract tar.gz files
+            let extractedURL = try extractTarGz(at: zipURL, to: directory)
+            return extractedURL
         }
 
         // For other file types, just copy them
@@ -396,6 +395,60 @@ class ModelDownloadManager: NSObject, ObservableObject {
         return destinationURL
     }
 
+    private func extractTarGz(at sourceURL: URL, to directory: URL) throws -> URL {
+        print("⚠️ MLX model extraction required")
+        print("Model file: \(sourceURL.lastPathComponent)")
+        
+        // For now, on iOS we'll need to handle this differently
+        // The proper solution would be to:
+        // 1. Use a library like libarchive or GzipSwift
+        // 2. Or pre-extract models server-side
+        // 3. Or use a different format like zip
+        
+        // Create a directory for the model based on the tar.gz filename
+        let modelName = sourceURL.deletingPathExtension().deletingPathExtension().lastPathComponent
+        let modelDir = directory.appendingPathComponent(modelName)
+        
+        // Create the directory
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        
+        // For now, copy the tar.gz file to indicate it needs manual extraction
+        let needsExtractionURL = modelDir.appendingPathComponent("NEEDS_EXTRACTION.tar.gz")
+        try FileManager.default.copyItem(at: sourceURL, to: needsExtractionURL)
+        
+        // Create a README file explaining the issue
+        let readmeContent = """
+        MLX Model Extraction Required
+        ============================
+        
+        This MLX model (\(modelName)) was downloaded as a tar.gz archive but could not be 
+        automatically extracted on iOS.
+        
+        To use this model:
+        1. The model needs to be extracted to reveal:
+           - config.json (model configuration)
+           - *.safetensors files (model weights)
+           - tokenizer files
+        
+        2. Current options:
+           - Use a Mac to extract and transfer files
+           - Wait for app update with extraction support
+           - Use a different model format
+        
+        File: \(sourceURL.lastPathComponent)
+        Location: \(needsExtractionURL.path)
+        """
+        
+        let readmeURL = modelDir.appendingPathComponent("README.txt")
+        try readmeContent.write(to: readmeURL, atomically: true, encoding: .utf8)
+        
+        print("Created placeholder directory at: \(modelDir.path)")
+        print("Tar.gz extraction is not yet supported on iOS")
+        print("Consider using a different model format or pre-extracted models")
+        
+        return modelDir
+    }
+    
     private func verifyChecksum(of fileURL: URL, expectedHash: String) async throws {
         let data = try Data(contentsOf: fileURL)
         let hash = SHA256.hash(data: data)
