@@ -353,12 +353,10 @@ class ONNXService: BaseLLMService {
             print("✅ ONNX Runtime inference completed")
         } catch {
             print("❌ ONNX Runtime inference failed: \(error)")
-            // Fallback to demo response
-            await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+            throw error
         }
         #else
-        // No ONNX Runtime available
-        await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+        throw LLMError.frameworkNotSupported
         #endif
     }
 
@@ -396,50 +394,8 @@ class ONNXService: BaseLLMService {
     }
     #endif
 
-    private func generateFallbackResponse(prompt: String, options: GenerationOptions, onToken: @escaping (String) -> Void) async {
-        // Fallback response when ONNX Runtime is not available
-        let response = "ONNX Runtime not available. Install via SPM: https://github.com/microsoft/onnxruntime-swift-package-manager. This framework provides cross-platform inference with multiple execution providers."
-
-        let words = response.components(separatedBy: " ")
-        for (index, word) in words.enumerated() {
-            if index >= options.maxTokens { break }
-
-            await MainActor.run {
-                onToken(word + " ")
-            }
-            try? await Task.sleep(nanoseconds: 60_000_000) // 60ms
-        }
-    }
 
     // MARK: - Private ONNX Helper Methods
-
-    private func generateONNXResponse(for prompt: String, modelInfo: ModelInfo?) -> String {
-        let modelName = modelInfo?.name ?? "ONNX model"
-
-        // ONNX Runtime emphasizes cross-platform compatibility and optimization
-        if prompt.lowercased().contains("cross-platform") || prompt.lowercased().contains("compatibility") {
-            return "ONNX Runtime with \(modelName) provides universal cross-platform inference capabilities. Models trained in PyTorch, TensorFlow, or other frameworks can run consistently across different operating systems and hardware accelerators."
-        } else if prompt.lowercased().contains("microsoft") || prompt.lowercased().contains("azure") {
-            return "Using \(modelName) through Microsoft's ONNX Runtime delivers enterprise-grade performance and reliability. This framework is optimized for both cloud and edge deployment with support for various execution providers."
-        } else if prompt.lowercased().contains("optimization") || prompt.lowercased().contains("performance") {
-            return "ONNX Runtime's \(modelName) leverages advanced graph optimization techniques and execution providers like CoreML on iOS. This results in efficient inference with automatic hardware acceleration selection."
-        } else {
-            return "Responding with \(modelName) via ONNX Runtime framework. This cross-platform inference engine provides optimized execution across diverse hardware while maintaining model compatibility and performance."
-        }
-    }
-
-    private func applyONNXSampling(_ word: String, options: GenerationOptions, config: ONNXSessionConfig) -> String {
-        // ONNX Runtime supports configurable sampling strategies
-        if options.temperature > 0.9 {
-            return word.count > 4 ? word.capitalized : word.uppercased()
-        } else if options.temperature < 0.2 {
-            return word.lowercased()
-        } else if config.optimizationLevel == .all && word.count > 5 {
-            // Simulate optimization effects on output
-            return word.prefix(word.count - 1) + word.suffix(1).capitalized
-        }
-        return word
-    }
 
     override func getModelInfo() -> ModelInfo? {
         currentModelInfo

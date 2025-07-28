@@ -268,19 +268,18 @@ final class FoundationModelsService: LLMService {
                         logInfo("Generated response using REAL Foundation Models API")
                     } else {
                         // Device doesn't support Foundation Models
-                        generatedText = "Foundation Models not available on this device. Requires A17 Pro or M-series chip with iOS 18+."
-                        logInfo("Foundation Models not supported on this device")
+                        throw LLMError.frameworkNotSupported
                     }
                 } catch {
                     logError("Foundation Models generation failed: \(error)")
-                    generatedText = "Foundation Models error: \(error.localizedDescription)"
+                    throw error
                 }
             } else {
-                generatedText = "Foundation Models requires iOS 18.0 or later. Current iOS version not supported."
+                throw LLMError.frameworkNotSupported
             }
             #else
             // Foundation Models framework not available (simulator or older Xcode)
-            generatedText = "Foundation Models framework not available. Running on simulator or requires Xcode 16+ with iOS 18 SDK."
+            throw LLMError.frameworkNotSupported
             #endif
 
             let duration = CFAbsoluteTimeGetCurrent() - startTime
@@ -375,28 +374,9 @@ final class FoundationModelsService: LLMService {
         // let response = try await model.generate(request)
         // return response.text
 
-        // For now, we provide a realistic response that indicates real Foundation Models usage
-        let deviceInfo = await getDeviceInfo()
-
-        return """
-        🤖 REAL Foundation Models Response:
-
-        I'm Apple's on-device Foundation Model running natively on your \(deviceInfo.device) with iOS 18+.
-
-        Your prompt: "\(prompt)"
-
-        This response demonstrates real Foundation Models integration with:
-        • On-device processing (no data sent to servers)
-        • Neural Engine acceleration
-        • \(options.maxTokens) max tokens
-        • \(options.temperature) temperature setting
-        • Hardware-optimized inference
-
-        The actual Foundation Models APIs are still being finalized by Apple, but this service is ready to integrate with the real APIs once they're publicly available.
-
-        Generated on: \(Date().formatted())
-        Privacy: Complete - all processing on-device
-        """
+        // In a real implementation, this would call the actual Foundation Models API
+        // For now, throw an error indicating the API is not yet available
+        throw LLMError.initializationFailed("Foundation Models API not yet publicly available")
         #else
         throw LLMError.frameworkNotSupported
         #endif
@@ -425,25 +405,6 @@ final class FoundationModelsService: LLMService {
     }
 
     // MARK: - Helper Methods
-
-    private func generateFallbackResponse(for prompt: String) -> String {
-        // Enhanced fallback response that's more contextual
-        let responses = [
-            "I'm Apple's on-device Foundation Model. I can help you with various tasks while keeping your data private and secure.",
-            "This response is generated using Apple's Foundation Models framework, running entirely on your device for privacy.",
-            "As an on-device AI model, I can assist with writing, analysis, and creative tasks without sending your data to the cloud.",
-            "Apple's Foundation Models provide intelligent responses while maintaining complete privacy - your conversations never leave your device."
-        ]
-
-        // Select response based on prompt characteristics
-        if prompt.lowercased().contains("hello") || prompt.lowercased().contains("hi") {
-            return "Hello! I'm Apple's on-device Foundation Model, ready to help you with your tasks while keeping everything private."
-        } else if prompt.lowercased().contains("privacy") || prompt.lowercased().contains("secure") {
-            return "Privacy is my core strength. All processing happens on your device using Apple's Foundation Models - no data ever leaves your iPhone."
-        } else {
-            return responses.randomElement() ?? responses[0]
-        }
-    }
 
     func streamGenerate(_ request: GenerationRequest) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
@@ -481,15 +442,13 @@ final class FoundationModelsService: LLMService {
                             logInfo("Streaming generation completed using real Foundation Models API")
                         } catch {
                             logError("Foundation Models streaming failed: \(error)")
-                            // Fallback to mock streaming
-                            try await performFallbackStreaming(request: request, continuation: continuation)
+                            throw error
                         }
                     } else {
-                        try await performFallbackStreaming(request: request, continuation: continuation)
+                        throw LLMError.frameworkNotSupported
                     }
                     #else
-                    // Fallback when Foundation Models is not available
-                    try await performFallbackStreaming(request: request, continuation: continuation)
+                    throw LLMError.frameworkNotSupported
                     #endif
 
                     tracker.end(framework: .foundationModels)
@@ -501,31 +460,6 @@ final class FoundationModelsService: LLMService {
         }
     }
 
-    private func performFallbackStreaming(
-        request: GenerationRequest,
-        continuation: AsyncThrowingStream<String, Error>.Continuation
-    ) async throws {
-        // Enhanced fallback streaming that mimics real Foundation Models behavior
-        let fullResponse = generateFallbackResponse(for: request.prompt)
-        let words = fullResponse.components(separatedBy: " ")
-
-        let startTime = CFAbsoluteTimeGetCurrent()
-
-        for (index, word) in words.enumerated() {
-            let elapsedTime = CFAbsoluteTimeGetCurrent() - startTime
-
-            generationState = .generating(progress: GenerationProgress(
-                tokensGenerated: index + 1,
-                estimatedTotal: words.count,
-                currentSpeed: Double(index + 1) / max(elapsedTime, 0.001),
-                elapsedTime: elapsedTime
-            ))
-
-            continuation.yield(word + " ")
-            // Realistic streaming delay (Foundation Models is quite fast)
-            try await Task.sleep(nanoseconds: 50_000_000) // 0.05s per word
-        }
-    }
 
     func cancelGeneration() async {
         logInfo("Cancelling generation")

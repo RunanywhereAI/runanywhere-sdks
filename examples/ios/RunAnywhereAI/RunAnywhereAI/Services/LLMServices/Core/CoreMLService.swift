@@ -379,56 +379,12 @@ class CoreMLService: BaseLLMService {
 
             print("Core ML generated \(generatedTokens.count) tokens successfully")
         } catch {
-            print("Core ML inference failed: \(error), falling back to mock response")
-
-            // Fallback to enhanced mock response
-            let responseTemplate = generateCoreMLResponse(for: prompt, modelInfo: currentModelInfo)
-            let responseWords = responseTemplate.components(separatedBy: .whitespacesAndNewlines)
-
-            for (index, word) in responseWords.enumerated() {
-                // Core ML inference is typically faster than CPU-only solutions
-                let delay = word.count > 8 ? 60_000_000 : 40_000_000 // 60ms or 40ms
-                try await Task.sleep(nanoseconds: UInt64(delay))
-
-                // Apply generation options
-                let processedWord = applyCoreMLSampling(word, options: options)
-                onToken(processedWord + " ")
-
-                // Stop at max tokens
-                if index >= options.maxTokens - 1 {
-                    break
-                }
-            }
+            print("Core ML inference failed: \(error)")
+            throw error
         }
     }
 
     // MARK: - Private Core ML Helper Methods
-
-    private func generateCoreMLResponse(for prompt: String, modelInfo: ModelInfo?) -> String {
-        let modelName = modelInfo?.name ?? "Core ML model"
-
-        // Core ML responses tend to be more structured and hardware-optimized
-        if prompt.lowercased().contains("performance") || prompt.lowercased().contains("speed") {
-            return "Core ML with \(modelName) leverages Apple's Neural Engine for accelerated inference. The model runs efficiently on-device with optimized memory usage and low latency, perfect for real-time applications."
-        } else if prompt.lowercased().contains("privacy") || prompt.lowercased().contains("secure") {
-            return "Running \(modelName) with Core ML ensures complete privacy - all inference happens locally on your device with no data sent to external servers. Apple's secure enclave and Neural Engine provide hardware-level security."
-        } else if prompt.lowercased().contains("apple") || prompt.lowercased().contains("ios") {
-            return "This \(modelName) is optimized for Apple devices using Core ML framework. It takes advantage of the Neural Engine, GPU, and CPU for maximum performance while maintaining energy efficiency."
-        } else {
-            return "Using \(modelName) via Core ML framework for hardware-accelerated inference. This approach provides excellent performance on Apple devices with automatic optimization for Neural Engine when available."
-        }
-    }
-
-    private func applyCoreMLSampling(_ word: String, options: GenerationOptions) -> String {
-        // Core ML typically has more deterministic outputs
-        if options.temperature < 0.5 {
-            return word.lowercased()
-        } else if options.temperature > 0.7 {
-            // Slightly more variation at higher temperatures
-            return word.count > 3 ? word.capitalized : word
-        }
-        return word
-    }
 
     private func createInputArray(from tokens: [Int32]) throws -> MLMultiArray {
         let inputShape = [1, min(tokens.count, maxSequenceLength)] as [NSNumber]

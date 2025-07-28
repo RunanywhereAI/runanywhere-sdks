@@ -241,31 +241,12 @@ class TFLiteService: BaseLLMService {
             print("✅ TensorFlow Lite inference completed")
         } catch {
             print("❌ TensorFlow Lite inference failed: \(error)")
-            // Fallback to demo response
-            await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+            throw error
         }
         #else
         // No TensorFlow Lite available
-        await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+        throw LLMError.frameworkNotSupported
         #endif
-
-        // Simulate TensorFlow Lite generation
-        let responseTokens = [
-            "I", "'m", " running", " on", " TensorFlow", " Lite", ",",
-            " Google", "'s", " lightweight", " ML", " framework", " for",
-            " mobile", " and", " embedded", " devices", ".", " It",
-            " provides", " hardware", " acceleration", " and", " model",
-            " optimization", " techniques", "."
-        ]
-
-        for (index, token) in responseTokens.prefix(options.maxTokens).enumerated() {
-            try await Task.sleep(nanoseconds: 40_000_000) // 40ms per token
-            onToken(token)
-
-            if token.contains(".") && index > 10 {
-                break
-            }
-        }
     }
 
     override func getModelInfo() -> ModelInfo? {
@@ -332,20 +313,6 @@ class TFLiteService: BaseLLMService {
     }
     #endif
 
-    private func generateFallbackResponse(prompt: String, options: GenerationOptions, onToken: @escaping (String) -> Void) async {
-        // Fallback response when TensorFlow Lite is not available
-        let response = "TensorFlow Lite not available. Install via CocoaPods: pod 'TensorFlowLiteSwift'. This framework provides efficient mobile inference with GPU acceleration and quantization support."
-
-        let words = response.components(separatedBy: " ")
-        for (index, word) in words.enumerated() {
-            if index >= options.maxTokens { break }
-
-            await MainActor.run {
-                onToken(word + " ")
-            }
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-        }
-    }
 
     // MARK: - Private Methods
 

@@ -229,8 +229,7 @@ class MLXService: BaseLLMService {
         // Simulate model loading with proper delay for MLX models
         try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds with MLX acceleration
         #else
-        print("MLX Framework not available - using fallback simulation")
-        try await Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds for simulation
+        throw LLMError.frameworkNotSupported
         #endif
 
         // Initialize wrapper and tokenizer
@@ -344,12 +343,10 @@ class MLXService: BaseLLMService {
             print("✅ MLX inference completed with GPU acceleration")
         } catch {
             print("❌ MLX inference failed: \(error)")
-            // Fallback to demo response
-            await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+            throw error
         }
         #else
-        print("MLX not available - using fallback")
-        await generateFallbackResponse(prompt: prompt, options: options, onToken: onToken)
+        throw LLMError.frameworkNotSupported
         #endif
     }
 
@@ -405,53 +402,7 @@ class MLXService: BaseLLMService {
     }
     #endif
 
-    private func generateFallbackResponse(prompt: String, options: GenerationOptions, onToken: @escaping (String) -> Void) async {
-        // Fallback when MLX is not available
-        let response = "MLX not available. MLX is Apple's array framework for machine learning on Apple Silicon. Install from https://github.com/ml-explore/mlx-swift for GPU-accelerated inference."
-
-        let words = response.components(separatedBy: " ")
-        for (index, word) in words.enumerated() {
-            if index >= options.maxTokens { break }
-
-            await MainActor.run {
-                onToken(word + " ")
-            }
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-        }
-    }
-
     // MARK: - Private MLX Helper Methods
-
-    private func generateMLXResponse(for prompt: String, modelInfo: ModelInfo?) -> String {
-        let modelName = modelInfo?.name ?? "MLX model"
-
-        // MLX responses emphasize Apple Silicon optimization
-        if prompt.lowercased().contains("performance") || prompt.lowercased().contains("fast") {
-            return "MLX with \(modelName) delivers exceptional performance on Apple Silicon, leveraging the unified memory architecture and GPU acceleration. This results in significantly faster inference compared to CPU-only solutions while maintaining high quality outputs."
-        } else if prompt.lowercased().contains("apple") || prompt.lowercased().contains("silicon") {
-            return "Running \(modelName) on MLX framework takes full advantage of Apple Silicon's capabilities. The unified memory architecture allows efficient data sharing between CPU and GPU, while the Metal Performance Shaders provide optimized compute kernels for transformer operations."
-        } else if prompt.lowercased().contains("memory") || prompt.lowercased().contains("efficient") {
-            return "MLX's \(modelName) implementation uses Apple's unified memory efficiently, sharing data between CPU and GPU without copying. This reduces memory bandwidth requirements and enables running larger models that wouldn't fit in traditional GPU memory."
-        } else {
-            return "Responding with \(modelName) using MLX framework on Apple Silicon. This provides hardware-accelerated inference with optimized memory usage and excellent performance characteristics for on-device AI applications."
-        }
-    }
-
-    private func applyMLXSampling(_ word: String, options: GenerationOptions, index: Int) -> String {
-        // MLX supports sophisticated sampling strategies
-        if options.temperature > 0.9 {
-            // High temperature: more creative sampling
-            let variations = [word, word.capitalized, word.uppercased()]
-            return variations.randomElement() ?? word
-        } else if options.temperature < 0.2 {
-            // Low temperature: deterministic output
-            return word.lowercased()
-        } else if options.topP < 0.9 && index % 3 == 0 {
-            // Top-p sampling effect simulation
-            return word.count > 4 ? word.capitalized : word
-        }
-        return word
-    }
 
     override func getModelInfo() -> ModelInfo? {
         currentModelInfo
