@@ -41,49 +41,13 @@ class SwiftTransformersService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "distilbert-base-uncased",
-                    name: "distilbert-base-uncased.mlpackage",
-                    format: .coreML,
-                    size: "265MB",
-                    framework: .swiftTransformers,
-                    quantization: "FP16",
-                    contextLength: 512,
-                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-distilbert-base-uncased/resolve/main/DistilBERT.mlpackage.zip")!,
-                    description: "DistilBERT model converted to Core ML for Swift Transformers",
-                    minimumMemory: 500_000_000,
-                    recommendedMemory: 800_000_000
-                ),
-                ModelInfo(
-                    id: "gpt2-swift",
-                    name: "gpt2.mlpackage",
-                    format: .coreML,
-                    size: "548MB",
-                    framework: .swiftTransformers,
-                    quantization: "FP16",
-                    contextLength: 1024,
-                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-gpt2/resolve/main/GPT2.mlpackage.zip")!,
-                    description: "GPT-2 model with native Swift tokenizer support",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 1_500_000_000
-                ),
-                ModelInfo(
-                    id: "llama2-7b-chat-hf-swift",
-                    name: "llama2-7b-chat.mlpackage",
-                    format: .coreML,
-                    size: "3.5GB",
-                    framework: .swiftTransformers,
-                    quantization: "INT8",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://huggingface.co/apple/coreml-llama2-7b-chat/resolve/main/Llama2-7b-chat.mlpackage.zip")!,
-                    description: "Llama 2 7B chat model optimized for Core ML",
-                    minimumMemory: 4_000_000_000,
-                    recommendedMemory: 6_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .swiftTransformers)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var model: Any? // Would be LanguageModel in real implementation

@@ -33,14 +33,27 @@ check_url() {
     local name="$2"
     local framework="$3"
     
+    # Skip built-in URLs
+    if [[ $url == "builtin://"* ]]; then
+        echo -e "${BLUE}🏗️  $framework - $name (Built-in model)${NC}"
+        return 0
+    fi
+    
     # Use curl to check URL with timeout and follow redirects
-    if curl --head --silent --fail --location --max-time 10 --user-agent "RunAnywhereAI-URLVerifier/1.0" "$url" >/dev/null 2>&1; then
+    # For GitHub LFS files, we need to handle redirects more carefully
+    if curl --head --silent --fail --location --max-time 15 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" "$url" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ $framework - $name${NC}"
         return 0
     else
-        echo -e "${RED}❌ $framework - $name${NC}"
-        echo -e "${RED}   URL: $url${NC}"
-        return 1
+        # Try again with a simple GET request for stubborn URLs
+        if curl --silent --fail --location --max-time 15 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" --range 0-1 "$url" >/dev/null 2>&1; then
+            echo -e "${GREEN}✅ $framework - $name${NC}"
+            return 0
+        else
+            echo -e "${RED}❌ $framework - $name${NC}"
+            echo -e "${RED}   URL: $url${NC}"
+            return 1
+        fi
     fi
 }
 
@@ -51,17 +64,27 @@ successful_urls=0
 echo -e "${YELLOW}🔄 Extracting URLs from ModelURLRegistry.swift...${NC}"
 echo ""
 
+# Foundation Models (Built-in)
+echo -e "${BLUE}=== Foundation Models ===${NC}"
+while IFS= read -r line; do
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
+        url="${BASH_REMATCH[1]}"
+        name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
+        ((total_urls++))
+        if check_url "$url" "$name" "Foundation Models"; then
+            ((successful_urls++))
+        fi
+    fi
+done < <(sed -n '/private var _foundationModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+
+echo ""
+
 # Core ML Models
 echo -e "${BLUE}=== Core ML Models ===${NC}"
 while IFS= read -r line; do
-    if [[ $line =~ URL\(string:\ \"([^\"]+)\" ]]; then
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
-        # Extract model name from the previous lines
-        name=$(echo "$line" | sed -n 's/.*name: "\([^"]*\)".*/\1/p' || echo "Unknown")
-        if [[ -z "$name" || "$name" == "Unknown" ]]; then
-            # Try to extract from context
-            name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/')
-        fi
+        name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
         if check_url "$url" "$name" "Core ML"; then
             ((successful_urls++))
@@ -74,7 +97,7 @@ echo ""
 # MLX Models  
 echo -e "${BLUE}=== MLX Models ===${NC}"
 while IFS= read -r line; do
-    if [[ $line =~ URL\(string:\ \"([^\"]+)\" ]]; then
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
@@ -89,7 +112,7 @@ echo ""
 # ONNX Models
 echo -e "${BLUE}=== ONNX Models ===${NC}"
 while IFS= read -r line; do
-    if [[ $line =~ URL\(string:\ \"([^\"]+)\" ]]; then
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
@@ -104,7 +127,7 @@ echo ""
 # TensorFlow Lite Models
 echo -e "${BLUE}=== TensorFlow Lite Models ===${NC}"
 while IFS= read -r line; do
-    if [[ $line =~ URL\(string:\ \"([^\"]+)\" ]]; then
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
@@ -126,7 +149,7 @@ echo ""
 # GGUF Models (llama.cpp)
 echo -e "${BLUE}=== GGUF Models (llama.cpp) ===${NC}"
 while IFS= read -r line; do
-    if [[ $line =~ URL\(string:\ \"([^\"]+)\" ]]; then
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))

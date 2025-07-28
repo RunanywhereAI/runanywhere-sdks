@@ -38,49 +38,13 @@ class PicoLLMService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "phi-2-picollm",
-                    name: "phi-2-x2.pllm",
-                    format: .other,
-                    size: "240MB",
-                    framework: .picoLLM,
-                    quantization: "X-bit",
-                    contextLength: 2048,
-                    downloadURL: URL(string: "https://console.picovoice.ai/ppn/phi-2-x2.pllm")!,
-                    description: "Microsoft Phi-2 compressed with X-bit quantization for ultra-low memory usage",
-                    minimumMemory: 300_000_000,
-                    recommendedMemory: 500_000_000
-                ),
-                ModelInfo(
-                    id: "llama3-2b-picollm",
-                    name: "llama3-2b-x3.pllm",
-                    format: .other,
-                    size: "680MB",
-                    framework: .picoLLM,
-                    quantization: "X-bit",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://console.picovoice.ai/ppn/llama3-2b-x3.pllm")!,
-                    description: "Llama 3 2B with aggressive X-bit compression for edge deployment",
-                    minimumMemory: 800_000_000,
-                    recommendedMemory: 1_200_000_000
-                ),
-                ModelInfo(
-                    id: "gemma-2b-picollm",
-                    name: "gemma-2b-x3.pllm",
-                    format: .other,
-                    size: "620MB",
-                    framework: .picoLLM,
-                    quantization: "X-bit",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://console.picovoice.ai/ppn/gemma-2b-x3.pllm")!,
-                    description: "Google Gemma 2B optimized for voice assistant applications",
-                    minimumMemory: 700_000_000,
-                    recommendedMemory: 1_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .picoLLM)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var picoLLM: Any? // Would be PicoLLM instance in real implementation

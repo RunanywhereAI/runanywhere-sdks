@@ -130,55 +130,13 @@ class CoreMLService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "gpt2-coreml",
-                    name: "GPT2-CoreML.mlpackage",
-                    format: .coreML,
-                    size: "548MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 1024,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip"
-                    )!,
-                    description: "GPT-2 model converted to Core ML format with Neural Engine acceleration",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 2_000_000_000
-                ),
-                ModelInfo(
-                    id: "distilgpt2-coreml",
-                    name: "DistilGPT2-CoreML.mlpackage",
-                    format: .coreML,
-                    size: "267MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 1024,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip"
-                    )!,
-                    description: "Smaller DistilGPT2 model optimized for mobile devices",
-                    minimumMemory: 500_000_000,
-                    recommendedMemory: 1_000_000_000
-                ),
-                ModelInfo(
-                    id: "openelm-270m-coreml",
-                    name: "OpenELM-270M.mlpackage",
-                    format: .coreML,
-                    size: "312MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 2048,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip"
-                    )!,
-                    description: "Apple's OpenELM 270M model optimized for on-device inference",
-                    minimumMemory: 400_000_000,
-                    recommendedMemory: 800_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .coreML)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var model: MLModel?

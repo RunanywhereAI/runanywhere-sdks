@@ -178,6 +178,17 @@ struct ModelInfo: Identifiable, Codable {
     var downloadedFileName: String?
     var modelType: ModelType?
 
+    // Download-related properties
+    let sha256: String?
+    let requiresUnzip: Bool
+    let requiresAuth: Bool
+    let alternativeURLs: [URL]
+    let notes: String?
+    
+    // Runtime properties (not encoded)
+    var isURLValid: Bool = true
+    var lastVerified: Date?
+    
     // Legacy support
     let description: String
     let minimumMemory: Int64
@@ -195,6 +206,11 @@ struct ModelInfo: Identifiable, Codable {
          downloadURL: URL? = nil,
          downloadedFileName: String? = nil,
          modelType: ModelType? = nil,
+         sha256: String? = nil,
+         requiresUnzip: Bool = false,
+         requiresAuth: Bool = false,
+         alternativeURLs: [URL] = [],
+         notes: String? = nil,
          description: String = "",
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
@@ -210,6 +226,11 @@ struct ModelInfo: Identifiable, Codable {
         self.downloadURL = downloadURL
         self.downloadedFileName = downloadedFileName
         self.modelType = modelType ?? .text // Default to text if not specified
+        self.sha256 = sha256
+        self.requiresUnzip = requiresUnzip
+        self.requiresAuth = requiresAuth
+        self.alternativeURLs = alternativeURLs
+        self.notes = notes
         self.description = description
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory
@@ -222,5 +243,21 @@ struct ModelInfo: Identifiable, Codable {
     var isCompatible: Bool {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return availableMemory >= minimumMemory
+    }
+    
+    var isBuiltIn: Bool {
+        downloadURL?.scheme == "builtin"
+    }
+    
+    var isUnavailable: Bool {
+        !isURLValid && !isBuiltIn && !requiresAuth
+    }
+    
+    // Custom Codable implementation to exclude runtime properties
+    enum CodingKeys: String, CodingKey {
+        case id, name, path, format, size, framework, quantization, contextLength
+        case isLocal, downloadURL, downloadedFileName, modelType
+        case sha256, requiresUnzip, requiresAuth, alternativeURLs, notes
+        case description, minimumMemory, recommendedMemory
     }
 }

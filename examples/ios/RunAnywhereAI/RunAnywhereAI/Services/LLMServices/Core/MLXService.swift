@@ -158,49 +158,13 @@ class MLXService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "mistral-7b-mlx-4bit",
-                    name: "Mistral-7B-Instruct-v0.2-4bit",
-                    format: .mlx,
-                    size: "3.8GB",
-                    framework: .mlx,
-                    quantization: "4-bit",
-                    contextLength: 32768,
-                    downloadURL: URL(string: "https://huggingface.co/mlx-community/Mistral-7B-Instruct-v0.2-4bit/resolve/main/Mistral-7B-Instruct-v0.2-4bit.tar.gz")!,
-                    description: "Mistral 7B optimized for Apple Silicon with MLX 4-bit quantization",
-                    minimumMemory: 6_000_000_000,
-                    recommendedMemory: 8_000_000_000
-                ),
-                ModelInfo(
-                    id: "llama-3.2-3b-mlx",
-                    name: "Llama-3.2-3B-Instruct-4bit",
-                    format: .mlx,
-                    size: "1.7GB",
-                    framework: .mlx,
-                    quantization: "4-bit",
-                    contextLength: 131072,
-                    downloadURL: URL(string: "https://huggingface.co/mlx-community/Llama-3.2-3B-Instruct-4bit/resolve/main/Llama-3.2-3B-Instruct-4bit.tar.gz")!,
-                    description: "Llama 3.2 3B model with MLX acceleration for Apple Silicon",
-                    minimumMemory: 3_000_000_000,
-                    recommendedMemory: 4_000_000_000
-                ),
-                ModelInfo(
-                    id: "gemma-2b-mlx",
-                    name: "gemma-2b-it-4bit",
-                    format: .mlx,
-                    size: "1.2GB",
-                    framework: .mlx,
-                    quantization: "4-bit",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://huggingface.co/mlx-community/gemma-2b-it-4bit/resolve/main/gemma-2b-it-4bit.tar.gz")!,
-                    description: "Google's Gemma 2B instruction-tuned model optimized for MLX",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .mlx)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var currentModelInfo: ModelInfo?

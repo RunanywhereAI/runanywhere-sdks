@@ -119,49 +119,13 @@ class ONNXService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "phi-3-mini-onnx",
-                    name: "Phi-3-mini-4k-instruct.onnxRuntime",
-                    format: .onnxRuntime,
-                    size: "2.4GB",
-                    framework: .onnxRuntime,
-                    quantization: "FP16",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32/phi3-mini-4k-instruct-cpu-int4-rtn-block-32.onnxRuntime")!,
-                    description: "Microsoft Phi-3 mini model in ONNX format with INT4 quantization",
-                    minimumMemory: 3_000_000_000,
-                    recommendedMemory: 4_000_000_000
-                ),
-                ModelInfo(
-                    id: "llama-2-7b-onnx",
-                    name: "llama-2-7b-chat.onnxRuntime",
-                    format: .onnxRuntime,
-                    size: "3.5GB",
-                    framework: .onnxRuntime,
-                    quantization: "INT8",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://huggingface.co/microsoft/Llama-2-7b-chat-hf-onnx/resolve/main/Llama-2-7b-chat-hf-int8.onnxRuntime")!,
-                    description: "Llama 2 7B chat model optimized with ONNX Runtime",
-                    minimumMemory: 4_000_000_000,
-                    recommendedMemory: 6_000_000_000
-                ),
-                ModelInfo(
-                    id: "gpt2-onnx",
-                    name: "gpt2.onnxRuntime",
-                    format: .onnxRuntime,
-                    size: "548MB",
-                    framework: .onnxRuntime,
-                    quantization: "FP32",
-                    contextLength: 1024,
-                    downloadURL: URL(string: "https://huggingface.co/onnx-community/gpt2/resolve/main/onnx/model.onnxRuntime")!,
-                    description: "GPT-2 model in ONNX format for cross-platform deployment",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 2_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .onnxRuntime)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var session: Any? // Would be ORTSession in real implementation

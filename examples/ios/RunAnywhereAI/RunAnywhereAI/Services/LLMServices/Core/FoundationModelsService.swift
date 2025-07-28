@@ -73,23 +73,8 @@ final class FoundationModelsService: LLMService {
     }
 
     var supportedModels: [ModelInfo] {
-        [
-            ModelInfo(
-                id: "apple-foundation-3b",
-                name: "Apple Foundation 3B",
-                path: nil,
-                format: .mlPackage,
-                size: "3GB",
-                framework: .foundationModels,
-                quantization: "INT8",
-                contextLength: 8192,
-                isLocal: false,
-                downloadURL: nil,
-                description: "Apple's ~3B parameter on-device model",
-                minimumMemory: 4_000_000_000,
-                recommendedMemory: 6_000_000_000
-            )
-        ]
+        // Get models from the single source of truth
+        ModelURLRegistry.shared.getAllModels(for: .foundationModels)
     }
 
     // MARK: - Initialization

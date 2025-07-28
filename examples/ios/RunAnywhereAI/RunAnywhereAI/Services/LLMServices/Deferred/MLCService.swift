@@ -97,49 +97,13 @@ class MLCService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "llama-3.2-1b-mlc",
-                    name: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-                    format: .mlc,
-                    size: "920MB",
-                    framework: .mlc,
-                    quantization: "q4f16_1",
-                    contextLength: 131072,
-                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/Llama-3.2-1B-Instruct-q4f16_1-MLC/resolve/main/Llama-3.2-1B-Instruct-q4f16_1-MLC.tar")!,
-                    description: "Llama 3.2 1B model optimized for MLC with quantization",
-                    minimumMemory: 1_500_000_000,
-                    recommendedMemory: 2_500_000_000
-                ),
-                ModelInfo(
-                    id: "gemma-2b-mlc",
-                    name: "gemma-2b-it-q4f16_1-MLC",
-                    format: .mlc,
-                    size: "1.4GB",
-                    framework: .mlc,
-                    quantization: "q4f16_1",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/gemma-2b-it-q4f16_1-MLC/resolve/main/gemma-2b-it-q4f16_1-MLC.tar")!,
-                    description: "Google Gemma 2B instruction-tuned model with MLC optimization",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                ),
-                ModelInfo(
-                    id: "phi-3-mini-mlc",
-                    name: "Phi-3-mini-4k-instruct-q4f16_1-MLC",
-                    format: .mlc,
-                    size: "2.3GB",
-                    framework: .mlc,
-                    quantization: "q4f16_1",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://huggingface.co/mlc-ai/Phi-3-mini-4k-instruct-q4f16_1-MLC/resolve/main/Phi-3-mini-4k-instruct-q4f16_1-MLC.tar")!,
-                    description: "Microsoft Phi-3 mini model with MLC cross-platform optimization",
-                    minimumMemory: 3_000_000_000,
-                    recommendedMemory: 4_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .mlc)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var engine: Any? // Would be MLCEngine in real implementation

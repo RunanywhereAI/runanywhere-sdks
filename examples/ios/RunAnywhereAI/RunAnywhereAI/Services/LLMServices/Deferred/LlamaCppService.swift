@@ -84,49 +84,13 @@ class LlamaCppService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "tinyllama-1.1b-q4",
-                    name: "TinyLlama-1.1B-Q4_K_M.gguf",
-                    format: .gguf,
-                    size: "637MB",
-                    framework: .llamaCpp,
-                    quantization: "Q4_K_M",
-                    contextLength: 2048,
-                    downloadURL: URL(string: "https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf")!,
-                    description: "TinyLlama 1.1B parameter model, 4-bit quantized",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 2_000_000_000
-                ),
-                ModelInfo(
-                    id: "phi3-mini-q4",
-                    name: "Phi-3-mini-Q4_K_M.gguf",
-                    format: .gguf,
-                    size: "1.5GB",
-                    framework: .llamaCpp,
-                    quantization: "Q4_K_M",
-                    contextLength: 4096,
-                    downloadURL: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!,
-                    description: "Microsoft Phi-3 mini model, optimized for mobile",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                ),
-                ModelInfo(
-                    id: "qwen2.5-0.5b-q5",
-                    name: "Qwen2.5-0.5B-Q5_K_M.gguf",
-                    format: .gguf,
-                    size: "394MB",
-                    framework: .llamaCpp,
-                    quantization: "Q5_K_M",
-                    contextLength: 32768,
-                    downloadURL: URL(string: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q5_k_m.gguf")!,
-                    description: "Qwen 2.5 0.5B model, great for quick responses",
-                    minimumMemory: 600_000_000,
-                    recommendedMemory: 1_000_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .llamaCpp)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var currentModelInfo: ModelInfo?

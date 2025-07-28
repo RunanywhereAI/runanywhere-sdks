@@ -42,49 +42,13 @@ class ExecuTorchService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "llama3-2b-executorch",
-                    name: "llama3-2b-instruct.pte",
-                    format: .pte,
-                    size: "1.2GB",
-                    framework: .execuTorch,
-                    quantization: "INT8",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://huggingface.co/pytorch/llama3-2b-executorch/resolve/main/llama3-2b-int8.pte")!,
-                    description: "Llama 3 2B model optimized for ExecuTorch with 4-bit quantization",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                ),
-                ModelInfo(
-                    id: "gemma-2b-executorch",
-                    name: "gemma-2b.pte",
-                    format: .pte,
-                    size: "1.4GB",
-                    framework: .execuTorch,
-                    quantization: "INT4",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://huggingface.co/google/gemma-2b-executorch/resolve/main/gemma-2b-int4.pte")!,
-                    description: "Google Gemma 2B model exported for ExecuTorch",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                ),
-                ModelInfo(
-                    id: "mobilellm-125m-executorch",
-                    name: "mobilellm-125m.pte",
-                    format: .pte,
-                    size: "150MB",
-                    framework: .execuTorch,
-                    quantization: "INT8",
-                    contextLength: 2048,
-                    downloadURL: URL(string: "https://huggingface.co/facebook/mobilellm-125m-executorch/resolve/main/mobilellm-125m-int8.pte")!,
-                    description: "Ultra-lightweight LLM for mobile devices",
-                    minimumMemory: 300_000_000,
-                    recommendedMemory: 500_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .execuTorch)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var module: Any? // Would be ETModule in real implementation
