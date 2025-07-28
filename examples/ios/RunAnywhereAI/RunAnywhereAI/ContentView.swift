@@ -20,9 +20,7 @@ struct ContentView: View {
             }
             .tag(0)
 
-            NavigationView {
-                ModelListView()
-            }
+            UnifiedModelsView()
             .tabItem {
                 Label("Models", systemImage: "cube")
             }

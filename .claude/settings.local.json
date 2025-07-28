@@ -42,7 +42,8 @@
       "Bash(./verify_urls.sh)",
       "WebFetch(domain:huggingface.co)",
       "WebFetch(domain:developer.apple.com)",
-      "Bash(swift:*)"
+      "Bash(swift:*)",
+      "Bash(xcrun swiftc:*)"
     ],
     "deny": []
   }
