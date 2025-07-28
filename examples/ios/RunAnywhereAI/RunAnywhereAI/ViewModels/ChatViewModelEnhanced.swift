@@ -15,7 +15,15 @@ class ChatViewModelEnhanced: ObservableObject {
     @Published var messages: [ChatMessage] = []
     @Published var isGenerating = false
     @Published var selectedFramework: LLMFramework = .llamaCpp
-    @Published var selectedModel: RunAnywhereAI.ModelInfo?
+    @Published var selectedModel: RunAnywhereAI.ModelInfo? {
+        didSet {
+            if let model = selectedModel {
+                Task {
+                    await loadSelectedModel(model)
+                }
+            }
+        }
+    }
     @Published var currentTokensPerSecond: Double?
     @Published var settings = ChatSettings()
     @Published var currentInput = ""
@@ -192,6 +200,25 @@ class ChatViewModelEnhanced: ObservableObject {
             timestamp: Date()
         )
         messages.append(welcomeMessage)
+    }
+    
+    private func loadSelectedModel(_ model: RunAnywhereAI.ModelInfo) async {
+        // Switch to the correct framework
+        unifiedService.selectService(named: selectedFramework.displayName)
+        
+        // Get the model path
+        let modelPath = ModelManager.shared.modelPath(for: model.name, framework: selectedFramework)
+        
+        do {
+            // Load the model using the unified service
+            try await unifiedService.currentService?.loadModel(modelPath.path)
+            logger.info("Successfully loaded model: \(model.name)")
+        } catch {
+            logger.error("Failed to load model \(model.name): \(error)")
+            await MainActor.run {
+                self.error = error
+            }
+        }
     }
 
     private func streamGeneration(prompt: String, messageIndex: Int) async throws {

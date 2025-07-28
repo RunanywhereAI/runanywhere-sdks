@@ -13,6 +13,8 @@ struct ChatInterfaceView: View {
     @State private var showingFrameworkPicker = false
     @State private var showingModelPicker = false
     @State private var showingSettings = false
+    @State private var showingNoModelAlert = false
+    @State private var showingConversationList = false
     @State private var selectedMessageForModelInfo: ChatMessage?
     @FocusState private var isTextFieldFocused: Bool
 
@@ -44,6 +46,9 @@ struct ChatInterfaceView: View {
                         .padding()
                     }
                     .background(Color(.systemGroupedBackground))
+                    .onTapGesture {
+                        isTextFieldFocused = false
+                    }
                     .onChange(of: viewModel.messages.count) { _ in
                         withAnimation {
                             if let lastMessage = viewModel.messages.last {
@@ -61,11 +66,19 @@ struct ChatInterfaceView: View {
             .navigationTitle("LLM Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showingConversationList = true }) {
+                        Image(systemName: "sidebar.left")
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gear")
                     }
                 }
+            }
+            .onTapGesture {
+                isTextFieldFocused = false
             }
             .sheet(isPresented: $showingFrameworkPicker) {
                 FrameworkPickerView(selectedFramework: $viewModel.selectedFramework)
@@ -96,60 +109,147 @@ struct ChatInterfaceView: View {
                     }
                 }
             }
+            .alert("No Model Selected", isPresented: $showingNoModelAlert) {
+                Button("Select Model") {
+                    showingModelPicker = true
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Please select a \(viewModel.selectedFramework.displayName) model to start chatting.")
+            }
+            .sheet(isPresented: $showingConversationList) {
+                ConversationListView()
+            }
         }
     }
 
     // MARK: - Subviews
 
     private var frameworkSelectorBar: some View {
-        HStack {
-            // Framework button
-            Button(action: { showingFrameworkPicker = true }) {
-                HStack {
-                    Image(systemName: "cpu")
-                    Text(viewModel.selectedFramework.displayName)
-                    Image(systemName: "chevron.down")
-                }
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.tertiarySystemBackground))
-                .cornerRadius(8)
-            }
-
-            // Model button
-            Button(action: { showingModelPicker = true }) {
-                HStack {
-                    Image(systemName: "doc.text")
-                    Text(viewModel.selectedModel?.name ?? "Select Model")
-                    Image(systemName: "chevron.down")
-                }
-                .font(.caption)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color(.tertiarySystemBackground))
-                .cornerRadius(8)
-            }
-
-            Spacer()
-
-            // Performance metrics
-            if viewModel.isGenerating {
-                HStack(spacing: 8) {
-                    if let tokensPerSecond = viewModel.currentTokensPerSecond {
-                        Label("\(String(format: "%.1f", tokensPerSecond)) t/s", systemImage: "speedometer")
-                            .font(.caption2)
+        VStack(spacing: 12) {
+            // Model selection section
+            VStack(spacing: 8) {
+                // Current model display
+                if let model = viewModel.selectedModel {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Current Model")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(model.name)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                        }
+                        
+                        Spacer()
+                        
+                        // Model info
+                        HStack(spacing: 12) {
+                            if let quantization = model.quantization {
+                                Text(quantization)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color(.tertiarySystemGroupedBackground))
+                                    .cornerRadius(6)
+                            }
+                            
+                            Text(model.displaySize)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                } else {
+                    // No model selected prompt
+                    VStack(spacing: 4) {
+                        Text("No Model Selected")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        Text("Tap below to select a model")
+                            .font(.caption)
                             .foregroundColor(.secondary)
                     }
-
-                    ProgressView()
-                        .scaleEffect(0.8)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
+                }
+                
+                // Selection buttons
+                HStack(spacing: 8) {
+                    // Framework selector
+                    Button(action: { showingFrameworkPicker = true }) {
+                        HStack {
+                            Image(systemName: frameworkIcon(for: viewModel.selectedFramework))
+                            Text(viewModel.selectedFramework.displayName)
+                            Image(systemName: "chevron.down")
+                        }
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(8)
+                    }
+                    
+                    // Model selector
+                    Button(action: { showingModelPicker = true }) {
+                        HStack {
+                            Image(systemName: "cube.box.fill")
+                            Text("Select Model")
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(viewModel.selectedModel == nil ? .white : .accentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(viewModel.selectedModel == nil ? Color.accentColor : Color(.tertiarySystemBackground))
+                        .cornerRadius(8)
+                    }
+                    .disabled(viewModel.isGenerating)
                 }
             }
+            .padding(.horizontal)
+            
+            // Performance metrics bar
+            if viewModel.isGenerating {
+                HStack {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                        Text("Generating...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    if let tokensPerSecond = viewModel.currentTokensPerSecond {
+                        Label("\(String(format: "%.1f", tokensPerSecond)) tokens/s", systemImage: "speedometer")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+            }
         }
-        .padding(.horizontal)
         .padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
+    }
+    
+    private func frameworkIcon(for framework: LLMFramework) -> String {
+        switch framework {
+        case .coreML: return "brain.head.profile"
+        case .mlx: return "cube.fill"
+        case .onnxRuntime: return "cpu.fill"
+        case .tensorFlowLite: return "network"
+        case .foundationModels: return "star.fill"
+        default: return "cpu"
+        }
     }
 
     private var inputArea: some View {
@@ -181,6 +281,12 @@ struct ChatInterfaceView: View {
 
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
+        
+        // Check if a model is selected
+        guard viewModel.selectedModel != nil else {
+            showingNoModelAlert = true
+            return
+        }
 
         let text = messageText
         messageText = ""
@@ -215,49 +321,59 @@ struct MessageBubbleView: View {
 
                 // Metadata
                 if message.role == .assistant {
-                    HStack(spacing: 6) {
-                        // Model info button
+                    VStack(alignment: .leading, spacing: 4) {
+                        // Model info section
                         if let modelName = message.modelName {
                             Button(action: {
                                 onModelInfoTap(message)
                             }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "info.circle")
-                                        .font(.caption2)
+                                HStack(spacing: 6) {
+                                    Image(systemName: "cube.box.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.accentColor)
+                                    
                                     Text(modelName)
-                                        .font(.caption2)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.accentColor)
                                         .lineLimit(1)
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 8))
+                                        .foregroundColor(.accentColor.opacity(0.7))
                                 }
-                                .foregroundColor(.blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.1))
+                                .cornerRadius(6)
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
                         
+                        // Performance metrics
                         if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                                .font(.caption2)
-                            
-                            Text("\(metrics.tokenCount) tokens")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-
-                            Text("•")
-                                .foregroundColor(.secondary)
-                                .font(.caption2)
-                            
-                            Text("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                            HStack(spacing: 8) {
+                                Label("\(metrics.tokenCount) tokens", systemImage: "text.word.spacing")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                Label("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s", systemImage: "speedometer")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                
+                                if metrics.totalTime > 0 {
+                                    Label("\(String(format: "%.1fs", metrics.totalTime))", systemImage: "clock")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
                         }
-                        
-                        Spacer()
-                        
-                        Text(message.timestamp.formatted(date: .omitted, time: .shortened))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                 }
+                
+                Text(message.timestamp.formatted(date: .omitted, time: .shortened))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.role == .user ? .trailing : .leading)
 
@@ -424,73 +540,135 @@ struct ModelPickerView: View {
     }
 
     private var modelList: some View {
-        List {
+        Group {
             if downloadedModels.isEmpty {
-                ContentUnavailableView(
-                    "No Models Available",
-                    systemImage: "doc.badge.arrow.up",
-                    description: Text("Download \(framework.displayName) models from the Models tab")
-                )
-            } else {
-                ForEach(downloadedModels) { model in
-                    downloadedModelButton(model)
+                VStack(spacing: 20) {
+                    ContentUnavailableView(
+                        "No Models Available",
+                        systemImage: "cube.box",
+                        description: Text("You need to download \(framework.displayName) models to start chatting")
+                    )
+                    
+                    Button(action: {
+                        // Dismiss the sheet and switch to Models tab
+                        dismiss()
+                        NotificationCenter.default.post(name: Notification.Name("SwitchToModelsTab"), object: nil)
+                    }) {
+                        Label("Go to Models", systemImage: "arrow.right.circle.fill")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 12)
+                            .background(Color.accentColor)
+                            .cornerRadius(10)
+                    }
                 }
+            } else {
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(downloadedModels) { model in
+                            downloadedModelCard(model)
+                        }
+                    }
+                    .padding()
+                }
+                .background(Color(.systemGroupedBackground))
             }
         }
     }
 
-    private func downloadedModelButton(_ model: ModelInfo) -> some View {
+    private func downloadedModelCard(_ model: ModelInfo) -> some View {
         Button(action: {
             selectedModel = model
             dismiss()
         }) {
-            HStack {
-                // Model icon
-                Image(systemName: "doc.text.fill")
-                    .font(.title3)
-                    .foregroundColor(.blue)
-                    .frame(width: 40)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(model.name)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    HStack(spacing: 8) {
-                        // Size
-                        Label(model.displaySize, systemImage: "internaldrive")
+            VStack(alignment: .leading, spacing: 0) {
+                // Selected indicator
+                if model.id == selectedModel?.id {
+                    HStack {
+                        Label("Currently Selected", systemImage: "checkmark.circle.fill")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor)
+                }
+                
+                HStack {
+                    // Model icon
+                    ZStack {
+                        Circle()
+                            .fill(model.id == selectedModel?.id ? Color.accentColor.opacity(0.2) : Color(.systemGray5))
+                            .frame(width: 50, height: 50)
                         
-                        // Quantization
-                        if let quantization = model.quantization {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Text(quantization)
-                                .font(.caption)
+                        Image(systemName: "cube.box.fill")
+                            .font(.title2)
+                            .foregroundColor(model.id == selectedModel?.id ? .accentColor : .secondary)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(model.name)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+
+                        HStack(spacing: 12) {
+                            // Size
+                            HStack(spacing: 4) {
+                                Image(systemName: "internaldrive")
+                                    .font(.caption2)
+                                Text(model.displaySize)
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.secondary)
+                            
+                            // Quantization
+                            if let quantization = model.quantization {
+                                Text(quantization)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color(.tertiarySystemGroupedBackground))
+                                    .cornerRadius(4)
+                            }
+                        }
+                        
+                        // Additional info
+                        if let contextLength = model.contextLength {
+                            Label("\(contextLength) token context", systemImage: "text.alignleft")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                         
-                        // Context length
-                        if let contextLength = model.contextLength {
-                            Text("•")
+                        // Downloaded file name if available
+                        if let fileName = model.downloadedFileName {
+                            Label(fileName, systemImage: "doc")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text("\(contextLength) ctx")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .lineLimit(1)
                         }
                     }
-                }
 
-                Spacer()
-
-                if model.id == selectedModel?.id {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.accentColor)
+                    Spacer()
+                    
+                    // Selection indicator
+                    Image(systemName: model.id == selectedModel?.id ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(model.id == selectedModel?.id ? .accentColor : .secondary)
                 }
+                .padding()
             }
-            .padding(.vertical, 4)
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(model.id == selectedModel?.id ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
         }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
