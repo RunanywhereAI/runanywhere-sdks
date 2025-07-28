@@ -108,8 +108,14 @@ class ModelDownloadManager: NSObject, ObservableObject {
         completionHandlers[downloadId] = completion
         downloadStartTimes[downloadId] = Date()
 
+        // Create download request with proper configuration
+        var request = URLRequest(url: downloadInfo.url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 3600 // 1 hour
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
         // Create download task
-        let task = session.downloadTask(with: downloadInfo.url)
+        let task = session.downloadTask(with: request)
         downloadTasks[downloadId] = task
 
         // Start download
@@ -256,10 +262,11 @@ class ModelDownloadManager: NSObject, ObservableObject {
         modelInfo: ModelInfo,
         to directory: URL
     ) async throws -> URL {
-        // Create directory if needed
+        // Create directory if needed with proper attributes
         try FileManager.default.createDirectory(
             at: directory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o755]
         )
 
         let downloadInfo = ModelURLRegistry.shared.getModelInfo(id: modelInfo.id)
@@ -270,11 +277,21 @@ class ModelDownloadManager: NSObject, ObservableObject {
         if downloadInfo?.requiresUnzip == true {
             finalURL = try await unzipModel(from: tempURL, to: directory)
         } else {
-            // Move file
+            // Move file with better error handling
             if FileManager.default.fileExists(atPath: finalURL.path) {
                 try FileManager.default.removeItem(at: finalURL)
             }
-            try FileManager.default.moveItem(at: tempURL, to: finalURL)
+            
+            // Try to move first, fallback to copy if move fails
+            do {
+                try FileManager.default.moveItem(at: tempURL, to: finalURL)
+            } catch {
+                print("Move failed, trying copy instead: \(error.localizedDescription)")
+                try FileManager.default.copyItem(at: tempURL, to: finalURL)
+                
+                // Clean up temp file after successful copy
+                try? FileManager.default.removeItem(at: tempURL)
+            }
         }
 
         // Verify checksum if available
@@ -401,21 +418,69 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
+        // Handle file operations synchronously to prevent deletion
+        let taskIdentifier = downloadTask.taskIdentifier
+        
+        // Create a safe location immediately
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let downloadsDir = documentsDir.appendingPathComponent("Downloads", isDirectory: true)
+        let tempFileName = "download_\(taskIdentifier)_\(UUID().uuidString).tmp"
+        let safeURL = downloadsDir.appendingPathComponent(tempFileName)
+        
+        var moveError: Error?
+        var moveSuccess = false
+        
+        do {
+            // Create downloads directory if needed
+            try FileManager.default.createDirectory(
+                at: downloadsDir,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            
+            // Move file immediately to prevent deletion
+            try FileManager.default.moveItem(at: location, to: safeURL)
+            moveSuccess = true
+            
+            print("Successfully moved download to: \(safeURL.path)")
+        } catch {
+            moveError = error
+            print("Failed to move downloaded file: \(error)")
+            print("Source: \(location.path)")
+            print("Source exists: \(FileManager.default.fileExists(atPath: location.path))")
+            print("Destination: \(safeURL.path)")
+            print("Downloads dir: \(downloadsDir.path)")
+            
+            // Try to get more details about the error
+            if let nsError = error as NSError? {
+                print("Error domain: \(nsError.domain)")
+                print("Error code: \(nsError.code)")
+                print("Error userInfo: \(nsError.userInfo)")
+            }
+        }
+        
+        // Now notify on main actor
         Task { @MainActor in
-            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
+                // Clean up the file if we can't find the model ID
+                if moveSuccess {
+                    try? FileManager.default.removeItem(at: safeURL)
+                }
                 return
             }
-
-            // Move to temporary location to prevent deletion
-            let tempDir = FileManager.default.temporaryDirectory
-            let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
-
-            do {
-                try FileManager.default.moveItem(at: location, to: tempURL)
-
-                self.completionHandlers[modelId]?(.success(tempURL))
+            
+            if moveSuccess {
+                print("Download completed for model: \(modelId)")
+                print("File saved to: \(safeURL.path)")
+                print("File exists: \(FileManager.default.fileExists(atPath: safeURL.path))")
+                
+                self.completionHandlers[modelId]?(.success(safeURL))
                 self.cleanup(downloadId: modelId)
-            } catch {
+            } else {
+                let error = moveError ?? ModelDownloadError.networkError(
+                    NSError(domain: "ModelDownload", code: -1, 
+                           userInfo: [NSLocalizedDescriptionKey: "Failed to save downloaded file"])
+                )
                 self.completionHandlers[modelId]?(.failure(error))
                 self.cleanup(downloadId: modelId)
             }
@@ -429,8 +494,10 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
+        let taskIdentifier = downloadTask.taskIdentifier
+        
         Task { @MainActor in
-            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
                 return
             }
 
@@ -465,9 +532,14 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
+        guard let downloadTask = task as? URLSessionDownloadTask else {
+            return
+        }
+        
+        let taskIdentifier = downloadTask.taskIdentifier
+        
         Task { @MainActor in
-            guard let downloadTask = task as? URLSessionDownloadTask,
-                  let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
                 return
             }
 

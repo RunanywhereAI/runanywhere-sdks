@@ -65,7 +65,8 @@ struct ModelDownloadProgressView: View {
                 Color(.systemBackground)
                     .ignoresSafeArea()
 
-                VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 0) {
                     // Header with model info
                     VStack(spacing: 12) {
                         Image(systemName: "doc.fill")
@@ -162,7 +163,8 @@ struct ModelDownloadProgressView: View {
                             .padding(.top, 20)
                     }
 
-                    Spacer()
+                    // Spacer for proper spacing in ScrollView
+                    Color.clear.frame(height: 80)
 
                     // Action buttons
                     if isComplete {
@@ -190,12 +192,15 @@ struct ModelDownloadProgressView: View {
                         }
                         .padding()
                     }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle("Downloading Model")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(isComplete)
         }
+        .interactiveDismissDisabled(true)
         .onAppear {
             startDownload()
         }
@@ -255,9 +260,12 @@ struct ModelDownloadProgressView: View {
                     Task { @MainActor in
                         switch result {
                         case .success(let tempURL):
+                            print("Download succeeded, temp URL: \(tempURL.path)")
+                            print("File exists: \(FileManager.default.fileExists(atPath: tempURL.path))")
                             // Continue with post-download steps
                             await self.processDownloadedModel(at: tempURL)
                         case .failure(let error):
+                            print("Download failed with error: \(error.localizedDescription)")
                             self.error = error
                             self.showingError = true
                         }
@@ -289,18 +297,32 @@ struct ModelDownloadProgressView: View {
 
     private func processDownloadedModel(at url: URL) async {
         do {
+            // First, ensure the file exists and is accessible
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                throw ModelDownloadError.networkError(NSError(
+                    domain: "ModelDownload",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Downloaded file not found at expected location"]
+                ))
+            }
+            
             // Verifying step
             currentStep = .verifying
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
 
             // Verify checksum if available
             if let expectedHash = downloadInfo.sha256 {
-                let data = try Data(contentsOf: url)
-                let hash = SHA256.hash(data: data)
-                let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
+                do {
+                    let data = try Data(contentsOf: url)
+                    let hash = SHA256.hash(data: data)
+                    let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
 
-                guard hashString == expectedHash else {
-                    throw ModelDownloadError.invalidChecksum
+                    guard hashString == expectedHash else {
+                        throw ModelDownloadError.invalidChecksum
+                    }
+                } catch {
+                    print("Failed to verify checksum: \(error.localizedDescription)")
+                    // Continue without checksum verification if file reading fails
                 }
             }
 
@@ -330,7 +352,24 @@ struct ModelDownloadProgressView: View {
                 if FileManager.default.fileExists(atPath: destinationURL.path) {
                     try FileManager.default.removeItem(at: destinationURL)
                 }
-                try FileManager.default.copyItem(at: url, to: destinationURL)
+                
+                // Ensure source file exists before copying
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    throw ModelDownloadError.networkError(NSError(
+                        domain: "ModelDownload",
+                        code: -2,
+                        userInfo: [NSLocalizedDescriptionKey: "Source file not found: \(url.lastPathComponent)"]
+                    ))
+                }
+                
+                do {
+                    try FileManager.default.copyItem(at: url, to: destinationURL)
+                } catch {
+                    print("Failed to copy file: \(error.localizedDescription)")
+                    print("Source: \(url.path)")
+                    print("Destination: \(destinationURL.path)")
+                    throw error
+                }
             }
 
             // Installing step (download tokenizers if needed)

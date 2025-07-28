@@ -11,6 +11,7 @@ struct DeviceInfoView: View {
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var storageService = StorageMonitorService.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var isRefreshingStorage = false
 
     var body: some View {
         NavigationView {
@@ -68,7 +69,7 @@ struct DeviceInfoView: View {
 
                     // Storage monitoring section
                     if let storageInfo = storageService.storageInfo {
-                        Section("App Storage Usage") {
+                        Section {
                             DeviceInfoRow(
                                 label: "Total App Size",
                                 value: storageInfo.totalAppSize.formattedFileSize,
@@ -94,6 +95,29 @@ struct DeviceInfoView: View {
                                 value: String(format: "%.2f%%", storageInfo.appPercentageOfDevice),
                                 valueColor: storageInfo.appPercentageOfDevice > 10 ? .orange : .green
                             )
+                        } header: {
+                            HStack {
+                                Text("App Storage Usage")
+                                Spacer()
+                                Button(action: {
+                                    Task {
+                                        isRefreshingStorage = true
+                                        await storageService.refreshStorageInfo()
+                                        isRefreshingStorage = false
+                                    }
+                                }) {
+                                    if isRefreshingStorage {
+                                        ProgressView()
+                                            .scaleEffect(0.7)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                            .font(.caption)
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .buttonStyle(BorderlessButtonStyle())
+                                .disabled(isRefreshingStorage)
+                            }
                         }
 
                         Section("Device Storage") {
