@@ -329,7 +329,7 @@ class CoreMLService: BaseLLMService {
                     nextToken = sampleFromLogits(logitsArray, temperature: Double(options.temperature))
                 } else if let tokensFeature = prediction.featureValue(for: "output_tokens"),
                           let tokensArray = tokensFeature.multiArrayValue,
-                          !tokensArray.isEmpty {
+                          tokensArray.count > 0 {
                     // Some models directly output tokens
                     nextToken = Int32(tokensArray[tokensArray.count - 1].intValue)
                 } else {
