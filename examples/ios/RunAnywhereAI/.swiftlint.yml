@@ -37,7 +37,6 @@ opt_in_rules:
 
 disabled_rules:
   - todo
-  - fixme
 
 # Directories to include
 included:

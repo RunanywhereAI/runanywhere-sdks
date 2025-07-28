@@ -1,13 +1,13 @@
 # CLAUDE.md
 
 ### Before starting work
-- Always in plan mode to make a plan refer to `.claude/commands/create_plan.md`.
+- Always in plan mode to make a plan refer to `thoughts/shared/plans/{descriptive_name}.md`.
 - After get the plan, make sure you Write the plan to the appropriate file as mentioned in the guide that you referred to.
 - If the task require external knowledge or certain package, also research to get latest knowledge (Use Task tool for research)
 - Don't over plan it, always think MVP.
 - Once you write the plan, firstly ask me to review it. Do not continue until I approve the plan.
 ### While implementing
-- You should update the plan as you work - check `.claude/commands/implement-plan` if you're running an already created plan via `.claude/commands/create-plan`
+- You should update the plan as you work - check `thoughts/shared/plans/{descriptive_name}.md` if you're running an already created plan via `thoughts/shared/plans/{descriptive_name}.md`
 - After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
 
 
@@ -96,12 +96,21 @@ cd examples/android/RunAnywhereAI/
 # Navigate to iOS example
 cd examples/ios/RunAnywhereAI/
 
+# Install CocoaPods dependencies (required for TensorFlow Lite)
+pod install
+
+# After pod install, always open the .xcworkspace file
+open RunAnywhereAI.xcworkspace
+
 # Run SwiftLint
 ./swiftlint.sh
-
-# Build and run (open in Xcode)
-open RunAnywhereAI.xcodeproj
 ```
+
+#### Known Issues - Xcode 16 Sandbox
+
+**Error**: `Sandbox: rsync deny(1) file-write-create`  
+**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`  
+**Note**: Required after each `pod install`
 
 ### Pre-commit Hooks
 
