@@ -25,8 +25,10 @@ class ChatViewModelEnhanced: ObservableObject {
     private let unifiedService = UnifiedLLMService.shared
     private let performanceMonitor = RealtimePerformanceMonitor.shared
     private let logger = Logger.shared
+    private let conversationStore = ConversationStore.shared
     private var cancellables = Set<AnyCancellable>()
     private var generationTask: Task<Void, Never>?
+    private var currentConversation: Conversation?
 
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
@@ -35,6 +37,7 @@ class ChatViewModelEnhanced: ObservableObject {
     // MARK: - Initialization
     init() {
         setupSubscriptions()
+        createNewConversation()
         addWelcomeMessage()
     }
 
@@ -49,6 +52,11 @@ class ChatViewModelEnhanced: ObservableObject {
             timestamp: Date()
         )
         messages.append(userMessage)
+        
+        // Save to conversation store
+        if let conversation = currentConversation {
+            conversationStore.addMessage(userMessage, to: conversation)
+        }
 
         let prompt = currentInput
         currentInput = ""
@@ -66,6 +74,11 @@ class ChatViewModelEnhanced: ObservableObject {
             timestamp: Date()
         )
         assistantMessage.framework = selectedFramework
+        if let model = selectedModel {
+            assistantMessage.modelName = model.name
+            assistantMessage.modelId = model.id
+            assistantMessage.modelInfo = model
+        }
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
 
@@ -82,6 +95,17 @@ class ChatViewModelEnhanced: ObservableObject {
                     let response = try await generateResponse(prompt: prompt)
                     messages[messageIndex].content = response.text
                     messages[messageIndex].generationMetrics = response.metrics
+                }
+                
+                // Save the completed message to conversation store
+                if let conversation = currentConversation {
+                    conversationStore.addMessage(messages[messageIndex], to: conversation)
+                    
+                    // Update conversation with current model and framework
+                    var updated = conversation
+                    updated.framework = selectedFramework
+                    updated.modelInfo = selectedModel
+                    conversationStore.updateConversation(updated)
                 }
             } catch {
                 await MainActor.run {
@@ -107,6 +131,7 @@ class ChatViewModelEnhanced: ObservableObject {
     func clearChat() {
         generationTask?.cancel()
         messages.removeAll()
+        createNewConversation()
         addWelcomeMessage()
         currentInput = ""
         isGenerating = false
@@ -141,6 +166,12 @@ class ChatViewModelEnhanced: ObservableObject {
     }
 
     // MARK: - Private Methods
+    
+    private func createNewConversation() {
+        currentConversation = conversationStore.createConversation(title: "New Chat")
+        currentConversation?.framework = selectedFramework
+        currentConversation?.modelInfo = selectedModel
+    }
 
     private func setupSubscriptions() {
         // Monitor performance metrics
@@ -209,6 +240,17 @@ class ChatViewModelEnhanced: ObservableObject {
             tokensPerSecond: Double(generatedTokens.count) / totalTime,
             timeToFirstToken: performanceMonitor.currentMetrics.timeToFirstToken
         )
+        
+        // Save the completed streamed message to conversation store
+        if let conversation = currentConversation, messageIndex < messages.count {
+            conversationStore.addMessage(messages[messageIndex], to: conversation)
+            
+            // Update conversation with current model and framework
+            var updated = conversation
+            updated.framework = selectedFramework
+            updated.modelInfo = selectedModel
+            conversationStore.updateConversation(updated)
+        }
     }
 
     private func generateResponse(prompt: String) async throws -> (text: String, metrics: EnhancedGenerationMetrics) {

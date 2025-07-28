@@ -21,6 +21,7 @@ struct UnifiedModelRow: View {
 
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
+    @StateObject private var modelManager = ModelManager.shared
 
     private var downloadInfo: ModelDownloadInfo? {
         let registry = ModelURLRegistry.shared
@@ -51,14 +52,21 @@ struct UnifiedModelRow: View {
     private var isDownloading: Bool {
         downloadManager.activeDownloads.keys.contains(model.id)
     }
+    
+    private var isModelDownloaded: Bool {
+        if let downloadInfo = downloadInfo {
+            return modelManager.isModelDownloaded(downloadInfo.name, framework: framework)
+        }
+        return modelManager.isModelDownloaded(model.name, framework: framework)
+    }
 
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
                 // Model icon
-                Image(systemName: model.isLocal ? "checkmark.circle.fill" : "doc.fill")
+                Image(systemName: isModelDownloaded ? "checkmark.circle.fill" : "doc.fill")
                     .font(.title3)
-                    .foregroundColor(model.isLocal ? .green : .secondary)
+                    .foregroundColor(isModelDownloaded ? .green : .secondary)
                     .frame(width: 40)
 
                 // Model info
@@ -101,7 +109,7 @@ struct UnifiedModelRow: View {
                         }
 
                         // Download status
-                        if model.isLocal {
+                        if isModelDownloaded {
                             Text("•")
                                 .foregroundColor(.secondary)
                             Label("Downloaded", systemImage: "checkmark.icloud.fill")
@@ -136,7 +144,7 @@ struct UnifiedModelRow: View {
                             ProgressView()
                                 .scaleEffect(0.8)
                         }
-                    } else if !model.isLocal {
+                    } else if !isModelDownloaded {
                         // Download button
                         Button(action: {
                             if let downloadInfo = downloadInfo {
@@ -154,7 +162,7 @@ struct UnifiedModelRow: View {
                     }
 
                     // Load button for local models
-                    if model.isLocal {
+                    if isModelDownloaded {
                         if isLoading {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -215,7 +223,29 @@ struct DownloadOnlyModelRow: View {
     @StateObject private var downloadManager = ModelDownloadManager.shared
 
     private var isDownloaded: Bool {
-        ModelManager.shared.isModelDownloaded(downloadInfo.name)
+        // Try to determine framework from downloadInfo
+        let framework = determineFramework(from: downloadInfo)
+        return ModelManager.shared.isModelDownloaded(downloadInfo.name, framework: framework)
+    }
+    
+    private func determineFramework(from downloadInfo: ModelDownloadInfo) -> LLMFramework? {
+        // Try to determine framework from URL path or name
+        let urlPath = downloadInfo.url.path.lowercased()
+        let name = downloadInfo.name.lowercased()
+        
+        if urlPath.contains("coreml") || name.contains(".mlpackage") {
+            return .coreML
+        } else if urlPath.contains("mlx") || name.contains("mlx") {
+            return .mlx
+        } else if urlPath.contains("onnx") || name.contains(".onnx") {
+            return .onnxRuntime
+        } else if urlPath.contains("tflite") || name.contains(".tflite") {
+            return .tensorFlowLite
+        } else if name.contains(".gguf") {
+            return .llamaCpp
+        }
+        
+        return nil
     }
 
     private var isDownloading: Bool {

@@ -12,6 +12,7 @@ struct DeviceInfoView: View {
     @StateObject private var storageService = StorageMonitorService.shared
     @Environment(\.dismiss) private var dismiss
     @State private var isRefreshingStorage = false
+    @State private var showingDownloadsManagement = false
 
     var body: some View {
         NavigationView {
@@ -172,6 +173,21 @@ struct DeviceInfoView: View {
                                         .foregroundColor(.secondary)
                                         .italic()
                                 }
+                                
+                                // Manage downloads button
+                                Button(action: {
+                                    showingDownloadsManagement = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "folder.badge.gearshape")
+                                        Text("Manage All Downloads")
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .foregroundColor(.blue)
+                                }
                             }
                         }
                     } else {
@@ -202,6 +218,9 @@ struct DeviceInfoView: View {
                 }
                 .onDisappear {
                     deviceInfoService.stopMonitoring()
+                }
+                .sheet(isPresented: $showingDownloadsManagement) {
+                    DownloadedModelsManagementView()
                 }
             } else {
                 ProgressView("Loading device information...")

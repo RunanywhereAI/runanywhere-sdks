@@ -144,6 +144,7 @@ struct ModelInfo: Identifiable, Codable {
     let contextLength: Int?
     var isLocal: Bool = false
     let downloadURL: URL?
+    var downloadedFileName: String?
 
     // Legacy support
     let description: String
@@ -160,6 +161,7 @@ struct ModelInfo: Identifiable, Codable {
          contextLength: Int? = nil,
          isLocal: Bool = false,
          downloadURL: URL? = nil,
+         downloadedFileName: String? = nil,
          description: String = "",
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
@@ -173,6 +175,7 @@ struct ModelInfo: Identifiable, Codable {
         self.contextLength = contextLength
         self.isLocal = isLocal
         self.downloadURL = downloadURL
+        self.downloadedFileName = downloadedFileName
         self.description = description
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory

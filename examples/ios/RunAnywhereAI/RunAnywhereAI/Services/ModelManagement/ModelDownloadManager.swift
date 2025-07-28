@@ -62,6 +62,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
     private var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
+    private var downloadInfoMap: [String: ModelDownloadInfo] = [:]
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -90,6 +91,9 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progress: @escaping (DownloadProgress) -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
+        // Clean up any existing model files first if re-downloading
+        cleanupExistingModel(downloadInfo)
+        
         // Check storage before starting
         // Estimate size from filename if not provided
         let estimatedSize: Int64 = 100_000_000 // Default 100MB
@@ -107,6 +111,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progressHandlers[downloadId] = progress
         completionHandlers[downloadId] = completion
         downloadStartTimes[downloadId] = Date()
+        downloadInfoMap[downloadId] = downloadInfo
 
         // Create download request with proper configuration
         var request = URLRequest(url: downloadInfo.url)
@@ -256,6 +261,77 @@ class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     // MARK: - Private Methods
+    
+    private func cleanupExistingModel(_ downloadInfo: ModelDownloadInfo) {
+        // Determine the framework from the download info
+        let framework = determineFramework(from: downloadInfo)
+        
+        // Get the models directory
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let modelsDirectory = documentsURL.appendingPathComponent("Models")
+        
+        // Check framework-specific directory
+        if let framework = framework {
+            let frameworkDir = modelsDirectory.appendingPathComponent(framework.displayName)
+            let modelPath = frameworkDir.appendingPathComponent(downloadInfo.name)
+            
+            if FileManager.default.fileExists(atPath: modelPath.path) {
+                do {
+                    try FileManager.default.removeItem(at: modelPath)
+                    print("Cleaned up existing model at: \(modelPath.path)")
+                } catch {
+                    print("Failed to cleanup existing model: \(error)")
+                }
+            }
+        }
+        
+        // Also check root models directory (legacy)
+        let rootModelPath = modelsDirectory.appendingPathComponent(downloadInfo.name)
+        if FileManager.default.fileExists(atPath: rootModelPath.path) {
+            do {
+                try FileManager.default.removeItem(at: rootModelPath)
+                print("Cleaned up legacy model at: \(rootModelPath.path)")
+            } catch {
+                print("Failed to cleanup legacy model: \(error)")
+            }
+        }
+        
+        // Clean up any partial downloads
+        let downloadsDir = documentsURL.appendingPathComponent("Downloads")
+        if FileManager.default.fileExists(atPath: downloadsDir.path) {
+            do {
+                let contents = try FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil)
+                for file in contents {
+                    if file.lastPathComponent.contains(downloadInfo.id) {
+                        try FileManager.default.removeItem(at: file)
+                        print("Cleaned up partial download: \(file.lastPathComponent)")
+                    }
+                }
+            } catch {
+                print("Failed to cleanup partial downloads: \(error)")
+            }
+        }
+    }
+    
+    private func determineFramework(from downloadInfo: ModelDownloadInfo) -> LLMFramework? {
+        // Try to determine framework from URL path or name
+        let urlPath = downloadInfo.url.path.lowercased()
+        let name = downloadInfo.name.lowercased()
+        
+        if urlPath.contains("coreml") || name.contains(".mlpackage") {
+            return .coreML
+        } else if urlPath.contains("mlx") || name.contains("mlx") {
+            return .mlx
+        } else if urlPath.contains("onnx") || name.contains(".onnx") {
+            return .onnxRuntime
+        } else if urlPath.contains("tflite") || name.contains(".tflite") {
+            return .tensorFlowLite
+        } else if name.contains(".gguf") {
+            return .llamaCpp
+        }
+        
+        return nil
+    }
 
     private func moveAndProcessModel(
         from tempURL: URL,
@@ -403,6 +479,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         downloadStartTimes.removeValue(forKey: downloadId)
         lastBytesWritten.removeValue(forKey: downloadId)
         activeDownloads.removeValue(forKey: downloadId)
+        downloadInfoMap.removeValue(forKey: downloadId)
 
         if downloadTasks.isEmpty {
             isDownloading = false
@@ -474,7 +551,29 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
                 print("File saved to: \(safeURL.path)")
                 print("File exists: \(FileManager.default.fileExists(atPath: safeURL.path))")
                 
-                self.completionHandlers[modelId]?(.success(safeURL))
+                // If we have download info, rename the file to its proper name
+                var finalURL = safeURL
+                if let downloadInfo = self.downloadInfoMap[modelId] {
+                    let properFileName = downloadInfo.name
+                    let properFileURL = downloadsDir.appendingPathComponent(properFileName)
+                    
+                    do {
+                        // Remove existing file if it exists
+                        if FileManager.default.fileExists(atPath: properFileURL.path) {
+                            try FileManager.default.removeItem(at: properFileURL)
+                        }
+                        
+                        // Rename temp file to proper name
+                        try FileManager.default.moveItem(at: safeURL, to: properFileURL)
+                        finalURL = properFileURL
+                        print("Renamed downloaded file to: \(properFileName)")
+                    } catch {
+                        print("Failed to rename file to proper name: \(error)")
+                        // Continue with temp name if rename fails
+                    }
+                }
+                
+                self.completionHandlers[modelId]?(.success(finalURL))
                 self.cleanup(downloadId: modelId)
             } else {
                 let error = moveError ?? ModelDownloadError.networkError(

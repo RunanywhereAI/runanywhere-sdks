@@ -14,6 +14,7 @@ struct UnifiedModelDetailsView: View {
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
+    @StateObject private var modelManager = ModelManager.shared
 
     @State private var showingCompatibilityDetails = false
 
@@ -39,6 +40,13 @@ struct UnifiedModelDetailsView: View {
         }
 
         return nil
+    }
+    
+    private var isModelDownloaded: Bool {
+        if let downloadInfo = downloadInfo {
+            return modelManager.isModelDownloaded(downloadInfo.name, framework: model.framework)
+        }
+        return modelManager.isModelDownloaded(model.name, framework: model.framework)
     }
 
     var body: some View {
@@ -67,9 +75,9 @@ struct UnifiedModelDetailsView: View {
                     // Status badges
                     HStack(spacing: 8) {
                         StatusBadge(
-                            text: model.isLocal ? "Downloaded" : "Not Downloaded",
-                            systemImage: model.isLocal ? "checkmark.circle.fill" : "circle",
-                            color: model.isLocal ? .green : .orange
+                            text: isModelDownloaded ? "Downloaded" : "Not Downloaded",
+                            systemImage: isModelDownloaded ? "checkmark.circle.fill" : "circle",
+                            color: isModelDownloaded ? .green : .orange
                         )
 
                         StatusBadge(
@@ -106,6 +114,19 @@ struct UnifiedModelDetailsView: View {
 
                         if let contextLength = model.contextLength {
                             DetailRow(label: "Context Length", value: "\(contextLength) tokens")
+                        }
+                        
+                        if let downloadedFileName = model.downloadedFileName {
+                            DetailRow(
+                                label: "Downloaded File",
+                                value: downloadedFileName,
+                                valueColor: .green
+                            )
+                        } else if let downloadInfo = downloadInfo {
+                            DetailRow(
+                                label: "File Name",
+                                value: downloadInfo.name
+                            )
                         }
 
                         if let downloadInfo = downloadInfo {
@@ -218,7 +239,7 @@ struct UnifiedModelDetailsView: View {
 
                 // Action Buttons
                 VStack(spacing: 12) {
-                    if !model.isLocal, let downloadInfo = downloadInfo {
+                    if !isModelDownloaded, let downloadInfo = downloadInfo {
                         Button(action: {
                             onDownload(downloadInfo)
                         }) {
@@ -235,7 +256,7 @@ struct UnifiedModelDetailsView: View {
                         .disabled(downloadManager.activeDownloads.keys.contains(model.id))
                     }
 
-                    if model.isLocal {
+                    if isModelDownloaded {
                         Button(action: {
                             // TODO: Implement model loading
                         }) {
@@ -329,11 +350,13 @@ struct DetailRow: View {
     let label: String
     let value: String
     let isURL: Bool
+    let valueColor: Color?
 
-    init(label: String, value: String, isURL: Bool = false) {
+    init(label: String, value: String, isURL: Bool = false, valueColor: Color? = nil) {
         self.label = label
         self.value = value
         self.isURL = isURL
+        self.valueColor = valueColor
     }
 
     var body: some View {
@@ -353,7 +376,7 @@ struct DetailRow: View {
             } else {
                 Text(value)
                     .font(.subheadline)
-                    .foregroundColor(.primary)
+                    .foregroundColor(valueColor ?? .primary)
                     .multilineTextAlignment(.leading)
             }
 

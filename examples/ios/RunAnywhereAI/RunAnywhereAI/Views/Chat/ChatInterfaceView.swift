@@ -13,6 +13,7 @@ struct ChatInterfaceView: View {
     @State private var showingFrameworkPicker = false
     @State private var showingModelPicker = false
     @State private var showingSettings = false
+    @State private var selectedMessageForModelInfo: ChatMessage?
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -26,8 +27,13 @@ struct ChatInterfaceView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.messages) { message in
-                                MessageBubbleView(message: message)
-                                    .id(message.id)
+                                MessageBubbleView(
+                                    message: message,
+                                    onModelInfoTap: { msg in
+                                        selectedMessageForModelInfo = msg
+                                    }
+                                )
+                                .id(message.id)
                             }
 
                             if viewModel.isGenerating {
@@ -65,10 +71,30 @@ struct ChatInterfaceView: View {
                 FrameworkPickerView(selectedFramework: $viewModel.selectedFramework)
             }
             .sheet(isPresented: $showingModelPicker) {
-                ModelPickerView(selectedModel: $viewModel.selectedModel)
+                ModelPickerView(
+                    selectedModel: $viewModel.selectedModel,
+                    framework: viewModel.selectedFramework
+                )
             }
             .sheet(isPresented: $showingSettings) {
                 ChatSettingsView(settings: $viewModel.settings)
+            }
+            .sheet(item: $selectedMessageForModelInfo) { message in
+                if let modelInfo = message.modelInfo {
+                    NavigationView {
+                        UnifiedModelDetailsView(
+                            model: modelInfo,
+                            onDownload: { _ in }
+                        )
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") {
+                                    selectedMessageForModelInfo = nil
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -170,6 +196,7 @@ struct ChatInterfaceView: View {
 
 struct MessageBubbleView: View {
     let message: ChatMessage
+    let onModelInfoTap: (ChatMessage) -> Void
 
     var body: some View {
         HStack {
@@ -187,22 +214,45 @@ struct MessageBubbleView: View {
                     .cornerRadius(16)
 
                 // Metadata
-                if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
-                    HStack(spacing: 8) {
-                        if let framework = message.framework {
-                            Text(framework.displayName)
+                if message.role == .assistant {
+                    HStack(spacing: 6) {
+                        // Model info button
+                        if let modelName = message.modelName {
+                            Button(action: {
+                                onModelInfoTap(message)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "info.circle")
+                                        .font(.caption2)
+                                    Text(modelName)
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.blue)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                        }
+                        
+                        if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                                .font(.caption2)
+                            
+                            Text("\(metrics.tokenCount) tokens")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+
+                            Text("•")
+                                .foregroundColor(.secondary)
+                                .font(.caption2)
+                            
+                            Text("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
-
-                        Text("\(metrics.tokenCount) tokens")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-
-                        Text("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-
+                        
+                        Spacer()
+                        
                         Text(message.timestamp.formatted(date: .omitted, time: .shortened))
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -325,20 +375,43 @@ struct FrameworkPickerView: View {
 
 struct ModelPickerView: View {
     @Binding var selectedModel: ModelInfo?
+    let framework: LLMFramework
     @Environment(\.dismiss) private var dismiss
-    @StateObject private var repository = ModelRepository.shared
+    @StateObject private var modelManager = ModelManager.shared
+    @State private var downloadedModels: [ModelInfo] = []
 
     var body: some View {
         modelNavigationView
             .task {
-                repository.refreshAvailableModels()
+                await loadModels()
             }
+    }
+    
+    private func loadModels() async {
+        await modelManager.refreshModelList()
+        
+        // Filter models for the selected framework
+        downloadedModels = modelManager.downloadedModels.filter { model in
+            model.framework == framework
+        }
+        
+        // Also include available models that are downloaded
+        let availableDownloaded = modelManager.availableModels.filter { model in
+            model.framework == framework && modelManager.isModelDownloaded(model.name, framework: framework)
+        }
+        
+        // Merge and deduplicate
+        for model in availableDownloaded {
+            if !downloadedModels.contains(where: { $0.name == model.name }) {
+                downloadedModels.append(model)
+            }
+        }
     }
 
     private var modelNavigationView: some View {
         NavigationView {
             modelList
-                .navigationTitle("Select Model")
+                .navigationTitle("Select \(framework.displayName) Model")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
@@ -352,23 +425,16 @@ struct ModelPickerView: View {
 
     private var modelList: some View {
         List {
-            downloadedModelsSection
-            availableModelsSection
-        }
-    }
-
-    private var downloadedModelsSection: some View {
-        Section("Downloaded Models") {
-            ForEach(repository.downloadedModels) { model in
-                downloadedModelButton(model)
-            }
-        }
-    }
-
-    private var availableModelsSection: some View {
-        Section("Available Models") {
-            ForEach(repository.availableModels.filter { !repository.isModelDownloaded($0) }) { model in
-                availableModelRow(model)
+            if downloadedModels.isEmpty {
+                ContentUnavailableView(
+                    "No Models Available",
+                    systemImage: "doc.badge.arrow.up",
+                    description: Text("Download \(framework.displayName) models from the Models tab")
+                )
+            } else {
+                ForEach(downloadedModels) { model in
+                    downloadedModelButton(model)
+                }
             }
         }
     }
@@ -379,17 +445,41 @@ struct ModelPickerView: View {
             dismiss()
         }) {
             HStack {
+                // Model icon
+                Image(systemName: "doc.text.fill")
+                    .font(.title3)
+                    .foregroundColor(.blue)
+                    .frame(width: 40)
+                
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.name)
                         .foregroundColor(.primary)
+                        .lineLimit(1)
 
-                    HStack {
-                        Text(model.displaySize)
-                        Text("•")
-                        Text(model.quantization ?? "Unknown")
+                    HStack(spacing: 8) {
+                        // Size
+                        Label(model.displaySize, systemImage: "internaldrive")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        // Quantization
+                        if let quantization = model.quantization {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            Text(quantization)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        // Context length
+                        if let contextLength = model.contextLength {
+                            Text("•")
+                                .foregroundColor(.secondary)
+                            Text("\(contextLength) ctx")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    .font(.caption)
-                    .foregroundColor(.secondary)
                 }
 
                 Spacer()
@@ -401,38 +491,6 @@ struct ModelPickerView: View {
             }
             .padding(.vertical, 4)
         }
-    }
-
-    private func availableModelRow(_ model: ModelInfo) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(model.name)
-
-                HStack {
-                    Text(model.displaySize)
-                    Text("•")
-                    Text(model.description)
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            Button(action: {
-                Task {
-                    try await repository.downloadModel(model)
-                }
-            }) {
-                if let progress = repository.downloadProgress[model.id] {
-                    ProgressView(value: progress)
-                        .frame(width: 50)
-                } else {
-                    Image(systemName: "arrow.down.circle")
-                }
-            }
-        }
-        .padding(.vertical, 4)
     }
 }
 
