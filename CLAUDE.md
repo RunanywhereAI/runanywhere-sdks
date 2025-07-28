@@ -96,12 +96,21 @@ cd examples/android/RunAnywhereAI/
 # Navigate to iOS example
 cd examples/ios/RunAnywhereAI/
 
+# Install CocoaPods dependencies (required for TensorFlow Lite)
+pod install
+
+# After pod install, always open the .xcworkspace file
+open RunAnywhereAI.xcworkspace
+
 # Run SwiftLint
 ./swiftlint.sh
-
-# Build and run (open in Xcode)
-open RunAnywhereAI.xcodeproj
 ```
+
+#### Known Issues - Xcode 16 Sandbox
+
+**Error**: `Sandbox: rsync deny(1) file-write-create`  
+**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`  
+**Note**: Required after each `pod install`
 
 ### Pre-commit Hooks
 
