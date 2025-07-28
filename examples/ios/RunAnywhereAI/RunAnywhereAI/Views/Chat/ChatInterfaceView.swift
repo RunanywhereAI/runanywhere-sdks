@@ -236,6 +236,23 @@ struct ChatInterfaceView: View {
                 }
                 .padding(.horizontal)
             }
+            
+            // Model loading indicator
+            if viewModel.isLoadingModel {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text(viewModel.modelLoadingProgress)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.1))
+                .cornerRadius(8)
+                .padding(.horizontal)
+            }
         }
         .padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
@@ -264,6 +281,14 @@ struct ChatInterfaceView: View {
                 .onSubmit {
                     sendMessage()
                 }
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Done") {
+                            isTextFieldFocused = false
+                        }
+                    }
+                }
 
             // Send button
             Button(action: sendMessage) {
@@ -271,7 +296,7 @@ struct ChatInterfaceView: View {
                     .font(.system(size: 32))
                     .foregroundColor(messageText.isEmpty ? .gray : .accentColor)
             }
-            .disabled(messageText.isEmpty || viewModel.isGenerating)
+            .disabled(messageText.isEmpty || viewModel.isGenerating || viewModel.isLoadingModel)
         }
         .padding()
         .background(Color(.secondarySystemBackground))
@@ -506,22 +531,59 @@ struct ModelPickerView: View {
     private func loadModels() async {
         await modelManager.refreshModelList()
         
-        // Filter models for the selected framework
-        downloadedModels = modelManager.downloadedModels.filter { model in
-            model.framework == framework
-        }
+        // Get all models for this framework
+        var allModels: [ModelInfo] = []
         
-        // Also include available models that are downloaded
+        // First, get downloaded models
+        let frameworkDownloaded = modelManager.downloadedModels.filter { $0.framework == framework }
+        
+        // Also check available models that are downloaded
         let availableDownloaded = modelManager.availableModels.filter { model in
-            model.framework == framework && modelManager.isModelDownloaded(model.name, framework: framework)
+            model.framework == framework && 
+            modelManager.isModelDownloaded(model.name, framework: framework)
         }
         
-        // Merge and deduplicate
-        for model in availableDownloaded {
-            if !downloadedModels.contains(where: { $0.name == model.name }) {
-                downloadedModels.append(model)
+        // Combine both sources
+        allModels = frameworkDownloaded + availableDownloaded
+        
+        // Remove duplicates based on name similarity
+        var uniqueModels: [ModelInfo] = []
+        var seenNames: Set<String> = []
+        
+        for model in allModels {
+            let normalizedName = normalizeModelName(model.name)
+            if !seenNames.contains(normalizedName) {
+                seenNames.insert(normalizedName)
+                uniqueModels.append(model)
             }
         }
+        
+        // Filter for chat-compatible models only
+        downloadedModels = uniqueModels.filter { model in
+            isChatCompatibleModel(model)
+        }
+        
+        // DEBUG: Log what we found
+        print("Downloaded models for \(framework.displayName): \(downloadedModels.map { $0.name })")
+        print("Filtered out non-chat models: \(uniqueModels.filter { !isChatCompatibleModel($0) }.map { $0.name })")
+    }
+    
+    private func normalizeModelName(_ name: String) -> String {
+        // Normalize model names to detect duplicates
+        return name.lowercased()
+            .replacingOccurrences(of: "quantized-", with: "")
+            .replacingOccurrences(of: "-4bit", with: "")
+            .replacingOccurrences(of: "_4bit", with: "")
+            .replacingOccurrences(of: "-it", with: "")
+            .replacingOccurrences(of: ".mlpackage", with: "")
+            .replacingOccurrences(of: ".gguf", with: "")
+            .replacingOccurrences(of: ".onnx", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func isChatCompatibleModel(_ model: ModelInfo) -> Bool {
+        // Use the model type to determine if it's compatible with chat
+        return model.modelType?.supportedInChat ?? true
     }
 
     private var modelNavigationView: some View {
@@ -565,7 +627,70 @@ struct ModelPickerView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
+                        // Show a help message if only non-chat models are available
+                        let nonChatModels = modelManager.downloadedModels.filter { model in
+                            model.framework == framework && !isChatCompatibleModel(model)
+                        }
+                        
+                        if !nonChatModels.isEmpty && downloadedModels.isEmpty {
+                            VStack(spacing: 8) {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.orange)
+                                
+                                Text("No Chat Models Available")
+                                    .font(.headline)
+                                
+                                Text("You have \(nonChatModels.count) model(s) downloaded, but they are not suitable for text chat:")
+                                    .font(.caption)
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(.secondary)
+                                    .padding(.horizontal)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    ForEach(nonChatModels.prefix(3), id: \.id) { model in
+                                        Text("• \(model.name)")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    if nonChatModels.count > 3 {
+                                        Text("• and \(nonChatModels.count - 3) more...")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                
+                                Text("For chat, please download one of these \(framework.displayName) models:")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 4)
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if framework == .coreML {
+                                        Text("• GPT2-CoreML.mlpackage (548MB)")
+                                        Text("• DistilGPT2-CoreML.mlpackage (267MB)")
+                                        Text("• OpenELM-270M.mlpackage (312MB)")
+                                    } else if framework == .mlx {
+                                        Text("• Mistral-7B-Instruct (4-bit)")
+                                        Text("• Phi-2 MLX")
+                                        Text("• Gemma-2B (4-bit)")
+                                    } else if framework == .onnxRuntime {
+                                        Text("• Phi-3-mini ONNX")
+                                        Text("• Llama-2-7B ONNX")
+                                        Text("• GPT2 ONNX")
+                                    }
+                                }
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        
                         ForEach(downloadedModels) { model in
                             downloadedModelCard(model)
                         }

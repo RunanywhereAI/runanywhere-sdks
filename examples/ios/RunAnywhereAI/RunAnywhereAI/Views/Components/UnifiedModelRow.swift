@@ -59,6 +59,11 @@ struct UnifiedModelRow: View {
         }
         return modelManager.isModelDownloaded(model.name, framework: framework)
     }
+    
+    private var effectiveModelType: ModelType {
+        // Use modelType from downloadInfo if available, otherwise from model
+        return downloadInfo?.modelType ?? model.modelType ?? .text
+    }
 
     var body: some View {
         Button(action: onTap) {
@@ -71,56 +76,90 @@ struct UnifiedModelRow: View {
 
                 // Model info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(model.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(model.name)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        
+                        // Model type indicator
+                        Image(systemName: effectiveModelType.icon)
+                            .font(.caption)
+                            .foregroundColor(effectiveModelType.supportedInChat ? .blue : .orange)
+                            .help(effectiveModelType.rawValue)
+                    }
 
                     // Status indicators
-                    HStack(spacing: 8) {
-                        // Size
-                        Text(model.displaySize)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-
-                        // Quantization
-                        if let quantization = model.quantization {
+                    VStack(alignment: .leading, spacing: 6) {
+                        // First row: Type and size
+                        HStack(spacing: 8) {
+                            // Model type badge
+                            Text(effectiveModelType.rawValue)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(effectiveModelType.supportedInChat ? Color.blue.opacity(0.1) : Color.orange.opacity(0.1))
+                                .foregroundColor(effectiveModelType.supportedInChat ? .blue : .orange)
+                                .cornerRadius(4)
+                            
                             Text("•")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Text(quantization)
+                            
+                            Text(model.displaySize)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
+                            
+                            // Quantization
+                            if let quantization = model.quantization {
+                                Text("•")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                Text(quantization)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            
+                            Spacer()
                         }
-
-                        // Compatibility
-                        if model.isCompatible {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Label("Compatible", systemImage: "checkmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.green)
-                        } else {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Label("Incompatible", systemImage: "xmark.circle.fill")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-
-                        // Download status
-                        if isModelDownloaded {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Label("Downloaded", systemImage: "checkmark.icloud.fill")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        } else if downloadInfo != nil {
-                            Text("•")
-                                .foregroundColor(.secondary)
-                            Label("Available", systemImage: "arrow.down.circle")
-                                .font(.caption)
-                                .foregroundColor(.blue)
+                        
+                        // Second row: Status badges
+                        HStack(spacing: 8) {
+                            // Compatibility
+                            if model.isCompatible {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.green)
+                                    Text("Compatible")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            
+                            // Download status
+                            if isModelDownloaded {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.green)
+                                    Text("Downloaded")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                }
+                            } else if downloadInfo != nil {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.green)
+                                    Text("Available")
+                                        .font(.caption2)
+                                        .foregroundColor(.green)
+                                }
+                            }
+                            
+                            Spacer()
                         }
                     }
                 }
@@ -161,11 +200,32 @@ struct UnifiedModelRow: View {
                         .buttonStyle(PlainButtonStyle())
                     }
 
-                    // Load button for local models
+                    // Load button for local models or Coming Soon for unsupported types
                     if isModelDownloaded {
-                        if isLoading {
-                            ProgressView()
-                                .scaleEffect(0.8)
+                        if !effectiveModelType.supportedInChat {
+                            // Coming Soon badge for unsupported model types
+                            VStack(spacing: 2) {
+                                Image(systemName: "clock.badge.exclamationmark")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                                Text("Coming Soon")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.horizontal, 8)
+                        } else if isLoading {
+                            HStack(spacing: 4) {
+                                ProgressView()
+                                    .scaleEffect(0.7)
+                                Text("Loading...")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(15)
                         } else {
                             Button(action: {
                                 Task {

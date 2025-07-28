@@ -53,7 +53,9 @@ class ModelURLRegistry: ObservableObject {
             url: URL(string: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_original_compiled.zip")!,
             sha256: nil,
             requiresUnzip: true,
-            requiresAuth: false
+            requiresAuth: false,
+            notes: "Image Generation Model - Text-to-Image support coming soon!",
+            modelType: .image
         ),
         ModelDownloadInfo(
             id: "openelm-270m-coreml",
@@ -99,7 +101,8 @@ class ModelURLRegistry: ObservableObject {
             url: URL(string: "https://huggingface.co/mlx-community/quantized-gemma-2b-it/resolve/main/model.safetensors")!,
             sha256: nil,
             requiresUnzip: false,
-            requiresAuth: false
+            requiresAuth: false,
+            notes: "4-bit quantized Gemma 2B MLX model - single file version"
         )
     ]
 
@@ -372,6 +375,7 @@ struct ModelDownloadInfo: Codable, Identifiable {
     let requiresAuth: Bool
     let alternativeURLs: [URL]
     let notes: String?
+    let modelType: ModelType
 
     // Runtime properties (not encoded)
     var isURLValid: Bool = true
@@ -379,7 +383,7 @@ struct ModelDownloadInfo: Codable, Identifiable {
     var isBuiltIn: Bool { url.scheme == "builtin" }
     var isUnavailable: Bool { !isURLValid && !isBuiltIn && !requiresAuth }
 
-    init(id: String, name: String, url: URL, sha256: String? = nil, requiresUnzip: Bool, requiresAuth: Bool = false, alternativeURLs: [URL] = [], notes: String? = nil) {
+    init(id: String, name: String, url: URL, sha256: String? = nil, requiresUnzip: Bool, requiresAuth: Bool = false, alternativeURLs: [URL] = [], notes: String? = nil, modelType: ModelType = .text) {
         self.id = id
         self.name = name
         self.url = url
@@ -388,11 +392,12 @@ struct ModelDownloadInfo: Codable, Identifiable {
         self.requiresAuth = requiresAuth
         self.alternativeURLs = alternativeURLs
         self.notes = notes
+        self.modelType = modelType
     }
 
     // Custom Codable implementation to exclude runtime properties
     enum CodingKeys: String, CodingKey {
-        case id, name, url, sha256, requiresUnzip, requiresAuth, alternativeURLs, notes
+        case id, name, url, sha256, requiresUnzip, requiresAuth, alternativeURLs, notes, modelType
     }
 }
 

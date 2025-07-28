@@ -14,7 +14,7 @@ class ChatViewModelEnhanced: ObservableObject {
     // MARK: - Published Properties
     @Published var messages: [ChatMessage] = []
     @Published var isGenerating = false
-    @Published var selectedFramework: LLMFramework = .llamaCpp
+    @Published var selectedFramework: LLMFramework = .mlx
     @Published var selectedModel: RunAnywhereAI.ModelInfo? {
         didSet {
             if let model = selectedModel {
@@ -28,6 +28,8 @@ class ChatViewModelEnhanced: ObservableObject {
     @Published var settings = ChatSettings()
     @Published var currentInput = ""
     @Published var error: Error?
+    @Published var isLoadingModel = false
+    @Published var modelLoadingProgress: String = ""
 
     // MARK: - Private Properties
     private let unifiedService = UnifiedLLMService.shared
@@ -53,6 +55,48 @@ class ChatViewModelEnhanced: ObservableObject {
 
     func sendMessage() async {
         guard canSend else { return }
+        
+        // Check if model is loaded
+        guard let service = unifiedService.currentService else {
+            let errorMessage = ChatMessage(
+                role: .assistant, 
+                content: "Please select a framework and model before chatting.",
+                timestamp: Date()
+            )
+            messages.append(errorMessage)
+            return
+        }
+        
+        // Check model state
+        switch service.modelState {
+        case .unloaded:
+            let errorMessage = ChatMessage(
+                role: .assistant, 
+                content: "Please wait for the model to load before chatting.",
+                timestamp: Date()
+            )
+            messages.append(errorMessage)
+            return
+        case .loading:
+            let errorMessage = ChatMessage(
+                role: .assistant, 
+                content: "Model is still loading. Please wait...",
+                timestamp: Date()
+            )
+            messages.append(errorMessage)
+            return
+        case .failed(let error):
+            let errorMessage = ChatMessage(
+                role: .assistant, 
+                content: "Model failed to load: \(error.localizedDescription)",
+                timestamp: Date()
+            )
+            messages.append(errorMessage)
+            return
+        case .loaded:
+            // Model is ready, continue with message
+            break
+        }
 
         let userMessage = ChatMessage(
             role: .user,
@@ -196,27 +240,76 @@ class ChatViewModelEnhanced: ObservableObject {
     private func addWelcomeMessage() {
         let welcomeMessage = ChatMessage(
             role: .assistant,
-            content: "Welcome! I'm ready to chat using \(selectedFramework.displayName). You can switch frameworks anytime using the selector above.",
+            content: "Welcome to RunAnywhere AI! Please select a framework and model to start chatting.",
             timestamp: Date()
         )
         messages.append(welcomeMessage)
     }
     
     private func loadSelectedModel(_ model: RunAnywhereAI.ModelInfo) async {
+        await MainActor.run {
+            isLoadingModel = true
+            modelLoadingProgress = "Loading \(model.name)..."
+            error = nil
+        }
+        
         // Switch to the correct framework
         unifiedService.selectService(named: selectedFramework.displayName)
         
-        // Get the model path
-        let modelPath = ModelManager.shared.modelPath(for: model.name, framework: selectedFramework)
+        // Get the model path - check if model already has a path set
+        let modelPath: String
+        if let existingPath = model.path, !existingPath.isEmpty {
+            modelPath = existingPath
+        } else {
+            modelPath = ModelManager.shared.modelPath(for: model.name, framework: selectedFramework).path
+        }
         
         do {
-            // Load the model using the unified service
-            try await unifiedService.currentService?.loadModel(modelPath.path)
+            await MainActor.run {
+                modelLoadingProgress = "Initializing \(selectedFramework.displayName) service..."
+            }
+            
+            // Initialize the service if needed
+            if let service = unifiedService.currentService {
+                switch service.modelState {
+                case .unloaded:
+                    await MainActor.run {
+                        modelLoadingProgress = "Loading model into memory..."
+                    }
+                    try await service.initialize(modelPath: modelPath)
+                case .loaded:
+                    // Model already loaded, just update UI
+                    await MainActor.run {
+                        modelLoadingProgress = "Model already loaded"
+                    }
+                default:
+                    break
+                }
+            }
+            
             logger.info("Successfully loaded model: \(model.name)")
+            
+            await MainActor.run {
+                isLoadingModel = false
+                modelLoadingProgress = ""
+                // Update welcome message
+                if !messages.isEmpty && messages[0].role == .assistant {
+                    messages[0].content = "Model loaded successfully! I'm ready to chat using \(model.name) with \(selectedFramework.displayName)."
+                }
+            }
         } catch {
             logger.error("Failed to load model \(model.name): \(error)")
             await MainActor.run {
                 self.error = error
+                isLoadingModel = false
+                modelLoadingProgress = ""
+                // Show error message in chat
+                let errorMessage = ChatMessage(
+                    role: .assistant,
+                    content: "Failed to load model: This model format is not supported by the selected framework. Please try selecting another model or check if the model file exists.",
+                    timestamp: Date()
+                )
+                messages.append(errorMessage)
             }
         }
     }

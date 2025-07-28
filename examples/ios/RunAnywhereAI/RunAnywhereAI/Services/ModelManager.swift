@@ -350,6 +350,21 @@ class ModelManager: ObservableObject {
         let fileSize = attributes?[.size] as? Int64 ?? 0
         let sizeString = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
 
+        // Try to find model type from registry
+        let registry = ModelURLRegistry.shared
+        var modelType: ModelType = .text
+        if let downloadInfo = registry.getModelInfo(id: fileName) {
+            modelType = downloadInfo.modelType
+        } else if let frameworkInfo = framework {
+            // Check all models in this framework for a match
+            let frameworkModels = registry.getAllModels(for: frameworkInfo)
+            if let matchingModel = frameworkModels.first(where: { 
+                isModelNameMatch($0.name, fileName) 
+            }) {
+                modelType = matchingModel.modelType
+            }
+        }
+
         return ModelInfo(
             id: UUID().uuidString,
             name: fileName,
@@ -358,7 +373,8 @@ class ModelManager: ObservableObject {
             size: sizeString,
             framework: inferredFramework,
             isLocal: true,
-            downloadedFileName: fileName
+            downloadedFileName: fileName,
+            modelType: modelType
         )
     }
     

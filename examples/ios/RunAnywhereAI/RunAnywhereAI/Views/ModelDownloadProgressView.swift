@@ -334,13 +334,27 @@ struct ModelDownloadProgressView: View {
             try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
 
             // Check if extraction is needed
-            if downloadInfo.requiresUnzip {
+            if downloadInfo.requiresUnzip || url.pathExtension == "gz" || url.lastPathComponent.contains(".tar.gz") {
                 currentStep = .extracting
                 try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
 
                 // Extract the file
                 if url.pathExtension == "zip" {
                     try FileManager.default.unzipItem(at: url, to: modelDirectory)
+                } else if url.pathExtension == "gz" || url.lastPathComponent.contains(".tar.gz") {
+                    // For MLX models that come as tar.gz, we need special handling
+                    // Since Process is not available on iOS, we'll just copy the file for now
+                    // In a production app, you'd want to use a library for tar.gz extraction
+                    let destinationURL = modelDirectory.appendingPathComponent(downloadInfo.name)
+                    
+                    print("MLX Model download detected: \(url.lastPathComponent)")
+                    print("Note: tar.gz extraction is not implemented on iOS. The model needs to be extracted manually.")
+                    
+                    // Just copy the tar.gz file for now
+                    try FileManager.default.copyItem(at: url, to: destinationURL)
+                    
+                    // TODO: Implement tar.gz extraction using a third-party library
+                    // For now, users will need to extract manually or use pre-extracted models
                 } else {
                     // For other compressed formats, just copy for now
                     let destinationURL = modelDirectory.appendingPathComponent(url.lastPathComponent)
