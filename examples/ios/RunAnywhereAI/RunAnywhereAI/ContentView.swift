@@ -21,10 +21,10 @@ struct ContentView: View {
             .tag(0)
 
             UnifiedModelsView()
-            .tabItem {
-                Label("Models", systemImage: "cube")
-            }
-            .tag(1)
+                .tabItem {
+                    Label("Models", systemImage: "cube")
+                }
+                .tag(1)
 
             NavigationView {
                 BenchmarkView()

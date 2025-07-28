@@ -16,7 +16,7 @@ enum KaggleAuthError: LocalizedError {
     case authRequired
     case invalidAPIKey
     case rateLimitExceeded
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidCredentials:
@@ -39,11 +39,11 @@ struct KaggleCredentials: Codable {
     let username: String
     let apiKey: String
     let createdAt: Date
-    
+
     var isValid: Bool {
-        return !username.isEmpty && !apiKey.isEmpty && apiKey.count >= 32
+        !username.isEmpty && !apiKey.isEmpty && apiKey.count >= 32
     }
-    
+
     var authorizationHeader: String {
         let credentials = "\(username):\(apiKey)"
         let encodedCredentials = Data(credentials.utf8).base64EncodedString()
@@ -56,61 +56,61 @@ struct KaggleCredentials: Codable {
 @MainActor
 class KaggleAuthService: ObservableObject {
     static let shared = KaggleAuthService()
-    
+
     @Published var isAuthenticated = false
     @Published var currentCredentials: KaggleCredentials?
-    
+
     private let keychain = KeychainService()
     private let kaggleKeychainKey = "kaggle_credentials"
-    
+
     private init() {
         loadCredentials()
     }
-    
+
     // MARK: - Authentication Methods
-    
+
     func authenticate(username: String, apiKey: String) async throws {
         // Validate format
         guard !username.isEmpty, !apiKey.isEmpty else {
             throw KaggleAuthError.invalidCredentials
         }
-        
+
         guard apiKey.count >= 32 else {
             throw KaggleAuthError.invalidAPIKey
         }
-        
+
         let credentials = KaggleCredentials(
             username: username,
             apiKey: apiKey,
             createdAt: Date()
         )
-        
+
         // Test credentials with a simple API call
         try await validateCredentials(credentials)
-        
+
         // Save to keychain
         try saveCredentials(credentials)
-        
+
         currentCredentials = credentials
         isAuthenticated = true
     }
-    
+
     func logout() {
         currentCredentials = nil
         isAuthenticated = false
         try? keychain.delete(key: kaggleKeychainKey)
     }
-    
+
     private func validateCredentials(_ credentials: KaggleCredentials) async throws {
         // Test with Kaggle API to validate credentials
         let url = URL(string: "https://www.kaggle.com/api/v1/datasets/list?user=\(credentials.username)")!
         var request = URLRequest(url: url)
         request.setValue(credentials.authorizationHeader, forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
-        
+
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 switch httpResponse.statusCode {
                 case 200...299:
@@ -130,9 +130,9 @@ class KaggleAuthService: ObservableObject {
             throw KaggleAuthError.networkError(error)
         }
     }
-    
+
     // MARK: - Credential Management
-    
+
     private func loadCredentials() {
         if let data = keychain.read(key: kaggleKeychainKey),
            let credentials = try? JSONDecoder().decode(KaggleCredentials.self, from: data) {
@@ -140,23 +140,23 @@ class KaggleAuthService: ObservableObject {
             isAuthenticated = credentials.isValid
         }
     }
-    
+
     private func saveCredentials(_ credentials: KaggleCredentials) throws {
         let data = try JSONEncoder().encode(credentials)
         try keychain.save(key: kaggleKeychainKey, data: data)
     }
-    
+
     // MARK: - Download Methods
-    
+
     func downloadModel(from url: URL, progress: @escaping (Double) -> Void) async throws -> URL {
         guard let credentials = currentCredentials else {
             throw KaggleAuthError.authRequired
         }
-        
+
         var request = URLRequest(url: url)
         request.setValue(credentials.authorizationHeader, forHTTPHeaderField: "Authorization")
         request.setValue("RunAnywhereAI/1.0", forHTTPHeaderField: "User-Agent")
-        
+
         // Use URLSession download task with progress tracking
         return try await withCheckedThrowingContinuation { continuation in
             let task = URLSession.shared.downloadTask(with: request) { tempURL, response, error in
@@ -164,12 +164,12 @@ class KaggleAuthService: ObservableObject {
                     continuation.resume(throwing: KaggleAuthError.networkError(error))
                     return
                 }
-                
+
                 guard let tempURL = tempURL else {
                     continuation.resume(throwing: KaggleAuthError.networkError(URLError(.badServerResponse)))
                     return
                 }
-                
+
                 if let httpResponse = response as? HTTPURLResponse {
                     switch httpResponse.statusCode {
                     case 200...299:
@@ -185,19 +185,19 @@ class KaggleAuthService: ObservableObject {
                     continuation.resume(returning: tempURL)
                 }
             }
-            
+
             task.resume()
         }
     }
-    
+
     // MARK: - Utility Methods
-    
+
     func requiresAuth(for url: URL) -> Bool {
-        return url.host?.contains("kaggle") == true
+        url.host?.contains("kaggle") == true
     }
-    
+
     func getAuthInstructions() -> [String] {
-        return [
+        [
             "1. Go to kaggle.com and sign in to your account",
             "2. Click on your profile picture → Account",
             "3. Scroll down to 'API' section",
@@ -218,17 +218,17 @@ class KeychainService {
             kSecAttrAccount as String: key,
             kSecValueData as String: data
         ]
-        
+
         // Delete existing item
         SecItemDelete(query as CFDictionary)
-        
+
         // Add new item
         let status = SecItemAdd(query as CFDictionary, nil)
         guard status == errSecSuccess else {
             throw KeychainError.saveFailed
         }
     }
-    
+
     func read(key: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -236,22 +236,22 @@ class KeychainService {
             kSecReturnData as String: kCFBooleanTrue!,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
-        
+
         var dataTypeRef: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &dataTypeRef)
-        
+
         if status == errSecSuccess {
             return dataTypeRef as? Data
         }
         return nil
     }
-    
+
     func delete(key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrAccount as String: key
         ]
-        
+
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
             throw KeychainError.deleteFailed

@@ -119,7 +119,7 @@ class ModelURLRegistry: ObservableObject {
         ),
         ModelDownloadInfo(
             id: "phi-3-mini-128k-onnx",
-            name: "Phi-3-mini-128k-instruct-onnx", 
+            name: "Phi-3-mini-128k-instruct-onnx",
             url: URL(string: "https://huggingface.co/microsoft/Phi-3-mini-128k-instruct-onnx/resolve/main/cpu_and_mobile/cpu-int4-rtn-block-32-acc-level-4/phi3-mini-128k-instruct-cpu-int4-rtn-block-32-acc-level-4.onnx")!,
             sha256: nil,
             requiresUnzip: false,
@@ -298,7 +298,7 @@ class ModelURLRegistry: ObservableObject {
                     url: URL(string: "https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer.json")!
                 ),
                 TokenizerFile(
-                    name: "tokenizer_config.json", 
+                    name: "tokenizer_config.json",
                     url: URL(string: "https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json")!
                 )
             ]
@@ -306,7 +306,7 @@ class ModelURLRegistry: ObservableObject {
     ]
 
     // MARK: - Computed Properties
-    
+
     var foundationModels: [ModelDownloadInfo] { _foundationModels }
     var coreMLModels: [ModelDownloadInfo] { _coreMLModels }
     var mlxModels: [ModelDownloadInfo] { _mlxModels }
@@ -372,7 +372,7 @@ struct ModelDownloadInfo: Codable, Identifiable {
     let requiresAuth: Bool
     let alternativeURLs: [URL]
     let notes: String?
-    
+
     // Runtime properties (not encoded)
     var isURLValid: Bool = true
     var lastVerified: Date?
@@ -389,7 +389,7 @@ struct ModelDownloadInfo: Codable, Identifiable {
         self.alternativeURLs = alternativeURLs
         self.notes = notes
     }
-    
+
     // Custom Codable implementation to exclude runtime properties
     enum CodingKeys: String, CodingKey {
         case id, name, url, sha256, requiresUnzip, requiresAuth, alternativeURLs, notes
@@ -440,13 +440,13 @@ extension ModelURLRegistry {
         let data = try encoder.encode(allModels)
         try data.write(to: url)
     }
-    
+
     // MARK: - URL Validation
-    
+
     /// Validate URLs for a specific framework
     func validateURLs(for framework: LLMFramework) async {
         var models = getAllModels(for: framework)
-        
+
         for i in 0..<models.count {
             // Skip built-in models
             if models[i].isBuiltIn {
@@ -454,31 +454,31 @@ extension ModelURLRegistry {
                 models[i].lastVerified = Date()
                 continue
             }
-            
+
             // Mark example/unavailable URLs as invalid
-            if models[i].url.host?.contains("example.com") == true || 
-               models[i].url.host?.contains("unavailable-url") == true {
+            if models[i].url.host?.contains("example.com") == true ||
+                models[i].url.host?.contains("unavailable-url") == true {
                 models[i].isURLValid = false
                 models[i].lastVerified = Date()
                 continue
             }
-            
+
             // Skip Kaggle URLs that require auth
             if models[i].requiresAuth && models[i].url.host?.contains("kaggle") == true {
                 models[i].isURLValid = true // Assume valid since auth is expected
                 models[i].lastVerified = Date()
                 continue
             }
-            
+
             // Validate HTTP/HTTPS URLs
             models[i].isURLValid = await validateURL(models[i].url)
             models[i].lastVerified = Date()
         }
-        
+
         // Update the internal collections
         updateModelsCollection(for: framework, with: models)
     }
-    
+
     /// Validate all URLs across all frameworks
     func validateAllURLs() async {
         await withTaskGroup(of: Void.self) { group in
@@ -489,16 +489,16 @@ extension ModelURLRegistry {
             }
         }
     }
-    
+
     private func validateURL(_ url: URL) async -> Bool {
         do {
             var request = URLRequest(url: url)
             request.httpMethod = "HEAD"
             request.timeoutInterval = 10
             request.setValue("RunAnywhereAI-URLVerifier/1.0", forHTTPHeaderField: "User-Agent")
-            
+
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 return httpResponse.statusCode == 200 || httpResponse.statusCode == 302
             }
@@ -508,7 +508,7 @@ extension ModelURLRegistry {
             return false
         }
     }
-    
+
     private func updateModelsCollection(for framework: LLMFramework, with models: [ModelDownloadInfo]) {
         switch framework {
         case .foundationModels:
@@ -526,36 +526,36 @@ extension ModelURLRegistry {
         default:
             break
         }
-        
+
         // Notify UI of validation completion
         NotificationCenter.default.post(name: .modelURLsValidated, object: nil, userInfo: [
             "framework": framework,
             "validatedModels": models
         ])
     }
-    
+
     /// Important Notes for Users
     static let usageNotes = """
     IMPORTANT NOTES:
-    
+
     1. Core ML Models:
        - Most models need conversion from PyTorch/TensorFlow
        - Use: python3 -m exporters.coreml --model=model-name exported/
        - Apple provides limited pre-converted models
-    
+
     2. MLX Models:
        - Require multiple files (weights, config.json, tokenizer)
        - Best downloaded using: huggingface-cli download --local-dir model-name mlx-community/model-name
        - Or use mlx-lm directly: mlx_lm.generate --model mlx-community/model-name
-    
+
     3. ONNX Models:
        - Microsoft provides good mobile-optimized versions
        - Look for "cpu-int4" variants for best mobile performance
-    
+
     4. TensorFlow Lite:
        - Many require Kaggle account for download
        - Alternative: convert from TensorFlow models
-    
+
     5. GGUF (llama.cpp):
        - Most reliable format for direct download
        - Single file contains everything needed

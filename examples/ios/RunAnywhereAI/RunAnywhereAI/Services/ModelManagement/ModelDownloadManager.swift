@@ -138,7 +138,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
                 continuation.resume(throwing: ModelDownloadError.noDownloadURL)
                 return
             }
-            
+
             let downloadInfo = ModelDownloadInfo(
                 id: modelInfo.id,
                 name: modelInfo.name,
@@ -147,7 +147,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
                 requiresUnzip: false,
                 requiresAuth: false
             )
-            
+
             downloadModel(downloadInfo, progress: progress) { result in
                 switch result {
                 case .success(let tempURL):
@@ -295,14 +295,14 @@ class ModelDownloadManager: NSObject, ObservableObject {
         if zipURL.pathExtension == "zip" {
             do {
                 try FileManager.default.unzipItem(at: zipURL, to: directory)
-                
+
                 // Find the extracted content
                 let contents = try FileManager.default.contentsOfDirectory(
-                    at: directory, 
+                    at: directory,
                     includingPropertiesForKeys: [.isDirectoryKey],
                     options: [.skipsHiddenFiles]
                 )
-                
+
                 // Return the first extracted item (could be file or directory)
                 if let firstItem = contents.first {
                     return firstItem
@@ -441,19 +441,19 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
             // Calculate download speed
             let now = Date()
             let elapsed = now.timeIntervalSince(downloadStartTimes[modelId] ?? now)
-        let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
+            let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
 
-        // Estimate time remaining
-        let bytesRemaining = totalBytesExpectedToWrite - totalBytesWritten
-        let estimatedTime = speed > 0 ? TimeInterval(Double(bytesRemaining) / speed) : nil
+            // Estimate time remaining
+            let bytesRemaining = totalBytesExpectedToWrite - totalBytesWritten
+            let estimatedTime = speed > 0 ? TimeInterval(Double(bytesRemaining) / speed) : nil
 
-        let progress = DownloadProgress(
-            bytesWritten: totalBytesWritten,
-            totalBytes: totalBytesExpectedToWrite,
-            fractionCompleted: fractionCompleted,
-            estimatedTimeRemaining: estimatedTime,
-            downloadSpeed: speed
-        )
+            let progress = DownloadProgress(
+                bytesWritten: totalBytesWritten,
+                totalBytes: totalBytesExpectedToWrite,
+                fractionCompleted: fractionCompleted,
+                estimatedTimeRemaining: estimatedTime,
+                downloadSpeed: speed
+            )
 
             self.activeDownloads[modelId] = progress
             self.progressHandlers[modelId]?(progress)

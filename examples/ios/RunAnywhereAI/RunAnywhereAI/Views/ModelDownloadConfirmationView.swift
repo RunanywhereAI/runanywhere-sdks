@@ -10,25 +10,25 @@ import SwiftUI
 struct ModelDownloadConfirmationView: View {
     let model: ModelInfo
     let onDownload: (ModelDownloadInfo) -> Void
-    
+
     @Environment(\.dismiss) private var dismiss
     @State private var selectedURL: URL?
     @State private var downloadInfo: ModelDownloadInfo?
-    
+
     private var availableDownloads: [ModelDownloadInfo] {
         let registry = ModelURLRegistry.shared
         let allModels = registry.getAllModels(for: model.framework)
-        
+
         return allModels.filter { downloadInfo in
             // Exact match
             if downloadInfo.name == model.name || downloadInfo.id == model.id {
                 return true
             }
-            
+
             // Check if the model name contains key parts of the download name
             let modelNameLower = model.name.lowercased()
             let downloadNameLower = downloadInfo.name.lowercased()
-            
+
             // Check for common patterns
             if modelNameLower.contains("phi") && downloadNameLower.contains("phi") {
                 return true
@@ -48,11 +48,11 @@ struct ModelDownloadConfirmationView: View {
             if modelNameLower.contains("gpt2") && downloadNameLower.contains("gpt2") {
                 return true
             }
-            
+
             return false
         }
     }
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
@@ -60,14 +60,14 @@ struct ModelDownloadConfirmationView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Label(model.name, systemImage: "doc.fill")
                         .font(.headline)
-                    
+
                     HStack {
                         Label(model.framework.displayName, systemImage: "cpu")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         Spacer()
-                        
+
                         Label(model.displaySize, systemImage: "internaldrive")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -76,24 +76,24 @@ struct ModelDownloadConfirmationView: View {
                 .padding()
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
-                
+
                 if availableDownloads.isEmpty {
                     // No pre-configured URLs
                     VStack(spacing: 16) {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundColor(.orange)
-                        
+
                         Text("No Download URL Available")
                             .font(.headline)
-                        
+
                         Text("This model doesn't have a pre-configured download URL.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                     }
                     .padding()
-                    
+
                     Spacer()
                 } else {
                     // Show available download options
@@ -101,21 +101,20 @@ struct ModelDownloadConfirmationView: View {
                         Text("Download Options")
                             .font(.headline)
                             .padding(.horizontal)
-                        
+
                         ForEach(availableDownloads) { download in
                             DownloadOptionRow(
                                 downloadInfo: download,
-                                isSelected: selectedURL == download.url,
-                                onSelect: {
+                                isSelected: selectedURL == download.url
+                            )                                {
                                     selectedURL = download.url
                                     downloadInfo = download
                                 }
-                            )
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     // Download details
                     if let info = downloadInfo {
                         VStack(alignment: .leading, spacing: 8) {
@@ -124,7 +123,7 @@ struct ModelDownloadConfirmationView: View {
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
-                            
+
                             if info.requiresUnzip {
                                 Label("Will be extracted after download", systemImage: "doc.zipper")
                                     .font(.caption)
@@ -135,7 +134,7 @@ struct ModelDownloadConfirmationView: View {
                         .background(Color(.tertiarySystemGroupedBackground))
                         .cornerRadius(8)
                     }
-                    
+
                     // Download button
                     Button(action: {
                         if let info = downloadInfo {
@@ -174,7 +173,7 @@ struct DownloadOptionRow: View {
     let downloadInfo: ModelDownloadInfo
     let isSelected: Bool
     let onSelect: () -> Void
-    
+
     var body: some View {
         Button(action: onSelect) {
             HStack {
@@ -182,14 +181,14 @@ struct DownloadOptionRow: View {
                     Text(downloadInfo.name)
                         .font(.subheadline)
                         .foregroundColor(.primary)
-                    
+
                     Text(downloadInfo.url.host ?? "Unknown source")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(isSelected ? .blue : .secondary)
             }
@@ -211,8 +210,7 @@ struct ModelDownloadConfirmationView_Previews: PreviewProvider {
                 size: "2.4 GB",
                 framework: .llamaCpp,
                 quantization: "Q4_K_M"
-            ),
-            onDownload: { _ in }
-        )
+            )
+        )            { _ in }
     }
 }

@@ -27,16 +27,16 @@ struct SystemDeviceInfo {
 @MainActor
 class DeviceInfoService: ObservableObject {
     static let shared = DeviceInfoService()
-    
+
     @Published var deviceInfo: SystemDeviceInfo?
     @Published var isMonitoring = false
-    
+
     private var updateTimer: Timer?
-    
+
     private init() {
         updateDeviceInfo()
     }
-    
+
     func startMonitoring() {
         isMonitoring = true
         updateTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
@@ -45,23 +45,23 @@ class DeviceInfoService: ObservableObject {
             }
         }
     }
-    
+
     func stopMonitoring() {
         isMonitoring = false
         updateTimer?.invalidate()
         updateTimer = nil
     }
-    
+
     func updateDeviceInfo() {
         let device = UIDevice.current
         device.isBatteryMonitoringEnabled = true
-        
+
         let processInfo = ProcessInfo.processInfo
         let totalMemory = processInfo.physicalMemory
-        
+
         // Get system-wide memory info using host_statistics64
         let (availableMemory, usedMemory) = getSystemMemoryInfo()
-        
+
         // Get thermal state
         let thermalState: String = {
             switch processInfo.thermalState {
@@ -77,7 +77,7 @@ class DeviceInfoService: ObservableObject {
                 return "Unknown"
             }
         }()
-        
+
         // Get battery state
         let batteryState: String = {
             switch device.batteryState {
@@ -93,10 +93,10 @@ class DeviceInfoService: ObservableObject {
                 return "Unknown"
             }
         }()
-        
+
         // Get processor info
         let processorType = getProcessorName()
-        
+
         // Debug logging
         #if DEBUG
         print("=== Device Info Debug ===")
@@ -111,7 +111,7 @@ class DeviceInfoService: ObservableObject {
         print("Battery Level: \(device.batteryLevel)")
         print("======================")
         #endif
-        
+
         deviceInfo = SystemDeviceInfo(
             modelName: modelName(),
             osVersion: "\(device.systemName) \(device.systemVersion)",
@@ -127,34 +127,34 @@ class DeviceInfoService: ObservableObject {
             thermalState: thermalState
         )
     }
-    
+
     private func getSystemMemoryInfo() -> (available: UInt64, used: UInt64) {
         var info = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.stride / MemoryLayout<natural_t>.stride)
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
             }
         }
-        
+
         guard result == KERN_SUCCESS else {
             // Fallback to simpler calculation
             let totalMemory = ProcessInfo.processInfo.physicalMemory
             return (totalMemory / 2, totalMemory / 2) // Rough estimate
         }
-        
+
         let pageSize = UInt64(vm_kernel_page_size)
-        
+
         // Calculate free memory (includes inactive pages that can be reused)
         let freeMemory = UInt64(info.free_count + info.inactive_count) * pageSize
-        
+
         // Calculate used memory (active + wired + compressed)
         let usedMemory = UInt64(info.active_count + info.wire_count + info.compressor_page_count) * pageSize
-        
+
         return (freeMemory, usedMemory)
     }
-    
+
     private func getRawProcessorName() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
@@ -162,10 +162,10 @@ class DeviceInfoService: ObservableObject {
         sysctlbyname("hw.model", &model, &size, nil, 0)
         return String(cString: model)
     }
-    
+
     private func getProcessorName() -> String {
         let rawModel = getRawProcessorName()
-        
+
         // Map to user-friendly names
         let processorMap: [String: String] = [
             // A18 Pro (iPhone 16 Pro series)
@@ -192,10 +192,10 @@ class DeviceInfoService: ObservableObject {
             "T8112": "M2",
             "T8103": "M1"
         ]
-        
+
         return processorMap[rawModel] ?? rawModel
     }
-    
+
     private func getModelCode() -> String? {
         var systemInfo = utsname()
         uname(&systemInfo)
@@ -205,10 +205,10 @@ class DeviceInfoService: ObservableObject {
             }
         }
     }
-    
+
     private func modelName() -> String {
         let modelCode = getModelCode()
-        
+
         let modelMap: [String: String] = [
             // iPhone 16 models
             "iPhone17,4": "iPhone 16 Pro Max",
@@ -243,16 +243,16 @@ class DeviceInfoService: ObservableObject {
             "iPad14,1": "iPad mini (6th generation)",
             "iPad13,19": "iPad (10th generation)",
             "iPad13,18": "iPad Pro 12.9-inch (6th generation)",
-            "iPad13,17": "iPad Pro 11-inch (4th generation)",
+            "iPad13,17": "iPad Pro 11-inch (4th generation)"
             // Add more models as needed
         ]
-        
+
         return modelMap[modelCode ?? ""] ?? modelCode ?? "Unknown Device"
     }
-    
+
     private func getMemoryPressureString(used: UInt64, total: UInt64) -> String {
         let usagePercentage = Double(used) / Double(total) * 100
-        
+
         switch usagePercentage {
         case 0..<50:
             return "Low"
@@ -264,40 +264,40 @@ class DeviceInfoService: ObservableObject {
             return "Critical"
         }
     }
-    
+
     private func checkNeuralEngineAvailability() -> Bool {
         let modelName = self.modelName()
-        
+
         // All iPhone 16 models have Neural Engine
         if modelName.contains("iPhone 16") {
             return true
         }
-        
+
         // All iPhone 15 models have Neural Engine
         if modelName.contains("iPhone 15") {
             return true
         }
-        
+
         // All iPhone 14 models have Neural Engine
         if modelName.contains("iPhone 14") {
             return true
         }
-        
+
         // All iPhone 13 models have Neural Engine
         if modelName.contains("iPhone 13") {
             return true
         }
-        
+
         // All iPhone 12 models have Neural Engine
         if modelName.contains("iPhone 12") {
             return true
         }
-        
+
         // iPhone 11 and later have Neural Engine
         if modelName.contains("iPhone 11") {
             return true
         }
-        
+
         // Use model identifier check as fallback
         if let modelCode = getModelCode() {
             // Extract major version number
@@ -310,7 +310,7 @@ class DeviceInfoService: ObservableObject {
                 return majorVersion >= 10
             }
         }
-        
+
         return false
     }
 }

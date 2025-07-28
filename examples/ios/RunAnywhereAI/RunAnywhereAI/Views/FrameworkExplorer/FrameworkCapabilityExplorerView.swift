@@ -226,7 +226,7 @@ struct CapabilityFrameworkCard: View {
                 }
                 .frame(height: 100)
                 .frame(maxWidth: .infinity)
-                
+
                 if framework.isDeferred {
                     VStack {
                         HStack {

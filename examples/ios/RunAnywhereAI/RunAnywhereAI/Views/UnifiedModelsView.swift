@@ -12,7 +12,7 @@ struct UnifiedModelsView: View {
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
-    
+
     @State private var expandedFramework: LLMFramework?
     @State private var selectedModel: ModelInfo?
     @State private var showingModelDetails = false
@@ -20,7 +20,7 @@ struct UnifiedModelsView: View {
     @State private var selectedDownloadInfo: ModelDownloadInfo?
     @State private var showingImportView = false
     @State private var showingDeviceInfo = false
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -33,23 +33,23 @@ struct UnifiedModelsView: View {
                         showingDeviceInfo: $showingDeviceInfo
                     )
                     .padding(.horizontal)
-                    
+
                     // Frameworks Section
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Text("Models & Downloads")
                                 .font(.title2)
                                 .fontWeight(.semibold)
-                            
+
                             Spacer()
-                            
+
                             Menu {
                                 Button(action: {
                                     showingImportView = true
                                 }) {
                                     Label("Import Model", systemImage: "doc.badge.plus")
                                 }
-                                
+
                                 Button(action: {
                                     Task {
                                         await modelURLRegistry.validateAllURLs()
@@ -64,7 +64,7 @@ struct UnifiedModelsView: View {
                             }
                         }
                         .padding(.horizontal)
-                        
+
                         // Framework Cards
                         VStack(spacing: 12) {
                             ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
@@ -92,7 +92,7 @@ struct UnifiedModelsView: View {
                             }
                         }
                         .padding(.horizontal)
-                        
+
                         // Coming Soon Section
                         if !LLMFramework.allCases.filter({ $0.isDeferred }).isEmpty {
                             ComingSoonSection()
@@ -124,12 +124,11 @@ struct UnifiedModelsView: View {
                 if let model = selectedModel {
                     NavigationView {
                         UnifiedModelDetailsView(
-                            model: model,
-                            onDownload: { downloadInfo in
-                                startDownload(downloadInfo)
+                            model: model
+                        )                            { downloadInfo in
+                                confirmAndStartDownload(downloadInfo)
                                 showingModelDetails = false
                             }
-                        )
                         .toolbar {
                             ToolbarItem(placement: .navigationBarTrailing) {
                                 Button("Done") {
@@ -161,18 +160,18 @@ struct UnifiedModelsView: View {
             }
         }
     }
-    
+
     private var downloadedModelsCount: Int {
         let allServices = viewModel.availableServices
         return allServices.reduce(0) { count, service in
             count + service.supportedModels.filter { $0.isLocal }.count
         }
     }
-    
+
     private func createModelInfo(from downloadInfo: ModelDownloadInfo) -> ModelInfo {
         let format = ModelFormat.from(extension: downloadInfo.url.pathExtension)
         let framework = LLMFramework.forFormat(format)
-        
+
         return ModelInfo(
             id: downloadInfo.id,
             name: downloadInfo.name,
@@ -182,15 +181,22 @@ struct UnifiedModelsView: View {
             downloadURL: downloadInfo.url
         )
     }
-    
+
     private func startDownload(_ downloadInfo: ModelDownloadInfo) {
-        // First, start the actual download process
-        downloadManager.downloadModel(downloadInfo, progress: { progress in
+        // Show confirmation dialog first, don't start download immediately
+        let model = createModelInfo(from: downloadInfo)
+        selectedModel = model
+        showingModelDetails = true
+    }
+
+    private func confirmAndStartDownload(_ downloadInfo: ModelDownloadInfo) {
+        // Actually start the download after confirmation
+        downloadManager.downloadModel(downloadInfo, progress: { _ in
             // Progress updates handled by the download manager
-        }, completion: { result in
+        }, completion: { _ in
             // Completion handled by the download manager
         })
-        
+
         // Then show the progress view
         selectedDownloadInfo = downloadInfo
         showingDownloadProgress = true
@@ -204,7 +210,7 @@ struct DeviceStatusCard: View {
     let downloadedModelsCount: Int
     let activeDownloadsCount: Int
     @Binding var showingDeviceInfo: Bool
-    
+
     var body: some View {
         Button(action: {
             showingDeviceInfo = true
@@ -215,21 +221,21 @@ struct DeviceStatusCard: View {
                         Text("Device Status")
                             .font(.headline)
                             .foregroundColor(.primary)
-                        
+
                         if let info = deviceInfo {
                             Text("\(info.modelName) • \(info.osVersion)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 4) {
                         Text("\(downloadedModelsCount) models")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         if activeDownloadsCount > 0 {
                             Label("\(activeDownloadsCount) downloading", systemImage: "arrow.down.circle")
                                 .font(.caption)
@@ -237,21 +243,21 @@ struct DeviceStatusCard: View {
                         }
                     }
                 }
-                
+
                 if let info = deviceInfo {
                     HStack(spacing: 16) {
                         Label(info.availableMemory, systemImage: "memorychip")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         if info.neuralEngineAvailable {
                             Label("Neural Engine", systemImage: "cpu")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
-                        
+
                         Spacer()
-                        
+
                         Image(systemName: "info.circle.fill")
                             .font(.title2)
                             .foregroundColor(.blue)
@@ -274,7 +280,7 @@ struct ComingSoonSection: View {
             Text("Coming Soon")
                 .font(.headline)
                 .foregroundColor(.secondary)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(LLMFramework.allCases.filter { $0.isDeferred }, id: \.self) { framework in
@@ -289,7 +295,7 @@ struct ComingSoonSection: View {
 
 struct ComingSoonCard: View {
     let framework: LLMFramework
-    
+
     private var frameworkIcon: String {
         switch framework {
         case .llamaCpp: return "cube.fill"
@@ -300,19 +306,19 @@ struct ComingSoonCard: View {
         default: return "cube"
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: frameworkIcon)
                 .font(.title)
                 .foregroundColor(.orange)
-            
+
             Text(framework.displayName)
                 .font(.caption)
                 .fontWeight(.medium)
                 .foregroundColor(.primary)
                 .multilineTextAlignment(.center)
-            
+
             Label("Coming Soon", systemImage: "clock.fill")
                 .font(.caption2)
                 .foregroundColor(.orange)

@@ -13,29 +13,29 @@ struct UnifiedModelRow: View {
     let onTap: () -> Void
     let onDownload: (ModelDownloadInfo) -> Void
     let viewModel: ModelListViewModel
-    
+
     @State private var isLoading = false
     @State private var showingNoURLAlert = false
     @State private var showingDownloadConfirmation = false
     @State private var selectedDownloadInfo: ModelDownloadInfo?
-    
+
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
-    
+
     private var downloadInfo: ModelDownloadInfo? {
         let registry = ModelURLRegistry.shared
         let modelsWithURLs = registry.getAllModels(for: framework)
-        
+
         return modelsWithURLs.first { downloadInfo in
             // Try exact matches first
             if downloadInfo.name == model.name || downloadInfo.id == model.id {
                 return true
             }
-            
+
             // Try fuzzy matching
             let modelNameLower = model.name.lowercased()
             let downloadNameLower = downloadInfo.name.lowercased()
-            
+
             // Common patterns for model name matching
             let patterns = ["phi", "tinyllama", "llama-3.2", "mistral", "gemma", "qwen"]
             for pattern in patterns {
@@ -43,15 +43,15 @@ struct UnifiedModelRow: View {
                     return true
                 }
             }
-            
+
             return false
         }
     }
-    
+
     private var isDownloading: Bool {
         downloadManager.activeDownloads.keys.contains(model.id)
     }
-    
+
     var body: some View {
         Button(action: onTap) {
             HStack(spacing: 12) {
@@ -60,7 +60,7 @@ struct UnifiedModelRow: View {
                     .font(.title3)
                     .foregroundColor(model.isLocal ? .green : .secondary)
                     .frame(width: 40)
-                
+
                 // Model info
                 VStack(alignment: .leading, spacing: 4) {
                     Text(model.name)
@@ -68,14 +68,14 @@ struct UnifiedModelRow: View {
                         .fontWeight(.medium)
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                    
+
                     // Status indicators
                     HStack(spacing: 8) {
                         // Size
                         Text(model.displaySize)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        
+
                         // Quantization
                         if let quantization = model.quantization {
                             Text("•")
@@ -84,7 +84,7 @@ struct UnifiedModelRow: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         // Compatibility
                         if model.isCompatible {
                             Text("•")
@@ -99,7 +99,7 @@ struct UnifiedModelRow: View {
                                 .font(.caption)
                                 .foregroundColor(.red)
                         }
-                        
+
                         // Download status
                         if model.isLocal {
                             Text("•")
@@ -116,9 +116,9 @@ struct UnifiedModelRow: View {
                         }
                     }
                 }
-                
+
                 Spacer()
-                
+
                 // Action buttons
                 HStack(spacing: 8) {
                     // Download progress or button
@@ -152,7 +152,7 @@ struct UnifiedModelRow: View {
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
-                    
+
                     // Load button for local models
                     if model.isLocal {
                         if isLoading {
@@ -188,12 +188,11 @@ struct UnifiedModelRow: View {
         .sheet(isPresented: $showingDownloadConfirmation) {
             if let downloadInfo = selectedDownloadInfo {
                 ModelDownloadConfirmationView(
-                    model: model,
-                    onDownload: { confirmedDownloadInfo in
+                    model: model
+                )                    { confirmedDownloadInfo in
                         onDownload(confirmedDownloadInfo)
                         showingDownloadConfirmation = false
                     }
-                )
             }
         }
         .alert("No Download URL Available", isPresented: $showingNoURLAlert) {
@@ -212,17 +211,17 @@ struct UnifiedModelRow: View {
 struct DownloadOnlyModelRow: View {
     let downloadInfo: ModelDownloadInfo
     let onDownload: () -> Void
-    
+
     @StateObject private var downloadManager = ModelDownloadManager.shared
-    
+
     private var isDownloaded: Bool {
         ModelManager.shared.isModelDownloaded(downloadInfo.name)
     }
-    
+
     private var isDownloading: Bool {
         downloadManager.activeDownloads.keys.contains(downloadInfo.id)
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Model icon
@@ -230,7 +229,7 @@ struct DownloadOnlyModelRow: View {
                 .font(.title3)
                 .foregroundColor(downloadInfo.isBuiltIn ? .blue : (isDownloaded ? .green : .orange))
                 .frame(width: 40)
-            
+
             // Model info
             VStack(alignment: .leading, spacing: 4) {
                 Text(downloadInfo.name)
@@ -238,7 +237,7 @@ struct DownloadOnlyModelRow: View {
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
                     .lineLimit(1)
-                
+
                 // Status indicators
                 HStack(spacing: 8) {
                     // Download status
@@ -280,7 +279,7 @@ struct DownloadOnlyModelRow: View {
                             .font(.caption)
                             .foregroundColor(.red)
                     }
-                    
+
                     // Additional info
                     if downloadInfo.requiresUnzip {
                         Text("•")
@@ -290,7 +289,7 @@ struct DownloadOnlyModelRow: View {
                             .foregroundColor(.secondary)
                     }
                 }
-                
+
                 // Notes
                 if let notes = downloadInfo.notes {
                     Text(notes)
@@ -299,9 +298,9 @@ struct DownloadOnlyModelRow: View {
                         .lineLimit(2)
                 }
             }
-            
+
             Spacer()
-            
+
             // Action button
             if isDownloading {
                 if let progress = downloadManager.activeDownloads[downloadInfo.id] {
@@ -367,16 +366,15 @@ struct DownloadOnlyModelRow: View {
             onDownload: { _ in },
             viewModel: ModelListViewModel()
         )
-        
+
         DownloadOnlyModelRow(
             downloadInfo: ModelDownloadInfo(
                 id: "test",
                 name: "Test Download Model",
                 url: URL(string: "https://example.com/model.gguf")!,
                 requiresUnzip: false
-            ),
-            onDownload: {}
-        )
+            )
+        )            {}
     }
     .padding()
 }

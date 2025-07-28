@@ -76,7 +76,7 @@ struct SettingsView: View {
                 NavigationLink(destination: ModelURLSettingsView()) {
                     Label("Manage URLs", systemImage: "link")
                 }
-                
+
                 Text("Configure custom download URLs for models. All model downloads and management are now handled in the Models tab.")
                     .font(.caption)
                     .foregroundColor(.secondary)

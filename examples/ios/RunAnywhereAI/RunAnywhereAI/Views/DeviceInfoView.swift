@@ -11,7 +11,7 @@ struct DeviceInfoView: View {
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var storageService = StorageMonitorService.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             if let info = deviceInfoService.deviceInfo {
@@ -22,39 +22,39 @@ struct DeviceInfoView: View {
                         DeviceInfoRow(label: "Processor", value: info.processorType)
                         DeviceInfoRow(label: "CPU Cores", value: "\(info.coreCount)")
                         DeviceInfoRow(label: "Neural Engine", value: info.neuralEngineAvailable ? "Available" : "Not Available",
-                               valueColor: info.neuralEngineAvailable ? .green : .secondary)
+                                      valueColor: info.neuralEngineAvailable ? .green : .secondary)
                     }
-                    
+
                     Section("Memory") {
                         DeviceInfoRow(label: "Total Memory", value: info.totalMemory)
-                        DeviceInfoRow(label: "Available", value: info.availableMemory, 
-                               valueColor: .green)
+                        DeviceInfoRow(label: "Available", value: info.availableMemory,
+                                      valueColor: .green)
                         DeviceInfoRow(label: "Used", value: info.usedMemory,
-                               valueColor: .orange)
+                                      valueColor: .orange)
                         DeviceInfoRow(label: "Memory Pressure", value: info.memoryPressure,
-                               valueColor: memoryPressureColor(for: info.memoryPressure))
+                                      valueColor: memoryPressureColor(for: info.memoryPressure))
                     }
-                    
+
                     Section("Battery") {
                         DeviceInfoRow(label: "Battery Level", value: "\(info.batteryLevel)%",
-                               valueColor: batteryColor(for: info.batteryLevel))
+                                      valueColor: batteryColor(for: info.batteryLevel))
                         DeviceInfoRow(label: "Battery State", value: info.batteryState)
                     }
-                    
+
                     Section("System Status") {
                         DeviceInfoRow(label: "Thermal State", value: info.thermalState,
-                               valueColor: thermalStateColor(for: info.thermalState))
+                                      valueColor: thermalStateColor(for: info.thermalState))
                     }
-                    
+
                     Section("AI Capabilities") {
                         if info.neuralEngineAvailable {
                             Label("Neural Engine accelerated inference", systemImage: "cpu")
                                 .foregroundColor(.green)
                         }
-                        
+
                         Label("Core ML optimizations available", systemImage: "brain")
                             .foregroundColor(.blue)
-                        
+
                         if info.totalMemory.contains("GB") {
                             if let memoryGB = extractGBValue(from: info.totalMemory), memoryGB >= 6 {
                                 Label("Sufficient memory for large models", systemImage: "memorychip")
@@ -65,55 +65,55 @@ struct DeviceInfoView: View {
                             }
                         }
                     }
-                    
+
                     // Storage monitoring section
                     if let storageInfo = storageService.storageInfo {
                         Section("App Storage Usage") {
                             DeviceInfoRow(
-                                label: "Total App Size", 
+                                label: "Total App Size",
                                 value: storageInfo.totalAppSize.formattedFileSize,
                                 valueColor: .primary
                             )
                             DeviceInfoRow(
-                                label: "Models Storage", 
+                                label: "Models Storage",
                                 value: storageInfo.modelsSize.formattedFileSize,
                                 valueColor: .blue
                             )
                             DeviceInfoRow(
-                                label: "Documents", 
+                                label: "Documents",
                                 value: storageInfo.documentsSize.formattedFileSize,
                                 valueColor: .secondary
                             )
                             DeviceInfoRow(
-                                label: "Cache", 
+                                label: "Cache",
                                 value: storageInfo.cacheSize.formattedFileSize,
                                 valueColor: .secondary
                             )
                             DeviceInfoRow(
-                                label: "App % of Device", 
+                                label: "App % of Device",
                                 value: String(format: "%.2f%%", storageInfo.appPercentageOfDevice),
                                 valueColor: storageInfo.appPercentageOfDevice > 10 ? .orange : .green
                             )
                         }
-                        
+
                         Section("Device Storage") {
                             DeviceInfoRow(
-                                label: "Total Storage", 
+                                label: "Total Storage",
                                 value: storageInfo.totalDeviceStorage.formattedFileSize,
                                 valueColor: .primary
                             )
                             DeviceInfoRow(
-                                label: "Used Storage", 
+                                label: "Used Storage",
                                 value: storageInfo.usedDeviceStorage.formattedFileSize,
                                 valueColor: .orange
                             )
                             DeviceInfoRow(
-                                label: "Free Storage", 
+                                label: "Free Storage",
                                 value: storageInfo.freeDeviceStorage.formattedFileSize,
                                 valueColor: .green
                             )
                         }
-                        
+
                         if !storageInfo.downloadedModels.isEmpty {
                             Section("Downloaded Models (\(storageInfo.downloadedModels.count))") {
                                 ForEach(storageInfo.downloadedModels.prefix(5), id: \.path) { model in
@@ -128,7 +128,7 @@ struct DeviceInfoView: View {
                                                 .foregroundColor(.blue)
                                                 .fontWeight(.medium)
                                         }
-                                        
+
                                         HStack {
                                             Text(model.framework)
                                                 .font(.caption)
@@ -141,7 +141,7 @@ struct DeviceInfoView: View {
                                     }
                                     .padding(.vertical, 2)
                                 }
-                                
+
                                 if storageInfo.downloadedModels.count > 5 {
                                     Text("+ \(storageInfo.downloadedModels.count - 5) more models")
                                         .font(.caption)
@@ -193,7 +193,7 @@ struct DeviceInfoView: View {
             }
         }
     }
-    
+
     private func memoryPressureColor(for pressure: String) -> Color {
         switch pressure {
         case "Low":
@@ -208,7 +208,7 @@ struct DeviceInfoView: View {
             return .secondary
         }
     }
-    
+
     private func batteryColor(for level: Int) -> Color {
         switch level {
         case 0..<20:
@@ -221,7 +221,7 @@ struct DeviceInfoView: View {
             return .green
         }
     }
-    
+
     private func thermalStateColor(for state: String) -> Color {
         switch state {
         case "Normal":
@@ -236,7 +236,7 @@ struct DeviceInfoView: View {
             return .secondary
         }
     }
-    
+
     private func extractGBValue(from memory: String) -> Double? {
         let pattern = #"(\d+\.?\d*)\s*GB"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -244,7 +244,7 @@ struct DeviceInfoView: View {
               let numberRange = Range(match.range(at: 1), in: memory) else {
             return nil
         }
-        
+
         return Double(memory[numberRange])
     }
 }
@@ -253,7 +253,7 @@ struct DeviceInfoRow: View {
     let label: String
     let value: String
     var valueColor: Color = .primary
-    
+
     var body: some View {
         HStack {
             Text(label)

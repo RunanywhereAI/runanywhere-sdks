@@ -95,7 +95,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     case tensorFlowLite = "TensorFlow Lite"
     case picoLLM = "picoLLM"
     case swiftTransformers = "Swift Transformers"
-    
+
     /// Indicates if this framework is deferred (coming soon)
     var isDeferred: Bool {
         switch self {
@@ -105,7 +105,7 @@ enum LLMFramework: String, CaseIterable, Codable {
             return false
         }
     }
-    
+
     /// Available frameworks (excluding deferred ones)
     static var availableFrameworks: [LLMFramework] {
         allCases.filter { !$0.isDeferred }

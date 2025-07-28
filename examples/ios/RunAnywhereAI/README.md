@@ -252,6 +252,8 @@ This script automatically replaces the problematic `rsync` commands with `cp` to
 ./swiftlint.sh
 ```
 
+```swiftlint --fix --format```
+
 ### Building from Command Line
 
 #### Using Build Scripts (Recommended)

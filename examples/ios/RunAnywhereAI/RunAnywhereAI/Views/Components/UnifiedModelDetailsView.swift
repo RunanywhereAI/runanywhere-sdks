@@ -10,25 +10,25 @@ import SwiftUI
 struct UnifiedModelDetailsView: View {
     let model: ModelInfo
     let onDownload: (ModelDownloadInfo) -> Void
-    
+
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
-    
+
     @State private var showingCompatibilityDetails = false
-    
+
     private var downloadInfo: ModelDownloadInfo? {
         let modelsWithURLs = modelURLRegistry.getAllModels(for: model.framework)
         return modelsWithURLs.first { downloadInfo in
-            downloadInfo.name == model.name || 
-            downloadInfo.id == model.id ||
-            isModelNameMatch(model.name, downloadInfo.name)
+            downloadInfo.name == model.name ||
+                downloadInfo.id == model.id ||
+                isModelNameMatch(model.name, downloadInfo.name)
         }
     }
-    
+
     private var repositoryURL: URL? {
         guard let downloadInfo = downloadInfo else { return nil }
-        
+
         // Extract repository URL from Hugging Face URLs
         if downloadInfo.url.host?.contains("huggingface.co") == true {
             let pathComponents = downloadInfo.url.pathComponents
@@ -37,10 +37,10 @@ struct UnifiedModelDetailsView: View {
                 return URL(string: "https://huggingface.co/\(repo)")
             }
         }
-        
+
         return nil
     }
-    
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -50,20 +50,20 @@ struct UnifiedModelDetailsView: View {
                         Image(systemName: frameworkIcon)
                             .font(.largeTitle)
                             .foregroundColor(.blue)
-                        
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text(model.name)
                                 .font(.title2)
                                 .fontWeight(.bold)
-                            
+
                             Text(model.framework.displayName)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         Spacer()
                     }
-                    
+
                     // Status badges
                     HStack(spacing: 8) {
                         StatusBadge(
@@ -71,13 +71,13 @@ struct UnifiedModelDetailsView: View {
                             systemImage: model.isLocal ? "checkmark.circle.fill" : "circle",
                             color: model.isLocal ? .green : .orange
                         )
-                        
+
                         StatusBadge(
                             text: model.isCompatible ? "Compatible" : "Incompatible",
                             systemImage: model.isCompatible ? "checkmark.circle.fill" : "xmark.circle.fill",
                             color: model.isCompatible ? .green : .red
                         )
-                        
+
                         if downloadInfo?.requiresAuth == true {
                             StatusBadge(
                                 text: "Auth Required",
@@ -90,35 +90,35 @@ struct UnifiedModelDetailsView: View {
                 .padding()
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
-                
+
                 // Model Details Section
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Model Details")
                         .font(.headline)
-                    
+
                     VStack(spacing: 12) {
                         DetailRow(label: "Format", value: model.format.displayName)
                         DetailRow(label: "Size", value: model.displaySize)
-                        
+
                         if let quantization = model.quantization {
                             DetailRow(label: "Quantization", value: quantization)
                         }
-                        
+
                         if let contextLength = model.contextLength {
                             DetailRow(label: "Context Length", value: "\(contextLength) tokens")
                         }
-                        
+
                         if let downloadInfo = downloadInfo {
                             DetailRow(
                                 label: "Download URL",
                                 value: downloadInfo.url.absoluteString,
                                 isURL: true
                             )
-                            
+
                             if downloadInfo.requiresUnzip {
                                 DetailRow(label: "Format", value: "ZIP Archive")
                             }
-                            
+
                             if let notes = downloadInfo.notes {
                                 DetailRow(label: "Notes", value: notes)
                             }
@@ -128,15 +128,15 @@ struct UnifiedModelDetailsView: View {
                 .padding()
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
-                
+
                 // Compatibility Section
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Text("Device Compatibility")
                             .font(.headline)
-                        
+
                         Spacer()
-                        
+
                         Button(action: {
                             showingCompatibilityDetails = true
                         }) {
@@ -145,20 +145,20 @@ struct UnifiedModelDetailsView: View {
                                 .foregroundColor(.blue)
                         }
                     }
-                    
+
                     VStack(spacing: 12) {
                         CompatibilityRow(
                             title: "Memory Required",
                             isCompatible: deviceMemory >= model.minimumMemory,
                             message: ByteCountFormatter.string(fromByteCount: model.minimumMemory, countStyle: .memory)
                         )
-                        
+
                         CompatibilityRow(
                             title: "Recommended Memory",
                             isCompatible: deviceMemory >= model.recommendedMemory,
                             message: ByteCountFormatter.string(fromByteCount: model.recommendedMemory, countStyle: .memory)
                         )
-                        
+
                         if let deviceInfo = deviceInfoService.deviceInfo {
                             CompatibilityRow(
                                 title: "Neural Engine",
@@ -166,7 +166,7 @@ struct UnifiedModelDetailsView: View {
                                 message: deviceInfo.neuralEngineAvailable ? "Available" : "Not Available"
                             )
                         }
-                        
+
                         CompatibilityRow(
                             title: "Framework Support",
                             isCompatible: !model.framework.isDeferred,
@@ -177,31 +177,31 @@ struct UnifiedModelDetailsView: View {
                 .padding()
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
-                
+
                 // Repository Section
                 if let repoURL = repositoryURL {
                     VStack(alignment: .leading, spacing: 16) {
                         Text("Repository")
                             .font(.headline)
-                        
+
                         Link(destination: repoURL) {
                             HStack {
                                 Image(systemName: "link")
                                     .foregroundColor(.blue)
-                                
+
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("View on Hugging Face")
                                         .font(.subheadline)
                                         .foregroundColor(.blue)
-                                    
+
                                     Text(repoURL.absoluteString)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                         .lineLimit(1)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 Image(systemName: "arrow.up.right")
                                     .font(.caption)
                                     .foregroundColor(.blue)
@@ -215,7 +215,7 @@ struct UnifiedModelDetailsView: View {
                     .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(12)
                 }
-                
+
                 // Action Buttons
                 VStack(spacing: 12) {
                     if !model.isLocal, let downloadInfo = downloadInfo {
@@ -234,7 +234,7 @@ struct UnifiedModelDetailsView: View {
                         }
                         .disabled(downloadManager.activeDownloads.keys.contains(model.id))
                     }
-                    
+
                     if model.isLocal {
                         Button(action: {
                             // TODO: Implement model loading
@@ -271,7 +271,7 @@ struct UnifiedModelDetailsView: View {
             }
         }
     }
-    
+
     private var frameworkIcon: String {
         switch model.framework {
         case .coreML: return "brain.head.profile"
@@ -282,22 +282,22 @@ struct UnifiedModelDetailsView: View {
         default: return "cube"
         }
     }
-    
+
     private var deviceMemory: Int64 {
         Int64(ProcessInfo.processInfo.physicalMemory)
     }
-    
+
     private func isModelNameMatch(_ modelName: String, _ downloadName: String) -> Bool {
         let modelLower = modelName.lowercased()
         let downloadLower = downloadName.lowercased()
-        
+
         let patterns = ["phi", "tinyllama", "llama-3.2", "mistral", "gemma", "qwen"]
         for pattern in patterns {
             if modelLower.contains(pattern) && downloadLower.contains(pattern) {
                 return true
             }
         }
-        
+
         return false
     }
 }
@@ -308,7 +308,7 @@ struct StatusBadge: View {
     let text: String
     let systemImage: String
     let color: Color
-    
+
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: systemImage)
@@ -329,20 +329,20 @@ struct DetailRow: View {
     let label: String
     let value: String
     let isURL: Bool
-    
+
     init(label: String, value: String, isURL: Bool = false) {
         self.label = label
         self.value = value
         self.isURL = isURL
     }
-    
+
     var body: some View {
         HStack(alignment: .top) {
             Text(label)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .frame(width: 100, alignment: .leading)
-            
+
             if isURL, let url = URL(string: value) {
                 Link(destination: url) {
                     Text(value)
@@ -356,7 +356,7 @@ struct DetailRow: View {
                     .foregroundColor(.primary)
                     .multilineTextAlignment(.leading)
             }
-            
+
             Spacer()
         }
     }
@@ -375,8 +375,7 @@ struct DetailRow: View {
                 quantization: "Q4_K_M",
                 isLocal: false,
                 description: "A test model for preview"
-            ),
-            onDownload: { _ in }
-        )
+            )
+        )            { _ in }
     }
 }

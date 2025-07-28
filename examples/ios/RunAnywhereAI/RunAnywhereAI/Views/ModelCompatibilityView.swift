@@ -12,7 +12,7 @@ struct ModelCompatibilityView: View {
     let framework: LLMFramework
     @StateObject private var deviceInfoService = DeviceInfoService.shared
     @State private var compatibilityResult: ModelCompatibilityChecker.CompatibilityResult?
-    
+
     var body: some View {
         List {
             Section("Model Information") {
@@ -24,7 +24,7 @@ struct ModelCompatibilityView: View {
                     InfoRow(title: "Quantization", value: quantization)
                 }
             }
-            
+
             if let result = compatibilityResult {
                 Section("Compatibility Check") {
                     // Overall Compatibility
@@ -33,7 +33,7 @@ struct ModelCompatibilityView: View {
                         isCompatible: result.isCompatible,
                         message: result.isCompatible ? "Model is compatible" : "Model has compatibility issues"
                     )
-                    
+
                     // Show errors
                     ForEach(result.errors, id: \.self) { error in
                         CompatibilityRow(
@@ -42,7 +42,7 @@ struct ModelCompatibilityView: View {
                             message: error
                         )
                     }
-                    
+
                     // Show warnings
                     ForEach(result.warnings, id: \.self) { warning in
                         CompatibilityRow(
@@ -51,19 +51,19 @@ struct ModelCompatibilityView: View {
                             message: warning
                         )
                     }
-                    
+
                     // Neural Engine info for Core ML
                     if framework == .coreML, let deviceInfo = deviceInfoService.deviceInfo {
                         CompatibilityRow(
                             title: "Neural Engine",
                             isCompatible: deviceInfo.neuralEngineAvailable,
-                            message: deviceInfo.neuralEngineAvailable ? 
-                                "Neural Engine acceleration available" : 
+                            message: deviceInfo.neuralEngineAvailable ?
+                                "Neural Engine acceleration available" :
                                 "No Neural Engine on this device"
                         )
                     }
                 }
-                
+
                 Section("Performance Expectations") {
                     if let deviceInfo = deviceInfoService.deviceInfo {
                         VStack(alignment: .leading, spacing: 8) {
@@ -71,7 +71,7 @@ struct ModelCompatibilityView: View {
                         }
                     }
                 }
-                
+
                 if !result.recommendations.isEmpty {
                     Section("Recommendations") {
                         VStack(alignment: .leading, spacing: 8) {
@@ -104,12 +104,12 @@ struct ModelCompatibilityView: View {
             }
         }
     }
-    
+
     @ViewBuilder
     private func performanceEstimate(for model: ModelInfo, deviceInfo: SystemDeviceInfo) -> some View {
         let modelSize = extractSizeInBytes(from: model.size)
         let sizeGB = Double(modelSize) / (1_024 * 1_024 * 1_024)
-        
+
         // Rough estimates based on model size and device
         let tokensPerSecond: String = {
             if deviceInfo.neuralEngineAvailable && framework == .coreML {
@@ -130,20 +130,20 @@ struct ModelCompatibilityView: View {
                 }
             }
         }()
-        
+
         Label("Estimated Speed: \(tokensPerSecond)", systemImage: "speedometer")
             .foregroundColor(.blue)
-        
+
         if deviceInfo.neuralEngineAvailable && framework == .coreML {
             Label("Neural Engine acceleration available", systemImage: "cpu")
                 .foregroundColor(.green)
         }
-        
+
         let loadTime = sizeGB < 1 ? "< 5 seconds" : sizeGB < 3 ? "5-15 seconds" : "15-30 seconds"
         Label("Load Time: \(loadTime)", systemImage: "timer")
             .foregroundColor(.orange)
     }
-    
+
     private func extractSizeInBytes(from sizeString: String) -> Int64 {
         let pattern = #"(\d+\.?\d*)\s*([KMGT]?B)"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
@@ -153,7 +153,7 @@ struct ModelCompatibilityView: View {
               let number = Double(sizeString[numberRange]) else {
             return 0
         }
-        
+
         let unit = String(sizeString[unitRange])
         let multiplier: Double = {
             switch unit {
@@ -164,7 +164,7 @@ struct ModelCompatibilityView: View {
             default: return 1
             }
         }()
-        
+
         return Int64(number * multiplier)
     }
 }
@@ -173,23 +173,23 @@ struct CompatibilityRow: View {
     let title: String
     let isCompatible: Bool
     let message: String
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                
+
                 if !message.isEmpty {
                     Text(message)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
-            
+
             Spacer()
-            
+
             Image(systemName: isCompatible ? "checkmark.circle.fill" : "xmark.circle.fill")
                 .foregroundColor(isCompatible ? .green : .red)
         }
