@@ -86,20 +86,60 @@ struct ModelDownloadView: View {
                     )
                 }
             }
+            .sheet(isPresented: $showingCustomURL) {
+                if let unavailableModel = selectedUnavailableModel {
+                    CustomURLDialog(
+                        model: unavailableModel,
+                        onSuccess: { customURL in
+                            showingCustomURL = false
+                            addCustomModel(unavailableModel, with: customURL)
+                            selectedUnavailableModel = nil
+                        },
+                        onCancel: {
+                            showingCustomURL = false
+                            selectedUnavailableModel = nil
+                        }
+                    )
+                }
+            }
         }
     }
 
     private func downloadSelectedModel() {
         guard let modelInfo = selectedModelInfo else { return }
         
+        // Check if model is unavailable
+        if modelInfo.isUnavailable {
+            selectedUnavailableModel = modelInfo
+            showingCustomURL = true
+        }
         // Check if this model requires Kaggle authentication
-        if modelInfo.requiresAuth && modelInfo.url.host?.contains("kaggle") == true {
+        else if modelInfo.requiresAuth && modelInfo.url.host?.contains("kaggle") == true {
             selectedKaggleModel = modelInfo
             showingKaggleAuth = true
         } else {
             // Regular download flow
             showingProgressView = true
         }
+    }
+    
+    private func addCustomModel(_ originalModel: ModelDownloadInfo, with customURL: URL) {
+        // Add the custom model to the registry
+        let customModel = ModelDownloadInfo(
+            id: "\(originalModel.id)-custom",
+            name: "\(originalModel.name) (Custom URL)",
+            url: customURL,
+            sha256: originalModel.sha256,
+            requiresUnzip: originalModel.requiresUnzip,
+            requiresAuth: false,
+            notes: "Custom URL provided by user"
+        )
+        
+        modelURLRegistry.addCustomModel(customModel)
+        
+        // Select the custom model for download
+        selectedModelInfo = customModel
+        showingProgressView = true
     }
     
     private func validateURLs() {
@@ -125,6 +165,38 @@ struct ModelDownloadView: View {
             framework: framework,
             downloadURL: downloadInfo.url
         )
+    }
+    
+    private func getButtonTitle() -> String {
+        guard let model = selectedModelInfo else { return "Download Model" }
+        
+        let isModelDownloaded = ModelManager.shared.isModelDownloaded(model.name)
+        
+        if model.isBuiltIn {
+            return "Setup Model"
+        } else if model.isUnavailable {
+            return "Add Custom URL"
+        } else if isModelDownloaded {
+            return "Downloaded"
+        } else {
+            return "Download Model"
+        }
+    }
+    
+    private func getButtonIcon() -> String {
+        guard let model = selectedModelInfo else { return "arrow.down.circle.fill" }
+        
+        let isModelDownloaded = ModelManager.shared.isModelDownloaded(model.name)
+        
+        if model.isBuiltIn {
+            return "apple.logo"
+        } else if model.isUnavailable {
+            return "link.circle.fill"
+        } else if isModelDownloaded {
+            return "checkmark.circle.fill"
+        } else {
+            return "arrow.down.circle.fill"
+        }
     }
     
     // MARK: - View Components
@@ -231,17 +303,14 @@ struct ModelDownloadView: View {
                     }
                     .padding()
                 } else {
-                    let buttonTitle = selectedModelInfo?.isBuiltIn == true ? "Setup Model" : "Download Model"
-                    let buttonIcon = selectedModelInfo?.isBuiltIn == true ? "apple.logo" : "arrow.down.circle.fill"
+                    let isModelDownloaded = selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)
                     
                     Button(action: downloadSelectedModel) {
-                        Label(buttonTitle, systemImage: buttonIcon)
+                        Label(getButtonTitle(), systemImage: getButtonIcon())
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isDownloading || 
-                             (selectedModelInfo?.isURLValid == false && selectedModelInfo?.isBuiltIn == false) ||
-                             (selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)))
+                    .disabled(isDownloading || isModelDownloaded)
                     .padding()
                 }
             }
@@ -321,6 +390,10 @@ struct ModelDownloadRow: View {
                                 Label("Available", systemImage: "checkmark.circle")
                                     .font(.caption)
                                     .foregroundColor(.green)
+                            } else if model.isUnavailable {
+                                Label("Unavailable", systemImage: "xmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
                             } else {
                                 Label("URL Broken", systemImage: "exclamationmark.triangle.fill")
                                     .font(.caption)

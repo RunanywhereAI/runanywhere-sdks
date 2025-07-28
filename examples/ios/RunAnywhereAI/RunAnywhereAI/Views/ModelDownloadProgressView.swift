@@ -190,8 +190,8 @@ struct ModelDownloadProgressView: View {
                     }
                     .padding()
                 }
-                }
             }
+        }
             .navigationTitle("Downloading Model")
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarHidden(isComplete)

@@ -41,7 +41,8 @@
       "WebFetch(domain:tfhub.dev)",
       "Bash(./verify_urls.sh)",
       "WebFetch(domain:huggingface.co)",
-      "WebFetch(domain:developer.apple.com)"
+      "WebFetch(domain:developer.apple.com)",
+      "Bash(swift:*)"
     ],
     "deny": []
   }

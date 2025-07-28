@@ -9,6 +9,7 @@ import SwiftUI
 
 struct DeviceInfoView: View {
     @StateObject private var deviceInfoService = DeviceInfoService.shared
+    @StateObject private var storageService = StorageMonitorService.shared
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -64,6 +65,101 @@ struct DeviceInfoView: View {
                             }
                         }
                     }
+                    
+                    // Storage monitoring section
+                    if let storageInfo = storageService.storageInfo {
+                        Section("App Storage Usage") {
+                            DeviceInfoRow(
+                                label: "Total App Size", 
+                                value: storageInfo.totalAppSize.formattedFileSize,
+                                valueColor: .primary
+                            )
+                            DeviceInfoRow(
+                                label: "Models Storage", 
+                                value: storageInfo.modelsSize.formattedFileSize,
+                                valueColor: .blue
+                            )
+                            DeviceInfoRow(
+                                label: "Documents", 
+                                value: storageInfo.documentsSize.formattedFileSize,
+                                valueColor: .secondary
+                            )
+                            DeviceInfoRow(
+                                label: "Cache", 
+                                value: storageInfo.cacheSize.formattedFileSize,
+                                valueColor: .secondary
+                            )
+                            DeviceInfoRow(
+                                label: "App % of Device", 
+                                value: String(format: "%.2f%%", storageInfo.appPercentageOfDevice),
+                                valueColor: storageInfo.appPercentageOfDevice > 10 ? .orange : .green
+                            )
+                        }
+                        
+                        Section("Device Storage") {
+                            DeviceInfoRow(
+                                label: "Total Storage", 
+                                value: storageInfo.totalDeviceStorage.formattedFileSize,
+                                valueColor: .primary
+                            )
+                            DeviceInfoRow(
+                                label: "Used Storage", 
+                                value: storageInfo.usedDeviceStorage.formattedFileSize,
+                                valueColor: .orange
+                            )
+                            DeviceInfoRow(
+                                label: "Free Storage", 
+                                value: storageInfo.freeDeviceStorage.formattedFileSize,
+                                valueColor: .green
+                            )
+                        }
+                        
+                        if !storageInfo.downloadedModels.isEmpty {
+                            Section("Downloaded Models (\(storageInfo.downloadedModels.count))") {
+                                ForEach(storageInfo.downloadedModels.prefix(5), id: \.path) { model in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        HStack {
+                                            Text(model.name)
+                                                .font(.headline)
+                                                .lineLimit(1)
+                                            Spacer()
+                                            Text(model.formattedSize)
+                                                .font(.caption)
+                                                .foregroundColor(.blue)
+                                                .fontWeight(.medium)
+                                        }
+                                        
+                                        HStack {
+                                            Text(model.framework)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            Spacer()
+                                            Text("Downloaded \(model.formattedDate)")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                                
+                                if storageInfo.downloadedModels.count > 5 {
+                                    Text("+ \(storageInfo.downloadedModels.count - 5) more models")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                        .italic()
+                                }
+                            }
+                        }
+                    } else {
+                        Section("Storage") {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Calculating storage usage...")
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
                 .navigationTitle("Device Information")
                 .navigationBarTitleDisplayMode(.inline)
@@ -76,6 +172,9 @@ struct DeviceInfoView: View {
                 }
                 .onAppear {
                     deviceInfoService.startMonitoring()
+                    Task {
+                        await storageService.refreshStorageInfo()
+                    }
                 }
                 .onDisappear {
                     deviceInfoService.stopMonitoring()

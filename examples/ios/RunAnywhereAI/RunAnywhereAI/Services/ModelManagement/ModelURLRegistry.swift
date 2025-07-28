@@ -58,11 +58,11 @@ class ModelURLRegistry: ObservableObject {
         ModelDownloadInfo(
             id: "openelm-270m-coreml",
             name: "OpenELM-270M-CoreML",
-            url: URL(string: "builtin://example/openelm-270m")!,
+            url: URL(string: "https://unavailable-url.example.com/openelm-270m.mlpackage")!,
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
-            notes: "Note: Actual OpenELM CoreML models require manual conversion. This is a placeholder."
+            notes: "Original URL not available. Use 'Add Custom URL' to provide an alternative download link."
         )
     ]
 
@@ -451,6 +451,14 @@ extension ModelURLRegistry {
             // Skip built-in models
             if models[i].isBuiltIn {
                 models[i].isURLValid = true
+                models[i].lastVerified = Date()
+                continue
+            }
+            
+            // Mark example/unavailable URLs as invalid
+            if models[i].url.host?.contains("example.com") == true || 
+               models[i].url.host?.contains("unavailable-url") == true {
+                models[i].isURLValid = false
                 models[i].lastVerified = Date()
                 continue
             }
