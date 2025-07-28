@@ -132,7 +132,22 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            downloadModel(modelInfo, progress: progress) { result in
+            // Convert ModelInfo to ModelDownloadInfo
+            guard let downloadURL = modelInfo.downloadURL else {
+                continuation.resume(throwing: ModelDownloadError.noDownloadURL)
+                return
+            }
+            
+            let downloadInfo = ModelDownloadInfo(
+                id: modelInfo.id,
+                name: modelInfo.name,
+                url: downloadURL,
+                sha256: nil,
+                requiresUnzip: false,
+                requiresAuth: false
+            )
+            
+            downloadModel(downloadInfo, progress: progress) { result in
                 switch result {
                 case .success(let tempURL):
                     Task {
@@ -327,8 +342,6 @@ class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     private func parseSize(_ sizeString: String) -> Int64 {
-        let formatter = ByteCountFormatter()
-
         // Try common formats
         if sizeString.hasSuffix("GB") {
             let value = Double(sizeString.dropLast(2).trimmingCharacters(in: .whitespaces)) ?? 0
@@ -378,23 +391,21 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
-            return
-        }
+        Task { @MainActor in
+            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+                return
+            }
 
-        // Move to temporary location to prevent deletion
-        let tempDir = FileManager.default.temporaryDirectory
-        let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
+            // Move to temporary location to prevent deletion
+            let tempDir = FileManager.default.temporaryDirectory
+            let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
 
-        do {
-            try FileManager.default.moveItem(at: location, to: tempURL)
+            do {
+                try FileManager.default.moveItem(at: location, to: tempURL)
 
-            DispatchQueue.main.async {
                 self.completionHandlers[modelId]?(.success(tempURL))
                 self.cleanup(downloadId: modelId)
-            }
-        } catch {
-            DispatchQueue.main.async {
+            } catch {
                 self.completionHandlers[modelId]?(.failure(error))
                 self.cleanup(downloadId: modelId)
             }
@@ -408,17 +419,18 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
-            return
-        }
+        Task { @MainActor in
+            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+                return
+            }
 
-        let fractionCompleted = totalBytesExpectedToWrite > 0
-            ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-            : 0
+            let fractionCompleted = totalBytesExpectedToWrite > 0
+                ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+                : 0
 
-        // Calculate download speed
-        let now = Date()
-        let elapsed = now.timeIntervalSince(downloadStartTimes[modelId] ?? now)
+            // Calculate download speed
+            let now = Date()
+            let elapsed = now.timeIntervalSince(downloadStartTimes[modelId] ?? now)
         let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
 
         // Estimate time remaining
@@ -433,7 +445,6 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
             downloadSpeed: speed
         )
 
-        DispatchQueue.main.async {
             self.activeDownloads[modelId] = progress
             self.progressHandlers[modelId]?(progress)
         }
@@ -444,13 +455,13 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
-        guard let downloadTask = task as? URLSessionDownloadTask,
-              let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
-            return
-        }
+        Task { @MainActor in
+            guard let downloadTask = task as? URLSessionDownloadTask,
+                  let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+                return
+            }
 
-        if let error = error {
-            DispatchQueue.main.async {
+            if let error = error {
                 self.completionHandlers[modelId]?(.failure(ModelDownloadError.networkError(error)))
                 self.cleanup(downloadId: modelId)
             }

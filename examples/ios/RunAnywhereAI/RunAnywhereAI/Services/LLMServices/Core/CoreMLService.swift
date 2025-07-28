@@ -10,8 +10,8 @@ import CoreML
 
 // MARK: - Core ML Text Generation Input/Output
 
-@objc(TextGenerationInput)
 @available(iOS 17.0, *)
+@objc(TextGenerationInput)
 class TextGenerationInput: NSObject, MLFeatureProvider {
     let inputIds: MLMultiArray
 
@@ -267,7 +267,7 @@ class CoreMLService: BaseLLMService {
     }
 
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
-        guard isInitialized, let model = model, let tokenizer = tokenizer else {
+        guard isInitialized, model != nil, tokenizer != nil else {
             throw LLMError.notInitialized()
         }
 
@@ -284,7 +284,7 @@ class CoreMLService: BaseLLMService {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isInitialized, let model = model, let tokenizer = tokenizer else {
+        guard isInitialized, model != nil, tokenizer != nil else {
             throw LLMError.notInitialized()
         }
 
@@ -295,10 +295,13 @@ class CoreMLService: BaseLLMService {
             let intTokens = realTokenizer.encode(prompt)
             inputTokens = intTokens.map { Int32($0) }
             print("Core ML: Processing \(inputTokens.count) input tokens (real tokenizer)")
-        } else {
+        } else if let tokenizer = tokenizer {
             // Fallback to basic tokenizer
             inputTokens = tokenizer.encode(prompt)
             print("Core ML: Processing \(inputTokens.count) input tokens (basic tokenizer)")
+        } else {
+            // No tokenizer available
+            throw LLMError.notInitialized()
         }
 
         // Track generated tokens for autoregressive generation
@@ -307,12 +310,15 @@ class CoreMLService: BaseLLMService {
 
         do {
             // Autoregressive generation loop
-            for step in 0..<options.maxTokens {
+            for _ in 0..<options.maxTokens {
                 // Create input array with current sequence
                 let inputArray = try createInputArray(from: allTokens)
                 let input = TextGenerationInput(inputIds: inputArray)
 
                 // Run Core ML prediction
+                guard let model = model else {
+                    throw LLMError.notInitialized()
+                }
                 let prediction = try await model.prediction(from: input)
 
                 // Extract logits from prediction output
@@ -323,7 +329,7 @@ class CoreMLService: BaseLLMService {
                     nextToken = sampleFromLogits(logitsArray, temperature: Double(options.temperature))
                 } else if let tokensFeature = prediction.featureValue(for: "output_tokens"),
                           let tokensArray = tokensFeature.multiArrayValue,
-                          !tokensArray.isEmpty {
+                          tokensArray.count > 0 {
                     // Some models directly output tokens
                     nextToken = Int32(tokensArray[tokensArray.count - 1].intValue)
                 } else {
@@ -358,7 +364,7 @@ class CoreMLService: BaseLLMService {
                 if let realTokenizer = realTokenizer {
                     decodedText = realTokenizer.decode([Int(nextToken)])
                 } else {
-                    decodedText = tokenizer.decode([nextToken])
+                    decodedText = tokenizer?.decode([nextToken]) ?? ""
                 }
                 onToken(decodedText)
 

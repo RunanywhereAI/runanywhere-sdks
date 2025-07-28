@@ -147,7 +147,7 @@ class BundledModelsService {
 
         // Add some mock metadata
         // This is a simplified version - real GGUF has complex metadata
-        let metadata = [
+        _ = [
             "general.architecture": "llama",
             "general.name": modelInfo.name,
             "general.quantization": modelInfo.quantization ?? "Q4_0",
@@ -173,7 +173,7 @@ class BundledModelsService {
             "itemInfoEntries": [
                 "model.mlmodel": [
                     "author": "com.runanywhere.ai",
-                    "description": modelInfo.description ?? "Test Core ML model",
+                    "description": modelInfo.description,
                     "name": modelInfo.name,
                     "path": "model.mlmodel"
                 ]

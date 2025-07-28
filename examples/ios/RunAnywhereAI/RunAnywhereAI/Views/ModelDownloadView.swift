@@ -24,83 +24,9 @@ struct ModelDownloadView: View {
     var body: some View {
         NavigationView {
             VStack {
-                // Framework Picker
-                Picker("Framework", selection: $selectedFramework) {
-                    ForEach([LLMFramework.coreML, .mlx, .onnxRuntime, .tensorFlowLite, .llamaCpp], id: \.self) { framework in
-                        Text(framework.displayName).tag(framework)
-                    }
-                }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding()
-
-                // Model List
-                if availableModels.isEmpty {
-                    VStack(spacing: 20) {
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.system(size: 60))
-                            .foregroundColor(.secondary)
-
-                        Text("No models available")
-                            .font(.title2)
-                            .foregroundColor(.secondary)
-
-                        Text("Models for \(selectedFramework.displayName) can be added via Settings → Model URLs")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .frame(maxHeight: .infinity)
-                } else {
-                    List {
-                        ForEach(availableModels) { model in
-                            ModelDownloadRow(
-                                model: model,
-                                isSelected: selectedModelInfo?.id == model.id,
-                                isDownloaded: ModelManager.shared.isModelDownloaded(model.name)
-                            )                                {
-                                    selectedModelInfo = model
-                                }
-                        }
-                    }
-                }
-
-                // Download Button
-                if selectedModelInfo != nil {
-                    HStack {
-                        if let progress = downloadProgress {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Downloading...")
-                                        .font(.caption)
-                                    Spacer()
-                                    Text("\(Int(progress.fractionCompleted * 100))%")
-                                        .font(.caption.monospacedDigit())
-                                }
-
-                                ProgressView(value: progress.fractionCompleted)
-
-                                HStack {
-                                    Text(progress.downloadSpeed ?? "Calculating...")
-                                        .font(.caption2)
-                                    Spacer()
-                                    Text(progress.timeRemaining ?? "")
-                                        .font(.caption2)
-                                }
-                                .foregroundColor(.secondary)
-                            }
-                            .padding()
-                        } else {
-                            Button(action: downloadSelectedModel) {
-                                Label("Download Model", systemImage: "arrow.down.circle.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(isDownloading || (selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)))
-                            .padding()
-                        }
-                    }
-                }
+                frameworkPicker
+                modelListSection
+                downloadButtonSection
             }
             .navigationTitle("Download Models")
             .navigationBarTitleDisplayMode(.inline)
@@ -145,6 +71,109 @@ struct ModelDownloadView: View {
                 }
             }
         )
+    }
+    
+    // MARK: - View Components
+    
+    private var frameworkPicker: some View {
+        Picker("Framework", selection: $selectedFramework) {
+            ForEach([LLMFramework.coreML, .mlx, .onnxRuntime, .tensorFlowLite, .llamaCpp], id: \.self) { framework in
+                Text(framework.displayName).tag(framework)
+            }
+        }
+        .pickerStyle(SegmentedPickerStyle())
+        .padding()
+    }
+    
+    @ViewBuilder
+    private var modelListSection: some View {
+        if availableModels.isEmpty {
+            VStack(spacing: 20) {
+                Image(systemName: "square.and.arrow.down")
+                    .font(.system(size: 60))
+                    .foregroundColor(.secondary)
+
+                Text("No models available")
+                    .font(.title2)
+                    .foregroundColor(.secondary)
+
+                Text("Models for \(selectedFramework.displayName) can be added via Settings → Model URLs")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            .frame(maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(availableModels) { model in
+                    ModelDownloadRow(
+                        model: model,
+                        isSelected: selectedModelInfo?.id == model.id,
+                        isDownloaded: ModelManager.shared.isModelDownloaded(model.name),
+                        onTap: {
+                            selectedModelInfo = model
+                        }
+                    )
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var downloadButtonSection: some View {
+        if selectedModelInfo != nil {
+            HStack {
+                if let progress = downloadProgress {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Downloading...")
+                                .font(.caption)
+                            Spacer()
+                            Text("\(Int(progress.fractionCompleted * 100))%")
+                                .font(.caption.monospacedDigit())
+                        }
+
+                        ProgressView(value: progress.fractionCompleted)
+
+                        HStack {
+                            Text(formatSpeed(progress.downloadSpeed))
+                                .font(.caption2)
+                            Spacer()
+                            if let time = progress.estimatedTimeRemaining {
+                                Text(formatTimeRemaining(time))
+                                    .font(.caption2)
+                            }
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                    .padding()
+                } else {
+                    Button(action: downloadSelectedModel) {
+                        Label("Download Model", systemImage: "arrow.down.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isDownloading || (selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)))
+                    .padding()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func formatSpeed(_ bytesPerSecond: Double) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .binary
+        return "\(formatter.string(fromByteCount: Int64(bytesPerSecond)))/s"
+    }
+    
+    private func formatTimeRemaining(_ seconds: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.allowedUnits = [.hour, .minute, .second]
+        return formatter.string(from: seconds) ?? ""
     }
 }
 
