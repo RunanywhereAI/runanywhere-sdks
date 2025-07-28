@@ -9,7 +9,7 @@ import SwiftUI
 
 struct UnifiedModelDetailsView: View {
     let model: ModelInfo
-    let onDownload: (ModelDownloadInfo) -> Void
+    let onDownload: (ModelInfo) -> Void
 
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var deviceInfoService = DeviceInfoService.shared
@@ -18,7 +18,7 @@ struct UnifiedModelDetailsView: View {
 
     @State private var showingCompatibilityDetails = false
 
-    private var downloadInfo: ModelDownloadInfo? {
+    private var downloadInfo: ModelInfo? {
         let modelsWithURLs = modelURLRegistry.getAllModels(for: model.framework)
         return modelsWithURLs.first { downloadInfo in
             downloadInfo.name == model.name ||
@@ -31,8 +31,8 @@ struct UnifiedModelDetailsView: View {
         guard let downloadInfo = downloadInfo else { return nil }
 
         // Extract repository URL from Hugging Face URLs
-        if downloadInfo.url.host?.contains("huggingface.co") == true {
-            let pathComponents = downloadInfo.url.pathComponents
+        if downloadInfo.downloadURL?.host?.contains("huggingface.co") == true {
+            let pathComponents = downloadInfo.downloadURL?.pathComponents ?? []
             if pathComponents.count >= 3 {
                 let repo = "\(pathComponents[1])/\(pathComponents[2])"
                 return URL(string: "https://huggingface.co/\(repo)")
@@ -132,7 +132,7 @@ struct UnifiedModelDetailsView: View {
                         if let downloadInfo = downloadInfo {
                             DetailRow(
                                 label: "Download URL",
-                                value: downloadInfo.url.absoluteString,
+                                value: downloadInfo.downloadURL?.absoluteString ?? "No URL",
                                 isURL: true
                             )
 

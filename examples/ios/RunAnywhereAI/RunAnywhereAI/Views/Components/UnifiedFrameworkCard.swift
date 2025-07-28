@@ -13,7 +13,7 @@ struct UnifiedFrameworkCard: View {
     let viewModel: ModelListViewModel
     let onTap: () -> Void
     let onModelTap: (ModelInfo) -> Void
-    let onDownload: (ModelDownloadInfo) -> Void
+    let onDownload: (ModelInfo) -> Void
 
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
 
@@ -34,7 +34,7 @@ struct UnifiedFrameworkCard: View {
         }
     }
 
-    private var availableDownloadModels: [ModelDownloadInfo] {
+    private var availableDownloadModels: [ModelInfo] {
         modelURLRegistry.getAllModels(for: framework)
     }
 
@@ -159,10 +159,10 @@ struct UnifiedFrameworkCard: View {
                                     .padding(.leading, 56)
                             }
 
-                            ForEach(Array(additionalModels.enumerated()), id: \.element.id) { index, downloadInfo in
+                            ForEach(Array(additionalModels.enumerated()), id: \.element.id) { index, modelInfo in
                                 DownloadOnlyModelRow(
-                                    downloadInfo: downloadInfo
-                                )                                    { onDownload(downloadInfo) }
+                                    modelInfo: modelInfo
+                                ) { onDownload(modelInfo) }
 
                                 if index < additionalModels.count - 1 {
                                     Divider()
@@ -179,13 +179,13 @@ struct UnifiedFrameworkCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
     }
 
-    private func getAdditionalDownloadableModels() -> [ModelDownloadInfo] {
+    private func getAdditionalDownloadableModels() -> [ModelInfo] {
         let serviceModelNames = Set(allModels.map { $0.name.lowercased() })
         let serviceModelIds = Set(allModels.map { $0.id.lowercased() })
 
-        return availableDownloadModels.filter { downloadInfo in
-            let downloadNameLower = downloadInfo.name.lowercased()
-            let downloadIdLower = downloadInfo.id.lowercased()
+        return availableDownloadModels.filter { modelInfo in
+            let downloadNameLower = modelInfo.name.lowercased()
+            let downloadIdLower = modelInfo.id.lowercased()
 
             // Include if not already in service models
             return !serviceModelNames.contains(downloadNameLower) &&
@@ -202,11 +202,11 @@ struct UnifiedFrameworkCard: View {
 
 struct EmptyModelsView: View {
     let framework: LLMFramework
-    let onDownload: (ModelDownloadInfo) -> Void
+    let onDownload: (ModelInfo) -> Void
 
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
 
-    private var availableDownloads: [ModelDownloadInfo] {
+    private var availableDownloads: [ModelInfo] {
         modelURLRegistry.getAllModels(for: framework)
     }
 
@@ -256,10 +256,10 @@ struct EmptyModelsView: View {
 
                 // Show downloadable models
                 VStack(spacing: 0) {
-                    ForEach(Array(availableDownloads.enumerated()), id: \.element.id) { index, downloadInfo in
+                    ForEach(Array(availableDownloads.enumerated()), id: \.element.id) { index, modelInfo in
                         DownloadOnlyModelRow(
-                            downloadInfo: downloadInfo
-                        )                            { onDownload(downloadInfo) }
+                            modelInfo: modelInfo
+                        ) { onDownload(modelInfo) }
 
                         if index < availableDownloads.count - 1 {
                             Divider()

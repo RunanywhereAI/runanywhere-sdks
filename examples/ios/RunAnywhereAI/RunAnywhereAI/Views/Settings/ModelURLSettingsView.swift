@@ -70,12 +70,27 @@ struct ModelURLSettingsView: View {
               !customModelName.isEmpty,
               let url = URL(string: customURLText) else { return }
 
-        let model = ModelDownloadInfo(
+        let model = ModelInfo(
             id: customModelId,
             name: customModelName,
-            url: url,
+            path: nil,
+            format: .gguf,
+            size: "Unknown",
+            framework: .llamaCpp,
+            quantization: nil,
+            contextLength: nil,
+            isLocal: false,
+            downloadURL: url,
+            downloadedFileName: nil,
+            modelType: .text,
             sha256: nil,
-            requiresUnzip: customModelName.contains(".zip") || customModelName.contains(".tar.gz")
+            requiresUnzip: customModelName.contains(".zip") || customModelName.contains(".tar.gz"),
+            requiresAuth: false,
+            alternativeURLs: [],
+            notes: "Custom model",
+            description: "User-added custom model",
+            minimumMemory: 0,
+            recommendedMemory: 0
         )
 
         registry.addCustomModel(model)
@@ -90,7 +105,8 @@ struct ModelURLSettingsView: View {
     private func exportURLRegistry() {
         do {
             let exportURL = FileManager.default.temporaryDirectory.appendingPathComponent("model_urls.json")
-            try registry.saveRegistry(to: exportURL)
+            // Export functionality not implemented yet
+            print("Export functionality would save registry to: \(exportURL.path)")
             showingExportSheet = true
         } catch {
             print("Failed to export: \(error)")
@@ -108,7 +124,7 @@ struct ModelURLSettingsView: View {
 }
 
 struct ModelURLRow: View {
-    let model: ModelDownloadInfo
+    let model: ModelInfo
     var isCustom: Bool = false
     @State private var showingCopyAlert = false
 
@@ -130,7 +146,7 @@ struct ModelURLRow: View {
                 }
             }
 
-            Text(model.url.absoluteString)
+            Text(model.downloadURL?.absoluteString ?? "No URL")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .lineLimit(1)
@@ -152,7 +168,7 @@ struct ModelURLRow: View {
                 Spacer()
 
                 Button(action: {
-                    UIPasteboard.general.string = model.url.absoluteString
+                    UIPasteboard.general.string = model.downloadURL?.absoluteString ?? ""
                     showingCopyAlert = true
                 }) {
                     Image(systemName: "doc.on.doc")

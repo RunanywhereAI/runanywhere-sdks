@@ -9,13 +9,13 @@ import SwiftUI
 
 struct ModelDownloadConfirmationView: View {
     let model: ModelInfo
-    let onDownload: (ModelDownloadInfo) -> Void
+    let onDownload: (ModelInfo) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedURL: URL?
-    @State private var downloadInfo: ModelDownloadInfo?
+    @State private var downloadInfo: ModelInfo?
 
-    private var availableDownloads: [ModelDownloadInfo] {
+    private var availableDownloads: [ModelInfo] {
         let registry = ModelURLRegistry.shared
         let allModels = registry.getAllModels(for: model.framework)
 
@@ -105,9 +105,9 @@ struct ModelDownloadConfirmationView: View {
                         ForEach(availableDownloads) { download in
                             DownloadOptionRow(
                                 downloadInfo: download,
-                                isSelected: selectedURL == download.url
+                                isSelected: selectedURL == download.downloadURL
                             )                                {
-                                    selectedURL = download.url
+                                    selectedURL = download.downloadURL
                                     downloadInfo = download
                                 }
                         }
@@ -170,7 +170,7 @@ struct ModelDownloadConfirmationView: View {
 }
 
 struct DownloadOptionRow: View {
-    let downloadInfo: ModelDownloadInfo
+    let downloadInfo: ModelInfo
     let isSelected: Bool
     let onSelect: () -> Void
 
@@ -182,7 +182,7 @@ struct DownloadOptionRow: View {
                         .font(.subheadline)
                         .foregroundColor(.primary)
 
-                    Text(downloadInfo.url.host ?? "Unknown source")
+                    Text(downloadInfo.downloadURL?.host ?? "Unknown source")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

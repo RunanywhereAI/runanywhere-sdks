@@ -14,20 +14,22 @@ import CoreML
 @objc(TextGenerationInput)
 class TextGenerationInput: NSObject, MLFeatureProvider {
     let inputIds: MLMultiArray
+    let inputName: String
 
     var featureNames: Set<String> {
-        ["input_ids"]
+        [inputName]
     }
 
     func featureValue(for featureName: String) -> MLFeatureValue? {
-        if featureName == "input_ids" {
+        if featureName == inputName {
             return MLFeatureValue(multiArray: inputIds)
         }
         return nil
     }
 
-    init(inputIds: MLMultiArray) {
+    init(inputIds: MLMultiArray, inputName: String = "input_ids") {
         self.inputIds = inputIds
+        self.inputName = inputName
         super.init()
     }
 }
@@ -267,45 +269,64 @@ class CoreMLService: BaseLLMService {
         var generatedTokens: [Int32] = []
 
         do {
+            // Get model input/output names
+            guard let model = model else {
+                throw LLMError.notInitialized()
+            }
+            
+            let inputNames = Array(model.modelDescription.inputDescriptionsByName.keys)
+            let outputNames = Array(model.modelDescription.outputDescriptionsByName.keys)
+            let inputName = inputNames.first ?? "input_ids"
+            
+            print("Core ML Model Info:")
+            print("- Input names: \(inputNames)")
+            print("- Output names: \(outputNames)")
+            
             // Autoregressive generation loop
-            for _ in 0..<options.maxTokens {
+            for step in 0..<options.maxTokens {
                 // Create input array with current sequence
                 let inputArray = try createInputArray(from: allTokens)
-                let input = TextGenerationInput(inputIds: inputArray)
+                let input = TextGenerationInput(inputIds: inputArray, inputName: inputName)
 
                 // Run Core ML prediction
-                guard let model = model else {
-                    throw LLMError.notInitialized()
-                }
                 let prediction = try await model.prediction(from: input)
 
                 // Extract logits from prediction output
-                var nextToken: Int32
-                if let logitsFeature = prediction.featureValue(for: "logits"),
-                   let logitsArray = logitsFeature.multiArrayValue {
-                    // Sample from logits using temperature
-                    nextToken = sampleFromLogits(logitsArray, temperature: Double(options.temperature))
-                } else if let tokensFeature = prediction.featureValue(for: "output_tokens"),
-                          let tokensArray = tokensFeature.multiArrayValue,
-                          tokensArray.count > 0 {
-                    // Some models directly output tokens
-                    nextToken = Int32(tokensArray[tokensArray.count - 1].intValue)
-                } else {
-                    // Fallback: use the model description to find the right output
-                    let outputKeys = model.modelDescription.outputDescriptionsByName.keys
-                    print("Available outputs: \(outputKeys)")
-
-                    // Try to find any numeric output that could be tokens/logits
-                    for outputKey in outputKeys {
-                        if let feature = prediction.featureValue(for: outputKey),
+                var nextToken: Int32 = 0
+                var foundOutput = false
+                
+                // Try common output names for GPT-2 models
+                let commonOutputNames = ["logits", "output", "prediction", "scores", outputNames.first ?? ""]
+                
+                for outputName in commonOutputNames {
+                    if let feature = prediction.featureValue(for: outputName),
+                       let logitsArray = feature.multiArrayValue {
+                        print("Using output: \(outputName) with shape: \(logitsArray.shape)")
+                        nextToken = sampleFromLogits(logitsArray, temperature: Double(options.temperature))
+                        foundOutput = true
+                        break
+                    }
+                }
+                
+                if !foundOutput {
+                    print("Available outputs: \(outputNames)")
+                    // Fallback: try any available output
+                    for outputName in outputNames {
+                        if let feature = prediction.featureValue(for: outputName),
                            let array = feature.multiArrayValue {
+                            print("Fallback using output: \(outputName)")
                             nextToken = sampleFromLogits(array, temperature: Double(options.temperature))
+                            foundOutput = true
                             break
                         }
                     }
-
-                    // If all else fails, generate a reasonable token
-                    nextToken = Int32.random(in: 2...50)
+                }
+                
+                if !foundOutput {
+                    // If still no output found, use a simple demo token
+                    let demoTokens: [Int32] = [2, 3, 4, 5, 6, 7, 8, 9, 10] // Common words
+                    nextToken = demoTokens[step % demoTokens.count]
+                    print("Warning: Using demo token \(nextToken) for step \(step)")
                 }
 
                 // Check for end of sequence

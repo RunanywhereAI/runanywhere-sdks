@@ -43,7 +43,7 @@ enum DownloadStep: String, CaseIterable {
 
 struct ModelDownloadProgressView: View {
     let model: ModelInfo
-    let downloadInfo: ModelDownloadInfo
+    let downloadInfo: ModelInfo
     @Binding var isPresented: Bool
 
     @StateObject private var downloadManager = ModelDownloadManager.shared
@@ -228,7 +228,7 @@ struct ModelDownloadProgressView: View {
             }
 
             // Check if this is a Kaggle model and handle separately
-            if downloadInfo.requiresAuth && downloadInfo.url.host?.contains("kaggle") == true {
+            if downloadInfo.requiresAuth && downloadInfo.downloadURL?.host?.contains("kaggle") == true {
                 try await downloadKaggleModel()
             } else {
                 // Start regular download
@@ -279,7 +279,7 @@ struct ModelDownloadProgressView: View {
         // Use separate Kaggle download service
         let authService = KaggleAuthService.shared
 
-        let tempURL = try await authService.downloadModel(from: downloadInfo.url) { progress in
+        let tempURL = try await authService.downloadModel(from: downloadInfo.downloadURL!) { progress in
             Task { @MainActor in
                 self.downloadProgress = progress
 
@@ -571,13 +571,27 @@ struct ModelDownloadProgressView_Previews: PreviewProvider {
                 framework: .llamaCpp,
                 quantization: "Q4_K_M"
             ),
-            downloadInfo: ModelDownloadInfo(
+            downloadInfo: ModelInfo(
                 id: "llama-3.2-3b",
                 name: "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-                url: URL(string: "https://example.com")!,
+                path: nil,
+                format: .gguf,
+                size: "2.4GB",
+                framework: .llamaCpp,
+                quantization: "Q4_K_M",
+                contextLength: 4096,
+                isLocal: false,
+                downloadURL: URL(string: "https://example.com"),
+                downloadedFileName: nil,
+                modelType: .text,
                 sha256: nil,
                 requiresUnzip: false,
-                requiresAuth: false
+                requiresAuth: false,
+                alternativeURLs: [],
+                notes: nil,
+                description: "Llama 3.2 3B model",
+                minimumMemory: 2_000_000_000,
+                recommendedMemory: 4_000_000_000
             ),
             isPresented: .constant(true)
         )

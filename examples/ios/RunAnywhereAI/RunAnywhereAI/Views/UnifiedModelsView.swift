@@ -17,97 +17,118 @@ struct UnifiedModelsView: View {
     @State private var selectedModel: ModelInfo?
     @State private var showingModelDetails = false
     @State private var showingDownloadProgress = false
-    @State private var selectedDownloadInfo: ModelDownloadInfo?
+    @State private var selectedDownloadInfo: ModelInfo?
     @State private var showingImportView = false
     @State private var showingDeviceInfo = false
+    
+    private var mainContent: some View {
+        VStack(spacing: 20) {
+            // Device Status Overview
+            DeviceStatusCard(
+                deviceInfo: deviceInfoService.deviceInfo,
+                downloadedModelsCount: downloadedModelsCount,
+                activeDownloadsCount: downloadManager.activeDownloads.count,
+                showingDeviceInfo: $showingDeviceInfo
+            )
+            .padding(.horizontal)
+
+            frameworksSection
+        }
+        .padding(.vertical)
+    }
+    
+    private var frameworksSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Models & Downloads")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+
+                Spacer()
+
+                Menu {
+                    Button(action: {
+                        showingImportView = true
+                    }) {
+                        Label("Import Model", systemImage: "doc.badge.plus")
+                    }
+
+                    Button(action: {
+                        Task {
+                            // Validate URLs for each framework
+                for framework in LLMFramework.availableFrameworks {
+                    await modelURLRegistry.validateURLs(for: framework)
+                }
+                        }
+                    }) {
+                        Label("Refresh URLs", systemImage: "arrow.clockwise")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding(.horizontal)
+
+            frameworkCards
+            
+            comingSoonSection
+        }
+    }
+    
+    private var frameworkCards: some View {
+        VStack(spacing: 12) {
+            ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
+                UnifiedFrameworkCard(
+                    framework: framework,
+                    isExpanded: expandedFramework == framework,
+                    viewModel: viewModel,
+                    onTap: {
+                        withAnimation(.spring()) {
+                            if expandedFramework == framework {
+                                expandedFramework = nil
+                            } else {
+                                expandedFramework = framework
+                            }
+                        }
+                    },
+                    onModelTap: { model in
+                        selectedModel = model
+                        showingModelDetails = true
+                    },
+                    onDownload: { downloadInfo in
+                        startDownload(downloadInfo)
+                    }
+                )
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var comingSoonSection: some View {
+        Group {
+            if !LLMFramework.allCases.filter({ $0.isDeferred }).isEmpty {
+                ComingSoonSection()
+                    .padding(.horizontal)
+            }
+        }
+    }
 
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Device Status Overview
-                    DeviceStatusCard(
-                        deviceInfo: deviceInfoService.deviceInfo,
-                        downloadedModelsCount: downloadedModelsCount,
-                        activeDownloadsCount: downloadManager.activeDownloads.count,
-                        showingDeviceInfo: $showingDeviceInfo
-                    )
-                    .padding(.horizontal)
-
-                    // Frameworks Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Text("Models & Downloads")
-                                .font(.title2)
-                                .fontWeight(.semibold)
-
-                            Spacer()
-
-                            Menu {
-                                Button(action: {
-                                    showingImportView = true
-                                }) {
-                                    Label("Import Model", systemImage: "doc.badge.plus")
-                                }
-
-                                Button(action: {
-                                    Task {
-                                        await modelURLRegistry.validateAllURLs()
-                                    }
-                                }) {
-                                    Label("Refresh URLs", systemImage: "arrow.clockwise")
-                                }
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        // Framework Cards
-                        VStack(spacing: 12) {
-                            ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
-                                UnifiedFrameworkCard(
-                                    framework: framework,
-                                    isExpanded: expandedFramework == framework,
-                                    viewModel: viewModel,
-                                    onTap: {
-                                        withAnimation(.spring()) {
-                                            if expandedFramework == framework {
-                                                expandedFramework = nil
-                                            } else {
-                                                expandedFramework = framework
-                                            }
-                                        }
-                                    },
-                                    onModelTap: { model in
-                                        selectedModel = model
-                                        showingModelDetails = true
-                                    },
-                                    onDownload: { downloadInfo in
-                                        startDownload(downloadInfo)
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal)
-
-                        // Coming Soon Section
-                        if !LLMFramework.allCases.filter({ $0.isDeferred }).isEmpty {
-                            ComingSoonSection()
-                                .padding(.horizontal)
-                        }
-                    }
-                }
-                .padding(.vertical)
+                mainContent
             }
             .navigationTitle("Models")
             .navigationBarTitleDisplayMode(.large)
             .background(Color(.systemGroupedBackground))
             .refreshable {
                 await viewModel.refreshServices()
-                await modelURLRegistry.validateAllURLs()
+                // Validate URLs for each framework
+                for framework in LLMFramework.availableFrameworks {
+                    await modelURLRegistry.validateURLs(for: framework)
+                }
             }
             .alert("Error", isPresented: $viewModel.showError) {
                 Button("OK", role: .cancel) { }
@@ -168,8 +189,8 @@ struct UnifiedModelsView: View {
         }
     }
 
-    private func createModelInfo(from downloadInfo: ModelDownloadInfo) -> ModelInfo {
-        let format = ModelFormat.from(extension: downloadInfo.url.pathExtension)
+    private func createModelInfo(from downloadInfo: ModelInfo) -> ModelInfo {
+        let format = ModelFormat.from(extension: downloadInfo.downloadURL?.pathExtension ?? "")
         let framework = LLMFramework.forFormat(format)
 
         return ModelInfo(
@@ -178,18 +199,18 @@ struct UnifiedModelsView: View {
             format: format,
             size: "Unknown",
             framework: framework,
-            downloadURL: downloadInfo.url
+            downloadURL: downloadInfo.downloadURL
         )
     }
 
-    private func startDownload(_ downloadInfo: ModelDownloadInfo) {
+    private func startDownload(_ downloadInfo: ModelInfo) {
         // Show confirmation dialog first, don't start download immediately
         let model = createModelInfo(from: downloadInfo)
         selectedModel = model
         showingModelDetails = true
     }
 
-    private func confirmAndStartDownload(_ downloadInfo: ModelDownloadInfo) {
+    private func confirmAndStartDownload(_ downloadInfo: ModelInfo) {
         // Actually start the download after confirmation
         downloadManager.downloadModel(downloadInfo, progress: { _ in
             // Progress updates handled by the download manager

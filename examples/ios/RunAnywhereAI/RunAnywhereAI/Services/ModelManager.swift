@@ -354,14 +354,14 @@ class ModelManager: ObservableObject {
         let registry = ModelURLRegistry.shared
         var modelType: ModelType = .text
         if let downloadInfo = registry.getModelInfo(id: fileName) {
-            modelType = downloadInfo.modelType
+            modelType = downloadInfo.modelType ?? .text
         } else if let frameworkInfo = framework {
             // Check all models in this framework for a match
             let frameworkModels = registry.getAllModels(for: frameworkInfo)
             if let matchingModel = frameworkModels.first(where: { 
                 isModelNameMatch($0.name, fileName) 
             }) {
-                modelType = matchingModel.modelType
+                modelType = matchingModel.modelType ?? .text
             }
         }
 

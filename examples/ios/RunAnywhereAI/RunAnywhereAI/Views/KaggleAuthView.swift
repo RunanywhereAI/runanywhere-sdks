@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct KaggleAuthView: View {
-    let model: ModelDownloadInfo
+    let model: ModelInfo
     let onSuccess: () -> Void
     let onCancel: () -> Void
 
@@ -359,12 +359,27 @@ struct KaggleInstructionsView: View {
 
 #Preview {
     KaggleAuthView(
-        model: ModelDownloadInfo(
+        model: ModelInfo(
             id: "test-kaggle-model",
             name: "Test Kaggle Model",
-            url: URL(string: "https://www.kaggle.com/models/google/test")!,
+            path: nil,
+            format: .gguf,
+            size: "1.0GB",
+            framework: .llamaCpp,
+            quantization: nil,
+            contextLength: nil,
+            isLocal: false,
+            downloadURL: URL(string: "https://www.kaggle.com/models/google/test"),
+            downloadedFileName: nil,
+            modelType: .text,
+            sha256: nil,
             requiresUnzip: false,
-            requiresAuth: true
+            requiresAuth: true,
+            alternativeURLs: [],
+            notes: nil,
+            description: "Test Kaggle model for preview",
+            minimumMemory: 0,
+            recommendedMemory: 0
         ),
         onSuccess: { },
         onCancel: { }

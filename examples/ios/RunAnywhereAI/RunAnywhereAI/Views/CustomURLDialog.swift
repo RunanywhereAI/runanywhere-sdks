@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct CustomURLDialog: View {
-    let model: ModelDownloadInfo
+    let model: ModelInfo
     let onSuccess: (URL) -> Void
     let onCancel: () -> Void
 
@@ -41,7 +41,7 @@ struct CustomURLDialog: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
 
-                    Text(model.url.absoluteString)
+                    Text(model.downloadURL?.absoluteString ?? "No URL")
                         .font(.caption)
                         .padding(8)
                         .background(Color(.systemGray6))
@@ -158,11 +158,27 @@ struct CustomURLDialog: View {
 
 #Preview {
     CustomURLDialog(
-        model: ModelDownloadInfo(
+        model: ModelInfo(
             id: "test-model",
             name: "Test Model",
-            url: URL(string: "https://broken-url.com/model.gguf")!,
-            requiresUnzip: false
+            path: nil,
+            format: .gguf,
+            size: "1.0GB",
+            framework: .llamaCpp,
+            quantization: nil,
+            contextLength: nil,
+            isLocal: false,
+            downloadURL: URL(string: "https://broken-url.com/model.gguf"),
+            downloadedFileName: nil,
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            alternativeURLs: [],
+            notes: nil,
+            description: "Test model for preview",
+            minimumMemory: 0,
+            recommendedMemory: 0
         ),
         onSuccess: { _ in },
         onCancel: { }
