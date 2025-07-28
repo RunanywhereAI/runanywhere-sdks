@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import CryptoKit
 import Compression
+import ZIPFoundation
 
 // MARK: - Download Error
 
@@ -290,33 +291,42 @@ class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     private func unzipModel(from zipURL: URL, to directory: URL) async throws -> URL {
-        // Use FileManager for unzipping on iOS
+        // Use ZIPFoundation for proper unzipping
         if zipURL.pathExtension == "zip" {
-            // For now, just copy the file since iOS doesn't have Process
-            // In a real app, you'd use a zip library like ZIPFoundation
-            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
-            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
-
-            // TODO: Implement proper unzipping using a library like ZIPFoundation
-            throw ModelDownloadError.unzipFailed
+            do {
+                try FileManager.default.unzipItem(at: zipURL, to: directory)
+                
+                // Find the extracted content
+                let contents = try FileManager.default.contentsOfDirectory(
+                    at: directory, 
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+                
+                // Return the first extracted item (could be file or directory)
+                if let firstItem = contents.first {
+                    return firstItem
+                } else {
+                    return directory
+                }
+            } catch {
+                print("ZIP extraction failed: \(error)")
+                throw ModelDownloadError.unzipFailed
+            }
         }
 
-        // Handle tar.gz files
+        // Handle tar.gz files - for now, just return the original file
+        // In a production app, you might want to add support for tar.gz extraction
         if zipURL.pathExtension == "gz" || zipURL.lastPathComponent.contains(".tar.gz") {
-            // For now, just copy the file since iOS doesn't have Process
-            // In a real app, you'd use a compression library
             let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
             try FileManager.default.copyItem(at: zipURL, to: destinationURL)
-
-            // TODO: Implement proper tar.gz extraction using a library
-            throw ModelDownloadError.unzipFailed
-
-            // Find the extracted directory
-            let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            return contents.first ?? directory
+            return destinationURL
         }
 
-        throw ModelDownloadError.unzipFailed
+        // For other file types, just copy them
+        let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
+        try FileManager.default.copyItem(at: zipURL, to: destinationURL)
+        return destinationURL
     }
 
     private func verifyChecksum(of fileURL: URL, expectedHash: String) async throws {

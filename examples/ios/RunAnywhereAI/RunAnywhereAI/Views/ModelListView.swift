@@ -299,6 +299,8 @@ struct ModelItemRow: View {
     @State private var showingCompatibility = false
     @State private var showingNoURLAlert = false
     @State private var showingDownloadView = false
+    @State private var showingDownloadProgress = false
+    @State private var selectedDownloadInfo: ModelDownloadInfo?
     @State private var downloadProgress: Double = 0
     @State private var isDownloading = false
     
@@ -381,12 +383,6 @@ struct ModelItemRow: View {
                     }
                 }
                 
-                // Show download progress if downloading
-                if isDownloading {
-                    ProgressView(value: downloadProgress, total: 1.0)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .tint(.blue)
-                }
             }
             
             Spacer()
@@ -460,9 +456,19 @@ struct ModelItemRow: View {
             ModelDownloadConfirmationView(
                 model: model,
                 onDownload: { downloadInfo in
-                    startDownload(downloadInfo)
+                    selectedDownloadInfo = downloadInfo
+                    showingDownloadProgress = true
                 }
             )
+        }
+        .fullScreenCover(isPresented: $showingDownloadProgress) {
+            if let downloadInfo = selectedDownloadInfo {
+                ModelDownloadProgressView(
+                    model: model,
+                    downloadInfo: downloadInfo,
+                    isPresented: $showingDownloadProgress
+                )
+            }
         }
         .alert("No Download URL Available", isPresented: $showingNoURLAlert) {
             Button("OK", role: .cancel) { }
