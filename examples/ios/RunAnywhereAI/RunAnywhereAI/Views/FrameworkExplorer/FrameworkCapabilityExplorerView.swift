@@ -198,29 +198,52 @@ struct FrameworkCard: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: framework.iconName)
-                    .font(.system(size: 30))
-                    .foregroundColor(isSelected ? .white : .blue)
+            ZStack {
+                VStack(spacing: 8) {
+                    Image(systemName: framework.iconName)
+                        .font(.system(size: 30))
+                        .foregroundColor(framework.isDeferred ? .gray : (isSelected ? .white : .blue))
 
-                Text(framework.displayName)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(isSelected ? .white : .primary)
+                    Text(framework.displayName)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(framework.isDeferred ? .gray : (isSelected ? .white : .primary))
 
-                HStack(spacing: 4) {
-                    ForEach(capabilities.topFeatures.prefix(3), id: \.self) { _ in
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 8))
-                            .foregroundColor(isSelected ? .white : .orange)
+                    if framework.isDeferred {
+                        Text("Coming Soon")
+                            .font(.system(size: 10))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.orange)
+                    } else {
+                        HStack(spacing: 4) {
+                            ForEach(capabilities.topFeatures.prefix(3), id: \.self) { _ in
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 8))
+                                    .foregroundColor(isSelected ? .white : .orange)
+                            }
+                        }
+                    }
+                }
+                .frame(height: 100)
+                .frame(maxWidth: .infinity)
+                
+                if framework.isDeferred {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "clock.badge.exclamationmark.fill")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                                .padding(4)
+                        }
+                        Spacer()
                     }
                 }
             }
-            .frame(height: 100)
-            .frame(maxWidth: .infinity)
-            .background(isSelected ? Color.blue : Color.blue.opacity(0.1))
+            .background(framework.isDeferred ? Color.gray.opacity(0.1) : (isSelected ? Color.blue : Color.blue.opacity(0.1)))
             .cornerRadius(12)
         }
+        .disabled(framework.isDeferred)
     }
 }
 

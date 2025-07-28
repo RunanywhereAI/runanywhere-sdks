@@ -77,7 +77,7 @@ struct ModelDownloadView: View {
     
     private var frameworkPicker: some View {
         Picker("Framework", selection: $selectedFramework) {
-            ForEach([LLMFramework.coreML, .mlx, .onnxRuntime, .tensorFlowLite, .llamaCpp], id: \.self) { framework in
+            ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
                 Text(framework.displayName).tag(framework)
             }
         }

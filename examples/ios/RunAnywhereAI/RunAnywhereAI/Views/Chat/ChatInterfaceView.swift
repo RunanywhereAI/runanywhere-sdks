@@ -288,24 +288,36 @@ struct FrameworkPickerView: View {
 
     private func frameworkButton(_ framework: LLMFramework) -> some View {
         Button(action: {
-            selectedFramework = framework
-            dismiss()
+            if !framework.isDeferred {
+                selectedFramework = framework
+                dismiss()
+            }
         }) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(framework.displayName)
-                        .foregroundColor(.primary)
+                        .foregroundColor(framework.isDeferred ? .secondary : .primary)
+                    if framework.isDeferred {
+                        Text("Coming Soon")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
                 }
 
                 Spacer()
 
-                if framework == selectedFramework {
+                if framework == selectedFramework && !framework.isDeferred {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.accentColor)
+                } else if framework.isDeferred {
+                    Image(systemName: "clock.badge.exclamationmark")
+                        .foregroundColor(.orange)
+                        .font(.caption)
                 }
             }
             .padding(.vertical, 4)
         }
+        .disabled(framework.isDeferred)
     }
 }
 

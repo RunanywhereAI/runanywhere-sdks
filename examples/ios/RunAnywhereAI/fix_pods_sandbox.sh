@@ -17,17 +17,25 @@ echo "Fixing Xcode 16 sandbox issue in CocoaPods resources script..."
 # Create a temporary file
 TEMP_FILE=$(mktemp)
 
-# Read the script and replace rsync commands
+# Read the script and replace rsync commands and fix realpath
 awk '
-/^rsync -avr --copy-links/ {
-    print "# Use cp instead of rsync for sandbox compatibility"
-    print "if [[ -f \"$RESOURCES_TO_COPY\" ]]; then"
-    print "  while IFS= read -r file; do"
-    print "    if [[ -n \"$file\" ]] && [[ -e \"$file\" ]]; then"
-    print "      cp -R \"$file\" \"" substr($0, match($0, /\$\{[^}]+\}/), RLENGTH) "/\" || true"
-    print "    fi"
-    print "  done < \"$RESOURCES_TO_COPY\""
-    print "fi"
+/realpath -mq/ {
+    gsub("realpath -mq", "cd \"$(dirname", $0)
+    gsub("\"\\${0}\"", "\"${0}\")\" && pwd)/$(basename \"${0}\"", $0)
+}
+/^[[:space:]]*rsync -avr --copy-links/ {
+    # Extract the destination path
+    if (match($0, /\$\{[^}]+\}/)) {
+        dest = substr($0, RSTART, RLENGTH)
+        print "  # Use cp instead of rsync for sandbox compatibility"
+        print "  if [[ -f \"$RESOURCES_TO_COPY\" ]]; then"
+        print "    while IFS= read -r file; do"
+        print "      if [[ -n \"$file\" ]] && [[ -e \"$file\" ]]; then"
+        print "        cp -R \"$file\" \"" dest "/\" || true"
+        print "      fi"
+        print "    done < \"$RESOURCES_TO_COPY\""
+        print "  fi"
+    }
     next
 }
 { print }

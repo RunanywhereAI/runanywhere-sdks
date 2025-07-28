@@ -42,7 +42,7 @@ struct BenchmarkView: View {
                     Text("Select Frameworks")
                         .font(.headline)
 
-                    ForEach(LLMFramework.allCases, id: \.self) { framework in
+                    ForEach(LLMFramework.availableFrameworks, id: \.self) { framework in
                         HStack {
                             Image(systemName: benchmarkService.selectedFrameworks.contains(framework) ? "checkmark.circle.fill" : "circle")
                                 .foregroundColor(.accentColor)

@@ -31,7 +31,8 @@
       "WebFetch(domain:docs.pytorch.org)",
       "Bash(grep:*)",
       "Bash(cat:*)",
-      "Bash(od:*)"
+      "Bash(od:*)",
+      "Bash(./fix_pods_sandbox.sh:*)"
     ],
     "deny": []
   }

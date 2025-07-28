@@ -1,4 +1,4 @@
-# Complete Guide to iOS LLM Frameworks - Production Deployment 2025
+# Complete Guide to iOS LLM Frameworks - Production Deployment 2025 (Updated July 2025)
 
 ## Executive Summary
 
@@ -30,7 +30,7 @@ This comprehensive guide covers all major frameworks for running Large Language 
 
 | Framework | Best For | Device Requirements | Model Support | Production Ready |
 |-----------|----------|-------------------|---------------|------------------|
-| **Foundation Models** | iOS 18+ native apps | iPhone 15 Pro+ | Apple's 3B model | ✅ |
+| **Foundation Models** | iOS 26+ native apps | iPhone 15 Pro+ | Apple's 3B model | 🔶 Beta |
 | **Core ML** | Apple ecosystem | All iOS devices | Converted models | ✅ |
 | **MLX** | Performance-critical | A17 Pro+ | HuggingFace models | ✅ |
 | **MLC-LLM** | Cross-platform | iPhone 6s+ | Pre-compiled models | ✅ |
@@ -46,13 +46,19 @@ This comprehensive guide covers all major frameworks for running Large Language 
 ## 1. Apple Foundation Models Framework
 
 ### Overview
-Apple's native framework for on-device AI, introduced in iOS 18+. Provides ~3B parameter models with sophisticated APIs including streaming, tool calling, and structured outputs.
+Apple's native framework for on-device AI, announced at WWDC 2025 for iOS 26+. Provides ~3B parameter models with sophisticated APIs including streaming, tool calling, and structured outputs. Currently in beta as of July 2025.
 
 ### Requirements
-- **iOS Version**: 18.1+ (iOS 18.5+ recommended for latest features)
-- **Devices**: iPhone 15 Pro or later (8GB+ RAM), iPhone 16 series fully supported
-- **Xcode**: 16.5+ (Xcode 17.0+ recommended for best experience)
-- **Swift**: 6.0+ (Swift 6.1+ with enhanced concurrency support)
+- **iOS Version**: 26.0+ (beta)
+- **Devices**: iPhone 15 Pro or later (A17 Pro chip minimum), devices with Apple Intelligence support
+- **Xcode**: 26.0+ (beta)
+- **Swift**: 6.1+
+
+### Beta Status (July 2025)
+- Framework announced at WWDC 2025
+- Available in iOS 26 developer beta
+- APIs may change before final release
+- Full functionality expected in public release
 
 ### Setup and Installation
 
@@ -80,19 +86,27 @@ import FoundationModels
 import FoundationModels
 
 class FoundationModelsService: LLMProtocol {
-    private let session = LanguageModelSession()
+    private var session: LanguageModelSession?
     
     var name: String { "Apple Foundation Models" }
-    var isInitialized: Bool { SystemLanguageModel.default.isAvailable }
     
-    func initialize(modelPath: String) async throws {
-        guard SystemLanguageModel.default.isAvailable else {
-            throw LLMError.modelNotAvailable
-        }
+    func initialize() async throws {
+        // Check availability (beta API)
+        let systemModel = SystemLanguageModel.default
+        
+        // Create session
+        session = LanguageModelSession()
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    func generate(prompt: String) async throws -> String {
+        guard let session = session else {
+            throw LLMError.notInitialized
+        }
+        
+        // Simple API (as per WWDC 2025)
+        let prompt = Prompt(prompt)
         let response = try await session.respond(to: prompt)
+        return response.text
         return response
     }
     

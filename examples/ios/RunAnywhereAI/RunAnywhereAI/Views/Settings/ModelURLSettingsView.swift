@@ -15,7 +15,7 @@ struct ModelURLSettingsView: View {
             List {
                 Section {
                     Picker("Framework", selection: $selectedFramework) {
-                        ForEach([LLMFramework.coreML, .mlx, .onnxRuntime, .tensorFlowLite, .llamaCpp], id: \.self) { framework in
+                        ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred && $0 != .mock }, id: \.self) { framework in
                             Text(framework.displayName).tag(framework)
                         }
                     }
