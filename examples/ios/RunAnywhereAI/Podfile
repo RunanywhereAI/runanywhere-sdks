@@ -6,8 +6,8 @@ target 'RunAnywhereAI' do
   # TensorFlow Lite (LiteRT) - Use latest available version
   pod 'TensorFlowLiteSwift'
   
-  # ZIP handling for model archives
-  pod 'ZIPFoundation', '~> 0.9.19'
+  # ZIP handling moved to Swift Package Manager
+  # pod 'ZIPFoundation', '~> 0.9.19'
   
   # PicoLLM - Proprietary SDK (Check actual pod name)
   # pod 'PicovoiceSDK', '~> 3.0.0'  # Correct Picovoice pod name

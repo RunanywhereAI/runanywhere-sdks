@@ -59,4 +59,4 @@ pod install
 print_status "Clean complete! Now building..."
 
 # Call the regular build script
-./build_and_run.sh "$@"
+./scripts/build_and_run.sh "$@"

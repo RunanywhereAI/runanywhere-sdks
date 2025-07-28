@@ -175,23 +175,38 @@ The app features a tab-based interface with four main sections:
 - **Apple Silicon Mac** recommended for MLX framework testing
 
 ### Quick Start
+
+#### Option 1: Using Build Scripts (Recommended)
 1. Clone the repository and navigate to the iOS example:
    ```bash
    cd examples/ios/RunAnywhereAI/
    ```
 
-2. Open the project in Xcode:
+2. Build and run on simulator:
    ```bash
-   open RunAnywhereAI.xcodeproj
+   ./scripts/build_and_run.sh simulator "iPhone 16 Pro"
    ```
 
-3. Build and run the app on simulator or device
+3. Or build and run on connected device:
+   ```bash
+   ./scripts/build_and_run.sh device
+   ```
 
-4. Explore the app:
-   - **Chat Tab**: Start a conversation with an LLM service
-   - **Models Tab**: Browse available frameworks and models
-   - **Benchmark Tab**: Run performance tests and view analytics
-   - **Settings Tab**: Configure generation parameters
+#### Option 2: Using Xcode
+1. Install dependencies and open workspace:
+   ```bash
+   pod install
+   ./fix_pods_sandbox.sh  # Required for Xcode 16
+   open RunAnywhereAI.xcworkspace
+   ```
+
+2. Build and run the app on simulator or device
+
+#### Explore the App
+- **Chat Tab**: Start a conversation with an LLM service
+- **Models Tab**: Browse available frameworks and download models
+- **Benchmark Tab**: Run performance tests and view analytics
+- **Settings Tab**: Configure generation parameters
 
 ## Development Setup
 
@@ -238,19 +253,48 @@ This script automatically replaces the problematic `rsync` commands with `cp` to
 ```
 
 ### Building from Command Line
+
+#### Using Build Scripts (Recommended)
+```bash
+# Build and run on simulator
+./scripts/build_and_run.sh simulator "iPhone 16 Pro"
+
+# Build and run on connected device
+./scripts/build_and_run.sh device "Your Device Name"
+
+# Clean build artifacts
+./scripts/clean_build_and_run.sh
+```
+
+#### Manual Xcode Commands
 ```bash
 # Build for iOS Simulator
-xcodebuild build -scheme RunAnywhereAI -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 
 # Build for device (requires valid provisioning profile)
-xcodebuild build -scheme RunAnywhereAI -destination 'generic/platform=iOS'
+xcodebuild -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -destination 'generic/platform=iOS' build
 ```
 
 ### Testing
 ```bash
 # Run unit tests
-xcodebuild test -scheme RunAnywhereAI -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild test -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -destination 'platform=iOS Simulator,name=iPhone 16 Pro'
 ```
+
+### Model URL Verification
+The app includes a comprehensive model download system with URL verification:
+
+```bash
+# Verify all model download URLs
+./scripts/verify_urls.sh
+```
+
+This script:
+- ✅ Uses `ModelURLRegistry.swift` as the single source of truth
+- 🔍 Verifies accessibility of all download URLs
+- 📊 Provides detailed success/failure reporting
+- ⚠️ Handles authentication-required URLs (Kaggle models)
+- 🔄 Must be run from the `scripts/` directory
 
 ## Framework Integration
 

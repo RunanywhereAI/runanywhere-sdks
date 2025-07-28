@@ -19,6 +19,7 @@
 		547F70AC2E35CE050061BAED /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70AB2E35CE050061BAED /* onnxruntime */; };
 		547F70AE2E35CE050061BAED /* onnxruntime_extensions in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70AD2E35CE050061BAED /* onnxruntime_extensions */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
+		547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 547F7D7D2E3735100061BAED /* ZIPFoundation */; };
 		709C55C514D9670AA4D809A1 /* libPods-RunAnywhereAIUITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EA037D2D2288790D354E61CC /* libPods-RunAnywhereAIUITests.a */; };
 		F1447EA007FB8828A4AA7DC5 /* libPods-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D4B419D14093A7C24CA1293F /* libPods-RunAnywhereAITests.a */; };
 /* End PBXBuildFile section */
@@ -95,6 +96,7 @@
 				547F70AC2E35CE050061BAED /* onnxruntime in Frameworks */,
 				547F70A92E35CCD00061BAED /* MLXLMCommon in Frameworks */,
 				547F70A62E35CC650061BAED /* MLXRandom in Frameworks */,
+				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
 				0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -175,7 +177,6 @@
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
 				7DA168F82B1450F9B771C80A /* [CP] Copy Pods Resources */,
-				A5F1F9339A59672910E5F3F3 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -197,6 +198,7 @@
 				547F70AB2E35CE050061BAED /* onnxruntime */,
 				547F70AD2E35CE050061BAED /* onnxruntime_extensions */,
 				547F70B02E35CE270061BAED /* Transformers */,
+				547F7D7D2E3735100061BAED /* ZIPFoundation */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -283,6 +285,7 @@
 				547F70A72E35CCD00061BAED /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 				547F70AA2E35CE050061BAED /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
+				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -403,23 +406,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		A5F1F9339A59672910E5F3F3 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -819,6 +805,14 @@
 				minimumVersion = 0.1.17;
 			};
 		};
+		547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.9.19;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -876,6 +870,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */;
 			productName = Transformers;
+		};
+		547F7D7D2E3735100061BAED /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

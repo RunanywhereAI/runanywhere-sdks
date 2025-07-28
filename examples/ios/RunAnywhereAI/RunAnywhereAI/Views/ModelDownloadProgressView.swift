@@ -353,9 +353,7 @@ struct ModelDownloadProgressView: View {
     }
     
     private func cancelDownload() {
-        if let modelId = downloadInfo.id {
-            downloadManager.cancelDownload(modelId)
-        }
+        downloadManager.cancelDownload(downloadInfo.id)
         isPresented = false
     }
 }
