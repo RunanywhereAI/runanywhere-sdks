@@ -39,7 +39,9 @@
       "WebFetch(domain:www.tensorflow.org)",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:tfhub.dev)",
-      "Bash(./verify_urls.sh)"
+      "Bash(./verify_urls.sh)",
+      "WebFetch(domain:huggingface.co)",
+      "WebFetch(domain:developer.apple.com)"
     ],
     "deny": []
   }

@@ -67,7 +67,7 @@ while IFS= read -r line; do
             ((successful_urls++))
         fi
     fi
-done < <(sed -n '/let coreMLModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+done < <(sed -n '/private var _coreMLModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 
@@ -82,7 +82,7 @@ while IFS= read -r line; do
             ((successful_urls++))
         fi
     fi
-done < <(sed -n '/let mlxModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+done < <(sed -n '/private var _mlxModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 
@@ -97,7 +97,7 @@ while IFS= read -r line; do
             ((successful_urls++))
         fi
     fi
-done < <(sed -n '/let onnxModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+done < <(sed -n '/private var _onnxModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 
@@ -119,7 +119,7 @@ while IFS= read -r line; do
             fi
         fi
     fi
-done < <(sed -n '/let tfliteModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+done < <(sed -n '/private var _tfliteModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 
@@ -134,7 +134,7 @@ while IFS= read -r line; do
             ((successful_urls++))
         fi
     fi
-done < <(sed -n '/let llamaCppModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+done < <(sed -n '/private var _llamaCppModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 

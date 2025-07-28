@@ -8,12 +8,19 @@ import SwiftUI
 struct ModelDownloadView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var downloadManager = ModelDownloadManager.shared
+    @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @State private var selectedModelInfo: ModelDownloadInfo?
     @State private var selectedFramework: LLMFramework = .coreML
     @State private var isDownloading = false
     @State private var downloadProgress: DownloadProgress?
     @State private var downloadError: Error?
     @State private var showingError = false
+    @State private var showingProgressView = false
+    @State private var isValidatingURLs = false
+    @State private var showingKaggleAuth = false
+    @State private var selectedKaggleModel: ModelDownloadInfo?
+    @State private var showingCustomURL = false
+    @State private var selectedUnavailableModel: ModelDownloadInfo?
 
     // Get models from centralized registry
     private var availableModels: [ModelDownloadInfo] {
@@ -31,6 +38,13 @@ struct ModelDownloadView: View {
             .navigationTitle("Download Models")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Refresh URLs") {
+                        validateURLs()
+                    }
+                    .disabled(isValidatingURLs)
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
@@ -44,44 +58,104 @@ struct ModelDownloadView: View {
             } message: {
                 Text(downloadError?.localizedDescription ?? "Unknown error")
             }
+            .fullScreenCover(isPresented: $showingProgressView) {
+                if let selectedModel = selectedModelInfo {
+                    ModelDownloadProgressView(
+                        model: createModelInfo(from: selectedModel),
+                        downloadInfo: selectedModel,
+                        isPresented: $showingProgressView
+                    )
+                }
+            }
+            .onAppear {
+                validateURLs()
+            }
+            .sheet(isPresented: $showingKaggleAuth) {
+                if let kaggleModel = selectedKaggleModel {
+                    KaggleAuthView(
+                        model: kaggleModel,
+                        onSuccess: {
+                            showingKaggleAuth = false
+                            selectedModelInfo = kaggleModel
+                            showingProgressView = true
+                        },
+                        onCancel: {
+                            showingKaggleAuth = false
+                            selectedKaggleModel = nil
+                        }
+                    )
+                }
+            }
         }
     }
 
     private func downloadSelectedModel() {
         guard let modelInfo = selectedModelInfo else { return }
-
-        isDownloading = true
-
-        downloadManager.downloadModel(
-            modelInfo,
-            progress: { progress in
-                downloadProgress = progress
-            },
-            completion: { result in
-                isDownloading = false
-                downloadProgress = nil
-
-                switch result {
-                case .success:
-                    selectedModelInfo = nil
-                // Refresh the view
-                case .failure(let error):
-                    downloadError = error
-                    showingError = true
-                }
+        
+        // Check if this model requires Kaggle authentication
+        if modelInfo.requiresAuth && modelInfo.url.host?.contains("kaggle") == true {
+            selectedKaggleModel = modelInfo
+            showingKaggleAuth = true
+        } else {
+            // Regular download flow
+            showingProgressView = true
+        }
+    }
+    
+    private func validateURLs() {
+        isValidatingURLs = true
+        Task {
+            await modelURLRegistry.validateURLs(for: selectedFramework)
+            await MainActor.run {
+                isValidatingURLs = false
             }
+        }
+    }
+    
+    private func createModelInfo(from downloadInfo: ModelDownloadInfo) -> ModelInfo {
+        // Convert ModelDownloadInfo to ModelInfo for the progress view
+        let format = ModelFormat.from(extension: downloadInfo.url.pathExtension)
+        let framework = LLMFramework.forFormat(format)
+        
+        return ModelInfo(
+            id: downloadInfo.id,
+            name: downloadInfo.name,
+            format: format,
+            size: "Unknown", // Will be determined during download
+            framework: framework,
+            downloadURL: downloadInfo.url
         )
     }
     
     // MARK: - View Components
     
     private var frameworkPicker: some View {
-        Picker("Framework", selection: $selectedFramework) {
-            ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
-                Text(framework.displayName).tag(framework)
+        VStack {
+            HStack {
+                Picker("Framework", selection: $selectedFramework) {
+                    ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
+                        Text(framework.displayName).tag(framework)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .onChange(of: selectedFramework) { oldValue, newValue in
+                    selectedModelInfo = nil // Clear selection when framework changes
+                    validateURLs()
+                }
+                
+                if isValidatingURLs {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .padding(.leading, 8)
+                }
+            }
+            
+            if isValidatingURLs {
+                Text("Validating model URLs...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
-        .pickerStyle(SegmentedPickerStyle())
         .padding()
     }
     
@@ -97,11 +171,19 @@ struct ModelDownloadView: View {
                     .font(.title2)
                     .foregroundColor(.secondary)
 
-                Text("Models for \(selectedFramework.displayName) can be added via Settings → Model URLs")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                if selectedFramework == .foundationModels {
+                    Text("Foundation Models are built into iOS/macOS and don't require downloads")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                } else {
+                    Text("Models for \(selectedFramework.displayName) can be added via Settings → Model URLs")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
             }
             .frame(maxHeight: .infinity)
         } else {
@@ -149,12 +231,17 @@ struct ModelDownloadView: View {
                     }
                     .padding()
                 } else {
+                    let buttonTitle = selectedModelInfo?.isBuiltIn == true ? "Setup Model" : "Download Model"
+                    let buttonIcon = selectedModelInfo?.isBuiltIn == true ? "apple.logo" : "arrow.down.circle.fill"
+                    
                     Button(action: downloadSelectedModel) {
-                        Label("Download Model", systemImage: "arrow.down.circle.fill")
+                        Label(buttonTitle, systemImage: buttonIcon)
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isDownloading || (selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)))
+                    .disabled(isDownloading || 
+                             (selectedModelInfo?.isURLValid == false && selectedModelInfo?.isBuiltIn == false) ||
+                             (selectedModelInfo != nil && ModelManager.shared.isModelDownloaded(selectedModelInfo!.name)))
                     .padding()
                 }
             }
@@ -193,18 +280,61 @@ struct ModelDownloadRow: View {
                         .font(.headline)
                         .foregroundColor(.primary)
 
-                    HStack {
+                    HStack(spacing: 8) {
+                        // Download status
                         if isDownloaded {
                             Label("Downloaded", systemImage: "checkmark.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.green)
                         }
-
-                        if model.requiresAuth {
-                            Label("Requires Auth", systemImage: "lock.fill")
+                        
+                        // Built-in model indicator
+                        if model.isBuiltIn {
+                            Label("Built-in", systemImage: "apple.logo")
                                 .font(.caption)
-                                .foregroundColor(.orange)
+                                .foregroundColor(.blue)
                         }
+                        
+                        // Auth requirement with Kaggle-specific info
+                        if model.requiresAuth {
+                            if model.url.host?.contains("kaggle") == true {
+                                let authService = KaggleAuthService.shared
+                                if authService.isAuthenticated {
+                                    Label("Kaggle: Authenticated", systemImage: "checkmark.shield.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                } else {
+                                    Label("Kaggle: Auth Required", systemImage: "lock.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                }
+                            } else {
+                                Label("Requires Auth", systemImage: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                        
+                        // URL validity indicator
+                        if !model.isBuiltIn {
+                            if model.isURLValid {
+                                Label("Available", systemImage: "checkmark.circle")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            } else {
+                                Label("URL Broken", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                        }
+                    }
+                    
+                    // Show notes if available
+                    if let notes = model.notes {
+                        Text(notes)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
                     }
                 }
 
@@ -221,6 +351,8 @@ struct ModelDownloadRow: View {
             .padding(.vertical, 4)
         }
         .buttonStyle(PlainButtonStyle())
+        .disabled(!model.isURLValid && !model.isBuiltIn && !isDownloaded)
+        .opacity((!model.isURLValid && !model.isBuiltIn && !isDownloaded) ? 0.6 : 1.0)
     }
 }
 

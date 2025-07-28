@@ -60,9 +60,14 @@ struct ModelDownloadProgressView: View {
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Header with model info
-                VStack(spacing: 12) {
+            ZStack {
+                // Background
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 0) {
+                    // Header with model info
+                    VStack(spacing: 12) {
                     Image(systemName: "doc.fill")
                         .font(.system(size: 48))
                         .foregroundColor(.blue)
@@ -185,6 +190,7 @@ struct ModelDownloadProgressView: View {
                     }
                     .padding()
                 }
+                }
             }
             .navigationTitle("Downloading Model")
             .navigationBarTitleDisplayMode(.inline)
@@ -216,8 +222,12 @@ struct ModelDownloadProgressView: View {
                 currentStep = .downloading
             }
             
-            // Start actual download
-            downloadManager.downloadModel(downloadInfo, progress: { progress in
+            // Check if this is a Kaggle model and handle separately
+            if downloadInfo.requiresAuth && downloadInfo.url.host?.contains("kaggle") == true {
+                try await downloadKaggleModel()
+            } else {
+                // Start regular download
+                downloadManager.downloadModel(downloadInfo, progress: { progress in
                 Task { @MainActor in
                     self.downloadProgress = progress.fractionCompleted
                     
@@ -252,8 +262,29 @@ struct ModelDownloadProgressView: View {
                         self.showingError = true
                     }
                 }
-            })
+                })
+            }
         }
+    }
+    
+    private func downloadKaggleModel() async throws {
+        // Use separate Kaggle download service
+        let authService = KaggleAuthService.shared
+        
+        let tempURL = try await authService.downloadModel(from: downloadInfo.url) { progress in
+            Task { @MainActor in
+                self.downloadProgress = progress
+                
+                // Format progress details
+                let formatter = ByteCountFormatter()
+                formatter.countStyle = .binary
+                self.downloadedSize = formatter.string(fromByteCount: Int64(progress * 100_000_000)) // Estimate
+                self.totalSize = formatter.string(fromByteCount: 100_000_000) // Estimate
+            }
+        }
+        
+        // Continue with post-download processing
+        await processDownloadedModel(at: tempURL)
     }
     
     private func processDownloadedModel(at url: URL) async {

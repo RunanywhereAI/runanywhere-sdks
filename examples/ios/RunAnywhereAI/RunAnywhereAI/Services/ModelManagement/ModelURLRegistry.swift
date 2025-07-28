@@ -4,10 +4,39 @@ import Foundation
 
 /// Centralized registry for all model download URLs
 /// This provides a single place to manage and update model URLs
-class ModelURLRegistry {
+@MainActor
+class ModelURLRegistry: ObservableObject {
     static let shared = ModelURLRegistry()
 
     private init() {}
+
+    // MARK: - Foundation Models (Built-in iOS/macOS)
+    // 📍 These models use Apple's built-in Foundation Models framework
+    // ✅ No download required - available directly on device
+    // 💡 Requires iOS 18.0+ or macOS 15.0+
+
+    private var _foundationModels: [ModelDownloadInfo] = [
+        // Note: Foundation Models are built into the OS, so no download URLs needed
+        // These entries are for UI purposes to show available models
+        ModelDownloadInfo(
+            id: "apple-intelligence-summary",
+            name: "Apple Intelligence - Text Summarization",
+            url: URL(string: "builtin://foundation-models/summarization")!,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            notes: "Built-in model for text summarization (iOS 18+)"
+        ),
+        ModelDownloadInfo(
+            id: "apple-intelligence-writing",
+            name: "Apple Intelligence - Writing Tools",
+            url: URL(string: "builtin://foundation-models/writing")!,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            notes: "Built-in model for writing assistance (iOS 18+)"
+        )
+    ]
 
     // MARK: - Core ML Models
     // 📍 SINGLE SOURCE OF TRUTH: All URLs in this file are verified by scripts/verify_urls.sh
@@ -15,7 +44,7 @@ class ModelURLRegistry {
     // ⚠️  Most Core ML models need conversion from PyTorch/TensorFlow
     // 💡 Use: python3 -m exporters.coreml --model=model-name exported/
 
-    let coreMLModels: [ModelDownloadInfo] = [
+    private var _coreMLModels: [ModelDownloadInfo] = [
         // Note: Most Core ML models need to be converted from PyTorch/TensorFlow
         // Use the exporters tool: python3 -m exporters.coreml --model=gpt2 exported/
         ModelDownloadInfo(
@@ -29,11 +58,11 @@ class ModelURLRegistry {
         ModelDownloadInfo(
             id: "openelm-270m-coreml",
             name: "OpenELM-270M-CoreML",
-            url: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/openelm-270m-instruct.mlpackage.zip")!,
+            url: URL(string: "builtin://example/openelm-270m")!,
             sha256: nil,
-            requiresUnzip: true,
+            requiresUnzip: false,
             requiresAuth: false,
-            notes: "CoreML-optimized version from corenet-community"
+            notes: "Note: Actual OpenELM CoreML models require manual conversion. This is a placeholder."
         )
     ]
 
@@ -42,7 +71,7 @@ class ModelURLRegistry {
     // ⚠️  MLX models require multiple files (weights, config.json, tokenizer)
     // 💡 Best downloaded with: huggingface-cli download --local-dir model-name mlx-community/model-name
 
-    let mlxModels: [ModelDownloadInfo] = [
+    private var _mlxModels: [ModelDownloadInfo] = [
         // MLX models require multiple files. Best to use git clone or huggingface-cli
         // Example: huggingface-cli download --local-dir model-name mlx-community/model-name
         ModelDownloadInfo(
@@ -58,11 +87,11 @@ class ModelURLRegistry {
         ModelDownloadInfo(
             id: "phi-2-mlx",
             name: "phi-2",
-            url: URL(string: "https://huggingface.co/mlx-community/phi-2/resolve/main/model.safetensors")!,
+            url: URL(string: "https://huggingface.co/mlx-community/phi-2/resolve/main/weights.npz")!,
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
-            notes: "MLX version of Phi-2"
+            notes: "MLX version of Phi-2 (note: requires config.json and tokenizer separately)"
         ),
         ModelDownloadInfo(
             id: "quantized-gemma-2b-mlx",
@@ -79,7 +108,7 @@ class ModelURLRegistry {
     // ✅ Microsoft provides excellent mobile-optimized versions
     // 💡 Look for "cpu-int4" variants for best mobile performance
 
-    let onnxModels: [ModelDownloadInfo] = [
+    private var _onnxModels: [ModelDownloadInfo] = [
         ModelDownloadInfo(
             id: "phi-3-mini-onnx",
             name: "Phi-3-mini-4k-instruct-onnx",
@@ -113,7 +142,7 @@ class ModelURLRegistry {
     // ⚠️  Many models now require Kaggle authentication
     // 🔄 Alternative: Convert from TensorFlow models yourself
 
-    let tfliteModels: [ModelDownloadInfo] = [
+    private var _tfliteModels: [ModelDownloadInfo] = [
         ModelDownloadInfo(
             id: "gemma-2b-tflite",
             name: "gemma-2b-it-gpu-int4.tar.gz",
@@ -148,7 +177,7 @@ class ModelURLRegistry {
     // ✅ Most reliable format for direct download
     // 💡 Single file contains everything needed - no additional files required
 
-    let llamaCppModels = [
+    private var _llamaCppModels: [ModelDownloadInfo] = [
         ModelDownloadInfo(
             id: "tinyllama-1.1b-q4",
             name: "TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf",
@@ -276,10 +305,21 @@ class ModelURLRegistry {
         )
     ]
 
+    // MARK: - Computed Properties
+    
+    var foundationModels: [ModelDownloadInfo] { _foundationModels }
+    var coreMLModels: [ModelDownloadInfo] { _coreMLModels }
+    var mlxModels: [ModelDownloadInfo] { _mlxModels }
+    var onnxModels: [ModelDownloadInfo] { _onnxModels }
+    var tfliteModels: [ModelDownloadInfo] { _tfliteModels }
+    var llamaCppModels: [ModelDownloadInfo] { _llamaCppModels }
+
     // MARK: - Convenience Methods
 
     func getAllModels(for framework: LLMFramework) -> [ModelDownloadInfo] {
         switch framework {
+        case .foundationModels:
+            return foundationModels
         case .coreML:
             return coreMLModels
         case .mlx:
@@ -296,7 +336,7 @@ class ModelURLRegistry {
     }
 
     func getModelInfo(id: String) -> ModelDownloadInfo? {
-        let allModels = coreMLModels + mlxModels + onnxModels + tfliteModels + llamaCppModels
+        let allModels = foundationModels + coreMLModels + mlxModels + onnxModels + tfliteModels + llamaCppModels + customModels
         return allModels.first { $0.id == id }
     }
 
@@ -332,6 +372,12 @@ struct ModelDownloadInfo: Codable, Identifiable {
     let requiresAuth: Bool
     let alternativeURLs: [URL]
     let notes: String?
+    
+    // Runtime properties (not encoded)
+    var isURLValid: Bool = true
+    var lastVerified: Date?
+    var isBuiltIn: Bool { url.scheme == "builtin" }
+    var isUnavailable: Bool { !isURLValid && !isBuiltIn && !requiresAuth }
 
     init(id: String, name: String, url: URL, sha256: String? = nil, requiresUnzip: Bool, requiresAuth: Bool = false, alternativeURLs: [URL] = [], notes: String? = nil) {
         self.id = id
@@ -342,6 +388,11 @@ struct ModelDownloadInfo: Codable, Identifiable {
         self.requiresAuth = requiresAuth
         self.alternativeURLs = alternativeURLs
         self.notes = notes
+    }
+    
+    // Custom Codable implementation to exclude runtime properties
+    enum CodingKeys: String, CodingKey {
+        case id, name, url, sha256, requiresUnzip, requiresAuth, alternativeURLs, notes
     }
 }
 
@@ -375,6 +426,7 @@ extension ModelURLRegistry {
     /// Save current URL registry to a file
     func saveRegistry(to url: URL) throws {
         let allModels = [
+            "foundationModels": foundationModels,
             "coreML": coreMLModels,
             "mlx": mlxModels,
             "onnx": onnxModels,
@@ -387,6 +439,91 @@ extension ModelURLRegistry {
         encoder.outputFormatting = .prettyPrinted
         let data = try encoder.encode(allModels)
         try data.write(to: url)
+    }
+    
+    // MARK: - URL Validation
+    
+    /// Validate URLs for a specific framework
+    func validateURLs(for framework: LLMFramework) async {
+        var models = getAllModels(for: framework)
+        
+        for i in 0..<models.count {
+            // Skip built-in models
+            if models[i].isBuiltIn {
+                models[i].isURLValid = true
+                models[i].lastVerified = Date()
+                continue
+            }
+            
+            // Skip Kaggle URLs that require auth
+            if models[i].requiresAuth && models[i].url.host?.contains("kaggle") == true {
+                models[i].isURLValid = true // Assume valid since auth is expected
+                models[i].lastVerified = Date()
+                continue
+            }
+            
+            // Validate HTTP/HTTPS URLs
+            models[i].isURLValid = await validateURL(models[i].url)
+            models[i].lastVerified = Date()
+        }
+        
+        // Update the internal collections
+        updateModelsCollection(for: framework, with: models)
+    }
+    
+    /// Validate all URLs across all frameworks
+    func validateAllURLs() async {
+        await withTaskGroup(of: Void.self) { group in
+            for framework in LLMFramework.availableFrameworks {
+                group.addTask {
+                    await self.validateURLs(for: framework)
+                }
+            }
+        }
+    }
+    
+    private func validateURL(_ url: URL) async -> Bool {
+        do {
+            var request = URLRequest(url: url)
+            request.httpMethod = "HEAD"
+            request.timeoutInterval = 10
+            request.setValue("RunAnywhereAI-URLVerifier/1.0", forHTTPHeaderField: "User-Agent")
+            
+            let (_, response) = try await URLSession.shared.data(for: request)
+            
+            if let httpResponse = response as? HTTPURLResponse {
+                return httpResponse.statusCode == 200 || httpResponse.statusCode == 302
+            }
+            return false
+        } catch {
+            print("URL validation failed for \(url): \(error)")
+            return false
+        }
+    }
+    
+    private func updateModelsCollection(for framework: LLMFramework, with models: [ModelDownloadInfo]) {
+        switch framework {
+        case .foundationModels:
+            _foundationModels = models
+        case .coreML:
+            _coreMLModels = models
+        case .mlx:
+            _mlxModels = models
+        case .onnxRuntime:
+            _onnxModels = models
+        case .tensorFlowLite:
+            _tfliteModels = models
+        case .llamaCpp:
+            _llamaCppModels = models
+        default:
+            break
+        }
+        
+        // Notify UI of validation completion
+        NotificationCenter.default.post(name: .modelURLsValidated, object: nil, userInfo: [
+            "framework": framework,
+            "validatedModels": models
+        ])
     }
     
     /// Important Notes for Users
@@ -416,4 +553,10 @@ extension ModelURLRegistry {
        - Single file contains everything needed
        - TheBloke and other quantizers provide many options
     """
+}
+
+// MARK: - Notification Extension
+
+extension Notification.Name {
+    static let modelURLsValidated = Notification.Name("modelURLsValidated")
 }
