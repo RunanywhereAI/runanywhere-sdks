@@ -2,9 +2,9 @@
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
 # Usage: ./build_and_run.sh [simulator|device] [device-name-or-id]
 # Examples:
-#   ./build_and_run.sh simulator "iPhone 16"
-#   ./build_and_run.sh device "00008140-000C6D860A3B001C"
-#   ./build_and_run.sh device "Monga's iphone"
+#   ./build_and_run.sh simulator "iPhone 16 Pro"
+#   ./build_and_run.sh device "YOUR_DEVICE_ID"
+#   ./build_and_run.sh device "Your Device Name"
 
 set -e
 
@@ -208,26 +208,26 @@ get_destination() {
             echo "platform=iOS Simulator,name=$DEVICE_NAME"
         fi
     else
-        # For device
+        # For device - use xcodebuild to get device IDs that work with build system
         if [ -z "$DEVICE_NAME" ]; then
-            # Get first connected device UUID
-            DEVICE_ID=$(xcrun devicectl list devices | grep -E "iPhone|iPad" | grep "connected" | head -1 | awk '{print $3}')
+            # Get first connected device UUID using xcodebuild destinations
+            DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
             if [ -z "$DEVICE_ID" ]; then
                 print_error "No connected iOS device found!"
                 exit 1
             fi
-            echo "id=$DEVICE_ID"
+            echo "platform=iOS,id=$DEVICE_ID"
         elif [[ "$DEVICE_NAME" =~ ^[0-9a-fA-F-]+$ ]]; then
             # It's a device ID
-            echo "id=$DEVICE_NAME"
+            echo "platform=iOS,id=$DEVICE_NAME"
         else
-            # It's a device name, try to find its ID
-            DEVICE_ID=$(xcrun devicectl list devices | grep "$DEVICE_NAME" | grep "connected" | awk '{print $3}' | head -1)
+            # It's a device name, try to find its ID using xcodebuild destinations
+            DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
             if [ -z "$DEVICE_ID" ]; then
                 print_error "Device '$DEVICE_NAME' not found!"
                 exit 1
             fi
-            echo "id=$DEVICE_ID"
+            echo "platform=iOS,id=$DEVICE_ID"
         fi
     fi
 }
@@ -286,11 +286,29 @@ if [ "$TARGET_TYPE" = "simulator" ]; then
     
 else
     # For device
-    # Extract device ID from destination
-    DEVICE_ID=$(echo "$DESTINATION" | sed 's/id=//')
+    # Extract Xcode device ID from destination
+    XCODE_DEVICE_ID=$(echo "$DESTINATION" | sed 's/platform=iOS,id=//')
+    
+    # Get the devicectl ID for the same device (needed for installation)
+    # Map from Xcode device ID to devicectl device ID using device name
+    DEVICE_NAME_FOR_INSTALL=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
+    
+    if [ -n "$DEVICE_NAME_FOR_INSTALL" ]; then
+        DEVICECTL_ID=$(xcrun devicectl list devices | grep "$DEVICE_NAME_FOR_INSTALL" | grep "connected" | head -1 | awk '{print $3}')
+    else
+        # Fallback: use first connected device
+        DEVICECTL_ID=$(xcrun devicectl list devices | grep -E "iPhone|iPad" | grep "connected" | head -1 | awk '{print $3}')
+    fi
+    
+    if [ -z "$DEVICECTL_ID" ]; then
+        print_error "Could not find device for installation!"
+        exit 1
+    fi
+    
+    print_status "Using device: $DEVICE_NAME_FOR_INSTALL (Xcode: $XCODE_DEVICE_ID, devicectl: $DEVICECTL_ID)"
     
     # Get the built app path
-    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphoneos/*" | head -1)
+    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphoneos/*" -not -path "*/Index.noindex/*" | head -1)
     
     if [ -z "$APP_PATH" ]; then
         print_error "Could not find built app!"
@@ -298,7 +316,7 @@ else
     fi
     
     print_status "Installing app on device..."
-    if xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"; then
+    if xcrun devicectl device install app --device "$DEVICECTL_ID" "$APP_PATH"; then
         print_status "App installed successfully!"
     else
         print_error "Failed to install app!"
@@ -306,7 +324,7 @@ else
     fi
     
     print_status "Launching app on device..."
-    if xcrun devicectl device process launch --device "$DEVICE_ID" "$BUNDLE_ID"; then
+    if xcrun devicectl device process launch --device "$DEVICECTL_ID" "$BUNDLE_ID"; then
         print_status "App launched successfully!"
     else
         print_error "Failed to launch app!"
