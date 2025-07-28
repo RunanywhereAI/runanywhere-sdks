@@ -201,11 +201,28 @@ EOF
 # Function to get device destination
 get_destination() {
     if [ "$TARGET_TYPE" = "simulator" ]; then
-        if [ -z "$DEVICE_NAME" ]; then
+        # First, check if there's already a booted simulator matching our criteria
+        if [ -n "$DEVICE_NAME" ]; then
+            # Check if the requested device is already booted
+            BOOTED_ID=$(xcrun simctl list devices | grep "$DEVICE_NAME" | grep "(Booted)" | sed 's/.*(\([^)]*\)) (Booted).*/\1/' | head -1)
+            if [ -n "$BOOTED_ID" ]; then
+                print_status "Using already booted simulator: $DEVICE_NAME ($BOOTED_ID)" >&2
+                echo "platform=iOS Simulator,id=$BOOTED_ID"
+                return
+            fi
+            echo "platform=iOS Simulator,name=$DEVICE_NAME"
+        else
+            # Check for any booted iPhone simulator
+            BOOTED_IPHONE=$(xcrun simctl list devices | grep -E "iPhone.*\(Booted\)" | head -1)
+            if [ -n "$BOOTED_IPHONE" ]; then
+                BOOTED_NAME=$(echo "$BOOTED_IPHONE" | sed 's/ *(.*//')
+                BOOTED_ID=$(echo "$BOOTED_IPHONE" | sed 's/.*(\([^)]*\)) (Booted).*/\1/')
+                print_status "Using already booted simulator: $BOOTED_NAME ($BOOTED_ID)" >&2
+                echo "platform=iOS Simulator,id=$BOOTED_ID"
+                return
+            fi
             # Default to iPhone 16 simulator
             echo "platform=iOS Simulator,name=iPhone 16"
-        else
-            echo "platform=iOS Simulator,name=$DEVICE_NAME"
         fi
     else
         # For device - use xcodebuild to get device IDs that work with build system
@@ -244,6 +261,7 @@ print_status "Building for destination: $DESTINATION"
 
 # Build the app
 print_status "Building the app..."
+# Removed debug output
 if xcodebuild -workspace "$WORKSPACE" \
     -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
@@ -262,17 +280,28 @@ if [ "$TARGET_TYPE" = "simulator" ]; then
     # For simulator
     print_status "Installing on simulator..."
     
-    # Get the app path
-    APP_PATH=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings | grep "BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-    APP_PATH="$APP_PATH/$SCHEME.app"
-    
-    # Boot simulator if needed
-    SIMULATOR_ID=$(xcrun simctl list devices | grep "$DEVICE_NAME" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
-    if [ -z "$SIMULATOR_ID" ]; then
-        SIMULATOR_ID=$(xcrun simctl list devices | grep "iPhone 16" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
+    # Get the app path - use correct path for simulator builds
+    if [[ "$DESTINATION" == *"id="* ]]; then
+        # For simulator builds, use Debug-iphonesimulator path
+        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphonesimulator/*" -not -path "*/Index.noindex/*" | head -1)
+    else
+        # Fallback to old method
+        APP_PATH=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings | grep "BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+        APP_PATH="$APP_PATH/$SCHEME.app"
     fi
     
-    xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+    # Extract simulator ID from destination if it's an ID-based destination
+    if [[ "$DESTINATION" == *"id="* ]]; then
+        SIMULATOR_ID=$(echo "$DESTINATION" | sed 's/.*id=//')
+        print_status "Using simulator ID from destination: $SIMULATOR_ID"
+    else
+        # Boot simulator if needed (name-based destination)
+        SIMULATOR_ID=$(xcrun simctl list devices | grep "$DEVICE_NAME" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
+        if [ -z "$SIMULATOR_ID" ]; then
+            SIMULATOR_ID=$(xcrun simctl list devices | grep "iPhone 16" | grep -v "unavailable" | awk -F '[()]' '{print $2}' | head -1)
+        fi
+        xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
+    fi
     
     # Install app
     xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
