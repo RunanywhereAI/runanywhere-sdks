@@ -36,6 +36,7 @@ enum LLMError: LocalizedError {
     // Other errors
     case notImplemented
     case unknown(String)
+    case custom(String)
 
     var errorDescription: String? {
         switch self {
@@ -82,6 +83,8 @@ enum LLMError: LocalizedError {
             return "This feature is not yet implemented."
         case .unknown(let reason):
             return "An unknown error occurred: \(reason)"
+        case .custom(let message):
+            return message
         }
     }
 
@@ -130,6 +133,8 @@ enum LLMError: LocalizedError {
             return "This feature will be available in a future update."
         case .unknown:
             return "Try restarting the app. If the problem persists, please report this issue."
+        case .custom:
+            return nil // Custom errors should provide their own context
         }
     }
 }

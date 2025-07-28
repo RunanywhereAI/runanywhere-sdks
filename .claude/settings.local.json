@@ -43,7 +43,9 @@
       "WebFetch(domain:huggingface.co)",
       "WebFetch(domain:developer.apple.com)",
       "Bash(swift:*)",
-      "Bash(xcrun swiftc:*)"
+      "Bash(xcrun swiftc:*)",
+      "Bash(xcrun devicectl list:*)",
+      "Bash(xcrun devicectl device logs stream:*)"
     ],
     "deny": []
   }
