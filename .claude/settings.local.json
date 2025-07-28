@@ -33,7 +33,9 @@
       "Bash(cat:*)",
       "Bash(od:*)",
       "Bash(./fix_pods_sandbox.sh:*)",
-      "Bash(./scripts/build_and_run.sh:*)"
+      "Bash(./scripts/build_and_run.sh:*)",
+      "Bash(./scripts/build_app.sh:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }
