@@ -32,7 +32,8 @@
       "Bash(grep:*)",
       "Bash(cat:*)",
       "Bash(od:*)",
-      "Bash(./fix_pods_sandbox.sh:*)"
+      "Bash(./fix_pods_sandbox.sh:*)",
+      "Bash(./scripts/build_and_run.sh:*)"
     ],
     "deny": []
   }

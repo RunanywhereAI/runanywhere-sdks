@@ -12,16 +12,42 @@ struct ModelListView: View {
     @State private var selectedService: String?
     @State private var showingImportView = false
     @State private var showingDownloadView = false
+    
+    // Group services by availability
+    var availableFrameworks: [LLMService] {
+        viewModel.availableServices.filter { service in
+            guard let framework = frameworkFromServiceName(service.name) else { return true }
+            return !framework.isDeferred
+        }
+    }
+    
+    var deferredFrameworks: [LLMFramework] {
+        LLMFramework.allCases.filter { $0.isDeferred }
+    }
+    
+    private func frameworkFromServiceName(_ name: String) -> LLMFramework? {
+        LLMFramework.allCases.first { $0.displayName == name || $0.rawValue == name }
+    }
 
     var body: some View {
         List {
-            Section("Available Services") {
-                ForEach(viewModel.availableServices, id: \.name) { service in
-                    ServiceRow(
-                        service: service,
-                        isSelected: selectedService == service.name
-                    ) {
-                        selectService(service)
+            if !availableFrameworks.isEmpty {
+                Section("Available Services") {
+                    ForEach(availableFrameworks, id: \.name) { service in
+                        ServiceRow(
+                            service: service,
+                            isSelected: selectedService == service.name
+                        ) {
+                            selectService(service)
+                        }
+                    }
+                }
+            }
+            
+            if !deferredFrameworks.isEmpty {
+                Section("Coming Soon") {
+                    ForEach(deferredFrameworks, id: \.self) { framework in
+                        ComingSoonRow(framework: framework)
                     }
                 }
             }
@@ -217,6 +243,32 @@ struct ModelRow: View {
                 }
             }
         }
+    }
+}
+
+struct ComingSoonRow: View {
+    let framework: LLMFramework
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(framework.displayName)
+                    .font(.headline)
+                    .foregroundColor(.secondary)
+                
+                Label("Coming Soon", systemImage: "clock.badge.exclamationmark")
+                    .font(.caption)
+                    .foregroundColor(.orange)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "clock.fill")
+                .foregroundColor(.orange)
+                .font(.title3)
+        }
+        .padding(.vertical, 4)
+        .opacity(0.7)
     }
 }
 

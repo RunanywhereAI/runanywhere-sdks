@@ -117,7 +117,7 @@ class ModelListViewModel: ObservableObject {
         case .mlx:
             return .mlx
         default:
-            return .mock
+            return .coreML  // Default to Core ML instead of mock
         }
     }
 }

@@ -85,7 +85,6 @@ enum ModelFormat: String, CaseIterable, Codable {
 // MARK: - LLM Framework
 
 enum LLMFramework: String, CaseIterable, Codable {
-    case mock = "Mock"
     case foundationModels = "Foundation Models"
     case llamaCpp = "llama.cpp"
     case coreML = "Core ML"
@@ -127,7 +126,7 @@ enum LLMFramework: String, CaseIterable, Codable {
         case .tflite: return .tensorFlowLite
         case .picoLLM: return .picoLLM
         case .pytorch: return .execuTorch
-        default: return .mock
+        default: return .coreML  // Default to Core ML instead of mock
         }
     }
 }

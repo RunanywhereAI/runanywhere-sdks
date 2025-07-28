@@ -148,7 +148,6 @@ final class DependencyContainer: ObservableObject {
 
     private func registerDefaultServices() {
         // Register all available LLM services
-        register(MockLLMService.self) { MockLLMService() }
         register(LlamaCppService.self) { LlamaCppService() }
         register(MLCService.self) { MLCService() }
         register(ONNXService.self) { ONNXService() }

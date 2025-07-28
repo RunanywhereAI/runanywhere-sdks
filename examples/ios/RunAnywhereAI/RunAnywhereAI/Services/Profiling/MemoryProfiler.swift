@@ -432,7 +432,7 @@ class MemoryProfiler: ObservableObject {
 
     private func getActiveFrameworks() -> [LLMFramework] {
         // Get currently active frameworks
-        [LLMFramework.mock] // Simplified implementation
+        [] // Return empty array for now
     }
 
     private func generateReport() -> MemoryProfilingReport {
@@ -639,7 +639,7 @@ extension LLMService {
         case "TFLiteService": return .tensorFlowLite
         case "PicoLLMService": return .picoLLM
         case "SwiftTransformersService": return .swiftTransformers
-        default: return .mock
+        default: return .coreML  // Default to Core ML
         }
     }
 }

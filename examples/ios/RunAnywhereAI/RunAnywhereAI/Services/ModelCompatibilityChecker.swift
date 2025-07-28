@@ -88,8 +88,7 @@ struct ModelCompatibilityChecker {
             .execuTorch: [.pte],
             .tensorFlowLite: [.tflite],
             .picoLLM: [.gguf, .onnxRuntime],
-            .swiftTransformers: [.coreML, .onnxRuntime],
-            .mock: ModelFormat.allCases
+            .swiftTransformers: [.coreML, .onnxRuntime]
         ]
 
         guard let supportedFormats = compatibleFormats[framework] else {
@@ -139,15 +138,14 @@ struct ModelCompatibilityChecker {
             .picoLLM: ["INT4", "INT8"],
             .execuTorch: ["INT8", "FP16"],
             .mlc: ["Q4", "Q8", "FP16"],
-            .swiftTransformers: ["FP16", "FP32"],
-            .mock: [] // Mock supports all
+            .swiftTransformers: ["FP16", "FP32"]
         ]
 
         guard let supported = supportedQuantizations[framework] else {
             return (true, "") // Unknown framework, assume compatible
         }
 
-        if framework == .mock || supported.isEmpty || supported.contains(where: { quantization.contains($0) }) {
+        if supported.isEmpty || supported.contains(where: { quantization.contains($0) }) {
             return (true, "")
         }
 
@@ -166,8 +164,7 @@ struct ModelCompatibilityChecker {
             .picoLLM: 512,
             .execuTorch: 2048,
             .mlc: 4096,
-            .swiftTransformers: 2048,
-            .mock: 10000
+            .swiftTransformers: 2048
         ]
 
         guard let maxLength = maxContextLengths[framework] else {

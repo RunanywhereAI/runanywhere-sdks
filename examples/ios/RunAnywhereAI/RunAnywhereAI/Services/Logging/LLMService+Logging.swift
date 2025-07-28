@@ -33,8 +33,6 @@ extension LLMService {
             return .picoLLM
         case "swift transformers":
             return .swiftTransformers
-        case "mock":
-            return .mock
         default:
             return nil
         }

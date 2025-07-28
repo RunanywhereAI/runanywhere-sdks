@@ -5,17 +5,6 @@ import Combine
 class FrameworkCapabilityExplorerViewModel: ObservableObject {
     func getCapabilities(for framework: LLMFramework) -> FrameworkCapabilities {
         switch framework {
-        case .mock:
-            return FrameworkCapabilities(
-                supportsStreaming: true,
-                supportsQuantization: true,
-                supportsBatching: true,
-                supportsMultiModal: true,
-                supportsGPUAcceleration: false,
-                supportsCustomModels: true,
-                topFeatures: ["Testing", "Development", "Prototyping"]
-            )
-
         case .llamaCpp:
             return FrameworkCapabilities(
                 supportsStreaming: true,
@@ -130,8 +119,6 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
 
     func getPerformanceProfile(for framework: LLMFramework) -> PerformanceProfile {
         switch framework {
-        case .mock:
-            return PerformanceProfile(speed: 1.0, memoryEfficiency: 1.0, modelSizeSupport: 1.0, easeOfUse: 1.0)
         case .llamaCpp:
             return PerformanceProfile(speed: 0.8, memoryEfficiency: 0.9, modelSizeSupport: 0.95, easeOfUse: 0.7)
         case .coreML:
@@ -157,8 +144,6 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
 
     func getUseCases(for framework: LLMFramework) -> [String] {
         switch framework {
-        case .mock:
-            return ["Testing and development", "Prototyping", "Demo applications"]
         case .llamaCpp:
             return ["Large model inference", "Resource-constrained devices", "GGUF model deployment"]
         case .coreML:
@@ -184,12 +169,6 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
 
     func getCodeExample(for framework: LLMFramework) -> String {
         switch framework {
-        case .mock:
-            return """
-            let service = MockLLMService()
-            let result = try await service.generate(prompt: "Hello")
-            print(result.text)
-            """
         case .llamaCpp:
             return """
             let service = LlamaCppService()
@@ -275,7 +254,6 @@ struct PerformanceProfile {
 extension LLMFramework {
     var iconName: String {
         switch self {
-        case .mock: return "testtube.2"
         case .llamaCpp: return "cube.fill"
         case .coreML: return "brain.head.profile"
         case .mlx: return "memorychip.fill"
@@ -291,7 +269,6 @@ extension LLMFramework {
 
     var description: String {
         switch self {
-        case .mock: return "Testing and development framework"
         case .llamaCpp: return "C++ implementation for GGUF models"
         case .coreML: return "Apple's machine learning framework"
         case .mlx: return "Apple Silicon optimized framework"

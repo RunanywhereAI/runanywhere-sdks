@@ -51,7 +51,7 @@ class BaseLLMService: LLMService {
             name: "Unknown",
             format: .other,
             size: "Unknown",
-            framework: .mock
+            framework: .coreML  // Default to Core ML
         ))
     }
 

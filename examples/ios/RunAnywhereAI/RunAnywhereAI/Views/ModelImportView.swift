@@ -214,7 +214,7 @@ struct ModelImportView: View {
         case .mlx:
             return .mlx
         default:
-            return .mock
+            return .coreML  // Default to Core ML
         }
     }
 }

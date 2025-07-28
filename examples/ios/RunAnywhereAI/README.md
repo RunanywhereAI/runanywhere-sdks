@@ -2,6 +2,8 @@
 
 A comprehensive iOS example app showcasing advanced on-device AI capabilities with multiple LLM frameworks, benchmarking tools, and performance optimization features.
 
+📖 **For detailed features documentation, see [FEATURES.md](./FEATURES.md)**
+
 ## Features
 
 ### 🤖 Multi-Framework Support
@@ -16,7 +18,6 @@ Integrates 10+ LLM frameworks including:
 - **Swift Transformers** (Native Swift implementation)
 - **PicoLLM** (Lightweight inference engine)
 - **Foundation Models** (System-level APIs)
-- **Mock service** for testing and development
 
 ### 💬 Advanced Chat Interface
 - **Enhanced Chat View**: Full-featured chat UI with streaming responses
@@ -76,8 +77,7 @@ RunAnywhereAI/
 │   │   ├── LLMModelLoader.swift
 │   │   ├── LLMProtocol.swift
 │   │   ├── LlamaCppService.swift
-│   │   ├── MLXService.swift
-│   │   └── MockLLMService.swift
+│   │   └── MLXService.swift
 │   ├── Benchmarking/
 │   │   └── BenchmarkSuite.swift
 │   ├── Configuration/
@@ -188,7 +188,7 @@ The app features a tab-based interface with four main sections:
 3. Build and run the app on simulator or device
 
 4. Explore the app:
-   - **Chat Tab**: Start a conversation with the mock LLM service
+   - **Chat Tab**: Start a conversation with an LLM service
    - **Models Tab**: Browse available frameworks and models
    - **Benchmark Tab**: Run performance tests and view analytics
    - **Settings Tab**: Configure generation parameters
@@ -256,10 +256,12 @@ xcodebuild test -scheme RunAnywhereAI -destination 'platform=iOS Simulator,name=
 
 This app demonstrates integration patterns for multiple LLM frameworks:
 
-### Currently Implemented (Mock Services)
-- **MockLLMService**: Development and testing service
-- **Foundation Models**: System-level model APIs
-- **Service Architecture**: Unified interface for all frameworks
+### Currently Available Services
+- **Core ML**: Apple's native ML framework (iOS 17.0+)
+- **MLX**: Apple Silicon-optimized framework (iOS 17.0+)
+- **ONNX Runtime**: Cross-platform inference engine
+- **TensorFlow Lite**: Mobile-optimized TensorFlow
+- **Foundation Models**: System-level model APIs (iOS 18.0+)
 
 ### Integration-Ready Services
 Each service includes the interface and architecture for:

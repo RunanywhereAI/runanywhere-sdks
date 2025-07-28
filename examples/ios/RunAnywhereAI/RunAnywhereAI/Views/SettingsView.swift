@@ -55,7 +55,7 @@ struct SettingsView: View {
             }
 
             Section("Framework Configuration") {
-                ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred && $0 != .mock }, id: \.self) { framework in
+                ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
                     Button(action: {
                         selectedFramework = framework
                         showingFrameworkConfig = true

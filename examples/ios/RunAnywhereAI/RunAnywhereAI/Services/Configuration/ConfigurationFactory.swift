@@ -32,8 +32,6 @@ enum ConfigurationFactory {
             return PicoLLMConfiguration.default
         case .swiftTransformers:
             return SwiftTransformersConfiguration.default
-        case .mock:
-            return MockConfiguration.default
         }
     }
 
@@ -133,24 +131,3 @@ enum ConfigurationFactory {
     }
 }
 
-/// Mock configuration for testing
-struct MockConfiguration: LLMFrameworkConfiguration {
-    let enableLogging: Bool
-    let logLevel: LogLevel
-    let performanceTracking: Bool
-    let memoryLimit: Int64?
-
-    let simulateDelay: Bool
-    let delayRange: ClosedRange<Double>
-    let errorRate: Double
-
-    static let `default` = MockConfiguration(
-        enableLogging: true,
-        logLevel: .debug,
-        performanceTracking: true,
-        memoryLimit: nil,
-        simulateDelay: true,
-        delayRange: 0.1...0.5,
-        errorRate: 0.0
-    )
-}
