@@ -540,20 +540,12 @@ class ModelManager: ObservableObject {
     }
 
     private func verifyCoreMLModel(at url: URL) throws {
-        // For .mlpackage, check if it's a valid directory
-        if url.pathExtension == "mlpackage" {
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue else {
-                throw ModelError.verificationFailed
-            }
-
-            // Check for required files
-            let manifestPath = url.appendingPathComponent("Manifest.json")
-            guard FileManager.default.fileExists(atPath: manifestPath.path) else {
-                throw ModelError.verificationFailed
-            }
-        }
+        let format = ModelFormat.from(extension: url.pathExtension)
+        let formatManager = ModelFormatManager.shared
+        let handler = formatManager.getHandler(for: url, format: format)
+        
+        // Use the format handler to verify the model
+        try handler.verifyDownloadedModel(at: url)
     }
 
     private func verifyONNXModel(at url: URL) throws {

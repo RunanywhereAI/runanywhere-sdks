@@ -82,13 +82,25 @@ class SwiftTransformersService: BaseLLMService {
         
         print("✅ Swift Transformers: Found model at path: \(modelPath)")
 
-        // Swift Transformers uses Core ML models
-        guard modelPath.hasSuffix(".mlpackage") || modelPath.hasSuffix(".mlmodel") || modelPath.hasSuffix(".mlmodelc") else {
+        // Swift Transformers uses Core ML models - verify using format manager
+        let modelURL = URL(fileURLWithPath: modelPath)
+        let format = ModelFormat.from(extension: modelURL.pathExtension)
+        let formatManager = ModelFormatManager.shared
+        
+        // Use Swift Transformers specific handler if available
+        let handler: ModelFormatHandler
+        if let swiftTransformersHandler = formatManager.getHandler(for: modelURL, format: format) as? SwiftTransformersModelHandler {
+            handler = swiftTransformersHandler
+        } else {
+            handler = formatManager.getHandler(for: modelURL, format: format)
+        }
+        
+        guard handler.canHandle(url: modelURL, format: format) && 
+              format.isSwiftTransformersSupported else {
             throw LLMError.unsupportedFormat
         }
 
         self.modelPath = modelPath
-        let modelURL = URL(fileURLWithPath: modelPath)
         
         // Find model info
         await MainActor.run {
@@ -102,7 +114,24 @@ class SwiftTransformersService: BaseLLMService {
             
             // Compile model if needed (similar to CoreMLService)
             let compiledURL: URL
-            if modelURL.pathExtension == "mlmodel" {
+            
+            // Use handler to determine if model is directory-based
+            if handler.isDirectoryBasedModel(url: modelURL) {
+                print("🔍 Model is directory-based - checking for compiled version in app bundle")
+                
+                // For bundled models, check if there's a compiled version in the app bundle
+                let modelNameWithoutExtension = modelURL.deletingPathExtension().lastPathComponent
+                if let compiledInBundle = Bundle.main.url(forResource: modelNameWithoutExtension, withExtension: "mlmodelc") {
+                    print("✅ Found compiled model in app bundle: \(compiledInBundle.path)")
+                    compiledURL = compiledInBundle
+                } else {
+                    print("🔍 No compiled version in bundle, using directory model as is")
+                    compiledURL = modelURL
+                }
+            } else if modelURL.pathExtension == "mlmodelc" {
+                print("🔍 Model is already compiled (.mlmodelc)")
+                compiledURL = modelURL
+            } else if modelURL.pathExtension == "mlmodel" {
                 print("🔍 Model is .mlmodel, checking for compiled version...")
                 // Check if already compiled
                 let compiledModelName = modelURL.lastPathComponent + "c"
@@ -115,21 +144,6 @@ class SwiftTransformersService: BaseLLMService {
                     print("⏳ Compiling model for first time...")
                     compiledURL = try await MLModel.compileModel(at: modelURL)
                     print("✅ Model compiled successfully to: \(compiledURL.path)")
-                }
-            } else if modelURL.pathExtension == "mlmodelc" {
-                print("🔍 Model is already compiled (.mlmodelc)")
-                compiledURL = modelURL
-            } else if modelURL.pathExtension == "mlpackage" {
-                print("🔍 Model is mlpackage - checking for compiled version in app bundle")
-                
-                // For bundled models, check if there's a compiled version in the app bundle
-                let modelNameWithoutExtension = modelURL.deletingPathExtension().lastPathComponent
-                if let compiledInBundle = Bundle.main.url(forResource: modelNameWithoutExtension, withExtension: "mlmodelc") {
-                    print("✅ Found compiled model in app bundle: \(compiledInBundle.path)")
-                    compiledURL = compiledInBundle
-                } else {
-                    print("🔍 No compiled version in bundle, using mlpackage as is")
-                    compiledURL = modelURL
                 }
             } else {
                 print("🔍 Unknown model extension, using as is")
@@ -355,30 +369,14 @@ class SwiftTransformersService: BaseLLMService {
 
     private func getModelSize() -> String {
         let url = URL(fileURLWithPath: modelPath)
+        let format = ModelFormat.from(extension: url.pathExtension)
+        let formatManager = ModelFormatManager.shared
+        let handler = formatManager.getHandler(for: url, format: format)
         
-        if url.pathExtension == "mlpackage" {
-            // Calculate total size of mlpackage directory
-            var totalSize: Int64 = 0
-            
-            if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
-                for case let fileURL as URL in enumerator {
-                    if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
-                        totalSize += Int64(fileSize)
-                    }
-                }
-            }
-            
+        let totalSize = handler.calculateModelSize(at: url)
+        
+        if totalSize > 0 {
             return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
-        } else {
-            // Single file
-            do {
-                let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-                if let fileSize = attributes[.size] as? Int64 {
-                    return ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
-                }
-            } catch {
-                print("Error getting model size: \(error)")
-            }
         }
         
         return "Unknown"

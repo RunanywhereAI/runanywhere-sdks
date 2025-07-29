@@ -166,13 +166,6 @@ class GGUFFormatHandler: BaseModelFormatHandler {
     }
 }
 
-// MARK: - Core ML Handler
-
-class CoreMLFormatHandler: BaseModelFormatHandler {
-    override func canHandle(url: URL, format: ModelFormat) -> Bool {
-        return format == .coreML || url.pathExtension == "mlmodel" || url.pathExtension == "mlmodelc"
-    }
-}
 
 // MARK: - Compressed Archive Handler
 
@@ -214,35 +207,3 @@ class CompressedArchiveHandler: BaseModelFormatHandler {
     }
 }
 
-// MARK: - Model Format Manager
-
-class ModelFormatManager {
-    static let shared = ModelFormatManager()
-    
-    private let handlers: [ModelFormatHandler] = [
-        MLPackageFormatHandler(),
-        GGUFFormatHandler(),
-        CoreMLFormatHandler(),
-        CompressedArchiveHandler(),
-        BaseModelFormatHandler() // Fallback
-    ]
-    
-    private init() {}
-    
-    /// Get the appropriate handler for a model
-    func getHandler(for url: URL, format: ModelFormat) -> ModelFormatHandler {
-        return handlers.first { $0.canHandle(url: url, format: format) } ?? BaseModelFormatHandler()
-    }
-    
-    /// Check if a model is directory-based
-    func isDirectoryBasedModel(_ url: URL, format: ModelFormat) -> Bool {
-        let handler = getHandler(for: url, format: format)
-        return handler.isDirectoryBasedModel(url: url)
-    }
-    
-    /// Check if a model requires special download handling
-    func requiresSpecialDownload(_ url: URL, format: ModelFormat) -> Bool {
-        let handler = getHandler(for: url, format: format)
-        return handler.requiresSpecialDownload(url: url)
-    }
-}
