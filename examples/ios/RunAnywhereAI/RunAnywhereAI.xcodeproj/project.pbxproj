@@ -59,22 +59,16 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5480A1F22E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
 		5480A2012E2F250400337F2F /* RunAnywhereAITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAITests;
 			sourceTree = "<group>";
 		};
 		5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAIUITests;
 			sourceTree = "<group>";
 		};
@@ -399,9 +393,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
