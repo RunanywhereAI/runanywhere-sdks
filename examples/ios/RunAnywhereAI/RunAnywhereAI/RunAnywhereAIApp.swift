@@ -24,8 +24,8 @@ struct RunAnywhereAIApp: App {
 
     private func initializeBundledModels() async {
         do {
-            // Generate sample models for testing
-            try await BundledModelsService.shared.generateSampleModels()
+            // Install bundled models from app bundle
+            try await BundledModelsService.shared.installBundledModels()
 
             // Refresh model list
             await modelManager.refreshModelList()

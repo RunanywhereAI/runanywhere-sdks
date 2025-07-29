@@ -56,7 +56,13 @@ class SwiftTransformersService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            ModelURLRegistry.shared.getAllModels(for: .swiftTransformers)
+            var models = ModelURLRegistry.shared.getAllModels(for: .swiftTransformers)
+            
+            // Add bundled Swift Transformers models
+            let bundledST = BundledModelsService.shared.bundledModels.filter { $0.framework == .swiftTransformers }
+            models.append(contentsOf: bundledST)
+            
+            return models
         }
         set {
             // Models are managed centrally in ModelURLRegistry
@@ -108,9 +114,20 @@ class SwiftTransformersService: BaseLLMService {
             } else if modelURL.pathExtension == "mlmodelc" {
                 print("🔍 Model is already compiled (.mlmodelc)")
                 compiledURL = modelURL
+            } else if modelURL.pathExtension == "mlpackage" {
+                print("🔍 Model is mlpackage - checking for compiled version in app bundle")
+                
+                // For bundled models, check if there's a compiled version in the app bundle
+                let modelNameWithoutExtension = modelURL.deletingPathExtension().lastPathComponent
+                if let compiledInBundle = Bundle.main.url(forResource: modelNameWithoutExtension, withExtension: "mlmodelc") {
+                    print("✅ Found compiled model in app bundle: \(compiledInBundle.path)")
+                    compiledURL = compiledInBundle
+                } else {
+                    print("🔍 No compiled version in bundle, using mlpackage as is")
+                    compiledURL = modelURL
+                }
             } else {
-                print("🔍 Model is mlpackage - using as is")
-                // mlpackage - use as is
+                print("🔍 Unknown model extension, using as is")
                 compiledURL = modelURL
             }
             
