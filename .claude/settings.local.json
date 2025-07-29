@@ -57,7 +57,8 @@
       "Bash(xcrun devicectl list:*)",
       "Bash(xcrun devicectl device logs stream:*)",
       "Bash(./verify_urls.sh:*)",
-      "Bash(./scripts/verify_urls.sh:*)"
+      "Bash(./scripts/verify_urls.sh:*)",
+      "Bash(./scripts/clean_build_and_run.sh:*)"
     ],
     "deny": []
   }

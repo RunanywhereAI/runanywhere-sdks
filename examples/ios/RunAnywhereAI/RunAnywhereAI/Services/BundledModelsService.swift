@@ -14,8 +14,12 @@ class BundledModelsService {
         // DISABLED: OpenELM models are now downloaded dynamically from HuggingFace
         // This reduces app size and allows for model updates without app updates
         /*
+        print("DEBUG: Searching for bundled models...")
+        print("DEBUG: Bundle path: \(Bundle.main.bundlePath)")
+        
         // Check if OpenELM model exists in bundle
         if let openELMPath = Bundle.main.path(forResource: "OpenELM-270M-Instruct-128-float32", ofType: "mlpackage") {
+            print("DEBUG: Found OpenELM model at resource path: \(openELMPath)")
             models.append(ModelInfo(
                 id: "openelm-270m-bundled-st",
                 name: "OpenELM-270M-Instruct-128-float32",
@@ -28,8 +32,44 @@ class BundledModelsService {
                 isLocal: true,
                 description: "Apple's OpenELM 270M instruction-tuned model optimized for on-device inference"
             ))
+        } else {
+            print("DEBUG: Bundle.main.path didn't find the model")
+            
+            // Try alternate path - check in Models directory within bundle
+            let bundleModelsPath = Bundle.main.bundleURL.appendingPathComponent("Models/OpenELM-270M-Instruct-128-float32.mlpackage")
+            print("DEBUG: Checking alternate path: \(bundleModelsPath.path)")
+            
+            if FileManager.default.fileExists(atPath: bundleModelsPath.path) {
+                print("DEBUG: Found OpenELM model at alternate path")
+                models.append(ModelInfo(
+                    id: "openelm-270m-bundled-st",
+                    name: "OpenELM-270M-Instruct-128-float32.mlpackage",
+                    path: bundleModelsPath.path,
+                    format: .mlPackage,
+                    size: "540 MB",
+                    framework: .swiftTransformers,
+                    quantization: "Float32",
+                    contextLength: 2048,
+                    isLocal: true,
+                    description: "Apple's OpenELM 270M instruction-tuned model optimized for on-device inference"
+                ))
+            } else {
+                print("Warning: OpenELM model not found in bundle. Searched paths:")
+                print("  - Resource: OpenELM-270M-Instruct-128-float32.mlpackage")
+                print("  - Bundle Models: \(bundleModelsPath.path)")
+                
+                // List contents of bundle to debug
+                if let bundleContents = try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath) {
+                    print("DEBUG: Bundle contents:")
+                    for item in bundleContents {
+                        print("  - \(item)")
+                    }
+                }
+            }
         }
         */
+        
+        print("DEBUG: Total bundled models found: \(models.count)")
         
         // Add more bundled models here as needed
         
