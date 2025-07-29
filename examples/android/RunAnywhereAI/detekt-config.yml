@@ -36,7 +36,7 @@ complexity:
     active: true
     functionThreshold: 6
     constructorThreshold: 7
-  ComplexMethod:
+  CyclomaticComplexMethod:
     active: true
     threshold: 15
   LargeClass:
@@ -57,10 +57,7 @@ coroutines:
   InjectDispatcher:
     active: true
 
-formatting:
-  active: true
-  android: true
-  autoCorrect: false
+# formatting section removed as it requires additional plugin
 
 naming:
   active: true
@@ -101,11 +98,8 @@ style:
     active: true
   ForbiddenComment:
     active: true
-    values: ['TODO:', 'FIXME:', 'HACK:', 'STOPSHIP:']
+    comments: ['TODO:', 'FIXME:', 'HACK:', 'STOPSHIP:']
     allowedPatterns: ''
-    message: 'Forbidden comment found.'
-  LibraryCodeMustSpecifyReturnType:
-    active: true
   MagicNumber:
     active: true
     excludes: ['**/test/**', '**/androidTest/**', '**/commonTest/**', '**/jvmTest/**', '**/jsTest/**', '**/iosTest/**']

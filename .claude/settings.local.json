@@ -10,6 +10,7 @@
       "Bash(swift build)",
       "Bash(swift test)",
       "Bash(find:*)",
+      "Bash(grep:*)"
       "Bash(xcodebuild:*)",
       "Bash(xcrun simctl list:*)",
       "Bash(xcrun simctl install:*)",
