@@ -121,6 +121,29 @@ class ModelDownloadManager: NSObject, ObservableObject {
             completion(.failure(ModelDownloadError.noDownloadURL))
             return
         }
+        
+        // Check if this is a .mlpackage URL on Hugging Face
+        if downloadURL.absoluteString.contains(".mlpackage") && 
+           downloadURL.host?.contains("huggingface") == true {
+            // Use the HuggingFace directory downloader for .mlpackage files
+            Task {
+                do {
+                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                    let modelsDirectory = documentsURL.appendingPathComponent("Models").appendingPathComponent(modelInfo.framework.directoryName)
+                    
+                    let finalURL = try await downloadHuggingFaceDirectory(
+                        modelInfo,
+                        to: modelsDirectory,
+                        progress: progress
+                    )
+                    
+                    completion(.success(finalURL))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+            return
+        }
         var request = URLRequest(url: downloadURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 3600 // 1 hour

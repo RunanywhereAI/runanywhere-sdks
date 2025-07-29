@@ -115,6 +115,55 @@ Then import it through Settings → Model URLs → Import URL Registry.
 - `.mlpackage` (preferred, usually zipped)
 - `.mlmodel` (legacy format)
 
+#### Understanding .mlpackage Files
+
+A `.mlpackage` is **not a single file** - it's actually a **directory structure** that contains all the components of a Core ML model. This format was introduced in Core ML 4 and is now the preferred format for newer models.
+
+##### Structure of a .mlpackage:
+```
+ModelName.mlpackage/
+├── Manifest.json                          # Package metadata
+└── Data/
+    └── com.apple.CoreML/
+        ├── model.mlmodel                  # Model architecture (graph)
+        └── weights/
+            └── weight.bin                 # Trained parameters
+```
+
+##### Components explained:
+1. **Manifest.json** - Contains metadata about the package version and format
+2. **model.mlmodel** - The computational graph defining layers and operations
+3. **weight.bin** - The actual trained weights/parameters (usually the largest file)
+
+##### Downloading .mlpackage Models from Hugging Face:
+When downloading .mlpackage models from Hugging Face, the app automatically:
+1. Detects that the URL points to a .mlpackage directory
+2. Lists all files within the directory structure using the HuggingFace Files API
+3. Downloads each file while preserving the folder hierarchy
+4. Creates the complete .mlpackage folder on device
+
+This is why a model like OpenELM-270M shows multiple files in the download progress - it's downloading the entire directory structure, not just a single file.
+
+##### Implementation Details:
+The app uses a dedicated `HuggingFaceDirectoryDownloader` service that:
+- Calls the HF API endpoint: `https://huggingface.co/api/models/{repo}/tree/main/{path}`
+- Recursively lists all files and subdirectories
+- Downloads each file using the resolve URL: `https://huggingface.co/{repo}/resolve/main/{path}`
+- Preserves the exact directory structure locally
+- Supports authentication for private repositories
+- Shows progress for each individual file download
+
+Example for OpenELM-270M-Instruct:
+```
+Downloading: OpenELM-270M-Instruct-128-float32.mlpackage/
+├── Manifest.json (1 KB)
+└── Data/
+    └── com.apple.CoreML/
+        ├── model.mlmodel (24 KB)
+        └── weights/
+            └── weight.bin (1.09 GB)
+```
+
 ### MLX
 - Directory with `.safetensors` files (tar.gz archive)
 - Requires `config.json` and `tokenizer.json`
@@ -184,6 +233,20 @@ The download manager handles:
 ### "Model Not Compatible"
 - Verify model format matches framework
 - Check model architecture compatibility
+
+### Swift Transformers Specific Issues
+Swift Transformers has very specific requirements:
+- **Generic Core ML models will NOT work**
+- Models must have `input_ids` and `attention_mask` inputs
+- Models need embedded tokenizer configuration
+- Models require Hub metadata for proper loading
+
+To use Swift Transformers, you need models that were:
+1. Converted using the `transformers-to-coreml` Space on Hugging Face
+2. Exported with the `exporters` Python package with Swift Transformers support
+3. Available from specialized repositories like `huggingface.co/apple/` or `huggingface.co/pcuenq/`
+
+If you're getting array bounds crashes or initialization errors, the model is likely a generic Core ML model. Use the Core ML service instead for such models.
 
 ## Currently Available Models
 

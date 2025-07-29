@@ -86,6 +86,16 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+            
+            Section("Maintenance") {
+                NavigationLink(destination: CleanupView()) {
+                    Label("Clean Misplaced Files", systemImage: "trash")
+                }
+                
+                Text("Remove files that were downloaded to incorrect locations.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
 
             Section("About") {
                 HStack {

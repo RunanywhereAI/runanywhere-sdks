@@ -8,7 +8,8 @@
       "Bash(source:*)",
       "Bash(pip install:*)",
       "Bash(log show:*)",
-      "Bash(bash scripts/verify_urls.sh:*)"
+      "Bash(bash scripts/verify_urls.sh:*)",
+      "Bash(./test_hf_token.swift)"
     ],
     "deny": []
   }

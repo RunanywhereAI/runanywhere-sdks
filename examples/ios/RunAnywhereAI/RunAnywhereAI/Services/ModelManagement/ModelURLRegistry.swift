@@ -112,10 +112,10 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 250_000_000,
             recommendedMemory: 500_000_000
         ),
-        // OpenELM models for Core ML (same as Swift Transformers but work better here)
+        // OpenELM models for Core ML
         ModelInfo(
             id: "openelm-270m-instruct-coreml",
-            name: "OpenELM-270M-Instruct-CoreML",
+            name: "OpenELM-270M-Instruct-128-float32.mlpackage",
             path: nil,
             format: .mlPackage,
             size: "540MB",
@@ -124,14 +124,14 @@ class ModelURLRegistry: ObservableObject {
             contextLength: 2048,
             isLocal: false,
             downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
-            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage.zip",
+            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage",
             modelType: .text,
             sha256: nil,
-            requiresUnzip: true,
+            requiresUnzip: false,  // This is a directory, not a zip file
             requiresAuth: true,  // Requires HF token
             authType: .huggingFace,
             alternativeURLs: [],
-            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication.",
+            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication. Downloads as directory structure.",
             description: "Apple's OpenELM 270M instruction-tuned model for Core ML",
             minimumMemory: 600_000_000,
             recommendedMemory: 1_000_000_000
@@ -640,78 +640,10 @@ class ModelURLRegistry: ObservableObject {
     ]
     
     // MARK: Swift Transformers Models
-    // NOTE: These are Core ML models that may work with Core ML service. Swift Transformers compatibility varies.
+    // NOTE: Swift Transformers requires models specifically designed for it, not generic Core ML models
     private var _swiftTransformersModels: [ModelInfo] = [
-        // OpenELM models - downloadable as archives with HF authentication
-        ModelInfo(
-            id: "openelm-270m-instruct",
-            name: "OpenELM-270M-Instruct",
-            path: nil,
-            format: .mlPackage,
-            size: "540MB",
-            framework: .swiftTransformers,
-            quantization: "Float32",
-            contextLength: 2048,
-            isLocal: false,
-            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
-            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage.zip",
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: true,
-            requiresAuth: true,  // Requires HF token
-            authType: .huggingFace,
-            alternativeURLs: [],
-            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
-            description: "Apple's OpenELM 270M instruction-tuned model for on-device inference",
-            minimumMemory: 600_000_000,
-            recommendedMemory: 1_000_000_000
-        ),
-        ModelInfo(
-            id: "openelm-450m-instruct",
-            name: "OpenELM-450M-Instruct",
-            path: nil,
-            format: .mlPackage,
-            size: "900MB",
-            framework: .swiftTransformers,
-            quantization: "Float32",
-            contextLength: 2048,
-            isLocal: false,
-            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-450M-Instruct/resolve/main/OpenELM-450M-Instruct-128-float32.mlpackage"),
-            downloadedFileName: "OpenELM-450M-Instruct-128-float32.mlpackage.zip",
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: true,
-            requiresAuth: true,  // Requires HF token
-            authType: .huggingFace,
-            alternativeURLs: [],
-            notes: "OpenELM 450M Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
-            description: "Apple's OpenELM 450M instruction-tuned model for on-device inference",
-            minimumMemory: 1_000_000_000,
-            recommendedMemory: 1_500_000_000
-        ),
-        ModelInfo(
-            id: "openelm-1.1b-instruct",
-            name: "OpenELM-1.1B-Instruct",
-            path: nil,
-            format: .mlPackage,
-            size: "2.2GB",
-            framework: .swiftTransformers,
-            quantization: "Float32",
-            contextLength: 2048,
-            isLocal: false,
-            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-1_1B-Instruct/resolve/main/OpenELM-1_1B-Instruct-128-float32.mlpackage"),
-            downloadedFileName: "OpenELM-1_1B-Instruct-128-float32.mlpackage.zip",
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: true,
-            requiresAuth: true,  // Requires HF token
-            authType: .huggingFace,
-            alternativeURLs: [],
-            notes: "OpenELM 1.1B Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
-            description: "Apple's OpenELM 1.1B instruction-tuned model for on-device inference",
-            minimumMemory: 2_500_000_000,
-            recommendedMemory: 3_500_000_000
-        ),
+        // Currently no properly formatted Swift Transformers models are available
+        // OpenELM models are Core ML models and should be used with Core ML framework
     ]
     
     // MARK: - Custom Models
