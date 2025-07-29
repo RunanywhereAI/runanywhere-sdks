@@ -1,6 +1,6 @@
-# Implement Plan
+# Implement Plan $ARGUMENTS
 
-You are tasked with implementing an approved technical plan from `thoughts/shared/plans/`. These plans contain phases with specific changes and success criteria.
+You are tasked with implementing an approved technical plan from $ARGUMENTS These plans contain phases with specific changes and success criteria.
 
 ## Getting Started
 
@@ -21,6 +21,7 @@ Plans are carefully designed, but reality can be messy. Your job is to:
 - Implement each phase fully before moving to the next
 - Verify your work makes sense in the broader codebase context
 - Update checkboxes in the plan as you complete sections
+- **Commit your changes using the `/commit` command at logical completion points (e.g., after finishing a phase or a significant unit of work).** This ensures atomic, reviewable commits and keeps your progress safe.
 
 When things don't match the plan exactly, think about why and communicate clearly. The plan is your guide, but your judgment matters too.
 
@@ -43,6 +44,7 @@ After implementing a phase:
 - Fix any issues before proceeding
 - Update your progress in both the plan and your todos
 - Check off completed items in the plan file itself using Edit
+- **Run the `/commit` command to create an atomic commit for the completed work.**
 
 Don't let verification interrupt your flow - batch it at natural stopping points.
 
@@ -62,4 +64,5 @@ If the plan has existing checkmarks:
 - Pick up from the first unchecked item
 - Verify previous work only if something seems off
 
-Remember: You're implementing a solution, not just checking boxes. Keep the end goal in mind and maintain forward momentum.
+Remember: You're implementing a solution, not just checking boxes. Keep the end goal in mind and maintain forward momentum. 
+**Commit your changes regularly using `/commit` to ensure a clean, reviewable history and to safeguard your progress.**
