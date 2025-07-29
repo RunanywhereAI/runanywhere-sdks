@@ -14,54 +14,7 @@ class ModelURLRegistry: ObservableObject {
     // 🔄 To verify URLs: Run `./scripts/verify_urls.sh` from the project root
     
     // MARK: Foundation Models (Built-in iOS/macOS)
-    private var _foundationModels: [ModelInfo] = [
-        ModelInfo(
-            id: "apple-intelligence-summary",
-            name: "Apple Intelligence - Text Summarization",
-            path: nil,
-            format: .other,
-            size: "Built-in",
-            framework: .foundationModels,
-            quantization: nil,
-            contextLength: nil,
-            isLocal: true,
-            downloadURL: URL(string: "builtin://foundation-models/summarization"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: false,
-            authType: .none,
-            alternativeURLs: [],
-            notes: "Built-in model for text summarization (iOS 18+)",
-            description: "Apple's built-in text summarization model",
-            minimumMemory: 0,
-            recommendedMemory: 0
-        ),
-        ModelInfo(
-            id: "apple-intelligence-writing",
-            name: "Apple Intelligence - Writing Tools",
-            path: nil,
-            format: .other,
-            size: "Built-in",
-            framework: .foundationModels,
-            quantization: nil,
-            contextLength: nil,
-            isLocal: true,
-            downloadURL: URL(string: "builtin://foundation-models/writing"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: false,
-            authType: .none,
-            alternativeURLs: [],
-            notes: "Built-in model for writing assistance (iOS 18+)",
-            description: "Apple's built-in writing assistance model",
-            minimumMemory: 0,
-            recommendedMemory: 0
-        )
-    ]
+    private var _foundationModels: [ModelInfo] = []
     
     // MARK: Core ML Models
     private var _coreMLModels: [ModelInfo] = [

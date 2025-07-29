@@ -153,14 +153,69 @@ struct ModelDownloadProgressView: View {
                         .padding()
                     }
 
-                    // Current step description
+                    // Current step description and file info
                     if !isComplete {
-                        Text(currentStep.description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                            .padding(.top, 20)
+                        VStack(spacing: 8) {
+                            Text(currentStep.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            // Show HuggingFace directory download status
+                            if currentStep == .downloading && 
+                               downloadInfo.downloadURL?.absoluteString.contains("huggingface.co") == true &&
+                               downloadInfo.format == .mlPackage {
+                                if !downloadManager.currentStep.isEmpty {
+                                    Text(downloadManager.currentStep)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(8)
+                                        .animation(.easeInOut(duration: 0.3), value: downloadManager.currentStep)
+                                }
+                                
+                                // Show file count progress with visual indicator
+                                let downloader = HuggingFaceDirectoryDownloader.shared
+                                if downloader.totalFiles > 0 {
+                                    VStack(spacing: 8) {
+                                        // Progress ring for files
+                                        ZStack {
+                                            Circle()
+                                                .stroke(Color.blue.opacity(0.2), lineWidth: 4)
+                                                .frame(width: 40, height: 40)
+                                            
+                                            Circle()
+                                                .trim(from: 0, to: downloader.currentProgress)
+                                                .stroke(Color.blue, lineWidth: 4)
+                                                .frame(width: 40, height: 40)
+                                                .rotationEffect(.degrees(-90))
+                                                .animation(.easeInOut(duration: 0.3), value: downloader.currentProgress)
+                                            
+                                            Text("\(downloader.completedFiles)")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.blue)
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "doc.on.doc.fill")
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                            
+                                            Text("\(downloader.completedFiles) of \(downloader.totalFiles) files")
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                        }
+                                    }
+                                    .padding(.top, 8)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 20)
                     }
 
                     // Spacer for proper spacing in ScrollView

@@ -57,13 +57,14 @@ class ModelDownloadManager: NSObject, ObservableObject {
     @Published var activeDownloads: [String: DownloadProgress] = [:]
     @Published var downloadQueue: [ModelInfo] = []
     @Published var isDownloading = false
+    @Published var currentStep: String = ""
 
     // MARK: - Private Properties
 
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
     private var progressHandlers: [String: (DownloadProgress) -> Void] = [:]
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
-    private var downloadStartTimes: [String: Date] = [:]
+    internal var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
     private var downloadInfoMap: [String: ModelInfo] = [:]
 
@@ -527,7 +528,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         }
     }
 
-    private func parseSize(_ sizeString: String) -> Int64 {
+    internal func parseSize(_ sizeString: String) -> Int64 {
         // Try common formats
         if sizeString.hasSuffix("GB") {
             let value = Double(sizeString.dropLast(2).trimmingCharacters(in: .whitespaces)) ?? 0

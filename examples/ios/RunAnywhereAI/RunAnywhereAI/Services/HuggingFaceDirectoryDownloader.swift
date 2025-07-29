@@ -63,12 +63,18 @@ class HuggingFaceDirectoryDownloader: ObservableObject {
         
         // Download each file
         for (index, file) in files.enumerated() {
-            currentFile = file.path.components(separatedBy: "/").last ?? file.path
+            // Extract just the filename for display
+            let fileName = file.path.components(separatedBy: "/").last ?? file.path
+            currentFile = fileName
             
             // Calculate overall progress
             let fileProgress = Double(index) / Double(files.count)
             currentProgress = fileProgress
-            progress(fileProgress, "Downloading \(currentFile)...")
+            
+            // Create a detailed status message
+            let fileSize = formatBytes(file.lfs?.size ?? file.size)
+            let status = "Downloading \(fileName) (\(fileSize))"
+            progress(fileProgress, status)
             
             try await downloadFile(
                 repoId: repoId,
@@ -79,6 +85,11 @@ class HuggingFaceDirectoryDownloader: ObservableObject {
             )
             
             completedFiles = index + 1
+            
+            // Update progress after file completion
+            let completedProgress = Double(completedFiles) / Double(files.count)
+            currentProgress = completedProgress
+            progress(completedProgress, "Completed \(completedFiles)/\(files.count) files")
         }
         
         currentProgress = 1.0
@@ -229,26 +240,56 @@ extension ModelDownloadManager {
         // directory is already the Models/Core ML folder
         let destinationURL = directory
         
+        // Track download start time
+        downloadStartTimes[modelInfo.id] = Date()
+        
         // Download using the directory downloader
-        let finalURL = try await HuggingFaceDirectoryDownloader.shared.downloadDirectory(
+        let downloader = HuggingFaceDirectoryDownloader.shared
+        
+        // Observe the downloader's progress for better UI updates
+        var lastUpdateTime = Date()
+        var downloadedBytes: Int64 = 0
+        let estimatedTotalBytes = parseSize(modelInfo.size)
+        
+        let finalURL = try await downloader.downloadDirectory(
             repoId: repoId,
             directoryPath: directoryPath,
             to: destinationURL
         ) { downloadProgress, status in
-            // Convert to DownloadProgress format
+            let now = Date()
+            let timeDiff = now.timeIntervalSince(lastUpdateTime)
+            
+            // Calculate approximate bytes based on progress
+            downloadedBytes = Int64(downloadProgress * Double(estimatedTotalBytes))
+            
+            // Calculate speed
+            let elapsed = now.timeIntervalSince(self.downloadStartTimes[modelInfo.id] ?? now)
+            let speed = elapsed > 0 ? Double(downloadedBytes) / elapsed : 0
+            
+            // Calculate time remaining
+            let remaining = estimatedTotalBytes - downloadedBytes
+            let timeRemaining = speed > 0 ? TimeInterval(Double(remaining) / speed) : nil
+            
+            // Create detailed progress info
             let downloadProgressInfo = DownloadProgress(
-                bytesWritten: Int64(downloadProgress * 1_000_000_000), // Approximate
-                totalBytes: 1_000_000_000, // Approximate
+                bytesWritten: downloadedBytes,
+                totalBytes: estimatedTotalBytes,
                 fractionCompleted: downloadProgress,
-                estimatedTimeRemaining: nil,
-                downloadSpeed: 0
+                estimatedTimeRemaining: timeRemaining,
+                downloadSpeed: speed
             )
             
             Task { @MainActor in
                 self.activeDownloads[modelInfo.id] = downloadProgressInfo
+                
+                // Store current file info for UI display
+                if !status.isEmpty && status != "Download complete" {
+                    self.currentStep = status
+                }
             }
             
             progress(downloadProgressInfo)
+            lastUpdateTime = now
         }
         
         return finalURL
