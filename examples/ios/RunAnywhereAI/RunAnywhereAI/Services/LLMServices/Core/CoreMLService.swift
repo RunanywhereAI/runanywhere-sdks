@@ -104,14 +104,39 @@ class CoreMLService: BaseLLMService {
             // REAL Core ML model loading
             if modelPath.hasSuffix(".mlpackage") {
                 // Load .mlpackage directly (preferred format)
+                print("Loading .mlpackage model from: \(modelURL.path)")
                 model = try MLModel(contentsOf: modelURL, configuration: configuration)
                 print("✅ Loaded .mlpackage model successfully")
             } else {
                 // Compile .mlmodel if needed, then load
-                print("Compiling .mlmodel...")
-                let compiledURL = try await MLModel.compileModel(at: modelURL)
+                print("Processing .mlmodel file...")
+                print("Model path: \(modelURL.path)")
+                
+                // Check if already compiled
+                let compiledModelName = modelURL.lastPathComponent + "c"
+                let compiledModelPath = modelURL.deletingLastPathComponent().appendingPathComponent(compiledModelName)
+                
+                let compiledURL: URL
+                if FileManager.default.fileExists(atPath: compiledModelPath.path) {
+                    print("✅ Found existing compiled model at: \(compiledModelPath.path)")
+                    compiledURL = compiledModelPath
+                } else {
+                    print("⏳ Compiling .mlmodel for first time... This may take a few minutes for large models.")
+                    print("Note: Future loads will be much faster.")
+                    
+                    do {
+                        let compiledPath = try await MLModel.compileModel(at: modelURL)
+                        compiledURL = compiledPath
+                        print("✅ Model compiled successfully at: \(compiledURL.path)")
+                    } catch {
+                        print("❌ Model compilation failed: \(error)")
+                        throw LLMError.modelLoadFailed(reason: "Failed to compile Core ML model: \(error.localizedDescription)", framework: "Core ML")
+                    }
+                }
+                
+                print("Loading compiled model...")
                 model = try MLModel(contentsOf: compiledURL, configuration: configuration)
-                print("✅ Compiled and loaded .mlmodel successfully")
+                print("✅ Loaded compiled .mlmodel successfully")
             }
 
             // Create model-specific adapter
