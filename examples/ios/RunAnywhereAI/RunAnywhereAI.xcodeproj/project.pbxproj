@@ -800,7 +800,7 @@
 			repositoryURL = "https://github.com/huggingface/swift-transformers";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.17;
+				minimumVersion = 0.1.22;
 			};
 		};
 		547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
