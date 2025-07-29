@@ -58,7 +58,7 @@ struct FrameworkCapabilityExplorerView: View {
     private var frameworkGridSection: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 2), spacing: 12) {
             ForEach(LLMFramework.allCases, id: \.self) { framework in
-                FrameworkCard(
+                CapabilityFrameworkCard(
                     framework: framework,
                     capabilities: viewModel.getCapabilities(for: framework),
                     isSelected: selectedFramework == framework
@@ -190,7 +190,7 @@ struct FrameworkCapabilityExplorerView: View {
     }
 }
 
-struct FrameworkCard: View {
+struct CapabilityFrameworkCard: View {
     let framework: LLMFramework
     let capabilities: FrameworkCapabilities
     let isSelected: Bool
@@ -226,7 +226,7 @@ struct FrameworkCard: View {
                 }
                 .frame(height: 100)
                 .frame(maxWidth: .infinity)
-                
+
                 if framework.isDeferred {
                     VStack {
                         HStack {

@@ -222,7 +222,7 @@ class TFLiteService: BaseLLMService {
                 let outputData = try interpreter.output(at: 0).data
 
                 // Decode output (simplified)
-                let token = decodeOutputToToken(outputData, step: step, temperature: options.temperature)
+                let token = try decodeOutputToToken(outputData, step: step, temperature: options.temperature)
 
                 // Send token to UI
                 await MainActor.run {
@@ -292,24 +292,19 @@ class TFLiteService: BaseLLMService {
         return data
     }
 
-    private func decodeOutputToToken(_ data: Data, step: Int, temperature: Float) -> String {
-        // Simplified output decoding for demonstration
-        // In real implementation, this would properly decode logits and sample tokens
-
-        let responseWords = [
-            "TensorFlow", "Lite", "provides", "efficient", "inference", "for", "mobile", "devices", "with", "optimized",
-            "performance", "and", "reduced", "memory", "usage", "making", "it", "ideal", "for", "edge", "computing",
-            "applications", "that", "require", "real-time", "AI", "processing", "capabilities", "while", "maintaining",
-            "low", "power", "consumption", "and", "fast", "response", "times", "across", "various", "hardware",
-            "configurations", "including", "ARM", "processors", "and", "specialized", "accelerators", "."
-        ]
-
-        // Simulate temperature effects
-        let baseIndex = step % responseWords.count
-        let variation = temperature > 0.7 ? Int.random(in: -2...2) : 0
-        let finalIndex = max(0, min(responseWords.count - 1, baseIndex + variation))
-
-        return responseWords[finalIndex]
+    private func decodeOutputToToken(_ data: Data, step: Int, temperature: Float) throws -> String {
+        // Real implementation required for decoding TFLite output
+        throw LLMError.custom("""
+            TensorFlow Lite output decoding not implemented.
+            
+            Required implementation:
+            1. Parse logits from output tensor data
+            2. Apply softmax with temperature
+            3. Sample token from probability distribution
+            4. Decode token ID to text using tokenizer
+            
+            This requires proper integration with the model's output format.
+            """)
     }
     #endif
 

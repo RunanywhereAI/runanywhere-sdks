@@ -142,16 +142,16 @@ final class FoundationModelsService: LLMService {
                     //     throw LLMError.modelNotAvailable
                     // }
                     // languageModelSession = LanguageModelSession()
-                    
+
                     modelState = .loading(progress: 0.5)
                     try await Task.sleep(nanoseconds: 500_000_000)
-                    
+
                     currentModelInfo = supportedModels.first
                     modelState = .loaded(modelInfo: currentModelInfo!)
-                    
+
                     logModelLoaded(info: currentModelInfo!, duration: 0.5)
                     metrics.successfulLoads += 1
-                    
+
                     logInfo("Foundation Models loaded (requires full Xcode 26 for real functionality)")
                 } catch {
                     throw LLMError.modelLoadFailed(
@@ -168,7 +168,7 @@ final class FoundationModelsService: LLMService {
             #else
             // Foundation Models not available - requires Xcode 26
             logInfo("Foundation Models requires Xcode 26 beta (currently using Xcode 16.4)")
-            
+
             throw LLMError.modelLoadFailed(
                 reason: "Foundation Models requires Xcode 26 beta. You're using Xcode 16.4.\n\nTo use Foundation Models:\n1. Download Xcode 26 beta from developer.apple.com\n2. Install macOS 26 Tahoe (required)\n3. Rebuild the app with Xcode 26\n\nYour iPhone (iOS 26) supports it, but the app must be built with Xcode 26.",
                 framework: name
@@ -387,7 +387,7 @@ final class FoundationModelsService: LLMService {
         // let prompt = Prompt(prompt)
         // let response = try await session.respond(to: prompt)
         // return response.text
-        
+
         // For now, provide a beta message
         return "Foundation Models framework is in beta. The API was announced at WWDC 2025 for iOS 26+ devices with Apple Intelligence support. Full functionality will be available in the final release."
         #else
@@ -435,12 +435,12 @@ final class FoundationModelsService: LLMService {
                         // Simulate streaming for beta
                         let response = "Foundation Models is in beta on iOS 26. The framework provides on-device AI with 3B parameters."
                         let words = response.split(separator: " ")
-                        
+
                         for word in words {
                             continuation.yield(String(word) + " ")
                             try await Task.sleep(nanoseconds: 50_000_000) // 50ms per word
                         }
-                        
+
                         logInfo("Streaming generation completed (simulated for beta)")
                     } else {
                         throw LLMError.frameworkNotSupported

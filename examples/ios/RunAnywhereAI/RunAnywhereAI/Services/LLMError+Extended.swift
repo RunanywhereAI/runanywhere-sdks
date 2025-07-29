@@ -69,7 +69,7 @@ extension LLMError {
             return .memory
         case .downloadFailed, .networkUnavailable:
             return .network
-        case .notImplemented, .unknown:
+        case .notImplemented, .unknown, .custom:
             return .other
         }
     }

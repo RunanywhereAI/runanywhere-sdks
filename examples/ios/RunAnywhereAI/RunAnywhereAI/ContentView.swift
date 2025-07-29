@@ -12,21 +12,17 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            NavigationView {
-                ChatView()
-            }
+            ChatInterfaceView()
             .tabItem {
                 Label("Chat", systemImage: "message")
             }
             .tag(0)
 
-            NavigationView {
-                ModelListView()
-            }
-            .tabItem {
-                Label("Models", systemImage: "cube")
-            }
-            .tag(1)
+            UnifiedModelsView()
+                .tabItem {
+                    Label("Models", systemImage: "cube")
+                }
+                .tag(1)
 
             NavigationView {
                 BenchmarkView()
@@ -43,6 +39,9 @@ struct ContentView: View {
                 Label("Settings", systemImage: "gear")
             }
             .tag(3)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
+            selectedTab = 1
         }
     }
 }

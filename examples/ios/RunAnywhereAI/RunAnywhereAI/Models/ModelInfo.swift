@@ -95,7 +95,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     case tensorFlowLite = "TensorFlow Lite"
     case picoLLM = "picoLLM"
     case swiftTransformers = "Swift Transformers"
-    
+
     /// Indicates if this framework is deferred (coming soon)
     var isDeferred: Bool {
         switch self {
@@ -105,7 +105,7 @@ enum LLMFramework: String, CaseIterable, Codable {
             return false
         }
     }
-    
+
     /// Available frameworks (excluding deferred ones)
     static var availableFrameworks: [LLMFramework] {
         allCases.filter { !$0.isDeferred }
@@ -131,6 +131,37 @@ enum LLMFramework: String, CaseIterable, Codable {
     }
 }
 
+// MARK: - Model Type
+
+enum ModelType: String, CaseIterable, Codable {
+    case text = "Text Generation"
+    case image = "Image Generation"
+    case multimodal = "Multimodal"
+    case embedding = "Embeddings"
+    case speech = "Speech"
+    case other = "Other"
+    
+    var icon: String {
+        switch self {
+        case .text: return "text.bubble"
+        case .image: return "photo"
+        case .multimodal: return "eye.circle"
+        case .embedding: return "doc.text.magnifyingglass"
+        case .speech: return "waveform"
+        case .other: return "questionmark.circle"
+        }
+    }
+    
+    var supportedInChat: Bool {
+        switch self {
+        case .text, .multimodal:
+            return true
+        case .image, .embedding, .speech, .other:
+            return false
+        }
+    }
+}
+
 // MARK: - Model Info
 
 struct ModelInfo: Identifiable, Codable {
@@ -144,6 +175,8 @@ struct ModelInfo: Identifiable, Codable {
     let contextLength: Int?
     var isLocal: Bool = false
     let downloadURL: URL?
+    var downloadedFileName: String?
+    var modelType: ModelType?
 
     // Legacy support
     let description: String
@@ -160,6 +193,8 @@ struct ModelInfo: Identifiable, Codable {
          contextLength: Int? = nil,
          isLocal: Bool = false,
          downloadURL: URL? = nil,
+         downloadedFileName: String? = nil,
+         modelType: ModelType? = nil,
          description: String = "",
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
@@ -173,6 +208,8 @@ struct ModelInfo: Identifiable, Codable {
         self.contextLength = contextLength
         self.isLocal = isLocal
         self.downloadURL = downloadURL
+        self.downloadedFileName = downloadedFileName
+        self.modelType = modelType ?? .text // Default to text if not specified
         self.description = description
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory

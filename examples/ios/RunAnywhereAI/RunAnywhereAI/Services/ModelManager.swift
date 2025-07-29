@@ -78,11 +78,48 @@ class ModelManager: ObservableObject {
         }
     }
 
-    func modelPath(for modelName: String) -> URL {
-        Self.modelsDirectory.appendingPathComponent(modelName)
+    func modelPath(for modelName: String, framework: LLMFramework? = nil) -> URL {
+        if let framework = framework {
+            return Self.modelsDirectory
+                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(modelName)
+        }
+        return Self.modelsDirectory.appendingPathComponent(modelName)
     }
 
-    func isModelDownloaded(_ modelName: String) -> Bool {
+    func isModelDownloaded(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
+        // Check with framework subdirectory first
+        if let framework = framework {
+            let frameworkPath = Self.modelsDirectory
+                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(modelName)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                return true
+            }
+        }
+        
+        // Check all framework directories
+        do {
+            let frameworkDirs = try FileManager.default.contentsOfDirectory(
+                at: Self.modelsDirectory,
+                includingPropertiesForKeys: nil
+            )
+            
+            for frameworkDir in frameworkDirs {
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: frameworkDir.path, isDirectory: &isDirectory),
+                   isDirectory.boolValue {
+                    let modelPath = frameworkDir.appendingPathComponent(modelName)
+                    if FileManager.default.fileExists(atPath: modelPath.path) {
+                        return true
+                    }
+                }
+            }
+        } catch {
+            print("Error checking for downloaded models: \(error)")
+        }
+        
+        // Legacy check - direct path
         let path = modelPath(for: modelName)
         return FileManager.default.fileExists(atPath: path.path)
     }
@@ -140,11 +177,49 @@ class ModelManager: ObservableObject {
         }
     }
 
-    func deleteModel(_ modelName: String) throws {
+    func deleteModel(_ modelName: String, framework: LLMFramework? = nil) throws {
+        // Try framework-specific path first
+        if let framework = framework {
+            let frameworkPath = Self.modelsDirectory
+                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(modelName)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                try FileManager.default.removeItem(at: frameworkPath)
+                return
+            }
+        }
+        
+        // Try all framework directories
+        do {
+            let frameworkDirs = try FileManager.default.contentsOfDirectory(
+                at: Self.modelsDirectory,
+                includingPropertiesForKeys: nil
+            )
+            
+            for frameworkDir in frameworkDirs {
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: frameworkDir.path, isDirectory: &isDirectory),
+                   isDirectory.boolValue {
+                    let modelPath = frameworkDir.appendingPathComponent(modelName)
+                    if FileManager.default.fileExists(atPath: modelPath.path) {
+                        try FileManager.default.removeItem(at: modelPath)
+                        return
+                    }
+                }
+            }
+        } catch {
+            print("Error searching for model to delete: \(error)")
+        }
+        
+        // Legacy path
         let path = modelPath(for: modelName)
         if FileManager.default.fileExists(atPath: path.path) {
             try FileManager.default.removeItem(at: path)
         }
+    }
+    
+    func verifyModelExists(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
+        return isModelDownloaded(modelName, framework: framework)
     }
 
     func listDownloadedModels() -> [String] {
@@ -209,38 +284,86 @@ class ModelManager: ObservableObject {
             for url in contents {
                 // Skip hidden files
                 if url.lastPathComponent.hasPrefix(".") { continue }
-
-                // Determine model info from file
-                if let modelInfo = await createModelInfo(from: url) {
-                    models.append(modelInfo)
+                
+                var isDirectory: ObjCBool = false
+                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
+                    if isDirectory.boolValue {
+                        // This is a framework directory, check for models inside
+                        let frameworkName = url.lastPathComponent
+                        if let framework = LLMFramework.allCases.first(where: { $0.displayName == frameworkName }) {
+                            let frameworkContents = try FileManager.default.contentsOfDirectory(
+                                at: url,
+                                includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
+                            )
+                            
+                            for modelURL in frameworkContents {
+                                if modelURL.lastPathComponent.hasPrefix(".") { continue }
+                                if let modelInfo = await createModelInfo(from: modelURL, framework: framework) {
+                                    models.append(modelInfo)
+                                }
+                            }
+                        }
+                    } else {
+                        // Legacy: direct file in Models directory
+                        if let modelInfo = await createModelInfo(from: url) {
+                            models.append(modelInfo)
+                        }
+                    }
                 }
             }
         } catch {
             print("Error listing models: \(error)")
         }
 
+        // Update the isLocal property for available models
+        for i in 0..<availableModels.count {
+            let modelName = availableModels[i].name
+            let framework = availableModels[i].framework
+            availableModels[i].isLocal = isModelDownloaded(modelName, framework: framework)
+        }
+
         downloadedModels = models
     }
 
-    private func createModelInfo(from url: URL) async -> ModelInfo? {
+    private func createModelInfo(from url: URL, framework: LLMFramework? = nil) async -> ModelInfo? {
         let fileName = url.lastPathComponent
         let fileExtension = url.pathExtension
 
         // Try to match with bundled models first
-        if let bundled = availableModels.first(where: { $0.id == url.deletingPathExtension().lastPathComponent }) {
+        if let bundled = availableModels.first(where: { 
+            $0.name == fileName || 
+            $0.id == url.deletingPathExtension().lastPathComponent ||
+            isModelNameMatch($0.name, fileName)
+        }) {
             var model = bundled
             model.path = url.path
             model.isLocal = true
+            model.downloadedFileName = fileName
             return model
         }
 
         // Create new model info from file
         let format = ModelFormat.from(extension: fileExtension)
-        let framework = LLMFramework.forFormat(format)
+        let inferredFramework = framework ?? LLMFramework.forFormat(format)
 
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         let fileSize = attributes?[.size] as? Int64 ?? 0
         let sizeString = ByteCountFormatter.string(fromByteCount: fileSize, countStyle: .file)
+
+        // Try to find model type from registry
+        let registry = ModelURLRegistry.shared
+        var modelType: ModelType = .text
+        if let downloadInfo = registry.getModelInfo(id: fileName) {
+            modelType = downloadInfo.modelType
+        } else if let frameworkInfo = framework {
+            // Check all models in this framework for a match
+            let frameworkModels = registry.getAllModels(for: frameworkInfo)
+            if let matchingModel = frameworkModels.first(where: { 
+                isModelNameMatch($0.name, fileName) 
+            }) {
+                modelType = matchingModel.modelType
+            }
+        }
 
         return ModelInfo(
             id: UUID().uuidString,
@@ -248,9 +371,38 @@ class ModelManager: ObservableObject {
             path: url.path,
             format: format,
             size: sizeString,
-            framework: framework,
-            isLocal: true
+            framework: inferredFramework,
+            isLocal: true,
+            downloadedFileName: fileName,
+            modelType: modelType
         )
+    }
+    
+    private func isModelNameMatch(_ modelName: String, _ fileName: String) -> Bool {
+        let modelLower = modelName.lowercased()
+        let fileLower = fileName.lowercased()
+        
+        // Remove extensions for comparison
+        let fileBase = fileLower.replacingOccurrences(of: ".gguf", with: "")
+            .replacingOccurrences(of: ".onnx", with: "")
+            .replacingOccurrences(of: ".mlpackage", with: "")
+            .replacingOccurrences(of: ".tflite", with: "")
+            .replacingOccurrences(of: ".mlmodelc", with: "")
+        
+        // Check for exact match first
+        if modelLower == fileBase || modelName == fileName {
+            return true
+        }
+        
+        // Check if file is a temporary download file that might match this model
+        // Pattern: download_<number>_<UUID>.tmp or similar
+        if fileLower.hasPrefix("download_") && fileLower.contains("tmp") {
+            // For temp files, we can't reliably match by name
+            return false
+        }
+        
+        // Check for partial matches
+        return modelLower.contains(fileBase) || fileBase.contains(modelLower)
     }
 
     func updateModelPath(modelId: String, path: String) async {

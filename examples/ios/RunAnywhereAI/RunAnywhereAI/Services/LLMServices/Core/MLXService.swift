@@ -22,9 +22,9 @@ import MLXRandom
 
 private struct MLXModelWrapper {
     let modelPath: String
-    let configPath: String
-    let weightsPath: String
-    let tokenizerPath: String
+    let configPath: String?
+    let weightsPath: String?
+    let tokenizerPath: String?
 
     // In real implementation, these would be MLX types:
     // let model: LLMModel
@@ -32,16 +32,29 @@ private struct MLXModelWrapper {
 
     init(modelDirectory: String) throws {
         self.modelPath = modelDirectory
-        self.configPath = "\(modelDirectory)/config.json"
-        self.weightsPath = "\(modelDirectory)/weights.safetensors"
-        self.tokenizerPath = "\(modelDirectory)/tokenizer.json"
-
-        // Verify required files exist
-        let requiredFiles = [configPath, weightsPath, tokenizerPath]
-        for file in requiredFiles {
-            guard FileManager.default.fileExists(atPath: file) else {
+        
+        // Check if it's a directory or a single file
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: modelDirectory, isDirectory: &isDirectory)
+        
+        if isDirectory.boolValue {
+            // It's a directory, look for standard files
+            self.configPath = "\(modelDirectory)/config.json"
+            self.weightsPath = "\(modelDirectory)/weights.safetensors"
+            self.tokenizerPath = "\(modelDirectory)/tokenizer.json"
+            
+            // At minimum, we need config.json
+            if !FileManager.default.fileExists(atPath: configPath!) {
                 throw LLMError.modelNotFound
             }
+        } else {
+            // It's a single file - this is a simplified model format
+            // For demo purposes, we'll accept this and create a minimal wrapper
+            self.configPath = nil
+            self.weightsPath = modelDirectory
+            self.tokenizerPath = nil
+            
+            print("MLX: Loading single-file model from \(modelDirectory)")
         }
     }
 }
@@ -57,9 +70,12 @@ private class MLXTokenizer {
     }
 
     private func loadTokenizer() throws {
-        // In real implementation, this would load from tokenizer.json
-        // and use proper BPE/SentencePiece tokenization
-
+        // If we have a tokenizer path, try to load it
+        if !tokenizerPath.isEmpty && FileManager.default.fileExists(atPath: tokenizerPath) {
+            // In real implementation, this would load from tokenizer.json
+            // For now, we'll use the basic vocabulary
+        }
+        
         // For demonstration, create a vocabulary based on common MLX models
         let commonTokens = [
             "<s>": 1, "</s>": 2, "<unk>": 3, "<pad>": 0,
@@ -198,20 +214,76 @@ class MLXService: BaseLLMService {
             throw LLMError.frameworkNotSupported
         }
 
-        // Verify model directory exists and contains required files
-        guard FileManager.default.fileExists(atPath: modelPath) else {
-            throw LLMError.modelNotFound
-        }
-
-        // MLX models are typically directories with multiple files
-        let isDirectory = (try? FileManager.default.attributesOfItem(atPath: modelPath)[.type] as? FileAttributeType) == .typeDirectory
-        guard isDirectory else {
-            throw LLMError.unsupportedFormat
-        }
-
+        // First, try to identify the model from the path
         await MainActor.run {
             currentModelInfo = supportedModels.first { modelInfo in
                 modelPath.contains(modelInfo.name) || modelPath.contains(modelInfo.id)
+            }
+        }
+
+        // If modelPath is empty, try to find the model in the downloaded models
+        var actualModelPath = modelPath
+        if modelPath.isEmpty || !FileManager.default.fileExists(atPath: modelPath) {
+            print("MLX: Model path empty or not found, searching for model...")
+            
+            // Look for the model in the Models directory
+            let modelManager = await MainActor.run { ModelManager.shared }
+            
+            // Try to find based on the current selection or path hints
+            var searchNames: [String] = []
+            
+            // Add names from currentModelInfo if available
+            if let modelInfo = currentModelInfo {
+                searchNames.append(modelInfo.name)
+                searchNames.append(modelInfo.name.replacingOccurrences(of: "-4bit", with: ""))
+                searchNames.append(modelInfo.name.replacingOccurrences(of: "4bit", with: ""))
+            }
+            
+            // Add names from the path
+            let pathComponents = modelPath.components(separatedBy: "/")
+            if let fileName = pathComponents.last {
+                searchNames.append(fileName)
+                searchNames.append(fileName.replacingOccurrences(of: "-4bit", with: ""))
+                searchNames.append(fileName.replacingOccurrences(of: "4bit", with: ""))
+            }
+            
+            // Search for the model
+            var foundPath: String? = nil
+            for searchName in searchNames {
+                let possiblePath = await modelManager.modelPath(for: searchName, framework: .mlx)
+                if FileManager.default.fileExists(atPath: possiblePath.path) {
+                    var isDir: ObjCBool = false
+                    if FileManager.default.fileExists(atPath: possiblePath.path, isDirectory: &isDir), isDir.boolValue {
+                        foundPath = possiblePath.path
+                        print("MLX: Found model directory at \(foundPath!)")
+                        break
+                    }
+                }
+            }
+            
+            if let foundPath = foundPath {
+                actualModelPath = foundPath
+            } else {
+                print("MLX: Could not find model directory. Searched names: \(searchNames)")
+                throw LLMError.modelNotFound
+            }
+        }
+
+        // Check if the path is a directory or file
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: actualModelPath, isDirectory: &isDirectory)
+        
+        // For now, we'll accept both files and directories for MLX models
+        // This is a temporary workaround for the demo
+        print("MLX: Model path is \(isDirectory.boolValue ? "directory" : "file"): \(actualModelPath)")
+
+        // Update currentModelInfo if not already set
+        if currentModelInfo == nil {
+            let pathToCheck = actualModelPath
+            await MainActor.run {
+                currentModelInfo = supportedModels.first { modelInfo in
+                    pathToCheck.contains(modelInfo.name) || pathToCheck.contains(modelInfo.id)
+                }
             }
         }
 
@@ -233,7 +305,7 @@ class MLXService: BaseLLMService {
         #endif
 
         // Initialize wrapper and tokenizer
-        mlxModel = try MLXModelWrapper(modelDirectory: modelPath)
+        mlxModel = try MLXModelWrapper(modelDirectory: actualModelPath)
         if let model = mlxModel {
             // Try to load real tokenizer using TokenizerFactory
             realTokenizer = TokenizerFactory.createForFramework(.mlx, modelPath: modelPath)
@@ -244,12 +316,17 @@ class MLXService: BaseLLMService {
                 print("⚠️ Using basic tokenizer for MLX")
             }
 
-            // Keep MLXTokenizer for compatibility
-            tokenizer = try MLXTokenizer(tokenizerPath: model.tokenizerPath)
+            // Keep MLXTokenizer for compatibility if we have a tokenizer path
+            if let tokenizerPath = model.tokenizerPath, FileManager.default.fileExists(atPath: tokenizerPath) {
+                tokenizer = try MLXTokenizer(tokenizerPath: tokenizerPath)
+            } else {
+                // Use a basic tokenizer if no tokenizer file is available
+                tokenizer = try MLXTokenizer(tokenizerPath: "")
+            }
         }
 
         print("MLX Model initialized successfully:")
-        print("- Path: \(modelPath)")
+        print("- Path: \(actualModelPath)")
         print("- Device support: Apple Silicon optimized")
         print("- Memory: GPU acceleration enabled")
 

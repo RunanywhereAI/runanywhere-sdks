@@ -92,18 +92,37 @@ cd examples/android/RunAnywhereAI/
 
 ### iOS Example App
 
+#### Quick Build & Run (Recommended)
 ```bash
 # Navigate to iOS example
 cd examples/ios/RunAnywhereAI/
+IMPORTANT!! - Always use build and run to run the project with correct device or sim
+# Build and run on simulator (handles dependencies automatically)
+./scripts/build_and_run.sh simulator "iPhone 16 Pro"
 
-# Install CocoaPods dependencies (required for TensorFlow Lite)
+# Build and run on connected device
+./scripts/build_and_run.sh device
+
+# Clean build artifacts
+./scripts/clean_build_and_run.sh
+```
+
+#### Manual Setup
+```bash
+# Install CocoaPods dependencies (required for TensorFlow Lite and ZIPFoundation)
 pod install
+
+# Fix Xcode 16 sandbox issues (required after pod install)
+./fix_pods_sandbox.sh
 
 # After pod install, always open the .xcworkspace file
 open RunAnywhereAI.xcworkspace
 
 # Run SwiftLint
 ./swiftlint.sh
+
+# Verify model download URLs
+./scripts/verify_urls.sh
 ```
 
 #### Known Issues - Xcode 16 Sandbox

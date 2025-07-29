@@ -130,4 +130,3 @@ enum ConfigurationFactory {
         return dict
     }
 }
-

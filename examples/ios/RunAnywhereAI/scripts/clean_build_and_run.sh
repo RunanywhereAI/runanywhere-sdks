@@ -2,9 +2,9 @@
 # clean_build_and_run.sh - Clean, build, install, and run the RunAnywhereAI app
 # Usage: ./clean_build_and_run.sh [simulator|device] [device-name-or-id]
 # Examples:
-#   ./clean_build_and_run.sh simulator "iPhone 16"
-#   ./clean_build_and_run.sh device "00008140-000C6D860A3B001C"
-#   ./clean_build_and_run.sh device "Monga's iphone"
+#   ./clean_build_and_run.sh simulator "iPhone 16 Pro"
+#   ./clean_build_and_run.sh device "YOUR_DEVICE_ID"
+#   ./clean_build_and_run.sh device "Your Device Name"
 
 set -e
 
@@ -59,4 +59,4 @@ pod install
 print_status "Clean complete! Now building..."
 
 # Call the regular build script
-./build_and_run.sh "$@"
+./scripts/build_and_run.sh "$@"

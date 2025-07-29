@@ -72,18 +72,14 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Model Management") {
-                NavigationLink(destination: ModelDownloadView()) {
-                    Label("Download Models", systemImage: "arrow.down.circle")
-                }
-
-                NavigationLink(destination: ModelDownloadStatusView()) {
-                    Label("Download Manager", systemImage: "arrow.down.doc")
-                }
-
+            Section("Model URLs") {
                 NavigationLink(destination: ModelURLSettingsView()) {
-                    Label("Model URLs", systemImage: "link")
+                    Label("Manage URLs", systemImage: "link")
                 }
+
+                Text("Configure custom download URLs for models. All model downloads and management are now handled in the Models tab.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section("About") {

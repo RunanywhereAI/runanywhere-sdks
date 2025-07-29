@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import CryptoKit
 import Compression
+import ZIPFoundation
 
 // MARK: - Download Error
 
@@ -61,6 +62,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
     private var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
+    private var downloadInfoMap: [String: ModelDownloadInfo] = [:]
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -89,6 +91,9 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progress: @escaping (DownloadProgress) -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
+        // Clean up any existing model files first if re-downloading
+        cleanupExistingModel(downloadInfo)
+        
         // Check storage before starting
         // Estimate size from filename if not provided
         let estimatedSize: Int64 = 100_000_000 // Default 100MB
@@ -106,9 +111,16 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progressHandlers[downloadId] = progress
         completionHandlers[downloadId] = completion
         downloadStartTimes[downloadId] = Date()
+        downloadInfoMap[downloadId] = downloadInfo
 
+        // Create download request with proper configuration
+        var request = URLRequest(url: downloadInfo.url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 3600 // 1 hour
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
         // Create download task
-        let task = session.downloadTask(with: downloadInfo.url)
+        let task = session.downloadTask(with: request)
         downloadTasks[downloadId] = task
 
         // Start download
@@ -137,7 +149,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
                 continuation.resume(throwing: ModelDownloadError.noDownloadURL)
                 return
             }
-            
+
             let downloadInfo = ModelDownloadInfo(
                 id: modelInfo.id,
                 name: modelInfo.name,
@@ -146,7 +158,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
                 requiresUnzip: false,
                 requiresAuth: false
             )
-            
+
             downloadModel(downloadInfo, progress: progress) { result in
                 switch result {
                 case .success(let tempURL):
@@ -249,16 +261,88 @@ class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     // MARK: - Private Methods
+    
+    private func cleanupExistingModel(_ downloadInfo: ModelDownloadInfo) {
+        // Determine the framework from the download info
+        let framework = determineFramework(from: downloadInfo)
+        
+        // Get the models directory
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let modelsDirectory = documentsURL.appendingPathComponent("Models")
+        
+        // Check framework-specific directory
+        if let framework = framework {
+            let frameworkDir = modelsDirectory.appendingPathComponent(framework.displayName)
+            let modelPath = frameworkDir.appendingPathComponent(downloadInfo.name)
+            
+            if FileManager.default.fileExists(atPath: modelPath.path) {
+                do {
+                    try FileManager.default.removeItem(at: modelPath)
+                    print("Cleaned up existing model at: \(modelPath.path)")
+                } catch {
+                    print("Failed to cleanup existing model: \(error)")
+                }
+            }
+        }
+        
+        // Also check root models directory (legacy)
+        let rootModelPath = modelsDirectory.appendingPathComponent(downloadInfo.name)
+        if FileManager.default.fileExists(atPath: rootModelPath.path) {
+            do {
+                try FileManager.default.removeItem(at: rootModelPath)
+                print("Cleaned up legacy model at: \(rootModelPath.path)")
+            } catch {
+                print("Failed to cleanup legacy model: \(error)")
+            }
+        }
+        
+        // Clean up any partial downloads
+        let downloadsDir = documentsURL.appendingPathComponent("Downloads")
+        if FileManager.default.fileExists(atPath: downloadsDir.path) {
+            do {
+                let contents = try FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil)
+                for file in contents {
+                    if file.lastPathComponent.contains(downloadInfo.id) {
+                        try FileManager.default.removeItem(at: file)
+                        print("Cleaned up partial download: \(file.lastPathComponent)")
+                    }
+                }
+            } catch {
+                print("Failed to cleanup partial downloads: \(error)")
+            }
+        }
+    }
+    
+    private func determineFramework(from downloadInfo: ModelDownloadInfo) -> LLMFramework? {
+        // Try to determine framework from URL path or name
+        let urlPath = downloadInfo.url.path.lowercased()
+        let name = downloadInfo.name.lowercased()
+        
+        if urlPath.contains("coreml") || name.contains(".mlpackage") {
+            return .coreML
+        } else if urlPath.contains("mlx") || name.contains("mlx") {
+            return .mlx
+        } else if urlPath.contains("onnx") || name.contains(".onnx") {
+            return .onnxRuntime
+        } else if urlPath.contains("tflite") || name.contains(".tflite") {
+            return .tensorFlowLite
+        } else if name.contains(".gguf") {
+            return .llamaCpp
+        }
+        
+        return nil
+    }
 
     private func moveAndProcessModel(
         from tempURL: URL,
         modelInfo: ModelInfo,
         to directory: URL
     ) async throws -> URL {
-        // Create directory if needed
+        // Create directory if needed with proper attributes
         try FileManager.default.createDirectory(
             at: directory,
-            withIntermediateDirectories: true
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o755]
         )
 
         let downloadInfo = ModelURLRegistry.shared.getModelInfo(id: modelInfo.id)
@@ -269,11 +353,21 @@ class ModelDownloadManager: NSObject, ObservableObject {
         if downloadInfo?.requiresUnzip == true {
             finalURL = try await unzipModel(from: tempURL, to: directory)
         } else {
-            // Move file
+            // Move file with better error handling
             if FileManager.default.fileExists(atPath: finalURL.path) {
                 try FileManager.default.removeItem(at: finalURL)
             }
-            try FileManager.default.moveItem(at: tempURL, to: finalURL)
+            
+            // Try to move first, fallback to copy if move fails
+            do {
+                try FileManager.default.moveItem(at: tempURL, to: finalURL)
+            } catch {
+                print("Move failed, trying copy instead: \(error.localizedDescription)")
+                try FileManager.default.copyItem(at: tempURL, to: finalURL)
+                
+                // Clean up temp file after successful copy
+                try? FileManager.default.removeItem(at: tempURL)
+            }
         }
 
         // Verify checksum if available
@@ -290,35 +384,97 @@ class ModelDownloadManager: NSObject, ObservableObject {
     }
 
     private func unzipModel(from zipURL: URL, to directory: URL) async throws -> URL {
-        // Use FileManager for unzipping on iOS
+        // Use ZIPFoundation for proper unzipping
         if zipURL.pathExtension == "zip" {
-            // For now, just copy the file since iOS doesn't have Process
-            // In a real app, you'd use a zip library like ZIPFoundation
-            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
-            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
+            do {
+                try FileManager.default.unzipItem(at: zipURL, to: directory)
 
-            // TODO: Implement proper unzipping using a library like ZIPFoundation
-            throw ModelDownloadError.unzipFailed
+                // Find the extracted content
+                let contents = try FileManager.default.contentsOfDirectory(
+                    at: directory,
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+
+                // Return the first extracted item (could be file or directory)
+                if let firstItem = contents.first {
+                    return firstItem
+                } else {
+                    return directory
+                }
+            } catch {
+                print("ZIP extraction failed: \(error)")
+                throw ModelDownloadError.unzipFailed
+            }
         }
 
         // Handle tar.gz files
         if zipURL.pathExtension == "gz" || zipURL.lastPathComponent.contains(".tar.gz") {
-            // For now, just copy the file since iOS doesn't have Process
-            // In a real app, you'd use a compression library
-            let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
-            try FileManager.default.copyItem(at: zipURL, to: destinationURL)
-
-            // TODO: Implement proper tar.gz extraction using a library
-            throw ModelDownloadError.unzipFailed
-
-            // Find the extracted directory
-            let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-            return contents.first ?? directory
+            // Extract tar.gz files
+            let extractedURL = try extractTarGz(at: zipURL, to: directory)
+            return extractedURL
         }
 
-        throw ModelDownloadError.unzipFailed
+        // For other file types, just copy them
+        let destinationURL = directory.appendingPathComponent(zipURL.lastPathComponent)
+        try FileManager.default.copyItem(at: zipURL, to: destinationURL)
+        return destinationURL
     }
 
+    private func extractTarGz(at sourceURL: URL, to directory: URL) throws -> URL {
+        print("⚠️ MLX model extraction required")
+        print("Model file: \(sourceURL.lastPathComponent)")
+        
+        // For now, on iOS we'll need to handle this differently
+        // The proper solution would be to:
+        // 1. Use a library like libarchive or GzipSwift
+        // 2. Or pre-extract models server-side
+        // 3. Or use a different format like zip
+        
+        // Create a directory for the model based on the tar.gz filename
+        let modelName = sourceURL.deletingPathExtension().deletingPathExtension().lastPathComponent
+        let modelDir = directory.appendingPathComponent(modelName)
+        
+        // Create the directory
+        try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
+        
+        // For now, copy the tar.gz file to indicate it needs manual extraction
+        let needsExtractionURL = modelDir.appendingPathComponent("NEEDS_EXTRACTION.tar.gz")
+        try FileManager.default.copyItem(at: sourceURL, to: needsExtractionURL)
+        
+        // Create a README file explaining the issue
+        let readmeContent = """
+        MLX Model Extraction Required
+        ============================
+        
+        This MLX model (\(modelName)) was downloaded as a tar.gz archive but could not be 
+        automatically extracted on iOS.
+        
+        To use this model:
+        1. The model needs to be extracted to reveal:
+           - config.json (model configuration)
+           - *.safetensors files (model weights)
+           - tokenizer files
+        
+        2. Current options:
+           - Use a Mac to extract and transfer files
+           - Wait for app update with extraction support
+           - Use a different model format
+        
+        File: \(sourceURL.lastPathComponent)
+        Location: \(needsExtractionURL.path)
+        """
+        
+        let readmeURL = modelDir.appendingPathComponent("README.txt")
+        try readmeContent.write(to: readmeURL, atomically: true, encoding: .utf8)
+        
+        print("Created placeholder directory at: \(modelDir.path)")
+        print("Tar.gz extraction is not yet supported on iOS")
+        print("Consider using a different model format or pre-extracted models")
+        
+        return modelDir
+    }
+    
     private func verifyChecksum(of fileURL: URL, expectedHash: String) async throws {
         let data = try Data(contentsOf: fileURL)
         let hash = SHA256.hash(data: data)
@@ -376,6 +532,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         downloadStartTimes.removeValue(forKey: downloadId)
         lastBytesWritten.removeValue(forKey: downloadId)
         activeDownloads.removeValue(forKey: downloadId)
+        downloadInfoMap.removeValue(forKey: downloadId)
 
         if downloadTasks.isEmpty {
             isDownloading = false
@@ -391,21 +548,91 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
+        // Handle file operations synchronously to prevent deletion
+        let taskIdentifier = downloadTask.taskIdentifier
+        
+        // Create a safe location immediately
+        let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let downloadsDir = documentsDir.appendingPathComponent("Downloads", isDirectory: true)
+        let tempFileName = "download_\(taskIdentifier)_\(UUID().uuidString).tmp"
+        let safeURL = downloadsDir.appendingPathComponent(tempFileName)
+        
+        var moveError: Error?
+        var moveSuccess = false
+        
+        do {
+            // Create downloads directory if needed
+            try FileManager.default.createDirectory(
+                at: downloadsDir,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+            
+            // Move file immediately to prevent deletion
+            try FileManager.default.moveItem(at: location, to: safeURL)
+            moveSuccess = true
+            
+            print("Successfully moved download to: \(safeURL.path)")
+        } catch {
+            moveError = error
+            print("Failed to move downloaded file: \(error)")
+            print("Source: \(location.path)")
+            print("Source exists: \(FileManager.default.fileExists(atPath: location.path))")
+            print("Destination: \(safeURL.path)")
+            print("Downloads dir: \(downloadsDir.path)")
+            
+            // Try to get more details about the error
+            if let nsError = error as NSError? {
+                print("Error domain: \(nsError.domain)")
+                print("Error code: \(nsError.code)")
+                print("Error userInfo: \(nsError.userInfo)")
+            }
+        }
+        
+        // Now notify on main actor
         Task { @MainActor in
-            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
+                // Clean up the file if we can't find the model ID
+                if moveSuccess {
+                    try? FileManager.default.removeItem(at: safeURL)
+                }
                 return
             }
-
-            // Move to temporary location to prevent deletion
-            let tempDir = FileManager.default.temporaryDirectory
-            let tempURL = tempDir.appendingPathComponent(UUID().uuidString)
-
-            do {
-                try FileManager.default.moveItem(at: location, to: tempURL)
-
-                self.completionHandlers[modelId]?(.success(tempURL))
+            
+            if moveSuccess {
+                print("Download completed for model: \(modelId)")
+                print("File saved to: \(safeURL.path)")
+                print("File exists: \(FileManager.default.fileExists(atPath: safeURL.path))")
+                
+                // If we have download info, rename the file to its proper name
+                var finalURL = safeURL
+                if let downloadInfo = self.downloadInfoMap[modelId] {
+                    let properFileName = downloadInfo.name
+                    let properFileURL = downloadsDir.appendingPathComponent(properFileName)
+                    
+                    do {
+                        // Remove existing file if it exists
+                        if FileManager.default.fileExists(atPath: properFileURL.path) {
+                            try FileManager.default.removeItem(at: properFileURL)
+                        }
+                        
+                        // Rename temp file to proper name
+                        try FileManager.default.moveItem(at: safeURL, to: properFileURL)
+                        finalURL = properFileURL
+                        print("Renamed downloaded file to: \(properFileName)")
+                    } catch {
+                        print("Failed to rename file to proper name: \(error)")
+                        // Continue with temp name if rename fails
+                    }
+                }
+                
+                self.completionHandlers[modelId]?(.success(finalURL))
                 self.cleanup(downloadId: modelId)
-            } catch {
+            } else {
+                let error = moveError ?? ModelDownloadError.networkError(
+                    NSError(domain: "ModelDownload", code: -1, 
+                           userInfo: [NSLocalizedDescriptionKey: "Failed to save downloaded file"])
+                )
                 self.completionHandlers[modelId]?(.failure(error))
                 self.cleanup(downloadId: modelId)
             }
@@ -419,8 +646,10 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
+        let taskIdentifier = downloadTask.taskIdentifier
+        
         Task { @MainActor in
-            guard let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
                 return
             }
 
@@ -431,19 +660,19 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
             // Calculate download speed
             let now = Date()
             let elapsed = now.timeIntervalSince(downloadStartTimes[modelId] ?? now)
-        let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
+            let speed = elapsed > 0 ? Double(totalBytesWritten) / elapsed : 0
 
-        // Estimate time remaining
-        let bytesRemaining = totalBytesExpectedToWrite - totalBytesWritten
-        let estimatedTime = speed > 0 ? TimeInterval(Double(bytesRemaining) / speed) : nil
+            // Estimate time remaining
+            let bytesRemaining = totalBytesExpectedToWrite - totalBytesWritten
+            let estimatedTime = speed > 0 ? TimeInterval(Double(bytesRemaining) / speed) : nil
 
-        let progress = DownloadProgress(
-            bytesWritten: totalBytesWritten,
-            totalBytes: totalBytesExpectedToWrite,
-            fractionCompleted: fractionCompleted,
-            estimatedTimeRemaining: estimatedTime,
-            downloadSpeed: speed
-        )
+            let progress = DownloadProgress(
+                bytesWritten: totalBytesWritten,
+                totalBytes: totalBytesExpectedToWrite,
+                fractionCompleted: fractionCompleted,
+                estimatedTimeRemaining: estimatedTime,
+                downloadSpeed: speed
+            )
 
             self.activeDownloads[modelId] = progress
             self.progressHandlers[modelId]?(progress)
@@ -455,9 +684,14 @@ extension ModelDownloadManager: @preconcurrency URLSessionDownloadDelegate {
         task: URLSessionTask,
         didCompleteWithError error: Error?
     ) {
+        guard let downloadTask = task as? URLSessionDownloadTask else {
+            return
+        }
+        
+        let taskIdentifier = downloadTask.taskIdentifier
+        
         Task { @MainActor in
-            guard let downloadTask = task as? URLSessionDownloadTask,
-                  let modelId = downloadTasks.first(where: { $0.value == downloadTask })?.key else {
+            guard let modelId = self.downloadTasks.first(where: { $0.value.taskIdentifier == taskIdentifier })?.key else {
                 return
             }
 
