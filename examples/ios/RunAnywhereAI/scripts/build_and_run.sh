@@ -1,10 +1,11 @@
 #!/bin/bash
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id]
+# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models]
 # Examples:
 #   ./build_and_run.sh simulator "iPhone 16 Pro"
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
 #   ./build_and_run.sh device "YOUR_DEVICE_ID"
-#   ./build_and_run.sh device "Your Device Name"
+#   ./build_and_run.sh device "Your Device Name" --add-models
 
 set -e
 
@@ -27,9 +28,36 @@ print_warning() {
     echo -e "${YELLOW}[!]${NC} $1"
 }
 
-# Default values
+# Parse arguments
 TARGET_TYPE="${1:-device}"
 DEVICE_NAME="${2:-}"
+ADD_MODELS=false
+
+# Check for help flag
+if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
+    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models]"
+    echo ""
+    echo "Arguments:"
+    echo "  simulator|device    Target type (default: device)"
+    echo "  device-name-or-id   Device name or ID (optional for simulator)"
+    echo "  --add-models        Add model files to Xcode project (optional)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 simulator \"iPhone 16 Pro\""
+    echo "  $0 simulator \"iPhone 16 Pro\" --add-models"
+    echo "  $0 device"
+    echo "  $0 device \"My iPhone\" --add-models"
+    exit 0
+fi
+
+# Check for --add-models flag in any position after the first two arguments
+for arg in "${@:3}"; do
+    if [ "$arg" = "--add-models" ]; then
+        ADD_MODELS=true
+    fi
+done
+
+# Default values
 WORKSPACE="RunAnywhereAI.xcworkspace"
 SCHEME="RunAnywhereAI"
 CONFIGURATION="Debug"
@@ -251,6 +279,16 @@ get_destination() {
 
 # Main execution
 print_status "Starting build process for $TARGET_TYPE..."
+
+# Ensure all model files are in the project (only if --add-models flag is set)
+if [ "$ADD_MODELS" = true ]; then
+    if [ -x "scripts/ensure_models_in_project.sh" ]; then
+        print_status "Ensuring model files are added to project..."
+        ./scripts/ensure_models_in_project.sh || print_warning "Failed to add models to project"
+    else
+        print_warning "Model addition script not found or not executable"
+    fi
+fi
 
 # Fix Pods script
 fix_pods_script

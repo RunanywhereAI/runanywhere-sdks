@@ -125,6 +125,16 @@ class ModelManager: ObservableObject {
     }
 
     func isModelDownloaded(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
+        // First check if it's a bundled model that's available
+        let bundledModels = BundledModelsService.shared.bundledModels
+        if bundledModels.contains(where: { 
+            $0.name == modelName && 
+            (framework == nil || $0.framework == framework) &&
+            $0.path != nil
+        }) {
+            return true
+        }
+        
         // Check with framework subdirectory first
         if let framework = framework {
             let frameworkPath = Self.modelsDirectory
@@ -296,14 +306,21 @@ class ModelManager: ObservableObject {
 
     func loadBundledModels() async {
         // Add bundled models to available models
-        availableModels = BundledModelsService.shared.bundledModels
+        let bundledModels = BundledModelsService.shared.bundledModels
+        print("DEBUG ModelManager: Loading bundled models, found \(bundledModels.count) models")
+        
+        for model in bundledModels {
+            print("DEBUG ModelManager: Bundled model - \(model.name), framework: \(model.framework), path: \(model.path ?? "nil")")
+        }
+        
+        availableModels = bundledModels
 
-        // Generate sample models if in debug mode
+        // Install bundled models if in debug mode
         #if DEBUG
         do {
-            try await BundledModelsService.shared.generateSampleModels()
+            try await BundledModelsService.shared.installBundledModels()
         } catch {
-            print("Failed to generate sample models: \(error)")
+            print("Failed to install bundled models: \(error)")
         }
         #endif
     }

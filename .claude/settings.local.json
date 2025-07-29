@@ -55,7 +55,8 @@
       "Bash(swift:*)",
       "Bash(xcrun swiftc:*)",
       "Bash(xcrun devicectl list:*)",
-      "Bash(xcrun devicectl device logs stream:*)"
+      "Bash(xcrun devicectl device logs stream:*)",
+      "Bash(./scripts/clean_build_and_run.sh:*)"
     ],
     "deny": []
   }
