@@ -361,44 +361,18 @@ struct ModelDownloadProgressView: View {
                     try FileManager.default.copyItem(at: url, to: destinationURL)
                 }
             } else {
-                // Just copy the file
-                let destinationURL = modelDirectory.appendingPathComponent(downloadInfo.name)
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
+                // Use ModelFormatManager to handle the downloaded model
+                let formatManager = ModelFormatManager.shared
+                let handler = formatManager.getHandler(for: url, format: downloadInfo.format)
                 
-                // Ensure source file exists before copying
-                guard FileManager.default.fileExists(atPath: url.path) else {
-                    throw ModelDownloadError.networkError(NSError(
-                        domain: "ModelDownload",
-                        code: -2,
-                        userInfo: [NSLocalizedDescriptionKey: "Source file not found: \(url.lastPathComponent)"]
-                    ))
-                }
+                // Process the downloaded model using the appropriate handler
+                let finalURL = try await handler.processDownloadedModel(
+                    from: url,
+                    to: modelDirectory,
+                    modelInfo: downloadInfo
+                )
                 
-                print("Moving downloaded file:")
-                print("  From: \(url.path)")
-                print("  To: \(destinationURL.path)")
-                
-                do {
-                    // Try to move first, as it's more efficient
-                    try FileManager.default.moveItem(at: url, to: destinationURL)
-                    print("Successfully moved model to: \(destinationURL.path)")
-                } catch {
-                    print("Move failed, trying copy: \(error.localizedDescription)")
-                    // If move fails, try copy
-                    do {
-                        try FileManager.default.copyItem(at: url, to: destinationURL)
-                        // Clean up source file after successful copy
-                        try? FileManager.default.removeItem(at: url)
-                        print("Successfully copied model to: \(destinationURL.path)")
-                    } catch {
-                        print("Failed to copy file: \(error.localizedDescription)")
-                        print("Source: \(url.path)")
-                        print("Destination: \(destinationURL.path)")
-                        throw error
-                    }
-                }
+                print("✅ Model processed successfully at: \(finalURL.path)")
             }
 
             // Installing step (download tokenizers if needed)

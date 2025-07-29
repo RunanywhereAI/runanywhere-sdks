@@ -55,7 +55,8 @@
       "Bash(swift:*)",
       "Bash(xcrun swiftc:*)",
       "Bash(xcrun devicectl list:*)",
-      "Bash(xcrun devicectl device logs stream:*)"
+      "Bash(xcrun devicectl device logs stream:*)",
+      "Bash(./verify_urls.sh:*)"
     ],
     "deny": []
   }

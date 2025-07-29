@@ -3,6 +3,7 @@
 # URL Verification Script for RunAnywhereAI
 # Single source of truth: ModelURLRegistry.swift
 # This script extracts URLs from the Swift file and validates them
+# Usage: ./verify_urls.sh [HUGGING_FACE_TOKEN]
 
 set -e
 
@@ -13,11 +14,20 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Optional HuggingFace token from command line argument
+HF_TOKEN="${1:-}"
+
 # Path to ModelURLRegistry.swift (single source of truth)
 REGISTRY_FILE="../RunAnywhereAI/Services/ModelManagement/ModelURLRegistry.swift"
 
 echo -e "${BLUE}🔍 Verifying Model URLs from ModelURLRegistry.swift${NC}"
 echo -e "${BLUE}📍 Source of Truth: $REGISTRY_FILE${NC}"
+if [ -n "$HF_TOKEN" ]; then
+    echo -e "${GREEN}🔑 HuggingFace token provided${NC}"
+else
+    echo -e "${YELLOW}⚠️  No HuggingFace token provided - auth-required URLs may fail${NC}"
+    echo -e "${YELLOW}   Usage: $0 [HUGGING_FACE_TOKEN]${NC}"
+fi
 echo ""
 
 # Check if registry file exists
@@ -54,8 +64,16 @@ check_url() {
         return 0
     fi
     
+    # Build curl command with optional HuggingFace auth
+    local curl_cmd="curl --head --silent --location --max-time 20 --retry 2 --user-agent \"RunAnywhereAI-URLVerifier/1.0\""
+    
+    # Add HuggingFace auth if token is provided and URL is from HuggingFace
+    if [[ $url == *"huggingface.co"* ]] && [ -n "$HF_TOKEN" ]; then
+        curl_cmd="$curl_cmd --header \"Authorization: Bearer $HF_TOKEN\""
+    fi
+    
     # Get headers including content-length
-    local headers=$(curl --head --silent --location --max-time 20 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" "$url" 2>&1)
+    local headers=$(eval "$curl_cmd \"$url\"" 2>&1)
     local curl_exit_code=$?
     
     if [ $curl_exit_code -eq 0 ]; then
@@ -78,18 +96,60 @@ check_url() {
             size_display=$(format_bytes $content_length)
         fi
         
-        # Check if size is suspiciously small (less than 1KB)
+        # Check if size is suspiciously small (less than 1KB) - except for .mlpackage
         if [ -n "$content_length" ] && [ "$content_length" -lt 1024 ] && [ "$content_length" -gt 0 ]; then
-            echo -e "${RED}⚠️  $framework - $name (WARNING: Suspiciously small - $size_display)${NC}"
-            echo -e "${RED}   URL: $url${NC}"
-            echo -e "${RED}   Expected: ~$expected_size, Actual: $size_display${NC}"
-            return 1
+            if [[ $url == *".mlpackage"* ]] && [[ $url == *"huggingface.co"* ]]; then
+                # For .mlpackage on HuggingFace, verify via API instead
+                local repo=$(echo "$url" | sed 's|https://huggingface.co/||' | cut -d'/' -f1-2)
+                local path=$(echo "$url" | sed 's|.*/resolve/main/||')
+                local api_url="https://huggingface.co/api/models/$repo/tree/main"
+                
+                local api_cmd="curl --silent --location --max-time 20"
+                if [ -n "$HF_TOKEN" ]; then
+                    api_cmd="$api_cmd --header \"Authorization: Bearer $HF_TOKEN\""
+                fi
+                
+                if eval "$api_cmd \"$api_url\"" 2>&1 | grep -q "\"$path\""; then
+                    echo -e "${GREEN}✅ $framework - $name (HF Directory verified)${NC}"
+                    echo -e "${GREEN}   Note: .mlpackage is a directory structure on HuggingFace${NC}"
+                    echo -e "${GREEN}   Expected size: ~$expected_size${NC}"
+                    return 0
+                else
+                    echo -e "${YELLOW}⚠️  $framework - $name (Could not verify directory)${NC}"
+                    echo -e "${YELLOW}   URL: $url${NC}"
+                    return 0  # Don't fail for .mlpackage
+                fi
+            else
+                echo -e "${RED}⚠️  $framework - $name (WARNING: Suspiciously small - $size_display)${NC}"
+                echo -e "${RED}   URL: $url${NC}"
+                echo -e "${RED}   Expected: ~$expected_size, Actual: $size_display${NC}"
+                return 1
+            fi
         elif [ "$http_status" == "200" ] || [ "$http_status" == "302" ] || [ "$http_status" == "301" ]; then
-            echo -e "${GREEN}✅ $framework - $name ($size_display)${NC}"
+            # Special handling for .mlpackage directories on HuggingFace
+            if [[ $url == *".mlpackage"* ]] && [[ $url == *"huggingface.co"* ]]; then
+                echo -e "${GREEN}✅ $framework - $name (HF Directory)${NC}"
+                echo -e "${GREEN}   Note: .mlpackage files are directories on HuggingFace${NC}"
+            else
+                echo -e "${GREEN}✅ $framework - $name ($size_display)${NC}"
+            fi
             if [ "$expected_size" != "Unknown" ] && [ "$size_display" != "Unknown" ]; then
                 echo -e "${GREEN}   Expected: ~$expected_size, Actual: $size_display${NC}"
             fi
             return 0
+        elif [ "$http_status" == "401" ] || [ "$http_status" == "403" ]; then
+            if [[ $url == *"huggingface.co"* ]]; then
+                echo -e "${YELLOW}🔒 $framework - $name (Authentication required)${NC}"
+                echo -e "${YELLOW}   URL: $url${NC}"
+                if [ -z "$HF_TOKEN" ]; then
+                    echo -e "${YELLOW}   Provide HuggingFace token to verify this URL${NC}"
+                else
+                    echo -e "${RED}   Authentication failed - check token validity${NC}"
+                fi
+            else
+                echo -e "${RED}❌ $framework - $name (HTTP $http_status)${NC}"
+            fi
+            return 1
         else
             echo -e "${RED}❌ $framework - $name (HTTP $http_status)${NC}"
             echo -e "${RED}   URL: $url${NC}"

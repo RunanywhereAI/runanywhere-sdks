@@ -124,10 +124,20 @@ class StorageMonitorService: ObservableObject {
                     for modelFile in modelFiles {
                         let resourceValues = try modelFile.resourceValues(forKeys: [.fileSizeKey, .creationDateKey, .isDirectoryKey])
 
-                        // Skip directories, only count files
-                        guard resourceValues.isDirectory != true else { continue }
-
-                        let fileSize = Int64(resourceValues.fileSize ?? 0)
+                        // Use ModelFormatManager to determine if this should be included
+                        let isDirectory = resourceValues.isDirectory ?? false
+                        let format = ModelFormat.from(extension: modelFile.pathExtension)
+                        let formatManager = ModelFormatManager.shared
+                        let handler = formatManager.getHandler(for: modelFile, format: format)
+                        
+                        // Skip if it's a directory that's not a model format
+                        if isDirectory && !handler.isDirectoryBasedModel(url: modelFile) {
+                            continue
+                        }
+                        
+                        // Calculate size using the appropriate handler
+                        let fileSize = handler.calculateModelSize(at: modelFile)
+                        
                         let creationDate = resourceValues.creationDate ?? Date()
 
                         let modelInfo = DownloadedModelInfo(

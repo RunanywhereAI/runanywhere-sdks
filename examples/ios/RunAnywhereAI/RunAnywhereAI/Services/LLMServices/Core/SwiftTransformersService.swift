@@ -56,11 +56,13 @@ class SwiftTransformersService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            var models = ModelURLRegistry.shared.getAllModels(for: .swiftTransformers)
+            // Get models from the registry - no longer using bundled models
+            let models = ModelURLRegistry.shared.getAllModels(for: .swiftTransformers)
             
-            // Add bundled Swift Transformers models
-            let bundledST = BundledModelsService.shared.bundledModels.filter { $0.framework == .swiftTransformers }
-            models.append(contentsOf: bundledST)
+            // Note: Bundled models are no longer used. All models should be downloaded dynamically.
+            // This ensures proper model management and reduces app size.
+            
+            print("📱 Swift Transformers: Available models: \(models.map { $0.name })")
             
             return models
         }
@@ -74,8 +76,11 @@ class SwiftTransformersService: BaseLLMService {
     override func initialize(modelPath: String) async throws {
         // Verify model exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
+            print("❌ Swift Transformers: Model not found at path: \(modelPath)")
             throw LLMError.modelNotFound
         }
+        
+        print("✅ Swift Transformers: Found model at path: \(modelPath)")
 
         // Swift Transformers uses Core ML models
         guard modelPath.hasSuffix(".mlpackage") || modelPath.hasSuffix(".mlmodel") || modelPath.hasSuffix(".mlmodelc") else {

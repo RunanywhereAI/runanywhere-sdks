@@ -122,10 +122,19 @@ class ModelDownloadManager: NSObject, ObservableObject {
             return
         }
         
-        // Check if this is a .mlpackage URL on Hugging Face
-        if downloadURL.absoluteString.contains(".mlpackage") && 
-           downloadURL.host?.contains("huggingface") == true {
-            // Use the HuggingFace directory downloader for .mlpackage files
+        // Check if this model requires special download handling
+        let formatManager = ModelFormatManager.shared
+        if formatManager.requiresSpecialDownload(downloadURL, format: modelInfo.format) {
+            
+            // Check authentication first if required
+            if modelInfo.requiresAuth {
+                if HuggingFaceAuthService.shared.currentCredentials == nil {
+                    completion(.failure(ModelDownloadError.authRequired))
+                    return
+                }
+            }
+            
+            // Use the HuggingFace directory downloader for directory-based models
             Task {
                 do {
                     let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!

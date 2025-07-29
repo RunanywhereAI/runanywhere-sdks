@@ -96,8 +96,15 @@ class ModelManager: ObservableObject {
         let coreMLDir = Self.modelsDirectory.appendingPathComponent("CoreML")
         let swiftTransformersDir = Self.modelsDirectory.appendingPathComponent("SwiftTransformers")
         
-        // List of known Swift Transformers models
-        let swiftTransformersModels = ["distilgpt2-swift.mlmodel", "gpt2-base.mlmodel", "gpt2-medium.mlmodel"]
+        // List of known Swift Transformers models (including OpenELM)
+        let swiftTransformersModels = [
+            "distilgpt2-swift.mlmodel",
+            "gpt2-base.mlmodel", 
+            "gpt2-medium.mlmodel",
+            "OpenELM-270M-Instruct-128-float32.mlpackage",
+            "OpenELM-450M-Instruct-128-float32.mlpackage",
+            "OpenELM-1_1B-Instruct-128-float32.mlpackage"
+        ]
         
         for modelName in swiftTransformersModels {
             let oldPath = coreMLDir.appendingPathComponent(modelName)
@@ -113,6 +120,27 @@ class ModelManager: ObservableObject {
                 }
             }
         }
+        
+        // Also check root Models directory for any misplaced models
+        do {
+            let rootContents = try FileManager.default.contentsOfDirectory(
+                at: Self.modelsDirectory,
+                includingPropertiesForKeys: nil
+            )
+            
+            for item in rootContents {
+                let fileName = item.lastPathComponent
+                if swiftTransformersModels.contains(fileName) {
+                    let newPath = swiftTransformersDir.appendingPathComponent(fileName)
+                    if !FileManager.default.fileExists(atPath: newPath.path) {
+                        try FileManager.default.moveItem(at: item, to: newPath)
+                        print("Migrated \(fileName) from root to SwiftTransformers directory")
+                    }
+                }
+            }
+        } catch {
+            print("Error during model migration: \(error)")
+        }
     }
 
     func modelPath(for modelName: String, framework: LLMFramework? = nil) -> URL {
@@ -122,6 +150,18 @@ class ModelManager: ObservableObject {
                 .appendingPathComponent(modelName)
         }
         return Self.modelsDirectory.appendingPathComponent(modelName)
+    }
+    
+    /// Get the framework-specific model path, ensuring directory exists
+    func getFrameworkModelPath(modelName: String, framework: LLMFramework) -> URL {
+        let frameworkDir = Self.modelsDirectory.appendingPathComponent(framework.directoryName)
+        
+        // Ensure framework directory exists
+        if !FileManager.default.fileExists(atPath: frameworkDir.path) {
+            try? FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
+        }
+        
+        return frameworkDir.appendingPathComponent(modelName)
     }
 
     func isModelDownloaded(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
@@ -298,12 +338,12 @@ class ModelManager: ObservableObject {
         // Add bundled models to available models
         availableModels = BundledModelsService.shared.bundledModels
 
-        // Generate sample models if in debug mode
+        // Install bundled models if in debug mode
         #if DEBUG
         do {
-            try await BundledModelsService.shared.generateSampleModels()
+            try await BundledModelsService.shared.installBundledModels()
         } catch {
-            print("Failed to generate sample models: \(error)")
+            print("Failed to install bundled models: \(error)")
         }
         #endif
     }

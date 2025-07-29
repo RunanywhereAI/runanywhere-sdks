@@ -11,6 +11,9 @@ class BundledModelsService {
     var bundledModels: [ModelInfo] {
         var models: [ModelInfo] = []
         
+        // DISABLED: OpenELM models are now downloaded dynamically from HuggingFace
+        // This reduces app size and allows for model updates without app updates
+        /*
         // Check if OpenELM model exists in bundle
         if let openELMPath = Bundle.main.path(forResource: "OpenELM-270M-Instruct-128-float32", ofType: "mlpackage") {
             models.append(ModelInfo(
@@ -26,6 +29,7 @@ class BundledModelsService {
                 description: "Apple's OpenELM 270M instruction-tuned model optimized for on-device inference"
             ))
         }
+        */
         
         // Add more bundled models here as needed
         
