@@ -248,6 +248,7 @@ extension ModelInfo {
         self.sha256 = nil
         self.requiresUnzip = false
         self.requiresAuth = false
+        self.authType = .none
         self.alternativeURLs = []
         self.notes = nil
         self.description = description ?? ""

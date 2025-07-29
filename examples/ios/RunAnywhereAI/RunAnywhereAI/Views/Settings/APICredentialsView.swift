@@ -288,39 +288,47 @@ struct HuggingFaceInstructionsView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("How to Get Your Hugging Face Token")
-                        .font(.title2)
-                        .bold()
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        InstructionStep(number: 1, text: "Go to huggingface.co and sign in")
-                        InstructionStep(number: 2, text: "Click on your profile picture in the top right")
-                        InstructionStep(number: 3, text: "Select 'Settings' from the dropdown")
-                        InstructionStep(number: 4, text: "Navigate to 'Access Tokens' in the left sidebar")
-                        InstructionStep(number: 5, text: "Click 'New token' button")
-                        InstructionStep(number: 6, text: "Give your token a name (e.g., 'RunAnywhereAI')")
-                        InstructionStep(number: 7, text: "Select 'Read' permission (or 'Write' if needed)")
-                        InstructionStep(number: 8, text: "Click 'Generate token'")
-                        InstructionStep(number: 9, text: "Copy the token (starts with 'hf_')")
-                        InstructionStep(number: 10, text: "Paste it in the field above")
+                VStack(alignment: .leading, spacing: 20) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("How to Get Your Hugging Face Token")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        
+                        Text("Follow these steps to create your access token:")
+                            .foregroundColor(.secondary)
                     }
                     
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Important Notes", systemImage: "exclamationmark.triangle")
+                    // Steps
+                    VStack(alignment: .leading, spacing: 16) {
+                        instructionStep(number: 1, text: "Go to huggingface.co and sign in")
+                        instructionStep(number: 2, text: "Click on your profile picture in the top right")
+                        instructionStep(number: 3, text: "Select 'Settings' from the dropdown")
+                        instructionStep(number: 4, text: "Navigate to 'Access Tokens' in the left sidebar")
+                        instructionStep(number: 5, text: "Click 'New token' button")
+                        instructionStep(number: 6, text: "Give your token a name (e.g., 'RunAnywhereAI')")
+                        instructionStep(number: 7, text: "Select 'Read' permission (or 'Write' if needed)")
+                        instructionStep(number: 8, text: "Click 'Generate token'")
+                        instructionStep(number: 9, text: "Copy the token (starts with 'hf_')")
+                        instructionStep(number: 10, text: "Paste it in the field above")
+                    }
+                    
+                    // Important Notes
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Important Notes:")
                             .font(.headline)
                             .foregroundColor(.orange)
                         
-                        Text("• Keep your token secure - treat it like a password")
-                            .font(.caption)
-                        Text("• The token will only be stored in your device's Keychain")
-                            .font(.caption)
-                        Text("• You can revoke the token anytime from Hugging Face settings")
-                            .font(.caption)
+                        VStack(alignment: .leading, spacing: 8) {
+                            noteItem(icon: "lock.shield", text: "Keep your token secure - treat it like a password")
+                            noteItem(icon: "shield", text: "The token will only be stored in your device's Keychain")
+                            noteItem(icon: "xmark.circle", text: "You can revoke the token anytime from Hugging Face settings")
+                            noteItem(icon: "checkmark.circle", text: "Use fine-grained tokens for better security")
+                        }
                     }
                     .padding()
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(8)
+                    .background(Color(.systemGroupedBackground))
+                    .cornerRadius(12)
                 }
                 .padding()
             }
@@ -335,61 +343,8 @@ struct HuggingFaceInstructionsView: View {
             }
         }
     }
-}
-
-struct KaggleInstructionsView: View {
-    @Environment(\.dismiss) private var dismiss
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("How to Get Your Kaggle API Key")
-                        .font(.title2)
-                        .bold()
-                    
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(KaggleAuthService.shared.getAuthInstructions().indices, id: \.self) { index in
-                            InstructionStep(number: index + 1, text: KaggleAuthService.shared.getAuthInstructions()[index])
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Important Notes", systemImage: "exclamationmark.triangle")
-                            .font(.headline)
-                            .foregroundColor(.orange)
-                        
-                        Text("• Your API key is like a password - keep it secure")
-                            .font(.caption)
-                        Text("• The credentials will only be stored in your device's Keychain")
-                            .font(.caption)
-                        Text("• You can regenerate your API key anytime from Kaggle")
-                            .font(.caption)
-                    }
-                    .padding()
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(8)
-                }
-                .padding()
-            }
-            .navigationTitle("Kaggle Instructions")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct InstructionStep: View {
-    let number: Int
-    let text: String
-    
-    var body: some View {
+    private func instructionStep(number: Int, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.caption)
@@ -406,7 +361,19 @@ struct InstructionStep: View {
             Spacer()
         }
     }
+    
+    private func noteItem(icon: String, text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(.orange)
+                .frame(width: 20)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
 }
+
 
 #Preview {
     NavigationView {
