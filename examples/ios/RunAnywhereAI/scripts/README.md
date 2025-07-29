@@ -4,51 +4,49 @@ This directory contains utility scripts for the RunAnywhereAI iOS application.
 
 ## Scripts
 
-### update_model_sizes.sh
+### verify_urls.sh
 
-A generic script that automatically updates model sizes in `ModelURLRegistry.swift` by fetching actual file sizes from remote URLs.
+Verifies that all model download URLs in `ModelURLRegistry.swift` are accessible and optionally updates their sizes.
 
 **Features:**
-- Dynamically extracts model IDs and URLs from the Swift file (no hardcoding)
-- Fetches actual file sizes from remote servers
+- Verifies URL accessibility for all models
+- Optionally updates model sizes with actual file sizes from remote servers
+- Dynamically extracts model information from the Swift file (no hardcoding)
 - Handles both regular files and HuggingFace directory-based models (.mlpackage)
 - Formats sizes in human-readable format (KB, MB, GB)
-- Creates automatic backups (configurable)
+- Creates automatic backups when updating sizes
+- Supports HuggingFace authentication for private models
 - Provides detailed progress and summary
 
 **Usage:**
 ```bash
-# Run with automatic backup
-./update_model_sizes.sh
+# Basic URL verification only
+./verify_urls.sh
 
-# Run without creating backup
-./update_model_sizes.sh --no-backup
+# Verify URLs and update sizes
+./verify_urls.sh --update-sizes
+
+# With HuggingFace authentication
+./verify_urls.sh YOUR_HF_TOKEN
+
+# Update sizes with HuggingFace authentication
+./verify_urls.sh --update-sizes YOUR_HF_TOKEN
 ```
 
 **Requirements:**
 - Must be run from the `scripts/` directory
 - Requires `curl` and `bc` commands
-- Internet connection to fetch file sizes
+- Internet connection to verify URLs and fetch sizes
 
 **How it works:**
 1. Parses `ModelURLRegistry.swift` to extract all model definitions
-2. For each model with a download URL, fetches the file size via HTTP HEAD request
-3. For HuggingFace .mlpackage directories, uses the HuggingFace API to sum all file sizes
-4. Updates the size field in the Swift file while preserving all other content
-5. Keeps up to 5 most recent backups for safety
-
-### verify_urls.sh
-
-Verifies that all model download URLs in `ModelURLRegistry.swift` are accessible.
-
-**Usage:**
-```bash
-# Basic verification
-./verify_urls.sh
-
-# With HuggingFace authentication
-./verify_urls.sh YOUR_HF_TOKEN
-```
+2. For each model with a download URL, verifies accessibility via HTTP HEAD request
+3. When `--update-sizes` is used:
+   - Fetches actual file sizes from remote servers
+   - For HuggingFace .mlpackage directories, uses the HuggingFace API to sum all file sizes
+   - Updates the size field in the Swift file while preserving all other content
+   - Creates a backup before making changes
+4. Provides a summary of accessible/failed URLs and any size updates
 
 ### build_and_run.sh
 
