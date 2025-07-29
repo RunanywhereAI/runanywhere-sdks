@@ -1,0 +1,49 @@
+{
+  "models": [
+    {
+      "id": "gemma-2b",
+      "name": "Gemma 2B",
+      "description": "Google's efficient 2B parameter model optimized for mobile",
+      "framework": "MEDIAPIPE",
+      "size_bytes": 1200000000,
+      "download_url": "https://storage.googleapis.com/mediapipe-models/genai/gemma-2b-it-gpu-int4.bin",
+      "file_name": "gemma-2b-it-gpu-int4.bin",
+      "quantization": "INT4",
+      "requirements": {
+        "min_ram_gb": 4,
+        "recommended_ram_gb": 6,
+        "gpu_required": true
+      }
+    },
+    {
+      "id": "phi-2",
+      "name": "Phi-2",
+      "description": "Microsoft's compact 2.7B model with strong performance",
+      "framework": "MEDIAPIPE",
+      "size_bytes": 1500000000,
+      "download_url": "https://example.com/models/phi-2-gpu-int4.bin",
+      "file_name": "phi-2-gpu-int4.bin",
+      "quantization": "INT4",
+      "requirements": {
+        "min_ram_gb": 4,
+        "recommended_ram_gb": 6,
+        "gpu_required": true
+      }
+    },
+    {
+      "id": "tinyllama",
+      "name": "TinyLlama 1.1B",
+      "description": "Compact Llama model optimized for mobile devices",
+      "framework": "ONNX_RUNTIME",
+      "size_bytes": 600000000,
+      "download_url": "https://example.com/models/tinyllama-1.1b.onnx",
+      "file_name": "tinyllama-1.1b.onnx",
+      "quantization": "FP16",
+      "requirements": {
+        "min_ram_gb": 2,
+        "recommended_ram_gb": 4,
+        "gpu_required": false
+      }
+    }
+  ]
+}
