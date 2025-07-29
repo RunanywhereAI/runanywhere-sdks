@@ -321,14 +321,30 @@ class ModelManager: ObservableObject {
         }
     }
 
-    func getModelSize(_ modelName: String) -> Int64? {
-        let path = modelPath(for: modelName)
-        do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-            return attributes[.size] as? Int64
-        } catch {
-            return nil
+    func getModelSize(_ modelName: String, framework: LLMFramework? = nil) -> Int64? {
+        // First check framework-specific paths
+        if let framework = framework {
+            let frameworkPath = getFrameworkModelPath(modelName: modelName, framework: framework)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
+            }
         }
+        
+        // Check all framework directories
+        for framework in LLMFramework.allCases {
+            let frameworkPath = getFrameworkModelPath(modelName: modelName, framework: framework)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
+            }
+        }
+        
+        // Legacy path
+        let path = modelPath(for: modelName)
+        if FileManager.default.fileExists(atPath: path.path) {
+            return ModelSizeManager.shared.calculateSize(at: path)
+        }
+        
+        return nil
     }
 
     func getAvailableSpace() -> Int64 {

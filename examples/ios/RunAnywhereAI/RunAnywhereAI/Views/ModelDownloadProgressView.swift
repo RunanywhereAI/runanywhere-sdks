@@ -180,7 +180,7 @@ struct ModelDownloadProgressView: View {
                                 // Show file count progress with visual indicator
                                 let downloader = HuggingFaceDirectoryDownloader.shared
                                 if downloader.totalFiles > 0 {
-                                    VStack(spacing: 8) {
+                                    VStack(spacing: 12) {
                                         // Progress ring for files
                                         ZStack {
                                             Circle()
@@ -208,6 +208,23 @@ struct ModelDownloadProgressView: View {
                                             Text("\(downloader.completedFiles) of \(downloader.totalFiles) files")
                                                 .font(.caption2)
                                                 .foregroundColor(.blue)
+                                        }
+                                        
+                                        // Individual file progress
+                                        if downloader.isDownloadingFile && !downloader.currentFileSize.isEmpty {
+                                            VStack(spacing: 4) {
+                                                ProgressView(value: downloader.currentFileProgress)
+                                                    .progressViewStyle(LinearProgressViewStyle())
+                                                    .tint(.blue)
+                                                    .scaleEffect(y: 1.5)
+                                                    .frame(width: 150)
+                                                
+                                                Text("(\(downloader.currentFileSize))")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            .padding(.horizontal, 20)
+                                            .animation(.easeInOut(duration: 0.2), value: downloader.currentFileProgress)
                                         }
                                     }
                                     .padding(.top, 8)

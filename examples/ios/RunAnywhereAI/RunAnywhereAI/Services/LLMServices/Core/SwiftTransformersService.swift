@@ -343,16 +343,17 @@ class SwiftTransformersService: BaseLLMService {
     override func getModelInfo() -> ModelInfo? {
         guard isInitialized, let model = languageModel else { return nil }
         
-        // Use existing model info or create a new one
+        // Return the model info from registry (single source of truth)
         if let info = currentModelInfo {
             return info
         }
         
+        // Fallback for models not in registry
         return ModelInfo(
             id: "swift-transformers-\(model.modelName)",
             name: model.modelName,
             format: .coreML,
-            size: getModelSize(),
+            size: "Unknown",
             framework: .swiftTransformers,
             quantization: "FP16",
             contextLength: model.maxContextLength
@@ -366,21 +367,6 @@ class SwiftTransformersService: BaseLLMService {
     }
 
     // MARK: - Private Methods
-
-    private func getModelSize() -> String {
-        let url = URL(fileURLWithPath: modelPath)
-        let format = ModelFormat.from(extension: url.pathExtension)
-        let formatManager = ModelFormatManager.shared
-        let handler = formatManager.getHandler(for: url, format: format)
-        
-        let totalSize = handler.calculateModelSize(at: url)
-        
-        if totalSize > 0 {
-            return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
-        }
-        
-        return "Unknown"
-    }
     
     private func isNeuralEngineAvailable() async -> Bool {
         // Check if device has Neural Engine (A11 and later)

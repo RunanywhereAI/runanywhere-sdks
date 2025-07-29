@@ -58,7 +58,14 @@
       "Bash(xcrun devicectl device logs stream:*)",
       "Bash(./verify_urls.sh:*)",
       "Bash(./scripts/verify_urls.sh:*)",
-      "Bash(./scripts/clean_build_and_run.sh:*)"
+      "Bash(./scripts/clean_build_and_run.sh:*)",
+      "Bash(./update_model_sizes.sh:*)",
+      "Bash(./scripts/update_model_sizes.sh:*)",
+      "Bash(bash:*)",
+      "Bash(chmod:*)",
+      "Bash(./update_sizes_simple.sh:*)",
+      "Bash(./update_model_sizes_fixed.sh:*)",
+      "Bash(./update_model_sizes_final.sh:*)"
     ],
     "deny": []
   }

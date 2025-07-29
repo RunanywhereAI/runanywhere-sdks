@@ -34,6 +34,9 @@ class HuggingFaceDirectoryDownloader: ObservableObject {
     @Published var currentFile: String = ""
     @Published var totalFiles: Int = 0
     @Published var completedFiles: Int = 0
+    @Published var currentFileProgress: Double = 0
+    @Published var currentFileSize: String = ""
+    @Published var isDownloadingFile: Bool = false
     
     private init() {}
     
@@ -178,28 +181,90 @@ class HuggingFaceDirectoryDownloader: ObservableObject {
         print("⬇️ Downloading \(filePath) (\(formatBytes(fileInfo.lfs?.size ?? fileInfo.size)))")
         print("   Saving to: \(fileDestination.path)")
         
-        // Download the file
+        // Download the file with timeout and retry
         var request = URLRequest(url: downloadURL)
+        request.timeoutInterval = 120 // 2 minutes timeout per file
         
         // Add auth if available
         if let hfAuth = HuggingFaceAuthService.shared.currentCredentials {
             request.setValue(hfAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
         }
         
-        let (tempURL, response) = try await URLSession.shared.download(for: request)
+        // Create a custom session with better configuration
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 120
+        config.timeoutIntervalForResource = 300 // 5 minutes total
+        config.waitsForConnectivity = true
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw URLError(.badServerResponse)
+        let session = URLSession(configuration: config)
+        
+        var lastError: Error?
+        var retryCount = 0
+        let maxRetries = 3
+        
+        // Update file download state
+        await MainActor.run {
+            self.isDownloadingFile = true
+            self.currentFileProgress = 0
+            self.currentFileSize = formatBytes(fileInfo.lfs?.size ?? fileInfo.size)
         }
         
-        // Move to destination
-        if FileManager.default.fileExists(atPath: fileDestination.path) {
-            try FileManager.default.removeItem(at: fileDestination)
+        // Retry logic for network failures
+        while retryCount < maxRetries {
+            do {
+                // Create download task to track progress
+                let downloadTask = session.downloadTask(with: request)
+                
+                // Track progress using delegate pattern would be ideal, but for now use async download
+                let (tempURL, response) = try await session.download(for: request)
+                
+                // Simulate progress for now (since URLSession async doesn't provide progress)
+                await MainActor.run {
+                    self.currentFileProgress = 1.0
+                }
+                
+                guard let httpResponse = response as? HTTPURLResponse,
+                      httpResponse.statusCode == 200 else {
+                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    if statusCode == 404 {
+                        throw URLError(.fileDoesNotExist)
+                    }
+                    throw URLError(.badServerResponse)
+                }
+                
+                // Success - move to next part of the function
+                lastError = nil
+                
+                // Move to destination
+                if FileManager.default.fileExists(atPath: fileDestination.path) {
+                    try FileManager.default.removeItem(at: fileDestination)
+                }
+                
+                try FileManager.default.moveItem(at: tempURL, to: fileDestination)
+                print("✅ Saved to \(fileDestination.path)")
+                
+                // Reset file download state
+                await MainActor.run {
+                    self.isDownloadingFile = false
+                    self.currentFileProgress = 0
+                }
+                
+                return
+                
+            } catch {
+                lastError = error
+                retryCount += 1
+                
+                if retryCount < maxRetries {
+                    print("⚠️ Download failed for \(filePath), retry \(retryCount)/\(maxRetries): \(error)")
+                    // Wait before retry with exponential backoff
+                    try? await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(retryCount)) * 1_000_000_000))
+                }
+            }
         }
         
-        try FileManager.default.moveItem(at: tempURL, to: fileDestination)
-        print("✅ Saved to \(fileDestination.path)")
+        // All retries failed
+        throw lastError ?? URLError(.unknown)
     }
     
     private func formatBytes(_ bytes: Int) -> String {
