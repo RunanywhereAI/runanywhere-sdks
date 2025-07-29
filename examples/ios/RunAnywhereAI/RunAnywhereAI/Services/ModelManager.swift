@@ -298,12 +298,12 @@ class ModelManager: ObservableObject {
         // Add bundled models to available models
         availableModels = BundledModelsService.shared.bundledModels
 
-        // Generate sample models if in debug mode
+        // Install bundled models if in debug mode
         #if DEBUG
         do {
-            try await BundledModelsService.shared.generateSampleModels()
+            try await BundledModelsService.shared.installBundledModels()
         } catch {
-            print("Failed to generate sample models: \(error)")
+            print("Failed to install bundled models: \(error)")
         }
         #endif
     }
