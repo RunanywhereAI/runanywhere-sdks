@@ -77,8 +77,9 @@ class ChatViewModel: ObservableObject {
             } catch {
                 await MainActor.run {
                     self.error = error
+                    // Add error message to chat
                     if messageIndex < self.messages.count {
-                        self.messages[messageIndex].content = "Error: \(error.localizedDescription)"
+                        self.messages[messageIndex].content = "❌ Generation failed: \(error.localizedDescription)"
                     }
                 }
             }

@@ -11,30 +11,30 @@ struct UnifiedModelRow: View {
     let model: ModelInfo
     let framework: LLMFramework
     let onTap: () -> Void
-    let onDownload: (ModelDownloadInfo) -> Void
+    let onDownload: (ModelInfo) -> Void
     let viewModel: ModelListViewModel
 
     @State private var showingNoURLAlert = false
     @State private var showingDownloadConfirmation = false
-    @State private var selectedDownloadInfo: ModelDownloadInfo?
+    @State private var selectedModelInfo: ModelInfo?
 
     @StateObject private var modelURLRegistry = ModelURLRegistry.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
     @StateObject private var modelManager = ModelManager.shared
 
-    private var downloadInfo: ModelDownloadInfo? {
+    private var downloadableModel: ModelInfo? {
         let registry = ModelURLRegistry.shared
         let modelsWithURLs = registry.getAllModels(for: framework)
 
-        return modelsWithURLs.first { downloadInfo in
+        return modelsWithURLs.first { modelInfo in
             // Try exact matches first
-            if downloadInfo.name == model.name || downloadInfo.id == model.id {
+            if modelInfo.name == model.name || modelInfo.id == model.id {
                 return true
             }
 
             // Try fuzzy matching
             let modelNameLower = model.name.lowercased()
-            let downloadNameLower = downloadInfo.name.lowercased()
+            let downloadNameLower = modelInfo.name.lowercased()
 
             // Common patterns for model name matching
             let patterns = ["phi", "tinyllama", "llama-3.2", "mistral", "gemma", "qwen"]
@@ -53,15 +53,15 @@ struct UnifiedModelRow: View {
     }
     
     private var isModelDownloaded: Bool {
-        if let downloadInfo = downloadInfo {
-            return modelManager.isModelDownloaded(downloadInfo.name, framework: framework)
+        if let downloadableModel = downloadableModel {
+            return modelManager.isModelDownloaded(downloadableModel.name, framework: framework)
         }
         return modelManager.isModelDownloaded(model.name, framework: framework)
     }
     
     private var effectiveModelType: ModelType {
-        // Use modelType from downloadInfo if available, otherwise from model
-        return downloadInfo?.modelType ?? model.modelType ?? .text
+        // Use modelType from downloadableModel if available, otherwise from model
+        return downloadableModel?.modelType ?? model.modelType ?? .text
     }
 
     var body: some View {
@@ -147,7 +147,7 @@ struct UnifiedModelRow: View {
                                         .font(.caption2)
                                         .foregroundColor(.green)
                                 }
-                            } else if downloadInfo != nil {
+                            } else if downloadableModel != nil {
                                 HStack(spacing: 4) {
                                     Image(systemName: "checkmark.circle")
                                         .font(.system(size: 10))
@@ -185,8 +185,8 @@ struct UnifiedModelRow: View {
                     } else if !isModelDownloaded {
                         // Download button
                         Button(action: {
-                            if let downloadInfo = downloadInfo {
-                                selectedDownloadInfo = downloadInfo
+                            if let downloadableModel = downloadableModel {
+                                selectedModelInfo = downloadableModel
                                 showingDownloadConfirmation = true
                             } else {
                                 showingNoURLAlert = true
@@ -227,13 +227,13 @@ struct UnifiedModelRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .sheet(isPresented: $showingDownloadConfirmation) {
-            if let downloadInfo = selectedDownloadInfo {
+            if let modelInfo = selectedModelInfo {
                 ModelDownloadConfirmationView(
                     model: model
-                )                    { confirmedDownloadInfo in
-                        onDownload(confirmedDownloadInfo)
-                        showingDownloadConfirmation = false
-                    }
+                ) { confirmedModelInfo in
+                    onDownload(confirmedModelInfo)
+                    showingDownloadConfirmation = false
+                }
             }
         }
         .alert("No Download URL Available", isPresented: $showingNoURLAlert) {
@@ -250,52 +250,32 @@ struct UnifiedModelRow: View {
 // MARK: - Download Only Model Row
 
 struct DownloadOnlyModelRow: View {
-    let downloadInfo: ModelDownloadInfo
+    let modelInfo: ModelInfo
     let onDownload: () -> Void
 
     @StateObject private var downloadManager = ModelDownloadManager.shared
 
     private var isDownloaded: Bool {
-        // Try to determine framework from downloadInfo
-        let framework = determineFramework(from: downloadInfo)
-        return ModelManager.shared.isModelDownloaded(downloadInfo.name, framework: framework)
-    }
-    
-    private func determineFramework(from downloadInfo: ModelDownloadInfo) -> LLMFramework? {
-        // Try to determine framework from URL path or name
-        let urlPath = downloadInfo.url.path.lowercased()
-        let name = downloadInfo.name.lowercased()
-        
-        if urlPath.contains("coreml") || name.contains(".mlpackage") {
-            return .coreML
-        } else if urlPath.contains("mlx") || name.contains("mlx") {
-            return .mlx
-        } else if urlPath.contains("onnx") || name.contains(".onnx") {
-            return .onnxRuntime
-        } else if urlPath.contains("tflite") || name.contains(".tflite") {
-            return .tensorFlowLite
-        } else if name.contains(".gguf") {
-            return .llamaCpp
-        }
-        
-        return nil
+        // Try to determine framework from modelInfo
+        let framework = modelInfo.framework
+        return ModelManager.shared.isModelDownloaded(modelInfo.name, framework: framework)
     }
 
     private var isDownloading: Bool {
-        downloadManager.activeDownloads.keys.contains(downloadInfo.id)
+        downloadManager.activeDownloads.keys.contains(modelInfo.id)
     }
 
     var body: some View {
         HStack(spacing: 12) {
             // Model icon
-            Image(systemName: downloadInfo.isBuiltIn ? "apple.logo" : (isDownloaded ? "checkmark.circle.fill" : "arrow.down.circle"))
+            Image(systemName: modelInfo.isLocal ? "apple.logo" : (isDownloaded ? "checkmark.circle.fill" : "arrow.down.circle"))
                 .font(.title3)
-                .foregroundColor(downloadInfo.isBuiltIn ? .blue : (isDownloaded ? .green : .orange))
+                .foregroundColor(modelInfo.isLocal ? .blue : (isDownloaded ? .green : .orange))
                 .frame(width: 40)
 
             // Model info
             VStack(alignment: .leading, spacing: 4) {
-                Text(downloadInfo.name)
+                Text(modelInfo.name)
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.primary)
@@ -308,65 +288,40 @@ struct DownloadOnlyModelRow: View {
                         Label("Downloaded", systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundColor(.green)
-                    } else if downloadInfo.isBuiltIn {
+                    } else if modelInfo.isLocal {
                         Label("Built-in", systemImage: "apple.logo")
                             .font(.caption)
                             .foregroundColor(.blue)
-                    } else if downloadInfo.requiresAuth {
-                        if downloadInfo.url.host?.contains("kaggle") == true {
-                            let authService = KaggleAuthService.shared
-                            if authService.isAuthenticated {
-                                Label("Kaggle: Ready", systemImage: "checkmark.shield.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.green)
-                            } else {
-                                Label("Kaggle: Auth Required", systemImage: "lock.fill")
-                                    .font(.caption)
-                                    .foregroundColor(.orange)
-                            }
-                        } else {
-                            Label("Requires Auth", systemImage: "lock.fill")
-                                .font(.caption)
-                                .foregroundColor(.orange)
-                        }
-                    } else if downloadInfo.isURLValid {
+                    } else if modelInfo.downloadURL != nil {
                         Label("Available", systemImage: "checkmark.circle")
                             .font(.caption)
                             .foregroundColor(.green)
-                    } else if downloadInfo.isUnavailable {
-                        Label("Unavailable", systemImage: "xmark.circle.fill")
-                            .font(.caption)
-                            .foregroundColor(.red)
                     } else {
                         Label("URL Issue", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
                             .foregroundColor(.red)
                     }
 
-                    // Additional info
-                    if downloadInfo.requiresUnzip {
-                        Text("•")
-                            .foregroundColor(.secondary)
-                        Label("ZIP", systemImage: "archivebox")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    // Additional info - show file format
+                    Text("•")
+                        .foregroundColor(.secondary)
+                    Label(modelInfo.format.rawValue.uppercased(), systemImage: "doc.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
-                // Notes
-                if let notes = downloadInfo.notes {
-                    Text(notes)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
+                // Model size
+                Text(modelInfo.displaySize)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer()
 
             // Action button
             if isDownloading {
-                if let progress = downloadManager.activeDownloads[downloadInfo.id] {
+                if let progress = downloadManager.activeDownloads[modelInfo.id] {
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(Int(progress.fractionCompleted * 100))%")
                             .font(.caption2)
@@ -381,11 +336,11 @@ struct DownloadOnlyModelRow: View {
                 }
             } else if !isDownloaded {
                 Button(action: onDownload) {
-                    if downloadInfo.isBuiltIn {
+                    if modelInfo.isLocal {
                         Image(systemName: "apple.logo")
                             .font(.title2)
                             .foregroundColor(.blue)
-                    } else if downloadInfo.isUnavailable {
+                    } else if modelInfo.downloadURL == nil {
                         Image(systemName: "link.circle.fill")
                             .font(.title2)
                             .foregroundColor(.orange)
@@ -395,7 +350,7 @@ struct DownloadOnlyModelRow: View {
                             .foregroundColor(.blue)
                     }
                 }
-                .disabled(!downloadInfo.isURLValid && !downloadInfo.isBuiltIn && !isDownloaded)
+                .disabled(modelInfo.downloadURL == nil && !modelInfo.isLocal && !isDownloaded)
             } else {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title2)
@@ -409,7 +364,7 @@ struct DownloadOnlyModelRow: View {
                 onDownload()
             }
         }
-        .opacity((!downloadInfo.isURLValid && !downloadInfo.isBuiltIn && !isDownloaded) ? 0.6 : 1.0)
+        .opacity((modelInfo.downloadURL == nil && !modelInfo.isLocal && !isDownloaded) ? 0.6 : 1.0)
     }
 }
 
@@ -431,13 +386,15 @@ struct DownloadOnlyModelRow: View {
         )
 
         DownloadOnlyModelRow(
-            downloadInfo: ModelDownloadInfo(
-                id: "test",
+            modelInfo: ModelInfo(
                 name: "Test Download Model",
-                url: URL(string: "https://example.com/model.gguf")!,
-                requiresUnzip: false
+                format: .gguf,
+                size: "2.1GB",
+                framework: .llamaCpp,
+                isLocal: false,
+                downloadURL: URL(string: "https://example.com/model.gguf")
             )
-        )            {}
+        ) {}
     }
     .padding()
 }

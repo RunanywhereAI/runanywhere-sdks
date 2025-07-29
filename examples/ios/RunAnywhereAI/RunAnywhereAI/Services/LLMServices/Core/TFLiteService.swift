@@ -41,36 +41,13 @@ class TFLiteService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "gemma-2b-tflite",
-                    name: "gemma-2b-it.tflite",
-                    format: .tflite,
-                    size: "1.4GB",
-                    framework: .tensorFlowLite,
-                    quantization: "INT8",
-                    contextLength: 8192,
-                    downloadURL: URL(string: "https://huggingface.co/google/gemma-2b-it/resolve/main/gemma-2b-it-int8.tflite")!,
-                    description: "Google Gemma 2B model quantized for TensorFlow Lite",
-                    minimumMemory: 2_000_000_000,
-                    recommendedMemory: 3_000_000_000
-                ),
-                ModelInfo(
-                    id: "mobilechat-1b-tflite",
-                    name: "mobilechat-1b.tflite",
-                    format: .tflite,
-                    size: "680MB",
-                    framework: .tensorFlowLite,
-                    quantization: "INT8",
-                    contextLength: 2048,
-                    downloadURL: URL(string: "https://huggingface.co/google/mobilechat-1b/resolve/main/mobilechat-1b-int8.tflite")!,
-                    description: "Mobile-optimized chat model for TensorFlow Lite deployment",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 1_500_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .tensorFlowLite)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)

@@ -78,51 +78,41 @@ class BaseTokenizer: Tokenizer {
     }
 }
 
-// MARK: - BPE Tokenizer
+// MARK: - BPE Tokenizer (Legacy - Use GenericBPETokenizer instead)
 
 class BPETokenizer: BaseTokenizer {
-    private var merges: [(String, String)] = []
-    private var vocab: [String: Int] = [:]
-    private var byteEncoder: [Int: String] = [:]
-    private var byteDecoder: [String: Int] = [:]
+    var merges: [(String, String)] = []
+    var vocab: [String: Int] = [:]
 
     override init() {
         super.init()
-        initializeBytePairEncoding()
     }
 
     init(vocabPath: String, mergesPath: String) throws {
         super.init()
         try loadVocabulary(from: vocabPath)
         try loadMerges(from: mergesPath)
-        initializeBytePairEncoding()
-    }
-
-    private func initializeBytePairEncoding() {
-        // Initialize byte-level BPE
-        let bytes = Array(0...255)
-        var n = 0
-
-        for b in bytes {
-            if (b >= 33 && b <= 126) || (b >= 161 && b <= 172) || (b >= 174 && b <= 255) {
-                byteEncoder[b] = String(UnicodeScalar(b)!)
-                byteDecoder[String(UnicodeScalar(b)!)] = b
-            } else {
-                byteEncoder[b] = String(UnicodeScalar(256 + n)!)
-                byteDecoder[String(UnicodeScalar(256 + n)!)] = b
-                n += 1
-            }
-        }
     }
 
     private func loadVocabulary(from path: String) throws {
-        let data = try String(contentsOfFile: path, encoding: .utf8)
-        let lines = data.components(separatedBy: .newlines)
-
-        for (index, line) in lines.enumerated() {
-            let components = line.components(separatedBy: " ")
-            if let token = components.first {
-                vocab[token] = index
+        let data = try Data(contentsOf: URL(fileURLWithPath: path))
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        
+        if let vocabDict = json as? [String: Int] {
+            // Direct vocab.json format (GPT-2 style)
+            vocab = vocabDict
+            vocabulary = vocabDict
+            for (token, id) in vocabDict {
+                reverseVocabulary[id] = token
+            }
+        } else if let lines = String(data: data, encoding: .utf8)?.components(separatedBy: .newlines) {
+            // Fallback to line-by-line format
+            for (index, token) in lines.enumerated() {
+                if !token.isEmpty {
+                    vocab[token] = index
+                    vocabulary[token] = index
+                    reverseVocabulary[index] = token
+                }
             }
         }
     }
@@ -140,30 +130,19 @@ class BPETokenizer: BaseTokenizer {
     }
 
     override func encode(_ text: String) -> [Int] {
-        // Convert text to bytes then apply BPE
-        let bytes = Array(text.utf8)
-        var tokens: [String] = []
-
-        for byte in bytes {
-            if let encoded = byteEncoder[Int(byte)] {
-                tokens.append(encoded)
-            }
-        }
-
-        // Apply BPE merges
-        tokens = applyBPE(tokens)
-
-        // Convert to token IDs
-        var tokenIds: [Int] = [bosToken]
-        for token in tokens {
+        // Simple BPE encoding - model-specific logic should be in adapters
+        let tokens = text.components(separatedBy: .whitespacesAndNewlines)
+        let bpeTokens = applyBPE(tokens)
+        
+        var tokenIds: [Int] = []
+        for token in bpeTokens {
             if let id = vocab[token] {
                 tokenIds.append(id)
             } else {
                 tokenIds.append(vocabulary["<unk>"] ?? 3)
             }
         }
-        tokenIds.append(eosToken)
-
+        
         return tokenIds
     }
 
@@ -183,6 +162,19 @@ class BPETokenizer: BaseTokenizer {
         }
 
         return result
+    }
+    
+    override func decode(_ tokens: [Int]) -> String {
+        // Simple BPE decoding - model-specific logic should be in adapters
+        var decodedPieces: [String] = []
+        
+        for token in tokens {
+            if let tokenStr = reverseVocabulary[token] {
+                decodedPieces.append(tokenStr)
+            }
+        }
+        
+        return decodedPieces.joined(separator: " ")
     }
 }
 
@@ -255,7 +247,7 @@ class SentencePieceTokenizer: BaseTokenizer {
 // MARK: - WordPiece Tokenizer
 
 class WordPieceTokenizer: BaseTokenizer {
-    private var wordPieces: [String: Int] = [:]
+    internal var wordPieces: [String: Int] = [:]
     private let maxInputCharsPerWord = 100
     private let unkToken = "[UNK]"
 
@@ -381,7 +373,7 @@ class TokenizerFactory {
             return BaseTokenizer()
 
         case .bpe(let vocabPath, let mergesPath):
-            return try BPETokenizer(vocabPath: vocabPath, mergesPath: mergesPath)
+            return try GenericBPETokenizer(vocabPath: vocabPath, mergesPath: mergesPath)
 
         case .sentencePiece(let modelPath):
             return try SentencePieceTokenizer(modelPath: modelPath)
@@ -390,37 +382,30 @@ class TokenizerFactory {
             return try WordPieceTokenizer(vocabPath: vocabPath)
 
         case .realBPE(let configPath):
-            return try RealBPETokenizer(configPath: configPath)
+            // For now, fallback to GenericBPE
+            return (try? GenericBPETokenizer(vocabPath: configPath.replacingOccurrences(of: "tokenizer.json", with: "vocab.json"), 
+                                            mergesPath: configPath.replacingOccurrences(of: "tokenizer.json", with: "merges.txt"))) ?? BaseTokenizer()
 
         case .realSentencePiece(let modelPath):
-            return try RealSentencePieceTokenizer(modelPath: modelPath)
+            return (try? SentencePieceTokenizer(modelPath: modelPath)) ?? BaseTokenizer()
 
         case .realWordPiece(let vocabPath):
-            return try RealWordPieceTokenizer(vocabPath: vocabPath)
+            return (try? WordPieceTokenizer(vocabPath: vocabPath)) ?? BaseTokenizer()
         }
     }
 
+    /// Create tokenizer for a framework and model - DEPRECATED, use createAdapter instead
     static func createForFramework(_ framework: LLMFramework, modelPath: String) -> Tokenizer {
         // First try to load real tokenizers with proper model files
 
         // Check for tokenizer.json (most modern models)
         let tokenizerJsonPath = "\(modelPath)/tokenizer.json"
         if FileManager.default.fileExists(atPath: tokenizerJsonPath) {
-            do {
-                let config = try TokenizerConfigLoader.load(from: tokenizerJsonPath)
-
-                switch config.model.type.lowercased() {
-                case "bpe":
-                    return try RealBPETokenizer(configPath: tokenizerJsonPath)
-                case "unigram", "sentencepiece":
-                    return try RealSentencePieceTokenizer(modelPath: tokenizerJsonPath)
-                case "wordpiece":
-                    return try RealWordPieceTokenizer(configPath: tokenizerJsonPath)
-                default:
-                    break
-                }
-            } catch {
-                print("Failed to load tokenizer.json: \(error)")
+            // For now, try to infer from associated files since we don't have a full JSON parser
+            if FileManager.default.fileExists(atPath: "\(modelPath)/vocab.json") &&
+               FileManager.default.fileExists(atPath: "\(modelPath)/merges.txt") {
+                // Likely BPE tokenizer (GPT-2 style)
+                return (try? BPETokenizer(vocabPath: "\(modelPath)/vocab.json", mergesPath: "\(modelPath)/merges.txt")) ?? BaseTokenizer()
             }
         }
 
@@ -436,16 +421,31 @@ class TokenizerFactory {
 
             for path in spPaths {
                 if FileManager.default.fileExists(atPath: path) {
-                    return (try? RealSentencePieceTokenizer(modelPath: path)) ?? BaseTokenizer()
+                    return (try? SentencePieceTokenizer(modelPath: path)) ?? BaseTokenizer()
                 }
             }
 
         case .coreML, .mlx:
             // These might use BPE tokenizers
+            // Check for standard names first
             if FileManager.default.fileExists(atPath: "\(modelPath)/vocab.json") &&
                 FileManager.default.fileExists(atPath: "\(modelPath)/merges.txt") {
-                return (try? RealBPETokenizer(vocabPath: "\(modelPath)/vocab.json",
-                                              mergesPath: "\(modelPath)/merges.txt")) ?? BaseTokenizer()
+                return (try? BPETokenizer(vocabPath: "\(modelPath)/vocab.json",
+                                         mergesPath: "\(modelPath)/merges.txt")) ?? BaseTokenizer()
+            }
+            // Check for GPT-2 specific names
+            if FileManager.default.fileExists(atPath: "\(modelPath)/gpt2-vocab.json") &&
+                FileManager.default.fileExists(atPath: "\(modelPath)/gpt2-merges.txt") {
+                print("Found GPT-2 tokenizer files!")
+                do {
+                    let tokenizer = try BPETokenizer(vocabPath: "\(modelPath)/gpt2-vocab.json",
+                                                    mergesPath: "\(modelPath)/gpt2-merges.txt")
+                    print("Successfully loaded BPE tokenizer with \(tokenizer.vocabularySize) tokens")
+                    return tokenizer
+                } catch {
+                    print("Failed to load BPE tokenizer: \(error)")
+                    return BaseTokenizer()
+                }
             }
 
         case .onnxRuntime, .tensorFlowLite:
@@ -457,7 +457,7 @@ class TokenizerFactory {
 
             for path in vocabPaths {
                 if FileManager.default.fileExists(atPath: path) {
-                    return (try? RealWordPieceTokenizer(vocabPath: path)) ?? BaseTokenizer()
+                    return (try? WordPieceTokenizer(vocabPath: path)) ?? BaseTokenizer()
                 }
             }
 

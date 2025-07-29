@@ -70,6 +70,12 @@ class ModelManager: ObservableObject {
     private init() {
         // Create models directory if it doesn't exist
         try? FileManager.default.createDirectory(at: Self.modelsDirectory, withIntermediateDirectories: true)
+        
+        // Create framework directories
+        createFrameworkDirectories()
+        
+        // Migrate any models in wrong directories
+        migrateModelsToCorrectDirectories()
 
         // Load bundled models
         Task {
@@ -77,11 +83,42 @@ class ModelManager: ObservableObject {
             await refreshModelList()
         }
     }
+    
+    private func createFrameworkDirectories() {
+        for framework in LLMFramework.allCases {
+            let frameworkDir = Self.modelsDirectory.appendingPathComponent(framework.directoryName)
+            try? FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
+        }
+    }
+    
+    private func migrateModelsToCorrectDirectories() {
+        // Migrate Swift Transformers models from CoreML directory
+        let coreMLDir = Self.modelsDirectory.appendingPathComponent("CoreML")
+        let swiftTransformersDir = Self.modelsDirectory.appendingPathComponent("SwiftTransformers")
+        
+        // List of known Swift Transformers models
+        let swiftTransformersModels = ["distilgpt2-swift.mlmodel", "gpt2-base.mlmodel", "gpt2-medium.mlmodel"]
+        
+        for modelName in swiftTransformersModels {
+            let oldPath = coreMLDir.appendingPathComponent(modelName)
+            let newPath = swiftTransformersDir.appendingPathComponent(modelName)
+            
+            if FileManager.default.fileExists(atPath: oldPath.path) &&
+               !FileManager.default.fileExists(atPath: newPath.path) {
+                do {
+                    try FileManager.default.moveItem(at: oldPath, to: newPath)
+                    print("Migrated \(modelName) from CoreML to SwiftTransformers directory")
+                } catch {
+                    print("Failed to migrate \(modelName): \(error)")
+                }
+            }
+        }
+    }
 
     func modelPath(for modelName: String, framework: LLMFramework? = nil) -> URL {
         if let framework = framework {
             return Self.modelsDirectory
-                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(framework.directoryName)
                 .appendingPathComponent(modelName)
         }
         return Self.modelsDirectory.appendingPathComponent(modelName)
@@ -91,7 +128,7 @@ class ModelManager: ObservableObject {
         // Check with framework subdirectory first
         if let framework = framework {
             let frameworkPath = Self.modelsDirectory
-                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(framework.directoryName)
                 .appendingPathComponent(modelName)
             if FileManager.default.fileExists(atPath: frameworkPath.path) {
                 return true
@@ -181,7 +218,7 @@ class ModelManager: ObservableObject {
         // Try framework-specific path first
         if let framework = framework {
             let frameworkPath = Self.modelsDirectory
-                .appendingPathComponent(framework.displayName)
+                .appendingPathComponent(framework.directoryName)
                 .appendingPathComponent(modelName)
             if FileManager.default.fileExists(atPath: frameworkPath.path) {
                 try FileManager.default.removeItem(at: frameworkPath)
@@ -290,7 +327,7 @@ class ModelManager: ObservableObject {
                     if isDirectory.boolValue {
                         // This is a framework directory, check for models inside
                         let frameworkName = url.lastPathComponent
-                        if let framework = LLMFramework.allCases.first(where: { $0.displayName == frameworkName }) {
+                        if let framework = LLMFramework.allCases.first(where: { $0.directoryName == frameworkName }) {
                             let frameworkContents = try FileManager.default.contentsOfDirectory(
                                 at: url,
                                 includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
@@ -354,14 +391,14 @@ class ModelManager: ObservableObject {
         let registry = ModelURLRegistry.shared
         var modelType: ModelType = .text
         if let downloadInfo = registry.getModelInfo(id: fileName) {
-            modelType = downloadInfo.modelType
+            modelType = downloadInfo.modelType ?? .text
         } else if let frameworkInfo = framework {
             // Check all models in this framework for a match
             let frameworkModels = registry.getAllModels(for: frameworkInfo)
             if let matchingModel = frameworkModels.first(where: { 
                 isModelNameMatch($0.name, fileName) 
             }) {
-                modelType = matchingModel.modelType
+                modelType = matchingModel.modelType ?? .text
             }
         }
 

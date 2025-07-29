@@ -99,7 +99,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     /// Indicates if this framework is deferred (coming soon)
     var isDeferred: Bool {
         switch self {
-        case .execuTorch, .llamaCpp, .mlc, .picoLLM, .swiftTransformers:
+        case .execuTorch, .llamaCpp, .mlc, .picoLLM:
             return true
         default:
             return false
@@ -114,11 +114,27 @@ enum LLMFramework: String, CaseIterable, Codable {
     var displayName: String {
         rawValue
     }
+    
+    /// Directory name for storing models of this framework
+    var directoryName: String {
+        switch self {
+        case .foundationModels: return "FoundationModels"
+        case .llamaCpp: return "llama.cpp"
+        case .coreML: return "CoreML"
+        case .mlx: return "MLX"
+        case .mlc: return "MLC-LLM"
+        case .onnxRuntime: return "ONNXRuntime"
+        case .execuTorch: return "ExecuTorch"
+        case .tensorFlowLite: return "TensorFlowLite"
+        case .picoLLM: return "picoLLM"
+        case .swiftTransformers: return "SwiftTransformers"
+        }
+    }
 
     static func forFormat(_ format: ModelFormat) -> LLMFramework {
         switch format {
         case .gguf, .ggml: return .llamaCpp
-        case .coreML, .mlPackage: return .coreML
+        case .coreML, .mlPackage: return .coreML  // Note: SwiftTransformers also uses these formats
         case .mlx, .safetensors: return .mlx
         case .mlc: return .mlc
         case .onnx, .onnxRuntime: return .onnxRuntime
@@ -127,6 +143,26 @@ enum LLMFramework: String, CaseIterable, Codable {
         case .picoLLM: return .picoLLM
         case .pytorch: return .execuTorch
         default: return .coreML  // Default to Core ML instead of mock
+        }
+    }
+}
+
+// MARK: - Auth Type
+
+enum AuthType: String, Codable {
+    case none = "None"
+    case kaggle = "Kaggle"
+    case huggingFace = "Hugging Face"
+    
+    var displayName: String {
+        rawValue
+    }
+    
+    var icon: String {
+        switch self {
+        case .none: return "lock.open"
+        case .kaggle: return "person.badge.key"
+        case .huggingFace: return "key.fill"
         }
     }
 }
@@ -171,6 +207,12 @@ struct ModelInfo: Identifiable, Codable {
     let format: ModelFormat
     let size: String
     let framework: LLMFramework
+    
+    /// Unique identifier combining framework and model ID
+    /// Format: "framework-directory.model-id" (e.g., "SwiftTransformers.distilgpt2-swift-transformers")
+    var uniqueId: String {
+        "\(framework.directoryName).\(id)"
+    }
     let quantization: String?
     let contextLength: Int?
     var isLocal: Bool = false
@@ -178,6 +220,18 @@ struct ModelInfo: Identifiable, Codable {
     var downloadedFileName: String?
     var modelType: ModelType?
 
+    // Download-related properties
+    let sha256: String?
+    let requiresUnzip: Bool
+    let requiresAuth: Bool
+    let authType: AuthType
+    let alternativeURLs: [URL]
+    let notes: String?
+    
+    // Runtime properties (not encoded)
+    var isURLValid: Bool = true
+    var lastVerified: Date?
+    
     // Legacy support
     let description: String
     let minimumMemory: Int64
@@ -195,6 +249,12 @@ struct ModelInfo: Identifiable, Codable {
          downloadURL: URL? = nil,
          downloadedFileName: String? = nil,
          modelType: ModelType? = nil,
+         sha256: String? = nil,
+         requiresUnzip: Bool = false,
+         requiresAuth: Bool = false,
+         authType: AuthType = .none,
+         alternativeURLs: [URL] = [],
+         notes: String? = nil,
          description: String = "",
          minimumMemory: Int64 = 2_000_000_000,
          recommendedMemory: Int64 = 4_000_000_000) {
@@ -210,6 +270,12 @@ struct ModelInfo: Identifiable, Codable {
         self.downloadURL = downloadURL
         self.downloadedFileName = downloadedFileName
         self.modelType = modelType ?? .text // Default to text if not specified
+        self.sha256 = sha256
+        self.requiresUnzip = requiresUnzip
+        self.requiresAuth = requiresAuth
+        self.authType = authType
+        self.alternativeURLs = alternativeURLs
+        self.notes = notes
         self.description = description
         self.minimumMemory = minimumMemory
         self.recommendedMemory = recommendedMemory
@@ -222,5 +288,21 @@ struct ModelInfo: Identifiable, Codable {
     var isCompatible: Bool {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return availableMemory >= minimumMemory
+    }
+    
+    var isBuiltIn: Bool {
+        downloadURL?.scheme == "builtin"
+    }
+    
+    var isUnavailable: Bool {
+        !isURLValid && !isBuiltIn && !requiresAuth
+    }
+    
+    // Custom Codable implementation to exclude runtime properties
+    enum CodingKeys: String, CodingKey {
+        case id, name, path, format, size, framework, quantization, contextLength
+        case isLocal, downloadURL, downloadedFileName, modelType
+        case sha256, requiresUnzip, requiresAuth, authType, alternativeURLs, notes
+        case description, minimumMemory, recommendedMemory
     }
 }

@@ -1,6 +1,15 @@
 {
   "permissions": {
     "allow": [
+      "Bash(xcrun simctl spawn:*)",
+      "WebFetch(domain:machinelearning.apple.com)",
+      "WebFetch(domain:medium.com)",
+      "Bash(pip3 install:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(log show:*)",
+      "Bash(bash scripts/verify_urls.sh:*)",
+      "Bash(./test_hf_token.swift)",
       "Bash(ls:*)",
       "Bash(git add:*)",
       "Bash(./gradlew:*)",
@@ -10,7 +19,7 @@
       "Bash(swift build)",
       "Bash(swift test)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
       "Bash(xcodebuild:*)",
       "Bash(xcrun simctl list:*)",
       "Bash(xcrun simctl install:*)",

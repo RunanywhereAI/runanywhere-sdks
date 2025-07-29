@@ -13,6 +13,7 @@ enum ModelDownloadError: LocalizedError {
     case invalidChecksum
     case unzipFailed
     case cancelled
+    case authRequired
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ enum ModelDownloadError: LocalizedError {
             return "Failed to extract model files"
         case .cancelled:
             return "Download was cancelled"
+        case .authRequired:
+            return "Authentication required. Please configure your API credentials in Settings."
         }
     }
 }
@@ -62,7 +65,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
     private var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
-    private var downloadInfoMap: [String: ModelDownloadInfo] = [:]
+    private var downloadInfoMap: [String: ModelInfo] = [:]
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -87,12 +90,12 @@ class ModelDownloadManager: NSObject, ObservableObject {
 
     /// Download a model with progress tracking
     func downloadModel(
-        _ downloadInfo: ModelDownloadInfo,
+        _ modelInfo: ModelInfo,
         progress: @escaping (DownloadProgress) -> Void,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
         // Clean up any existing model files first if re-downloading
-        cleanupExistingModel(downloadInfo)
+        cleanupExistingModel(modelInfo)
         
         // Check storage before starting
         // Estimate size from filename if not provided
@@ -107,17 +110,65 @@ class ModelDownloadManager: NSObject, ObservableObject {
         }
 
         // Setup download
-        let downloadId = downloadInfo.id
+        let downloadId = modelInfo.id
         progressHandlers[downloadId] = progress
         completionHandlers[downloadId] = completion
         downloadStartTimes[downloadId] = Date()
-        downloadInfoMap[downloadId] = downloadInfo
+        downloadInfoMap[downloadId] = modelInfo
 
         // Create download request with proper configuration
-        var request = URLRequest(url: downloadInfo.url)
+        guard let downloadURL = modelInfo.downloadURL else {
+            completion(.failure(ModelDownloadError.noDownloadURL))
+            return
+        }
+        
+        // Check if this is a .mlpackage URL on Hugging Face
+        if downloadURL.absoluteString.contains(".mlpackage") && 
+           downloadURL.host?.contains("huggingface") == true {
+            // Use the HuggingFace directory downloader for .mlpackage files
+            Task {
+                do {
+                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                    let modelsDirectory = documentsURL.appendingPathComponent("Models").appendingPathComponent(modelInfo.framework.directoryName)
+                    
+                    let finalURL = try await downloadHuggingFaceDirectory(
+                        modelInfo,
+                        to: modelsDirectory,
+                        progress: progress
+                    )
+                    
+                    completion(.success(finalURL))
+                } catch {
+                    completion(.failure(error))
+                }
+            }
+            return
+        }
+        var request = URLRequest(url: downloadURL)
         request.httpMethod = "GET"
         request.timeoutInterval = 3600 // 1 hour
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        // Add authentication headers if needed
+        if modelInfo.requiresAuth {
+            if downloadURL.host?.contains("kaggle") == true {
+                // Kaggle authentication
+                if let kaggleAuth = KaggleAuthService.shared.currentCredentials {
+                    request.setValue(kaggleAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
+                } else {
+                    completion(.failure(ModelDownloadError.authRequired))
+                    return
+                }
+            } else if downloadURL.host?.contains("huggingface") == true {
+                // Hugging Face authentication
+                if let hfAuth = HuggingFaceAuthService.shared.currentCredentials {
+                    request.setValue(hfAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
+                } else {
+                    completion(.failure(ModelDownloadError.authRequired))
+                    return
+                }
+            }
+        }
         
         // Create download task
         let task = session.downloadTask(with: request)
@@ -144,22 +195,13 @@ class ModelDownloadManager: NSObject, ObservableObject {
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            // Convert ModelInfo to ModelDownloadInfo
+            // Convert ModelInfo to ModelInfo
             guard let downloadURL = modelInfo.downloadURL else {
                 continuation.resume(throwing: ModelDownloadError.noDownloadURL)
                 return
             }
 
-            let downloadInfo = ModelDownloadInfo(
-                id: modelInfo.id,
-                name: modelInfo.name,
-                url: downloadURL,
-                sha256: nil,
-                requiresUnzip: false,
-                requiresAuth: false
-            )
-
-            downloadModel(downloadInfo, progress: progress) { result in
+            downloadModel(modelInfo, progress: progress) { result in
                 switch result {
                 case .success(let tempURL):
                     Task {
@@ -262,31 +304,29 @@ class ModelDownloadManager: NSObject, ObservableObject {
 
     // MARK: - Private Methods
     
-    private func cleanupExistingModel(_ downloadInfo: ModelDownloadInfo) {
-        // Determine the framework from the download info
-        let framework = determineFramework(from: downloadInfo)
+    private func cleanupExistingModel(_ modelInfo: ModelInfo) {
+        // Determine the framework from the model info
+        let framework = modelInfo.framework
         
         // Get the models directory
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsDirectory = documentsURL.appendingPathComponent("Models")
         
         // Check framework-specific directory
-        if let framework = framework {
-            let frameworkDir = modelsDirectory.appendingPathComponent(framework.displayName)
-            let modelPath = frameworkDir.appendingPathComponent(downloadInfo.name)
-            
-            if FileManager.default.fileExists(atPath: modelPath.path) {
-                do {
-                    try FileManager.default.removeItem(at: modelPath)
-                    print("Cleaned up existing model at: \(modelPath.path)")
-                } catch {
-                    print("Failed to cleanup existing model: \(error)")
-                }
+        let frameworkDir = modelsDirectory.appendingPathComponent(framework.directoryName)
+        let modelPath = frameworkDir.appendingPathComponent(modelInfo.name)
+        
+        if FileManager.default.fileExists(atPath: modelPath.path) {
+            do {
+                try FileManager.default.removeItem(at: modelPath)
+                print("Cleaned up existing model at: \(modelPath.path)")
+            } catch {
+                print("Failed to cleanup existing model: \(error)")
             }
         }
         
         // Also check root models directory (legacy)
-        let rootModelPath = modelsDirectory.appendingPathComponent(downloadInfo.name)
+        let rootModelPath = modelsDirectory.appendingPathComponent(modelInfo.name)
         if FileManager.default.fileExists(atPath: rootModelPath.path) {
             do {
                 try FileManager.default.removeItem(at: rootModelPath)
@@ -302,7 +342,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
             do {
                 let contents = try FileManager.default.contentsOfDirectory(at: downloadsDir, includingPropertiesForKeys: nil)
                 for file in contents {
-                    if file.lastPathComponent.contains(downloadInfo.id) {
+                    if file.lastPathComponent.contains(modelInfo.id) {
                         try FileManager.default.removeItem(at: file)
                         print("Cleaned up partial download: \(file.lastPathComponent)")
                     }
@@ -313,25 +353,6 @@ class ModelDownloadManager: NSObject, ObservableObject {
         }
     }
     
-    private func determineFramework(from downloadInfo: ModelDownloadInfo) -> LLMFramework? {
-        // Try to determine framework from URL path or name
-        let urlPath = downloadInfo.url.path.lowercased()
-        let name = downloadInfo.name.lowercased()
-        
-        if urlPath.contains("coreml") || name.contains(".mlpackage") {
-            return .coreML
-        } else if urlPath.contains("mlx") || name.contains("mlx") {
-            return .mlx
-        } else if urlPath.contains("onnx") || name.contains(".onnx") {
-            return .onnxRuntime
-        } else if urlPath.contains("tflite") || name.contains(".tflite") {
-            return .tensorFlowLite
-        } else if name.contains(".gguf") {
-            return .llamaCpp
-        }
-        
-        return nil
-    }
 
     private func moveAndProcessModel(
         from tempURL: URL,

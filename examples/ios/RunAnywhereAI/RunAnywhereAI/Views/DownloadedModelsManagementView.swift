@@ -337,6 +337,22 @@ struct ModelRowView: View {
     
     @State private var fileExists = true
     
+    private func formatPath(_ path: String) -> String {
+        // Get the relative path from the Documents directory
+        if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path {
+            if path.hasPrefix(documentsPath) {
+                let relativePath = String(path.dropFirst(documentsPath.count))
+                return "~/Documents\(relativePath)"
+            }
+        }
+        // If not in Documents, show the last few components
+        let components = path.split(separator: "/")
+        if components.count > 3 {
+            return ".../\(components.suffix(3).joined(separator: "/"))"
+        }
+        return path
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Selection checkbox in edit mode
@@ -378,6 +394,12 @@ struct ModelRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
+                
+                // File path
+                Text(formatPath(model.path))
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
                 
                 if !fileExists {
                     Text("File not found - tap to remove")

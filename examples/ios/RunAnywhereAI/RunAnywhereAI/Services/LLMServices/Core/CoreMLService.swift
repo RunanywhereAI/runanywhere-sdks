@@ -8,85 +8,7 @@
 import Foundation
 import CoreML
 
-// MARK: - Core ML Text Generation Input/Output
-
-@available(iOS 17.0, *)
-@objc(TextGenerationInput)
-class TextGenerationInput: NSObject, MLFeatureProvider {
-    let inputIds: MLMultiArray
-
-    var featureNames: Set<String> {
-        ["input_ids"]
-    }
-
-    func featureValue(for featureName: String) -> MLFeatureValue? {
-        if featureName == "input_ids" {
-            return MLFeatureValue(multiArray: inputIds)
-        }
-        return nil
-    }
-
-    init(inputIds: MLMultiArray) {
-        self.inputIds = inputIds
-        super.init()
-    }
-}
-
-@available(iOS 17.0, *)
-private class CoreMLTokenizer {
-    private let vocabPath: String
-    private var vocab: [String: Int] = [:]
-    private var inverseVocab: [Int: String] = [:]
-
-    init(vocabPath: String) throws {
-        self.vocabPath = vocabPath
-        try loadVocabulary()
-    }
-
-    private func loadVocabulary() throws {
-        // In a real implementation, this would load from a tokenizer.json or vocab.txt file
-        // For demonstration, create a simple vocabulary
-        let commonTokens = [
-            "<|endoftext|>": 0,
-            "<|start|>": 1,
-            " the": 2, " and": 3, " to": 4, " of": 5, " a": 6, " in": 7, " is": 8, " it": 9, " you": 10,
-            " that": 11, " he": 12, " was": 13, " for": 14, " on": 15, " are": 16, " as": 17, " with": 18,
-            " his": 19, " they": 20, " I": 21, " at": 22, " be": 23, " this": 24, " have": 25, " from": 26,
-            " or": 27, " one": 28, " had": 29, " by": 30, " word": 31, " but": 32, " what": 33, " some": 34,
-            " we": 35, " can": 36, " out": 37, " other": 38, " were": 39, " all": 40, " there": 41, " when": 42,
-            " up": 43, " use": 44, " your": 45, " how": 46, " said": 47, " an": 48, " each": 49, " which": 50
-        ]
-
-        for (token, id) in commonTokens {
-            vocab[token] = id
-            inverseVocab[id] = token
-        }
-    }
-
-    func encode(_ text: String) -> [Int32] {
-        // Simple tokenization - in reality would use BPE or WordPiece
-        var tokens: [Int32] = []
-        let words = text.components(separatedBy: .whitespacesAndNewlines)
-
-        for word in words {
-            let tokenKey = " " + word.lowercased()
-            if let tokenId = vocab[tokenKey] {
-                tokens.append(Int32(tokenId))
-            } else {
-                // Unknown token - use a hash of the word
-                tokens.append(Int32(abs(word.hashValue) % 1000 + 100))
-            }
-        }
-
-        return tokens.isEmpty ? [1] : tokens // Return start token if empty
-    }
-
-    func decode(_ tokens: [Int32]) -> String {
-        tokens.compactMap { tokenId in
-            inverseVocab[Int(tokenId)] ?? "unk"
-        }.joined(separator: "")
-    }
-}
+// MARK: - Core ML Text Generation Service
 
 @available(iOS 17.0, *)
 class CoreMLService: BaseLLMService {
@@ -130,62 +52,19 @@ class CoreMLService: BaseLLMService {
 
     override var supportedModels: [ModelInfo] {
         get {
-            [
-                ModelInfo(
-                    id: "gpt2-coreml",
-                    name: "GPT2-CoreML.mlpackage",
-                    format: .coreML,
-                    size: "548MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 1024,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/coreml-community/gpt2-coreml/resolve/main/GPT2.mlpackage.zip"
-                    )!,
-                    description: "GPT-2 model converted to Core ML format with Neural Engine acceleration",
-                    minimumMemory: 1_000_000_000,
-                    recommendedMemory: 2_000_000_000
-                ),
-                ModelInfo(
-                    id: "distilgpt2-coreml",
-                    name: "DistilGPT2-CoreML.mlpackage",
-                    format: .coreML,
-                    size: "267MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 1024,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/coreml-community/distilgpt2-coreml/resolve/main/DistilGPT2.mlpackage.zip"
-                    )!,
-                    description: "Smaller DistilGPT2 model optimized for mobile devices",
-                    minimumMemory: 500_000_000,
-                    recommendedMemory: 1_000_000_000
-                ),
-                ModelInfo(
-                    id: "openelm-270m-coreml",
-                    name: "OpenELM-270M.mlpackage",
-                    format: .coreML,
-                    size: "312MB",
-                    framework: .coreML,
-                    quantization: "Float16",
-                    contextLength: 2048,
-                    downloadURL: URL(
-                        string: "https://huggingface.co/apple/OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-coreml.zip"
-                    )!,
-                    description: "Apple's OpenELM 270M model optimized for on-device inference",
-                    minimumMemory: 400_000_000,
-                    recommendedMemory: 800_000_000
-                )
-            ]
+            // Get models from the single source of truth
+            ModelURLRegistry.shared.getAllModels(for: .coreML)
         }
-        set {}
+        set {
+            // Models are managed centrally in ModelURLRegistry
+            // This setter is here for protocol compliance but does nothing
+        }
     }
 
     private var model: MLModel?
-    private var tokenizer: CoreMLTokenizer?
-    private var realTokenizer: Tokenizer?  // Real tokenizer from TokenizerFactory
+    private var tokenizerAdapter: TokenizerAdapter?  // Model-agnostic tokenizer adapter
     private var currentModelInfo: ModelInfo?
-    private let maxSequenceLength = 512
+    private var modelAdapter: CoreMLModelAdapter?  // Model-specific adapter
 
     override func initialize(modelPath: String) async throws {
         // Verify model file exists and is valid
@@ -225,28 +104,68 @@ class CoreMLService: BaseLLMService {
             // REAL Core ML model loading
             if modelPath.hasSuffix(".mlpackage") {
                 // Load .mlpackage directly (preferred format)
+                print("Loading .mlpackage model from: \(modelURL.path)")
                 model = try MLModel(contentsOf: modelURL, configuration: configuration)
                 print("✅ Loaded .mlpackage model successfully")
             } else {
                 // Compile .mlmodel if needed, then load
-                print("Compiling .mlmodel...")
-                let compiledURL = try await MLModel.compileModel(at: modelURL)
+                print("Processing .mlmodel file...")
+                print("Model path: \(modelURL.path)")
+                
+                // Check if already compiled
+                let compiledModelName = modelURL.lastPathComponent + "c"
+                let compiledModelPath = modelURL.deletingLastPathComponent().appendingPathComponent(compiledModelName)
+                
+                let compiledURL: URL
+                if FileManager.default.fileExists(atPath: compiledModelPath.path) {
+                    print("✅ Found existing compiled model at: \(compiledModelPath.path)")
+                    compiledURL = compiledModelPath
+                } else {
+                    print("⏳ Compiling .mlmodel for first time... This may take a few minutes for large models.")
+                    print("Note: Future loads will be much faster.")
+                    
+                    do {
+                        let compiledPath = try await MLModel.compileModel(at: modelURL)
+                        compiledURL = compiledPath
+                        print("✅ Model compiled successfully at: \(compiledURL.path)")
+                    } catch {
+                        print("❌ Model compilation failed: \(error)")
+                        throw LLMError.modelLoadFailed(reason: "Failed to compile Core ML model: \(error.localizedDescription)", framework: "Core ML")
+                    }
+                }
+                
+                print("Loading compiled model...")
                 model = try MLModel(contentsOf: compiledURL, configuration: configuration)
-                print("✅ Compiled and loaded .mlmodel successfully")
+                print("✅ Loaded compiled .mlmodel successfully")
             }
 
-            // Try to load real tokenizer using TokenizerFactory
-            let modelDirectory = modelURL.deletingLastPathComponent().path
-            realTokenizer = TokenizerFactory.createForFramework(.coreML, modelPath: modelDirectory)
+            // Create model-specific adapter
+            guard let currentModelInfo = currentModelInfo else {
+                throw LLMError.initializationFailed("Model info not found")
+            }
+            
+            guard let loadedModel = model else {
+                throw LLMError.initializationFailed("Model loading failed")
+            }
+            
+            modelAdapter = CoreMLAdapterFactory.createAdapter(for: currentModelInfo, model: loadedModel)
+            
+            guard let adapter = modelAdapter else {
+                throw LLMError.initializationFailed("No compatible adapter found for model: \(currentModelInfo.name)")
+            }
+            
+            print("✅ Using adapter: \(type(of: adapter)) for model: \(currentModelInfo.name)")
 
-            if !(realTokenizer is BaseTokenizer) {
-                // Using real tokenizer
-                print("✅ Loaded real tokenizer for Core ML model")
-                tokenizer = try CoreMLTokenizer(vocabPath: "")  // Keep for interface compatibility
+            // Try to load tokenizer adapter
+            let modelDirectory = modelURL.deletingLastPathComponent().path
+            tokenizerAdapter = TokenizerAdapterFactory.createAdapter(for: modelDirectory, framework: .coreML)
+            
+            if let adapter = tokenizerAdapter {
+                print("✅ Loaded tokenizer adapter: \(type(of: adapter)) with \(adapter.vocabularySize) tokens")
             } else {
-                // Fallback to basic tokenizer
-                tokenizer = try CoreMLTokenizer(vocabPath: "")
-                print("⚠️ Using basic tokenizer (no model-specific tokenizer found)")
+                print("⚠️ No tokenizer adapter found, using basic tokenizer")
+                // Create a basic adapter as fallback
+                tokenizerAdapter = BaseTokenizerAdapter(tokenizer: BaseTokenizer(), modelType: "unknown")
             }
         } catch {
             print("❌ Core ML model loading failed: \(error)")
@@ -267,7 +186,7 @@ class CoreMLService: BaseLLMService {
     }
 
     override func generate(prompt: String, options: GenerationOptions) async throws -> String {
-        guard isInitialized, model != nil, tokenizer != nil else {
+        guard isInitialized, model != nil, tokenizerAdapter != nil else {
             throw LLMError.notInitialized()
         }
 
@@ -284,71 +203,56 @@ class CoreMLService: BaseLLMService {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isInitialized, model != nil, tokenizer != nil else {
+        guard isInitialized, model != nil, let adapter = modelAdapter, let tokenizerAdapter = tokenizerAdapter else {
             throw LLMError.notInitialized()
         }
 
-        // Real Core ML implementation with autoregressive generation
-        let inputTokens: [Int32]
-        if let realTokenizer = realTokenizer {
-            // Use real tokenizer
-            let intTokens = realTokenizer.encode(prompt)
-            inputTokens = intTokens.map { Int32($0) }
-            print("Core ML: Processing \(inputTokens.count) input tokens (real tokenizer)")
-        } else if let tokenizer = tokenizer {
-            // Fallback to basic tokenizer
-            inputTokens = tokenizer.encode(prompt)
-            print("Core ML: Processing \(inputTokens.count) input tokens (basic tokenizer)")
-        } else {
-            // No tokenizer available
-            throw LLMError.notInitialized()
-        }
+        // Use tokenizer adapter for encoding
+        let intTokens = tokenizerAdapter.encode(prompt)
+        let inputTokens = intTokens.map { Int32($0) }
+        print("Core ML: Processing \(inputTokens.count) input tokens using \(type(of: tokenizerAdapter))")
 
         // Track generated tokens for autoregressive generation
         var allTokens = inputTokens
         var generatedTokens: [Int32] = []
 
         do {
-            // Autoregressive generation loop
+            // Get model and adapter info
+            guard let model = model else {
+                throw LLMError.notInitialized()
+            }
+            
+            let inputNames = Array(model.modelDescription.inputDescriptionsByName.keys)
+            let outputNames = Array(model.modelDescription.outputDescriptionsByName.keys)
+            
+            print("Core ML Model Info:")
+            print("- Input names: \(inputNames)")
+            print("- Output names: \(outputNames)")
+            print("- Using adapter: \(type(of: adapter))")
+            print("- Max sequence length: \(adapter.maxSequenceLength)")
+            
+            // Autoregressive generation loop using adapter
             for _ in 0..<options.maxTokens {
-                // Create input array with current sequence
-                let inputArray = try createInputArray(from: allTokens)
-                let input = TextGenerationInput(inputIds: inputArray)
+                // Use sliding window approach for long sequences
+                let contextTokens: [Int32]
+                if allTokens.count > adapter.maxSequenceLength {
+                    contextTokens = Array(allTokens.suffix(adapter.maxSequenceLength))
+                } else {
+                    contextTokens = allTokens
+                }
+                
+                // Create input arrays using the adapter
+                let inputArrays = try adapter.createInputArrays(from: contextTokens)
+                
+                // Create feature provider from adapter's input arrays
+                let inputFeatures = try MLDictionaryFeatureProvider(dictionary: inputArrays.mapValues { MLFeatureValue(multiArray: $0) })
 
                 // Run Core ML prediction
-                guard let model = model else {
-                    throw LLMError.notInitialized()
-                }
-                let prediction = try await model.prediction(from: input)
+                let prediction = try await model.prediction(from: inputFeatures)
 
-                // Extract logits from prediction output
-                var nextToken: Int32
-                if let logitsFeature = prediction.featureValue(for: "logits"),
-                   let logitsArray = logitsFeature.multiArrayValue {
-                    // Sample from logits using temperature
-                    nextToken = sampleFromLogits(logitsArray, temperature: Double(options.temperature))
-                } else if let tokensFeature = prediction.featureValue(for: "output_tokens"),
-                          let tokensArray = tokensFeature.multiArrayValue,
-                          tokensArray.count > 0 {
-                    // Some models directly output tokens
-                    nextToken = Int32(tokensArray[tokensArray.count - 1].intValue)
-                } else {
-                    // Fallback: use the model description to find the right output
-                    let outputKeys = model.modelDescription.outputDescriptionsByName.keys
-                    print("Available outputs: \(outputKeys)")
-
-                    // Try to find any numeric output that could be tokens/logits
-                    for outputKey in outputKeys {
-                        if let feature = prediction.featureValue(for: outputKey),
-                           let array = feature.multiArrayValue {
-                            nextToken = sampleFromLogits(array, temperature: Double(options.temperature))
-                            break
-                        }
-                    }
-
-                    // If all else fails, generate a reasonable token
-                    nextToken = Int32.random(in: 2...50)
-                }
+                // Use adapter to sample next token from prediction
+                let lastTokenPosition = min(contextTokens.count - 1, adapter.maxSequenceLength - 1)
+                let nextToken = try adapter.sampleNextToken(from: prediction, lastTokenPosition: lastTokenPosition, temperature: Double(options.temperature))
 
                 // Check for end of sequence
                 if nextToken == 0 || nextToken == 1 { // Common EOS tokens
@@ -359,22 +263,23 @@ class CoreMLService: BaseLLMService {
                 allTokens.append(nextToken)
                 generatedTokens.append(nextToken)
 
-                // Decode and emit token
-                let decodedText: String
-                if let realTokenizer = realTokenizer {
-                    decodedText = realTokenizer.decode([Int(nextToken)])
+                // Decode and emit token using tokenizer adapter
+                let decodedText = tokenizerAdapter.decodeToken(Int(nextToken))
+                print("Tokenizer adapter decoded token \(nextToken) -> '\(decodedText)'")
+                
+                // Ensure we emit non-empty text
+                if !decodedText.isEmpty {
+                    onToken(decodedText)
                 } else {
-                    decodedText = tokenizer?.decode([nextToken]) ?? ""
+                    // Fallback for empty decode - emit space to show progress
+                    onToken(" ")
+                    print("Warning: Empty decode for token \(nextToken), emitting space")
                 }
-                onToken(decodedText)
 
                 // Core ML inference timing (Neural Engine is quite fast)
                 try await Task.sleep(nanoseconds: 30_000_000) // 30ms per token
-
-                // Limit context length to prevent memory issues
-                if allTokens.count > maxSequenceLength {
-                    allTokens = Array(allTokens.suffix(maxSequenceLength))
-                }
+                
+                // Context length is now handled in the generation loop with sliding window
             }
 
             print("Core ML generated \(generatedTokens.count) tokens successfully")
@@ -384,60 +289,7 @@ class CoreMLService: BaseLLMService {
         }
     }
 
-    // MARK: - Private Core ML Helper Methods
-
-    private func createInputArray(from tokens: [Int32]) throws -> MLMultiArray {
-        let inputShape = [1, min(tokens.count, maxSequenceLength)] as [NSNumber]
-        let inputArray = try MLMultiArray(shape: inputShape, dataType: .int32)
-
-        for (index, token) in tokens.prefix(maxSequenceLength).enumerated() {
-            inputArray[index] = NSNumber(value: token)
-        }
-
-        return inputArray
-    }
-
-    private func sampleFromLogits(_ logitsArray: MLMultiArray, temperature: Double) -> Int32 {
-        // Convert MLMultiArray to Swift array
-        let count = logitsArray.count
-        var logits: [Float] = []
-
-        for i in 0..<count {
-            logits.append(logitsArray[i].floatValue)
-        }
-
-        // Apply temperature scaling
-        if temperature > 0 {
-            for i in 0..<logits.count {
-                logits[i] = logits[i] / Float(temperature)
-            }
-        }
-
-        // Apply softmax to get probabilities
-        let maxLogit = logits.max() ?? 0
-        for i in 0..<logits.count {
-            logits[i] = exp(logits[i] - maxLogit)
-        }
-
-        let sumExp = logits.reduce(0, +)
-        for i in 0..<logits.count {
-            logits[i] = logits[i] / sumExp
-        }
-
-        // Sample from the probability distribution
-        let randomValue = Float.random(in: 0...1)
-        var cumulativeProb: Float = 0
-
-        for (index, prob) in logits.enumerated() {
-            cumulativeProb += prob
-            if randomValue <= cumulativeProb {
-                return Int32(index)
-            }
-        }
-
-        // Fallback to the last token
-        return Int32(logits.count - 1)
-    }
+    // MARK: - Private Core ML Helper Methods (Generic)
 
     override func getModelInfo() -> ModelInfo? {
         currentModelInfo
@@ -447,9 +299,9 @@ class CoreMLService: BaseLLMService {
         // Core ML models are automatically managed by the system
         // Just clear our references
         model = nil
-        tokenizer = nil
-        realTokenizer = nil
+        tokenizerAdapter = nil
         currentModelInfo = nil
+        modelAdapter = nil
         isInitialized = false
 
         // Force garbage collection to free model memory

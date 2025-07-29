@@ -137,3 +137,7 @@ lint/reports/
 *.tar.gz
 *.rar
 hs_err_pid*
+
+EXTERNAL/
+thoughts/
+local/
