@@ -139,3 +139,5 @@ lint/reports/
 hs_err_pid*
 
 EXTERNAL/
+thoughts/
+local/
