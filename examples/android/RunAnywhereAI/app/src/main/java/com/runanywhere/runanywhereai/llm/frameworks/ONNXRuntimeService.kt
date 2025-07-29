@@ -46,7 +46,6 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
             val sessionOptions = OrtSession.SessionOptions().apply {
                 // Add execution providers
                 addNnapi() // Android NNAPI
-                addCPU()   // CPU fallback
                 
                 // Optimization settings
                 setInterOpNumThreads(4)
@@ -70,72 +69,127 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
         }
     }
     
-    override suspend fun generate(prompt: String, options: GenerationOptions): String {
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
-            val session = ortSession ?: throw IllegalStateException("Service not initialized")
-            val generatedTokens = mutableListOf<Long>()
-            var inputIds = tokenizer.encode(prompt)
+            val session = ortSession ?: return@withContext GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            )
             
-            for (i in 0 until options.maxTokens) {
-                // Prepare input tensor
-                val inputTensor = createInputTensor(inputIds)
+            try {
+                val startTime = System.currentTimeMillis()
+                val generatedTokens = mutableListOf<Long>()
+                var inputIds = tokenizer.encode(prompt)
                 
-                // Run inference
-                val outputs = session.run(mapOf("input_ids" to inputTensor))
+                for (i in 0 until options.maxTokens) {
+                    // Prepare input tensor
+                    val inputTensor = createInputTensor(inputIds)
+                    
+                    // Run inference
+                    val outputs = session.run(mapOf("input_ids" to inputTensor))
+                    
+                    // Process output
+                    val logits = outputs[0]?.value as? Array<Array<FloatArray>>
+                        ?: throw IllegalStateException("Invalid output format")
+                    
+                    val lastLogits = logits[0][inputIds.size - 1]
+                    
+                    // Sample next token
+                    val nextToken = sampleToken(lastLogits, options.temperature, options.topK, options.topP)
+                    generatedTokens.add(nextToken)
+                    
+                    // Check for EOS or stop sequences
+                    if (nextToken == tokenizer.eosTokenId) break
+                    
+                    val decodedToken = tokenizer.decode(listOf(nextToken))
+                    if (options.stopSequences.any { decodedToken.contains(it) }) break
+                    
+                    // Update input
+                    inputIds = inputIds + nextToken
+                    
+                    // Clean up tensors
+                    inputTensor.close()
+                }
                 
-                // Process output
-                val logits = outputs[0]?.value as? Array<Array<FloatArray>>
-                    ?: throw IllegalStateException("Invalid output format")
+                val response = tokenizer.decode(generatedTokens)
+                val endTime = System.currentTimeMillis()
+                val tokensPerSecond = generatedTokens.size.toFloat() / ((endTime - startTime) / 1000f)
                 
-                val lastLogits = logits[0][inputIds.size - 1]
-                
-                // Sample next token
-                val nextToken = sampleToken(lastLogits, options.temperature, options.topK, options.topP)
-                generatedTokens.add(nextToken)
-                
-                // Check for EOS or stop sequences
-                if (nextToken == tokenizer.eosTokenId) break
-                
-                val decodedToken = tokenizer.decode(listOf(nextToken))
-                if (options.stopSequences.any { decodedToken.contains(it) }) break
-                
-                // Update input
-                inputIds = inputIds + nextToken
-                
-                // Clean up tensors
-                outputs.forEach { it?.close() }
-                inputTensor.close()
+                GenerationResult(
+                    text = response,
+                    tokensGenerated = generatedTokens.size,
+                    timeMs = endTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Generation failed", e)
+                GenerationResult(
+                    text = "",
+                    tokensGenerated = 0,
+                    timeMs = 0,
+                    tokensPerSecond = 0f
+                )
             }
-            
-            tokenizer.decode(generatedTokens)
         }
     }
     
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> = flow {
-        val session = ortSession ?: throw IllegalStateException("Service not initialized")
-        var inputIds = tokenizer.encode(prompt)
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
+        val session = ortSession ?: run {
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
+            return@flow
+        }
         
-        repeat(options.maxTokens) {
-            val inputTensor = createInputTensor(inputIds)
-            val outputs = session.run(mapOf("input_ids" to inputTensor))
+        try {
+            val startTime = System.currentTimeMillis()
+            var inputIds = tokenizer.encode(prompt)
+            var tokenCount = 0
             
-            val logits = outputs[0]?.value as? Array<Array<FloatArray>>
-                ?: throw IllegalStateException("Invalid output format")
-            
-            val nextToken = sampleToken(logits[0].last(), options.temperature, options.topK, options.topP)
-            
-            if (nextToken == tokenizer.eosTokenId) return@flow
-            
-            val text = tokenizer.decode(listOf(nextToken))
-            emit(text)
-            
-            if (options.stopSequences.any { text.contains(it) }) return@flow
-            
-            inputIds = inputIds + nextToken
-            
-            // Clean up
-            outputs.forEach { it?.close() }
-            inputTensor.close()
+            repeat(options.maxTokens) {
+                val inputTensor = createInputTensor(inputIds)
+                val outputs = session.run(mapOf("input_ids" to inputTensor))
+                
+                val logits = outputs[0]?.value as? Array<Array<FloatArray>>
+                    ?: throw IllegalStateException("Invalid output format")
+                
+                val nextToken = sampleToken(logits[0].last(), options.temperature, options.topK, options.topP)
+                
+                if (nextToken == tokenizer.eosTokenId) return@flow
+                
+                tokenCount++
+                val text = tokenizer.decode(listOf(nextToken))
+                
+                val currentTime = System.currentTimeMillis()
+                val tokensPerSecond = tokenCount.toFloat() / ((currentTime - startTime) / 1000f)
+                
+                emit(GenerationResult(
+                    text = text,
+                    tokensGenerated = tokenCount,
+                    timeMs = currentTime - startTime,
+                    tokensPerSecond = tokensPerSecond
+                ))
+                
+                if (options.stopSequences.any { text.contains(it) }) return@flow
+                
+                inputIds = inputIds + nextToken
+                
+                // Clean up
+                inputTensor.close()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Stream generation failed", e)
+            emit(GenerationResult(
+                text = "",
+                tokensGenerated = 0,
+                timeMs = 0,
+                tokensPerSecond = 0f
+            ))
         }
     }
     
@@ -152,11 +206,13 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
         }
     }
     
-    override fun release() {
-        ortSession?.close()
-        ortSession = null
-        ortEnvironment?.close()
-        ortEnvironment = null
+    override suspend fun release() {
+        withContext(Dispatchers.IO) {
+            ortSession?.close()
+            ortSession = null
+            ortEnvironment?.close()
+            ortEnvironment = null
+        }
     }
     
     private fun createInputTensor(tokens: List<Long>): OnnxTensor {
@@ -218,14 +274,12 @@ class ONNXRuntimeService(private val context: Context) : LLMService {
         
         Log.d(TAG, "Model inputs:")
         session.inputNames?.forEach { name ->
-            val info = session.getInputInfo(name)
-            Log.d(TAG, "  $name: ${info?.shape?.contentToString()}")
+            Log.d(TAG, "  $name")
         }
         
         Log.d(TAG, "Model outputs:")
         session.outputNames?.forEach { name ->
-            val info = session.getOutputInfo(name)
-            Log.d(TAG, "  $name: ${info?.shape?.contentToString()}")
+            Log.d(TAG, "  $name")
         }
     }
     

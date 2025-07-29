@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>FunctionNaming:ChatScreen.kt$@Composable fun MessageItem(message: ChatMessage)</ID>
+    <ID>FunctionNaming:ChatScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ChatScreen( viewModel: ChatViewModel = viewModel(), onNavigateToModels: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:MainActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun AboutScreen()</ID>
+    <ID>FunctionNaming:MainActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun RunAnywhereApp()</ID>
+    <ID>FunctionNaming:ModelsScreen.kt$@Composable fun ModelCard( model: ModelInfo, isSelected: Boolean, downloadProgress: ModelDownloadProgress?, onSelect: () -&gt; Unit, onDownload: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:ModelsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ModelsScreen( viewModel: ModelsViewModel = viewModel(), onNavigateBack: () -&gt; Unit )</ID>
+    <ID>FunctionNaming:Theme.kt$@Composable fun RunAnywhereAITheme( darkTheme: Boolean = isSystemInDarkTheme(), // Dynamic color is available on Android 12+ dynamicColor: Boolean = true, content: @Composable () -&gt; Unit )</ID>
+    <ID>LongParameterList:ModelsScreen.kt$( model: ModelInfo, isSelected: Boolean, downloadProgress: ModelDownloadProgress?, onSelect: () -&gt; Unit, onDownload: () -&gt; Unit, onDelete: () -&gt; Unit )</ID>
+    <ID>MagicNumber:Color.kt$0xFF625b71</ID>
+    <ID>MagicNumber:Color.kt$0xFF6650a4</ID>
+    <ID>MagicNumber:Color.kt$0xFF7D5260</ID>
+    <ID>MagicNumber:Color.kt$0xFFCCC2DC</ID>
+    <ID>MagicNumber:Color.kt$0xFFD0BCFF</ID>
+    <ID>MagicNumber:Color.kt$0xFFEFB8C8</ID>
+    <ID>MagicNumber:FormatUtils.kt$1000</ID>
+    <ID>MagicNumber:FormatUtils.kt$1024</ID>
+    <ID>MagicNumber:FormatUtils.kt$60</ID>
+    <ID>MagicNumber:MediaPipeService.kt$MediaPipeService$0.8f</ID>
+    <ID>MagicNumber:MediaPipeService.kt$MediaPipeService$40</ID>
+    <ID>MagicNumber:MediaPipeService.kt$MediaPipeService$42</ID>
+    <ID>MagicNumber:MediaPipeService.kt$MediaPipeService$512</ID>
+    <ID>MagicNumber:ModelRepository.kt$ModelRepository$8192</ID>
+    <ID>MagicNumber:ModelsViewModel.kt$ModelsViewModel$2000</ID>
+    <ID>MagicNumber:ONNXRuntimeService.kt$ONNXRuntimeService$4</ID>
+    <ID>MagicNumber:ONNXRuntimeService.kt$ONNXRuntimeService.SimpleTokenizer$3L</ID>
+  </CurrentIssues>
+</SmellBaseline>

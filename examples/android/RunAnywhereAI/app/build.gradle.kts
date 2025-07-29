@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.detekt)
+    id("kotlin-kapt")
+    // TODO: Add Hilt plugin when configured in project level build.gradle
+    // id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -16,26 +20,156 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Native build disabled for now to focus on Kotlin implementation
+        // externalNativeBuild {
+        //     cmake {
+        //         cppFlags += listOf("-std=c++17", "-O3")
+        //         arguments += listOf(
+        //             "-DANDROID_STL=c++_shared",
+        //             "-DBUILD_SHARED_LIBS=ON"
+        //         )
+        //     }
+        // }
+        
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
-        release {
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            
+            // Disable optimizations for faster builds
+            buildConfigField("boolean", "DEBUG_MODE", "true")
+            buildConfigField("String", "BUILD_TYPE", "\"debug\"")
+        }
+        
+        release {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // Build configuration fields
+            buildConfigField("boolean", "DEBUG_MODE", "false")
+            buildConfigField("String", "BUILD_TYPE", "\"release\"")
+            
+            // Optimization flags
+            isJniDebuggable = false
+            
+            // Using default debug signing for now
+        }
+        
+        create("benchmark") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
+            isDebuggable = false
+            
+            // Additional optimizations for benchmarking
+            buildConfigField("boolean", "BENCHMARK_MODE", "true")
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
         }
     }
+    
+    // Signing configurations
+    // Using default debug keystore for now
+    
+    // APK splits disabled for now to focus on basic functionality
+    // splits {
+    //     abi {
+    //         isEnable = true
+    //         reset()
+    //         include("armeabi-v7a", "arm64-v8a")  // Focus on ARM architectures for mobile
+    //         isUniversalApk = true  // Also generate a universal APK
+    //     }
+    //     
+    //     density {
+    //         isEnable = true
+    //         reset()
+    //         include("ldpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi")
+    //     }
+    // }
+    
+    // Packaging options
+    packaging {
+        resources {
+            excludes += listOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/DEPENDENCIES",
+                "/META-INF/LICENSE",
+                "/META-INF/LICENSE.txt",
+                "/META-INF/NOTICE",
+                "/META-INF/NOTICE.txt",
+                "/META-INF/licenses/**",
+                "/META-INF/AL2.0",
+                "/META-INF/LGPL2.1",
+                "**/kotlin/**",
+                "kotlin/**",
+                "META-INF/kotlin/**",
+                "META-INF/*.kotlin_module"
+            )
+        }
+        
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+    
+    // Bundle configuration for Play Store
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
     kotlinOptions {
         jvmTarget = "11"
+        
+        // Kotlin compiler optimizations
+        freeCompilerArgs += listOf(
+            "-opt-in=kotlin.RequiresOptIn",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-Xjvm-default=all"
+        )
+    }
+    
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+        
+        // Disable unused features for smaller APK
+        aidl = false
+        renderScript = false
+        resValues = false
+        shaders = false
+        viewBinding = false
+        dataBinding = false
     }
     lint {
         abortOnError = true
@@ -43,6 +177,13 @@ android {
         warningsAsErrors = true
         baseline = file("lint-baseline.xml")
     }
+    // Native build disabled for now to focus on Kotlin implementation
+    // externalNativeBuild {
+    //     cmake {
+    //         path = file("src/main/cpp/CMakeLists.txt")
+    //         version = "3.22.1"
+    //     }
+    // }
 }
 
 dependencies {
@@ -70,13 +211,50 @@ dependencies {
     implementation("com.google.mediapipe:tasks-genai:0.10.14")
     
     // ONNX Runtime
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.1")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
+    
+    // Google AI SDK for Gemini Nano
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    
+    // TensorFlow Lite
+    implementation("org.tensorflow:tensorflow-lite:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
     
     // OkHttp for model downloads
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.11.0")
+    
+    // ExecuTorch runtime (Note: These are placeholder versions as ExecuTorch Android packages may not be published yet)
+    // implementation("org.pytorch:executorch-runtime:0.3.0")
+    // implementation("org.pytorch:executorch-backend-xnnpack:0.3.0")
+    // implementation("org.pytorch:executorch-backend-vulkan:0.3.0")
+    
+    // Android AI Core (Note: These dependencies are not yet published)
+    // TODO: Uncomment when AI Core SDK is publicly available
+    // implementation("com.google.android.gms:play-services-aicore:1.0.0")
+    implementation("androidx.core:core-ktx:1.12.0")
+    
+    // picoLLM (Note: Requires Picovoice account and SDK access)
+    // TODO: Uncomment when picoLLM SDK is available
+    // implementation("ai.picovoice:picollm-android:1.0.0")
+    
+    // Room database
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+    
+    // Hilt for dependency injection
+    implementation("com.google.dagger:hilt-android:2.48")
+    kapt("com.google.dagger:hilt-compiler:2.48")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    
+    // Security
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
@@ -85,4 +263,8 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+}
+
+detekt {
+    config.setFrom("$rootDir/detekt-config.yml")
 }

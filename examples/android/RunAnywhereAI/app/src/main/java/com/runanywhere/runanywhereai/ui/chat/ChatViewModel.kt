@@ -22,8 +22,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
     
-    private val _currentModel = MutableStateFlow<ModelInfo?>(null)
-    val currentModel: StateFlow<ModelInfo?> = _currentModel.asStateFlow()
+    private val _currentModel = MutableStateFlow<com.runanywhere.runanywhereai.data.repository.ModelInfo?>(null)
+    val currentModel: StateFlow<com.runanywhere.runanywhereai.data.repository.ModelInfo?> = _currentModel.asStateFlow()
     
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -56,7 +56,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Select and load a model
      */
-    suspend fun selectModel(modelInfo: ModelInfo) {
+    suspend fun selectModel(modelInfo: com.runanywhere.runanywhereai.data.repository.ModelInfo) {
         try {
             _error.value = null
             
@@ -138,14 +138,17 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     /**
-     * Get current model info
+     * Get current model info from LLM manager
      */
-    fun getModelInfo(): ModelInfo? {
+    fun getLLMModelInfo(): com.runanywhere.runanywhereai.llm.ModelInfo? {
         return llmManager.getModelInfo()
     }
     
     override fun onCleared() {
         super.onCleared()
-        llmManager.release()
+        // Launch coroutine for suspend function
+        viewModelScope.launch {
+            llmManager.release()
+        }
     }
 }

@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -49,7 +50,7 @@ fun RunAnywhereApp() {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Chat, contentDescription = "Chat") },
+                    icon = { Icon(Icons.Default.Email, contentDescription = "Chat") },
                     label = { Text("Chat") },
                     selected = currentRoute == "chat",
                     onClick = {
@@ -60,7 +61,7 @@ fun RunAnywhereApp() {
                     }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.Storage, contentDescription = "Models") },
+                    icon = { Icon(Icons.Default.List, contentDescription = "Models") },
                     label = { Text("Models") },
                     selected = currentRoute == "models",
                     onClick = {
