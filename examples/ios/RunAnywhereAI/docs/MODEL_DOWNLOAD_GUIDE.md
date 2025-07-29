@@ -2,6 +2,8 @@
 
 This guide explains how to use the on-demand model download feature in the RunAnywhereAI iOS app.
 
+> **Note**: For bundled models that ship with the app, see [BUNDLED_MODELS_GUIDE.md](../RunAnywhereAI/docs/BUNDLED_MODELS_GUIDE.md)
+
 ## Overview
 
 The app implements Method 2 from the Model Integration Guide: **On-Demand Download**. All model URLs are centrally managed in `ModelURLRegistry.swift`, making it easy to update or add new models.

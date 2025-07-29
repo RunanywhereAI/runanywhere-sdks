@@ -329,6 +329,15 @@ To integrate actual frameworks:
 3. **Configure Models**: Add model loading and format detection
 4. **Test Integration**: Use the benchmark suite to validate performance
 
+## Documentation
+
+### Guides
+- **[Bundled Models Guide](RunAnywhereAI/docs/BUNDLED_MODELS_GUIDE.md)**: How to add pre-trained models to your app bundle
+- **[Model Download Guide](docs/MODEL_DOWNLOAD_GUIDE.md)**: On-demand model download system
+- **[Model Integration Guide](docs/MODEL_INTEGRATION_GUIDE.md)**: Complete model integration documentation
+- **[Foundation Models Setup](docs/FOUNDATION_MODELS_SETUP.md)**: iOS 18+ foundation models
+- **[TensorFlow Lite Fix](docs/TENSORFLOW_LITE_FIX.md)**: Resolving TFLite issues
+
 ## Architecture Highlights
 
 - **Modular Design**: Each framework is isolated in its own service
