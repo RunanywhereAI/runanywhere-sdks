@@ -277,14 +277,32 @@ struct ModelDownloadProgressView: View {
             startDownload()
         }
         .alert("Download Error", isPresented: $showingError) {
-            Button("Retry") {
-                startDownload()
-            }
-            Button("Cancel", role: .cancel) {
-                isPresented = false
+            // Check if it's a terms not accepted error
+            if let kaggleError = error as? KaggleAuthError,
+               kaggleError == .termsNotAccepted,
+               let downloadURL = downloadInfo.downloadURL,
+               let modelPageURL = KaggleAuthService.shared.getModelPageURL(from: downloadURL) {
+                Button("Open Model Page") {
+                    UIApplication.shared.open(modelPageURL)
+                }
+                Button("Cancel", role: .cancel) {
+                    isPresented = false
+                }
+            } else {
+                Button("Retry") {
+                    startDownload()
+                }
+                Button("Cancel", role: .cancel) {
+                    isPresented = false
+                }
             }
         } message: {
-            Text(error?.localizedDescription ?? "Unknown error occurred")
+            if let kaggleError = error as? KaggleAuthError,
+               kaggleError == .termsNotAccepted {
+                Text("You need to accept the model's terms of use on Kaggle.com before downloading. Click 'Open Model Page' to visit the model page and accept the terms.")
+            } else {
+                Text(error?.localizedDescription ?? "Unknown error occurred")
+            }
         }
     }
 
@@ -299,12 +317,9 @@ struct ModelDownloadProgressView: View {
                 currentStep = .downloading
             }
 
-            // Check if this is a Kaggle model and handle separately
-            if downloadInfo.requiresAuth && downloadInfo.downloadURL?.host?.contains("kaggle") == true {
-                try await downloadKaggleModel()
-            } else {
-                // Start regular download
-                downloadManager.downloadModel(downloadInfo, progress: { progress in
+            // Use the unified download manager for all downloads
+            // The ModelProviderManager will handle Kaggle authentication
+            downloadManager.downloadModel(downloadInfo, progress: { progress in
                     Task { @MainActor in
                         self.downloadProgress = progress.fractionCompleted
 
@@ -343,28 +358,7 @@ struct ModelDownloadProgressView: View {
                         }
                     }
                 })
-            }
         }
-    }
-
-    private func downloadKaggleModel() async throws {
-        // Use separate Kaggle download service
-        let authService = KaggleAuthService.shared
-
-        let tempURL = try await authService.downloadModel(from: downloadInfo.downloadURL!) { progress in
-            Task { @MainActor in
-                self.downloadProgress = progress
-
-                // Format progress details
-                let formatter = ByteCountFormatter()
-                formatter.countStyle = .binary
-                self.downloadedSize = formatter.string(fromByteCount: Int64(progress * 100_000_000)) // Estimate
-                self.totalSize = formatter.string(fromByteCount: 100_000_000) // Estimate
-            }
-        }
-
-        // Continue with post-download processing
-        await processDownloadedModel(at: tempURL)
     }
 
     private func processDownloadedModel(at url: URL) async {

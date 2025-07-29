@@ -51,6 +51,8 @@ enum FrameworkFeature: String, CaseIterable {
     case pruning = "Model Pruning"
     case caching = "Response Caching"
     case batching = "Batch Processing"
+    case gpuAcceleration = "GPU Acceleration"
+    case neuralEngine = "Neural Engine"
 
     // Advanced Features
     case fineTuning = "Fine-Tuning"

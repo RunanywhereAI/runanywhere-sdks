@@ -965,46 +965,55 @@ class GGUFModelManager {
 ## 8. TensorFlow Lite (LiteRT)
 
 ### Overview
-Google's lightweight ML framework, officially rebranded as LiteRT in 2025, for mobile and embedded devices.
+Google's lightweight ML framework, officially rebranded as LiteRT in 2025, for mobile and embedded devices. The framework provides excellent support for text classification, BERT models, and is being enhanced for generative AI workloads.
 
 ### Requirements (2025 Update)
-- **iOS Version**: 13.0+ (updated minimum requirement)
-- **Framework Size**: ~1.5MB (enhanced base framework)
+- **iOS Version**: 12.0+ (based on official examples)
+- **Framework Size**: ~15MB (with Metal and CoreML delegates)
 - **Model Format**: .tflite (LiteRT format)
+- **Supported Models**: BERT, MobileBERT, GPT-2, Gemma, Phi-2, StableLM
 
 ### Installation (2025 Update)
 
 ```swift
-// Note: Swift Package Manager NOT yet officially supported
-// Use CocoaPods (recommended approach for 2025):
-
+// CocoaPods (REQUIRED - no official SPM support):
 // Podfile:
-pod 'TensorFlowLiteSwift', '~> 2.17.0'  // Latest LiteRT version
-// For nightly builds:
-// pod 'TensorFlowLiteSwift', '~> 0.0.1-nightly'
+platform :ios, '12.0'
+use_frameworks!
 
-// Alternative: Community Swift Package
-dependencies: [
-    .package(url: "https://github.com/kewlbear/TensorFlowLiteSwift", from: "0.1.0")
-]
+target 'YourApp' do
+  pod 'TensorFlowLiteSwift', '~> 2.17.0'
+  
+  # Optional: Add delegates for hardware acceleration
+  pod 'TensorFlowLiteSwift/Metal', '~> 2.17.0'    # GPU acceleration
+  pod 'TensorFlowLiteSwift/CoreML', '~> 2.17.0'   # Neural Engine support
+end
+
+// Note: Community SPM packages exist but are not officially supported
 ```
 
 ### New Features in LiteRT 2025
 - **Rebranding to LiteRT**: Enhanced vision with expanded mobile AI capabilities
-- **Improved Performance**: Better optimization for Apple Neural Engine
-- **Enhanced Quantization**: Support for 4-bit and mixed precision quantization
-- **LLM Support**: Better support for on-device language models
-- **Maintained API Compatibility**: Same methods as TensorFlow Lite for easy migration
+- **Improved Performance**: Better optimization for Apple Neural Engine via CoreML delegate
+- **Enhanced Quantization**: Support for INT4, INT8, and mixed precision quantization
+- **LLM Support**: Native support for decoder-only language models
+- **Metal GPU Delegate**: Optimized for Apple Silicon with MLDrift technology
+- **CoreML Delegate**: Direct Neural Engine access on A12+ devices
 
-### Implementation
+### Production Implementation (Based on Official Examples)
 
 ```swift
 import TensorFlowLite
 
-class TFLiteService: LLMProtocol {
+class TFLiteService: BaseLLMService {
     private var interpreter: Interpreter?
+    private var tokenizer: WordpieceTokenizer?
     
-    var name: String { "TensorFlow Lite" }
+    // Hardware acceleration delegates
+    private var metalDelegate: MetalDelegate?
+    private var coreMLDelegate: CoreMLDelegate?
+    
+    var name: String { "TensorFlow Lite (LiteRT)" }
     var isInitialized: Bool { interpreter != nil }
     
     func initialize(modelPath: String) async throws {
@@ -1015,19 +1024,42 @@ class TFLiteService: LLMProtocol {
             throw LLMError.modelNotFound
         }
         
-        // Configure options
+        // Configure interpreter options
         var options = Interpreter.Options()
-        options.threadCount = ProcessInfo.processInfo.processorCount
         
-        // Add Metal delegate for GPU acceleration
-        let metalDelegate = MetalDelegate()
-        options.addDelegate(metalDelegate)
+        // Determine best acceleration mode
+        if DeviceCapabilities.hasNeuralEngine {
+            // Use CoreML delegate for Neural Engine (A12+)
+            var coreMLOptions = CoreMLDelegate.Options()
+            coreMLOptions.enabledDevices = .all
+            coreMLOptions.coreMLVersion = 3
+            coreMLDelegate = CoreMLDelegate(options: coreMLOptions)
+            options.addDelegate(coreMLDelegate!)
+        } else if DeviceCapabilities.hasHighPerformanceGPU {
+            // Use Metal delegate for GPU
+            var metalOptions = MetalDelegate.Options()
+            metalOptions.isPrecisionLossAllowed = true
+            metalOptions.waitType = .passive
+            metalOptions.isQuantizationEnabled = true
+            metalDelegate = MetalDelegate(options: metalOptions)
+            options.addDelegate(metalDelegate!)
+        } else {
+            // CPU-only mode
+            options.threadCount = ProcessInfo.processInfo.processorCount
+        }
         
         // Create interpreter
         interpreter = try Interpreter(modelPath: modelPath, options: options)
         
         // Allocate tensors
         try interpreter?.allocateTensors()
+        
+        // Initialize tokenizer (based on model type)
+        if modelPath.contains("bert") {
+            tokenizer = WordpieceTokenizer(vocabPath: "bert_vocab.txt")
+        } else {
+            tokenizer = WordpieceTokenizer(vocabPath: "average_vocab.txt")
+        }
     }
     
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
@@ -1035,50 +1067,230 @@ class TFLiteService: LLMProtocol {
             throw LLMError.notInitialized
         }
         
-        // Get input/output tensor info
+        // Tokenize input using WordPiece tokenizer
+        let tokens = tokenizer.tokenize(prompt)
+        let inputIds = tokenizer.convertToIDs(tokens: tokens)
+        
+        // Get input tensor info
         let inputTensor = try interpreter.input(at: 0)
-        let outputTensor = try interpreter.output(at: 0)
+        let inputShape = inputTensor.shape.dimensions
         
-        // Tokenize input
-        let tokenizer = TFLiteTokenizer()
-        let inputIds = tokenizer.encode(prompt)
+        // Prepare padded input
+        var inputBuffer = [Int32](repeating: 0, count: inputShape[1])
+        inputBuffer.replaceSubrange(0..<min(inputIds.count, inputShape[1]), 
+                                   with: inputIds.prefix(inputShape[1]))
         
-        // Prepare input data
-        let inputData = createInputData(tokens: inputIds, shape: inputTensor.shape)
+        // Convert to Data
+        let inputData = Data(copyingBufferOf: inputBuffer)
         try interpreter.copy(inputData, toInputAt: 0)
         
         // Run inference
         try interpreter.invoke()
         
-        // Get output
-        let outputData = try interpreter.output(at: 0).data
-        let generatedTokens = decodeOutput(outputData, shape: outputTensor.shape)
+        // Process output
+        let outputTensor = try interpreter.output(at: 0)
+        let outputData = outputTensor.data
         
-        return tokenizer.decode(generatedTokens)
+        // For classification models (like BERT)
+        if modelPath.contains("classifier") {
+            let logits = outputData.toArray(type: Float32.self)
+            return processClassificationOutput(logits)
+        } else {
+            // For generative models
+            return processGenerativeOutput(outputData, vocabSize: tokenizer.vocabularySize)
+        }
+    }
+}
+
+// MARK: - WordPiece Tokenizer (Based on Official Example)
+
+struct WordpieceTokenizer {
+    let vocabularyIDs: [String: Int32]
+    let reverseVocabulary: [Int: String]
+    var vocabularySize: Int { vocabularyIDs.count }
+    
+    private static let UNKNOWN_TOKEN = "[UNK]"
+    private static let MAX_INPUT_CHARS_PER_WORD = 128
+    
+    init(vocabPath: String) {
+        // Load vocabulary from file
+        let vocabURL = Bundle.main.url(forResource: vocabPath, withExtension: nil)!
+        let vocabContent = try! String(contentsOf: vocabURL)
+        
+        var vocab = [String: Int32]()
+        for (index, line) in vocabContent.components(separatedBy: .newlines).enumerated() {
+            if !line.isEmpty {
+                vocab[line] = Int32(index)
+            }
+        }
+        
+        self.vocabularyIDs = vocab
+        self.reverseVocabulary = vocab.reduce(into: [:]) { dict, pair in
+            dict[Int(pair.value)] = pair.key
+        }
+    }
+    
+    func tokenize(_ text: String) -> [String] {
+        var outputTokens = [String]()
+        
+        text.lowercased().components(separatedBy: .whitespaces).forEach { token in
+            if token.count > Self.MAX_INPUT_CHARS_PER_WORD {
+                outputTokens.append(Self.UNKNOWN_TOKEN)
+                return
+            }
+            
+            let subwords = wordpieceTokenize(token)
+            outputTokens.append(contentsOf: subwords)
+        }
+        
+        return outputTokens
+    }
+    
+    private func wordpieceTokenize(_ token: String) -> [String] {
+        var start = token.startIndex
+        var subwords = [String]()
+        
+        while start < token.endIndex {
+            var end = token.endIndex
+            var foundSubword = false
+            
+            while start < end {
+                var substr = String(token[start..<end])
+                if start > token.startIndex {
+                    substr = "##" + substr
+                }
+                
+                if vocabularyIDs[substr] != nil {
+                    foundSubword = true
+                    subwords.append(substr)
+                    break
+                }
+                
+                end = token.index(before: end)
+            }
+            
+            if foundSubword {
+                start = end
+            } else {
+                return [Self.UNKNOWN_TOKEN]
+            }
+        }
+        
+        return subwords
+    }
+    
+    func convertToIDs(tokens: [String]) -> [Int32] {
+        return tokens.compactMap { vocabularyIDs[$0] }
     }
 }
 ```
 
-### GPU Acceleration
+### Hardware Acceleration Best Practices
 
 ```swift
-func configureGPUAcceleration() throws {
-    var options = Interpreter.Options()
+// Device capability detection
+struct DeviceCapabilities {
+    static var hasNeuralEngine: Bool {
+        let modelCode = getModelCode()
+        let neuralEngineDevices = ["iPhone11", "iPhone12", "iPhone13", "iPhone14", "iPhone15"]
+        return neuralEngineDevices.contains { modelCode.contains($0) }
+    }
     
-    // Metal delegate for iOS
-    let metalOptions = MetalDelegate.Options()
-    metalOptions.isPrecisionLossAllowed = true
-    metalOptions.waitType = .passive
-    metalOptions.isQuantizationEnabled = true
-    
-    let metalDelegate = MetalDelegate(options: metalOptions)
-    options.addDelegate(metalDelegate)
-    
-    interpreter = try Interpreter(
-        modelPath: modelPath,
-        options: options
-    )
+    static var hasHighPerformanceGPU: Bool {
+        ProcessInfo.processInfo.processorCount >= 6
+    }
 }
+
+// Optimized delegate configuration
+func configureBestDelegate() throws -> Delegate? {
+    if DeviceCapabilities.hasNeuralEngine {
+        var options = CoreMLDelegate.Options()
+        options.enabledDevices = .all
+        options.coreMLVersion = 3
+        options.maxDelegatedPartitions = 0
+        return CoreMLDelegate(options: options)
+    } else if DeviceCapabilities.hasHighPerformanceGPU {
+        var options = MetalDelegate.Options()
+        options.isPrecisionLossAllowed = true
+        options.waitType = .passive
+        options.isQuantizationEnabled = true
+        return MetalDelegate(options: options)
+    }
+    return nil
+}
+```
+
+### Supported Models and Performance
+
+| Model | Size | Quantization | Performance | Use Case |
+|-------|------|--------------|-------------|----------|
+| **BERT Classifier** | 100MB | FP32 | <10ms/inference | Text classification |
+| **MobileBERT** | 25MB | INT8 | <5ms/inference | Mobile classification |
+| **Gemma 2B** | 1.3GB | INT4 | 15-25 tokens/sec | General generation |
+| **Phi-2** | 2.7GB | INT8 | 10-20 tokens/sec | Code/reasoning |
+| **StableLM 3B** | 1.8GB | INT8 | 8-15 tokens/sec | Long-form text |
+
+### Model Download and Integration
+
+```swift
+// Download models from Google Storage (official examples)
+let modelURLs = [
+    "bert_classifier": "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/bert_classifier.tflite",
+    "average_word_classifier": "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/average_word_classifier.tflite"
+]
+
+// For LLMs (Kaggle authentication required)
+let llmModels = [
+    "gemma-2b-int4": "https://www.kaggle.com/models/google/gemma/tfLite/gemma-2b-it-gpu-int4",
+    "phi-2-int8": "https://www.kaggle.com/models/microsoft/phi/tfLite/phi-2-int8"
+]
+```
+
+### Production Tips
+
+1. **Model Selection**:
+   - Use INT4 quantization for memory-constrained devices
+   - INT8 provides best balance of size/quality
+   - FP16/FP32 only for accuracy-critical tasks
+
+2. **Delegate Priority**:
+   - CoreML delegate: Best for iPhone XS+ (Neural Engine)
+   - Metal delegate: Good for iPhone 7-X
+   - CPU: Fallback for older devices
+
+3. **Memory Management**:
+   ```swift
+   // Release model when not in use
+   func cleanup() {
+       interpreter = nil
+       metalDelegate = nil
+       coreMLDelegate = nil
+   }
+   ```
+
+4. **Error Handling**:
+   ```swift
+   enum TFLiteError: Error {
+       case delegateCreationFailed
+       case tensorAllocationFailed
+       case inferenceTimeout
+   }
+   ```
+
+### Xcode 16 Build Issues
+
+If encountering sandbox errors with CocoaPods:
+
+```bash
+# Fix script (fix_pods_sandbox.sh)
+#!/bin/bash
+find Pods/Target\ Support\ Files -name "*.xcconfig" -type f | while read -r file; do
+    if ! grep -q "ENABLE_USER_SCRIPT_SANDBOXING" "$file"; then
+        echo "" >> "$file"
+        echo "# Fix for Xcode 16 sandbox issues" >> "$file"
+        echo "ENABLE_USER_SCRIPT_SANDBOXING = NO" >> "$file"
+    fi
+done
 ```
 
 ---

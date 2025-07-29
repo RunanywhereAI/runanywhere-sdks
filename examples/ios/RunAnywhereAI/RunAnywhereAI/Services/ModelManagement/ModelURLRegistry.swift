@@ -240,76 +240,130 @@ class ModelURLRegistry: ObservableObject {
         )
     ]
     
-    // MARK: TensorFlow Lite Models
+    // MARK: TensorFlow Lite Models (Validated URLs)
     private var _tfliteModels: [ModelInfo] = [
+        // ✅ Official Google AI Edge samples - Direct download, no auth required
         ModelInfo(
-            id: "gemma-2b-tflite",
+            id: "bert-classifier-tflite",
+            name: "bert_classifier.tflite",
+            path: nil,
+            format: .tflite,
+            size: "24.5MB",
+            framework: .tensorFlowLite,
+            quantization: "FP32",
+            contextLength: 512,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/bert_classifier.tflite"),
+            downloadedFileName: "bert_classifier.tflite",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "BERT model for text classification from official Google AI Edge samples. Ready to use with included vocabulary.",
+            description: "Official BERT classifier model optimized for mobile text classification tasks",
+            minimumMemory: 100_000_000,
+            recommendedMemory: 200_000_000
+        ),
+        
+        ModelInfo(
+            id: "average-word-classifier-tflite", 
+            name: "average_word_classifier.tflite",
+            path: nil,
+            format: .tflite,
+            size: "0.7MB",
+            framework: .tensorFlowLite,
+            quantization: "FP32",
+            contextLength: 256,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/average_word_classifier.tflite"),
+            downloadedFileName: "average_word_classifier.tflite",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Lightweight text classifier from official Google AI Edge samples. Perfect for testing TensorFlow Lite integration.",
+            description: "Efficient text classifier using average word embeddings",
+            minimumMemory: 25_000_000,
+            recommendedMemory: 50_000_000
+        ),
+        
+        // 📱 TensorFlow Model Garden - Public models  
+        ModelInfo(
+            id: "mobilenet-v1-tflite",
+            name: "mobilenet_v1_1.0_224_quant.tgz",
+            path: nil,
+            format: .tflite,
+            size: "33.4MB",
+            framework: .tensorFlowLite,
+            quantization: "INT8",
+            contextLength: nil,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/download.tensorflow.org/models/mobilenet_v1_2018_08_02/mobilenet_v1_1.0_224_quant.tgz"),
+            downloadedFileName: "mobilenet_v1_1.0_224_quant.tgz",
+            modelType: .image,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "MobileNet v1 for image classification. Quantized INT8 version for mobile efficiency.",
+            description: "MobileNet v1 1.0 224x224 with INT8 quantization for image classification",
+            minimumMemory: 15_000_000,
+            recommendedMemory: 30_000_000
+        ),
+        
+        // 🔒 Kaggle-hosted LLM models - Require authentication (placeholder for future integration)
+        // Note: These require Kaggle API credentials to download - current URLs return 404
+        ModelInfo(
+            id: "gemma-2b-tflite-gpu-int4",
             name: "gemma-2b-it-gpu-int4.tar.gz",
             path: nil,
             format: .tflite,
-            size: "1.35GB",
+            size: "~1.35GB",
             framework: .tensorFlowLite,
             quantization: "INT4",
             contextLength: 8192,
             isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/google/gemma/tfLite/gemma-2b-it-gpu-int4/3/download"),
-            downloadedFileName: nil,
+            downloadURL: URL(string: "https://www.kaggle.com/api/v1/models/google/gemma/tfLite/gemma-2b-it-gpu-int4/1/download"),
+            downloadedFileName: "gemma-2b-it-gpu-int4.tar.gz",
             modelType: .text,
             sha256: nil,
             requiresUnzip: true,
             requiresAuth: true,
             authType: .kaggle,
             alternativeURLs: [],
-            notes: "Requires Kaggle account for download",
-            description: "Google Gemma 2B instruction-tuned, GPU-optimized with INT4",
+            notes: "⚠️ Requires accepting Gemma terms on Kaggle.com before downloading. Visit: https://www.kaggle.com/models/google/gemma",
+            description: "Google Gemma 2B instruction-tuned, GPU-optimized with INT4 quantization",
             minimumMemory: 2_000_000_000,
             recommendedMemory: 4_000_000_000
         ),
+        
         ModelInfo(
-            id: "mobilebert-tflite",
-            name: "mobilebert_1_default_1.tflite",
+            id: "gemma-2b-cpu-int8-tflite",
+            name: "gemma-2b-it-cpu-int8.tar.gz",
             path: nil,
             format: .tflite,
-            size: "100MB",
-            framework: .tensorFlowLite,
-            quantization: "Float16",
-            contextLength: 512,
-            isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/google/mobilebert/tfLite/default"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: true,
-            authType: .kaggle,
-            alternativeURLs: [],
-            notes: "Now hosted on Kaggle - requires authentication",
-            description: "MobileBERT - BERT optimized for mobile devices",
-            minimumMemory: 200_000_000,
-            recommendedMemory: 500_000_000
-        ),
-        ModelInfo(
-            id: "efficientnet-lite-tflite",
-            name: "efficientnet-lite0-int8.tflite",
-            path: nil,
-            format: .tflite,
-            size: "5MB",
+            size: "~2.5GB",
             framework: .tensorFlowLite,
             quantization: "INT8",
-            contextLength: nil,
+            contextLength: 8192,
             isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/tensorflow/efficientnet/tfLite/lite0-int8"),
-            downloadedFileName: nil,
-            modelType: .image,
+            downloadURL: URL(string: "https://www.kaggle.com/api/v1/models/google/gemma/tfLite/gemma-2b-it-cpu-int8/1/download"),
+            downloadedFileName: "gemma-2b-it-cpu-int8.tar.gz",
+            modelType: .text,
             sha256: nil,
-            requiresUnzip: false,
+            requiresUnzip: true,
             requiresAuth: true,
             authType: .kaggle,
             alternativeURLs: [],
-            notes: "EfficientNet Lite - optimized for mobile. Kaggle account required",
-            description: "EfficientNet-Lite0 for image classification, INT8 quantized",
-            minimumMemory: 50_000_000,
-            recommendedMemory: 100_000_000
+            notes: "⚠️ Requires accepting Gemma terms on Kaggle.com before downloading. Visit: https://www.kaggle.com/models/google/gemma",
+            description: "Google Gemma 2B instruction-tuned, CPU-optimized with INT8 quantization",
+            minimumMemory: 3_000_000_000,
+            recommendedMemory: 4_000_000_000
         )
     ]
     
@@ -931,3 +985,4 @@ extension ModelURLRegistry {
 
 extension Notification.Name {
     static let modelURLsValidated = Notification.Name("modelURLsValidated")
+}

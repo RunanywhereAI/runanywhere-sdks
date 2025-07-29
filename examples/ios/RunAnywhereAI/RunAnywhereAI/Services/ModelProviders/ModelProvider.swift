@@ -180,11 +180,12 @@ class KaggleProvider: BaseModelProvider {
     }
     
     override var isAuthenticated: Bool {
-        // Check if we have stored credentials
+        // Check if we have stored credentials in keychain
+        // Can't access MainActor properties from here
         let keychain = KeychainService()
-        if let _ = keychain.read(key: "kaggle_username"),
-           let _ = keychain.read(key: "kaggle_key") {
-            return true
+        if let data = keychain.read(key: "kaggle_credentials"),
+           let credentials = try? JSONDecoder().decode(KaggleCredentials.self, from: data) {
+            return credentials.isValid
         }
         return false
     }
@@ -193,14 +194,74 @@ class KaggleProvider: BaseModelProvider {
         return url.host?.contains("kaggle.com") == true
     }
     
+    override func downloadModel(
+        _ modelInfo: ModelInfo,
+        to directory: URL,
+        progress: @escaping (DownloadProgress) -> Void
+    ) async throws -> URL {
+        // Use KaggleAuthService for downloading
+        let authService = await KaggleAuthService.shared
+        
+        guard await authService.isAuthenticated else {
+            throw ModelDownloadError.authRequired
+        }
+        
+        guard let downloadURL = modelInfo.downloadURL else {
+            throw ModelDownloadError.noDownloadURL
+        }
+        
+        // Parse the Kaggle URL to get model details
+        // URL format: https://www.kaggle.com/models/{owner}/{model}/{framework}/{variation}/{version}/download
+        let pathComponents = downloadURL.pathComponents.filter { $0 != "/" }
+        
+        guard pathComponents.count >= 7,
+              pathComponents[0] == "models" else {
+            // Fall back to standard download if URL format is unexpected
+            return try await super.downloadModel(modelInfo, to: directory, progress: progress)
+        }
+        
+        let owner = pathComponents[1]
+        let model = pathComponents[2]
+        let framework = pathComponents[3]
+        let variation = pathComponents[4]
+        let version = pathComponents[5]
+        
+        // Construct the correct API URL
+        // Format: https://www.kaggle.com/api/v1/models/{owner}/{model}/{framework}/{variation}/{version}/download
+        let apiURL = URL(string: "https://www.kaggle.com/api/v1/models/\(owner)/\(model)/\(framework)/\(variation)/\(version)/download")!
+        
+        // Download using KaggleAuthService
+        let tempURL = try await authService.downloadModel(from: apiURL) { downloadProgress in
+            // Convert to DownloadProgress
+            let downloadInfo = DownloadProgress(
+                bytesWritten: Int64(downloadProgress * 100_000_000), // Estimate
+                totalBytes: 100_000_000, // Estimate
+                fractionCompleted: downloadProgress,
+                estimatedTimeRemaining: nil,
+                downloadSpeed: 0
+            )
+            progress(downloadInfo)
+        }
+        
+        // Move to final location
+        let fileName = modelInfo.downloadedFileName ?? modelInfo.name
+        let finalURL = directory.appendingPathComponent(fileName)
+        
+        if FileManager.default.fileExists(atPath: finalURL.path) {
+            try FileManager.default.removeItem(at: finalURL)
+        }
+        
+        try FileManager.default.moveItem(at: tempURL, to: finalURL)
+        
+        return finalURL
+    }
+    
     override func getAuthCredentials() -> Any? {
-        // Return credentials from keychain
+        // Get credentials from keychain directly
         let keychain = KeychainService()
-        if let usernameData = keychain.read(key: "kaggle_username"),
-           let username = String(data: usernameData, encoding: .utf8),
-           let keyData = keychain.read(key: "kaggle_key"),
-           let key = String(data: keyData, encoding: .utf8) {
-            return KaggleCredentials(username: username, apiKey: key, createdAt: Date())
+        if let data = keychain.read(key: "kaggle_credentials"),
+           let credentials = try? JSONDecoder().decode(KaggleCredentials.self, from: data) {
+            return credentials
         }
         return nil
     }
@@ -209,14 +270,17 @@ class KaggleProvider: BaseModelProvider {
         guard let kaggleCredentials = credentials as? KaggleCredentials else {
             throw ModelProviderError.invalidCredentials
         }
-        // Save directly to keychain
+        // This would need to be async to use KaggleAuthService.authenticate
+        // For now, we'll save directly following the same pattern as KaggleAuthService
         let keychain = KeychainService()
-        guard let usernameData = kaggleCredentials.username.data(using: .utf8),
-              let keyData = kaggleCredentials.apiKey.data(using: .utf8) else {
-            throw ModelProviderError.invalidCredentials
+        let data = try JSONEncoder().encode(kaggleCredentials)
+        try keychain.save(key: "kaggle_credentials", data: data)
+        
+        // Update KaggleAuthService state
+        Task { @MainActor in
+            KaggleAuthService.shared.currentCredentials = kaggleCredentials
+            KaggleAuthService.shared.isAuthenticated = true
         }
-        try keychain.save(key: "kaggle_username", data: usernameData)
-        try keychain.save(key: "kaggle_key", data: keyData)
     }
 }
 

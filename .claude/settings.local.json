@@ -65,7 +65,14 @@
       "Bash(chmod:*)",
       "Bash(./update_sizes_simple.sh:*)",
       "Bash(./update_model_sizes_fixed.sh:*)",
-      "Bash(./update_model_sizes_final.sh:*)"
+      "Bash(./update_model_sizes_final.sh:*)",
+      "Bash(./scripts/clean_build_and_run.sh:*)",
+      "Bash(python:*)",
+      "Bash(./test_kaggle_curl.sh:*)",
+      "Bash(./test_kaggle_api_correct.sh:*)",
+      "Bash(./find_tflite_models.sh:*)",
+      "WebFetch(domain:www.kaggle.com)",
+      "Bash(./test_kaggle_correct_api.sh:*)"
     ],
     "deny": []
   }
