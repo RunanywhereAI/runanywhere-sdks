@@ -27,11 +27,26 @@ if [ ! -f "$REGISTRY_FILE" ]; then
     exit 1
 fi
 
-# Function to check URL accessibility
+# Function to format bytes to human readable format
+format_bytes() {
+    local bytes=$1
+    if [ $bytes -lt 1024 ]; then
+        echo "${bytes} bytes"
+    elif [ $bytes -lt 1048576 ]; then
+        echo "$(( bytes / 1024 )) KB"
+    elif [ $bytes -lt 1073741824 ]; then
+        echo "$(( bytes / 1048576 )) MB"
+    else
+        echo "$(( bytes / 1073741824 )) GB"
+    fi
+}
+
+# Function to check URL accessibility and file size
 check_url() {
     local url="$1"
     local name="$2"
     local framework="$3"
+    local expected_size="$4"
     
     # Skip built-in URLs
     if [[ $url == "builtin://"* ]]; then
@@ -39,21 +54,51 @@ check_url() {
         return 0
     fi
     
-    # Use curl to check URL with timeout and follow redirects
-    # For GitHub LFS files, we need to handle redirects more carefully
-    if curl --head --silent --fail --location --max-time 15 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" "$url" >/dev/null 2>&1; then
-        echo -e "${GREEN}✅ $framework - $name${NC}"
-        return 0
-    else
-        # Try again with a simple GET request for stubborn URLs
-        if curl --silent --fail --location --max-time 15 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" --range 0-1 "$url" >/dev/null 2>&1; then
-            echo -e "${GREEN}✅ $framework - $name${NC}"
+    # Get headers including content-length
+    local headers=$(curl --head --silent --location --max-time 20 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" "$url" 2>&1)
+    local curl_exit_code=$?
+    
+    if [ $curl_exit_code -eq 0 ]; then
+        # Extract content-length
+        local content_length=$(echo "$headers" | grep -i "content-length" | tail -1 | awk '{print $2}' | tr -d '\r')
+        local http_status=$(echo "$headers" | head -n 1 | awk '{print $2}')
+        
+        # If no content-length in headers, try a range request
+        if [ -z "$content_length" ] || [ "$content_length" -eq 0 ]; then
+            # Try to get file size with a partial content request
+            local partial_headers=$(curl --head --silent --location --max-time 20 --retry 2 --user-agent "RunAnywhereAI-URLVerifier/1.0" --header "Range: bytes=0-0" "$url" 2>&1)
+            if echo "$partial_headers" | grep -q "Content-Range"; then
+                content_length=$(echo "$partial_headers" | grep -i "content-range" | sed 's/.*\///' | tr -d '\r')
+            fi
+        fi
+        
+        # Format size for display
+        local size_display="Unknown"
+        if [ -n "$content_length" ] && [ "$content_length" -gt 0 ]; then
+            size_display=$(format_bytes $content_length)
+        fi
+        
+        # Check if size is suspiciously small (less than 1KB)
+        if [ -n "$content_length" ] && [ "$content_length" -lt 1024 ] && [ "$content_length" -gt 0 ]; then
+            echo -e "${RED}⚠️  $framework - $name (WARNING: Suspiciously small - $size_display)${NC}"
+            echo -e "${RED}   URL: $url${NC}"
+            echo -e "${RED}   Expected: ~$expected_size, Actual: $size_display${NC}"
+            return 1
+        elif [ "$http_status" == "200" ] || [ "$http_status" == "302" ] || [ "$http_status" == "301" ]; then
+            echo -e "${GREEN}✅ $framework - $name ($size_display)${NC}"
+            if [ "$expected_size" != "Unknown" ] && [ "$size_display" != "Unknown" ]; then
+                echo -e "${GREEN}   Expected: ~$expected_size, Actual: $size_display${NC}"
+            fi
             return 0
         else
-            echo -e "${RED}❌ $framework - $name${NC}"
+            echo -e "${RED}❌ $framework - $name (HTTP $http_status)${NC}"
             echo -e "${RED}   URL: $url${NC}"
             return 1
         fi
+    else
+        echo -e "${RED}❌ $framework - $name (Connection failed)${NC}"
+        echo -e "${RED}   URL: $url${NC}"
+        return 1
     fi
 }
 
@@ -70,8 +115,9 @@ while IFS= read -r line; do
     if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
+        size=$(grep -B15 "$line" "$REGISTRY_FILE" | grep 'size:' | tail -1 | sed 's/.*size: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
-        if check_url "$url" "$name" "Foundation Models"; then
+        if check_url "$url" "$name" "Foundation Models" "$size"; then
             ((successful_urls++))
         fi
     fi
@@ -85,8 +131,9 @@ while IFS= read -r line; do
     if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
         url="${BASH_REMATCH[1]}"
         name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
+        size=$(grep -B15 "$line" "$REGISTRY_FILE" | grep 'size:' | tail -1 | sed 's/.*size: "\([^"]*\)".*/\1/' || echo "Unknown")
         ((total_urls++))
-        if check_url "$url" "$name" "Core ML"; then
+        if check_url "$url" "$name" "Core ML" "$size"; then
             ((successful_urls++))
         fi
     fi
@@ -143,6 +190,22 @@ while IFS= read -r line; do
         fi
     fi
 done < <(sed -n '/private var _tfliteModels.*=/,/^    ]/p' "$REGISTRY_FILE")
+
+echo ""
+
+# Swift Transformers Models
+echo -e "${BLUE}=== Swift Transformers Models ===${NC}"
+while IFS= read -r line; do
+    if [[ $line =~ downloadURL:\ URL\(string:\ \"([^\"]+)\" ]]; then
+        url="${BASH_REMATCH[1]}"
+        name=$(grep -B5 "$line" "$REGISTRY_FILE" | grep 'name:' | tail -1 | sed 's/.*name: "\([^"]*\)".*/\1/' || echo "Unknown")
+        size=$(grep -B15 "$line" "$REGISTRY_FILE" | grep 'size:' | tail -1 | sed 's/.*size: "\([^"]*\)".*/\1/' || echo "Unknown")
+        ((total_urls++))
+        if check_url "$url" "$name" "Swift Transformers" "$size"; then
+            ((successful_urls++))
+        fi
+    fi
+done < <(sed -n '/private var _swiftTransformersModels.*=/,/^    ]/p' "$REGISTRY_FILE")
 
 echo ""
 

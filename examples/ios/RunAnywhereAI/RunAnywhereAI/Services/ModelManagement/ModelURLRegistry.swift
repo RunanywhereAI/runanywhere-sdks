@@ -31,6 +31,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Built-in model for text summarization (iOS 18+)",
             description: "Apple's built-in text summarization model",
@@ -53,6 +54,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Built-in model for writing assistance (iOS 18+)",
             description: "Apple's built-in writing assistance model",
@@ -79,56 +81,86 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: true,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Image Generation Model - Text-to-Image support",
             description: "Stable Diffusion v1.5 optimized for Core ML with palettization",
             minimumMemory: 2_000_000_000,
             recommendedMemory: 4_000_000_000
         ),
+        // Apple's official Core ML models - directly downloadable
         ModelInfo(
-            id: "gpt2-coreml",
-            name: "gpt2.mlmodel",
+            id: "bert-squad-qa",
+            name: "BERT-SQuAD.mlmodel",
             path: nil,
             format: .coreML,
-            size: "150MB",
+            size: "218MB",
+            framework: .coreML,
+            quantization: "Float16",
+            contextLength: 384,
+            isLocal: false,
+            downloadURL: URL(string: "https://ml-assets.apple.com/coreml/models/Text/QuestionAnswering/BERT_SQUAD/BERTSQUADFP16.mlmodel"),
+            downloadedFileName: "BERTSQUADFP16.mlmodel",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "BERT model fine-tuned on SQuAD dataset for question answering",
+            description: "Apple's official BERT model for question answering tasks",
+            minimumMemory: 250_000_000,
+            recommendedMemory: 500_000_000
+        ),
+        // OpenELM models for Core ML (same as Swift Transformers but work better here)
+        ModelInfo(
+            id: "openelm-270m-instruct-coreml",
+            name: "OpenELM-270M-Instruct-CoreML",
+            path: nil,
+            format: .mlPackage,
+            size: "540MB",
+            framework: .coreML,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage.zip",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: true,  // Requires HF token
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication.",
+            description: "Apple's OpenELM 270M instruction-tuned model for Core ML",
+            minimumMemory: 600_000_000,
+            recommendedMemory: 1_000_000_000
+        ),
+        ModelInfo(
+            id: "gpt2-coreml",
+            name: "distilgpt2-coreml.mlmodel",
+            path: nil,
+            format: .coreML,
+            size: "482MB",
             framework: .coreML,
             quantization: "Float16",
             contextLength: 256,
             isLocal: false,
-            downloadURL: URL(string: "https://github.com/huggingface/swift-coreml-transformers/raw/master/Resources/gpt2.mlmodel"),
+            downloadURL: URL(string: "https://huggingface.co/distilbert/distilgpt2/resolve/main/coreml_model.mlmodel"),
             downloadedFileName: nil,
             modelType: .text,
-            sha256: nil,
+            sha256: "6c0ee43d6d4be21bc3cef1f44035fefaa96962fd05be39570ea268e4a5ce11bc",
             requiresUnzip: false,
             requiresAuth: false,
-            alternativeURLs: [],
-            notes: "GPT-2 text generation model (124M params) - requires Git LFS",
-            description: "GPT-2 model converted to Core ML format with Neural Engine acceleration",
-            minimumMemory: 300_000_000,
-            recommendedMemory: 500_000_000
+            authType: .none,
+            alternativeURLs: [
+                URL(string: "https://huggingface.co/distilgpt2/resolve/main/coreml_model.mlmodel")!
+            ],
+            notes: "DistilGPT2 - smaller, faster variant of GPT-2 (82M params)",
+            description: "DistilGPT2 model converted to Core ML format with Neural Engine acceleration",
+            minimumMemory: 500_000_000,
+            recommendedMemory: 800_000_000
         ),
-        ModelInfo(
-            id: "gpt2-512-coreml",
-            name: "gpt2-512.mlmodel",
-            path: nil,
-            format: .coreML,
-            size: "646MB",
-            framework: .coreML,
-            quantization: "Float16",
-            contextLength: 512,
-            isLocal: false,
-            downloadURL: URL(string: "https://github.com/huggingface/swift-coreml-transformers/raw/master/Resources/gpt2-512.mlmodel"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: false,
-            alternativeURLs: [],
-            notes: "GPT-2 with 512 context length (646MB) - requires Git LFS",
-            description: "GPT-2 model with extended 512 token context",
-            minimumMemory: 800_000_000,
-            recommendedMemory: 1_200_000_000
-        )
     ]
     
     // MARK: MLX Models
@@ -149,6 +181,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "4-bit quantized MLX model. Use huggingface-cli for full download",
             description: "Mistral 7B Instruct v0.3 - 4-bit quantized for MLX",
@@ -171,6 +204,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "MLX version of Phi-2 (note: requires config.json and tokenizer separately)",
             description: "Microsoft Phi-2 2.7B parameter model for MLX",
@@ -193,6 +227,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "4-bit quantized Gemma 2B MLX model - single file version",
             description: "Google Gemma 2B instruction-tuned, 4-bit quantized",
@@ -219,6 +254,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "CPU-optimized ONNX model with INT4 quantization",
             description: "Microsoft Phi-3 Mini 4k - mobile optimized with INT4 quantization",
@@ -241,6 +277,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "CPU-optimized ONNX model with 128k context",
             description: "Microsoft Phi-3 Mini 128k - extended context with INT4 quantization",
@@ -263,6 +300,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "No official ONNX version - using GGUF format instead",
             description: "Microsoft Phi-2 in GGUF format (not ONNX)",
@@ -289,6 +327,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: true,
             requiresAuth: true,
+            authType: .kaggle,
             alternativeURLs: [],
             notes: "Requires Kaggle account for download",
             description: "Google Gemma 2B instruction-tuned, GPU-optimized with INT4",
@@ -311,6 +350,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: true,
+            authType: .kaggle,
             alternativeURLs: [],
             notes: "Now hosted on Kaggle - requires authentication",
             description: "MobileBERT - BERT optimized for mobile devices",
@@ -333,6 +373,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: true,
+            authType: .kaggle,
             alternativeURLs: [],
             notes: "EfficientNet Lite - optimized for mobile. Kaggle account required",
             description: "EfficientNet-Lite0 for image classification, INT8 quantized",
@@ -359,6 +400,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Compact model perfect for testing",
             description: "TinyLlama 1.1B Chat - compact yet capable model",
@@ -381,6 +423,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Microsoft's efficient model in GGUF format",
             description: "Microsoft Phi-3 Mini 4k - efficient 3.8B parameter model",
@@ -403,6 +446,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Ultra-lightweight model with good performance",
             description: "Qwen 2.5 0.5B - ultra-lightweight with 32k context",
@@ -425,6 +469,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Balanced size and performance",
             description: "Qwen 2.5 1.5B - balanced model with 32k context",
@@ -447,6 +492,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Meta's latest small language model",
             description: "Meta Llama 3.2 3B - latest generation with 128k context",
@@ -469,6 +515,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Popular open-source model",
             description: "Mistral 7B Instruct v0.2 - powerful open model",
@@ -491,6 +538,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "Google's Gemma in GGUF format",
             description: "Google Gemma 2B instruction-tuned in GGUF",
@@ -513,6 +561,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "StableLM Zephyr 3B - instruction-following model",
             description: "Stability AI's StableLM Zephyr 3B",
@@ -535,6 +584,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "SmolLM 135M - Ultra-small language model",
             description: "SmolLM 135M - Tiny but functional language model",
@@ -557,6 +607,7 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "SmolLM 360M - Small but capable model",
             description: "SmolLM 360M - Balanced tiny model",
@@ -579,12 +630,88 @@ class ModelURLRegistry: ObservableObject {
             sha256: nil,
             requiresUnzip: false,
             requiresAuth: false,
+            authType: .none,
             alternativeURLs: [],
             notes: "SmolLM 1.7B - Larger variant",
             description: "SmolLM 1.7B - Larger small language model",
             minimumMemory: 1_500_000_000,
             recommendedMemory: 2_500_000_000
         )
+    ]
+    
+    // MARK: Swift Transformers Models
+    // NOTE: These are Core ML models that may work with Core ML service. Swift Transformers compatibility varies.
+    private var _swiftTransformersModels: [ModelInfo] = [
+        // OpenELM models - downloadable as archives with HF authentication
+        ModelInfo(
+            id: "openelm-270m-instruct",
+            name: "OpenELM-270M-Instruct",
+            path: nil,
+            format: .mlPackage,
+            size: "540MB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage.zip",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: true,  // Requires HF token
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
+            description: "Apple's OpenELM 270M instruction-tuned model for on-device inference",
+            minimumMemory: 600_000_000,
+            recommendedMemory: 1_000_000_000
+        ),
+        ModelInfo(
+            id: "openelm-450m-instruct",
+            name: "OpenELM-450M-Instruct",
+            path: nil,
+            format: .mlPackage,
+            size: "900MB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-450M-Instruct/resolve/main/OpenELM-450M-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-450M-Instruct-128-float32.mlpackage.zip",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: true,  // Requires HF token
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 450M Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
+            description: "Apple's OpenELM 450M instruction-tuned model for on-device inference",
+            minimumMemory: 1_000_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "openelm-1.1b-instruct",
+            name: "OpenELM-1.1B-Instruct",
+            path: nil,
+            format: .mlPackage,
+            size: "2.2GB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-1_1B-Instruct/resolve/main/OpenELM-1_1B-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-1_1B-Instruct-128-float32.mlpackage.zip",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: true,  // Requires HF token
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 1.1B Instruct model. Requires Hugging Face authentication. May work better with Core ML service.",
+            description: "Apple's OpenELM 1.1B instruction-tuned model for on-device inference",
+            minimumMemory: 2_500_000_000,
+            recommendedMemory: 3_500_000_000
+        ),
     ]
     
     // MARK: - Custom Models
@@ -598,6 +725,7 @@ class ModelURLRegistry: ObservableObject {
     var onnxModels: [ModelInfo] { _onnxModels }
     var tfliteModels: [ModelInfo] { _tfliteModels }
     var llamaCppModels: [ModelInfo] { _llamaCppModels }
+    var swiftTransformersModels: [ModelInfo] { _swiftTransformersModels }
     
     // MARK: - Public Methods
     
@@ -616,6 +744,8 @@ class ModelURLRegistry: ObservableObject {
             return tfliteModels
         case .llamaCpp:
             return llamaCppModels
+        case .swiftTransformers:
+            return swiftTransformersModels
         default:
             return []
         }
@@ -819,6 +949,8 @@ class ModelURLRegistry: ObservableObject {
             _tfliteModels = models
         case .llamaCpp:
             _llamaCppModels = models
+        case .swiftTransformers:
+            _swiftTransformersModels = models
         default:
             break
         }

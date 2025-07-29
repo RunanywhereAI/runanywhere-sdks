@@ -191,14 +191,13 @@ struct UnifiedModelsView: View {
 
     private func createModelInfo(from downloadInfo: ModelInfo) -> ModelInfo {
         let format = ModelFormat.from(extension: downloadInfo.downloadURL?.pathExtension ?? "")
-        let framework = LLMFramework.forFormat(format)
-
+        
         return ModelInfo(
             id: downloadInfo.id,
             name: downloadInfo.name,
             format: format,
             size: "Unknown",
-            framework: framework,
+            framework: downloadInfo.framework,  // Preserve the original framework!
             downloadURL: downloadInfo.downloadURL
         )
     }

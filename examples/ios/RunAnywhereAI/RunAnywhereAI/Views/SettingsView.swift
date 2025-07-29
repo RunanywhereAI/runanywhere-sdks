@@ -72,12 +72,17 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Model URLs") {
+            Section("API Configuration") {
+                NavigationLink(destination: APICredentialsView()) {
+                    Label("API Credentials", systemImage: "key.fill")
+                        .badge(getCredentialsStatus())
+                }
+                
                 NavigationLink(destination: ModelURLSettingsView()) {
-                    Label("Manage URLs", systemImage: "link")
+                    Label("Model URLs", systemImage: "link")
                 }
 
-                Text("Configure custom download URLs for models. All model downloads and management are now handled in the Models tab.")
+                Text("Configure API credentials and custom download URLs for models.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -129,6 +134,25 @@ struct SettingsView: View {
         topP = 0.95
         topK = 40
         showAdvancedSettings = false
+    }
+    
+    private func getCredentialsStatus() -> Text? {
+        let hfConnected = HuggingFaceAuthService.shared.isAuthenticated
+        let kaggleConnected = KaggleAuthService.shared.isAuthenticated
+        
+        if hfConnected && kaggleConnected {
+            return Text("All Connected")
+                .font(.caption)
+                .foregroundColor(.green)
+        } else if hfConnected || kaggleConnected {
+            return Text("Partial")
+                .font(.caption)
+                .foregroundColor(.orange)
+        } else {
+            return Text("Not Connected")
+                .font(.caption)
+                .foregroundColor(.red)
+        }
     }
 }
 

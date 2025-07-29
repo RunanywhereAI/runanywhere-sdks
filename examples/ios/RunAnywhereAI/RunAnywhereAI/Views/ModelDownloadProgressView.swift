@@ -329,7 +329,7 @@ struct ModelDownloadProgressView: View {
             // Get models directory
             let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
             let modelsDirectory = documentsURL.appendingPathComponent("Models")
-            let modelDirectory = modelsDirectory.appendingPathComponent(model.framework.displayName)
+            let modelDirectory = modelsDirectory.appendingPathComponent(model.framework.directoryName)
 
             try FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
 

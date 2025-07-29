@@ -7,7 +7,8 @@
       "Bash(pip3 install:*)",
       "Bash(source:*)",
       "Bash(pip install:*)",
-      "Bash(log show:*)"
+      "Bash(log show:*)",
+      "Bash(bash scripts/verify_urls.sh:*)"
     ],
     "deny": []
   }

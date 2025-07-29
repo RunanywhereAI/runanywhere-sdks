@@ -186,7 +186,7 @@ class ModelRepository: ObservableObject {
 
     /// Get path for downloaded model
     func getModelPath(for model: ModelInfo) -> URL? {
-        let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.rawValue)
+        let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.directoryName)
         let modelFile = frameworkDir.appendingPathComponent("\(model.id).\(model.format.fileExtension)")
 
         if fileManager.fileExists(atPath: modelFile.path) {
@@ -239,7 +239,7 @@ class ModelRepository: ObservableObject {
 
         // Create framework subdirectories
         for framework in LLMFramework.allCases {
-            let frameworkDir = modelsDirectory.appendingPathComponent(framework.rawValue)
+            let frameworkDir = modelsDirectory.appendingPathComponent(framework.directoryName)
             try? fileManager.createDirectory(
                 at: frameworkDir,
                 withIntermediateDirectories: true
@@ -262,7 +262,7 @@ class ModelRepository: ObservableObject {
     }
 
     private func createModelPath(for model: ModelInfo) throws -> URL {
-        let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.rawValue)
+        let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.directoryName)
         return frameworkDir.appendingPathComponent("\(model.id).\(model.format.fileExtension)")
     }
 

@@ -13,6 +13,7 @@ enum ModelDownloadError: LocalizedError {
     case invalidChecksum
     case unzipFailed
     case cancelled
+    case authRequired
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ enum ModelDownloadError: LocalizedError {
             return "Failed to extract model files"
         case .cancelled:
             return "Download was cancelled"
+        case .authRequired:
+            return "Authentication required. Please configure your API credentials in Settings."
         }
     }
 }
@@ -122,6 +125,27 @@ class ModelDownloadManager: NSObject, ObservableObject {
         request.httpMethod = "GET"
         request.timeoutInterval = 3600 // 1 hour
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        
+        // Add authentication headers if needed
+        if modelInfo.requiresAuth {
+            if downloadURL.host?.contains("kaggle") == true {
+                // Kaggle authentication
+                if let kaggleAuth = KaggleAuthService.shared.currentCredentials {
+                    request.setValue(kaggleAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
+                } else {
+                    completion(.failure(ModelDownloadError.authRequired))
+                    return
+                }
+            } else if downloadURL.host?.contains("huggingface") == true {
+                // Hugging Face authentication
+                if let hfAuth = HuggingFaceAuthService.shared.currentCredentials {
+                    request.setValue(hfAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
+                } else {
+                    completion(.failure(ModelDownloadError.authRequired))
+                    return
+                }
+            }
+        }
         
         // Create download task
         let task = session.downloadTask(with: request)
@@ -266,7 +290,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         let modelsDirectory = documentsURL.appendingPathComponent("Models")
         
         // Check framework-specific directory
-        let frameworkDir = modelsDirectory.appendingPathComponent(framework.displayName)
+        let frameworkDir = modelsDirectory.appendingPathComponent(framework.directoryName)
         let modelPath = frameworkDir.appendingPathComponent(modelInfo.name)
         
         if FileManager.default.fileExists(atPath: modelPath.path) {
