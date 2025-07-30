@@ -99,7 +99,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     /// Indicates if this framework is deferred (coming soon)
     var isDeferred: Bool {
         switch self {
-        case .execuTorch, .llamaCpp, .mlc, .picoLLM:
+        case .llamaCpp, .mlc, .picoLLM:
             return true
         default:
             return false

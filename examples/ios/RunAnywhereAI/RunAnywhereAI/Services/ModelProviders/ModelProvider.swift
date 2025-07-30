@@ -76,13 +76,9 @@ class BaseModelProvider: ModelProvider {
         to directory: URL,
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
-        // Base implementation using standard download
-        guard modelInfo.downloadURL != nil else {
-            throw ModelDownloadError.noDownloadURL
-        }
-        
-        let downloadManager = await ModelDownloadManager.shared
-        return try await downloadManager.downloadModel(modelInfo, to: directory, progress: progress)
+        // Base implementation should not use ModelDownloadManager to avoid circular dependency
+        // Subclasses should override this method with actual download logic
+        throw ModelProviderError.providerNotFound
     }
     
     func getAuthCredentials() -> Any? {
@@ -126,19 +122,45 @@ class HuggingFaceProvider: BaseModelProvider {
         to directory: URL,
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
-        // Check if it's a directory-based model
-        if modelInfo.format == .mlPackage && 
-           modelInfo.downloadURL?.pathExtension == "mlpackage" {
-            // Use ModelDownloadManager for HuggingFace directory download
-            let downloadManager = await ModelDownloadManager.shared
-            return try await downloadManager.downloadHuggingFaceDirectory(
-                modelInfo,
-                to: directory,
-                progress: progress
-            )
-        } else {
-            // Use standard download with HF auth
-            return try await super.downloadModel(modelInfo, to: directory, progress: progress)
+        // For HuggingFace, we need to handle downloads directly with proper auth
+        guard let downloadURL = modelInfo.downloadURL else {
+            throw ModelDownloadError.noDownloadURL
+        }
+        
+        // Create a proper download request
+        var request = URLRequest(url: downloadURL)
+        request.setValue("RunAnywhereAI/1.0", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 3600 // 1 hour for large models
+        
+        // Add HuggingFace auth if available
+        let keychain = KeychainService()
+        if let tokenData = keychain.read(key: "huggingface_token"),
+           let token = String(data: tokenData, encoding: .utf8) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        // Use continuation to bridge delegate callbacks to async/await
+        return try await withCheckedThrowingContinuation { continuation in
+            print("Starting HuggingFace download for: \(downloadURL.absoluteString)")
+            
+            let delegate = DirectURLDownloadDelegate()
+            delegate.progressHandler = progress
+            delegate.destinationDirectory = directory
+            delegate.fileName = modelInfo.downloadedFileName ?? downloadURL.lastPathComponent
+            delegate.completionHandler = { result in
+                switch result {
+                case .success(let url):
+                    continuation.resume(returning: url)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            delegate.session = session  // Keep reference to prevent deallocation
+            let task = session.downloadTask(with: request)
+            
+            task.resume()
         }
     }
     
@@ -289,6 +311,87 @@ class KaggleProvider: BaseModelProvider {
     }
 }
 
+// MARK: - Download Delegate for Progress Tracking
+
+private class DirectURLDownloadDelegate: NSObject, URLSessionDownloadDelegate {
+    var progressHandler: ((DownloadProgress) -> Void)?
+    var completionHandler: ((Result<URL, Error>) -> Void)?
+    var destinationDirectory: URL?
+    var fileName: String?
+    var session: URLSession?
+    private var startTime = Date()
+    private var lastBytesWritten: Int64 = 0
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let progress = DownloadProgress(
+            bytesWritten: totalBytesWritten,
+            totalBytes: totalBytesExpectedToWrite,
+            fractionCompleted: totalBytesExpectedToWrite > 0 ? Double(totalBytesWritten) / Double(totalBytesExpectedToWrite) : 0,
+            estimatedTimeRemaining: calculateTimeRemaining(totalBytesWritten: totalBytesWritten, totalBytes: totalBytesExpectedToWrite),
+            downloadSpeed: calculateSpeed(bytesWritten: totalBytesWritten)
+        )
+        
+        // Debug logging
+        print("Download progress: \(Int(progress.fractionCompleted * 100))% - \(totalBytesWritten)/\(totalBytesExpectedToWrite) bytes")
+        
+        DispatchQueue.main.async {
+            self.progressHandler?(progress)
+        }
+        lastBytesWritten = totalBytesWritten
+    }
+    
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        print("Download finished, file at: \(location.path)")
+        
+        // Move file to destination
+        guard let destinationDirectory = destinationDirectory,
+              let fileName = fileName else {
+            completionHandler?(.failure(ModelDownloadError.networkError(NSError(domain: "Download", code: -1, userInfo: [NSLocalizedDescriptionKey: "Missing destination info"]))))
+            return
+        }
+        
+        do {
+            // Create directory if needed
+            try FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+            
+            let destinationURL = destinationDirectory.appendingPathComponent(fileName)
+            
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                try FileManager.default.removeItem(at: destinationURL)
+            }
+            
+            try FileManager.default.moveItem(at: location, to: destinationURL)
+            print("File moved to: \(destinationURL.path)")
+            
+            completionHandler?(.success(destinationURL))
+        } catch {
+            print("Error moving file: \(error)")
+            completionHandler?(.failure(error))
+        }
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            print("Download failed with error: \(error)")
+            completionHandler?(.failure(ModelDownloadError.networkError(error)))
+        }
+    }
+    
+    private func calculateSpeed(bytesWritten: Int64) -> Double {
+        let elapsed = Date().timeIntervalSince(startTime)
+        return elapsed > 0 ? Double(bytesWritten) / elapsed : 0
+    }
+    
+    private func calculateTimeRemaining(totalBytesWritten: Int64, totalBytes: Int64) -> TimeInterval? {
+        guard totalBytes > 0 && totalBytesWritten > 0 else { return nil }
+        let elapsed = Date().timeIntervalSince(startTime)
+        let speed = Double(totalBytesWritten) / elapsed
+        guard speed > 0 else { return nil }
+        let remaining = Double(totalBytes - totalBytesWritten) / speed
+        return remaining > 0 ? remaining : nil
+    }
+}
+
 // MARK: - Direct URL Provider
 
 class DirectURLProvider: BaseModelProvider {
@@ -313,30 +416,48 @@ class DirectURLProvider: BaseModelProvider {
         to directory: URL,
         progress: @escaping (DownloadProgress) -> Void
     ) async throws -> URL {
-        // Direct download without any special handling
+        // Direct download with progress tracking
         guard let downloadURL = modelInfo.downloadURL else {
             throw ModelDownloadError.noDownloadURL
         }
         
-        // Use URLSession directly for maximum flexibility
-        let (tempURL, response) = try await URLSession.shared.download(from: downloadURL)
+        // Create a proper download request
+        var request = URLRequest(url: downloadURL)
+        request.setValue("RunAnywhereAI/1.0", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 3600 // 1 hour for large models
         
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw ModelDownloadError.networkError(URLError(.badServerResponse))
+        // For HuggingFace URLs, check if we need auth
+        if downloadURL.host?.contains("huggingface.co") == true {
+            let keychain = KeychainService()
+            if let tokenData = keychain.read(key: "huggingface_token"),
+               let token = String(data: tokenData, encoding: .utf8) {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
         }
         
-        // Move to destination
-        let fileName = modelInfo.downloadedFileName ?? downloadURL.lastPathComponent
-        let destinationURL = directory.appendingPathComponent(fileName)
-        
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
+        // Use continuation to bridge delegate callbacks to async/await
+        return try await withCheckedThrowingContinuation { continuation in
+            print("Starting direct URL download for: \(downloadURL.absoluteString)")
+            
+            let delegate = DirectURLDownloadDelegate()
+            delegate.progressHandler = progress
+            delegate.destinationDirectory = directory
+            delegate.fileName = modelInfo.downloadedFileName ?? downloadURL.lastPathComponent
+            delegate.completionHandler = { result in
+                switch result {
+                case .success(let url):
+                    continuation.resume(returning: url)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+            
+            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            delegate.session = session  // Keep reference to prevent deallocation
+            let task = session.downloadTask(with: request)
+            
+            task.resume()
         }
-        
-        try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-        
-        return destinationURL
     }
 }
 
