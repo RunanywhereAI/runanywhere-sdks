@@ -20,6 +20,20 @@
 		547F70AE2E35CE050061BAED /* onnxruntime_extensions in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70AD2E35CE050061BAED /* onnxruntime_extensions */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
 		547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 547F7D7D2E3735100061BAED /* ZIPFoundation */; };
+		547F83652E39AE660061BAED /* backend_coreml in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83642E39AE660061BAED /* backend_coreml */; };
+		547F83672E39AE660061BAED /* backend_coreml_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83662E39AE660061BAED /* backend_coreml_debug */; };
+		547F83692E39AE660061BAED /* backend_mps in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83682E39AE660061BAED /* backend_mps */; };
+		547F836B2E39AE660061BAED /* backend_mps_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F836A2E39AE660061BAED /* backend_mps_debug */; };
+		547F836D2E39AE660061BAED /* backend_xnnpack in Frameworks */ = {isa = PBXBuildFile; productRef = 547F836C2E39AE660061BAED /* backend_xnnpack */; };
+		547F836F2E39AE660061BAED /* backend_xnnpack_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F836E2E39AE660061BAED /* backend_xnnpack_debug */; };
+		547F83712E39AE660061BAED /* executorch in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83702E39AE660061BAED /* executorch */; };
+		547F83732E39AE660061BAED /* executorch_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83722E39AE660061BAED /* executorch_debug */; };
+		547F83752E39AE660061BAED /* kernels_custom in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83742E39AE660061BAED /* kernels_custom */; };
+		547F83772E39AE660061BAED /* kernels_custom_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83762E39AE660061BAED /* kernels_custom_debug */; };
+		547F83792E39AE660061BAED /* kernels_optimized in Frameworks */ = {isa = PBXBuildFile; productRef = 547F83782E39AE660061BAED /* kernels_optimized */; };
+		547F837B2E39AE660061BAED /* kernels_optimized_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F837A2E39AE660061BAED /* kernels_optimized_debug */; };
+		547F837D2E39AE660061BAED /* kernels_quantized in Frameworks */ = {isa = PBXBuildFile; productRef = 547F837C2E39AE660061BAED /* kernels_quantized */; };
+		547F837F2E39AE660061BAED /* kernels_quantized_debug in Frameworks */ = {isa = PBXBuildFile; productRef = 547F837E2E39AE660061BAED /* kernels_quantized_debug */; };
 		709C55C514D9670AA4D809A1 /* libPods-RunAnywhereAIUITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = EA037D2D2288790D354E61CC /* libPods-RunAnywhereAIUITests.a */; };
 		F1447EA007FB8828A4AA7DC5 /* libPods-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D4B419D14093A7C24CA1293F /* libPods-RunAnywhereAITests.a */; };
 /* End PBXBuildFile section */
@@ -59,22 +73,16 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5480A1F22E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
 		5480A2012E2F250400337F2F /* RunAnywhereAITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAITests;
 			sourceTree = "<group>";
 		};
 		5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAIUITests;
 			sourceTree = "<group>";
 		};
@@ -86,17 +94,31 @@
 			buildActionMask = 2147483647;
 			files = (
 				547F70AE2E35CE050061BAED /* onnxruntime_extensions in Frameworks */,
+				547F837D2E39AE660061BAED /* kernels_quantized in Frameworks */,
 				547F70A42E35CC650061BAED /* MLXOptimizers in Frameworks */,
+				547F837F2E39AE660061BAED /* kernels_quantized_debug in Frameworks */,
+				547F83692E39AE660061BAED /* backend_mps in Frameworks */,
 				547F709E2E35CC650061BAED /* MLXFast in Frameworks */,
 				547F70A02E35CC650061BAED /* MLXLinalg in Frameworks */,
+				547F836D2E39AE660061BAED /* backend_xnnpack in Frameworks */,
+				547F83752E39AE660061BAED /* kernels_custom in Frameworks */,
 				547F709A2E35CC650061BAED /* MLX in Frameworks */,
 				547F70A22E35CC650061BAED /* MLXNN in Frameworks */,
+				547F836F2E39AE660061BAED /* backend_xnnpack_debug in Frameworks */,
+				547F837B2E39AE660061BAED /* kernels_optimized_debug in Frameworks */,
+				547F83672E39AE660061BAED /* backend_coreml_debug in Frameworks */,
+				547F83772E39AE660061BAED /* kernels_custom_debug in Frameworks */,
 				547F709C2E35CC650061BAED /* MLXFFT in Frameworks */,
 				547F70B12E35CE270061BAED /* Transformers in Frameworks */,
+				547F83712E39AE660061BAED /* executorch in Frameworks */,
 				547F70AC2E35CE050061BAED /* onnxruntime in Frameworks */,
 				547F70A92E35CCD00061BAED /* MLXLMCommon in Frameworks */,
+				547F83792E39AE660061BAED /* kernels_optimized in Frameworks */,
+				547F83732E39AE660061BAED /* executorch_debug in Frameworks */,
 				547F70A62E35CC650061BAED /* MLXRandom in Frameworks */,
+				547F83652E39AE660061BAED /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
+				547F836B2E39AE660061BAED /* backend_mps_debug in Frameworks */,
 				0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -199,6 +221,20 @@
 				547F70AD2E35CE050061BAED /* onnxruntime_extensions */,
 				547F70B02E35CE270061BAED /* Transformers */,
 				547F7D7D2E3735100061BAED /* ZIPFoundation */,
+				547F83642E39AE660061BAED /* backend_coreml */,
+				547F83662E39AE660061BAED /* backend_coreml_debug */,
+				547F83682E39AE660061BAED /* backend_mps */,
+				547F836A2E39AE660061BAED /* backend_mps_debug */,
+				547F836C2E39AE660061BAED /* backend_xnnpack */,
+				547F836E2E39AE660061BAED /* backend_xnnpack_debug */,
+				547F83702E39AE660061BAED /* executorch */,
+				547F83722E39AE660061BAED /* executorch_debug */,
+				547F83742E39AE660061BAED /* kernels_custom */,
+				547F83762E39AE660061BAED /* kernels_custom_debug */,
+				547F83782E39AE660061BAED /* kernels_optimized */,
+				547F837A2E39AE660061BAED /* kernels_optimized_debug */,
+				547F837C2E39AE660061BAED /* kernels_quantized */,
+				547F837E2E39AE660061BAED /* kernels_quantized_debug */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -286,6 +322,7 @@
 				547F70AA2E35CE050061BAED /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -398,9 +435,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -812,6 +853,14 @@
 				minimumVersion = 0.9.19;
 			};
 		};
+		547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pytorch/executorch";
+			requirement = {
+				branch = "swiftpm-0.7.0";
+				kind = branch;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -874,6 +923,76 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		547F83642E39AE660061BAED /* backend_coreml */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_coreml;
+		};
+		547F83662E39AE660061BAED /* backend_coreml_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_coreml_debug;
+		};
+		547F83682E39AE660061BAED /* backend_mps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_mps;
+		};
+		547F836A2E39AE660061BAED /* backend_mps_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_mps_debug;
+		};
+		547F836C2E39AE660061BAED /* backend_xnnpack */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_xnnpack;
+		};
+		547F836E2E39AE660061BAED /* backend_xnnpack_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = backend_xnnpack_debug;
+		};
+		547F83702E39AE660061BAED /* executorch */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = executorch;
+		};
+		547F83722E39AE660061BAED /* executorch_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = executorch_debug;
+		};
+		547F83742E39AE660061BAED /* kernels_custom */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_custom;
+		};
+		547F83762E39AE660061BAED /* kernels_custom_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_custom_debug;
+		};
+		547F83782E39AE660061BAED /* kernels_optimized */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_optimized;
+		};
+		547F837A2E39AE660061BAED /* kernels_optimized_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_optimized_debug;
+		};
+		547F837C2E39AE660061BAED /* kernels_quantized */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_quantized;
+		};
+		547F837E2E39AE660061BAED /* kernels_quantized_debug */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 547F83632E39AE660061BAED /* XCRemoteSwiftPackageReference "executorch" */;
+			productName = kernels_quantized_debug;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

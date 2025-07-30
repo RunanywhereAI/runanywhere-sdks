@@ -699,6 +699,125 @@ class ModelURLRegistry: ObservableObject {
         )
     ]
     
+    // MARK: ExecuTorch Models
+    private var _execuTorchModels: [ModelInfo] = [
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-executorch",
+            name: "Llama-3.2-1B-Instruct.pte",
+            path: nil,
+            format: .pte,
+            size: "2.47GB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-ET/resolve/main/Llama-3.2-1B-Instruct.pte"),
+            downloadedFileName: nil,
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B Instruct optimized for ExecuTorch with 128k context",
+            description: "Meta's Llama 3.2 1B instruction-tuned model for ExecuTorch",
+            minimumMemory: 3_000_000_000,
+            recommendedMemory: 4_000_000_000
+        ),
+        ModelInfo(
+            id: "smollm2-135m-executorch",
+            name: "model.pte",
+            path: nil,
+            format: .pte,
+            size: "543MB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/SmolLM2-135M/resolve/main/model.pte"),
+            downloadedFileName: "smollm2-135m.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "SmolLM2 135M - excellent for testing and mobile deployment",
+            description: "HuggingFace's SmolLM2 135M model optimized for ExecuTorch",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-int4-executorch",
+            name: "Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte",
+            path: nil,
+            format: .pte,
+            size: "~600MB",
+            framework: .execuTorch,
+            quantization: "INT4",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET/resolve/main/model.pte"),
+            downloadedFileName: "llama-3.2-1b-int4.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B with INT4 quantization using SpinQuant",
+            description: "Highly compressed Llama 3.2 1B with INT4 quantization for minimal memory usage",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-qlora-int4-executorch",
+            name: "Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte",
+            path: nil,
+            format: .pte,
+            size: "~600MB",
+            framework: .execuTorch,
+            quantization: "INT4-QLORA",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET/resolve/main/model.pte"),
+            downloadedFileName: "llama-3.2-1b-qlora-int4.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B with QLORA INT4 quantization",
+            description: "Llama 3.2 1B using QLORA quantization for efficient edge deployment",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "smollm2-135m-sdpa-executorch",
+            name: "SmolLM2-135M-Custom_SDPA.pte",
+            path: nil,
+            format: .pte,
+            size: "~550MB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/SmolLM2-135M-Custom_SDPA/resolve/main/model.pte"),
+            downloadedFileName: "smollm2-135m-sdpa.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "SmolLM2 with custom SDPA (Scaled Dot Product Attention)",
+            description: "SmolLM2 135M with optimized attention mechanism for ExecuTorch",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        )
+    ]
+    
     // MARK: - Custom Models
     private var customModels: [ModelInfo] = []
     
@@ -711,6 +830,7 @@ class ModelURLRegistry: ObservableObject {
     var tfliteModels: [ModelInfo] { _tfliteModels }
     var llamaCppModels: [ModelInfo] { _llamaCppModels }
     var swiftTransformersModels: [ModelInfo] { _swiftTransformersModels }
+    var execuTorchModels: [ModelInfo] { _execuTorchModels }
     
     // MARK: - Public Methods
     
@@ -731,6 +851,8 @@ class ModelURLRegistry: ObservableObject {
             return llamaCppModels
         case .swiftTransformers:
             return swiftTransformersModels
+        case .execuTorch:
+            return execuTorchModels
         default:
             return []
         }
@@ -745,6 +867,8 @@ class ModelURLRegistry: ObservableObject {
         allModels.append(contentsOf: onnxModels)
         allModels.append(contentsOf: tfliteModels)
         allModels.append(contentsOf: llamaCppModels)
+        allModels.append(contentsOf: swiftTransformersModels)
+        allModels.append(contentsOf: execuTorchModels)
         allModels.append(contentsOf: customModels)
         return allModels
     }
