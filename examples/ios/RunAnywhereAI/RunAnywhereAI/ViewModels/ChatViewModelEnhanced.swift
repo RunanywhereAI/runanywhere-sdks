@@ -312,6 +312,15 @@ class ChatViewModelEnhanced: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        // Listen for model download completion to refresh available services
+        NotificationCenter.default.publisher(for: Notification.Name("ModelDownloadCompleted"))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                // Force the unified service to refresh its available services
+                self?.unifiedService.setupServices()
+            }
+            .store(in: &cancellables)
     }
 
     private func addWelcomeMessage() {

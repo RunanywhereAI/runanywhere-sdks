@@ -26,7 +26,7 @@ class UnifiedLLMService: ObservableObject {
         observeServiceLifecycle()
     }
 
-    private func setupServices() {
+    func setupServices() {
         // Get all available services from the dependency container
         availableServices = container.resolveAll(LLMService.self)
     }

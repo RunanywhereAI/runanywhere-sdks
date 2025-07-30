@@ -103,7 +103,7 @@ class HuggingFaceProvider: BaseModelProvider {
             id: "huggingface",
             name: "Hugging Face",
             icon: "face.smiling",
-            requiresAuth: true,
+            requiresAuth: false,  // Public models don't require auth
             authType: .huggingFace
         )
     }
@@ -211,24 +211,29 @@ class KaggleProvider: BaseModelProvider {
         }
         
         // Parse the Kaggle URL to get model details
-        // URL format: https://www.kaggle.com/models/{owner}/{model}/{framework}/{variation}/{version}/download
+        // The URL can be in two formats:
+        // 1. API format: https://www.kaggle.com/api/v1/models/{owner}/{model}/{framework}/{variation}/{version}/download
+        // 2. Web format: https://www.kaggle.com/models/{owner}/{model}/{framework}/{variation}/{version}/download
         let pathComponents = downloadURL.pathComponents.filter { $0 != "/" }
         
-        guard pathComponents.count >= 7,
-              pathComponents[0] == "models" else {
-            // Fall back to standard download if URL format is unexpected
+        var apiURL: URL
+        
+        if pathComponents.count >= 9 && pathComponents[0] == "api" && pathComponents[1] == "v1" && pathComponents[2] == "models" {
+            // Already in API format, use as-is
+            apiURL = downloadURL
+        } else if pathComponents.count >= 7 && pathComponents[0] == "models" {
+            // Web format, convert to API format
+            let owner = pathComponents[1]
+            let model = pathComponents[2]
+            let framework = pathComponents[3]
+            let variation = pathComponents[4]
+            let version = pathComponents[5]
+            
+            apiURL = URL(string: "https://www.kaggle.com/api/v1/models/\(owner)/\(model)/\(framework)/\(variation)/\(version)/download")!
+        } else {
+            // Unknown format, fall back to standard download
             return try await super.downloadModel(modelInfo, to: directory, progress: progress)
         }
-        
-        let owner = pathComponents[1]
-        let model = pathComponents[2]
-        let framework = pathComponents[3]
-        let variation = pathComponents[4]
-        let version = pathComponents[5]
-        
-        // Construct the correct API URL
-        // Format: https://www.kaggle.com/api/v1/models/{owner}/{model}/{framework}/{variation}/{version}/download
-        let apiURL = URL(string: "https://www.kaggle.com/api/v1/models/\(owner)/\(model)/\(framework)/\(variation)/\(version)/download")!
         
         // Download using KaggleAuthService
         let tempURL = try await authService.downloadModel(from: apiURL) { downloadProgress in

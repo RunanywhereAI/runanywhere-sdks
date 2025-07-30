@@ -474,6 +474,9 @@ struct ModelDownloadProgressView: View {
             
             // Refresh model list to show downloaded status
             await ModelManager.shared.refreshModelList()
+            
+            // Post notification for other views to update
+            NotificationCenter.default.post(name: Notification.Name("ModelDownloadCompleted"), object: nil)
         } catch {
             await MainActor.run {
                 self.error = error

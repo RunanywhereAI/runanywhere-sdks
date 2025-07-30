@@ -643,7 +643,7 @@ class ModelURLRegistry: ObservableObject {
             modelType: .text,
             sha256: nil,
             requiresUnzip: false,
-            requiresAuth: true,
+            requiresAuth: false,  // Public model, no auth required
             authType: .huggingFace,
             alternativeURLs: [],
             notes: "OpenELM 270M for Swift Transformers. Requires Hugging Face authentication. Downloads as directory structure.",
@@ -666,7 +666,7 @@ class ModelURLRegistry: ObservableObject {
             modelType: .text,
             sha256: nil,
             requiresUnzip: false,
-            requiresAuth: true,
+            requiresAuth: false,  // Public model, no auth required
             authType: .huggingFace,
             alternativeURLs: [],
             notes: "OpenELM 450M for Swift Transformers. Requires Hugging Face authentication.",
@@ -689,7 +689,7 @@ class ModelURLRegistry: ObservableObject {
             modelType: .text,
             sha256: nil,
             requiresUnzip: false,
-            requiresAuth: true,
+            requiresAuth: false,  // Public model, no auth required
             authType: .huggingFace,
             alternativeURLs: [],
             notes: "OpenELM 1.1B for Swift Transformers. Larger model, requires more memory.",
