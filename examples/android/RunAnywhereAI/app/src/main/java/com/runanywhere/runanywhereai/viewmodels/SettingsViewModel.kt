@@ -15,7 +15,7 @@ import javax.inject.Inject
 
 /**
  * ViewModel for managing application settings
- * 
+ *
  * Handles all app settings including:
  * - Generation parameters (temperature, max tokens, etc.)
  * - Hardware preferences (CPU/GPU selection)
@@ -51,7 +51,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _isLoading.value = true
-                
+
                 val generationOptions = GenerationOptions(
                     maxTokens = preferencesRepository.getMaxTokens(),
                     temperature = preferencesRepository.getTemperature(),
@@ -66,23 +66,23 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = SettingsUiState(
                     // Generation Parameters
                     generationOptions = generationOptions,
-                    
+
                     // Hardware Settings
                     preferredFramework = preferencesRepository.getPreferredFramework(),
                     enableGPUAcceleration = preferencesRepository.getEnableGPUAcceleration(),
                     maxMemoryUsageMB = preferencesRepository.getMaxMemoryUsage(),
-                    
+
                     // Battery Settings
                     enableBatteryOptimization = preferencesRepository.getEnableBatteryOptimization(),
                     thermalThrottlingEnabled = preferencesRepository.getThermalThrottlingEnabled(),
                     maxBatteryTemperature = preferencesRepository.getMaxBatteryTemperature(),
-                    
+
                     // Privacy Settings
                     enableConversationEncryption = preferencesRepository.getEnableConversationEncryption(),
                     autoDeleteConversations = preferencesRepository.getAutoDeleteConversations(),
                     conversationRetentionDays = preferencesRepository.getConversationRetentionDays(),
                     enableAnalytics = preferencesRepository.getEnableAnalytics(),
-                    
+
                     // Advanced Settings
                     enableDebugLogging = preferencesRepository.getEnableDebugLogging(),
                     modelCacheSizeMB = preferencesRepository.getModelCacheSize(),
@@ -111,7 +111,7 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setStopSequences(options.stopSequences)
                 preferencesRepository.setPresencePenalty(options.presencePenalty)
                 preferencesRepository.setFrequencyPenalty(options.frequencyPenalty)
-                
+
                 _uiState.value = _uiState.value.copy(generationOptions = options)
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to update generation settings: ${e.message}"
@@ -132,7 +132,7 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setPreferredFramework(preferredFramework)
                 preferencesRepository.setEnableGPUAcceleration(enableGPUAcceleration)
                 preferencesRepository.setMaxMemoryUsage(maxMemoryUsageMB)
-                
+
                 _uiState.value = _uiState.value.copy(
                     preferredFramework = preferredFramework,
                     enableGPUAcceleration = enableGPUAcceleration,
@@ -157,7 +157,7 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setEnableBatteryOptimization(enableBatteryOptimization)
                 preferencesRepository.setThermalThrottlingEnabled(thermalThrottlingEnabled)
                 preferencesRepository.setMaxBatteryTemperature(maxBatteryTemperature)
-                
+
                 _uiState.value = _uiState.value.copy(
                     enableBatteryOptimization = enableBatteryOptimization,
                     thermalThrottlingEnabled = thermalThrottlingEnabled,
@@ -184,7 +184,7 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setAutoDeleteConversations(autoDeleteConversations)
                 preferencesRepository.setConversationRetentionDays(conversationRetentionDays)
                 preferencesRepository.setEnableAnalytics(enableAnalytics)
-                
+
                 _uiState.value = _uiState.value.copy(
                     enableConversationEncryption = enableConversationEncryption,
                     autoDeleteConversations = autoDeleteConversations,
@@ -212,7 +212,7 @@ class SettingsViewModel @Inject constructor(
                 preferencesRepository.setModelCacheSize(modelCacheSizeMB)
                 preferencesRepository.setEnableModelPreloading(enableModelPreloading)
                 preferencesRepository.setConcurrentInferencesLimit(concurrentInferencesLimit)
-                
+
                 _uiState.value = _uiState.value.copy(
                     enableDebugLogging = enableDebugLogging,
                     modelCacheSizeMB = modelCacheSizeMB,
@@ -285,23 +285,23 @@ class SettingsViewModel @Inject constructor(
 data class SettingsUiState(
     // Generation Parameters
     val generationOptions: GenerationOptions = GenerationOptions(),
-    
+
     // Hardware Settings
     val preferredFramework: LLMFramework? = null,
     val enableGPUAcceleration: Boolean = true,
     val maxMemoryUsageMB: Int = 4096,
-    
+
     // Battery Settings
     val enableBatteryOptimization: Boolean = true,
     val thermalThrottlingEnabled: Boolean = true,
     val maxBatteryTemperature: Float = 40.0f,
-    
+
     // Privacy Settings
     val enableConversationEncryption: Boolean = true,
     val autoDeleteConversations: Boolean = false,
     val conversationRetentionDays: Int = 30,
     val enableAnalytics: Boolean = false,
-    
+
     // Advanced Settings
     val enableDebugLogging: Boolean = false,
     val modelCacheSizeMB: Int = 2048,

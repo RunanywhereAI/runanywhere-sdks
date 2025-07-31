@@ -4,14 +4,14 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Base interface for all LLM service implementations
- * 
+ *
  * This interface provides a unified API for interacting with different LLM frameworks
- * including MediaPipe, ONNX Runtime, TensorFlow Lite, llama.cpp, ExecuTorch, MLC-LLM, 
+ * including MediaPipe, ONNX Runtime, TensorFlow Lite, llama.cpp, ExecuTorch, MLC-LLM,
  * Gemini Nano, Android AI Core, and picoLLM.
- * 
+ *
  * All implementations should handle model loading, text generation, and resource cleanup
  * in a consistent manner while abstracting away framework-specific details.
- * 
+ *
  * @sample Basic usage:
  * ```kotlin
  * val service = MediaPipeService(context)
@@ -24,44 +24,44 @@ import kotlinx.coroutines.flow.Flow
 interface LLMService {
     val name: String
     val isInitialized: Boolean
-    
+
     /**
      * Initialize the LLM service with a model
-     * 
+     *
      * @param modelPath Path to the model file (format depends on framework)
      * @throws IllegalArgumentException if model path is invalid
      * @throws IllegalStateException if initialization fails
      */
     suspend fun initialize(modelPath: String)
-    
+
     /**
      * Generate text based on the prompt
-     * 
+     *
      * @param prompt Input text to generate from
      * @param options Generation parameters (temperature, max tokens, etc.)
      * @return GenerationResult containing generated text and performance metrics
      * @throws IllegalStateException if service is not initialized
      */
     suspend fun generate(prompt: String, options: GenerationOptions = GenerationOptions()): GenerationResult
-    
+
     /**
      * Stream generation results token by token
-     * 
+     *
      * This method provides real-time streaming of generated text, useful for
      * displaying incremental results to users as they are generated.
-     * 
+     *
      * @param prompt Input text to generate from
      * @param options Generation parameters
      * @return Flow of GenerationResult objects with partial text and cumulative metrics
      * @throws IllegalStateException if service is not initialized
      */
     fun generateStream(prompt: String, options: GenerationOptions = GenerationOptions()): Flow<GenerationResult>
-    
+
     /**
      * Get information about the loaded model
      */
     fun getModelInfo(): ModelInfo?
-    
+
     /**
      * Release resources
      */

@@ -9,19 +9,19 @@ import AppKit
 /// Manager for hardware capability detection and configuration
 public class HardwareCapabilityManager {
     // MARK: - Properties
-    
+
     /// Shared instance
     public static let shared: HardwareCapabilityManager = HardwareCapabilityManager()
-    
+
     /// Registered hardware detector
     private var registeredHardwareDetector: HardwareDetector?
     private let detectorLock: NSLock = NSLock()
-    
+
     /// Cached capabilities
     private var cachedCapabilities: DeviceCapabilities?
     private var cacheTimestamp: Date?
     private let cacheValidityDuration: TimeInterval = 60 // 1 minute
-    
+
     /// Device identifier for compilation cache
     public var deviceIdentifier: String {
         #if os(iOS) || os(tvOS)
@@ -32,36 +32,36 @@ public class HardwareCapabilityManager {
         return "Unknown-" + ProcessInfo.processInfo.operatingSystemVersionString
         #endif
     }
-    
+
     // MARK: - Initialization
-    
+
     private init() {}
-    
+
     // MARK: - Public API
-    
+
     /// Register a platform-specific hardware detector
     /// - Parameter detector: Hardware detector implementation
     public func registerHardwareDetector(_ detector: HardwareDetector) {
         detectorLock.lock()
         defer { detectorLock.unlock() }
-        
+
         self.registeredHardwareDetector = detector
         self.cachedCapabilities = nil // Clear cache
         self.cacheTimestamp = nil
     }
-    
+
     /// Get current device capabilities
     public var capabilities: DeviceCapabilities {
         detectorLock.lock()
         defer { detectorLock.unlock() }
-        
+
         // Check cache validity
         if let cached = cachedCapabilities,
            let timestamp = cacheTimestamp,
            Date().timeIntervalSince(timestamp) < cacheValidityDuration {
             return cached
         }
-        
+
         // Use registered detector or fallback
         if let detector = registeredHardwareDetector {
             let capabilities = detector.detectCapabilities()
@@ -76,50 +76,50 @@ public class HardwareCapabilityManager {
             return defaultCapabilities
         }
     }
-    
+
     /// Get optimal hardware configuration for a model
     /// - Parameter model: Model information
     /// - Returns: Optimal hardware configuration
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         var config = HardwareConfiguration()
-        
+
         // Get current capabilities
         let capabilities = self.capabilities
-        
+
         // Determine primary accelerator
         config.primaryAccelerator = selectPrimaryAccelerator(for: model, capabilities: capabilities)
-        
+
         // Set fallback accelerator
         config.fallbackAccelerator = selectFallbackAccelerator(
             primary: config.primaryAccelerator,
             capabilities: capabilities
         )
-        
+
         // Configure memory mode
         config.memoryMode = selectMemoryMode(for: model, capabilities: capabilities)
-        
+
         // Set thread count
         config.threadCount = selectThreadCount(for: model, capabilities: capabilities)
-        
+
         // Determine quantization settings
         let quantizationSettings = selectQuantizationSettings(for: model, capabilities: capabilities)
         config.useQuantization = quantizationSettings.use
         config.quantizationBits = quantizationSettings.bits
-        
+
         return config
     }
-    
+
     /// Check resource availability
     /// - Returns: Current resource availability
     public func checkResourceAvailability() -> ResourceAvailability {
         let detector = registeredHardwareDetector ?? DefaultHardwareDetector()
-        
+
         let memoryAvailable = detector.getAvailableMemory()
         let storageAvailable = getAvailableStorage()
         let accelerators = getAvailableAccelerators(from: detector)
         let thermalState = detector.getThermalState()
         let batteryInfo = detector.getBatteryInfo()
-        
+
         return ResourceAvailability(
             memoryAvailable: memoryAvailable,
             storageAvailable: storageAvailable,
@@ -129,18 +129,18 @@ public class HardwareCapabilityManager {
             isLowPowerMode: batteryInfo?.isLowPowerModeEnabled ?? false
         )
     }
-    
+
     /// Refresh cached capabilities
     public func refreshCapabilities() {
         detectorLock.lock()
         defer { detectorLock.unlock() }
-        
+
         cachedCapabilities = nil
         cacheTimestamp = nil
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func createDefaultCapabilities() -> DeviceCapabilities {
         DeviceCapabilities(
             totalMemory: 2_000_000_000, // 2GB default
@@ -154,7 +154,7 @@ public class HardwareCapabilityManager {
             modelIdentifier: deviceIdentifier
         )
     }
-    
+
     private func selectPrimaryAccelerator(
         for model: ModelInfo,
         capabilities: DeviceCapabilities
@@ -166,12 +166,12 @@ public class HardwareCapabilityManager {
                 return .neuralEngine
             }
         }
-        
+
         // GPU for medium to large models
         if capabilities.hasGPU && model.estimatedMemory > 1_000_000_000 {
             return .gpu
         }
-        
+
         // Check framework preferences
         if let preferred = model.preferredFramework {
             switch preferred {
@@ -185,11 +185,11 @@ public class HardwareCapabilityManager {
                 break
             }
         }
-        
+
         // Default to auto selection
         return .auto
     }
-    
+
     private func selectFallbackAccelerator(
         primary: HardwareAcceleration,
         capabilities: DeviceCapabilities
@@ -207,48 +207,48 @@ public class HardwareCapabilityManager {
             return .cpu
         }
     }
-    
+
     private func selectMemoryMode(
         for model: ModelInfo,
         capabilities: DeviceCapabilities
     ) -> HardwareConfiguration.MemoryMode {
         let availableMemory = capabilities.availableMemory
         let modelMemory = model.estimatedMemory
-        
+
         // Conservative mode for low memory
         if availableMemory < modelMemory * 2 {
             return .conservative
         }
-        
+
         // Aggressive mode for plenty of memory
         if availableMemory > modelMemory * 4 && capabilities.totalMemory > 8_000_000_000 {
             return .aggressive
         }
-        
+
         // Default to balanced
         return .balanced
     }
-    
+
     private func selectThreadCount(
         for model: ModelInfo,
         capabilities: DeviceCapabilities
     ) -> Int {
         let processorCount = capabilities.processorCount
-        
+
         // Use all cores for large models
         if model.estimatedMemory > 2_000_000_000 {
             return processorCount
         }
-        
+
         // Use half cores for small models to save power
         if model.estimatedMemory < 500_000_000 {
             return max(1, processorCount / 2)
         }
-        
+
         // Default to 75% of cores
         return max(1, Int(Double(processorCount) * 0.75))
     }
-    
+
     private func selectQuantizationSettings(
         for model: ModelInfo,
         capabilities: DeviceCapabilities
@@ -271,21 +271,21 @@ public class HardwareCapabilityManager {
                 return (true, 8) // Default for mixed
             }
         }
-        
+
         // Enable quantization for low memory devices
         if capabilities.totalMemory < 4_000_000_000 {
             return (true, 4)
         }
-        
+
         // Enable 8-bit quantization for medium memory
         if capabilities.totalMemory < 8_000_000_000 && model.estimatedMemory > 1_000_000_000 {
             return (true, 8)
         }
-        
+
         // No quantization for high-end devices
         return (false, 8)
     }
-    
+
     private func getAvailableStorage() -> Int64 {
         do {
             let fileURL = URL(fileURLWithPath: NSHomeDirectory())
@@ -295,20 +295,20 @@ public class HardwareCapabilityManager {
             return 0
         }
     }
-    
+
     private func getAvailableAccelerators(from detector: HardwareDetector) -> [HardwareAcceleration] {
         var accelerators: [HardwareAcceleration] = [.cpu]
-        
+
         if detector.hasGPU() {
             accelerators.append(.gpu)
             accelerators.append(.metal)
         }
-        
+
         if detector.hasNeuralEngine() {
             accelerators.append(.neuralEngine)
             accelerators.append(.coreML)
         }
-        
+
         return accelerators
     }
 }
@@ -327,32 +327,32 @@ private class DefaultHardwareDetector: HardwareDetector {
             osVersion: ProcessInfo.processInfo.operatingSystemVersion
         )
     }
-    
+
     func getAvailableMemory() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout.size(ofValue: info) / MemoryLayout<natural_t>.size)
-        
+
         let result = withUnsafeMutablePointer(to: &info) { infoPtr in
             infoPtr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { intPtr in
                 task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), intPtr, &count)
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int64(info.resident_size) : 0
     }
-    
+
     func getTotalMemory() -> Int64 {
         Int64(ProcessInfo.processInfo.physicalMemory)
     }
-    
+
     func hasNeuralEngine() -> Bool {
         false
     }
-    
+
     func hasGPU() -> Bool {
         false
     }
-    
+
     func getProcessorInfo() -> ProcessorInfo {
         ProcessorInfo(
             name: "Unknown",
@@ -360,7 +360,7 @@ private class DefaultHardwareDetector: HardwareDetector {
             coreCount: ProcessInfo.processInfo.processorCount
         )
     }
-    
+
     func getThermalState() -> ProcessInfo.ThermalState {
         #if canImport(Foundation)
         return ProcessInfo.processInfo.thermalState
@@ -368,7 +368,7 @@ private class DefaultHardwareDetector: HardwareDetector {
         return .unknown
         #endif
     }
-    
+
     func getBatteryInfo() -> BatteryInfo? {
         #if os(iOS) || os(watchOS)
         UIDevice.current.isBatteryMonitoringEnabled = true
@@ -406,12 +406,12 @@ public extension HardwareCapabilityManager {
         let resources = checkResourceAvailability()
         return resources.acceleratorsAvailable.contains(accelerator)
     }
-    
+
     /// Get memory pressure level
     var memoryPressureLevel: MemoryPressureLevel {
         let capabilities = self.capabilities
         let ratio = Double(capabilities.availableMemory) / Double(capabilities.totalMemory)
-        
+
         if ratio < 0.1 {
             return .critical
         } else if ratio < 0.2 {
@@ -422,7 +422,7 @@ public extension HardwareCapabilityManager {
             return .low
         }
     }
-    
+
     /// Memory pressure levels
     enum MemoryPressureLevel {
         case low
@@ -444,10 +444,10 @@ extension HardwareCapabilityManager {
             kIOMainPortDefault,
             IOServiceMatching("IOPlatformExpertDevice")
         )
-        
+
         guard service != 0 else { return nil }
         defer { IOObjectRelease(service) }
-        
+
         var properties: Unmanaged<CFMutableDictionary>?
         guard IORegistryEntryCreateCFProperties(
             service,
@@ -458,7 +458,7 @@ extension HardwareCapabilityManager {
         let dict = properties?.takeRetainedValue() as? [String: Any] else {
             return nil
         }
-        
+
         return dict
     }
 }

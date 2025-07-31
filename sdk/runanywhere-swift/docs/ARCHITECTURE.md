@@ -115,14 +115,14 @@ Low-level services that interact with the operating system and hardware capabili
 public class RunAnywhereSDK {
     // Singleton instance
     public static let shared = RunAnywhereSDK()
-    
+
     // Core managers
     private let routerManager: RouterManager
     private let executorManager: ExecutorManager
     private let modelRegistry: DynamicModelRegistry
     private let memoryManager: UnifiedMemoryManager
     private let downloadManager: EnhancedDownloadManager
-    
+
     // Configuration
     private(set) var configuration: Configuration
     private(set) var isInitialized = false

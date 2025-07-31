@@ -32,7 +32,7 @@ comments:
     active: true
   UndocumentedPublicProperty:
     active: true
-  
+
   # Custom rule for TODOs without issue references
   TodoCommentWithoutIssue:
     active: true

@@ -1,7 +1,7 @@
 # Parallel tasks execution
 ARGUMENTS: $ARGUMENTS
 
-# Parallel tasks execution › 
+# Parallel tasks execution ›
 ## Step 1: Setup git worktree
 Let's firstly setup a few git worktrees in 'trees' folder depends on number of parallel agents needed, so we can have different sandbox environment for experimentation Run `git worktree add -b branch-name ./trees/branch-name` Replace branch-with a good name that reflect the meaning
 

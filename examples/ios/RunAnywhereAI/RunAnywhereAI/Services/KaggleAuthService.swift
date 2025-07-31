@@ -18,7 +18,7 @@ enum KaggleAuthError: LocalizedError, Equatable {
     case rateLimitExceeded
     case termsNotAccepted
     case modelNotFound
-    
+
     static func == (lhs: KaggleAuthError, rhs: KaggleAuthError) -> Bool {
         switch (lhs, rhs) {
         case (.invalidCredentials, .invalidCredentials),
@@ -182,52 +182,52 @@ class KaggleAuthService: ObservableObject {
         request.setValue("RunAnywhereAI/1.0", forHTTPHeaderField: "User-Agent")
         request.httpMethod = "GET"
         request.timeoutInterval = 300 // 5 minutes for large models
-        
+
         // Create a proper download session with delegation for progress
         let session = URLSession(configuration: .default, delegate: nil, delegateQueue: nil)
-        
+
         // Use download task to handle redirects properly
         do {
             let (tempURL, response) = try await session.download(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 print("Kaggle Response Status: \(httpResponse.statusCode)")
                 print("Response Headers: \(httpResponse.allHeaderFields)")
-                
+
                 switch httpResponse.statusCode {
                 case 200...299:
                     // Success - move to persistent location
                     let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
                     let downloadsDir = documentsDir.appendingPathComponent("KaggleDownloads", isDirectory: true)
-                    
+
                     try FileManager.default.createDirectory(
                         at: downloadsDir,
                         withIntermediateDirectories: true,
                         attributes: nil
                     )
-                    
+
                     let savedURL = downloadsDir.appendingPathComponent(UUID().uuidString + ".tmp")
                     try FileManager.default.moveItem(at: tempURL, to: savedURL)
-                    
+
                     progress(1.0)
                     return savedURL
-                    
+
                 case 401:
                     throw KaggleAuthError.invalidCredentials
-                    
+
                 case 403, 404:
                     // For error responses, we need to fetch the error details
                     // Try to read the error from the temp file
                     if let errorData = try? Data(contentsOf: tempURL),
                        let json = try? JSONSerialization.jsonObject(with: errorData) as? [String: Any] {
                         print("Error details: \(json)")
-                        
+
                         if let message = json["message"] as? String {
                             if message.contains("terms of use") || message.contains("consent") {
                                 throw KaggleAuthError.termsNotAccepted
                             }
                         }
-                        
+
                         // Sometimes Kaggle returns 404 with embedded error codes
                         if httpResponse.statusCode == 404,
                            let code = json["code"] as? Int,
@@ -235,16 +235,16 @@ class KaggleAuthService: ObservableObject {
                             throw KaggleAuthError.termsNotAccepted
                         }
                     }
-                    
+
                     if httpResponse.statusCode == 403 {
                         throw KaggleAuthError.authRequired
                     } else {
                         throw KaggleAuthError.modelNotFound
                     }
-                    
+
                 case 429:
                     throw KaggleAuthError.rateLimitExceeded
-                    
+
                 default:
                     print("Unexpected status code: \(httpResponse.statusCode)")
                     throw KaggleAuthError.networkError(URLError(.badServerResponse))
@@ -278,15 +278,15 @@ class KaggleAuthService: ObservableObject {
             "7. Enter them below to authenticate"
         ]
     }
-    
+
     /// Get the Kaggle model page URL from a download URL
     func getModelPageURL(from downloadURL: URL) -> URL? {
         // Parse the API URL to construct the web URL
         // API: https://www.kaggle.com/api/v1/models/{owner}/{model}/{framework}/{variation}/{version}/download
         // Web: https://www.kaggle.com/models/{owner}/{model}/frameworks/{framework}/variations/{variation}/versions/{version}
-        
+
         let pathComponents = downloadURL.pathComponents.filter { $0 != "/" }
-        
+
         // Check if it's a valid API URL
         guard pathComponents.count >= 7,
               pathComponents[0] == "api",
@@ -294,16 +294,15 @@ class KaggleAuthService: ObservableObject {
               pathComponents[2] == "models" else {
             return nil
         }
-        
+
         let owner = pathComponents[3]
         let model = pathComponents[4]
         let framework = pathComponents[5]
         let variation = pathComponents[6]
         let version = pathComponents[7]
-        
+
         // Construct the web URL
         let webURL = "https://www.kaggle.com/models/\(owner)/\(model)/frameworks/\(framework)/variations/\(variation)/versions/\(version)"
         return URL(string: webURL)
     }
 }
-

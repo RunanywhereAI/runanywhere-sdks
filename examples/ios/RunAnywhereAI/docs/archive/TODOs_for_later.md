@@ -11,7 +11,7 @@ The `verify_urls.sh` script cannot properly calculate sizes for HuggingFace-host
 - **Script**: `/scripts/verify_urls.sh` (lines 93-123 in `get_file_size()` function)
 - **Affected Models**: All Swift Transformers models in `ModelURLRegistry.swift`:
   - OpenELM-270M-Instruct (currently showing ~1GB)
-  - OpenELM-450M-Instruct (currently showing ~1.7GB)  
+  - OpenELM-450M-Instruct (currently showing ~1.7GB)
   - OpenELM-1.1B-Instruct (currently showing ~4GB)
 
 ### Technical Details
@@ -26,7 +26,7 @@ Using the HuggingFace API with proper authentication:
 curl -sL --header "Authorization: Bearer $HF_TOKEN" \
   "https://huggingface.co/api/models/corenet-community/coreml-OpenELM-270M-Instruct/tree/main/OpenELM-270M-Instruct-128-float32.mlpackage/Data/com.apple.CoreML/weights"
 
-# OpenELM-450M actual size: ~1.7 GB  
+# OpenELM-450M actual size: ~1.7 GB
 # OpenELM-1.1B actual size: ~4.0 GB
 ```
 

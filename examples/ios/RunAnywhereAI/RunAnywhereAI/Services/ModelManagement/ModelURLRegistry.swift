@@ -6,16 +6,16 @@ import Foundation
 /// This is the SINGLE SOURCE OF TRUTH for model metadata, download URLs, and requirements
 class ModelURLRegistry: ObservableObject {
     static let shared = ModelURLRegistry()
-    
+
     private init() {}
-    
+
     // MARK: - All Models by Framework
     // 📍 SINGLE SOURCE OF TRUTH: All model information is defined here
     // 🔄 To verify URLs: Run `./scripts/verify_urls.sh` from the project root
-    
+
     // MARK: Foundation Models (Built-in iOS/macOS)
     private var _foundationModels: [ModelInfo] = []
-    
+
     // MARK: Core ML Models
     private var _coreMLModels: [ModelInfo] = [
         ModelInfo(
@@ -93,7 +93,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 800_000_000
         ),
     ]
-    
+
     // MARK: MLX Models
     private var _mlxModels: [ModelInfo] = [
         ModelInfo(
@@ -166,7 +166,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 4_000_000_000
         )
     ]
-    
+
     // MARK: ONNX Runtime Models
     private var _onnxModels: [ModelInfo] = [
         ModelInfo(
@@ -239,7 +239,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 4_000_000_000
         )
     ]
-    
+
     // MARK: TensorFlow Lite Models (Validated URLs)
     private var _tfliteModels: [ModelInfo] = [
         // ✅ Official Google AI Edge samples - Direct download, no auth required
@@ -266,9 +266,9 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 100_000_000,
             recommendedMemory: 200_000_000
         ),
-        
+
         ModelInfo(
-            id: "average-word-classifier-tflite", 
+            id: "average-word-classifier-tflite",
             name: "average_word_classifier.tflite",
             path: nil,
             format: .tflite,
@@ -290,8 +290,8 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 25_000_000,
             recommendedMemory: 50_000_000
         ),
-        
-        // 📱 TensorFlow Model Garden - Public models  
+
+        // 📱 TensorFlow Model Garden - Public models
         ModelInfo(
             id: "mobilenet-v1-tflite",
             name: "mobilenet_v1_1.0_224_quant.tgz",
@@ -315,7 +315,7 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 15_000_000,
             recommendedMemory: 30_000_000
         ),
-        
+
         // 🔒 Kaggle-hosted LLM models - Require authentication (placeholder for future integration)
         // Note: These require Kaggle API credentials to download - current URLs return 404
         ModelInfo(
@@ -341,7 +341,7 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 2_000_000_000,
             recommendedMemory: 4_000_000_000
         ),
-        
+
         ModelInfo(
             id: "gemma-2b-cpu-int8-tflite",
             name: "gemma-2b-it-cpu-int8.tar.gz",
@@ -366,7 +366,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 4_000_000_000
         )
     ]
-    
+
     // MARK: llama.cpp Models (GGUF format)
     private var _llamaCppModels: [ModelInfo] = [
         ModelInfo(
@@ -623,7 +623,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 2_500_000_000
         )
     ]
-    
+
     // MARK: Swift Transformers Models
     // NOTE: Swift Transformers requires models specifically designed for it, not generic Core ML models
     private var _swiftTransformersModels: [ModelInfo] = [
@@ -698,7 +698,7 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 4_000_000_000
         )
     ]
-    
+
     // MARK: ExecuTorch Models
     private var _execuTorchModels: [ModelInfo] = [
         ModelInfo(
@@ -817,12 +817,12 @@ class ModelURLRegistry: ObservableObject {
             recommendedMemory: 1_500_000_000
         )
     ]
-    
+
     // MARK: - Custom Models
     private var customModels: [ModelInfo] = []
-    
+
     // MARK: - Computed Properties
-    
+
     var foundationModels: [ModelInfo] { _foundationModels }
     var coreMLModels: [ModelInfo] { _coreMLModels }
     var mlxModels: [ModelInfo] { _mlxModels }
@@ -831,9 +831,9 @@ class ModelURLRegistry: ObservableObject {
     var llamaCppModels: [ModelInfo] { _llamaCppModels }
     var swiftTransformersModels: [ModelInfo] { _swiftTransformersModels }
     var execuTorchModels: [ModelInfo] { _execuTorchModels }
-    
+
     // MARK: - Public Methods
-    
+
     /// Get all models for a specific framework
     func getAllModels(for framework: LLMFramework) -> [ModelInfo] {
         switch framework {
@@ -857,7 +857,7 @@ class ModelURLRegistry: ObservableObject {
             return []
         }
     }
-    
+
     /// Get all models across all frameworks
     func getAllModels() -> [ModelInfo] {
         var allModels: [ModelInfo] = []
@@ -872,17 +872,17 @@ class ModelURLRegistry: ObservableObject {
         allModels.append(contentsOf: customModels)
         return allModels
     }
-    
+
     /// Get a specific model by ID
     func getModelInfo(id: String) -> ModelInfo? {
         getAllModels().first { $0.id == id }
     }
-    
+
     /// Get models by type (text, image, etc)
     func getModels(ofType type: ModelType) -> [ModelInfo] {
         getAllModels().filter { $0.modelType == type }
     }
-    
+
     /// Get models that support a specific context length
     func getModels(withMinContextLength minLength: Int) -> [ModelInfo] {
         getAllModels().filter { model in
@@ -890,7 +890,7 @@ class ModelURLRegistry: ObservableObject {
             return contextLength >= minLength
         }
     }
-    
+
     /// Get models within a size range
     func getModels(maxSizeGB: Double) -> [ModelInfo] {
         getAllModels().filter { model in
@@ -906,25 +906,25 @@ class ModelURLRegistry: ObservableObject {
             return false
         }
     }
-    
+
     // MARK: - Custom Model Management
-    
+
     func addCustomModel(_ model: ModelInfo) {
         customModels.append(model)
         objectWillChange.send()
     }
-    
+
     func removeCustomModel(id: String) {
         customModels.removeAll { $0.id == id }
         objectWillChange.send()
     }
-    
+
     func getCustomModels() -> [ModelInfo] {
         customModels
     }
-    
+
     // MARK: - Tokenizer Support
-    
+
     let tokenizerFiles = [
         TokenizerDownloadInfo(
             modelId: "gpt2",
@@ -996,16 +996,16 @@ class ModelURLRegistry: ObservableObject {
             ]
         )
     ]
-    
+
     func getTokenizerFiles(for modelId: String) -> [TokenizerFile] {
         tokenizerFiles.first { $0.modelId == modelId }?.files ?? []
     }
-    
+
     // MARK: - URL Validation
-    
+
     func validateURLs(for framework: LLMFramework) async {
         var models = getAllModels(for: framework)
-        
+
         for i in 0..<models.count {
             // Skip built-in models
             if models[i].isBuiltIn {
@@ -1013,27 +1013,27 @@ class ModelURLRegistry: ObservableObject {
                 models[i].lastVerified = Date()
                 continue
             }
-            
+
             // Validate URL
             models[i].isURLValid = await validateURL(models[i].downloadURL)
             models[i].lastVerified = Date()
         }
-        
+
         // Update the internal collections
         updateModelsCollection(for: framework, with: models)
     }
-    
+
     private func validateURL(_ url: URL?) async -> Bool {
         guard let url = url else { return false }
-        
+
         do {
             var request = URLRequest(url: url)
             request.httpMethod = "HEAD"
             request.timeoutInterval = 10
             request.setValue("RunAnywhereAI-URLVerifier/1.0", forHTTPHeaderField: "User-Agent")
-            
+
             let (_, response) = try await URLSession.shared.data(for: request)
-            
+
             if let httpResponse = response as? HTTPURLResponse {
                 return httpResponse.statusCode == 200 || httpResponse.statusCode == 302
             }
@@ -1043,7 +1043,7 @@ class ModelURLRegistry: ObservableObject {
             return false
         }
     }
-    
+
     private func updateModelsCollection(for framework: LLMFramework, with models: [ModelInfo]) {
         switch framework {
         case .foundationModels:
@@ -1063,7 +1063,7 @@ class ModelURLRegistry: ObservableObject {
         default:
             break
         }
-        
+
         objectWillChange.send()
     }
 }
@@ -1085,19 +1085,19 @@ struct TokenizerFile: Codable {
 extension ModelURLRegistry {
     static let usageNotes = """
     MODEL URL REGISTRY - SINGLE SOURCE OF TRUTH
-    
+
     This registry contains ALL model information for the entire app:
     - Download URLs and requirements
     - Model metadata (size, format, quantization)
     - Framework compatibility
     - Memory requirements
     - Context lengths
-    
+
     To add a new model:
     1. Add it to the appropriate framework array above
     2. Include ALL ModelInfo fields
     3. Run ./scripts/verify_urls.sh to verify the URL works
-    
+
     To use models in a service:
     1. Get models: ModelURLRegistry.shared.getAllModels(for: .yourFramework)
     2. No need to duplicate model definitions in services

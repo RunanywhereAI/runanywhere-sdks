@@ -31,17 +31,17 @@ fun EnhancedChatScreen(
     val uiState by viewModel.uiState.collectAsState()
     val messages by viewModel.messages.collectAsState()
     val listState = rememberLazyListState()
-    
+
     LaunchedEffect(conversationId) {
         conversationId?.let {
             viewModel.loadConversation(it)
         }
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(uiState.conversation?.title ?: "New Conversation")
                 },
                 actions = {
@@ -49,16 +49,16 @@ fun EnhancedChatScreen(
                     IconButton(onClick = { viewModel.showConversationInfo() }) {
                         Icon(Icons.Default.Info, "Conversation Info")
                     }
-                    
+
                     IconButton(onClick = { viewModel.exportConversation() }) {
                         Icon(Icons.Default.Share, "Export")
                     }
-                    
+
                     var showMenu by remember { mutableStateOf(false) }
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, "More")
                     }
-                    
+
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
@@ -110,7 +110,7 @@ fun EnhancedChatScreen(
                         onBranch = { viewModel.branchConversation(message.id) }
                     )
                 }
-                
+
                 // Typing indicator
                 if (uiState.isGenerating) {
                     item {
@@ -118,7 +118,7 @@ fun EnhancedChatScreen(
                     }
                 }
             }
-            
+
             // Input area
             ChatInputArea(
                 value = uiState.currentInput,
@@ -128,12 +128,12 @@ fun EnhancedChatScreen(
                 onImageAttach = viewModel::attachImage,
                 supportsImages = uiState.currentModel?.framework?.name?.contains("GEMINI") ?: false
             )
-            
+
             // Model selector chip
             if (uiState.showModelSelector) {
                 ModelSelectorChip(
                     currentModel = uiState.currentModel,
-                    onModelSelected = { framework, path -> 
+                    onModelSelected = { framework, path ->
                         viewModel.selectModel(framework, path)
                     }
                 )
@@ -150,7 +150,7 @@ fun MessageBubble(
     onBranch: () -> Unit
 ) {
     val isUser = message.role == "user"
-    
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
@@ -160,9 +160,9 @@ fun MessageBubble(
                 .widthIn(max = 320.dp)
                 .animateContentSize(),
             colors = CardDefaults.cardColors(
-                containerColor = if (isUser) 
+                containerColor = if (isUser)
                     MaterialTheme.colorScheme.primaryContainer
-                else 
+                else
                     MaterialTheme.colorScheme.surfaceVariant
             )
         ) {
@@ -174,7 +174,7 @@ fun MessageBubble(
                     text = message.content,
                     style = MaterialTheme.typography.bodyMedium
                 )
-                
+
                 // Message metadata and actions
                 Row(
                     modifier = Modifier
@@ -188,7 +188,7 @@ fun MessageBubble(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
+
                     Row {
                         if (onEdit != null) {
                             IconButton(
@@ -202,7 +202,7 @@ fun MessageBubble(
                                 )
                             }
                         }
-                        
+
                         if (onRegenerate != null) {
                             IconButton(
                                 onClick = onRegenerate,
@@ -215,7 +215,7 @@ fun MessageBubble(
                                 )
                             }
                         }
-                        
+
                         IconButton(
                             onClick = onBranch,
                             modifier = Modifier.size(20.dp)
@@ -228,13 +228,13 @@ fun MessageBubble(
                         }
                     }
                 }
-                
+
                 // Token count and generation time
                 if (message.tokenCount > 0) {
                     Text(
-                        text = "${message.tokenCount} tokens" + 
-                               if (message.generationTimeMs != null) 
-                                   " • ${message.generationTimeMs}ms" 
+                        text = "${message.tokenCount} tokens" +
+                               if (message.generationTimeMs != null)
+                                   " • ${message.generationTimeMs}ms"
                                else "",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -290,7 +290,7 @@ fun ChatInputArea(
                     Icon(Icons.Default.Add, "Attach Image") // Using Add as placeholder for AttachFile
                 }
             }
-            
+
             // Text input
             OutlinedTextField(
                 value = value,
@@ -306,7 +306,7 @@ fun ChatInputArea(
                     onSend = { onSend() }
                 )
             )
-            
+
             // Send button
             IconButton(
                 onClick = onSend,
@@ -345,7 +345,7 @@ fun ModelSelectorChip(
             if (currentModel != null) {
                 AssistChip(
                     onClick = { /* TODO: Show model selector */ },
-                    label = { 
+                    label = {
                         Text("${currentModel.framework}: ${currentModel.name}")
                     },
                     leadingIcon = {

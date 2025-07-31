@@ -77,33 +77,33 @@ skipped_files = []
 # Find all model files
 Dir.glob(File.join(models_dir, '**/*')).each do |file_path|
   next if File.directory?(file_path)
-  
+
   # Check if it's a model file or part of a model package
   extension = File.extname(file_path)[1..-1]
   base_name = File.basename(file_path)
-  
+
   # Skip if not a model file (unless it's inside an mlpackage)
   unless model_extensions.include?(extension) || file_path.include?('.mlpackage/')
     next if extension != 'swift' # Keep Swift files in Models group
   end
-  
+
   # Check if file already exists in project
   relative_path = Pathname.new(file_path).relative_path_from(Pathname.new('.'))
   existing_ref = models_group.files.find { |f| f.path == relative_path.to_s }
-  
+
   if existing_ref
     skipped_files << base_name
     next
   end
-  
+
   # For mlpackage directories, add the directory not individual files
   if file_path.include?('.mlpackage/') && !file_path.end_with?('.mlpackage')
     next
   end
-  
+
   # Add file reference to project
   file_ref = models_group.new_file(relative_path.to_s)
-  
+
   # Add to target's resources build phase (for model files)
   if model_extensions.include?(extension)
     target.resources_build_phase.add_file_reference(file_ref)

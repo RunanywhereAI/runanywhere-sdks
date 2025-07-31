@@ -115,7 +115,7 @@ explicit_type_interface:
   excluded:
     - local
   allow_redundancy: false
-  
+
 # Custom rules for strong typing
 custom_rules:
   avoid_any_type:
@@ -123,37 +123,37 @@ custom_rules:
     regex: ':\s*Any\b'
     message: "Avoid using 'Any' type. Use specific types or protocols instead."
     severity: warning
-    
+
   avoid_any_object:
     name: "Avoid AnyObject Type"
     regex: ':\s*AnyObject\b'
     message: "Avoid using 'AnyObject' type. Use specific types or protocols instead."
     severity: warning
-    
+
   prefer_concrete_types:
     name: "Prefer Concrete Types"
     regex: ':\s*\[String:\s*Any\]'
     message: "Avoid dictionaries with 'Any' values. Define a struct or use specific types."
     severity: warning
-    
+
   avoid_force_cast:
     name: "Avoid Force Cast"
     regex: ' as! '
     message: "Force casting can crash. Use conditional casting (as?) instead."
     severity: error
-    
+
   avoid_implicitly_unwrapped_optionals:
     name: "Avoid Implicitly Unwrapped Optionals"
     regex: ':\s*\w+!'
     message: "Avoid implicitly unwrapped optionals. Use regular optionals or non-optional types."
     severity: warning
-    
+
   todo_with_issue:
     name: "TODO Must Reference GitHub Issue"
     regex: '//\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
     message: "TODOs must reference a GitHub issue (e.g., // TODO: #123 - Description)"
     severity: error
-    
+
   multiline_todo_with_issue:
     name: "Multiline TODO Must Reference GitHub Issue"
     regex: '/\*\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'

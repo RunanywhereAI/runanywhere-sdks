@@ -6,13 +6,13 @@ public protocol ErrorRecoveryStrategy {
     /// - Parameter error: The error to check
     /// - Returns: Whether recovery is possible
     func canRecover(from error: Error) -> Bool
-    
+
     /// Attempt to recover from the error
     /// - Parameters:
     ///   - error: The error to recover from
     ///   - context: Recovery context
     func recover(from error: Error, context: RecoveryContext) async throws
-    
+
     /// Get recovery suggestions
     /// - Parameter error: The error
     /// - Returns: Suggested recovery actions
@@ -27,7 +27,7 @@ public struct RecoveryContext {
     public let previousErrors: [Error]
     public let availableResources: ResourceAvailability
     public let options: RecoveryOptions
-    
+
     public init(
         model: ModelInfo,
         stage: LifecycleStage,
@@ -53,7 +53,7 @@ public struct RecoveryOptions {
     public let allowFrameworkSwitch: Bool
     public let allowQualityReduction: Bool
     public let allowMemoryOptimization: Bool
-    
+
     public init(
         maxRetryAttempts: Int = 3,
         retryDelay: TimeInterval = 1.0,
@@ -77,7 +77,7 @@ public struct RecoverySuggestion {
     public let description: String
     public let priority: Priority
     public let estimatedDuration: TimeInterval?
-    
+
     public enum RecoveryAction {
         case retry
         case retryWithDelay(TimeInterval)
@@ -89,14 +89,14 @@ public struct RecoverySuggestion {
         case updateConfiguration
         case contactSupport
     }
-    
+
     public enum Priority {
         case low
         case medium
         case high
         case critical
     }
-    
+
     public init(
         action: RecoveryAction,
         description: String,
@@ -121,7 +121,7 @@ public enum ErrorType {
     case configuration
     case authentication
     case unknown
-    
+
     /// Initialize from an error
     public init(from error: Error) {
         // Categorize based on error type
@@ -168,7 +168,7 @@ public enum UnifiedModelError: LocalizedError {
     case retryWithFramework(LLMFramework)
     case noAlternativeFramework
     case unrecoverable(Error)
-    
+
     public var errorDescription: String? {
         switch self {
         case .lifecycle(let error):
@@ -204,7 +204,7 @@ public enum DownloadError: LocalizedError {
     case unsupportedArchive(String)
     case extractionFailed(Error)
     case unknown
-    
+
     public var errorDescription: String? {
         switch self {
         case .networkError(let error):

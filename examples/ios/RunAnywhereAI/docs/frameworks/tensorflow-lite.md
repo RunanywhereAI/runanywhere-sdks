@@ -39,7 +39,7 @@ Our tokenizer now matches the exact implementation from Google's text classifica
 class TFLiteTokenizer {
     private static let UNKNOWN_TOKEN = "[UNK]"
     private static let MAX_INPUT_CHARS_PER_WORD = 128
-    
+
     func tokenize(_ text: String) -> [String]
     func convertToIDs(tokens: [String]) -> [Int32]
 }
@@ -53,7 +53,7 @@ extension Data {
     init<T>(copyingBufferOf array: [T]) {
         self = array.withUnsafeBufferPointer(Data.init)
     }
-    
+
     func toArray<T>(type: T.Type) -> [T] where T: AdditiveArithmetic {
         var array = [T](repeating: T.zero, count: self.count / MemoryLayout<T>.stride)
         _ = array.withUnsafeMutableBytes { self.copyBytes(to: $0) }

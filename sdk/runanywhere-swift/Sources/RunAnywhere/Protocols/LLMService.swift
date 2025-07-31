@@ -5,14 +5,14 @@ public protocol LLMService: AnyObject {
     /// Initialize the service with a model
     /// - Parameter modelPath: Path to the model file
     func initialize(modelPath: String) async throws
-    
+
     /// Generate text from a prompt
     /// - Parameters:
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Generated text
     func generate(prompt: String, options: GenerationOptions) async throws -> String
-    
+
     /// Stream generate text from a prompt
     /// - Parameters:
     ///   - prompt: The input prompt
@@ -23,24 +23,24 @@ public protocol LLMService: AnyObject {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws
-    
+
     /// Clean up resources
     func cleanup() async
-    
+
     /// Get current memory usage
     /// - Returns: Memory usage in bytes
     func getModelMemoryUsage() async throws -> Int64
-    
+
     /// Check if the service is ready
     var isReady: Bool { get }
-    
+
     /// Get model information
     var modelInfo: LoadedModelInfo? { get }
-    
+
     /// Set generation context
     /// - Parameter context: The context to use
     func setContext(_ context: Context) async
-    
+
     /// Clear generation context
     func clearContext() async
 }
@@ -55,7 +55,7 @@ public struct LoadedModelInfo {
     public let contextLength: Int
     public let loadedAt: Date
     public let configuration: HardwareConfiguration
-    
+
     public init(
         id: String,
         name: String,
@@ -86,7 +86,7 @@ public enum LLMServiceError: LocalizedError {
     case contextTooLong(Int, Int)
     case unsupportedOperation(String)
     case frameworkError(FrameworkError)
-    
+
     public var errorDescription: String? {
         switch self {
         case .notInitialized:
@@ -110,13 +110,13 @@ public struct FrameworkError: LocalizedError {
     public let framework: LLMFramework
     public let underlying: Error
     public let context: String?
-    
+
     public init(framework: LLMFramework, underlying: Error, context: String? = nil) {
         self.framework = framework
         self.underlying = underlying
         self.context = context
     }
-    
+
     public var errorDescription: String? {
         var description = "\(framework.rawValue) error: \(underlying.localizedDescription)"
         if let context = context {

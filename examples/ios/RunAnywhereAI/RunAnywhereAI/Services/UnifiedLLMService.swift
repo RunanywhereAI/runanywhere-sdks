@@ -101,15 +101,15 @@ class UnifiedLLMService: ObservableObject {
         currentService = service
         currentFramework = framework
         currentModel = model
-        
+
         // Determine the actual model path
         var modelPath = model.path ?? ""
-        
+
         // If path is empty, try to find the model using ModelManager
         if modelPath.isEmpty {
             let modelManager = ModelManager.shared
             let calculatedPath = modelManager.modelPath(for: model.name, framework: framework)
-            
+
             // Check if the model exists at the calculated path
             if FileManager.default.fileExists(atPath: calculatedPath.path) {
                 modelPath = calculatedPath.path
@@ -124,7 +124,7 @@ class UnifiedLLMService: ObservableObject {
                     print("UnifiedService: Model not found at calculated paths:")
                     print("  - Framework path: \(calculatedPath.path)")
                     print("  - Legacy path: \(legacyPath.path)")
-                    
+
                     // List what's actually in the Models directory for debugging
                     let modelsDir = ModelManager.modelsDirectory
                     do {
@@ -136,7 +136,7 @@ class UnifiedLLMService: ObservableObject {
                 }
             }
         }
-        
+
         print("UnifiedService: Initializing \(framework.displayName) service with model path: '\(modelPath)'")
         try await service.initialize(modelPath: modelPath)
     }

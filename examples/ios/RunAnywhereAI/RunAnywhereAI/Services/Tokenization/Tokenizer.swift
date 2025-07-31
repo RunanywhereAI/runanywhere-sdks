@@ -97,7 +97,7 @@ class BPETokenizer: BaseTokenizer {
     private func loadVocabulary(from path: String) throws {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         let json = try JSONSerialization.jsonObject(with: data, options: [])
-        
+
         if let vocabDict = json as? [String: Int] {
             // Direct vocab.json format (GPT-2 style)
             vocab = vocabDict
@@ -133,7 +133,7 @@ class BPETokenizer: BaseTokenizer {
         // Simple BPE encoding - model-specific logic should be in adapters
         let tokens = text.components(separatedBy: .whitespacesAndNewlines)
         let bpeTokens = applyBPE(tokens)
-        
+
         var tokenIds: [Int] = []
         for token in bpeTokens {
             if let id = vocab[token] {
@@ -142,7 +142,7 @@ class BPETokenizer: BaseTokenizer {
                 tokenIds.append(vocabulary["<unk>"] ?? 3)
             }
         }
-        
+
         return tokenIds
     }
 
@@ -163,17 +163,17 @@ class BPETokenizer: BaseTokenizer {
 
         return result
     }
-    
+
     override func decode(_ tokens: [Int]) -> String {
         // Simple BPE decoding - model-specific logic should be in adapters
         var decodedPieces: [String] = []
-        
+
         for token in tokens {
             if let tokenStr = reverseVocabulary[token] {
                 decodedPieces.append(tokenStr)
             }
         }
-        
+
         return decodedPieces.joined(separator: " ")
     }
 }
@@ -383,7 +383,7 @@ class TokenizerFactory {
 
         case .realBPE(let configPath):
             // For now, fallback to GenericBPE
-            return (try? GenericBPETokenizer(vocabPath: configPath.replacingOccurrences(of: "tokenizer.json", with: "vocab.json"), 
+            return (try? GenericBPETokenizer(vocabPath: configPath.replacingOccurrences(of: "tokenizer.json", with: "vocab.json"),
                                             mergesPath: configPath.replacingOccurrences(of: "tokenizer.json", with: "merges.txt"))) ?? BaseTokenizer()
 
         case .realSentencePiece(let modelPath):
@@ -465,14 +465,14 @@ class TokenizerFactory {
             // Apple's models might have their own format
             // For now, use base tokenizer
             break
-            
+
         case .execuTorch:
             // ExecuTorch uses tokenizer.bin files
             let tokenizerPaths = [
                 "\(modelPath)/tokenizer.bin",
                 "\(modelPath).tokenizer"
             ]
-            
+
             for path in tokenizerPaths {
                 if FileManager.default.fileExists(atPath: path) {
                     // For now, use base tokenizer as ExecuTorch has custom format

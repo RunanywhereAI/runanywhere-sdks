@@ -4,34 +4,34 @@ import Foundation
 public protocol AuthProvider {
     /// Provider name
     var providerName: String { get }
-    
+
     /// Check if credentials are stored
     /// - Returns: Whether valid credentials exist
     func hasStoredCredentials() -> Bool
-    
+
     /// Store credentials securely
     /// - Parameter credentials: Credentials to store
     func storeCredentials(_ credentials: ProviderCredentials) async throws
-    
+
     /// Retrieve stored credentials
     /// - Returns: Stored credentials if available
     func retrieveCredentials() async throws -> ProviderCredentials?
-    
+
     /// Remove stored credentials
     func removeCredentials() async throws
-    
+
     /// Validate credentials
     /// - Parameter credentials: Credentials to validate
     /// - Returns: Whether credentials are valid
     func validateCredentials(_ credentials: ProviderCredentials) async throws -> Bool
-    
+
     /// Get authentication headers
     /// - Returns: Headers to include in requests
     func getAuthHeaders() async throws -> [String: String]
-    
+
     /// Refresh authentication if needed
     func refreshAuthenticationIfNeeded() async throws
-    
+
     /// Check if authentication is expired
     /// - Returns: Whether authentication has expired
     func isAuthenticationExpired() -> Bool
@@ -42,37 +42,37 @@ public protocol ModelStorageManager {
     /// Get storage directory for models
     /// - Returns: URL to models directory
     func getModelsDirectory() -> URL
-    
+
     /// Get path for a specific model
     /// - Parameter modelId: Model identifier
     /// - Returns: Path where model should be stored
     func getModelPath(for modelId: String) -> URL
-    
+
     /// Check if model exists locally
     /// - Parameter modelId: Model identifier
     /// - Returns: Whether model exists
     func modelExists(_ modelId: String) -> Bool
-    
+
     /// Get model size on disk
     /// - Parameter modelId: Model identifier
     /// - Returns: Size in bytes
     func getModelSize(_ modelId: String) -> Int64?
-    
+
     /// Delete a model
     /// - Parameter modelId: Model identifier
     func deleteModel(_ modelId: String) async throws
-    
+
     /// Get available storage space
     /// - Returns: Available space in bytes
     func getAvailableSpace() -> Int64
-    
+
     /// List all stored models
     /// - Returns: Array of stored model identifiers
     func listStoredModels() -> [String]
-    
+
     /// Clean up temporary files
     func cleanupTemporaryFiles() async throws
-    
+
     /// Move model from temporary to permanent storage
     /// - Parameters:
     ///   - temporaryPath: Temporary file path
@@ -87,7 +87,7 @@ public struct DownloadTask {
     public let modelId: String
     public let progress: AsyncStream<DownloadProgress>
     public let result: Task<URL, Error>
-    
+
     public init(
         id: String,
         modelId: String,
@@ -109,7 +109,7 @@ public struct DownloadProgress {
     public let estimatedTimeRemaining: TimeInterval?
     public let downloadSpeed: Double // bytes per second
     public let status: DownloadStatus
-    
+
     public enum DownloadStatus {
         case pending
         case downloading
@@ -119,7 +119,7 @@ public struct DownloadProgress {
         case cancelled
         case retrying(attempt: Int)
     }
-    
+
     public init(
         bytesDownloaded: Int64,
         totalBytes: Int64,
@@ -149,7 +149,7 @@ public struct ModelCriteria {
     public let tags: [String]
     public let quantization: String?
     public let search: String?
-    
+
     public init(
         framework: LLMFramework? = nil,
         format: ModelFormat? = nil,
@@ -180,25 +180,25 @@ public protocol ModelRegistry {
     /// Discover available models
     /// - Returns: Array of discovered models
     func discoverModels() async -> [ModelInfo]
-    
+
     /// Register a model
     /// - Parameter model: Model to register
     func registerModel(_ model: ModelInfo)
-    
+
     /// Get model by ID
     /// - Parameter id: Model identifier
     /// - Returns: Model information if found
     func getModel(by id: String) -> ModelInfo?
-    
+
     /// Filter models by criteria
     /// - Parameter criteria: Filter criteria
     /// - Returns: Filtered models
     func filterModels(by criteria: ModelCriteria) -> [ModelInfo]
-    
+
     /// Update model information
     /// - Parameter model: Updated model information
     func updateModel(_ model: ModelInfo)
-    
+
     /// Remove a model
     /// - Parameter id: Model identifier
     func removeModel(_ id: String)

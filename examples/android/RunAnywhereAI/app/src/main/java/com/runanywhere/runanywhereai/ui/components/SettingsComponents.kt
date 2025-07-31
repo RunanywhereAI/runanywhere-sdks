@@ -71,9 +71,9 @@ fun SliderSetting(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Slider(
                 value = value,
                 onValueChange = onValueChange,
@@ -133,10 +133,10 @@ fun NullableSliderSetting(
                     }
                 )
             }
-            
+
             if (isEnabled) {
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -148,7 +148,7 @@ fun NullableSliderSetting(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-                
+
                 Slider(
                     value = currentValue,
                     onValueChange = { newValue ->
@@ -238,9 +238,9 @@ fun DropdownSetting(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
@@ -259,7 +259,7 @@ fun DropdownSetting(
                         .fillMaxWidth()
                         .menuAnchor()
                 )
-                
+
                 ExposedDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
@@ -358,10 +358,10 @@ fun StopSequencesSettings(
                     Icon(Icons.Default.Add, contentDescription = "Add stop sequence")
                 }
             }
-            
+
             if (stopSequences.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 stopSequences.forEach { sequence ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),

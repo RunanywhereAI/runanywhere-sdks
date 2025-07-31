@@ -73,7 +73,9 @@
       "Bash(./find_tflite_models.sh:*)",
       "WebFetch(domain:www.kaggle.com)",
       "Bash(./test_kaggle_correct_api.sh:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(pre-commit:*)",
+      "Bash(git rev-parse:*)"
     ],
     "deny": []
   }

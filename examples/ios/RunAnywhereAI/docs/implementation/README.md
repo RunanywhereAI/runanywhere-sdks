@@ -116,7 +116,7 @@ RunAnywhereAI/
    ```bash
    # CocoaPods for TensorFlow Lite
    pod install
-   
+
    # Fix Xcode 16 sandbox issues
    ./fix_pods_sandbox.sh
    ```

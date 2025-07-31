@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.runanywhere.runanywhereai.data.database.ConversationDao
-import com.runanywhere.runanywhereai.data.database.Message
-import com.runanywhere.runanywhereai.data.database.Conversation
+import com.runanywhere.runanywhereai.data.models.Message
+import com.runanywhere.runanywhereai.data.models.Conversation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -25,7 +25,7 @@ class PrivacyManager(
         private const val TAG = "PrivacyManager"
         private const val PREFS_NAME = "privacy_settings"
         private const val PRIVACY_SETTINGS_FILE = "privacy_settings.json"
-        
+
         // Privacy preference keys
         private const val KEY_PRIVACY_MODE_ENABLED = "privacy_mode_enabled"
         private const val KEY_ANALYTICS_ENABLED = "analytics_enabled"
@@ -36,21 +36,21 @@ class PrivacyManager(
         private const val KEY_AUTO_DELETE_ENABLED = "auto_delete_enabled"
         private const val KEY_INCOGNITO_MODE_ENABLED = "incognito_mode_enabled"
     }
-    
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         prettyPrint = true
     }
-    
+
     private val preferences: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val privacySettingsFile: File by lazy {
         File(context.filesDir, PRIVACY_SETTINGS_FILE)
     }
-    
+
     private var currentSettings: PrivacySettings? = null
     private var privacyListeners = mutableListOf<PrivacyListener>()
-    
+
     /**
      * Initialize privacy manager
      */
@@ -58,14 +58,14 @@ class PrivacyManager(
         currentSettings = loadPrivacySettings()
         Log.d(TAG, "Privacy manager initialized with settings: ${currentSettings}")
     }
-    
+
     /**
      * Check if privacy mode is enabled (no logging/tracking)
      */
     fun isPrivacyModeEnabled(): Boolean {
         return preferences.getBoolean(KEY_PRIVACY_MODE_ENABLED, false)
     }
-    
+
     /**
      * Enable or disable privacy mode
      */
@@ -73,24 +73,24 @@ class PrivacyManager(
         preferences.edit()
             .putBoolean(KEY_PRIVACY_MODE_ENABLED, enabled)
             .apply()
-        
+
         if (enabled) {
             enablePrivacyMode()
         } else {
             disablePrivacyMode()
         }
-        
+
         notifyPrivacyListeners(PrivacyEvent.PrivacyModeChanged(enabled))
         Log.d(TAG, "Privacy mode ${if (enabled) "enabled" else "disabled"}")
     }
-    
+
     /**
      * Check if incognito mode is enabled (temporary conversations)
      */
     fun isIncognitoModeEnabled(): Boolean {
         return preferences.getBoolean(KEY_INCOGNITO_MODE_ENABLED, false)
     }
-    
+
     /**
      * Enable or disable incognito mode
      */
@@ -98,18 +98,18 @@ class PrivacyManager(
         preferences.edit()
             .putBoolean(KEY_INCOGNITO_MODE_ENABLED, enabled)
             .apply()
-        
+
         notifyPrivacyListeners(PrivacyEvent.IncognitoModeChanged(enabled))
         Log.d(TAG, "Incognito mode ${if (enabled) "enabled" else "disabled"}")
     }
-    
+
     /**
      * Get current privacy settings
      */
     suspend fun getPrivacySettings(): PrivacySettings = withContext(Dispatchers.IO) {
         currentSettings ?: loadPrivacySettings().also { currentSettings = it }
     }
-    
+
     /**
      * Update privacy settings
      */
@@ -126,23 +126,23 @@ class PrivacyManager(
                 .putBoolean(KEY_AUTO_DELETE_ENABLED, settings.autoDeleteEnabled)
                 .putBoolean(KEY_INCOGNITO_MODE_ENABLED, settings.incognitoModeEnabled)
                 .apply()
-            
+
             // Save to file
             savePrivacySettings(settings)
             currentSettings = settings
-            
+
             // Apply changes
             applyPrivacySettings(settings)
-            
+
             notifyPrivacyListeners(PrivacyEvent.SettingsUpdated(settings))
             Log.d(TAG, "Privacy settings updated")
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to update privacy settings", e)
             throw e
         }
     }
-    
+
     /**
      * Start incognito session
      */
@@ -153,16 +153,16 @@ class PrivacyManager(
             startTime = System.currentTimeMillis(),
             isActive = true
         )
-        
+
         // Save session info
         saveIncognitoSession(session)
-        
+
         notifyPrivacyListeners(PrivacyEvent.IncognitoSessionStarted(session))
         Log.d(TAG, "Started incognito session: $sessionId")
-        
+
         session
     }
-    
+
     /**
      * End incognito session and clean up data
      */
@@ -170,26 +170,26 @@ class PrivacyManager(
         try {
             // Delete all conversations and messages from this session
             val incognitoConversations = conversationDao.getIncognitoConversations(sessionId)
-            
+
             for (conversation in incognitoConversations) {
                 conversationDao.deleteConversation(conversation.id)
             }
-            
+
             // Clean up any temporary files
             cleanupIncognitoFiles(sessionId)
-            
+
             // Remove session info
             removeIncognitoSession(sessionId)
-            
+
             notifyPrivacyListeners(PrivacyEvent.IncognitoSessionEnded(sessionId))
             Log.d(TAG, "Ended incognito session: $sessionId, deleted ${incognitoConversations.size} conversations")
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to end incognito session", e)
             throw e
         }
     }
-    
+
     /**
      * Check if logging should be performed based on privacy settings
      */
@@ -206,7 +206,7 @@ class PrivacyManager(
                 LogType.SECURITY -> true // Always log security events
             }
         }
-        
+
         return when (logType) {
             LogType.ANALYTICS -> preferences.getBoolean(KEY_ANALYTICS_ENABLED, true)
             LogType.TELEMETRY -> preferences.getBoolean(KEY_TELEMETRY_ENABLED, true)
@@ -214,7 +214,7 @@ class PrivacyManager(
             else -> true
         }
     }
-    
+
     /**
      * Check if data should be stored based on privacy settings
      */
@@ -229,7 +229,7 @@ class PrivacyManager(
                 DataType.TEMPORARY_FILES -> true
             }
         }
-        
+
         return when (dataType) {
             DataType.CONVERSATIONS -> !isPrivacyModeEnabled() || preferences.getBoolean(KEY_LOCAL_STORAGE_ONLY, false)
             DataType.MESSAGES -> !isPrivacyModeEnabled() || preferences.getBoolean(KEY_LOCAL_STORAGE_ONLY, false)
@@ -237,7 +237,7 @@ class PrivacyManager(
             else -> true
         }
     }
-    
+
     /**
      * Sanitize data for logging based on privacy settings
      */
@@ -245,7 +245,7 @@ class PrivacyManager(
         if (isPrivacyModeEnabled()) {
             return "[REDACTED - Privacy Mode]"
         }
-        
+
         // Basic PII sanitization
         return data
             .replace(Regex("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"), "[EMAIL]")
@@ -253,7 +253,7 @@ class PrivacyManager(
             .replace(Regex("\\b\\d{4}\\s?\\d{4}\\s?\\d{4}\\s?\\d{4}\\b"), "[CARD]")
             .replace(Regex("\\b\\d{3}-\\d{3}-\\d{4}\\b"), "[PHONE]")
     }
-    
+
     /**
      * Get privacy compliance report
      */
@@ -261,7 +261,7 @@ class PrivacyManager(
         val settings = getPrivacySettings()
         val dataStored = getStoredDataSummary()
         val activeSessions = getActiveIncognitoSessions()
-        
+
         PrivacyComplianceReport(
             generatedAt = System.currentTimeMillis(),
             privacyModeEnabled = settings.privacyModeEnabled,
@@ -276,7 +276,7 @@ class PrivacyManager(
             complianceScore = calculateComplianceScore(settings)
         )
     }
-    
+
     /**
      * Export privacy data for user (GDPR compliance)
      */
@@ -285,7 +285,7 @@ class PrivacyManager(
             val settings = getPrivacySettings()
             val conversations = conversationDao.getAllConversations()
             val messages = conversationDao.getAllMessages()
-            
+
             val exportData = PrivacyDataExport(
                 exportedAt = System.currentTimeMillis(),
                 privacySettings = settings,
@@ -294,87 +294,87 @@ class PrivacyManager(
                 // Don't include actual content for privacy
                 dataTypes = listOf("conversations", "messages", "settings", "preferences")
             )
-            
+
             val exportFile = File(exportPath, "privacy_data_export_${System.currentTimeMillis()}.json")
             val jsonData = json.encodeToString(exportData)
             exportFile.writeText(jsonData)
-            
+
             Log.d(TAG, "Privacy data exported to ${exportFile.absolutePath}")
             true
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to export privacy data", e)
             false
         }
     }
-    
+
     /**
      * Add privacy listener
      */
     fun addPrivacyListener(listener: PrivacyListener) {
         privacyListeners.add(listener)
     }
-    
+
     /**
      * Remove privacy listener
      */
     fun removePrivacyListener(listener: PrivacyListener) {
         privacyListeners.remove(listener)
     }
-    
+
     // Private helper methods
-    
+
     private suspend fun enablePrivacyMode() {
         // Disable analytics, telemetry, and detailed logging
         preferences.edit()
             .putBoolean(KEY_ANALYTICS_ENABLED, false)
             .putBoolean(KEY_TELEMETRY_ENABLED, false)
             .apply()
-        
+
         // Clear any existing analytics data
         clearAnalyticsData()
-        
+
         Log.d(TAG, "Privacy mode protections activated")
     }
-    
+
     private suspend fun disablePrivacyMode() {
         // Restore default settings (but don't force enable)
         Log.d(TAG, "Privacy mode protections deactivated")
     }
-    
+
     private fun applyPrivacySettings(settings: PrivacySettings) {
         // Apply settings to various components
         if (settings.privacyModeEnabled) {
             enablePrivacyMode()
         }
-        
+
         // Configure encryption
         if (settings.encryptionEnabled) {
             // Enable encryption for stored data
         }
-        
+
         // Configure auto-delete
         if (settings.autoDeleteEnabled) {
             // Schedule automatic deletion
         }
     }
-    
+
     private fun clearAnalyticsData() {
         try {
             val analyticsDir = File(context.filesDir, "analytics")
             if (analyticsDir.exists()) {
                 analyticsDir.deleteRecursively()
             }
-            
+
             // Clear analytics preferences
             val analyticsPrefs = context.getSharedPreferences("analytics", Context.MODE_PRIVATE)
             analyticsPrefs.edit().clear().apply()
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to clear analytics data", e)
         }
     }
-    
+
     private fun cleanupIncognitoFiles(sessionId: String) {
         try {
             val incognitoDir = File(context.cacheDir, "incognito/$sessionId")
@@ -385,7 +385,7 @@ class PrivacyManager(
             Log.e(TAG, "Failed to cleanup incognito files", e)
         }
     }
-    
+
     private fun saveIncognitoSession(session: IncognitoSession) {
         try {
             val sessionsFile = File(context.filesDir, "incognito_sessions.json")
@@ -395,16 +395,16 @@ class PrivacyManager(
             } else {
                 mutableListOf()
             }
-            
+
             sessions.add(session)
             val jsonData = json.encodeToString(sessions)
             sessionsFile.writeText(jsonData)
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save incognito session", e)
         }
     }
-    
+
     private fun removeIncognitoSession(sessionId: String) {
         try {
             val sessionsFile = File(context.filesDir, "incognito_sessions.json")
@@ -413,7 +413,7 @@ class PrivacyManager(
                 val sessions = json.decodeFromString<MutableList<IncognitoSession>>(jsonData).apply {
                     removeAll { it.sessionId == sessionId }
                 }
-                
+
                 val updatedJsonData = json.encodeToString(sessions)
                 sessionsFile.writeText(updatedJsonData)
             }
@@ -421,7 +421,7 @@ class PrivacyManager(
             Log.e(TAG, "Failed to remove incognito session", e)
         }
     }
-    
+
     private fun getActiveIncognitoSessions(): List<IncognitoSession> {
         return try {
             val sessionsFile = File(context.filesDir, "incognito_sessions.json")
@@ -437,12 +437,12 @@ class PrivacyManager(
             emptyList()
         }
     }
-    
+
     private suspend fun getStoredDataSummary(): StoredDataSummary {
         return try {
             val conversations = conversationDao.getConversationCount()
             val messages = conversationDao.getMessageCount()
-            
+
             StoredDataSummary(
                 conversationsCount = conversations,
                 messagesCount = messages,
@@ -455,7 +455,7 @@ class PrivacyManager(
             StoredDataSummary()
         }
     }
-    
+
     private fun getCacheSize(): Long {
         return try {
             context.cacheDir.walkTopDown()
@@ -466,7 +466,7 @@ class PrivacyManager(
             0L
         }
     }
-    
+
     private fun estimateTotalDataSize(): Long {
         return try {
             context.filesDir.walkTopDown()
@@ -477,15 +477,15 @@ class PrivacyManager(
             0L
         }
     }
-    
+
     private fun getDataRetentionPoliciesCount(): Int {
         // This would integrate with DataRetentionManager
         return 0 // Placeholder
     }
-    
+
     private fun calculateComplianceScore(settings: PrivacySettings): Int {
         var score = 0
-        
+
         if (settings.privacyModeEnabled) score += 20
         if (settings.encryptionEnabled) score += 15
         if (settings.localStorageOnly) score += 15
@@ -494,10 +494,10 @@ class PrivacyManager(
         if (!settings.telemetryEnabled) score += 10
         if (settings.autoDeleteEnabled) score += 10
         if (settings.incognitoModeEnabled) score += 10
-        
+
         return score
     }
-    
+
     private fun loadPrivacySettings(): PrivacySettings {
         return try {
             if (privacySettingsFile.exists()) {
@@ -511,7 +511,7 @@ class PrivacyManager(
             getDefaultPrivacySettings()
         }
     }
-    
+
     private fun savePrivacySettings(settings: PrivacySettings) {
         try {
             val jsonData = json.encodeToString(settings)
@@ -521,7 +521,7 @@ class PrivacyManager(
             throw e
         }
     }
-    
+
     private fun getDefaultPrivacySettings(): PrivacySettings {
         return PrivacySettings(
             privacyModeEnabled = preferences.getBoolean(KEY_PRIVACY_MODE_ENABLED, false),
@@ -534,7 +534,7 @@ class PrivacyManager(
             incognitoModeEnabled = preferences.getBoolean(KEY_INCOGNITO_MODE_ENABLED, false)
         )
     }
-    
+
     private fun notifyPrivacyListeners(event: PrivacyEvent) {
         privacyListeners.forEach { listener ->
             try {
@@ -630,7 +630,7 @@ suspend fun ConversationDao.getConversationCount(): Int {
 }
 
 suspend fun ConversationDao.getMessageCount(): Int {
-    // Implementation would be added to the actual DAO  
+    // Implementation would be added to the actual DAO
     return 0 // Placeholder
 }
 

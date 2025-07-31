@@ -22,14 +22,14 @@ class UnifiedLLMManager(private val context: Context) {
     companion object {
         private const val TAG = "UnifiedLLMManager"
     }
-    
+
     private val services = mutableMapOf<LLMFramework, LLMService>()
     private var currentService: LLMService? = null
-    
+
     init {
         registerServices()
     }
-    
+
     private fun tryRegisterService(framework: LLMFramework, serviceProvider: () -> LLMService) {
         try {
             val service = serviceProvider()
@@ -39,7 +39,7 @@ class UnifiedLLMManager(private val context: Context) {
             Log.w(TAG, "Failed to register service $framework - native dependencies may be missing", e)
         }
     }
-    
+
     private fun registerServices() {
         // Register available services
         tryRegisterService(LLMFramework.MEDIAPIPE) { MediaPipeService(context) }
@@ -48,7 +48,7 @@ class UnifiedLLMManager(private val context: Context) {
         tryRegisterService(LLMFramework.LLAMA_CPP) { LlamaCppService(context) }
         tryRegisterService(LLMFramework.EXECUTORCH) { ExecuTorchService(context) }
         tryRegisterService(LLMFramework.MLC_LLM) { MLCLLMService(context) }
-        
+
         // Register Gemini Nano if available
         try {
             val geminiService = GeminiNanoService(context)
@@ -58,7 +58,7 @@ class UnifiedLLMManager(private val context: Context) {
         } catch (e: Exception) {
             Log.w(TAG, "Gemini Nano not available on this device", e)
         }
-        
+
         // Register AI Core if available (Android 14+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             try {
@@ -67,7 +67,7 @@ class UnifiedLLMManager(private val context: Context) {
                 Log.w(TAG, "AI Core not available on this device", e)
             }
         }
-        
+
         // Register picoLLM (requires access key)
         // Note: In production, the access key should be stored securely
         val picoAccessKey = "" // TODO: Add Picovoice access key
@@ -75,30 +75,30 @@ class UnifiedLLMManager(private val context: Context) {
             tryRegisterService(LLMFramework.PICOLLM) { PicoLLMService(context, picoAccessKey) }
         }
     }
-    
+
     /**
      * Get available frameworks
      */
     fun getAvailableFrameworks(): List<LLMFramework> {
         return services.keys.toList()
     }
-    
+
     /**
      * Get current active framework
      */
     fun getCurrentFramework(): LLMFramework? {
         return services.entries.firstOrNull { it.value == currentService }?.key
     }
-    
+
     /**
      * Select and initialize a framework with a model
      */
     suspend fun selectFramework(framework: LLMFramework, modelPath: String) {
         Log.d(TAG, "Selecting framework: $framework with model: $modelPath")
-        
+
         // Release current service if any
         currentService?.release()
-        
+
         // Get and initialize new service
         currentService = services[framework]?.apply {
             try {
@@ -111,7 +111,7 @@ class UnifiedLLMManager(private val context: Context) {
             }
         } ?: throw IllegalArgumentException("Framework $framework not available")
     }
-    
+
     /**
      * Generate text using the current service
      */
@@ -119,28 +119,28 @@ class UnifiedLLMManager(private val context: Context) {
         val service = currentService ?: throw IllegalStateException("No LLM service selected")
         return service.generate(prompt, options)
     }
-    
+
     /**
      * Stream generation using the current service
      */
     fun generateStream(prompt: String, options: GenerationOptions = GenerationOptions()): Flow<GenerationResult> {
         return currentService?.generateStream(prompt, options) ?: emptyFlow()
     }
-    
+
     /**
      * Get information about the current model
      */
     fun getModelInfo(): ModelInfo? {
         return currentService?.getModelInfo()
     }
-    
+
     /**
      * Check if a service is initialized
      */
     fun isInitialized(): Boolean {
         return currentService?.isInitialized == true
     }
-    
+
     /**
      * Release all resources
      */
@@ -148,7 +148,7 @@ class UnifiedLLMManager(private val context: Context) {
         currentService?.release()
         currentService = null
     }
-    
+
     /**
      * Get recommended framework for device
      */

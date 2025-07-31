@@ -119,7 +119,7 @@ Integrate Swift Transformers package into RunAnywhereAI iOS app, moving it from 
 
 ### Models Added to Registry
 1. **GPT-2 Base (150MB)** - 256 token context, Float16 quantization
-2. **GPT-2 Extended (646MB)** - 512 token context, Float16 quantization  
+2. **GPT-2 Extended (646MB)** - 512 token context, Float16 quantization
 3. **DistilGPT2 (81MB)** - Smaller, faster variant with mlpackage format
 
 ### Key Features Implemented

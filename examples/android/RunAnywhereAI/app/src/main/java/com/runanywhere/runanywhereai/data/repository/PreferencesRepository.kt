@@ -15,7 +15,7 @@ import javax.inject.Singleton
 
 /**
  * Repository for managing encrypted application preferences
- * 
+ *
  * Provides secure storage for all app settings using Android's EncryptedSharedPreferences
  * and additional encryption through EncryptionManager for sensitive data.
  */
@@ -26,7 +26,7 @@ class PreferencesRepository @Inject constructor(
 ) {
     companion object {
         private const val PREFS_NAME = "app_settings"
-        
+
         // Generation Parameters Keys
         private const val KEY_MAX_TOKENS = "max_tokens"
         private const val KEY_TEMPERATURE = "temperature"
@@ -36,29 +36,29 @@ class PreferencesRepository @Inject constructor(
         private const val KEY_STOP_SEQUENCES = "stop_sequences"
         private const val KEY_PRESENCE_PENALTY = "presence_penalty"
         private const val KEY_FREQUENCY_PENALTY = "frequency_penalty"
-        
+
         // Hardware Settings Keys
         private const val KEY_PREFERRED_FRAMEWORK = "preferred_framework"
         private const val KEY_ENABLE_GPU_ACCELERATION = "enable_gpu_acceleration"
         private const val KEY_MAX_MEMORY_USAGE = "max_memory_usage"
-        
+
         // Battery Settings Keys
         private const val KEY_ENABLE_BATTERY_OPTIMIZATION = "enable_battery_optimization"
         private const val KEY_THERMAL_THROTTLING_ENABLED = "thermal_throttling_enabled"
         private const val KEY_MAX_BATTERY_TEMPERATURE = "max_battery_temperature"
-        
+
         // Privacy Settings Keys
         private const val KEY_ENABLE_CONVERSATION_ENCRYPTION = "enable_conversation_encryption"
         private const val KEY_AUTO_DELETE_CONVERSATIONS = "auto_delete_conversations"
         private const val KEY_CONVERSATION_RETENTION_DAYS = "conversation_retention_days"
         private const val KEY_ENABLE_ANALYTICS = "enable_analytics"
-        
+
         // Advanced Settings Keys
         private const val KEY_ENABLE_DEBUG_LOGGING = "enable_debug_logging"
         private const val KEY_MODEL_CACHE_SIZE = "model_cache_size"
         private const val KEY_ENABLE_MODEL_PRELOADING = "enable_model_preloading"
         private const val KEY_CONCURRENT_INFERENCES_LIMIT = "concurrent_inferences_limit"
-        
+
         // Default Values
         private const val DEFAULT_MAX_TOKENS = 150
         private const val DEFAULT_TEMPERATURE = 0.7f
@@ -307,7 +307,7 @@ class PreferencesRepository @Inject constructor(
     fun exportSettings(): String {
         val allPrefs = sharedPreferences.all
         val jsonObject = JSONObject()
-        
+
         allPrefs.forEach { (key, value) ->
             when (value) {
                 is String -> jsonObject.put(key, value)
@@ -317,7 +317,7 @@ class PreferencesRepository @Inject constructor(
                 is Long -> jsonObject.put(key, value)
             }
         }
-        
+
         // Encrypt the JSON string for additional security
         return encryptionManager.encrypt(jsonObject.toString())
     }
@@ -330,7 +330,7 @@ class PreferencesRepository @Inject constructor(
             val decryptedData = encryptionManager.decrypt(encryptedData)
             val jsonObject = JSONObject(decryptedData)
             val editor = sharedPreferences.edit()
-            
+
             val keys = jsonObject.keys()
             while (keys.hasNext()) {
                 val key = keys.next()
@@ -342,7 +342,7 @@ class PreferencesRepository @Inject constructor(
                     is Long -> editor.putLong(key, value)
                 }
             }
-            
+
             editor.apply()
         } catch (e: Exception) {
             throw IllegalArgumentException("Invalid settings data format", e)

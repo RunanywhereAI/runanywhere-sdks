@@ -1,13 +1,41 @@
 package com.runanywhere.runanywhereai.ui.models.components
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Cpu
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeviceThermostat
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hub
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Rocket
+import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +70,7 @@ fun EnhancedModelCard(
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(false) }
-    
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -78,7 +106,7 @@ fun EnhancedModelCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    
+
                     Text(
                         text = model.description,
                         style = MaterialTheme.typography.bodyMedium,
@@ -87,59 +115,59 @@ fun EnhancedModelCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                
+
                 // Framework compatibility badge
                 FrameworkBadge(
                     framework = model.framework,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // Model statistics row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 StatisticChip(
-                    icon = Icons.Default.Storage,
+                    icon = Icons.Filled.Storage,
                     label = "Size",
                     value = formatBytes(model.sizeBytes),
                     color = MaterialTheme.colorScheme.primary
                 )
-                
+
                 performanceMetrics?.let { metrics ->
                     StatisticChip(
-                        icon = Icons.Default.Speed,
+                        icon = Icons.Filled.Speed,
                         label = "Speed",
                         value = "${metrics.tokensPerSecond.toInt()} t/s",
                         color = MaterialTheme.colorScheme.secondary
                     )
                 }
-                
+
                 hardwareRequirements?.let { requirements ->
                     StatisticChip(
-                        icon = Icons.Default.Memory,
+                        icon = Icons.Filled.Memory,
                         label = "RAM",
                         value = formatBytes(requirements.minRamBytes),
                         color = MaterialTheme.colorScheme.tertiary
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             // Hardware compatibility indicators
             hardwareRequirements?.let { requirements ->
                 HardwareCompatibilityRow(
                     requirements = requirements,
                     modifier = Modifier.fillMaxWidth()
                 )
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
             }
-            
+
             // Download progress or action buttons
             if (downloadProgress != null) {
                 DownloadProgressSection(
@@ -155,7 +183,7 @@ fun EnhancedModelCard(
                     onToggleExpanded = { isExpanded = !isExpanded }
                 )
             }
-            
+
             // Expandable details section
             AnimatedVisibility(
                 visible = isExpanded,
@@ -166,7 +194,7 @@ fun EnhancedModelCard(
                     Spacer(modifier = Modifier.height(12.dp))
                     Divider()
                     Spacer(modifier = Modifier.height(12.dp))
-                    
+
                     DetailedModelInfo(
                         model = model,
                         performanceMetrics = performanceMetrics,
@@ -189,51 +217,51 @@ private fun FrameworkBadge(
     val (color, icon, text) = when (framework) {
         LLMFramework.GEMINI_NANO -> Triple(
             Color(0xFF4285F4), // Google Blue
-            Icons.Default.Android,
+            Icons.Filled.Android,
             "Gemini"
         )
         LLMFramework.TFLITE -> Triple(
             Color(0xFFFF6F00), // TensorFlow Orange
-            Icons.Default.Psychology,
+            Icons.Filled.Psychology,
             "TFLite"
         )
         LLMFramework.LLAMA_CPP -> Triple(
             Color(0xFF8BC34A), // Green
-            Icons.Default.Code,
+            Icons.Filled.Code,
             "llama.cpp"
         )
         LLMFramework.ONNX_RUNTIME -> Triple(
             Color(0xFF9C27B0), // Purple
-            Icons.Default.Hub,
+            Icons.Filled.Hub,
             "ONNX"
         )
         LLMFramework.EXECUTORCH -> Triple(
             Color(0xFFE91E63), // Pink
-            Icons.Default.Bolt,
+            Icons.Filled.Bolt,
             "ExecuTorch"
         )
         LLMFramework.MLC_LLM -> Triple(
             Color(0xFF00BCD4), // Cyan
-            Icons.Default.Rocket,
+            Icons.Filled.Rocket,
             "MLC-LLM"
         )
         LLMFramework.MEDIAPIPE -> Triple(
             Color(0xFF607D8B), // Blue Grey
-            Icons.Default.Videocam,
+            Icons.Filled.Videocam,
             "MediaPipe"
         )
         LLMFramework.PICOLLM -> Triple(
             Color(0xFF795548), // Brown
-            Icons.Default.RecordVoiceOver,
+            Icons.Filled.RecordVoiceOver,
             "picoLLM"
         )
         LLMFramework.AI_CORE -> Triple(
             Color(0xFF3F51B5), // Indigo
-            Icons.Default.SmartToy,
+            Icons.Filled.SmartToy,
             "AI Core"
         )
     }
-    
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(20.dp),
@@ -319,28 +347,28 @@ private fun HardwareCompatibilityRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         HardwareIndicator(
-            icon = Icons.Default.Cpu,
+            icon = Icons.Filled.Cpu,
             label = "CPU",
             isSupported = requirements.cpuSupported,
             details = requirements.cpuDetails
         )
-        
+
         HardwareIndicator(
-            icon = Icons.Default.GraphicEq,
+            icon = Icons.Filled.GraphicEq,
             label = "GPU",
             isSupported = requirements.gpuSupported,
             details = requirements.gpuDetails
         )
-        
+
         HardwareIndicator(
-            icon = Icons.Default.Memory,
+            icon = Icons.Filled.Memory,
             label = "NPU",
             isSupported = requirements.npuSupported,
             details = requirements.npuDetails
         )
-        
+
         HardwareIndicator(
-            icon = Icons.Default.DeviceThermostat,
+            icon = Icons.Filled.DeviceThermostat,
             label = "Thermal",
             isSupported = requirements.thermalOptimized,
             details = "Thermal optimized"
@@ -364,7 +392,7 @@ private fun HardwareIndicator(
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-    
+
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(6.dp),
@@ -414,7 +442,7 @@ private fun DownloadProgressSection(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
-            
+
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -424,31 +452,31 @@ private fun DownloadProgressSection(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary
                 )
-                
+
                 IconButton(
                     onClick = onCancel,
                     modifier = Modifier.size(24.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Cancel,
+                        imageVector = Icons.Filled.Cancel,
                         contentDescription = "Cancel download",
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         LinearProgressIndicator(
             progress = progress.progress,
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.primary,
             trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
         )
-        
+
         Spacer(modifier = Modifier.height(4.dp))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -458,7 +486,7 @@ private fun DownloadProgressSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
+
             Text(
                 text = "${progress.speedBytesPerSecond?.let { formatBytes(it) } ?: "0 B"}/s",
                 style = MaterialTheme.typography.bodySmall,
@@ -495,7 +523,7 @@ private fun ActionButtonsRow(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Delete,
+                    imageVector = Icons.Filled.Delete,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
@@ -508,7 +536,7 @@ private fun ActionButtonsRow(
                 modifier = Modifier.weight(1f)
             ) {
                 Icon(
-                    imageVector = Icons.Default.Download,
+                    imageVector = Icons.Filled.Download,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp)
                 )
@@ -516,25 +544,25 @@ private fun ActionButtonsRow(
                 Text("Download")
             }
         }
-        
+
         // Compare button
         OutlinedButton(
             onClick = onCompare,
             modifier = Modifier.width(120.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.Compare,
+                imageVector = Icons.Filled.Compare,
                 contentDescription = null,
                 modifier = Modifier.size(16.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text("Compare")
         }
-        
+
         // Expand details button
         IconButton(onClick = onToggleExpanded) {
             Icon(
-                imageVector = Icons.Default.ExpandMore,
+                imageVector = Icons.Filled.ExpandMore,
                 contentDescription = "Show details"
             )
         }

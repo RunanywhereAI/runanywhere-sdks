@@ -54,14 +54,14 @@ This document provides a comprehensive analysis of all LLM frameworks integrated
 - **Format**: .mlmodel (single file) or .mlpackage (directory)
 - **Providers**: Apple ML Assets, Hugging Face
 - **Auth**: None required
-- **Challenges**: 
+- **Challenges**:
   - .mlpackage files are directories requiring special handling
   - Large file sizes (often 1-4GB)
   - No built-in compression
 
 #### Extract Stage
 - **Process**: Direct use for .mlmodel, directory structure for .mlpackage
-- **Challenges**: 
+- **Challenges**:
   - Directory-based models need proper path handling
   - No extraction needed but validation required
 
@@ -503,11 +503,11 @@ protocol ModelLifecycleManager {
     // Lifecycle state machine
     var currentState: ModelLifecycleState { get }
     var stateHistory: [ModelLifecycleTransition] { get }
-    
+
     // State transitions
     func transitionTo(_ state: ModelLifecycleState) async throws
     func canTransitionTo(_ state: ModelLifecycleState) -> Bool
-    
+
     // Observers
     func addObserver(_ observer: ModelLifecycleObserver)
     func removeObserver(_ observer: ModelLifecycleObserver)
@@ -541,11 +541,11 @@ protocol UnifiedModelLoader {
     func loadModel(_ model: ModelInfo) async throws -> LoadedModel
     func unloadModel(_ modelId: String) async throws
     func isModelLoaded(_ modelId: String) -> Bool
-    
+
     // Framework detection
     func detectOptimalFramework(for model: ModelInfo) -> LLMFramework
     func canLoad(_ model: ModelInfo, with framework: LLMFramework) -> Bool
-    
+
     // Resource management
     func estimateMemoryRequirement(_ model: ModelInfo) -> Int64
     func checkAvailableResources() -> ResourceAvailability
@@ -568,13 +568,13 @@ protocol UnifiedTokenizer {
     func encode(_ text: String) -> [Int]
     func decode(_ tokens: [Int]) -> String
     func decodeToken(_ token: Int) -> String
-    
+
     // Properties
     var vocabularySize: Int { get }
     var bosToken: Int? { get }
     var eosToken: Int? { get }
     var padToken: Int? { get }
-    
+
     // Configuration
     var maxLength: Int { get }
     var truncationStrategy: TruncationStrategy { get }
@@ -595,11 +595,11 @@ protocol ModelRegistry {
     func discoverModels() async -> [ModelInfo]
     func searchModels(query: String) async -> [ModelInfo]
     func getModelInfo(id: String) -> ModelInfo?
-    
+
     // Filtering
     func filterModels(by criteria: ModelCriteria) -> [ModelInfo]
     func getCompatibleModels(for device: DeviceInfo) -> [ModelInfo]
-    
+
     // Registration
     func registerModel(_ model: ModelInfo)
     func unregisterModel(_ modelId: String)
@@ -624,12 +624,12 @@ protocol ModelStorageManager {
     func pauseDownload(_ taskId: String)
     func resumeDownload(_ taskId: String)
     func cancelDownload(_ taskId: String)
-    
+
     // Storage operations
     func storeModel(_ data: Data, for model: ModelInfo) async throws -> URL
     func deleteModel(_ modelId: String) async throws
     func moveModel(_ modelId: String, to location: URL) async throws
-    
+
     // Query operations
     func getStoredModels() -> [StoredModel]
     func getModelLocation(_ modelId: String) -> URL?
@@ -653,7 +653,7 @@ protocol HardwareCapabilities {
     var totalMemory: Int64 { get }
     var availableMemory: Int64 { get }
     var supportedQuantizations: [QuantizationFormat] { get }
-    
+
     // Optimization
     func recommendedConfiguration(for model: ModelInfo) -> HardwareConfiguration
     func canRun(_ model: ModelInfo) -> Bool
@@ -675,12 +675,12 @@ protocol ProgressTracker {
     // Progress reporting
     func reportProgress(_ progress: StageProgress)
     func getCurrentProgress() -> OverallProgress
-    
+
     // Stage management
     func startStage(_ stage: LifecycleStage)
     func completeStage(_ stage: LifecycleStage)
     func failStage(_ stage: LifecycleStage, error: Error)
-    
+
     // Observers
     func addProgressObserver(_ observer: ProgressObserver)
     func removeProgressObserver(_ observer: ProgressObserver)
@@ -848,7 +848,7 @@ enum LifecycleStage {
    class TokenizerRegistry {
        static let shared = TokenizerRegistry()
        private var tokenizers: [String: UnifiedTokenizer] = [:]
-       
+
        func register(_ tokenizer: UnifiedTokenizer, for modelId: String) {
            tokenizers[modelId] = tokenizer
        }
@@ -869,7 +869,7 @@ enum LifecycleStage {
    ```swift
    class UnifiedProgressReporter {
        private let progressSubject = PassthroughSubject<ProgressUpdate, Never>()
-       
+
        func report(stage: LifecycleStage, progress: Double, message: String) {
            // Unified progress reporting
        }
@@ -912,7 +912,7 @@ class ModelLifecycleStateMachine {
         StateTransition(from: .discovered, to: .downloading, action: startDownload),
         // ... all valid transitions
     ]
-    
+
     func transition(to newState: ModelLifecycleState) async throws {
         guard let transition = findTransition(from: state, to: newState) else {
             throw UnifiedLLMError.invalidStateTransition(from: state, to: newState)

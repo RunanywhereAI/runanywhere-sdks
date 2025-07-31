@@ -6,33 +6,33 @@ public protocol UnifiedTokenizer {
     /// - Parameter text: The text to encode
     /// - Returns: Array of token IDs
     func encode(_ text: String) -> [Int]
-    
+
     /// Decode tokens back to text
     /// - Parameter tokens: The token IDs to decode
     /// - Returns: The decoded text
     func decode(_ tokens: [Int]) -> String
-    
+
     /// The size of the vocabulary
     var vocabularySize: Int { get }
-    
+
     /// Maximum sequence length supported
     var maxSequenceLength: Int { get }
-    
+
     /// Special tokens used by the tokenizer
     var specialTokens: SpecialTokens { get }
-    
+
     /// Encode text with special tokens
     /// - Parameters:
     ///   - text: The text to encode
     ///   - addSpecialTokens: Whether to add special tokens
     /// - Returns: Array of token IDs
     func encode(_ text: String, addSpecialTokens: Bool) -> [Int]
-    
+
     /// Batch encode multiple texts
     /// - Parameter texts: Array of texts to encode
     /// - Returns: Array of token arrays
     func batchEncode(_ texts: [String]) -> [[Int]]
-    
+
     /// Get token for a specific word
     /// - Parameter word: The word to look up
     /// - Returns: Token ID if found, nil otherwise
@@ -48,7 +48,7 @@ public struct SpecialTokens {
     public let sepToken: Int?  // Separator
     public let clsToken: Int?  // Classification
     public let maskToken: Int? // Mask
-    
+
     public init(
         bosToken: Int? = nil,
         eosToken: Int? = nil,
@@ -83,11 +83,11 @@ public enum TokenizerFormat: String, CaseIterable {
 public protocol TokenizerAdapter: UnifiedTokenizer {
     /// The format this adapter handles
     var format: TokenizerFormat { get }
-    
+
     /// Initialize with model-specific configuration
     /// - Parameter config: Configuration for the tokenizer
     init(config: TokenizerConfig) throws
-    
+
     /// Load tokenizer from file
     /// - Parameter path: Path to tokenizer file
     func load(from path: URL) async throws
@@ -103,20 +103,20 @@ public struct TokenizerConfig {
     public let maxLength: Int
     public let paddingStrategy: PaddingStrategy
     public let truncationStrategy: TruncationStrategy
-    
+
     public enum PaddingStrategy {
         case none
         case longest
         case maxLength
     }
-    
+
     public enum TruncationStrategy {
         case none
         case longest
         case onlyFirst
         case onlySecond
     }
-    
+
     public init(
         modelPath: URL,
         vocabPath: URL? = nil,
@@ -147,7 +147,7 @@ public enum TokenizerError: LocalizedError {
     case decodingFailed(String)
     case vocabNotLoaded
     case invalidToken(Int)
-    
+
     public var errorDescription: String? {
         switch self {
         case .formatNotDetected:

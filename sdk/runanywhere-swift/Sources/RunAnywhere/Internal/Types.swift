@@ -19,7 +19,7 @@ public struct ModelInfo {
     public let tokenizerFormat: TokenizerFormat?
     public let metadata: ModelInfoMetadata?
     public let alternativeDownloadURLs: [URL]?
-    
+
     public init(
         id: String,
         name: String,
@@ -64,7 +64,7 @@ public struct ModelInfoMetadata {
     public let trainingDataset: String?
     public let baseModel: String?
     public let quantizationLevel: QuantizationLevel?
-    
+
     public init(
         author: String? = nil,
         license: String? = nil,
@@ -103,7 +103,7 @@ public struct ResourceAvailability {
     public let thermalState: ProcessInfo.ThermalState
     public let batteryLevel: Float?
     public let isLowPowerMode: Bool
-    
+
     public init(
         memoryAvailable: Int64,
         storageAvailable: Int64,
@@ -119,7 +119,7 @@ public struct ResourceAvailability {
         self.batteryLevel = batteryLevel
         self.isLowPowerMode = isLowPowerMode
     }
-    
+
     public func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
         // Check memory
         if model.estimatedMemory > memoryAvailable {
@@ -127,24 +127,24 @@ public struct ResourceAvailability {
             let available = ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory)
             return (false, "Insufficient memory: need \(needed), have \(available)")
         }
-        
+
         // Check storage
         if let downloadSize = model.downloadSize, downloadSize > storageAvailable {
             let needed = ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)
             let available = ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file)
             return (false, "Insufficient storage: need \(needed), have \(available)")
         }
-        
+
         // Check thermal state
         if thermalState == .critical {
             return (false, "Device is too hot, please wait for it to cool down")
         }
-        
+
         // Check battery in low power mode
         if isLowPowerMode, let battery = batteryLevel, battery < 0.2 {
             return (false, "Battery too low for model loading in Low Power Mode")
         }
-        
+
         return (true, nil)
     }
 }
@@ -159,7 +159,7 @@ internal struct InferenceRequest {
     let timestamp: Date
     let estimatedTokens: Int?
     let priority: RequestPriority
-    
+
     init(
         prompt: String,
         options: GenerationOptions? = nil,
@@ -181,7 +181,7 @@ internal enum RequestPriority: Int, Comparable {
     case normal = 1
     case high = 2
     case critical = 3
-    
+
     static func < (lhs: RequestPriority, rhs: RequestPriority) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
@@ -192,7 +192,7 @@ internal enum RoutingDecision {
     case onDevice(framework: LLMFramework?, reason: RoutingReason)
     case cloud(provider: String?, reason: RoutingReason)
     case hybrid(devicePortion: Double, framework: LLMFramework?, reason: RoutingReason)
-    
+
     var executionTarget: ExecutionTarget {
         switch self {
         case .onDevice:
@@ -203,7 +203,7 @@ internal enum RoutingDecision {
             return .hybrid
         }
     }
-    
+
     /// Get the selected framework if on-device
     var selectedFramework: LLMFramework? {
         switch self {
@@ -229,7 +229,7 @@ internal enum RoutingReason {
     case costOptimization(savedAmount: Double)
     case latencyOptimization(expectedMs: TimeInterval)
     case modelNotAvailable
-    
+
     /// Human-readable description
     var description: String {
         switch self {
@@ -264,7 +264,7 @@ internal struct RoutingContext {
     let resourceAvailability: ResourceAvailability
     let configuration: Configuration
     let costEstimates: CostEstimates?
-    
+
     struct CostEstimates {
         let onDeviceCost: Double
         let cloudCost: Double
@@ -278,7 +278,7 @@ internal struct ModelSelection {
     let framework: LLMFramework
     let adapter: FrameworkAdapter?
     let fallbackOptions: [ModelSelection]?
-    
+
     init(
         model: ModelInfo,
         framework: LLMFramework,

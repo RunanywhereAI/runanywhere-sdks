@@ -90,12 +90,12 @@ class TFLiteService: BaseLLMService {
         do {
             // Configure TensorFlow Lite options
             var options = Interpreter.Options()
-            
+
             // Determine acceleration mode
             if accelerationMode == .auto {
                 accelerationMode = DeviceCapabilities.recommendedAccelerationMode()
             }
-            
+
             // Configure based on acceleration mode
             switch accelerationMode {
             case .coreML:
@@ -106,7 +106,7 @@ class TFLiteService: BaseLLMService {
                     accelerationMode = .metal
                     try configureMetalDelegate(options: &options)
                 }
-                
+
             case .metal:
                 if DeviceCapabilities.supportsMetalDelegate {
                     try configureMetalDelegate(options: &options)
@@ -115,7 +115,7 @@ class TFLiteService: BaseLLMService {
                     accelerationMode = .cpu
                     configureCPUOptions(options: &options)
                 }
-                
+
             case .cpu, .auto:
                 configureCPUOptions(options: &options)
             }
@@ -307,20 +307,20 @@ class TFLiteService: BaseLLMService {
         guard let outputTensor = try? interpreter?.output(at: 0) else {
             throw LLMError.custom("Failed to get output tensor")
         }
-        
+
         // Parse the shape to understand the output format
         let shape = outputTensor.shape
         let vocabSize = shape.dimensions.last ?? 0
-        
+
         // Convert data to logits array
         let logits = parseLogitsFromData(data, vocabSize: vocabSize)
-        
+
         // Apply temperature and softmax
         let probabilities = applySoftmax(logits: logits, temperature: temperature)
-        
+
         // Sample token based on probabilities
         let tokenId = sampleToken(from: probabilities)
-        
+
         // Decode token to text
         if let tokenizer = realTokenizer as? TFLiteTokenizer {
             return tokenizer.decode([tokenId])
@@ -329,17 +329,17 @@ class TFLiteService: BaseLLMService {
             return "token_\(tokenId) "
         }
     }
-    
+
     private func parseLogitsFromData(_ data: Data, vocabSize: Int) -> [Float] {
         // Assuming Float32 output format
         let floatSize = MemoryLayout<Float32>.size
         let count = min(data.count / floatSize, vocabSize)
-        
+
         var logits: [Float] = []
-        
+
         // Extract last vocabSize floats (last token's logits)
         let startOffset = max(0, data.count - (vocabSize * floatSize))
-        
+
         for i in 0..<count {
             let offset = startOffset + (i * floatSize)
             if offset + floatSize <= data.count {
@@ -348,38 +348,38 @@ class TFLiteService: BaseLLMService {
                 logits.append(Float(value))
             }
         }
-        
+
         return logits
     }
-    
+
     private func applySoftmax(logits: [Float], temperature: Float) -> [Float] {
         guard !logits.isEmpty else { return [] }
-        
+
         // Apply temperature
         let scaledLogits = logits.map { $0 / temperature }
-        
+
         // Find max for numerical stability
         let maxLogit = scaledLogits.max() ?? 0
-        
+
         // Compute exp(logit - max)
         let expValues = scaledLogits.map { exp($0 - maxLogit) }
-        
+
         // Sum of exponentials
         let sumExp = expValues.reduce(0, +)
-        
+
         // Normalize to get probabilities
         return expValues.map { $0 / sumExp }
     }
-    
+
     private func sampleToken(from probabilities: [Float]) -> Int {
         guard !probabilities.isEmpty else { return 0 }
-        
+
         // Simple sampling: pick the token with highest probability
         // For more sophisticated sampling, implement top-k or top-p
         if let maxIndex = probabilities.indices.max(by: { probabilities[$0] < probabilities[$1] }) {
             return maxIndex
         }
-        
+
         return 0
     }
     #endif
@@ -410,21 +410,21 @@ class TFLiteService: BaseLLMService {
 // MARK: - Delegate Configuration
 
 extension TFLiteService {
-    
+
     #if canImport(TensorFlowLite) || canImport(TFLiteSwift_TensorFlowLite)
-    
+
     // MARK: Metal Delegate Configuration
-    
+
     private func configureMetalDelegate(options: inout Interpreter.Options) throws {
         print("🚀 Configuring Metal GPU acceleration")
-        
+
         var metalOptions = MetalDelegate.Options()
         metalOptions.isPrecisionLossAllowed = true
         metalOptions.waitType = .passive
         metalOptions.isQuantizationEnabled = true
-        
+
         metalDelegate = MetalDelegate(options: metalOptions)
-        
+
         if let delegate = metalDelegate {
             // Note: TensorFlow Lite delegate configuration varies by version
             // This is a placeholder for proper delegate configuration
@@ -433,19 +433,19 @@ extension TFLiteService {
             print("❌ Failed to create Metal delegate")
         }
     }
-    
+
     // MARK: Core ML Delegate Configuration
-    
+
     private func configureCoreMLDelegate(options: inout Interpreter.Options) throws {
         print("🧠 Configuring Core ML Neural Engine acceleration")
-        
+
         var coreMLOptions = CoreMLDelegate.Options()
         coreMLOptions.enabledDevices = .all
         coreMLOptions.coreMLVersion = 3  // iOS 14+
         coreMLOptions.maxDelegatedPartitions = 0  // Let TFLite decide
-        
+
         coreMLDelegate = CoreMLDelegate(options: coreMLOptions)
-        
+
         if let delegate = coreMLDelegate {
             // Note: TensorFlow Lite delegate configuration varies by version
             // This is a placeholder for proper delegate configuration
@@ -454,33 +454,33 @@ extension TFLiteService {
             print("❌ Failed to create Core ML delegate")
         }
     }
-    
+
     // MARK: CPU Configuration
-    
+
     private func configureCPUOptions(options: inout Interpreter.Options) {
         print("💻 Configuring CPU-only mode")
         options.threadCount = DeviceCapabilities.recommendedThreadCount
         print("✅ CPU configured with \(options.threadCount) threads")
     }
-    
+
     #else
-    
+
     private func configureMetalDelegate(options: inout Any) throws {
         print("❌ TensorFlow Lite framework not available")
         throw LLMError.frameworkNotSupported
     }
-    
+
     private func configureCoreMLDelegate(options: inout Any) throws {
         print("❌ TensorFlow Lite framework not available")
         throw LLMError.frameworkNotSupported
     }
-    
+
     private func configureCPUOptions(options: inout Any) {
         print("❌ TensorFlow Lite framework not available")
     }
-    
+
     #endif
-    
+
     // GPU Delegate configuration (legacy method)
     func configureGPUAcceleration() async throws {
         // In real implementation:

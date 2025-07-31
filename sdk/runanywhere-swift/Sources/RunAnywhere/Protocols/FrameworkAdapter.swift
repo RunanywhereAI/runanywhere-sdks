@@ -48,13 +48,13 @@ public struct HardwareConfiguration {
     public var threadCount: Int = ProcessInfo.processInfo.processorCount
     public var useQuantization: Bool = false
     public var quantizationBits: Int = 8
-    
+
     public enum MemoryMode {
         case conservative
         case balanced
         case aggressive
     }
-    
+
     public init(
         primaryAccelerator: HardwareAcceleration = .auto,
         fallbackAccelerator: HardwareAcceleration? = .cpu,
@@ -76,28 +76,28 @@ public struct HardwareConfiguration {
 public protocol FrameworkAdapter {
     /// The framework this adapter handles
     var framework: LLMFramework { get }
-    
+
     /// Supported model formats
     var supportedFormats: [ModelFormat] { get }
-    
+
     /// Check if this adapter can handle a specific model
     /// - Parameter model: The model information
     /// - Returns: Whether this adapter can handle the model
     func canHandle(model: ModelInfo) -> Bool
-    
+
     /// Create a service instance for this framework
     /// - Returns: An LLMService implementation
     func createService() -> LLMService
-    
+
     /// Configure the adapter with hardware settings
     /// - Parameter hardware: Hardware configuration
     func configure(with hardware: HardwareConfiguration) async
-    
+
     /// Estimate memory usage for a model
     /// - Parameter model: The model to estimate
     /// - Returns: Estimated memory in bytes
     func estimateMemoryUsage(for model: ModelInfo) -> Int64
-    
+
     /// Get optimal hardware configuration for a model
     /// - Parameter model: The model to configure for
     /// - Returns: Optimal hardware configuration
@@ -113,4 +113,3 @@ public enum HardwareRequirement {
     case minimumOSVersion(String)
     case specificChip(String)
 }
-

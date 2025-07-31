@@ -4,37 +4,37 @@ import Foundation
 public struct GenerationOptions {
     /// Maximum number of tokens to generate
     public let maxTokens: Int
-    
+
     /// Temperature for sampling (0.0 - 1.0)
     public let temperature: Float
-    
+
     /// Top-p sampling parameter
     public let topP: Float
-    
+
     /// Context for the generation
     public let context: Context?
-    
+
     /// Enable real-time tracking for cost dashboard
     public let enableRealTimeTracking: Bool
-    
+
     /// Stop sequences
     public let stopSequences: [String]
-    
+
     /// Seed for reproducible generation
     public let seed: Int?
-    
+
     /// Enable streaming mode
     public let streamingEnabled: Bool
-    
+
     /// Token budget constraint (for cost control)
     public let tokenBudget: TokenBudget?
-    
+
     /// Framework-specific options
     public let frameworkOptions: FrameworkOptions?
-    
+
     /// Preferred execution target
     public let preferredExecutionTarget: ExecutionTarget?
-    
+
     /// Initialize generation options
     /// - Parameters:
     ///   - maxTokens: Maximum tokens to generate (default: 100)
@@ -79,19 +79,19 @@ public struct GenerationOptions {
 public struct TokenBudget {
     /// Maximum tokens allowed
     public let maxTokens: Int
-    
+
     /// Maximum cost allowed (in cents)
     public let maxCost: Double?
-    
+
     /// Fallback behavior when budget exceeded
     public let fallbackBehavior: FallbackBehavior
-    
+
     public enum FallbackBehavior {
         case stop
         case switchToDevice
         case truncate
     }
-    
+
     public init(
         maxTokens: Int,
         maxCost: Double? = nil,
@@ -107,16 +107,16 @@ public struct TokenBudget {
 public struct FrameworkOptions {
     /// Core ML specific options
     public let coreMLOptions: CoreMLOptions?
-    
+
     /// TensorFlow Lite specific options
     public let tfliteOptions: TFLiteOptions?
-    
+
     /// MLX specific options
     public let mlxOptions: MLXOptions?
-    
+
     /// GGUF/llama.cpp specific options
     public let ggufOptions: GGUFOptions?
-    
+
     public init(
         coreMLOptions: CoreMLOptions? = nil,
         tfliteOptions: TFLiteOptions? = nil,
@@ -134,17 +134,17 @@ public struct FrameworkOptions {
 public struct CoreMLOptions {
     /// Use Neural Engine if available
     public let useNeuralEngine: Bool
-    
+
     /// Compute units preference
     public let computeUnits: ComputeUnits
-    
+
     public enum ComputeUnits {
         case all
         case cpuOnly
         case cpuAndGPU
         case cpuAndNeuralEngine
     }
-    
+
     public init(
         useNeuralEngine: Bool = true,
         computeUnits: ComputeUnits = .all
@@ -158,13 +158,13 @@ public struct CoreMLOptions {
 public struct TFLiteOptions {
     /// Number of threads to use
     public let numThreads: Int
-    
+
     /// Use GPU delegate
     public let useGPUDelegate: Bool
-    
+
     /// Use Core ML delegate
     public let useCoreMLDelegate: Bool
-    
+
     public init(
         numThreads: Int = 4,
         useGPUDelegate: Bool = false,
@@ -180,10 +180,10 @@ public struct TFLiteOptions {
 public struct MLXOptions {
     /// Use unified memory
     public let useUnifiedMemory: Bool
-    
+
     /// Metal performance shaders
     public let useMPS: Bool
-    
+
     public init(
         useUnifiedMemory: Bool = true,
         useMPS: Bool = true
@@ -197,13 +197,13 @@ public struct MLXOptions {
 public struct GGUFOptions {
     /// Number of layers to offload to GPU
     public let gpuLayers: Int
-    
+
     /// Use memory mapping
     public let useMemoryMap: Bool
-    
+
     /// Batch size
     public let batchSize: Int
-    
+
     public init(
         gpuLayers: Int = 0,
         useMemoryMap: Bool = true,

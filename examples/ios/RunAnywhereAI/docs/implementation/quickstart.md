@@ -91,7 +91,7 @@ struct ContentView: View {
     @StateObject private var chatModel = ChatModel()
     @State private var inputText = ""
     @State private var messages: [Message] = []
-    
+
     var body: some View {
         VStack {
             // Chat messages
@@ -102,13 +102,13 @@ struct ContentView: View {
                             if message.isUser {
                                 Spacer()
                             }
-                            
+
                             Text(message.content)
                                 .padding(10)
                                 .background(message.isUser ? Color.blue : Color.gray.opacity(0.3))
                                 .foregroundColor(message.isUser ? .white : .primary)
                                 .cornerRadius(10)
-                            
+
                             if !message.isUser {
                                 Spacer()
                             }
@@ -117,12 +117,12 @@ struct ContentView: View {
                     }
                 }
             }
-            
+
             // Input field
             HStack {
                 TextField("Type a message...", text: $inputText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                
+
                 Button("Send") {
                     sendMessage()
                 }
@@ -134,18 +134,18 @@ struct ContentView: View {
             chatModel.initialize()
         }
     }
-    
+
     func sendMessage() {
         let userMessage = Message(content: inputText, isUser: true)
         messages.append(userMessage)
-        
+
         let prompt = inputText
         inputText = ""
-        
+
         // Add AI message placeholder
         let aiMessage = Message(content: "", isUser: false)
         messages.append(aiMessage)
-        
+
         Task {
             var response = ""
             for await token in chatModel.generate(prompt: prompt) {
@@ -163,19 +163,19 @@ struct ContentView: View {
 class ChatModel: ObservableObject {
     @Published var isGenerating = false
     private var engine: MLCEngine?
-    
+
     func initialize() {
         Task {
             do {
                 // Download model if needed
                 let modelPath = await downloadModelIfNeeded()
-                
+
                 // Initialize MLC engine
                 let config = MLCEngineConfig(
                     model: modelPath,
                     device: .auto
                 )
-                
+
                 engine = try await MLCEngine(config: config)
                 print("Model loaded successfully!")
             } catch {
@@ -183,12 +183,12 @@ class ChatModel: ObservableObject {
             }
         }
     }
-    
+
     func generate(prompt: String) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task {
                 isGenerating = true
-                
+
                 do {
                     let request = ChatCompletionRequest(
                         messages: [
@@ -196,36 +196,36 @@ class ChatModel: ObservableObject {
                         ],
                         stream: true
                     )
-                    
+
                     for try await chunk in engine!.streamChatCompletion(request) {
                         if let content = chunk.choices.first?.delta.content {
                             continuation.yield(content)
                         }
                     }
-                    
+
                     continuation.finish()
                 } catch {
                     print("Generation error: \(error)")
                     continuation.finish()
                 }
-                
+
                 isGenerating = false
             }
         }
     }
-    
+
     private func downloadModelIfNeeded() async -> String {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelPath = documentsPath.appendingPathComponent("phi-3-mini-q4.mlc")
-        
+
         // Check if model exists
         if FileManager.default.fileExists(atPath: modelPath.path) {
             return modelPath.path
         }
-        
+
         // Download model (simplified - in production use proper downloader)
         let modelURL = URL(string: "https://huggingface.co/mlc-ai/phi-3-mini-4k-instruct-q4f16_1-MLC/resolve/main/model.tar")!
-        
+
         do {
             let (localURL, _) = try await URLSession.shared.download(from: modelURL)
             try FileManager.default.moveItem(at: localURL, to: modelPath)
@@ -278,18 +278,18 @@ let modelPath = Bundle.main.path(forResource: "tinyllama-q4", ofType: "mlc")!
 dependencies {
     // Gemini Nano (for supported devices)
     implementation("com.google.ai.edge:genai:1.0.0")
-    
+
     // ONNX Runtime (universal)
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
-    
+
     // MLC-LLM
     implementation("org.mlc:mlc-llm:0.1.0")
-    
+
     // Jetpack Compose
     implementation("androidx.compose.ui:ui:1.5.4")
     implementation("androidx.compose.material3:material3:1.1.2")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
@@ -333,7 +333,7 @@ fun ChatScreen(
     val messages by viewModel.messages.collectAsState()
     val isGenerating by viewModel.isGenerating.collectAsState()
     var inputText by remember { mutableStateOf("") }
-    
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -341,7 +341,7 @@ fun ChatScreen(
         TopAppBar(
             title = { Text("Local LLM Chat") }
         )
-        
+
         // Messages
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -351,7 +351,7 @@ fun ChatScreen(
                 MessageBubble(message)
             }
         }
-        
+
         // Input
         Row(
             modifier = Modifier
@@ -366,7 +366,7 @@ fun ChatScreen(
                 placeholder = { Text("Type a message...") },
                 enabled = !isGenerating
             )
-            
+
             IconButton(
                 onClick = {
                     if (inputText.isNotBlank()) {
@@ -428,27 +428,27 @@ import org.mlc.llm.*
 class ChatViewModel : ViewModel() {
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
     val messages: StateFlow<List<Message>> = _messages.asStateFlow()
-    
+
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
-    
+
     private var mlcEngine: MLCEngine? = null
-    
+
     init {
         initializeModel()
     }
-    
+
     private fun initializeModel() {
         viewModelScope.launch {
             try {
                 // Use pre-downloaded model or download
                 val modelPath = getModelPath()
-                
+
                 val config = MLCEngineConfig().apply {
                     model = modelPath
                     device = DeviceKind.AUTO
                 }
-                
+
                 mlcEngine = MLCEngine(config)
                 println("Model loaded successfully!")
             } catch (e: Exception) {
@@ -456,7 +456,7 @@ class ChatViewModel : ViewModel() {
             }
         }
     }
-    
+
     fun sendMessage(content: String) {
         viewModelScope.launch {
             // Add user message
@@ -464,16 +464,16 @@ class ChatViewModel : ViewModel() {
                 content = content,
                 isUser = true
             )
-            
+
             // Add AI message placeholder
             val aiMessage = Message(
                 content = "",
                 isUser = false
             )
             _messages.value += aiMessage
-            
+
             _isGenerating.value = true
-            
+
             try {
                 // Generate response
                 val request = ChatCompletionRequest(
@@ -482,7 +482,7 @@ class ChatViewModel : ViewModel() {
                     ),
                     stream = true
                 )
-                
+
                 var response = ""
                 mlcEngine?.streamChatCompletion(request) { chunk ->
                     chunk.choices.firstOrNull()?.delta?.content?.let { token ->
@@ -506,15 +506,15 @@ class ChatViewModel : ViewModel() {
             }
         }
     }
-    
+
     private suspend fun getModelPath(): String {
         // Check if model exists in app files
         val modelFile = File(context.filesDir, "tinyllama-q4.mlc")
-        
+
         if (modelFile.exists()) {
             return modelFile.absolutePath
         }
-        
+
         // Copy from assets (if bundled)
         try {
             context.assets.open("tinyllama-q4.mlc").use { input ->
@@ -596,7 +596,7 @@ struct ChatView: View {
     @State private var messages: [(String, Bool)] = []
     @State private var input = ""
     @State private var engine: MLCEngine?
-    
+
     var body: some View {
         VStack {
             ScrollView {
@@ -613,7 +613,7 @@ struct ChatView: View {
                     .padding(.horizontal)
                 }
             }
-            
+
             HStack {
                 TextField("Message", text: $input)
                 Button("Send") { send() }
@@ -622,7 +622,7 @@ struct ChatView: View {
         }
         .task { await setup() }
     }
-    
+
     func setup() async {
         do {
             engine = try await MLCEngine(
@@ -635,13 +635,13 @@ struct ChatView: View {
             print("Setup failed: \(error)")
         }
     }
-    
+
     func send() {
         let prompt = input
         messages.append((prompt, true))
         messages.append(("", false))
         input = ""
-        
+
         Task {
             var response = ""
             for try await chunk in engine!.streamChatCompletion(
@@ -677,7 +677,7 @@ fun ChatApp() {
     var messages by remember { mutableStateOf(listOf<Pair<String, Boolean>>()) }
     var input by remember { mutableStateOf("") }
     val engine = remember { mutableStateOf<MLCEngine?>(null) }
-    
+
     LaunchedEffect(Unit) {
         try {
             engine.value = MLCEngine(
@@ -690,7 +690,7 @@ fun ChatApp() {
             println("Setup failed: $e")
         }
     }
-    
+
     Column(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.weight(1f),
@@ -715,7 +715,7 @@ fun ChatApp() {
                 }
             }
         }
-        
+
         Row(Modifier.padding(8.dp)) {
             TextField(
                 value = input,
@@ -727,7 +727,7 @@ fun ChatApp() {
                     val prompt = input
                     messages = messages + (prompt to true) + ("" to false)
                     input = ""
-                    
+
                     GlobalScope.launch {
                         var response = ""
                         engine.value?.streamChatCompletion(

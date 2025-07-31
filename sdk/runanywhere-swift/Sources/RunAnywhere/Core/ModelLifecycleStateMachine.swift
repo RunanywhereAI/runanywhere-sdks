@@ -3,12 +3,12 @@ import Foundation
 /// Implementation of the model lifecycle state machine
 public class ModelLifecycleStateMachine: ModelLifecycleManager {
     // MARK: - Properties
-    
+
     private var state: ModelLifecycleState = .uninitialized
     private let stateLock: NSLock = NSLock()
     private var observers: [UUID: WeakObserver] = [:]
     private let observerLock: NSLock = NSLock()
-    
+
     /// Valid state transitions
     private let validTransitions: [ModelLifecycleState: Set<ModelLifecycleState>] = [
         .uninitialized: [.discovered],
@@ -28,98 +28,98 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
         .error: [.cleanup, .discovered], // Allow retry from discovered
         .cleanup: [.uninitialized]
     ]
-    
+
     // MARK: - Initialization
-    
+
     public init() {}
-    
+
     // MARK: - ModelLifecycleManager Protocol
-    
+
     public var currentState: ModelLifecycleState {
         stateLock.lock()
         defer { stateLock.unlock() }
         return state
     }
-    
+
     public func transitionTo(_ newState: ModelLifecycleState) async throws {
         stateLock.lock()
         let oldState = state
-        
+
         guard isValidTransition(from: oldState, to: newState) else {
             stateLock.unlock()
             throw ModelLifecycleError.invalidTransition(from: oldState, to: newState)
         }
-        
+
         state = newState
         stateLock.unlock()
-        
+
         // Notify observers asynchronously
         await notifyObservers(oldState: oldState, newState: newState)
     }
-    
+
     public func addObserver(_ observer: ModelLifecycleObserver) {
         observerLock.lock()
         defer { observerLock.unlock() }
-        
+
         let id = UUID()
         observers[id] = WeakObserver(observer: observer)
     }
-    
+
     public func removeObserver(_ observer: ModelLifecycleObserver) {
         observerLock.lock()
         defer { observerLock.unlock() }
-        
+
         observers = observers.filter { $0.value.observer !== observer }
     }
-    
+
     public func isValidTransition(from: ModelLifecycleState, to: ModelLifecycleState) -> Bool {
         validTransitions[from]?.contains(to) ?? false
     }
-    
+
     // MARK: - Helper Methods
-    
+
     private func notifyObservers(oldState: ModelLifecycleState, newState: ModelLifecycleState) async {
         observerLock.lock()
         let activeObservers = observers.compactMap { $0.value.observer }
         observerLock.unlock()
-        
+
         for observer in activeObservers {
             observer.modelDidTransition(from: oldState, to: newState)
         }
     }
-    
+
     /// Notify observers of an error
     public func notifyError(_ error: Error) {
         observerLock.lock()
         let activeObservers = observers.compactMap { $0.value.observer }
         let currentState = self.state
         observerLock.unlock()
-        
+
         for observer in activeObservers {
             observer.modelDidEncounterError(error, in: currentState)
         }
     }
-    
+
     /// Reset to initial state
     public func reset() async throws {
         try await transitionTo(.cleanup)
         try await transitionTo(.uninitialized)
     }
-    
+
     /// Get allowed transitions from current state
     public func getAllowedTransitions() -> Set<ModelLifecycleState> {
         stateLock.lock()
         defer { stateLock.unlock() }
         return validTransitions[state] ?? []
     }
-    
+
     /// Check if in error state
     public var isInErrorState: Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
         return state == .error
     }
-    
+
     /// Check if ready for execution
     public var isReady: Bool {
         stateLock.lock()
@@ -133,7 +133,7 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
 /// Weak observer wrapper to prevent retain cycles
 private class WeakObserver {
     weak var observer: ModelLifecycleObserver?
-    
+
     init(observer: ModelLifecycleObserver) {
         self.observer = observer
     }
@@ -145,7 +145,7 @@ public extension ModelLifecycleStateMachine {
     /// Convenience method to handle common state progressions
     func progressToNextState() async throws {
         let currentState = self.currentState
-        
+
         let nextState: ModelLifecycleState? = {
             switch currentState {
             case .uninitialized:
@@ -176,28 +176,28 @@ public extension ModelLifecycleStateMachine {
                 return nil
             }
         }()
-        
+
         if let nextState = nextState {
             try await transitionTo(nextState)
         }
     }
-    
+
     /// Handle error state with automatic transition
     func handleError(_ error: Error) async throws {
         try await transitionTo(.error)
         notifyError(error)
     }
-    
+
     /// Check if model needs download
     var needsDownload: Bool {
         currentState == .discovered
     }
-    
+
     /// Check if model needs extraction
     var needsExtraction: Bool {
         currentState == .downloaded
     }
-    
+
     /// Check if model needs validation
     var needsValidation: Bool {
         currentState == .extracted || currentState == .downloaded
@@ -252,7 +252,7 @@ public extension ModelLifecycleState {
             return "Cleaning up"
         }
     }
-    
+
     /// Whether this is a terminal state
     var isTerminal: Bool {
         switch self {
@@ -262,7 +262,7 @@ public extension ModelLifecycleState {
             return false
         }
     }
-    
+
     /// Whether this state represents active processing
     var isProcessing: Bool {
         switch self {

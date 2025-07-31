@@ -32,17 +32,17 @@ private struct MLXModelWrapper {
 
     init(modelDirectory: String) throws {
         self.modelPath = modelDirectory
-        
+
         // Check if it's a directory or a single file
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: modelDirectory, isDirectory: &isDirectory)
-        
+
         if isDirectory.boolValue {
             // It's a directory, look for standard files
             self.configPath = "\(modelDirectory)/config.json"
             self.weightsPath = "\(modelDirectory)/weights.safetensors"
             self.tokenizerPath = "\(modelDirectory)/tokenizer.json"
-            
+
             // At minimum, we need config.json
             if !FileManager.default.fileExists(atPath: configPath!) {
                 throw LLMError.modelNotFound
@@ -53,7 +53,7 @@ private struct MLXModelWrapper {
             self.configPath = nil
             self.weightsPath = modelDirectory
             self.tokenizerPath = nil
-            
+
             print("MLX: Loading single-file model from \(modelDirectory)")
         }
     }
@@ -75,7 +75,7 @@ private class MLXTokenizer {
             // In real implementation, this would load from tokenizer.json
             // For now, we'll use the basic vocabulary
         }
-        
+
         // For demonstration, create a vocabulary based on common MLX models
         let commonTokens = [
             "<s>": 1, "</s>": 2, "<unk>": 3, "<pad>": 0,
@@ -189,20 +189,20 @@ class MLXService: BaseLLMService {
         var actualModelPath = modelPath
         if modelPath.isEmpty || !FileManager.default.fileExists(atPath: modelPath) {
             print("MLX: Model path empty or not found, searching for model...")
-            
+
             // Look for the model in the Models directory
             let modelManager = await MainActor.run { ModelManager.shared }
-            
+
             // Try to find based on the current selection or path hints
             var searchNames: [String] = []
-            
+
             // Add names from currentModelInfo if available
             if let modelInfo = currentModelInfo {
                 searchNames.append(modelInfo.name)
                 searchNames.append(modelInfo.name.replacingOccurrences(of: "-4bit", with: ""))
                 searchNames.append(modelInfo.name.replacingOccurrences(of: "4bit", with: ""))
             }
-            
+
             // Add names from the path
             let pathComponents = modelPath.components(separatedBy: "/")
             if let fileName = pathComponents.last {
@@ -210,7 +210,7 @@ class MLXService: BaseLLMService {
                 searchNames.append(fileName.replacingOccurrences(of: "-4bit", with: ""))
                 searchNames.append(fileName.replacingOccurrences(of: "4bit", with: ""))
             }
-            
+
             // Search for the model
             var foundPath: String? = nil
             for searchName in searchNames {
@@ -224,7 +224,7 @@ class MLXService: BaseLLMService {
                     }
                 }
             }
-            
+
             if let foundPath = foundPath {
                 actualModelPath = foundPath
             } else {
@@ -236,7 +236,7 @@ class MLXService: BaseLLMService {
         // Check if the path is a directory or file
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: actualModelPath, isDirectory: &isDirectory)
-        
+
         // For now, we'll accept both files and directories for MLX models
         // This is a temporary workaround for the demo
         print("MLX: Model path is \(isDirectory.boolValue ? "directory" : "file"): \(actualModelPath)")

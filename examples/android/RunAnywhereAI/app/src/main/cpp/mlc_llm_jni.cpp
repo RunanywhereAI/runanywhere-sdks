@@ -15,8 +15,8 @@ struct MLCEngine {
     std::string model_path;
     std::string device;
     bool is_initialized = false;
-    
-    MLCEngine(const std::string& path, const std::string& dev) 
+
+    MLCEngine(const std::string& path, const std::string& dev)
         : model_path(path), device(dev) {
         // In real implementation:
         // 1. Initialize TVM runtime
@@ -25,7 +25,7 @@ struct MLCEngine {
         is_initialized = true;
         LOGI("MLC-LLM Engine created with model: %s, device: %s", path.c_str(), dev.c_str());
     }
-    
+
     std::string generate(const std::string& messages, float temperature, int max_tokens) {
         // Placeholder implementation
         std::stringstream response;
@@ -44,10 +44,10 @@ struct MLCEngine {
         response << "}],";
         response << "\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":20,\"total_tokens\":30}";
         response << "}";
-        
+
         return response.str();
     }
-    
+
     void streamGenerate(const std::string& messages, float temperature, int max_tokens,
                        std::function<void(const std::string&)> callback) {
         // Placeholder streaming implementation
@@ -55,13 +55,13 @@ struct MLCEngine {
             "This", "is", "a", "streaming", "response", "from", "MLC-LLM",
             "using", device, "device.", "Each", "token", "is", "sent", "separately."
         };
-        
+
         for (const auto& token : tokens) {
             std::stringstream chunk;
             chunk << "{\"choices\":[{\"delta\":{\"content\":\"" << token << " \"}}]}";
             callback(chunk.str());
         }
-        
+
         // Send final chunk
         callback("{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}");
     }
@@ -72,18 +72,18 @@ extern "C" {
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_nativeCreateEngine(
     JNIEnv *env, jobject /* this */, jstring modelPath, jstring deviceConfig) {
-    
+
     const char* model_path = env->GetStringUTFChars(modelPath, nullptr);
     const char* device = env->GetStringUTFChars(deviceConfig, nullptr);
-    
+
     LOGI("Creating MLC-LLM engine with model: %s, device: %s", model_path, device);
-    
+
     try {
         auto engine = std::make_unique<MLCEngine>(model_path, device);
-        
+
         env->ReleaseStringUTFChars(modelPath, model_path);
         env->ReleaseStringUTFChars(deviceConfig, device);
-        
+
         return reinterpret_cast<jlong>(engine.release());
     } catch (const std::exception& e) {
         env->ReleaseStringUTFChars(modelPath, model_path);
@@ -95,17 +95,17 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_n
 
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_nativeChatCompletion(
-    JNIEnv *env, jobject /* this */, jlong enginePtr, jstring messages, 
+    JNIEnv *env, jobject /* this */, jlong enginePtr, jstring messages,
     jfloat temperature, jint maxTokens) {
-    
+
     if (enginePtr == 0) {
         LOGE("Invalid engine pointer");
         return env->NewStringUTF("{\"error\":\"Invalid engine pointer\"}");
     }
-    
+
     auto* engine = reinterpret_cast<MLCEngine*>(enginePtr);
     const char* msgs = env->GetStringUTFChars(messages, nullptr);
-    
+
     try {
         std::string response = engine->generate(msgs, temperature, maxTokens);
         env->ReleaseStringUTFChars(messages, msgs);
@@ -132,17 +132,17 @@ public:
         onCompleteMethod = env->GetMethodID(callbackClass, "onComplete", "()V");
         onErrorMethod = env->GetMethodID(callbackClass, "onError", "(Ljava/lang/String;)V");
     }
-    
+
     void onToken(const std::string& token) {
         jstring jToken = env->NewStringUTF(token.c_str());
         env->CallVoidMethod(callback, onTokenMethod, jToken);
         env->DeleteLocalRef(jToken);
     }
-    
+
     void onComplete() {
         env->CallVoidMethod(callback, onCompleteMethod);
     }
-    
+
     void onError(const std::string& error) {
         jstring jError = env->NewStringUTF(error.c_str());
         env->CallVoidMethod(callback, onErrorMethod, jError);
@@ -154,17 +154,17 @@ JNIEXPORT void JNICALL
 Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_nativeStreamCompletion(
     JNIEnv *env, jobject /* this */, jlong enginePtr, jstring messages,
     jfloat temperature, jint maxTokens, jobject callback) {
-    
+
     if (enginePtr == 0) {
         LOGE("Invalid engine pointer");
         return;
     }
-    
+
     auto* engine = reinterpret_cast<MLCEngine*>(enginePtr);
     const char* msgs = env->GetStringUTFChars(messages, nullptr);
-    
+
     StreamCallbackWrapper wrapper(env, callback);
-    
+
     try {
         engine->streamGenerate(msgs, temperature, maxTokens,
             [&wrapper](const std::string& chunk) {
@@ -175,14 +175,14 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_n
         LOGE("Stream generation failed: %s", e.what());
         wrapper.onError(e.what());
     }
-    
+
     env->ReleaseStringUTFChars(messages, msgs);
 }
 
 JNIEXPORT void JNICALL
 Java_com_runanywhere_runanywhereai_llm_frameworks_MLCLLMService_00024Companion_nativeReleaseEngine(
     JNIEnv *env, jobject /* this */, jlong enginePtr) {
-    
+
     if (enginePtr != 0) {
         auto* engine = reinterpret_cast<MLCEngine*>(enginePtr);
         delete engine;
