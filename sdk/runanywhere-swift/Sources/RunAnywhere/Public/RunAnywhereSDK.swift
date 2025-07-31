@@ -2,7 +2,6 @@ import Foundation
 
 /// The main entry point for the RunAnywhere SDK
 public class RunAnywhereSDK {
-    
     /// Shared instance of the SDK
     public static let shared = RunAnywhereSDK()
     
@@ -180,7 +179,6 @@ public class RunAnywhereSDK {
             
             try await lifecycleManager.transitionTo(.ready)
             return result
-            
         } catch {
             // Handle error with recovery
             try await handleGenerationError(error, request: request, model: model)
@@ -345,7 +343,6 @@ private extension RunAnywhereSDK {
             
             progressTracker.completeStage(.download)
             try await lifecycleManager.transitionTo(.downloaded)
-            
         } catch {
             progressTracker.failStage(.download, error: error)
             throw SDKError.downloadFailed(error)

@@ -176,7 +176,9 @@ public enum UnifiedModelError: LocalizedError {
         case .framework(let error):
             return error.errorDescription
         case .insufficientMemory(let required, let available):
-            return "Insufficient memory: need \(ByteCountFormatter.string(fromByteCount: required, countStyle: .memory)), have \(ByteCountFormatter.string(fromByteCount: available, countStyle: .memory))"
+            let neededStr = ByteCountFormatter.string(fromByteCount: required, countStyle: .memory)
+            let availStr = ByteCountFormatter.string(fromByteCount: available, countStyle: .memory)
+            return "Insufficient memory: need \(neededStr), have \(availStr)"
         case .deviceNotSupported(let reason):
             return "Device not supported: \(reason)"
         case .authRequired(let provider):

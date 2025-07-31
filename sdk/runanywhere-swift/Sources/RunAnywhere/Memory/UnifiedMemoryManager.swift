@@ -189,7 +189,9 @@ public class UnifiedMemoryManager {
         }
         
         // Log memory status
-        print("[MemoryManager] Available: \(ByteCountFormatter.string(fromByteCount: availableMemory, countStyle: .memory)), Used by models: \(ByteCountFormatter.string(fromByteCount: usedMemory, countStyle: .memory))")
+        let availableString = ByteCountFormatter.string(fromByteCount: availableMemory, countStyle: .memory)
+        let usedString = ByteCountFormatter.string(fromByteCount: usedMemory, countStyle: .memory)
+        print("[MemoryManager] Available: \(availableString), Used by models: \(usedString)")
     }
     
     /// Memory pressure levels
@@ -281,7 +283,8 @@ public class UnifiedMemoryManager {
         }
         modelLock.unlock()
         
-        print("[MemoryManager] Unloading model: \(modelInfo.model.name) to free \(ByteCountFormatter.string(fromByteCount: modelInfo.size, countStyle: .memory))")
+        let sizeString = ByteCountFormatter.string(fromByteCount: modelInfo.size, countStyle: .memory)
+        print("[MemoryManager] Unloading model: \(modelInfo.model.name) to free \(sizeString)")
         
         // Notify service to cleanup
         await modelInfo.service?.cleanup()
@@ -372,12 +375,12 @@ public class UnifiedMemoryManager {
     
     /// Get total system memory
     public func getTotalMemory() -> Int64 {
-        return Int64(ProcessInfo.processInfo.physicalMemory)
+        Int64(ProcessInfo.processInfo.physicalMemory)
     }
     
     /// Get memory statistics
     public func getMemoryStatistics() -> MemoryStatistics {
-        return MemoryStatistics(
+        MemoryStatistics(
             totalMemory: getTotalMemory(),
             availableMemory: getAvailableMemory(),
             modelMemory: getTotalModelMemory(),
@@ -400,7 +403,7 @@ public class UnifiedMemoryManager {
         }
         
         public var modelMemoryPercentage: Double {
-            return Double(modelMemory) / Double(totalMemory) * 100
+            Double(modelMemory) / Double(totalMemory) * 100
         }
     }
 }
@@ -409,7 +412,7 @@ public class UnifiedMemoryManager {
 
 extension UnifiedMemoryManager: MemoryManager {
     public func checkAvailableMemory() async -> Int64 {
-        return getAvailableMemory()
+        getAvailableMemory()
     }
     
     public func requestMemory(size: Int64) async throws -> Bool {

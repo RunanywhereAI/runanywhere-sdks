@@ -159,7 +159,6 @@ public struct ModelRequirements {
 
 /// Unified model validator implementation
 public class UnifiedModelValidator: ModelValidator {
-    
     private let metadataExtractor = MetadataExtractor()
     private let formatDetector = ModelFormatDetector()
     
@@ -276,7 +275,7 @@ public class UnifiedModelValidator: ModelValidator {
     // MARK: - Private Methods
     
     private func extractAndValidateMetadata(from url: URL, format: ModelFormat) async throws -> ModelMetadata {
-        return await metadataExtractor.extractMetadata(from: url, format: format)
+        await metadataExtractor.extractMetadata(from: url, format: format)
     }
     
     private func validateFrameworkSpecific(_ model: ModelInfo, at path: URL) async throws -> [ValidationError]? {
@@ -317,7 +316,6 @@ public class UnifiedModelValidator: ModelValidator {
             
             // Try to load the model
             _ = try MLModel(contentsOf: compiledURL)
-            
         } catch {
             errors.append(.corruptedFile(reason: "Failed to load Core ML model: \(error.localizedDescription)"))
         }
@@ -416,7 +414,7 @@ public class UnifiedModelValidator: ModelValidator {
     private func isTokenizerAvailable(_ format: TokenizerFormat) -> Bool {
         // Check if tokenizer adapter is registered
         // This would integrate with UnifiedTokenizerManager
-        return true // Placeholder
+        true // Placeholder
     }
     
     private func isFrameworkAvailable(_ framework: LLMFramework) -> Bool {
@@ -439,7 +437,6 @@ public class UnifiedModelValidator: ModelValidator {
 
 /// Detects model format from file
 public class ModelFormatDetector {
-    
     public func detectFormat(at url: URL) -> ModelFormat? {
         let ext = url.pathExtension.lowercased()
         
@@ -523,7 +520,6 @@ public class ModelFormatDetector {
 
 /// Extracts metadata from model files
 public class MetadataExtractor {
-    
     private let cache = MetadataCache()
     
     public func extractMetadata(from url: URL, format: ModelFormat) async -> ModelMetadata {

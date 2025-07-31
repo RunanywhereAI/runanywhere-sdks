@@ -142,7 +142,7 @@ public class HardwareCapabilityManager {
     // MARK: - Private Methods
     
     private func createDefaultCapabilities() -> DeviceCapabilities {
-        return DeviceCapabilities(
+        DeviceCapabilities(
             totalMemory: 2_000_000_000, // 2GB default
             availableMemory: 1_000_000_000, // 1GB default
             hasNeuralEngine: false,
@@ -309,7 +309,7 @@ public class HardwareCapabilityManager {
 /// Basic fallback hardware detector
 private class DefaultHardwareDetector: HardwareDetector {
     func detectCapabilities() -> DeviceCapabilities {
-        return DeviceCapabilities(
+        DeviceCapabilities(
             totalMemory: ProcessInfo.processInfo.physicalMemory,
             availableMemory: getAvailableMemory(),
             hasNeuralEngine: false,
@@ -333,19 +333,19 @@ private class DefaultHardwareDetector: HardwareDetector {
     }
     
     func getTotalMemory() -> Int64 {
-        return ProcessInfo.processInfo.physicalMemory
+        ProcessInfo.processInfo.physicalMemory
     }
     
     func hasNeuralEngine() -> Bool {
-        return false
+        false
     }
     
     func hasGPU() -> Bool {
-        return false
+        false
     }
     
     func getProcessorInfo() -> ProcessorInfo {
-        return ProcessorInfo(
+        ProcessorInfo(
             name: "Unknown",
             architecture: "Unknown",
             coreCount: ProcessInfo.processInfo.processorCount

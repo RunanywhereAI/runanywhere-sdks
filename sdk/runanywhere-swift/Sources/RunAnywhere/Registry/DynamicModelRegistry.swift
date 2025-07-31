@@ -44,7 +44,6 @@ public struct ModelCriteria {
 
 /// Dynamic model registry with discovery capabilities
 public class DynamicModelRegistry: ModelRegistry {
-    
     public static let shared = DynamicModelRegistry()
     
     private var registeredModels: [String: ModelInfo] = [:]
@@ -114,11 +113,14 @@ public class DynamicModelRegistry: ModelRegistry {
         let uniqueModels = deduplicateModels(allModels)
         
         // Update registry
-        modelLock.lock()
-        for model in uniqueModels {
-            registeredModels[model.id] = model
+        await withCheckedContinuation { continuation in
+            modelLock.lock()
+            for model in uniqueModels {
+                registeredModels[model.id] = model
+            }
+            modelLock.unlock()
+            continuation.resume()
         }
-        modelLock.unlock()
         
         // Update cache
         discoveryCache = uniqueModels
@@ -245,9 +247,12 @@ public class DynamicModelRegistry: ModelRegistry {
     // MARK: - Model Registration
     
     public func registerModel(_ model: ModelInfo) async {
-        modelLock.lock()
-        registeredModels[model.id] = model
-        modelLock.unlock()
+        await withCheckedContinuation { continuation in
+            modelLock.lock()
+            registeredModels[model.id] = model
+            modelLock.unlock()
+            continuation.resume()
+        }
         
         // Persist to local storage
         await localStorage.saveModel(model)
@@ -548,7 +553,6 @@ public class DynamicModelRegistry: ModelRegistry {
 
 /// Handles local storage of model information
 private class ModelLocalStorage {
-    
     private let storageURL: URL
     
     init() {
@@ -571,7 +575,7 @@ private class ModelLocalStorage {
     func loadAllModels() async -> [String: ModelInfo] {
         // This would need proper encoding/decoding implementation
         // For now, return empty dictionary
-        return [:]
+        [:]
     }
     
     func saveAllModels(_ models: [String: ModelInfo]) async {

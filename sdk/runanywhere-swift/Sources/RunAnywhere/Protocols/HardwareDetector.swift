@@ -238,12 +238,16 @@ public struct ResourceAvailability {
     public func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
         // Check memory
         if model.estimatedMemory > memoryAvailable {
-            return (false, "Insufficient memory: need \(ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)), have \(ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory))")
+            let needed = ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)
+            let available = ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory)
+            return (false, "Insufficient memory: need \(needed), have \(available)")
         }
         
         // Check storage
         if let downloadSize = model.downloadSize, downloadSize > storageAvailable {
-            return (false, "Insufficient storage: need \(ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)), have \(ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file))")
+            let needed = ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)
+            let available = ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file)
+            return (false, "Insufficient storage: need \(needed), have \(available)")
         }
         
         // Check thermal state

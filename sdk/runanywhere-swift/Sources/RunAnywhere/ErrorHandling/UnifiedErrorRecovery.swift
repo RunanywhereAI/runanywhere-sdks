@@ -59,7 +59,7 @@ public class UnifiedErrorRecovery {
     }
     
     private func getDefaultSuggestions(for error: Error) -> [RecoverySuggestion] {
-        return [
+        [
             RecoverySuggestion(
                 action: .retry,
                 description: "Retry the operation",
@@ -171,7 +171,7 @@ class MemoryErrorRecovery: ErrorRecoveryStrategy {
     }
     
     func getRecoverySuggestions(for error: Error) -> [RecoverySuggestion] {
-        return [
+        [
             RecoverySuggestion(
                 action: .freeMemory,
                 description: "Close other applications to free memory",
@@ -240,7 +240,7 @@ class ValidationErrorRecovery: ErrorRecoveryStrategy {
     }
     
     func getRecoverySuggestions(for error: Error) -> [RecoverySuggestion] {
-        return [
+        [
             RecoverySuggestion(
                 action: .downloadAlternative,
                 description: "Re-download the model",
@@ -259,7 +259,7 @@ class ValidationErrorRecovery: ErrorRecoveryStrategy {
 class FrameworkErrorRecovery: ErrorRecoveryStrategy {
     func canRecover(from error: Error) -> Bool {
         // Most framework errors can potentially be recovered by switching frameworks
-        return true
+        true
     }
     
     func recover(from error: Error, context: RecoveryContext) async throws {
@@ -322,7 +322,7 @@ class NetworkErrorRecovery: ErrorRecoveryStrategy {
     }
     
     func getRecoverySuggestions(for error: Error) -> [RecoverySuggestion] {
-        return [
+        [
             RecoverySuggestion(
                 action: .retry,
                 description: "Check network connection and retry",
@@ -339,6 +339,6 @@ class NetworkErrorRecovery: ErrorRecoveryStrategy {
     private func isNetworkAvailable() -> Bool {
         // Simplified network check
         // In production, use proper reachability check
-        return true
+        true
     }
 }

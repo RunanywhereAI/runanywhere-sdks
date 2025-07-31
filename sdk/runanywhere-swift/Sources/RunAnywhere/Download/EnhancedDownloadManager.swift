@@ -336,7 +336,7 @@ public class EnhancedDownloadManager {
         var error: NSError?
         let coordinator = NSFileCoordinator(filePresenter: nil)
         
-        coordinator.coordinate(writingItemAt: archive, options: .forReplacing, error: &error) { (url) in
+        coordinator.coordinate(writingItemAt: archive, options: .forReplacing, error: &error) { url in
             do {
                 try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
                 
@@ -460,7 +460,7 @@ public class EnhancedDownloadManager {
     private func calculateChecksum(for data: Data) -> String {
         // Simple SHA256 implementation
         // In production, use CryptoKit or similar
-        return data.base64EncodedString()
+        data.base64EncodedString()
     }
     
     private func isRetryableError(_ error: Error) -> Bool {

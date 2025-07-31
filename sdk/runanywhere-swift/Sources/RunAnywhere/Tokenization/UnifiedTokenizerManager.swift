@@ -315,7 +315,7 @@ public extension UnifiedTokenizerManager {
     
     private func estimateMemoryUsage() -> Int64 {
         // Rough estimate: assume each tokenizer uses ~10MB for vocab
-        return Int64(tokenizers.count) * 10_000_000
+        Int64(tokenizers.count) * 10_000_000
     }
 }
 
@@ -350,15 +350,15 @@ public class BasicTokenizer: UnifiedTokenizer {
     }
     
     public var vocabularySize: Int {
-        return vocab.count
+        vocab.count
     }
     
     public var maxSequenceLength: Int {
-        return 2048
+        2048
     }
     
     public var specialTokens: SpecialTokens {
-        return SpecialTokens(
+        SpecialTokens(
             bosToken: vocab["<bos>"],
             eosToken: vocab["<eos>"],
             padToken: vocab["<pad>"],
@@ -382,11 +382,11 @@ public class BasicTokenizer: UnifiedTokenizer {
     }
     
     public func batchEncode(_ texts: [String]) -> [[Int]] {
-        return texts.map { encode($0) }
+        texts.map { encode($0) }
     }
     
     public func getToken(for word: String) -> Int? {
-        return vocab[word]
+        vocab[word]
     }
     
     private func buildBasicVocab() {

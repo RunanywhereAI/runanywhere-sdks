@@ -73,7 +73,7 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
     }
     
     public func isValidTransition(from: ModelLifecycleState, to: ModelLifecycleState) -> Bool {
-        return validTransitions[from]?.contains(to) ?? false
+        validTransitions[from]?.contains(to) ?? false
     }
     
     // MARK: - Helper Methods
@@ -208,7 +208,7 @@ public extension ModelLifecycleStateMachine {
 
 extension ModelLifecycleStateMachine: CustomStringConvertible {
     public var description: String {
-        return "ModelLifecycleStateMachine(state: \(currentState.rawValue))"
+        "ModelLifecycleStateMachine(state: \(currentState.rawValue))"
     }
 }
 
