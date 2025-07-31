@@ -176,6 +176,7 @@ android {
         checkDependencies = true
         warningsAsErrors = true
         baseline = file("lint-baseline.xml")
+        lintConfig = file("lint.xml")
     }
     // Native build disabled for now to focus on Kotlin implementation
     // externalNativeBuild {
@@ -266,5 +267,5 @@ dependencies {
 }
 
 detekt {
-    config.setFrom("$rootDir/detekt-config.yml")
+    config.setFrom("${project.rootDir}/detekt.yml")
 }

@@ -35,9 +35,6 @@ opt_in_rules:
   - vertical_whitespace_opening_braces
   - yoda_condition
 
-disabled_rules:
-  - todo
-
 # Directories to include
 included:
   - RunAnywhereAI
@@ -108,3 +105,17 @@ trailing_whitespace:
   ignores_empty_lines: true
 vertical_whitespace:
   max_empty_lines: 2
+
+# Custom rules for enforcing TODO patterns
+custom_rules:
+  todo_with_issue:
+    name: "TODO Must Reference GitHub Issue"
+    regex: '//\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
+    message: "TODOs must reference a GitHub issue (e.g., // TODO: #123 - Description)"
+    severity: error
+    
+  multiline_todo_with_issue:
+    name: "Multiline TODO Must Reference GitHub Issue"
+    regex: '/\*\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
+    message: "TODOs must reference a GitHub issue (e.g., /* TODO: #123 - Description */)"
+    severity: error

@@ -41,10 +41,6 @@ opt_in_rules:
   - typesafe_array_init
   - array_init
 
-disabled_rules:
-  - todo
-  - fixme
-
 # Directories to include
 included:
   - Sources
@@ -151,3 +147,15 @@ custom_rules:
     regex: ':\s*\w+!'
     message: "Avoid implicitly unwrapped optionals. Use regular optionals or non-optional types."
     severity: warning
+    
+  todo_with_issue:
+    name: "TODO Must Reference GitHub Issue"
+    regex: '//\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
+    message: "TODOs must reference a GitHub issue (e.g., // TODO: #123 - Description)"
+    severity: error
+    
+  multiline_todo_with_issue:
+    name: "Multiline TODO Must Reference GitHub Issue"
+    regex: '/\*\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#\d+)'
+    message: "TODOs must reference a GitHub issue (e.g., /* TODO: #123 - Description */)"
+    severity: error

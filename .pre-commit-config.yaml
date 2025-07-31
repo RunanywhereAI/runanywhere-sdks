@@ -13,6 +13,16 @@ repos:
         args: ['--maxkb=1000']
       - id: check-merge-conflict
 
+  # TODO Comments Check
+  - repo: local
+    hooks:
+      - id: todo-issue-check
+        name: Check TODOs have GitHub issue references
+        entry: bash -c 'if grep -rEn "(//|/\*|#)\s*(TODO|FIXME|HACK|XXX|BUG|REFACTOR|OPTIMIZE)(?!.*#[0-9]+)" --include="*.swift" --include="*.kt" --include="*.java" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" --include="*.py" --include="*.rb" --include="*.go" --include="*.rs" --include="*.cpp" --include="*.c" --include="*.h" --include="*.hpp" --include="*.cs" --include="*.m" --include="*.mm" . 2>/dev/null | grep -v ".git/" | grep -v "node_modules/" | grep -v ".build/" | grep -v "build/" | grep -v "DerivedData/"; then echo "ERROR: Found TODOs without GitHub issue references. All TODOs must reference an issue (e.g., // TODO: #123 - Description)"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # Android Lint for SDK
   - repo: local
     hooks:
