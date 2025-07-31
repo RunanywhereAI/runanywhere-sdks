@@ -1,10 +1,10 @@
 {
-  "originHash" : "8852f392df44ee8c05bc816827f623837cf7b4e50faeefe914082bdcd4fcc0c4",
+  "originHash" : "02614b2ec3f0c905de242d0f1ab349d77d0d0694311d362b58dd290ac35ceec1",
   "pins" : [
     {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch",
+      "location" : "https://github.com/pytorch/executorch.git",
       "state" : {
         "branch" : "swiftpm-0.7.0",
         "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
