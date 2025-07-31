@@ -5,9 +5,9 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
     // MARK: - Properties
     
     private var state: ModelLifecycleState = .uninitialized
-    private let stateLock = NSLock()
+    private let stateLock: NSLock = NSLock()
     private var observers: [UUID: WeakObserver] = [:]
-    private let observerLock = NSLock()
+    private let observerLock: NSLock = NSLock()
     
     /// Valid state transitions
     private let validTransitions: [ModelLifecycleState: Set<ModelLifecycleState>] = [

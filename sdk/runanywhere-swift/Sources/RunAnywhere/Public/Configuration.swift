@@ -49,7 +49,7 @@ public struct Configuration {
         telemetryConsent: TelemetryConsent = .granted
     ) {
         self.apiKey = apiKey
-        self.baseURL = URL(string: "https://api.runanywhere.ai")!
+        self.baseURL = URL(string: "https://api.runanywhere.ai") ?? URL(fileURLWithPath: "/")
         self.enableRealTimeDashboard = enableRealTimeDashboard
         self.routingPolicy = .automatic
         self.telemetryConsent = telemetryConsent

@@ -424,7 +424,7 @@ public class UnifiedModelValidator: ModelValidator {
         case .coreML:
             return true
         #endif
-        case .tfLite:
+        case .tensorFlowLite:
             // Check if TensorFlow Lite is available
             return Bundle.main.path(forResource: "TensorFlowLiteC", ofType: "framework") != nil
         default:
@@ -512,7 +512,7 @@ public class ModelFormatDetector {
         // Check for other patterns
         // Add more format detection logic here
         
-        return .unknown
+        return nil
     }
 }
 

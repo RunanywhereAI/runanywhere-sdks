@@ -31,7 +31,7 @@ public protocol HardwareDetector {
     
     /// Get thermal state
     /// - Returns: Current thermal state
-    func getThermalState() -> ThermalState
+    func getThermalState() -> ProcessInfo.ThermalState
     
     /// Get battery information
     /// - Returns: Battery information if available

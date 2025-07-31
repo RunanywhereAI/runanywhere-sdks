@@ -6,12 +6,12 @@ public class UnifiedProgressTracker: ProgressTracker {
     // MARK: - Properties
     
     private var stages: [LifecycleStage: StageInfo] = [:]
-    private let stageLock = NSLock()
+    private let stageLock: NSLock = NSLock()
     
     private var observers: [UUID: WeakObserver] = [:]
-    private let observerLock = NSLock()
+    private let observerLock: NSLock = NSLock()
     
-    private let progressSubject = PassthroughSubject<OverallProgress, Never>()
+    private let progressSubject: PassthroughSubject<OverallProgress, Never> = PassthroughSubject<OverallProgress, Never>()
     
     // Stage duration history for time estimation
     private var stageDurationHistory: [LifecycleStage: [TimeInterval]] = [:]

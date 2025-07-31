@@ -7,11 +7,11 @@ import AppKit
 
 /// Unified memory management system with coordinated cleanup and pressure handling
 public class UnifiedMemoryManager {
-    public static let shared = UnifiedMemoryManager()
+    public static let shared: UnifiedMemoryManager = UnifiedMemoryManager()
     
     private var loadedModels: [String: LoadedModelInfo] = [:]
     private var memoryPressureObserver: NSObjectProtocol?
-    private let modelLock = NSLock()
+    private let modelLock: NSLock = NSLock()
     private var memoryMonitorTimer: Timer?
     
     /// Configuration for memory management
@@ -38,14 +38,14 @@ public class UnifiedMemoryManager {
         public let size: Int64
         public var lastUsed: Date
         public weak var service: LLMService?
-        public let priority: ModelPriority
+        public let priority: MemoryPriority
         
         public init(
             model: LoadedModel,
             size: Int64,
             lastUsed: Date = Date(),
             service: LLMService? = nil,
-            priority: ModelPriority = .normal
+            priority: MemoryPriority = .normal
         ) {
             self.model = model
             self.size = size
@@ -55,30 +55,7 @@ public class UnifiedMemoryManager {
         }
     }
     
-    /// Model priority for memory management
-    public enum ModelPriority: Int {
-        case low = 0
-        case normal = 1
-        case high = 2
-        case critical = 3 // Never unload unless absolutely necessary
-    }
-    
-    /// Loaded model information
-    public struct LoadedModel {
-        public let id: String
-        public let name: String
-        public let framework: LLMFramework
-        public let modelPath: URL
-        
-        public init(id: String, name: String, framework: LLMFramework, modelPath: URL) {
-            self.id = id
-            self.name = name
-            self.framework = framework
-            self.modelPath = modelPath
-        }
-    }
-    
-    private var config = MemoryConfig()
+    private var config: MemoryConfig = MemoryConfig()
     
     private init() {
         setupMemoryPressureHandling()
@@ -106,7 +83,7 @@ public class UnifiedMemoryManager {
         _ model: LoadedModel,
         size: Int64,
         service: LLMService,
-        priority: ModelPriority = .normal
+        priority: MemoryPriority = .normal
     ) {
         modelLock.lock()
         defer { modelLock.unlock() }
@@ -301,7 +278,7 @@ public class UnifiedMemoryManager {
     }
     
     /// Unload all models with a specific priority or lower
-    public func unloadModelsByPriority(_ maxPriority: ModelPriority) async {
+    public func unloadModelsByPriority(_ maxPriority: MemoryPriority) async {
         modelLock.lock()
         let modelsToUnload = loadedModels.values
             .filter { $0.priority.rawValue <= maxPriority.rawValue }
@@ -411,6 +388,59 @@ public class UnifiedMemoryManager {
 // MARK: - Memory Manager Protocol Extension
 
 extension UnifiedMemoryManager: MemoryManager {
+    public func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
+        let modelInfo = LoadedModelInfo(
+            model: model,
+            size: size,
+            service: service
+        )
+        
+        modelLock.lock()
+        loadedModels[model.id] = modelInfo
+        modelLock.unlock()
+    }
+    
+    public func getLoadedModels() -> [LoadedModel] {
+        modelLock.lock()
+        defer { modelLock.unlock() }
+        
+        return loadedModels.values.map { $0.model }
+    }
+    
+    public func getCurrentMemoryUsage() -> Int64 {
+        getTotalModelMemory()
+    }
+    
+    public func hasAvailableMemory(for size: Int64) -> Bool {
+        getAvailableMemory() >= size
+    }
+    
+    public func handleMemoryPressure() async {
+        await handleMemoryPressure(level: .warning)
+    }
+    
+    public func requestMemory(size: Int64, priority: MemoryPriority) async -> Bool {
+        let available = getAvailableMemory()
+        
+        if available >= size {
+            return true
+        }
+        
+        // Try to free memory based on priority
+        let pressureLevel: MemoryPressureLevel = priority == .critical ? .critical : .warning
+        await handleMemoryPressure(level: pressureLevel)
+        
+        // Check again
+        let newAvailable = getAvailableMemory()
+        return newAvailable >= size
+    }
+    
+    public func setMemoryThreshold(_ threshold: Int64) {
+        var newConfig = config
+        newConfig.memoryThreshold = threshold
+        configure(newConfig)
+    }
+    
     public func checkAvailableMemory() async -> Int64 {
         getAvailableMemory()
     }

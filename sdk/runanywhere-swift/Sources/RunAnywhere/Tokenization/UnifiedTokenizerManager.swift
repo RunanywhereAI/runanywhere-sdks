@@ -5,15 +5,15 @@ public class UnifiedTokenizerManager {
     // MARK: - Properties
     
     /// Shared instance
-    public static let shared = UnifiedTokenizerManager()
+    public static let shared: UnifiedTokenizerManager = UnifiedTokenizerManager()
     
     /// Cache of loaded tokenizers
     private var tokenizers: [String: UnifiedTokenizer] = [:]
-    private let tokenizerLock = NSLock()
+    private let tokenizerLock: NSLock = NSLock()
     
     /// Registered tokenizer adapters by format
     private var adapters: [TokenizerFormat: TokenizerAdapter.Type] = [:]
-    private let adapterLock = NSLock()
+    private let adapterLock: NSLock = NSLock()
     
     // MARK: - Initialization
     

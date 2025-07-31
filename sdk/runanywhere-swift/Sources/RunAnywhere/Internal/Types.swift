@@ -17,7 +17,7 @@ public struct ModelInfo {
     public let preferredFramework: LLMFramework?
     public let hardwareRequirements: [HardwareRequirement]
     public let tokenizerFormat: TokenizerFormat?
-    public let metadata: [String: Any]?
+    public let metadata: ModelInfoMetadata?
     public let alternativeDownloadURLs: [URL]?
     
     public init(
@@ -34,7 +34,7 @@ public struct ModelInfo {
         preferredFramework: LLMFramework? = nil,
         hardwareRequirements: [HardwareRequirement] = [],
         tokenizerFormat: TokenizerFormat? = nil,
-        metadata: [String: Any]? = nil,
+        metadata: ModelInfoMetadata? = nil,
         alternativeDownloadURLs: [URL]? = nil
     ) {
         self.id = id
@@ -53,6 +53,45 @@ public struct ModelInfo {
         self.metadata = metadata
         self.alternativeDownloadURLs = alternativeDownloadURLs
     }
+}
+
+/// Model information metadata
+public struct ModelInfoMetadata {
+    public let author: String?
+    public let license: String?
+    public let tags: [String]
+    public let description: String?
+    public let trainingDataset: String?
+    public let baseModel: String?
+    public let quantizationLevel: QuantizationLevel?
+    
+    public init(
+        author: String? = nil,
+        license: String? = nil,
+        tags: [String] = [],
+        description: String? = nil,
+        trainingDataset: String? = nil,
+        baseModel: String? = nil,
+        quantizationLevel: QuantizationLevel? = nil
+    ) {
+        self.author = author
+        self.license = license
+        self.tags = tags
+        self.description = description
+        self.trainingDataset = trainingDataset
+        self.baseModel = baseModel
+        self.quantizationLevel = quantizationLevel
+    }
+}
+
+/// Quantization level
+public enum QuantizationLevel: String {
+    case full = "fp32"
+    case half = "fp16"
+    case int8 = "int8"
+    case int4 = "int4"
+    case int2 = "int2"
+    case mixed = "mixed"
 }
 
 
@@ -102,7 +141,7 @@ public struct ResourceAvailability {
         }
         
         // Check battery in low power mode
-        if isLowPowerMode && batteryLevel != nil && batteryLevel! < 0.2 {
+        if isLowPowerMode, let battery = batteryLevel, battery < 0.2 {
             return (false, "Battery too low for model loading in Low Power Mode")
         }
         

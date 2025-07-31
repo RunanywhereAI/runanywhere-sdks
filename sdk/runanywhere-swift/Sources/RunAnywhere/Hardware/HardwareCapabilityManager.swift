@@ -11,11 +11,11 @@ public class HardwareCapabilityManager {
     // MARK: - Properties
     
     /// Shared instance
-    public static let shared = HardwareCapabilityManager()
+    public static let shared: HardwareCapabilityManager = HardwareCapabilityManager()
     
     /// Registered hardware detector
     private var registeredHardwareDetector: HardwareDetector?
-    private let detectorLock = NSLock()
+    private let detectorLock: NSLock = NSLock()
     
     /// Cached capabilities
     private var cachedCapabilities: DeviceCapabilities?
@@ -254,12 +254,21 @@ public class HardwareCapabilityManager {
         capabilities: DeviceCapabilities
     ) -> (use: Bool, bits: Int) {
         // Check if model already quantized
-        if let quantization = model.metadata?.quantization {
-            // Extract bits from quantization string (e.g., "Q4_K_M" -> 4)
-            if let match = quantization.firstMatch(of: /Q(\d+)/) {
-                if let bits = Int(match.1) {
-                    return (true, bits)
-                }
+        if let quantLevel = model.metadata?.quantizationLevel {
+            // Extract bits from quantization level
+            switch quantLevel {
+            case .int4:
+                return (true, 4)
+            case .int8:
+                return (true, 8)
+            case .half:
+                return (true, 16)
+            case .full:
+                return (false, 32)
+            case .int2:
+                return (true, 2)
+            case .mixed:
+                return (true, 8) // Default for mixed
             }
         }
         
@@ -310,7 +319,7 @@ public class HardwareCapabilityManager {
 private class DefaultHardwareDetector: HardwareDetector {
     func detectCapabilities() -> DeviceCapabilities {
         DeviceCapabilities(
-            totalMemory: ProcessInfo.processInfo.physicalMemory,
+            totalMemory: Int64(ProcessInfo.processInfo.physicalMemory),
             availableMemory: getAvailableMemory(),
             hasNeuralEngine: false,
             hasGPU: false,
@@ -333,7 +342,7 @@ private class DefaultHardwareDetector: HardwareDetector {
     }
     
     func getTotalMemory() -> Int64 {
-        ProcessInfo.processInfo.physicalMemory
+        Int64(ProcessInfo.processInfo.physicalMemory)
     }
     
     func hasNeuralEngine() -> Bool {
@@ -352,9 +361,9 @@ private class DefaultHardwareDetector: HardwareDetector {
         )
     }
     
-    func getThermalState() -> ThermalState {
+    func getThermalState() -> ProcessInfo.ThermalState {
         #if canImport(Foundation)
-        return ThermalState(from: ProcessInfo.processInfo.thermalState)
+        return ProcessInfo.processInfo.thermalState
         #else
         return .unknown
         #endif
@@ -432,7 +441,7 @@ extension HardwareCapabilityManager {
     /// Get macOS-specific hardware information
     private func getMacHardwareInfo() -> [String: Any]? {
         let service = IOServiceGetMatchingService(
-            kIOMasterPortDefault,
+            kIOMainPortDefault,
             IOServiceMatching("IOPlatformExpertDevice")
         )
         

@@ -36,7 +36,7 @@ public struct GenerationResult {
     public let performanceMetrics: PerformanceMetrics
     
     /// Additional metadata
-    public let metadata: [String: Any]?
+    public let metadata: ResultMetadata?
     
     /// Initializer
     internal init(
@@ -51,7 +51,7 @@ public struct GenerationResult {
         memoryUsed: Int64 = 0,
         tokenizerFormat: TokenizerFormat? = nil,
         performanceMetrics: PerformanceMetrics,
-        metadata: [String: Any]? = nil
+        metadata: ResultMetadata? = nil
     ) {
         self.text = text
         self.tokensUsed = tokensUsed
@@ -102,5 +102,81 @@ public struct PerformanceMetrics {
         self.tokensPerSecond = tokensPerSecond
         self.peakMemoryUsage = peakMemoryUsage
         self.queueWaitTimeMs = queueWaitTimeMs
+    }
+}
+
+/// Result metadata for additional strongly-typed information
+public struct ResultMetadata {
+    public let routingReason: RoutingReasonType
+    public let fallbackUsed: Bool
+    public let cacheHit: Bool
+    public let modelVersion: String?
+    public let experimentId: String?
+    public let debugInfo: DebugInfo?
+    
+    public init(
+        routingReason: RoutingReasonType,
+        fallbackUsed: Bool = false,
+        cacheHit: Bool = false,
+        modelVersion: String? = nil,
+        experimentId: String? = nil,
+        debugInfo: DebugInfo? = nil
+    ) {
+        self.routingReason = routingReason
+        self.fallbackUsed = fallbackUsed
+        self.cacheHit = cacheHit
+        self.modelVersion = modelVersion
+        self.experimentId = experimentId
+        self.debugInfo = debugInfo
+    }
+}
+
+/// Strongly typed routing reason
+public enum RoutingReasonType {
+    case userPreference
+    case costOptimization
+    case performanceOptimization
+    case resourceConstraint
+    case policyDriven
+    case fallback
+    case experimental
+}
+
+/// Debug information for development
+public struct DebugInfo {
+    public let startTime: Date
+    public let endTime: Date
+    public let threadCount: Int
+    public let deviceLoad: DeviceLoadLevel
+    
+    public init(startTime: Date, endTime: Date, threadCount: Int, deviceLoad: DeviceLoadLevel) {
+        self.startTime = startTime
+        self.endTime = endTime
+        self.threadCount = threadCount
+        self.deviceLoad = deviceLoad
+    }
+}
+
+/// Device load level
+public enum DeviceLoadLevel {
+    case idle       // 0-20%
+    case low        // 20-40%
+    case moderate   // 40-60%
+    case high       // 60-80%
+    case critical   // 80-100%
+    
+    public init(percentage: Double) {
+        switch percentage {
+        case 0..<0.2:
+            self = .idle
+        case 0.2..<0.4:
+            self = .low
+        case 0.4..<0.6:
+            self = .moderate
+        case 0.6..<0.8:
+            self = .high
+        default:
+            self = .critical
+        }
     }
 }

@@ -2,14 +2,14 @@ import Foundation
 
 /// Dynamic model registry with discovery capabilities
 public class DynamicModelRegistry: ModelRegistry {
-    public static let shared = DynamicModelRegistry()
+    public static let shared: DynamicModelRegistry = DynamicModelRegistry()
     
     private var registeredModels: [String: ModelInfo] = [:]
-    private let modelLock = NSLock()
-    private let localStorage = ModelLocalStorage()
+    private let modelLock: NSLock = NSLock()
+    private let localStorage: ModelLocalStorage = ModelLocalStorage()
     private var registeredProviders: [ModelProvider] = []
-    private let formatDetector = ModelFormatDetector()
-    private let metadataExtractor = MetadataExtractor()
+    private let formatDetector: ModelFormatDetector = ModelFormatDetector()
+    private let metadataExtractor: MetadataExtractor = MetadataExtractor()
     
     /// Configuration for model discovery
     public struct DiscoveryConfig {
@@ -26,7 +26,7 @@ public class DynamicModelRegistry: ModelRegistry {
         }
     }
     
-    private var config = DiscoveryConfig()
+    private var config: DiscoveryConfig = DiscoveryConfig()
     private var lastDiscovery: Date?
     private var discoveryCache: [ModelInfo] = []
     
@@ -119,7 +119,7 @@ public class DynamicModelRegistry: ModelRegistry {
             for provider in registeredProviders {
                 group.addTask {
                     do {
-                        return try await provider.listAvailableModels()
+                        return try await provider.listAvailableModels(limit: 100)
                     } catch {
                         print("[ModelRegistry] Failed to query provider \(provider.name): \(error)")
                         return []
@@ -146,10 +146,7 @@ public class DynamicModelRegistry: ModelRegistry {
             return nil
         }
         
-        // Skip unknown formats
-        if format == .unknown {
-            return nil
-        }
+        // Format detected successfully
         
         // Extract metadata
         let metadata = await metadataExtractor.extractMetadata(from: url, format: format)
@@ -176,7 +173,7 @@ public class DynamicModelRegistry: ModelRegistry {
             preferredFramework: frameworks.first,
             hardwareRequirements: detectHardwareRequirements(format: format, metadata: metadata),
             tokenizerFormat: detectTokenizerFormat(at: url),
-            metadata: convertMetadataToDict(metadata)
+            metadata: convertToModelInfoMetadata(metadata)
         )
     }
     
@@ -204,36 +201,37 @@ public class DynamicModelRegistry: ModelRegistry {
     
     // MARK: - Model Registration
     
-    public func registerModel(_ model: ModelInfo) async {
-        await withCheckedContinuation { continuation in
-            modelLock.lock()
-            registeredModels[model.id] = model
-            modelLock.unlock()
-            continuation.resume()
-        }
+    public func registerModel(_ model: ModelInfo) {
+        modelLock.lock()
+        registeredModels[model.id] = model
+        modelLock.unlock()
         
-        // Persist to local storage
-        await localStorage.saveModel(model)
+        // Persist to local storage in background
+        Task {
+            await localStorage.saveModel(model)
+        }
     }
     
-    public func unregisterModel(_ modelId: String) async {
+    public func removeModel(_ modelId: String) {
         modelLock.lock()
         registeredModels.removeValue(forKey: modelId)
         modelLock.unlock()
         
-        // Remove from local storage
-        await localStorage.removeModel(modelId)
+        // Remove from local storage in background
+        Task {
+            await localStorage.removeModel(modelId)
+        }
     }
     
-    public func getModel(_ modelId: String) -> ModelInfo? {
+    public func getModel(by modelId: String) -> ModelInfo? {
         modelLock.lock()
         defer { modelLock.unlock() }
         
         return registeredModels[modelId]
     }
     
-    public func updateModel(_ model: ModelInfo) async {
-        await registerModel(model)
+    public func updateModel(_ model: ModelInfo) {
+        registerModel(model)
     }
     
     // MARK: - Model Filtering
@@ -243,57 +241,61 @@ public class DynamicModelRegistry: ModelRegistry {
         let models = Array(registeredModels.values)
         modelLock.unlock()
         
-        return models.filter { model in
+        var filteredModels: [ModelInfo] = []
+        
+        for model in models {
             // Framework filter
             if let framework = criteria.framework {
                 guard model.compatibleFrameworks.contains(framework) else {
-                    return false
+                    continue
                 }
             }
             
             // Format filter
             if let format = criteria.format {
                 guard model.format == format else {
-                    return false
+                    continue
                 }
             }
             
             // Size filter
             if let maxSize = criteria.maxSize {
                 guard model.estimatedMemory <= maxSize else {
-                    return false
+                    continue
                 }
             }
             
             // Context length filters
             if let minContext = criteria.minContextLength {
                 guard model.contextLength >= minContext else {
-                    return false
+                    continue
                 }
             }
             
             if let maxContext = criteria.maxContextLength {
                 guard model.contextLength <= maxContext else {
-                    return false
+                    continue
                 }
             }
             
             // Neural Engine filter
             if let requiresNE = criteria.requiresNeuralEngine, requiresNE {
                 let hasNERequirement = model.hardwareRequirements.contains { req in
-                    if case .neuralEngine = req { return true }
+                    if case .requiresNeuralEngine = req { return true }
                     return false
                 }
                 guard hasNERequirement else {
-                    return false
+                    continue
                 }
             }
             
             // Quantization filter
             if let quantization = criteria.quantization {
-                guard let modelQuant = model.metadata?["quantization"] as? String,
-                      modelQuant.lowercased().contains(quantization.lowercased()) else {
-                    return false
+                guard let modelQuantLevel = model.metadata?.quantizationLevel else {
+                    continue
+                }
+                guard modelQuantLevel.rawValue.lowercased().contains(quantization.lowercased()) else {
+                    continue
                 }
             }
             
@@ -301,12 +303,15 @@ public class DynamicModelRegistry: ModelRegistry {
             if let search = criteria.search?.lowercased(), !search.isEmpty {
                 let searchableText = "\(model.name) \(model.format.rawValue)".lowercased()
                 guard searchableText.contains(search) else {
-                    return false
+                    continue
                 }
             }
             
-            return true
+            // If we get here, model matches all criteria
+            filteredModels.append(model)
         }
+        
+        return filteredModels
     }
     
     // MARK: - Compatibility Detection
@@ -323,7 +328,7 @@ public class DynamicModelRegistry: ModelRegistry {
             }
             
         case .tflite:
-            frameworks.append(.tfLite)
+            frameworks.append(.tensorFlowLite)
             
         case .onnx, .ort:
             frameworks.append(.onnx)
@@ -370,22 +375,22 @@ public class DynamicModelRegistry: ModelRegistry {
         
         // Memory requirements
         if let minMemory = metadata.requirements?.minMemory {
-            requirements.append(.minMemory(minMemory))
+            requirements.append(.minimumMemory(minMemory))
         }
         
         // Accelerator requirements
         switch format {
         case .mlmodel, .mlpackage:
             // Core ML can use Neural Engine
-            requirements.append(.neuralEngine)
+            requirements.append(.requiresNeuralEngine)
             
         case .tflite:
             // TFLite can use GPU
-            requirements.append(.gpu)
+            requirements.append(.requiresGPU)
             
-        case .mlx:
+        case .safetensors:
             // MLX requires Apple Silicon
-            requirements.append(.minProcessorGeneration("A17"))
+            requirements.append(.specificChip("A17"))
             
         default:
             break
@@ -491,19 +496,21 @@ public class DynamicModelRegistry: ModelRegistry {
         }
     }
     
-    private func convertMetadataToDict(_ metadata: ModelMetadata) -> [String: Any] {
-        var dict: [String: Any] = [:]
+    private func convertToModelInfoMetadata(_ metadata: ModelMetadata) -> ModelInfoMetadata {
+        let quantLevel: QuantizationLevel? = {
+            guard let q = metadata.quantization else { return nil }
+            return QuantizationLevel(rawValue: q)
+        }()
         
-        if let author = metadata.author { dict["author"] = author }
-        if let description = metadata.description { dict["description"] = description }
-        if let version = metadata.version { dict["version"] = version }
-        if let modelType = metadata.modelType { dict["modelType"] = modelType }
-        if let architecture = metadata.architecture { dict["architecture"] = architecture }
-        if let quantization = metadata.quantization { dict["quantization"] = quantization }
-        if let contextLength = metadata.contextLength { dict["contextLength"] = contextLength }
-        if let parameterCount = metadata.parameterCount { dict["parameterCount"] = parameterCount }
-        
-        return dict
+        return ModelInfoMetadata(
+            author: metadata.author,
+            license: nil, // Not available in ModelMetadata
+            tags: [], // Not available in ModelMetadata
+            description: metadata.description,
+            trainingDataset: nil, // Not available in ModelMetadata
+            baseModel: nil, // Not available in ModelMetadata
+            quantizationLevel: quantLevel
+        )
     }
 }
 

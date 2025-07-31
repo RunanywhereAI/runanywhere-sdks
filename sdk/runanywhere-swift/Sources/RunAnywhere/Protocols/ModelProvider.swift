@@ -45,7 +45,7 @@ public struct ModelSearchFilters {
     public let framework: LLMFramework?
     public let maxSize: Int64?
     public let minContextLength: Int?
-    public let tags: [String]?
+    public let tags: [String]
     public let author: String?
     public let sortBy: SortOption?
     
@@ -62,7 +62,7 @@ public struct ModelSearchFilters {
         framework: LLMFramework? = nil,
         maxSize: Int64? = nil,
         minContextLength: Int? = nil,
-        tags: [String]? = nil,
+        tags: [String] = [],
         author: String? = nil,
         sortBy: SortOption? = nil
     ) {

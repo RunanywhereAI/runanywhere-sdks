@@ -5,7 +5,7 @@ public class UnifiedErrorRecovery {
     // MARK: - Properties
     
     private var strategies: [ErrorType: ErrorRecoveryStrategy] = [:]
-    private let strategyLock = NSLock()
+    private let strategyLock: NSLock = NSLock()
     
     // MARK: - Initialization
     

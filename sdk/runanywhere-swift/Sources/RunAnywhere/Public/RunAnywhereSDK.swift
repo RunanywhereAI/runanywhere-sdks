@@ -3,7 +3,7 @@ import Foundation
 /// The main entry point for the RunAnywhere SDK
 public class RunAnywhereSDK {
     /// Shared instance of the SDK
-    public static let shared = RunAnywhereSDK()
+    public static let shared: RunAnywhereSDK = RunAnywhereSDK()
     
     /// Current configuration
     private var configuration: Configuration?
@@ -11,13 +11,13 @@ public class RunAnywhereSDK {
     // MARK: - Unified Architecture Components
     
     /// Model lifecycle state machine
-    private let lifecycleManager = ModelLifecycleStateMachine()
+    private let lifecycleManager: ModelLifecycleStateMachine = ModelLifecycleStateMachine()
     
     /// Tokenizer manager
-    private let tokenizerManager = UnifiedTokenizerManager.shared
+    private let tokenizerManager: UnifiedTokenizerManager = UnifiedTokenizerManager.shared
     
     /// Hardware capability manager
-    private let hardwareManager = HardwareCapabilityManager.shared
+    private let hardwareManager: HardwareCapabilityManager = HardwareCapabilityManager.shared
     
     /// Model registry (to be provided by implementation)
     private var modelRegistry: ModelRegistry?
@@ -26,16 +26,16 @@ public class RunAnywhereSDK {
     private var adapterRegistry: FrameworkAdapterRegistry?
     
     /// Download manager (to be provided by implementation)
-    private var downloadManager: ModelStorageManager?
+    private var downloadManager: EnhancedDownloadManager?
     
     /// Memory manager (to be provided by implementation)
     private var memoryManager: MemoryManager?
     
     /// Progress tracker
-    private let progressTracker = UnifiedProgressTracker()
+    private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
     
     /// Error recovery system
-    private let errorRecovery = UnifiedErrorRecovery()
+    private let errorRecovery: UnifiedErrorRecovery = UnifiedErrorRecovery()
     
     /// Currently loaded model
     private var currentModel: ModelInfo?
@@ -287,7 +287,7 @@ public extension RunAnywhereSDK {
     }
     
     /// Register download manager
-    func registerDownloadManager(_ manager: ModelStorageManager) {
+    func registerDownloadManager(_ manager: EnhancedDownloadManager) {
         self.downloadManager = manager
     }
     
@@ -361,7 +361,7 @@ private extension RunAnywhereSDK {
         // Basic validation - could be extended with format-specific validators
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: localPath.path) else {
-            throw SDKError.validationFailed(ValidationError.corruptedFile)
+            throw SDKError.validationFailed(ValidationError.corruptedFile(reason: "Model file does not exist at path"))
         }
         
         progressTracker.completeStage(.validation)
@@ -483,8 +483,35 @@ private extension RunAnywhereSDK {
             memoryUsed: memoryUsed,
             tokenizerFormat: model.tokenizerFormat,
             performanceMetrics: performanceMetrics,
-            metadata: ["reason": reason.description]
+            metadata: ResultMetadata(
+                routingReason: convertRoutingReason(reason),
+                fallbackUsed: false,
+                cacheHit: false,
+                modelVersion: model.metadata?.author,
+                experimentId: nil,
+                debugInfo: nil
+            )
         )
+    }
+    
+    /// Convert internal RoutingReason to public RoutingReasonType
+    private func convertRoutingReason(_ reason: RoutingReason) -> RoutingReasonType {
+        switch reason {
+        case .privacySensitive, .insufficientResources:
+            return .resourceConstraint
+        case .lowComplexity, .highComplexity:
+            return .performanceOptimization
+        case .policyDriven:
+            return .policyDriven
+        case .userPreference:
+            return .userPreference
+        case .frameworkUnavailable, .modelNotAvailable:
+            return .fallback
+        case .costOptimization:
+            return .costOptimization
+        case .latencyOptimization:
+            return .performanceOptimization
+        }
     }
     
     /// Handle generation error
@@ -494,7 +521,7 @@ private extension RunAnywhereSDK {
         // Attempt recovery
         let context = RecoveryContext(
             model: model,
-            stage: .executing,
+            stage: .ready,
             attemptCount: 1,
             previousErrors: [error],
             availableResources: hardwareManager.checkResourceAvailability(),
