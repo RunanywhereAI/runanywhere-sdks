@@ -8,22 +8,22 @@ import AppKit
 /// Unified memory management system with coordinated cleanup and pressure handling
 public class UnifiedMemoryManager {
     public static let shared: UnifiedMemoryManager = UnifiedMemoryManager()
-    
+
     private var loadedModels: [String: LoadedModelInfo] = [:]
     private var memoryPressureObserver: NSObjectProtocol?
     private let modelLock: NSLock = NSLock()
     private var memoryMonitorTimer: Timer?
-    
+
     /// Configuration for memory management
     public struct MemoryConfig {
         public var memoryThreshold: Int64 = 500_000_000 // 500MB
         public var criticalThreshold: Int64 = 200_000_000 // 200MB
         public var monitoringInterval: TimeInterval = 5.0
         public var unloadStrategy: UnloadStrategy = .leastRecentlyUsed
-        
+
         public init() {}
     }
-    
+
     /// Strategy for unloading models
     public enum UnloadStrategy {
         case leastRecentlyUsed
@@ -31,7 +31,7 @@ public class UnifiedMemoryManager {
         case oldestFirst
         case priorityBased
     }
-    
+
     /// Information about a loaded model
     public struct LoadedModelInfo {
         public let model: LoadedModel
@@ -39,7 +39,7 @@ public class UnifiedMemoryManager {
         public var lastUsed: Date
         public weak var service: LLMService?
         public let priority: MemoryPriority
-        
+
         public init(
             model: LoadedModel,
             size: Int64,
@@ -54,30 +54,30 @@ public class UnifiedMemoryManager {
             self.priority = priority
         }
     }
-    
+
     private var config: MemoryConfig = MemoryConfig()
-    
+
     private init() {
         setupMemoryPressureHandling()
         startMemoryMonitoring()
     }
-    
+
     deinit {
         stopMemoryMonitoring()
         if let observer = memoryPressureObserver {
             NotificationCenter.default.removeObserver(observer)
         }
     }
-    
+
     /// Configure memory manager
     public func configure(_ config: MemoryConfig) {
         self.config = config
         stopMemoryMonitoring()
         startMemoryMonitoring()
     }
-    
+
     // MARK: - Model Registration
-    
+
     /// Register a loaded model
     public func registerLoadedModel(
         _ model: LoadedModel,
@@ -87,41 +87,41 @@ public class UnifiedMemoryManager {
     ) {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         loadedModels[model.id] = LoadedModelInfo(
             model: model,
             size: size,
             service: service,
             priority: priority
         )
-        
+
         // Check memory after loading
         Task {
             await checkMemoryUsage()
         }
     }
-    
+
     /// Update last used time for a model
     public func touchModel(_ modelId: String) {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         if var modelInfo = loadedModels[modelId] {
             modelInfo.lastUsed = Date()
             loadedModels[modelId] = modelInfo
         }
     }
-    
+
     /// Unregister a model
     public func unregisterModel(_ modelId: String) {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         loadedModels.removeValue(forKey: modelId)
     }
-    
+
     // MARK: - Memory Monitoring
-    
+
     private func setupMemoryPressureHandling() {
         #if os(iOS) || os(tvOS) || os(watchOS)
         memoryPressureObserver = NotificationCenter.default.addObserver(
@@ -137,7 +137,7 @@ public class UnifiedMemoryManager {
         // macOS doesn't have system memory warnings, rely on manual monitoring
         #endif
     }
-    
+
     private func startMemoryMonitoring() {
         memoryMonitorTimer = Timer.scheduledTimer(
             withTimeInterval: config.monitoringInterval,
@@ -148,35 +148,35 @@ public class UnifiedMemoryManager {
             }
         }
     }
-    
+
     private func stopMemoryMonitoring() {
         memoryMonitorTimer?.invalidate()
         memoryMonitorTimer = nil
     }
-    
+
     /// Check current memory usage
     public func checkMemoryUsage() async {
         let availableMemory = getAvailableMemory()
         let usedMemory = getTotalModelMemory()
-        
+
         if availableMemory < config.criticalThreshold {
             await handleMemoryPressure(level: .critical)
         } else if availableMemory < config.memoryThreshold {
             await handleMemoryPressure(level: .warning)
         }
-        
+
         // Log memory status
         let availableString = ByteCountFormatter.string(fromByteCount: availableMemory, countStyle: .memory)
         let usedString = ByteCountFormatter.string(fromByteCount: usedMemory, countStyle: .memory)
         print("[MemoryManager] Available: \(availableString), Used by models: \(usedString)")
     }
-    
+
     /// Memory pressure levels
     public enum MemoryPressureLevel {
         case warning
         case critical
     }
-    
+
     /// Handle memory pressure
     public func handleMemoryPressure(level: MemoryPressureLevel = .warning) async {
         let targetMemory: Int64
@@ -186,38 +186,38 @@ public class UnifiedMemoryManager {
         case .critical:
             targetMemory = config.memoryThreshold * 3
         }
-        
+
         let modelsToUnload = selectModelsToUnload(targetMemory: targetMemory)
-        
+
         for modelId in modelsToUnload {
             await unloadModel(modelId)
-            
+
             // Check if we've freed enough memory
             if getAvailableMemory() > targetMemory {
                 break
             }
         }
     }
-    
+
     // MARK: - Model Selection for Unloading
-    
+
     private func selectModelsToUnload(targetMemory: Int64) -> [String] {
         modelLock.lock()
         let models = Array(loadedModels.values)
         modelLock.unlock()
-        
+
         var sortedModels: [LoadedModelInfo]
-        
+
         switch config.unloadStrategy {
         case .leastRecentlyUsed:
             sortedModels = models.sorted { $0.lastUsed < $1.lastUsed }
-            
+
         case .largestFirst:
             sortedModels = models.sorted { $0.size > $1.size }
-            
+
         case .oldestFirst:
             sortedModels = models.sorted { $0.lastUsed < $1.lastUsed }
-            
+
         case .priorityBased:
             sortedModels = models.sorted { lhs, rhs in
                 if lhs.priority != rhs.priority {
@@ -226,31 +226,31 @@ public class UnifiedMemoryManager {
                 return lhs.lastUsed < rhs.lastUsed
             }
         }
-        
+
         var modelsToUnload: [String] = []
         var freedMemory: Int64 = 0
         let currentAvailable = getAvailableMemory()
         let neededMemory = targetMemory - currentAvailable
-        
+
         for model in sortedModels {
             // Skip critical priority models unless absolutely necessary
             if model.priority == .critical && currentAvailable + freedMemory > config.criticalThreshold {
                 continue
             }
-            
+
             modelsToUnload.append(model.model.id)
             freedMemory += model.size
-            
+
             if freedMemory >= neededMemory {
                 break
             }
         }
-        
+
         return modelsToUnload
     }
-    
+
     // MARK: - Model Unloading
-    
+
     /// Unload a specific model
     public func unloadModel(_ modelId: String) async {
         modelLock.lock()
@@ -259,24 +259,24 @@ public class UnifiedMemoryManager {
             return
         }
         modelLock.unlock()
-        
+
         let sizeString = ByteCountFormatter.string(fromByteCount: modelInfo.size, countStyle: .memory)
         print("[MemoryManager] Unloading model: \(modelInfo.model.name) to free \(sizeString)")
-        
+
         // Notify service to cleanup
         await modelInfo.service?.cleanup()
-        
+
         // Remove from tracking
         modelLock.lock()
         loadedModels.removeValue(forKey: modelId)
         modelLock.unlock()
-        
+
         // Force memory reclaim
         autoreleasepool {
             // Trigger cleanup
         }
     }
-    
+
     /// Unload all models with a specific priority or lower
     public func unloadModelsByPriority(_ maxPriority: MemoryPriority) async {
         modelLock.lock()
@@ -284,53 +284,53 @@ public class UnifiedMemoryManager {
             .filter { $0.priority.rawValue <= maxPriority.rawValue }
             .map { $0.model.id }
         modelLock.unlock()
-        
+
         for modelId in modelsToUnload {
             await unloadModel(modelId)
         }
     }
-    
+
     // MARK: - Memory Information
-    
+
     /// Get total memory used by loaded models
     public func getTotalModelMemory() -> Int64 {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         return loadedModels.values.reduce(0) { $0 + $1.size }
     }
-    
+
     /// Get information about loaded models
     public func getLoadedModels() -> [LoadedModelInfo] {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         return Array(loadedModels.values)
     }
-    
+
     /// Check if a model is loaded
     public func isModelLoaded(_ modelId: String) -> Bool {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         return loadedModels[modelId] != nil
     }
-    
+
     /// Get memory usage for a specific model
     public func getModelMemoryUsage(_ modelId: String) -> Int64? {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         return loadedModels[modelId]?.size
     }
-    
+
     // MARK: - System Memory Information
-    
+
     /// Get available system memory
     public func getAvailableMemory() -> Int64 {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(mach_task_self_,
@@ -339,22 +339,22 @@ public class UnifiedMemoryManager {
                          &count)
             }
         }
-        
+
         if result == KERN_SUCCESS {
             let totalMemory = ProcessInfo.processInfo.physicalMemory
             let usedMemory = info.resident_size
             return Int64(totalMemory) - Int64(usedMemory)
         }
-        
+
         // Fallback to process info
         return Int64(ProcessInfo.processInfo.physicalMemory / 2) // Assume 50% available
     }
-    
+
     /// Get total system memory
     public func getTotalMemory() -> Int64 {
         Int64(ProcessInfo.processInfo.physicalMemory)
     }
-    
+
     /// Get memory statistics
     public func getMemoryStatistics() -> MemoryStatistics {
         MemoryStatistics(
@@ -365,7 +365,7 @@ public class UnifiedMemoryManager {
             memoryPressure: getAvailableMemory() < config.memoryThreshold
         )
     }
-    
+
     /// Memory statistics
     public struct MemoryStatistics {
         public let totalMemory: Int64
@@ -373,12 +373,12 @@ public class UnifiedMemoryManager {
         public let modelMemory: Int64
         public let loadedModelCount: Int
         public let memoryPressure: Bool
-        
+
         public var usedMemoryPercentage: Double {
             let used = totalMemory - availableMemory
             return Double(used) / Double(totalMemory) * 100
         }
-        
+
         public var modelMemoryPercentage: Double {
             Double(modelMemory) / Double(totalMemory) * 100
         }
@@ -394,72 +394,72 @@ extension UnifiedMemoryManager: MemoryManager {
             size: size,
             service: service
         )
-        
+
         modelLock.lock()
         loadedModels[model.id] = modelInfo
         modelLock.unlock()
     }
-    
+
     public func getLoadedModels() -> [LoadedModel] {
         modelLock.lock()
         defer { modelLock.unlock() }
-        
+
         return loadedModels.values.map { $0.model }
     }
-    
+
     public func getCurrentMemoryUsage() -> Int64 {
         getTotalModelMemory()
     }
-    
+
     public func hasAvailableMemory(for size: Int64) -> Bool {
         getAvailableMemory() >= size
     }
-    
+
     public func handleMemoryPressure() async {
         await handleMemoryPressure(level: .warning)
     }
-    
+
     public func requestMemory(size: Int64, priority: MemoryPriority) async -> Bool {
         let available = getAvailableMemory()
-        
+
         if available >= size {
             return true
         }
-        
+
         // Try to free memory based on priority
         let pressureLevel: MemoryPressureLevel = priority == .critical ? .critical : .warning
         await handleMemoryPressure(level: pressureLevel)
-        
+
         // Check again
         let newAvailable = getAvailableMemory()
         return newAvailable >= size
     }
-    
+
     public func setMemoryThreshold(_ threshold: Int64) {
         var newConfig = config
         newConfig.memoryThreshold = threshold
         configure(newConfig)
     }
-    
+
     public func checkAvailableMemory() async -> Int64 {
         getAvailableMemory()
     }
-    
+
     public func requestMemory(size: Int64) async throws -> Bool {
         let available = getAvailableMemory()
-        
+
         if available >= size {
             return true
         }
-        
+
         // Try to free memory
         await handleMemoryPressure(level: .warning)
-        
+
         // Check again
         let newAvailable = getAvailableMemory()
         return newAvailable >= size
     }
-    
+
     public func releaseMemory(size: Int64) async {
         // Memory is automatically released when models are unloaded
         // This is a no-op for now but could track memory allocations in the future

@@ -8,35 +8,35 @@ public protocol MemoryManager {
     ///   - size: Memory size in bytes
     ///   - service: The LLM service managing the model
     func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService)
-    
+
     /// Unregister a model
     /// - Parameter modelId: The model identifier
     func unregisterModel(_ modelId: String)
-    
+
     /// Get current memory usage
     /// - Returns: Current memory usage in bytes
     func getCurrentMemoryUsage() -> Int64
-    
+
     /// Get available memory
     /// - Returns: Available memory in bytes
     func getAvailableMemory() -> Int64
-    
+
     /// Check if enough memory is available
     /// - Parameter size: Required memory size
     /// - Returns: Whether enough memory is available
     func hasAvailableMemory(for size: Int64) -> Bool
-    
+
     /// Handle memory pressure
     func handleMemoryPressure() async
-    
+
     /// Set memory threshold
     /// - Parameter threshold: Memory threshold in bytes
     func setMemoryThreshold(_ threshold: Int64)
-    
+
     /// Get loaded models
     /// - Returns: Array of loaded model information
     func getLoadedModels() -> [LoadedModel]
-    
+
     /// Request memory for a model
     /// - Parameters:
     ///   - size: Required memory size
@@ -54,7 +54,7 @@ public struct LoadedModel {
     public let loadedAt: Date
     public var lastUsed: Date
     public let priority: MemoryPriority
-    
+
     public init(
         id: String,
         name: String,
@@ -80,7 +80,7 @@ public enum MemoryPriority: Int, Comparable {
     case normal = 1
     case high = 2
     case critical = 3
-    
+
     public static func < (lhs: MemoryPriority, rhs: MemoryPriority) -> Bool {
         lhs.rawValue < rhs.rawValue
     }
@@ -91,32 +91,32 @@ public protocol ProgressTracker {
     /// Start a new stage
     /// - Parameter stage: The lifecycle stage
     func startStage(_ stage: LifecycleStage)
-    
+
     /// Update stage progress
     /// - Parameters:
     ///   - stage: The lifecycle stage
     ///   - progress: Progress value (0.0 to 1.0)
     ///   - message: Optional status message
     func updateStageProgress(_ stage: LifecycleStage, progress: Double, message: String?)
-    
+
     /// Complete a stage
     /// - Parameter stage: The lifecycle stage
     func completeStage(_ stage: LifecycleStage)
-    
+
     /// Fail a stage
     /// - Parameters:
     ///   - stage: The lifecycle stage
     ///   - error: The error that occurred
     func failStage(_ stage: LifecycleStage, error: Error)
-    
+
     /// Get current overall progress
     /// - Returns: Overall progress information
     func getCurrentProgress() -> OverallProgress
-    
+
     /// Add a progress observer
     /// - Parameter observer: The observer to add
     func addObserver(_ observer: ProgressObserver)
-    
+
     /// Remove a progress observer
     /// - Parameter observer: The observer to remove
     func removeObserver(_ observer: ProgressObserver)
@@ -131,7 +131,7 @@ public enum LifecycleStage: String, CaseIterable {
     case initialization = "Initialization"
     case loading = "Loading"
     case ready = "Ready"
-    
+
     /// Default message for each stage
     public var defaultMessage: String {
         switch self {
@@ -160,7 +160,7 @@ public struct OverallProgress {
     public let stageProgress: Double
     public let message: String
     public let estimatedTimeRemaining: TimeInterval?
-    
+
     public init(
         percentage: Double,
         currentStage: LifecycleStage? = nil,
@@ -181,11 +181,11 @@ public protocol ProgressObserver: AnyObject {
     /// Called when progress is updated
     /// - Parameter progress: The current progress
     func progressDidUpdate(_ progress: OverallProgress)
-    
+
     /// Called when a stage completes
     /// - Parameter stage: The completed stage
     func stageDidComplete(_ stage: LifecycleStage)
-    
+
     /// Called when a stage fails
     /// - Parameters:
     ///   - stage: The failed stage

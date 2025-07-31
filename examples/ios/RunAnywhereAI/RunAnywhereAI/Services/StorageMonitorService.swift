@@ -129,15 +129,15 @@ class StorageMonitorService: ObservableObject {
                         let format = ModelFormat.from(extension: modelFile.pathExtension)
                         let formatManager = ModelFormatManager.shared
                         let handler = formatManager.getHandler(for: modelFile, format: format)
-                        
+
                         // Skip if it's a directory that's not a model format
                         if isDirectory && !handler.isDirectoryBasedModel(url: modelFile) {
                             continue
                         }
-                        
+
                         // Calculate size using the appropriate handler
                         let fileSize = handler.calculateModelSize(at: modelFile)
-                        
+
                         let creationDate = resourceValues.creationDate ?? Date()
 
                         let modelInfo = DownloadedModelInfo(

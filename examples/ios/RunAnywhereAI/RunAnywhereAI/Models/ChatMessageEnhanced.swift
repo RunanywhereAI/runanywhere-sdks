@@ -42,7 +42,7 @@ extension ChatMessage {
             objc_setAssociatedObject(self, &errorKey, newValue, .OBJC_ASSOCIATION_RETAIN)
         }
     }
-    
+
     var modelName: String? {
         get {
             objc_getAssociatedObject(self, &modelNameKey) as? String
@@ -51,7 +51,7 @@ extension ChatMessage {
             objc_setAssociatedObject(self, &modelNameKey, newValue, .OBJC_ASSOCIATION_RETAIN)
         }
     }
-    
+
     var modelId: String? {
         get {
             objc_getAssociatedObject(self, &modelIdKey) as? String
@@ -60,7 +60,7 @@ extension ChatMessage {
             objc_setAssociatedObject(self, &modelIdKey, newValue, .OBJC_ASSOCIATION_RETAIN)
         }
     }
-    
+
     var modelInfo: ModelInfo? {
         get {
             objc_getAssociatedObject(self, &modelInfoKey) as? ModelInfo

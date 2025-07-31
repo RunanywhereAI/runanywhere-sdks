@@ -4,7 +4,27 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Architecture
+import androidx.compose.material.icons.filled.Battery3Bar
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Cpu
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Hardware
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,36 +54,36 @@ fun DetailedModelInfo(
         // Model specifications
         DetailSection(
             title = "Model Specifications",
-            icon = Icons.Default.Info
+            icon = Icons.Filled.Info
         ) {
             SpecificationGrid(model = model)
         }
-        
+
         // Performance metrics
         performanceMetrics?.let { metrics ->
             DetailSection(
                 title = "Performance Metrics",
-                icon = Icons.Default.Speed
+                icon = Icons.Filled.Speed
             ) {
                 PerformanceMetricsGrid(metrics = metrics)
             }
         }
-        
+
         // Hardware requirements
         hardwareRequirements?.let { requirements ->
             DetailSection(
                 title = "Hardware Requirements",
-                icon = Icons.Default.Hardware
+                icon = Icons.Filled.Hardware
             ) {
                 HardwareRequirementsGrid(requirements = requirements)
             }
         }
-        
+
         // Benchmark results
         performanceMetrics?.benchmarkScore?.let { score ->
             DetailSection(
                 title = "Benchmark Results",
-                icon = Icons.Default.Analytics
+                icon = Icons.Filled.Analytics
             ) {
                 BenchmarkResults(
                     score = score,
@@ -102,9 +122,9 @@ private fun DetailSection(
                 color = MaterialTheme.colorScheme.primary
             )
         }
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         content()
     }
 }
@@ -134,7 +154,7 @@ private fun SpecificationGrid(
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         Row(modifier = Modifier.fillMaxWidth()) {
             SpecificationItem(
                 label = "File Size",
@@ -148,7 +168,7 @@ private fun SpecificationGrid(
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         Row(modifier = Modifier.fillMaxWidth()) {
             SpecificationItem(
                 label = "Parameters",
@@ -162,7 +182,7 @@ private fun SpecificationGrid(
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         SpecificationItem(
             label = "Download URL",
             value = if (model.downloadUrl.isNotEmpty()) "Available" else "System managed",
@@ -185,7 +205,7 @@ private fun PerformanceMetricsGrid(
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             MetricItem(
-                icon = Icons.Default.Speed,
+                icon = Icons.Filled.Speed,
                 label = "Tokens/Second",
                 value = "${metrics.tokensPerSecond.toInt()}",
                 color = MaterialTheme.colorScheme.primary,
@@ -193,17 +213,17 @@ private fun PerformanceMetricsGrid(
             )
             Spacer(modifier = Modifier.width(8.dp))
             MetricItem(
-                icon = Icons.Default.Timer,
+                icon = Icons.Filled.Timer,
                 label = "Latency",
                 value = "${metrics.latencyMs}ms",
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         Row(modifier = Modifier.fillMaxWidth()) {
             MetricItem(
-                icon = Icons.Default.Memory,
+                icon = Icons.Filled.Memory,
                 label = "Memory Usage",
                 value = "${metrics.memoryUsageMB}MB",
                 color = MaterialTheme.colorScheme.tertiary,
@@ -212,7 +232,7 @@ private fun PerformanceMetricsGrid(
             Spacer(modifier = Modifier.width(8.dp))
             metrics.powerConsumptionMw?.let { power ->
                 MetricItem(
-                    icon = Icons.Default.Battery3Bar,
+                    icon = Icons.Filled.Battery3Bar,
                     label = "Power",
                     value = "${power.toInt()}mW",
                     color = MaterialTheme.colorScheme.error,
@@ -220,23 +240,23 @@ private fun PerformanceMetricsGrid(
                 )
             } ?: Spacer(modifier = Modifier.weight(1f))
         }
-        
+
         Row(modifier = Modifier.fillMaxWidth()) {
             metrics.accuracy?.let { accuracy ->
                 MetricItem(
-                    icon = Icons.Default.CheckCircle,
+                    icon = Icons.Filled.CheckCircle,
                     label = "Accuracy",
                     value = "${(accuracy * 100).toInt()}%",
                     color = Color(0xFF4CAF50),
                     modifier = Modifier.weight(1f)
                 )
             } ?: Spacer(modifier = Modifier.weight(1f))
-            
+
             Spacer(modifier = Modifier.width(8.dp))
-            
+
             metrics.benchmarkScore?.let { score ->
                 MetricItem(
-                    icon = Icons.Default.Star,
+                    icon = Icons.Filled.Star,
                     label = "Benchmark",
                     value = score.toString(),
                     color = Color(0xFFFF9800),
@@ -272,7 +292,7 @@ private fun HardwareRequirementsGrid(
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         Row(modifier = Modifier.fillMaxWidth()) {
             RequirementItem(
                 label = "Min Android",
@@ -286,7 +306,7 @@ private fun HardwareRequirementsGrid(
                 modifier = Modifier.weight(1f)
             )
         }
-        
+
         // Hardware support details
         HardwareSupportDetails(requirements = requirements)
     }
@@ -305,21 +325,21 @@ private fun HardwareSupportDetails(
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         HardwareSupportRow(
-            icon = Icons.Default.Cpu,
+            icon = Icons.Filled.Cpu,
             label = "CPU Support",
             isSupported = requirements.cpuSupported,
             details = requirements.cpuDetails
         )
-        
+
         HardwareSupportRow(
-            icon = Icons.Default.GraphicEq,
+            icon = Icons.Filled.GraphicEq,
             label = "GPU Support",
             isSupported = requirements.gpuSupported,
             details = requirements.gpuDetails
         )
-        
+
         HardwareSupportRow(
-            icon = Icons.Default.Memory,
+            icon = Icons.Filled.Memory,
             label = "NPU Support",
             isSupported = requirements.npuSupported,
             details = requirements.npuDetails
@@ -353,7 +373,7 @@ private fun HardwareSupportRow(
             },
             modifier = Modifier.size(20.dp)
         )
-        
+
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = label,
@@ -366,9 +386,9 @@ private fun HardwareSupportRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        
+
         Icon(
-            imageVector = if (isSupported) Icons.Default.CheckCircle else Icons.Default.Cancel,
+            imageVector = if (isSupported) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
             contentDescription = if (isSupported) "Supported" else "Not supported",
             tint = if (isSupported) {
                 Color(0xFF4CAF50)
@@ -404,7 +424,7 @@ private fun BenchmarkResults(
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold
             )
-            
+
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = getBenchmarkScoreColor(score).copy(alpha = 0.1f),
@@ -419,20 +439,20 @@ private fun BenchmarkResults(
                 )
             }
         }
-        
+
         // Performance categories
         BenchmarkCategory(
             label = "Speed",
             score = ((metrics.tokensPerSecond / 50f) * 100).toInt().coerceAtMost(100),
             color = MaterialTheme.colorScheme.primary
         )
-        
+
         BenchmarkCategory(
             label = "Efficiency",
             score = ((1000f / metrics.latencyMs) * 100).toInt().coerceAtMost(100),
             color = MaterialTheme.colorScheme.secondary
         )
-        
+
         metrics.accuracy?.let { accuracy ->
             BenchmarkCategory(
                 label = "Accuracy",
@@ -469,9 +489,9 @@ private fun BenchmarkCategory(
                 color = color
             )
         }
-        
+
         Spacer(modifier = Modifier.height(4.dp))
-        
+
         LinearProgressIndicator(
             progress = score / 100f,
             modifier = Modifier.fillMaxWidth(),

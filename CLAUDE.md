@@ -127,8 +127,8 @@ open RunAnywhereAI.xcworkspace
 
 #### Known Issues - Xcode 16 Sandbox
 
-**Error**: `Sandbox: rsync deny(1) file-write-create`  
-**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`  
+**Error**: `Sandbox: rsync deny(1) file-write-create`
+**Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
 **Note**: Required after each `pod install`
 
 ### Pre-commit Hooks

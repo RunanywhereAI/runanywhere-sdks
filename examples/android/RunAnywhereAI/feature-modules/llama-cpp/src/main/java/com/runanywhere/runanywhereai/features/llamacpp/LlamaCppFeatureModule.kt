@@ -17,7 +17,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object LlamaCppFeatureModule {
-    
+
     @Provides
     @Singleton
     @Named("llamacpp")
@@ -34,16 +34,16 @@ class LlamaCppFeature {
         const val FEATURE_NAME = "llamacpp"
         const val MIN_SDK_VERSION = 24
         const val REQUIRED_MEMORY_MB = 2048 // 2GB minimum
-        
+
         fun isSupported(context: Context): Boolean {
             val memoryInfo = android.app.ActivityManager.MemoryInfo()
             val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             activityManager.getMemoryInfo(memoryInfo)
-            
+
             val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
             return availableMemoryMB >= REQUIRED_MEMORY_MB
         }
-        
+
         fun getRequirements(): FeatureRequirements {
             return FeatureRequirements(
                 minSdkVersion = MIN_SDK_VERSION,

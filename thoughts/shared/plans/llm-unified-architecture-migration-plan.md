@@ -186,7 +186,7 @@ sdk.registerFrameworkAdapter(MyCustomAdapter())
 #### Benefits of This Architecture
 
 1. **Smaller App Size**: Include only what you need
-2. **Faster Integration**: Working defaults reduce setup time  
+2. **Faster Integration**: Working defaults reduce setup time
 3. **Clear Upgrade Path**: Start simple, add modules as needed
 4. **Community Friendly**: Easy to contribute new modules
 5. **Future Proof**: New frameworks can be added without breaking changes
@@ -242,7 +242,7 @@ public protocol AuthProvider { }
 RunAnywhereProviders/ (Model discovery & download)
 ├── RunAnywhereHuggingFace
 │   └── HuggingFaceProvider & Auth
-├── RunAnywhereOpenModels  
+├── RunAnywhereOpenModels
 │   ├── KaggleProvider & Auth
 │   └── MicrosoftModelsProvider
 └── RunAnywhereSystemModels
@@ -252,7 +252,7 @@ RunAnywhereFrameworks/ (Ready-to-use adapters)
 ├── RunAnywhereCorML (iOS only)
 │   └── CoreMLFrameworkAdapter
 ├── RunAnywhereONNX (cross-platform)
-│   └── ONNXFrameworkAdapter  
+│   └── ONNXFrameworkAdapter
 ├── RunAnywhereGGUF (llama.cpp)
 │   └── LlamaCppFrameworkAdapter
 └── RunAnywhereSystemML
@@ -331,7 +331,7 @@ public protocol LLMService {
 public class ModelLifecycleStateMachine: ModelLifecycleManager {
     private var state: ModelLifecycleState = .uninitialized
     private var observers: [UUID: ModelLifecycleObserver] = [:]
-    
+
     private let validTransitions: [ModelLifecycleState: Set<ModelLifecycleState>] = [
         .uninitialized: [.discovered],
         .discovered: [.downloading],
@@ -350,17 +350,17 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
         .error: [.cleanup],
         .cleanup: [.uninitialized]
     ]
-    
+
     func transitionTo(_ newState: ModelLifecycleState) async throws {
         guard isValidTransition(from: state, to: newState) else {
             throw UnifiedModelError.lifecycle(
                 .invalidTransition(from: state, to: newState)
             )
         }
-        
+
         let oldState = state
         state = newState
-        
+
         await notifyObservers(oldState: oldState, newState: newState)
     }
 }
@@ -387,44 +387,44 @@ public class ModelLifecycleStateMachine: ModelLifecycleManager {
 // SDK: Sources/RunAnywhere/Tokenization/UnifiedTokenizerManager.swift
 public class UnifiedTokenizerManager {
     static let shared = UnifiedTokenizerManager()
-    
+
     private var tokenizers: [String: UnifiedTokenizer] = [:]
     private var adapters: [TokenizerFormat: TokenizerAdapter.Type] = [:]
-    
+
     init() {
         registerDefaultAdapters()
     }
-    
+
     private func registerDefaultAdapters() {
         // SDK provides empty registry
         // Sample app will register concrete implementations
         // This allows SDK users to register their own tokenizer adapters
     }
-    
+
     func getTokenizer(for model: ModelInfo) async throws -> UnifiedTokenizer {
         // Check cache
         if let cached = tokenizers[model.id] {
             return cached
         }
-        
+
         // Auto-detect and create
         let format = try detectTokenizerFormat(for: model)
         let adapter = try createAdapter(format: format, model: model)
-        
+
         tokenizers[model.id] = adapter
         return adapter
     }
-    
+
     private func detectTokenizerFormat(for model: ModelInfo) throws -> TokenizerFormat {
         // Check model metadata first
         if let format = model.tokenizerFormat {
             return format
         }
-        
+
         // Auto-detect based on model files
         if let modelPath = model.localPath {
             let files = try FileManager.default.contentsOfDirectory(at: modelPath, includingPropertiesForKeys: nil)
-            
+
             // Check for specific tokenizer files
             if files.contains(where: { $0.lastPathComponent == "tokenizer.json" }) {
                 return .huggingFace
@@ -436,7 +436,7 @@ public class UnifiedTokenizerManager {
                 return .bpe
             }
         }
-        
+
         // Framework-specific defaults
         switch model.format {
         case .tflite:
@@ -476,22 +476,22 @@ public class UnifiedTokenizerManager {
 // SDK: Sources/RunAnywhere/Hardware/HardwareCapabilityManager.swift
 public class HardwareCapabilityManager {
     public static let shared = HardwareCapabilityManager()
-    
+
     private var registeredHardwareDetector: HardwareDetector?
     private var cachedCapabilities: DeviceCapabilities?
-    
+
     /// Register a platform-specific hardware detector
     public func registerHardwareDetector(_ detector: HardwareDetector) {
         self.registeredHardwareDetector = detector
         self.cachedCapabilities = nil // Clear cache
     }
-    
+
     /// Get current device capabilities
     public var capabilities: DeviceCapabilities {
         if let cached = cachedCapabilities {
             return cached
         }
-        
+
         guard let detector = registeredHardwareDetector else {
             // Return minimal defaults if no detector registered
             return DeviceCapabilities(
@@ -502,14 +502,14 @@ public class HardwareCapabilityManager {
                 processorCount: 2
             )
         }
-        
+
         cachedCapabilities = detector.detectCapabilities()
         return cachedCapabilities!
     }
-    
+
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         var config = HardwareConfiguration()
-        
+
         // Use registered hardware detector (provided by sample app)
         guard let detector = registeredHardwareDetector else {
             // Fallback to conservative defaults
@@ -518,9 +518,9 @@ public class HardwareCapabilityManager {
             config.threadCount = 2
             return config
         }
-        
+
         let capabilities = detector.detectCapabilities()
-        
+
         // Smart selection based on detected capabilities
         if model.estimatedMemory > 3_000_000_000 && capabilities.hasNeuralEngine {
             config.primaryAccelerator = .neuralEngine
@@ -532,17 +532,17 @@ public class HardwareCapabilityManager {
             config.primaryAccelerator = .cpu
             config.memoryMode = .conservative
         }
-        
+
         config.threadCount = capabilities.processorCount
-        
+
         return config
     }
-    
+
     func checkResourceAvailability() -> ResourceAvailability {
         let thermalState = ProcessInfo.processInfo.thermalState
         let batteryLevel = UIDevice.current.batteryLevel
         let isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
-        
+
         return ResourceAvailability(
             memoryAvailable: getAvailableMemory(),
             storageAvailable: getAvailableStorage(),
@@ -561,28 +561,28 @@ public struct ResourceAvailability {
     let thermalState: ProcessInfo.ThermalState
     let batteryLevel: Float?
     let isLowPowerMode: Bool
-    
+
     func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
         // Check memory
         if model.estimatedMemory > memoryAvailable {
             return (false, "Insufficient memory: need \(ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)), have \(ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory))")
         }
-        
+
         // Check storage
         if let downloadSize = model.downloadSize, downloadSize > storageAvailable {
             return (false, "Insufficient storage: need \(ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)), have \(ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file))")
         }
-        
+
         // Check thermal state
         if thermalState == .critical {
             return (false, "Device is too hot, please wait for it to cool down")
         }
-        
+
         // Check battery in low power mode
         if isLowPowerMode && batteryLevel != nil && batteryLevel! < 0.2 {
             return (false, "Battery too low for model loading in Low Power Mode")
         }
-        
+
         return (true, nil)
     }
 }
@@ -713,10 +713,10 @@ import Gzip // Add to SDK Package.swift
 public class EnhancedDownloadManager: ModelStorageManager {
     private let downloadQueue = OperationQueue()
     private var activeTasks: [String: DownloadTask] = [:]
-    
+
     func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
         let taskId = UUID().uuidString
-        
+
         let task = DownloadTask(
             id: taskId,
             modelId: model.id,
@@ -725,14 +725,14 @@ public class EnhancedDownloadManager: ModelStorageManager {
                 try await performDownload(model, taskId: taskId)
             }
         )
-        
+
         activeTasks[taskId] = task
         return task
     }
-    
+
     private func performDownload(_ model: ModelInfo, taskId: String) async throws -> URL {
         var lastError: Error?
-        
+
         // Retry logic with exponential backoff
         for attempt in 0..<3 {
             do {
@@ -740,32 +740,32 @@ public class EnhancedDownloadManager: ModelStorageManager {
                     let delay = pow(2.0, Double(attempt))
                     try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                 }
-                
+
                 let data = try await downloadWithProgress(
                     from: model.downloadURL,
                     taskId: taskId
                 )
-                
+
                 let storedURL = try await storeModel(data, for: model)
-                
+
                 // Handle archives
                 if needsExtraction(storedURL) {
                     return try await extractArchive(storedURL)
                 }
-                
+
                 return storedURL
             } catch {
                 lastError = error
                 reportProgress(taskId, .retrying(attempt: attempt + 1))
             }
         }
-        
+
         throw lastError ?? DownloadError.unknown
     }
-    
+
     private func extractArchive(_ archive: URL) async throws -> URL {
         let ext = archive.pathExtension.lowercased()
-        
+
         switch ext {
         case "zip":
             return try await extractZip(archive)
@@ -781,26 +781,26 @@ public class EnhancedDownloadManager: ModelStorageManager {
             throw DownloadError.unsupportedArchive(ext)
         }
     }
-    
+
     private func extractTarGz(_ archive: URL) async throws -> URL {
         // Proper tar.gz extraction
         let decompressed = try Data(contentsOf: archive).gunzipped()
         let tarURL = archive.deletingPathExtension()
         try decompressed.write(to: tarURL)
-        
+
         // Extract tar
         let outputDir = tarURL.deletingPathExtension()
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
-        
+
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         task.arguments = ["-xf", tarURL.path, "-C", outputDir.path]
         try task.run()
         task.waitUntilExit()
-        
+
         return outputDir
     }
-    
+
     private func extractTarBz2(_ archive: URL) async throws -> URL {
         // Handle bzip2 compressed archives
         let task = Process()
@@ -808,10 +808,10 @@ public class EnhancedDownloadManager: ModelStorageManager {
         task.arguments = ["-xjf", archive.path, "-C", archive.deletingLastPathComponent().path]
         try task.run()
         task.waitUntilExit()
-        
+
         return archive.deletingPathExtension()
     }
-    
+
     private func extractTarXz(_ archive: URL) async throws -> URL {
         // Handle xz compressed archives
         let task = Process()
@@ -819,7 +819,7 @@ public class EnhancedDownloadManager: ModelStorageManager {
         task.arguments = ["-xJf", archive.path, "-C", archive.deletingLastPathComponent().path]
         try task.run()
         task.waitUntilExit()
-        
+
         return archive.deletingPathExtension()
     }
 }
@@ -842,22 +842,22 @@ public class EnhancedDownloadManager: ModelStorageManager {
 // SDK: Sources/RunAnywhere/Memory/UnifiedMemoryManager.swift
 public class UnifiedMemoryManager {
     static let shared = UnifiedMemoryManager()
-    
+
     private var loadedModels: [String: LoadedModelInfo] = [:]
     private var memoryPressureObserver: NSObjectProtocol?
     private let memoryThreshold: Int64 = 500_000_000 // 500MB threshold
-    
+
     struct LoadedModelInfo {
         let model: LoadedModel
         let size: Int64
         var lastUsed: Date
         weak var service: LLMService?
     }
-    
+
     init() {
         setupMemoryPressureHandling()
     }
-    
+
     private func setupMemoryPressureHandling() {
         // iOS memory pressure
         memoryPressureObserver = NotificationCenter.default.addObserver(
@@ -869,7 +869,7 @@ public class UnifiedMemoryManager {
                 await self?.handleMemoryPressure()
             }
         }
-        
+
         // Also monitor available memory periodically
         Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task {
@@ -877,7 +877,7 @@ public class UnifiedMemoryManager {
             }
         }
     }
-    
+
     func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
         loadedModels[model.id] = LoadedModelInfo(
             model: model,
@@ -886,33 +886,33 @@ public class UnifiedMemoryManager {
             service: service
         )
     }
-    
+
     private func handleMemoryPressure() async {
         let availableMemory = getAvailableMemory()
-        
+
         if availableMemory < memoryThreshold {
             // Unload least recently used models
             let sortedModels = loadedModels.values.sorted { $0.lastUsed < $1.lastUsed }
-            
+
             for modelInfo in sortedModels {
                 if getAvailableMemory() > memoryThreshold * 2 {
                     break
                 }
-                
+
                 await unloadModel(modelInfo.model.id)
             }
         }
     }
-    
+
     private func unloadModel(_ modelId: String) async {
         guard let modelInfo = loadedModels[modelId] else { return }
-        
+
         // Notify service to cleanup
         await modelInfo.service?.cleanup()
-        
+
         // Remove from tracking
         loadedModels.removeValue(forKey: modelId)
-        
+
         // Force memory reclaim
         autoreleasepool {
             // Trigger cleanup
@@ -953,7 +953,7 @@ class UnifiedModelValidator: ModelValidator {
     func validateModel(_ model: ModelInfo, at path: URL) async throws -> ValidationResult {
         var warnings: [ValidationWarning] = []
         var errors: [ValidationError] = []
-        
+
         // Validate checksum if provided
         if let expectedChecksum = model.checksum {
             let isValid = try await validateChecksum(path, expected: expectedChecksum)
@@ -961,27 +961,27 @@ class UnifiedModelValidator: ModelValidator {
                 errors.append(.checksumMismatch)
             }
         }
-        
+
         // Validate format
         let formatValid = try await validateFormat(path, expectedFormat: model.format)
         if !formatValid {
             errors.append(.invalidFormat)
         }
-        
+
         // Check dependencies
         let missingDeps = try await validateDependencies(model)
         if !missingDeps.isEmpty {
             errors.append(.missingDependencies(missingDeps))
         }
-        
+
         // Extract and validate metadata
         let metadata = try await extractAndValidateMetadata(from: path, format: model.format)
-        
+
         // Framework-specific validation
         if let frameworkErrors = try await validateFrameworkSpecific(model, at: path) {
             errors.append(contentsOf: frameworkErrors)
         }
-        
+
         return ValidationResult(
             isValid: errors.isEmpty,
             warnings: warnings,
@@ -989,7 +989,7 @@ class UnifiedModelValidator: ModelValidator {
             metadata: metadata
         )
     }
-    
+
     private func validateFrameworkSpecific(_ model: ModelInfo, at path: URL) async throws -> [ValidationError]? {
         switch model.format {
         case .mlmodel, .mlpackage:
@@ -1036,35 +1036,35 @@ public class DynamicModelRegistry: ModelRegistry {
         PicovoiceProvider(),
         MLCProvider()
     ]
-    
+
     func discoverModels() async -> [ModelInfo] {
         async let localModels = discoverLocalModels()
         async let onlineModels = discoverOnlineModels()
-        
+
         let (local, online) = await (localModels, onlineModels)
-        
+
         // Merge and deduplicate
         var allModels = local
         let localIds = Set(local.map { $0.id })
-        
+
         for model in online where !localIds.contains(model.id) {
             allModels.append(model)
         }
-        
+
         // Update registry
         for model in allModels {
             registeredModels[model.id] = model
         }
-        
+
         return allModels
     }
-    
+
     private func discoverLocalModels() async -> [ModelInfo] {
         var models: [ModelInfo] = []
-        
+
         // Scan model directories
         let modelDirs = getModelDirectories()
-        
+
         for dir in modelDirs {
             if let contents = try? FileManager.default.contentsOfDirectory(
                 at: dir,
@@ -1077,22 +1077,22 @@ public class DynamicModelRegistry: ModelRegistry {
                 }
             }
         }
-        
+
         return models
     }
-    
+
     private func detectModel(at url: URL) async -> ModelInfo? {
         // Auto-detect model format and metadata
         let format = ModelFormatDetector.detect(at: url)
-        
+
         guard let format = format else { return nil }
-        
+
         // Extract metadata
         let metadata = await extractMetadata(from: url, format: format)
-        
+
         // Determine compatible frameworks
         let frameworks = detectCompatibleFrameworks(format: format, metadata: metadata)
-        
+
         return ModelInfo(
             id: UUID().uuidString,
             name: url.lastPathComponent,
@@ -1102,7 +1102,7 @@ public class DynamicModelRegistry: ModelRegistry {
             metadata: metadata
         )
     }
-    
+
     func filterModels(by criteria: ModelCriteria) -> [ModelInfo] {
         return registeredModels.values.filter { model in
             // Apply all criteria
@@ -1111,19 +1111,19 @@ public class DynamicModelRegistry: ModelRegistry {
                     return false
                 }
             }
-            
+
             if let maxSize = criteria.maxSize {
                 guard model.estimatedMemory <= maxSize else {
                     return false
                 }
             }
-            
+
             if let minContext = criteria.minContextLength {
                 guard model.contextLength >= minContext else {
                     return false
                 }
             }
-            
+
             return true
         }
     }
@@ -1148,7 +1148,7 @@ public class UnifiedProgressTracker: ProgressTracker {
     private var stages: [LifecycleStage: StageInfo] = [:]
     private var observers: [UUID: ProgressObserver] = [:]
     private let progressSubject = PassthroughSubject<OverallProgress, Never>()
-    
+
     struct StageInfo {
         let stage: LifecycleStage
         var startTime: Date
@@ -1156,42 +1156,42 @@ public class UnifiedProgressTracker: ProgressTracker {
         var message: String = ""
         var subStages: [String: Double] = [:]
     }
-    
+
     func startStage(_ stage: LifecycleStage) {
         stages[stage] = StageInfo(
             stage: stage,
             startTime: Date(),
             message: stage.defaultMessage
         )
-        
+
         notifyProgress()
     }
-    
+
     func updateStageProgress(_ stage: LifecycleStage, progress: Double, message: String? = nil) {
         guard var stageInfo = stages[stage] else { return }
-        
+
         stageInfo.progress = progress
         if let message = message {
             stageInfo.message = message
         }
-        
+
         stages[stage] = stageInfo
         notifyProgress()
     }
-    
+
     func completeStage(_ stage: LifecycleStage) {
         guard var stageInfo = stages[stage] else { return }
-        
+
         stageInfo.progress = 1.0
         stages[stage] = stageInfo
-        
+
         // Store duration for future estimates
         let duration = Date().timeIntervalSince(stageInfo.startTime)
         storeStageDuration(stage, duration: duration)
-        
+
         notifyProgress()
     }
-    
+
     func getCurrentProgress() -> OverallProgress {
         let stageWeights: [LifecycleStage: Double] = [
             .discovery: 0.05,
@@ -1202,25 +1202,25 @@ public class UnifiedProgressTracker: ProgressTracker {
             .loading: 0.30,
             .ready: 0.10
         ]
-        
+
         var totalProgress = 0.0
         var totalWeight = 0.0
         var currentStage: LifecycleStage?
         var estimatedTimeRemaining: TimeInterval?
-        
+
         for (stage, info) in stages {
             let weight = stageWeights[stage] ?? 0.1
             totalProgress += info.progress * weight
             totalWeight += weight
-            
+
             if info.progress < 1.0 && currentStage == nil {
                 currentStage = stage
                 estimatedTimeRemaining = estimateTimeRemaining(for: stage, progress: info.progress)
             }
         }
-        
+
         let overallProgress = totalWeight > 0 ? totalProgress / totalWeight : 0
-        
+
         return OverallProgress(
             percentage: overallProgress,
             currentStage: currentStage,
@@ -1229,13 +1229,13 @@ public class UnifiedProgressTracker: ProgressTracker {
             estimatedTimeRemaining: estimatedTimeRemaining
         )
     }
-    
+
     private func estimateTimeRemaining(for stage: LifecycleStage, progress: Double) -> TimeInterval? {
         guard progress > 0 else { return nil }
-        
+
         let avgDuration = getAverageDuration(for: stage)
         let elapsed = Date().timeIntervalSince(stages[stage]?.startTime ?? Date())
-        
+
         // Use actual progress if available, otherwise use historical average
         if elapsed > 0 {
             let estimatedTotal = elapsed / progress
@@ -1276,26 +1276,26 @@ struct RecoveryContext {
 
 class UnifiedErrorRecovery {
     private var strategies: [ErrorType: ErrorRecoveryStrategy] = [:]
-    
+
     init() {
         registerDefaultStrategies()
     }
-    
+
     private func registerDefaultStrategies() {
         registerStrategy(DownloadErrorRecovery(), for: .download)
         registerStrategy(MemoryErrorRecovery(), for: .memory)
         registerStrategy(ValidationErrorRecovery(), for: .validation)
         registerStrategy(FrameworkErrorRecovery(), for: .framework)
     }
-    
+
     func registerStrategy(_ strategy: ErrorRecoveryStrategy, for errorType: ErrorType) {
         strategies[errorType] = strategy
     }
-    
+
     func attemptRecovery(from error: Error, in context: RecoveryContext) async throws {
         let errorType = ErrorType(from: error)
-        
-        if let strategy = strategies[errorType], 
+
+        if let strategy = strategies[errorType],
            strategy.canRecover(from: error) {
             try await strategy.recover(from: error, context: context)
         } else {
@@ -1312,12 +1312,12 @@ class DownloadErrorRecovery: ErrorRecoveryStrategy {
         if case DownloadError.partialDownload = error { return true }
         return false
     }
-    
+
     func recover(from error: Error, context: RecoveryContext) async throws {
         // Retry with exponential backoff
         let delay = pow(2.0, Double(context.attemptCount))
         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-        
+
         // Try alternative download URLs if available
         if let alternativeURLs = context.model.alternativeDownloadURLs {
             for url in alternativeURLs {
@@ -1329,7 +1329,7 @@ class DownloadErrorRecovery: ErrorRecoveryStrategy {
                 }
             }
         }
-        
+
         // Clear partial downloads and restart
         if case DownloadError.partialDownload = error {
             try await clearPartialDownload(for: context.model)
@@ -1343,16 +1343,16 @@ class MemoryErrorRecovery: ErrorRecoveryStrategy {
         if error.localizedDescription.contains("memory") { return true }
         return false
     }
-    
+
     func recover(from error: Error, context: RecoveryContext) async throws {
         let memoryManager = UnifiedMemoryManager.shared
-        
+
         // Unload least recently used models
         await memoryManager.handleMemoryPressure()
-        
+
         // Wait for memory to be freed
         try await Task.sleep(nanoseconds: 1_000_000_000)
-        
+
         // Check if we have enough memory now
         let available = context.availableResources.memoryAvailable
         if context.model.estimatedMemory > available {
@@ -1370,16 +1370,16 @@ class ValidationErrorRecovery: ErrorRecoveryStrategy {
         if case ValidationError.corruptedFile = error { return true }
         return false
     }
-    
+
     func recover(from error: Error, context: RecoveryContext) async throws {
         // Re-download the model
         let downloadManager = EnhancedDownloadManager()
-        
+
         // Delete corrupted file
         if let localPath = context.model.localPath {
             try FileManager.default.removeItem(at: localPath)
         }
-        
+
         // Force re-download
         context.model.localPath = nil
         throw UnifiedModelError.retryRequired("Model validation failed, re-downloading")
@@ -1391,21 +1391,21 @@ class FrameworkErrorRecovery: ErrorRecoveryStrategy {
         // Framework initialization errors might be recoverable with different framework
         return true
     }
-    
+
     func recover(from error: Error, context: RecoveryContext) async throws {
         let adapterRegistry = FrameworkAdapterRegistry.shared
-        
+
         // Find alternative framework
         let currentFramework = context.model.preferredFramework
         let alternatives = context.model.compatibleFrameworks.filter { $0 != currentFramework }
-        
+
         for framework in alternatives {
             if let adapter = adapterRegistry.getAdapter(for: framework),
                adapter.canHandle(model: context.model) {
                 throw UnifiedModelError.retryWithFramework(framework)
             }
         }
-        
+
         throw UnifiedModelError.noAlternativeFramework
     }
 }
@@ -1427,19 +1427,19 @@ class FrameworkErrorRecovery: ErrorRecoveryStrategy {
 // SDK: Sources/RunAnywhere/Metadata/MetadataExtractor.swift
 public class MetadataExtractor {
     private let cache = MetadataCache()
-    
+
     func extractMetadata(from url: URL, format: ModelFormat) async -> ModelMetadata {
         // Check cache first
         if let cached = cache.get(for: url) {
             return cached
         }
-        
+
         let metadata = await extractForFormat(from: url, format: format)
         cache.store(metadata, for: url)
-        
+
         return metadata
     }
-    
+
     private func extractForFormat(from url: URL, format: ModelFormat) async -> ModelMetadata {
         switch format {
         case .mlmodel, .mlpackage:
@@ -1458,10 +1458,10 @@ public class MetadataExtractor {
             return await extractGenericMetadata(from: url)
         }
     }
-    
+
     private func extractCoreMLMetadata(from url: URL) async -> ModelMetadata {
         var metadata = ModelMetadata()
-        
+
         if url.pathExtension == "mlpackage" {
             // Read Metadata.json from mlpackage
             let metadataURL = url.appendingPathComponent("Metadata.json")
@@ -1483,31 +1483,31 @@ public class MetadataExtractor {
                 }
             }
         }
-        
+
         return metadata
     }
-    
+
     private func extractSafetensorsMetadata(from url: URL) async -> ModelMetadata {
         var metadata = ModelMetadata()
-        
+
         // Read safetensors header
         if let file = try? FileHandle(forReadingFrom: url) {
             defer { try? file.close() }
-            
+
             // First 8 bytes contain header size
             let headerSizeData = file.readData(ofLength: 8)
             guard headerSizeData.count == 8 else { return metadata }
-            
+
             let headerSize = headerSizeData.withUnsafeBytes { $0.load(as: UInt64.self) }
             let headerData = file.readData(ofLength: Int(headerSize))
-            
+
             if let json = try? JSONSerialization.jsonObject(with: headerData) as? [String: Any] {
                 // Extract tensor information
                 if let tensors = json["tensors"] as? [String: Any] {
                     metadata.tensorCount = tensors.count
                     metadata.parameterCount = calculateParameterCount(from: tensors)
                 }
-                
+
                 // Extract model config if present
                 if let config = json["__metadata__"] as? [String: Any] {
                     metadata.modelType = config["model_type"] as? String
@@ -1515,27 +1515,27 @@ public class MetadataExtractor {
                 }
             }
         }
-        
+
         return metadata
     }
-    
+
     private func extractGGUFMetadata(from url: URL) async -> ModelMetadata {
         var metadata = ModelMetadata()
-        
+
         // GGUF has rich metadata in header
         if let file = try? FileHandle(forReadingFrom: url) {
             defer { try? file.close() }
-            
+
             // Read GGUF magic and version
             let magic = file.readData(ofLength: 4)
             guard String(data: magic, encoding: .utf8) == "GGUF" else { return metadata }
-            
+
             let version = file.readData(ofLength: 4).withUnsafeBytes { $0.load(as: UInt32.self) }
             metadata.formatVersion = String(version)
-            
+
             // Read metadata key-value pairs
             let metadataKVCount = file.readData(ofLength: 8).withUnsafeBytes { $0.load(as: UInt64.self) }
-            
+
             for _ in 0..<metadataKVCount {
                 if let (key, value) = readGGUFKeyValue(from: file) {
                     switch key {
@@ -1555,7 +1555,7 @@ public class MetadataExtractor {
                 }
             }
         }
-        
+
         return metadata
     }
 }
@@ -1568,16 +1568,16 @@ struct ModelMetadata {
     var architecture: String?
     var quantization: String?
     var formatVersion: String?
-    
+
     var inputShapes: [String: [Int]]?
     var outputShapes: [String: [Int]]?
-    
+
     var contextLength: Int?
     var embeddingDimension: Int?
     var layerCount: Int?
     var parameterCount: Int64?
     var tensorCount: Int?
-    
+
     var requirements: ModelRequirements?
 }
 ```
@@ -1800,19 +1800,19 @@ The SDK exposes a clean, extensible public API:
 // Main SDK entry point - FULLY IMPLEMENTED
 public class RunAnywhereSDK {
     public static let shared = RunAnywhereSDK()
-    
+
     // Configuration
     public func initialize(with config: Configuration) async throws
-    
+
     // Model operations
     public func loadModel(_ identifier: String) async throws
     public func generate(_ prompt: String, options: GenerationOptions? = nil) async throws -> GenerationResult
     public func streamGenerate(_ prompt: String, options: GenerationOptions? = nil) -> AsyncThrowingStream<String, Error>
-    
+
     // Context management
     public func setContext(_ context: Context)
     public func updateConfiguration(_ config: Configuration) async throws
-    
+
     // Component registration (for extensibility)
     public func registerAdapterRegistry(_ registry: FrameworkAdapterRegistry)
     public func registerModelRegistry(_ registry: ModelRegistry)
@@ -1868,7 +1868,7 @@ import Foundation
 
 public class RunAnywhereSDK {
     public static let shared = RunAnywhereSDK()
-    
+
     // Unified components
     private let lifecycleManager = ModelLifecycleStateMachine()
     private let downloadManager = EnhancedDownloadManager()
@@ -1878,44 +1878,44 @@ public class RunAnywhereSDK {
     private let hardwareManager = HardwareCapabilityManager.shared
     private let tokenizerManager = UnifiedTokenizerManager.shared
     private let errorRecovery = UnifiedErrorRecovery()
-    
+
     // Framework adapters registry
     private var frameworkAdapters: [LLMFramework: FrameworkAdapter] = [:]
-    
+
     // Current state
     private var currentAdapter: FrameworkAdapter?
     private var currentService: LLMService?
-    
+
     /// Register a framework adapter
     public func registerFrameworkAdapter(_ adapter: FrameworkAdapter) {
         frameworkAdapters[adapter.framework] = adapter
     }
-    
+
     /// Load a model with optional framework preference
     public func loadModel(_ identifier: String, preferredFramework: LLMFramework? = nil) async throws {
         // Use unified architecture to load model
         let model = try await modelRegistry.findModel(identifier: identifier)
-        
+
         // Select best framework adapter
         let adapter = preferredFramework.flatMap { frameworkAdapters[$0] }
             ?? findBestAdapter(for: model)
-        
+
         guard let adapter = adapter else {
             throw SDKError.noCompatibleFramework
         }
-        
+
         // Use lifecycle manager for loading
         try await loadModelWithAdapter(model, adapter: adapter)
     }
-    
+
     /// Generate text using loaded model
     public func generate(_ prompt: String, options: GenerationOptions? = nil) async throws -> GenerationResult {
         guard let service = currentService else {
             throw SDKError.modelNotLoaded
         }
-        
+
         let result = try await service.generate(prompt: prompt, options: options ?? GenerationOptions())
-        
+
         // Track usage for cost calculation
         return GenerationResult(
             text: result,
@@ -2026,10 +2026,10 @@ Since we're replacing the entire implementation without maintaining parallel ver
 ### Technical Risks
 1. **Breaking Changes**
    - Mitigation: Keep old implementation, use feature flags
-   
+
 2. **Performance Regression**
    - Mitigation: Comprehensive benchmarking, A/B testing
-   
+
 3. **Memory Issues**
    - Mitigation: Aggressive testing, memory profiling
 
@@ -2042,7 +2042,7 @@ Since we're replacing the entire implementation without maintaining parallel ver
 ### Process Risks
 1. **Timeline Slippage**
    - Mitigation: Phased approach, can ship incrementally
-   
+
 2. **Integration Issues**
    - Mitigation: Extensive testing, gradual rollout
 
@@ -2056,22 +2056,22 @@ struct PerformanceTargets {
     // Loading performance
     static let modelLoadTime: TimeInterval = 5.0 // seconds max
     static let modelSwitchTime: TimeInterval = 2.0 // seconds max
-    
+
     // Memory targets
     static let memoryOverhead: Double = 1.1 // 10% max overhead vs old implementation
     static let minimumFreeMemory: Int64 = 500_000_000 // 500MB minimum
-    
+
     // Tokenization performance
     static let tokenizationSpeed: Int = 10000 // tokens/second minimum
     static let decodingSpeed: Int = 5000 // tokens/second minimum
-    
+
     // Download performance
     static let downloadSpeedEfficiency: Double = 0.8 // 80% of network speed
     static let compressionRatio: Double = 0.7 // 30% size reduction expected
-    
+
     // Framework switching
     static let frameworkSwitchTime: TimeInterval = 3.0 // seconds max
-    
+
     // Error recovery
     static let maxRecoveryAttempts: Int = 3
     static let recoverySuccessRate: Double = 0.9 // 90% recovery success

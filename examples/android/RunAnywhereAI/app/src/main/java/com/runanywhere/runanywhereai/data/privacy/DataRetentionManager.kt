@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.runanywhere.runanywhereai.data.database.ConversationDao
-import com.runanywhere.runanywhereai.data.database.Message
-import com.runanywhere.runanywhereai.data.database.Conversation
+import com.runanywhere.runanywhereai.data.models.Message
+import com.runanywhere.runanywhereai.data.models.Conversation
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -28,40 +28,40 @@ class DataRetentionManager(
         private const val LAST_CLEANUP_KEY = "last_cleanup_timestamp"
         private const val CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000L // 24 hours
     }
-    
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         prettyPrint = true
     }
-    
+
     private val preferences: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val retentionPoliciesFile: File by lazy {
         File(context.filesDir, RETENTION_POLICIES_FILE)
     }
-    
+
     private var cleanupJob: Job? = null
-    
+
     /**
      * Initialize data retention manager and start periodic cleanup
      */
     fun initialize() {
         Log.d(TAG, "Initializing data retention manager")
-        
+
         // Start periodic cleanup
         schedulePeriodicCleanup()
-        
+
         // Run initial cleanup if needed
         CoroutineScope(Dispatchers.IO).launch {
             val lastCleanup = preferences.getLong(LAST_CLEANUP_KEY, 0)
             val currentTime = System.currentTimeMillis()
-            
+
             if (currentTime - lastCleanup > CLEANUP_INTERVAL_MS) {
                 performCleanup()
             }
         }
     }
-    
+
     /**
      * Set data retention policy
      */
@@ -69,15 +69,15 @@ class DataRetentionManager(
         try {
             val policies = loadRetentionPolicies().toMutableList()
             val existingIndex = policies.indexOfFirst { it.dataType == policy.dataType }
-            
+
             if (existingIndex >= 0) {
                 policies[existingIndex] = policy
             } else {
                 policies.add(policy)
             }
-            
+
             saveRetentionPolicies(policies)
-            
+
             Log.d(TAG, "Set retention policy for ${policy.dataType}: ${policy.retentionPeriodDays} days")
             true
         } catch (e: Exception) {
@@ -85,21 +85,21 @@ class DataRetentionManager(
             false
         }
     }
-    
+
     /**
      * Get current retention policies
      */
     suspend fun getRetentionPolicies(): List<DataRetentionPolicy> = withContext(Dispatchers.IO) {
         loadRetentionPolicies()
     }
-    
+
     /**
      * Get retention policy for specific data type
      */
     suspend fun getRetentionPolicy(dataType: DataType): DataRetentionPolicy? = withContext(Dispatchers.IO) {
         loadRetentionPolicies().find { it.dataType == dataType }
     }
-    
+
     /**
      * Remove retention policy
      */
@@ -107,31 +107,31 @@ class DataRetentionManager(
         try {
             val policies = loadRetentionPolicies().toMutableList()
             val removed = policies.removeAll { it.dataType == dataType }
-            
+
             if (removed) {
                 saveRetentionPolicies(policies)
                 Log.d(TAG, "Removed retention policy for $dataType")
             }
-            
+
             removed
         } catch (e: Exception) {
             Log.e(TAG, "Failed to remove retention policy", e)
             false
         }
     }
-    
+
     /**
      * Perform manual cleanup based on current policies
      */
     suspend fun performCleanup(): CleanupResult = withContext(Dispatchers.IO) {
         Log.d(TAG, "Starting data cleanup")
-        
+
         val startTime = System.currentTimeMillis()
         val policies = loadRetentionPolicies()
         var totalItemsDeleted = 0
         var totalSpaceFreed = 0L
         val cleanupDetails = mutableListOf<CleanupDetail>()
-        
+
         try {
             for (policy in policies) {
                 val detail = cleanupDataType(policy)
@@ -139,16 +139,16 @@ class DataRetentionManager(
                 totalItemsDeleted += detail.itemsDeleted
                 totalSpaceFreed += detail.spaceFreedBytes
             }
-            
+
             // Update last cleanup timestamp
             preferences.edit()
                 .putLong(LAST_CLEANUP_KEY, System.currentTimeMillis())
                 .apply()
-            
+
             val duration = System.currentTimeMillis() - startTime
-            
+
             Log.d(TAG, "Cleanup completed: $totalItemsDeleted items deleted, ${formatBytes(totalSpaceFreed)} freed in ${duration}ms")
-            
+
             CleanupResult(
                 success = true,
                 totalItemsDeleted = totalItemsDeleted,
@@ -156,7 +156,7 @@ class DataRetentionManager(
                 durationMs = duration,
                 details = cleanupDetails
             )
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Cleanup failed", e)
             CleanupResult(
@@ -167,7 +167,7 @@ class DataRetentionManager(
             )
         }
     }
-    
+
     /**
      * Get cleanup statistics without performing cleanup
      */
@@ -176,67 +176,71 @@ class DataRetentionManager(
         val previews = mutableListOf<CleanupItemPreview>()
         var totalItems = 0
         var estimatedSpaceToFree = 0L
-        
+
         for (policy in policies) {
             val preview = getCleanupPreviewForPolicy(policy)
             previews.add(preview)
             totalItems += preview.itemCount
             estimatedSpaceToFree += preview.estimatedSizeBytes
         }
-        
+
         CleanupPreview(
             totalItemsToDelete = totalItems,
             estimatedSpaceToFree = estimatedSpaceToFree,
             items = previews
         )
     }
-    
+
     /**
      * Check if data should be retained based on policies
      */
     suspend fun shouldRetainData(dataType: DataType, timestamp: Long): Boolean = withContext(Dispatchers.IO) {
         val policy = getRetentionPolicy(dataType) ?: return@withContext true
-        
+
         if (!policy.enabled) return@withContext true
-        
+
         val cutoffTime = System.currentTimeMillis() - (policy.retentionPeriodDays * 24 * 60 * 60 * 1000L)
         timestamp >= cutoffTime
     }
-    
+
     /**
      * Get data that will be deleted based on current policies
      */
     suspend fun getDataForDeletion(dataType: DataType): List<DeletableItem> = withContext(Dispatchers.IO) {
         val policy = getRetentionPolicy(dataType) ?: return@withContext emptyList()
-        
+
         if (!policy.enabled) return@withContext emptyList()
-        
+
         val cutoffTime = System.currentTimeMillis() - (policy.retentionPeriodDays * 24 * 60 * 60 * 1000L)
-        
+
         when (dataType) {
             DataType.CONVERSATIONS -> {
-                val conversations = conversationDao.getConversationsOlderThan(cutoffTime)
-                conversations.map { conv ->
-                    DeletableItem(
-                        id = conv.id.toString(),
-                        type = DataType.CONVERSATIONS,
-                        timestamp = conv.createdAt,
-                        sizeBytes = estimateConversationSize(conv),
-                        description = "Conversation: ${conv.title}"
-                    )
-                }
+                // TODO: #004 - Implement getConversationsOlderThan in ConversationDao
+                // val conversations = conversationDao.getConversationsOlderThan(cutoffTime)
+                // conversations.map { conv ->
+                //     DeletableItem(
+                //         id = conv.id.toString(),
+                //         type = DataType.CONVERSATIONS,
+                //         timestamp = conv.createdAt,
+                //         sizeBytes = estimateConversationSize(conv),
+                //         description = "Conversation: ${conv.title}"
+                //     )
+                // }
+                emptyList()
             }
             DataType.MESSAGES -> {
-                val messages = conversationDao.getMessagesOlderThan(cutoffTime)
-                messages.map { msg ->
-                    DeletableItem(
-                        id = msg.id.toString(),
-                        type = DataType.MESSAGES,
-                        timestamp = msg.timestamp,
-                        sizeBytes = msg.content.length.toLong() * 2, // Rough estimate
-                        description = "Message: ${msg.content.take(50)}..."
-                    )
-                }
+                // TODO: #005 - Implement getMessagesOlderThan in ConversationDao
+                // val messages = conversationDao.getMessagesOlderThan(cutoffTime)
+                // messages.map { msg ->
+                //     DeletableItem(
+                //         id = msg.id.toString(),
+                //         type = DataType.MESSAGES,
+                //         timestamp = msg.timestamp,
+                //         sizeBytes = msg.content.length.toLong() * 2, // Rough estimate
+                //         description = "Message: ${msg.content.take(50)}..."
+                //     )
+                // }
+                emptyList()
             }
             DataType.ATTACHMENTS -> {
                 // Implementation would depend on attachment storage system
@@ -253,7 +257,7 @@ class DataRetentionManager(
             }
         }
     }
-    
+
     /**
      * Export data before deletion (for compliance)
      */
@@ -266,17 +270,17 @@ class DataRetentionManager(
             if (!exportDir.exists()) {
                 exportDir.mkdirs()
             }
-            
+
             val exportData = DataExport(
                 exportedAt = System.currentTimeMillis(),
                 items = items,
                 reason = "Data retention policy cleanup"
             )
-            
+
             val exportFile = File(exportDir, "data_export_${System.currentTimeMillis()}.json")
             val jsonData = json.encodeToString(exportData)
             exportFile.writeText(jsonData)
-            
+
             Log.d(TAG, "Exported ${items.size} items to ${exportFile.absolutePath}")
             true
         } catch (e: Exception) {
@@ -284,7 +288,7 @@ class DataRetentionManager(
             false
         }
     }
-    
+
     /**
      * Get default retention policies
      */
@@ -340,14 +344,14 @@ class DataRetentionManager(
             )
         )
     }
-    
+
     fun shutdown() {
         Log.d(TAG, "Shutting down data retention manager")
         cleanupJob?.cancel()
     }
-    
+
     // Private helper methods
-    
+
     private fun schedulePeriodicCleanup() {
         cleanupJob?.cancel()
         cleanupJob = CoroutineScope(Dispatchers.IO).launch {
@@ -363,7 +367,7 @@ class DataRetentionManager(
             }
         }
     }
-    
+
     private suspend fun cleanupDataType(policy: DataRetentionPolicy): CleanupDetail {
         if (!policy.enabled || !policy.autoCleanup) {
             return CleanupDetail(
@@ -374,9 +378,9 @@ class DataRetentionManager(
                 reason = if (!policy.enabled) "Policy disabled" else "Auto cleanup disabled"
             )
         }
-        
+
         val cutoffTime = System.currentTimeMillis() - (policy.retentionPeriodDays * 24 * 60 * 60 * 1000L)
-        
+
         return when (policy.dataType) {
             DataType.CONVERSATIONS -> cleanupConversations(cutoffTime, policy.exportBeforeDelete)
             DataType.MESSAGES -> cleanupMessages(cutoffTime, policy.exportBeforeDelete)
@@ -386,48 +390,20 @@ class DataRetentionManager(
             DataType.TEMPORARY_FILES -> cleanupTemporaryFiles(cutoffTime)
         }
     }
-    
+
     private suspend fun cleanupConversations(cutoffTime: Long, exportFirst: Boolean): CleanupDetail {
-        val conversations = conversationDao.getConversationsOlderThan(cutoffTime)
-        
-        if (exportFirst && conversations.isNotEmpty()) {
-            // Export conversations before deletion
-            val exportItems = conversations.map { conv ->
-                DeletableItem(
-                    id = conv.id.toString(),
-                    type = DataType.CONVERSATIONS,
-                    timestamp = conv.createdAt,
-                    sizeBytes = estimateConversationSize(conv),
-                    description = "Conversation: ${conv.title}"
-                )
-            }
-            exportDataBeforeDeletion(exportItems, "${context.filesDir}/exports/conversations")
-        }
-        
-        var deletedCount = 0
-        var freedSpace = 0L
-        
-        for (conversation in conversations) {
-            try {
-                val sizeEstimate = estimateConversationSize(conversation)
-                conversationDao.deleteConversation(conversation.id)
-                deletedCount++
-                freedSpace += sizeEstimate
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to delete conversation ${conversation.id}", e)
-            }
-        }
-        
+        // TODO: #006 - Implement conversation cleanup once getConversationsOlderThan is added to DAO
         return CleanupDetail(
             dataType = DataType.CONVERSATIONS,
-            itemsDeleted = deletedCount,
-            spaceFreedBytes = freedSpace
+            itemsDeleted = 0,
+            spaceFreedBytes = 0L
         )
     }
-    
+
     private suspend fun cleanupMessages(cutoffTime: Long, exportFirst: Boolean): CleanupDetail {
-        val messages = conversationDao.getMessagesOlderThan(cutoffTime)
-        
+        // TODO: #007 - Implement getMessagesOlderThan in DAO
+        val messages = emptyList<Message>() // conversationDao.getMessagesOlderThan(cutoffTime)
+
         if (exportFirst && messages.isNotEmpty()) {
             val exportItems = messages.map { msg ->
                 DeletableItem(
@@ -440,28 +416,29 @@ class DataRetentionManager(
             }
             exportDataBeforeDeletion(exportItems, "${context.filesDir}/exports/messages")
         }
-        
+
         var deletedCount = 0
         var freedSpace = 0L
-        
+
         for (message in messages) {
             try {
                 val sizeEstimate = message.content.length.toLong() * 2
-                conversationDao.deleteMessage(message.id)
+                // TODO: #008 - Implement deleteMessage in DAO
+                // conversationDao.deleteMessage(message.id)
                 deletedCount++
                 freedSpace += sizeEstimate
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to delete message ${message.id}", e)
             }
         }
-        
+
         return CleanupDetail(
             dataType = DataType.MESSAGES,
             itemsDeleted = deletedCount,
             spaceFreedBytes = freedSpace
         )
     }
-    
+
     private suspend fun cleanupAttachments(cutoffTime: Long, exportFirst: Boolean): CleanupDetail {
         // Implementation would depend on attachment storage system
         return CleanupDetail(
@@ -472,12 +449,12 @@ class DataRetentionManager(
             reason = "Attachment cleanup not implemented"
         )
     }
-    
+
     private suspend fun cleanupModelCache(cutoffTime: Long): CleanupDetail {
         val cacheDir = File(context.cacheDir, "models")
         var deletedCount = 0
         var freedSpace = 0L
-        
+
         if (cacheDir.exists()) {
             cacheDir.listFiles()?.forEach { file ->
                 if (file.lastModified() < cutoffTime) {
@@ -493,19 +470,19 @@ class DataRetentionManager(
                 }
             }
         }
-        
+
         return CleanupDetail(
             dataType = DataType.MODEL_CACHE,
             itemsDeleted = deletedCount,
             spaceFreedBytes = freedSpace
         )
     }
-    
+
     private suspend fun cleanupLogs(cutoffTime: Long): CleanupDetail {
         val logDir = File(context.filesDir, "logs")
         var deletedCount = 0
         var freedSpace = 0L
-        
+
         if (logDir.exists()) {
             logDir.listFiles()?.forEach { file ->
                 if (file.lastModified() < cutoffTime) {
@@ -521,19 +498,19 @@ class DataRetentionManager(
                 }
             }
         }
-        
+
         return CleanupDetail(
             dataType = DataType.LOGS,
             itemsDeleted = deletedCount,
             spaceFreedBytes = freedSpace
         )
     }
-    
+
     private suspend fun cleanupTemporaryFiles(cutoffTime: Long): CleanupDetail {
         val tempDir = context.cacheDir
         var deletedCount = 0
         var freedSpace = 0L
-        
+
         tempDir.listFiles()?.forEach { file ->
             if (file.lastModified() < cutoffTime && file.name.startsWith("temp_")) {
                 try {
@@ -547,14 +524,14 @@ class DataRetentionManager(
                 }
             }
         }
-        
+
         return CleanupDetail(
             dataType = DataType.TEMPORARY_FILES,
             itemsDeleted = deletedCount,
             spaceFreedBytes = freedSpace
         )
     }
-    
+
     private suspend fun getCleanupPreviewForPolicy(policy: DataRetentionPolicy): CleanupItemPreview {
         if (!policy.enabled) {
             return CleanupItemPreview(
@@ -564,9 +541,9 @@ class DataRetentionManager(
                 enabled = false
             )
         }
-        
+
         val cutoffTime = System.currentTimeMillis() - (policy.retentionPeriodDays * 24 * 60 * 60 * 1000L)
-        
+
         return when (policy.dataType) {
             DataType.CONVERSATIONS -> {
                 val conversations = conversationDao.getConversationsOlderThan(cutoffTime)
@@ -578,7 +555,8 @@ class DataRetentionManager(
                 )
             }
             DataType.MESSAGES -> {
-                val messages = conversationDao.getMessagesOlderThan(cutoffTime)
+                // TODO: #007 - Implement getMessagesOlderThan in DAO
+        val messages = emptyList<Message>() // conversationDao.getMessagesOlderThan(cutoffTime)
                 CleanupItemPreview(
                     dataType = policy.dataType,
                     itemCount = messages.size,
@@ -594,11 +572,11 @@ class DataRetentionManager(
             )
         }
     }
-    
+
     private fun getModelCacheForDeletion(cutoffTime: Long): List<DeletableItem> {
         val cacheDir = File(context.cacheDir, "models")
         val items = mutableListOf<DeletableItem>()
-        
+
         if (cacheDir.exists()) {
             cacheDir.listFiles()?.forEach { file ->
                 if (file.lastModified() < cutoffTime) {
@@ -612,14 +590,14 @@ class DataRetentionManager(
                 }
             }
         }
-        
+
         return items
     }
-    
+
     private fun getLogsForDeletion(cutoffTime: Long): List<DeletableItem> {
         val logDir = File(context.filesDir, "logs")
         val items = mutableListOf<DeletableItem>()
-        
+
         if (logDir.exists()) {
             logDir.listFiles()?.forEach { file ->
                 if (file.lastModified() < cutoffTime) {
@@ -633,14 +611,14 @@ class DataRetentionManager(
                 }
             }
         }
-        
+
         return items
     }
-    
+
     private fun getTemporaryFilesForDeletion(cutoffTime: Long): List<DeletableItem> {
         val tempDir = context.cacheDir
         val items = mutableListOf<DeletableItem>()
-        
+
         tempDir.listFiles()?.forEach { file ->
             if (file.lastModified() < cutoffTime && file.name.startsWith("temp_")) {
                 items.add(DeletableItem(
@@ -652,15 +630,16 @@ class DataRetentionManager(
                 ))
             }
         }
-        
+
         return items
     }
-    
+
     private suspend fun estimateConversationSize(conversation: Conversation): Long {
-        val messages = conversationDao.getMessagesForConversation(conversation.id)
-        return messages.sumOf { it.content.length.toLong() * 2 } + conversation.title.length * 2
+        // TODO: #009 - Update to use MessageDao instead of ConversationDao for messages
+        // For now, return an estimate based on title
+        return conversation.title.length * 2L + 1000L // Rough estimate
     }
-    
+
     private fun loadRetentionPolicies(): List<DataRetentionPolicy> {
         return try {
             if (retentionPoliciesFile.exists()) {
@@ -674,7 +653,7 @@ class DataRetentionManager(
             getDefaultRetentionPolicies()
         }
     }
-    
+
     private fun saveRetentionPolicies(policies: List<DataRetentionPolicy>) {
         try {
             val jsonData = json.encodeToString(policies)
@@ -684,17 +663,17 @@ class DataRetentionManager(
             throw e
         }
     }
-    
+
     private fun formatBytes(bytes: Long): String {
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
         var size = bytes.toDouble()
         var unitIndex = 0
-        
+
         while (size >= 1024 && unitIndex < units.size - 1) {
             size /= 1024
             unitIndex++
         }
-        
+
         return "%.2f %s".format(size, units[unitIndex])
     }
 }

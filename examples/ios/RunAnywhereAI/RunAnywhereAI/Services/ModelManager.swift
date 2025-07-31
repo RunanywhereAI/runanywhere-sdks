@@ -70,10 +70,10 @@ class ModelManager: ObservableObject {
     private init() {
         // Create models directory if it doesn't exist
         try? FileManager.default.createDirectory(at: Self.modelsDirectory, withIntermediateDirectories: true)
-        
+
         // Create framework directories
         createFrameworkDirectories()
-        
+
         // Migrate any models in wrong directories
         migrateModelsToCorrectDirectories()
 
@@ -83,33 +83,33 @@ class ModelManager: ObservableObject {
             await refreshModelList()
         }
     }
-    
+
     private func createFrameworkDirectories() {
         for framework in LLMFramework.allCases {
             let frameworkDir = Self.modelsDirectory.appendingPathComponent(framework.directoryName)
             try? FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
         }
     }
-    
+
     private func migrateModelsToCorrectDirectories() {
         // Migrate Swift Transformers models from CoreML directory
         let coreMLDir = Self.modelsDirectory.appendingPathComponent("CoreML")
         let swiftTransformersDir = Self.modelsDirectory.appendingPathComponent("SwiftTransformers")
-        
+
         // List of known Swift Transformers models (including OpenELM)
         let swiftTransformersModels = [
             "distilgpt2-swift.mlmodel",
-            "gpt2-base.mlmodel", 
+            "gpt2-base.mlmodel",
             "gpt2-medium.mlmodel",
             "OpenELM-270M-Instruct-128-float32.mlpackage",
             "OpenELM-450M-Instruct-128-float32.mlpackage",
             "OpenELM-1_1B-Instruct-128-float32.mlpackage"
         ]
-        
+
         for modelName in swiftTransformersModels {
             let oldPath = coreMLDir.appendingPathComponent(modelName)
             let newPath = swiftTransformersDir.appendingPathComponent(modelName)
-            
+
             if FileManager.default.fileExists(atPath: oldPath.path) &&
                !FileManager.default.fileExists(atPath: newPath.path) {
                 do {
@@ -120,14 +120,14 @@ class ModelManager: ObservableObject {
                 }
             }
         }
-        
+
         // Also check root Models directory for any misplaced models
         do {
             let rootContents = try FileManager.default.contentsOfDirectory(
                 at: Self.modelsDirectory,
                 includingPropertiesForKeys: nil
             )
-            
+
             for item in rootContents {
                 let fileName = item.lastPathComponent
                 if swiftTransformersModels.contains(fileName) {
@@ -151,30 +151,30 @@ class ModelManager: ObservableObject {
         }
         return Self.modelsDirectory.appendingPathComponent(modelName)
     }
-    
+
     /// Get the framework-specific model path, ensuring directory exists
     func getFrameworkModelPath(modelName: String, framework: LLMFramework) -> URL {
         let frameworkDir = Self.modelsDirectory.appendingPathComponent(framework.directoryName)
-        
+
         // Ensure framework directory exists
         if !FileManager.default.fileExists(atPath: frameworkDir.path) {
             try? FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
         }
-        
+
         return frameworkDir.appendingPathComponent(modelName)
     }
 
     func isModelDownloaded(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
         // First check if it's a bundled model that's available
         let bundledModels = BundledModelsService.shared.bundledModels
-        if bundledModels.contains(where: { 
-            $0.name == modelName && 
+        if bundledModels.contains(where: {
+            $0.name == modelName &&
             (framework == nil || $0.framework == framework) &&
             $0.path != nil
         }) {
             return true
         }
-        
+
         // Check with framework subdirectory first
         if let framework = framework {
             let frameworkPath = Self.modelsDirectory
@@ -184,14 +184,14 @@ class ModelManager: ObservableObject {
                 return true
             }
         }
-        
+
         // Check all framework directories
         do {
             let frameworkDirs = try FileManager.default.contentsOfDirectory(
                 at: Self.modelsDirectory,
                 includingPropertiesForKeys: nil
             )
-            
+
             for frameworkDir in frameworkDirs {
                 var isDirectory: ObjCBool = false
                 if FileManager.default.fileExists(atPath: frameworkDir.path, isDirectory: &isDirectory),
@@ -205,7 +205,7 @@ class ModelManager: ObservableObject {
         } catch {
             print("Error checking for downloaded models: \(error)")
         }
-        
+
         // Legacy check - direct path
         let path = modelPath(for: modelName)
         return FileManager.default.fileExists(atPath: path.path)
@@ -275,14 +275,14 @@ class ModelManager: ObservableObject {
                 return
             }
         }
-        
+
         // Try all framework directories
         do {
             let frameworkDirs = try FileManager.default.contentsOfDirectory(
                 at: Self.modelsDirectory,
                 includingPropertiesForKeys: nil
             )
-            
+
             for frameworkDir in frameworkDirs {
                 var isDirectory: ObjCBool = false
                 if FileManager.default.fileExists(atPath: frameworkDir.path, isDirectory: &isDirectory),
@@ -297,14 +297,14 @@ class ModelManager: ObservableObject {
         } catch {
             print("Error searching for model to delete: \(error)")
         }
-        
+
         // Legacy path
         let path = modelPath(for: modelName)
         if FileManager.default.fileExists(atPath: path.path) {
             try FileManager.default.removeItem(at: path)
         }
     }
-    
+
     func verifyModelExists(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
         return isModelDownloaded(modelName, framework: framework)
     }
@@ -329,7 +329,7 @@ class ModelManager: ObservableObject {
                 return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
             }
         }
-        
+
         // Check all framework directories
         for framework in LLMFramework.allCases {
             let frameworkPath = getFrameworkModelPath(modelName: modelName, framework: framework)
@@ -337,13 +337,13 @@ class ModelManager: ObservableObject {
                 return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
             }
         }
-        
+
         // Legacy path
         let path = modelPath(for: modelName)
         if FileManager.default.fileExists(atPath: path.path) {
             return ModelSizeManager.shared.calculateSize(at: path)
         }
-        
+
         return nil
     }
 
@@ -364,11 +364,11 @@ class ModelManager: ObservableObject {
         // Add bundled models to available models
         let bundledModels = BundledModelsService.shared.bundledModels
         print("DEBUG ModelManager: Loading bundled models, found \(bundledModels.count) models")
-        
+
         for model in bundledModels {
             print("DEBUG ModelManager: Bundled model - \(model.name), framework: \(model.framework), path: \(model.path ?? "nil")")
         }
-        
+
         availableModels = bundledModels
 
         // Install bundled models if in debug mode
@@ -394,7 +394,7 @@ class ModelManager: ObservableObject {
             for url in contents {
                 // Skip hidden files
                 if url.lastPathComponent.hasPrefix(".") { continue }
-                
+
                 var isDirectory: ObjCBool = false
                 if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) {
                     if isDirectory.boolValue {
@@ -405,7 +405,7 @@ class ModelManager: ObservableObject {
                                 at: url,
                                 includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey]
                             )
-                            
+
                             for modelURL in frameworkContents {
                                 if modelURL.lastPathComponent.hasPrefix(".") { continue }
                                 if let modelInfo = await createModelInfo(from: modelURL, framework: framework) {
@@ -440,8 +440,8 @@ class ModelManager: ObservableObject {
         let fileExtension = url.pathExtension
 
         // Try to match with bundled models first
-        if let bundled = availableModels.first(where: { 
-            $0.name == fileName || 
+        if let bundled = availableModels.first(where: {
+            $0.name == fileName ||
             $0.id == url.deletingPathExtension().lastPathComponent ||
             isModelNameMatch($0.name, fileName)
         }) {
@@ -468,8 +468,8 @@ class ModelManager: ObservableObject {
         } else if let frameworkInfo = framework {
             // Check all models in this framework for a match
             let frameworkModels = registry.getAllModels(for: frameworkInfo)
-            if let matchingModel = frameworkModels.first(where: { 
-                isModelNameMatch($0.name, fileName) 
+            if let matchingModel = frameworkModels.first(where: {
+                isModelNameMatch($0.name, fileName)
             }) {
                 modelType = matchingModel.modelType ?? .text
             }
@@ -487,30 +487,30 @@ class ModelManager: ObservableObject {
             modelType: modelType
         )
     }
-    
+
     private func isModelNameMatch(_ modelName: String, _ fileName: String) -> Bool {
         let modelLower = modelName.lowercased()
         let fileLower = fileName.lowercased()
-        
+
         // Remove extensions for comparison
         let fileBase = fileLower.replacingOccurrences(of: ".gguf", with: "")
             .replacingOccurrences(of: ".onnx", with: "")
             .replacingOccurrences(of: ".mlpackage", with: "")
             .replacingOccurrences(of: ".tflite", with: "")
             .replacingOccurrences(of: ".mlmodelc", with: "")
-        
+
         // Check for exact match first
         if modelLower == fileBase || modelName == fileName {
             return true
         }
-        
+
         // Check if file is a temporary download file that might match this model
         // Pattern: download_<number>_<UUID>.tmp or similar
         if fileLower.hasPrefix("download_") && fileLower.contains("tmp") {
             // For temp files, we can't reliably match by name
             return false
         }
-        
+
         // Check for partial matches
         return modelLower.contains(fileBase) || fileBase.contains(modelLower)
     }
@@ -576,7 +576,7 @@ class ModelManager: ObservableObject {
         let format = ModelFormat.from(extension: url.pathExtension)
         let formatManager = ModelFormatManager.shared
         let handler = formatManager.getHandler(for: url, format: format)
-        
+
         // Use the format handler to verify the model
         try handler.verifyDownloadedModel(at: url)
     }

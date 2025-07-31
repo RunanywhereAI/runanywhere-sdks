@@ -282,7 +282,7 @@ Many models on HuggingFace now require authentication:
 ### Recommended Approach
 
 1. **For GGUF models**: Use the pre-configured URLs (all verified working)
-2. **For Core ML/MLX models**: 
+2. **For Core ML/MLX models**:
    - Clone the repository: `git clone https://huggingface.co/mlx-community/model-name`
    - Use the Model Import feature to add the downloaded directory
 3. **For authenticated models**:

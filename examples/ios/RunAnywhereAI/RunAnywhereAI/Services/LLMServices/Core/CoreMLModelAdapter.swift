@@ -16,28 +16,28 @@ import CoreML
 protocol CoreMLModelAdapter {
     /// The model this adapter supports
     var modelInfo: ModelInfo { get }
-    
+
     /// Maximum sequence length supported by the model
     var maxSequenceLength: Int { get }
-    
+
     /// Expected vocabulary size (if applicable)
     var vocabularySize: Int? { get }
-    
+
     /// Model-specific input names
     var inputNames: [String] { get }
-    
-    /// Model-specific output names  
+
+    /// Model-specific output names
     var outputNames: [String] { get }
-    
+
     /// Create input arrays for the model from tokens
     func createInputArrays(from tokens: [Int32]) throws -> [String: MLMultiArray]
-    
+
     /// Sample next token from model output
     func sampleNextToken(from prediction: MLFeatureProvider, lastTokenPosition: Int, temperature: Double) throws -> Int32
-    
+
     /// Validate if a Core ML model is compatible with this adapter
     func isCompatible(with model: MLModel) -> Bool
-    
+
     /// Get model-specific tokenizer if available
     func createTokenizer(modelPath: String) -> Tokenizer?
 }
@@ -54,7 +54,7 @@ class CoreMLAdapterFactory {
             // StableDiffusionCoreMLAdapter(modelInfo: modelInfo),
             // BERTCoreMLAdapter(modelInfo: modelInfo),
         ]
-        
+
         return adapters.first { $0.isCompatible(with: model) }
     }
 }

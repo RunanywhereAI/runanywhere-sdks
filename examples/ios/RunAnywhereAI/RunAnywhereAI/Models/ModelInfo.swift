@@ -114,7 +114,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     var displayName: String {
         rawValue
     }
-    
+
     /// Directory name for storing models of this framework
     var directoryName: String {
         switch self {
@@ -145,7 +145,7 @@ enum LLMFramework: String, CaseIterable, Codable {
         default: return .coreML  // Default to Core ML instead of mock
         }
     }
-    
+
     /// Get supported model formats for this framework
     var supportedFormats: [ModelFormat] {
         switch self {
@@ -167,7 +167,7 @@ enum LLMFramework: String, CaseIterable, Codable {
             return []
         }
     }
-    
+
     /// Check if this framework supports directory-based models
     var supportsDirectoryModels: Bool {
         switch self {
@@ -187,11 +187,11 @@ enum AuthType: String, Codable {
     case none = "None"
     case kaggle = "Kaggle"
     case huggingFace = "Hugging Face"
-    
+
     var displayName: String {
         rawValue
     }
-    
+
     var icon: String {
         switch self {
         case .none: return "lock.open"
@@ -210,7 +210,7 @@ enum ModelType: String, CaseIterable, Codable {
     case embedding = "Embeddings"
     case speech = "Speech"
     case other = "Other"
-    
+
     var icon: String {
         switch self {
         case .text: return "text.bubble"
@@ -221,7 +221,7 @@ enum ModelType: String, CaseIterable, Codable {
         case .other: return "questionmark.circle"
         }
     }
-    
+
     var supportedInChat: Bool {
         switch self {
         case .text, .multimodal:
@@ -241,7 +241,7 @@ struct ModelInfo: Identifiable, Codable {
     let format: ModelFormat
     let size: String
     let framework: LLMFramework
-    
+
     /// Unique identifier combining framework and model ID
     /// Format: "framework-directory.model-id" (e.g., "SwiftTransformers.distilgpt2-swift-transformers")
     var uniqueId: String {
@@ -261,11 +261,11 @@ struct ModelInfo: Identifiable, Codable {
     let authType: AuthType
     let alternativeURLs: [URL]
     let notes: String?
-    
+
     // Runtime properties (not encoded)
     var isURLValid: Bool = true
     var lastVerified: Date?
-    
+
     // Legacy support
     let description: String
     let minimumMemory: Int64
@@ -323,15 +323,15 @@ struct ModelInfo: Identifiable, Codable {
         let availableMemory = ProcessInfo.processInfo.physicalMemory
         return availableMemory >= minimumMemory
     }
-    
+
     var isBuiltIn: Bool {
         downloadURL?.scheme == "builtin"
     }
-    
+
     var isUnavailable: Bool {
         !isURLValid && !isBuiltIn && !requiresAuth
     }
-    
+
     // Custom Codable implementation to exclude runtime properties
     enum CodingKeys: String, CodingKey {
         case id, name, path, format, size, framework, quantization, contextLength

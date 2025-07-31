@@ -11,7 +11,7 @@ struct DownloadedModelsManagementView: View {
     @StateObject private var storageService = StorageMonitorService.shared
     @StateObject private var modelManager = ModelManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var selectedModels = Set<String>()
     @State private var isEditMode = false
     @State private var showingDeleteConfirmation = false
@@ -20,7 +20,7 @@ struct DownloadedModelsManagementView: View {
     @State private var deletionError: Error?
     @State private var showingError = false
     @State private var sortOrder: SortOrder = .sizeDescending
-    
+
     enum SortOrder: String, CaseIterable {
         case nameAscending = "Name (A-Z)"
         case nameDescending = "Name (Z-A)"
@@ -29,10 +29,10 @@ struct DownloadedModelsManagementView: View {
         case dateAscending = "Date (Oldest First)"
         case dateDescending = "Date (Newest First)"
     }
-    
+
     var sortedModels: [DownloadedModelInfo] {
         let models = storageService.storageInfo?.downloadedModels ?? []
-        
+
         switch sortOrder {
         case .nameAscending:
             return models.sorted { $0.name < $1.name }
@@ -48,24 +48,24 @@ struct DownloadedModelsManagementView: View {
             return models.sorted(by: { $0.downloadDate > $1.downloadDate })
         }
     }
-    
+
     var totalSelectedSize: Int64 {
         let models = storageService.storageInfo?.downloadedModels ?? []
         return models
             .filter { selectedModels.contains($0.path) }
             .reduce(0) { $0 + $1.size }
     }
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
                 if let storageInfo = storageService.storageInfo {
                     // Header with storage summary
                     storageHeaderView(storageInfo)
-                    
+
                     // Sort options
                     sortingView
-                    
+
                     // Models list
                     if sortedModels.isEmpty {
                         emptyStateView
@@ -85,7 +85,7 @@ struct DownloadedModelsManagementView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(isEditMode ? "Done" : "Edit") {
                         withAnimation {
@@ -120,9 +120,9 @@ struct DownloadedModelsManagementView: View {
             Text(deletionError?.localizedDescription ?? "Failed to delete model")
         }
     }
-    
+
     // MARK: - Subviews
-    
+
     private func storageHeaderView(_ storageInfo: StorageInfo) -> some View {
         VStack(spacing: 12) {
             // Storage overview
@@ -135,10 +135,10 @@ struct DownloadedModelsManagementView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                 }
-                
+
                 Divider()
                     .frame(height: 40)
-                
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Model Count")
                         .font(.caption)
@@ -147,11 +147,11 @@ struct DownloadedModelsManagementView: View {
                         .font(.title2)
                         .fontWeight(.bold)
                 }
-                
+
                 Spacer()
             }
             .padding(.horizontal)
-            
+
             // Selection info when in edit mode
             if isEditMode && !selectedModels.isEmpty {
                 HStack {
@@ -170,13 +170,13 @@ struct DownloadedModelsManagementView: View {
         .padding(.vertical)
         .background(Color(.secondarySystemBackground))
     }
-    
+
     private var sortingView: some View {
         HStack {
             Text("Sort by:")
                 .font(.caption)
                 .foregroundColor(.secondary)
-            
+
             Picker("Sort Order", selection: $sortOrder) {
                 ForEach(SortOrder.allCases, id: \.self) { order in
                     Text(order.rawValue).tag(order)
@@ -184,9 +184,9 @@ struct DownloadedModelsManagementView: View {
             }
             .pickerStyle(MenuPickerStyle())
             .font(.caption)
-            
+
             Spacer()
-            
+
             if isEditMode && !selectedModels.isEmpty {
                 Button(action: deleteSelectedModels) {
                     Label("Delete Selected", systemImage: "trash")
@@ -199,7 +199,7 @@ struct DownloadedModelsManagementView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
     }
-    
+
     private var modelsListView: some View {
         List {
             ForEach(sortedModels, id: \.path) { model in
@@ -226,7 +226,7 @@ struct DownloadedModelsManagementView: View {
         }
         .listStyle(PlainListStyle())
     }
-    
+
     private var emptyStateView: some View {
         ContentUnavailableView(
             "No Downloaded Models",
@@ -234,27 +234,27 @@ struct DownloadedModelsManagementView: View {
             description: Text("Download models from the Models tab to use them for inference")
         )
     }
-    
+
     // MARK: - Actions
-    
+
     private func deleteModel(_ model: DownloadedModelInfo) {
         isDeleting = true
-        
+
         Task {
             do {
                 // Delete the model file
                 try FileManager.default.removeItem(atPath: model.path)
-                
+
                 // Refresh storage info
                 await storageService.refreshStorageInfo()
-                
+
                 // Refresh model list
                 await modelManager.refreshModelList()
-                
+
                 await MainActor.run {
                     isDeleting = false
                     modelToDelete = nil
-                    
+
                     // Remove from selection if it was selected
                     selectedModels.remove(model.path)
                 }
@@ -267,19 +267,19 @@ struct DownloadedModelsManagementView: View {
             }
         }
     }
-    
+
     private func deleteSelectedModels() {
         showingDeleteConfirmation = true
         // Set modelToDelete to nil to trigger bulk delete
         modelToDelete = nil
     }
-    
+
     private func performBulkDelete() {
         isDeleting = true
-        
+
         Task {
             var failedDeletions: [String] = []
-            
+
             for modelPath in selectedModels {
                 do {
                     try FileManager.default.removeItem(atPath: modelPath)
@@ -287,18 +287,18 @@ struct DownloadedModelsManagementView: View {
                     failedDeletions.append(URL(fileURLWithPath: modelPath).lastPathComponent)
                 }
             }
-            
+
             // Refresh storage info
             await storageService.refreshStorageInfo()
-            
+
             // Refresh model list
             await modelManager.refreshModelList()
-            
+
             await MainActor.run {
                 isDeleting = false
                 selectedModels.removeAll()
                 isEditMode = false
-                
+
                 if !failedDeletions.isEmpty {
                     deletionError = NSError(
                         domain: "ModelDeletion",
@@ -310,11 +310,11 @@ struct DownloadedModelsManagementView: View {
             }
         }
     }
-    
+
     private func verifyModel(_ model: DownloadedModelInfo) {
         // Check if the file still exists
         let fileExists = FileManager.default.fileExists(atPath: model.path)
-        
+
         if !fileExists {
             // Model file is missing, refresh the list
             Task {
@@ -334,9 +334,9 @@ struct ModelRowView: View {
     let onToggleSelection: () -> Void
     let onDelete: () -> Void
     let onVerify: () -> Void
-    
+
     @State private var fileExists = true
-    
+
     private func formatPath(_ path: String) -> String {
         // Get the relative path from the Documents directory
         if let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path {
@@ -352,7 +352,7 @@ struct ModelRowView: View {
         }
         return path
     }
-    
+
     var body: some View {
         HStack(spacing: 12) {
             // Selection checkbox in edit mode
@@ -364,59 +364,59 @@ struct ModelRowView: View {
                         onToggleSelection()
                     }
             }
-            
+
             // Model icon
             Image(systemName: fileExists ? "doc.fill" : "doc.badge.exclamationmark")
                 .font(.title2)
                 .foregroundColor(fileExists ? frameworkColor : .red)
                 .frame(width: 40)
-            
+
             // Model info
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.name)
                     .font(.headline)
                     .lineLimit(1)
                     .foregroundColor(fileExists ? .primary : .secondary)
-                
+
                 HStack(spacing: 12) {
                     // Framework
                     Label(model.framework, systemImage: "cpu")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     // Size
                     Label(model.formattedSize, systemImage: "internaldrive")
                         .font(.caption)
                         .foregroundColor(.blue)
-                    
+
                     // Date
                     Label(model.formattedDate, systemImage: "calendar")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 // File path
                 Text(formatPath(model.path))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
-                
+
                 if !fileExists {
                     Text("File not found - tap to remove")
                         .font(.caption2)
                         .foregroundColor(.red)
                 }
             }
-            
+
             Spacer()
-            
+
             // Actions
             if !isEditMode {
                 Menu {
                     Button(action: onVerify) {
                         Label("Verify File", systemImage: "checkmark.shield")
                     }
-                    
+
                     Button(role: .destructive, action: onDelete) {
                         Label("Delete", systemImage: "trash")
                     }
@@ -440,7 +440,7 @@ struct ModelRowView: View {
             checkFileExists()
         }
     }
-    
+
     private var frameworkColor: Color {
         switch model.framework.lowercased() {
         case "core ml": return .blue
@@ -450,7 +450,7 @@ struct ModelRowView: View {
         default: return .secondary
         }
     }
-    
+
     private func checkFileExists() {
         fileExists = FileManager.default.fileExists(atPath: model.path)
     }

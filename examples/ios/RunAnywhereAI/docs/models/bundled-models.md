@@ -36,7 +36,7 @@ Edit `Services/BundledModelsService.swift`:
 ```swift
 var bundledModels: [ModelInfo] {
     var models: [ModelInfo] = []
-    
+
     // Example: OpenELM Model
     if let openELMPath = Bundle.main.path(forResource: "OpenELM-270M-Instruct-128-float32", ofType: "mlpackage") {
         models.append(ModelInfo(
@@ -52,7 +52,7 @@ var bundledModels: [ModelInfo] {
             description: "Your model description"
         ))
     }
-    
+
     // Add your new model here
     if let yourModelPath = Bundle.main.path(forResource: "YourModelName", ofType: "mlpackage") {
         models.append(ModelInfo(
@@ -68,7 +68,7 @@ var bundledModels: [ModelInfo] {
             description: "Description of your model"
         ))
     }
-    
+
     return models
 }
 ```

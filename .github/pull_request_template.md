@@ -14,7 +14,7 @@ Brief description of the changes made.
 ## Labels
 Please add the appropriate label(s):
 - [ ] `iOS SDK` - Changes to iOS/Swift SDK
-- [ ] `Android SDK` - Changes to Android/Kotlin SDK  
+- [ ] `Android SDK` - Changes to Android/Kotlin SDK
 - [ ] `iOS Sample` - Changes to iOS example app
 - [ ] `Android Sample` - Changes to Android example app
 

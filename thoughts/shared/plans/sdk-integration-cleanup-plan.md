@@ -71,7 +71,7 @@ Integrate with:
 ```swift
 public struct Configuration {
     // ... existing fields ...
-    
+
     // New fields for unified architecture
     public var preferredFrameworks: [LLMFramework]
     public var hardwarePreferences: HardwareConfiguration?
@@ -104,7 +104,7 @@ public struct DownloadConfig {
 ```swift
 public struct GenerationResult {
     // ... existing fields ...
-    
+
     // New fields
     public let framework: LLMFramework?
     public let hardwareUsed: HardwareAcceleration

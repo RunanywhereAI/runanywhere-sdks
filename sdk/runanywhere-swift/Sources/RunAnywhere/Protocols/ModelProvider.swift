@@ -4,35 +4,35 @@ import Foundation
 public protocol ModelProvider {
     /// Name of the provider
     var name: String { get }
-    
+
     /// Whether authentication is required
     var requiresAuthentication: Bool { get }
-    
+
     /// Search for models
     /// - Parameters:
     ///   - query: Search query
     ///   - filters: Additional filters
     /// - Returns: Array of discovered models
     func searchModels(query: String, filters: ModelSearchFilters?) async throws -> [ModelInfo]
-    
+
     /// Get model details
     /// - Parameter modelId: The model identifier
     /// - Returns: Detailed model information
     func getModelDetails(modelId: String) async throws -> ModelInfo
-    
+
     /// Get download URL for a model
     /// - Parameter model: The model to download
     /// - Returns: Download URL
     func getDownloadURL(for model: ModelInfo) async throws -> URL
-    
+
     /// Authenticate with the provider
     /// - Parameter credentials: Authentication credentials
     func authenticate(with credentials: ProviderCredentials) async throws
-    
+
     /// Check if authenticated
     /// - Returns: Whether the provider is authenticated
     func isAuthenticated() -> Bool
-    
+
     /// List available models
     /// - Parameter limit: Maximum number of models to return
     /// - Returns: Array of available models
@@ -48,7 +48,7 @@ public struct ModelSearchFilters {
     public let tags: [String]
     public let author: String?
     public let sortBy: SortOption?
-    
+
     public enum SortOption {
         case relevance
         case downloads
@@ -56,7 +56,7 @@ public struct ModelSearchFilters {
         case recent
         case alphabetical
     }
-    
+
     public init(
         format: ModelFormat? = nil,
         framework: LLMFramework? = nil,
@@ -88,17 +88,17 @@ public enum ProviderCredentials {
 public protocol MetadataExtractorProtocol {
     /// Supported model formats
     var supportedFormats: [ModelFormat] { get }
-    
+
     /// Extract metadata from a model file
     /// - Parameter url: URL to the model file
     /// - Returns: Extracted metadata
     func extractMetadata(from url: URL) async throws -> ModelMetadata
-    
+
     /// Validate model file
     /// - Parameter url: URL to the model file
     /// - Returns: Whether the model is valid
     func validateModel(at url: URL) async throws -> Bool
-    
+
     /// Get model requirements
     /// - Parameter url: URL to the model file
     /// - Returns: Model requirements

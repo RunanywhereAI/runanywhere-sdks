@@ -10,7 +10,7 @@ import java.io.FileReader
  */
 object HardwareDetector {
     private const val TAG = "HardwareDetector"
-    
+
     /**
      * Detects the device chipset manufacturer and model
      */
@@ -18,31 +18,31 @@ object HardwareDetector {
         val hardware = Build.HARDWARE.lowercase()
         val board = Build.BOARD.lowercase()
         val device = Build.DEVICE.lowercase()
-        
+
         Log.d(TAG, "Hardware: $hardware, Board: $board, Device: $device")
-        
+
         return when {
             // Qualcomm Snapdragon
-            hardware.contains("qcom") || 
+            hardware.contains("qcom") ||
             board.contains("msm") ||
             board.contains("sdm") ||
             board.contains("sm") -> {
                 Chipset.QUALCOMM(getQualcommModel())
             }
-            
+
             // Samsung Exynos
             hardware.contains("exynos") ||
             board.contains("exynos") -> {
                 Chipset.SAMSUNG_EXYNOS(getExynosModel())
             }
-            
+
             // MediaTek
             hardware.contains("mt") ||
             board.contains("mt") ||
             hardware.contains("mediatek") -> {
                 Chipset.MEDIATEK(getMediaTekModel())
             }
-            
+
             // Google Tensor
             hardware.contains("tensor") ||
             device.contains("oriole") || // Pixel 6
@@ -53,17 +53,17 @@ object HardwareDetector {
             {
                 Chipset.GOOGLE_TENSOR(getTensorModel())
             }
-            
+
             // Huawei Kirin
             hardware.contains("kirin") ||
             board.contains("kirin") -> {
                 Chipset.HUAWEI_KIRIN(getKirinModel())
             }
-            
+
             else -> Chipset.UNKNOWN
         }
     }
-    
+
     /**
      * Determines if the device has a neural processing unit
      */
@@ -77,40 +77,40 @@ object HardwareDetector {
             else -> false
         }
     }
-    
+
     /**
      * Gets the optimal backend for the current device
      */
     fun getOptimalBackend(): Backend {
         val chipset = getChipset()
-        
+
         return when {
             // Qualcomm with Hexagon DSP
             chipset is Chipset.QUALCOMM && hasQualcommHexagon() -> Backend.QNN
-            
+
             // Google Tensor with TPU
             chipset is Chipset.GOOGLE_TENSOR -> Backend.NNAPI
-            
+
             // Samsung with NPU
             chipset is Chipset.SAMSUNG_EXYNOS && hasSamsungNPU() -> Backend.SAMSUNG_NPU
-            
+
             // MediaTek with APU
             chipset is Chipset.MEDIATEK && hasMediaTekAPU() -> Backend.MEDIATEK_APU
-            
+
             // Vulkan capable GPU
             hasVulkanSupport() -> Backend.VULKAN
-            
+
             // OpenCL capable GPU
             hasOpenCLSupport() -> Backend.OPENCL
-            
+
             // NNAPI as fallback for Android 8.1+
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 -> Backend.NNAPI
-            
+
             // CPU fallback
             else -> Backend.CPU
         }
     }
-    
+
     private fun getQualcommModel(): String {
         val hardware = Build.HARDWARE.lowercase()
         return when {
@@ -125,7 +125,7 @@ object HardwareDetector {
             else -> "Snapdragon"
         }
     }
-    
+
     private fun getExynosModel(): String {
         val board = Build.BOARD.lowercase()
         return when {
@@ -137,7 +137,7 @@ object HardwareDetector {
             else -> "Exynos"
         }
     }
-    
+
     private fun getMediaTekModel(): String {
         val hardware = Build.HARDWARE.lowercase()
         return when {
@@ -148,7 +148,7 @@ object HardwareDetector {
             else -> "MediaTek"
         }
     }
-    
+
     private fun getTensorModel(): String {
         val device = Build.DEVICE.lowercase()
         return when {
@@ -157,7 +157,7 @@ object HardwareDetector {
             else -> "Tensor"
         }
     }
-    
+
     private fun getKirinModel(): String {
         val hardware = Build.HARDWARE.lowercase()
         return when {
@@ -167,41 +167,41 @@ object HardwareDetector {
             else -> "Kirin"
         }
     }
-    
+
     private fun hasQualcommHexagon(): Boolean {
         // Snapdragon 835 and newer have Hexagon DSP
         val model = getQualcommModel()
         return model.contains("8") || model.contains("7")
     }
-    
+
     private fun hasSamsungNPU(): Boolean {
         // Exynos 9820 and newer have NPU
         val model = getExynosModel()
         return model.contains("2") || model.contains("990") || model.contains("9925")
     }
-    
+
     private fun hasMediaTekAPU(): Boolean {
         // Dimensity 1000 and newer have APU
         val model = getMediaTekModel()
         return model.contains("Dimensity")
     }
-    
+
     private fun hasKirinNPU(): Boolean {
         // Kirin 970 and newer have NPU
         val model = getKirinModel()
         return model.contains("9")
     }
-    
+
     fun hasVulkanSupport(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
     }
-    
+
     fun hasOpenCLSupport(): Boolean {
         // Most modern Android GPUs support OpenCL
         // This is a simplified check
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP
     }
-    
+
     /**
      * Represents different chipset manufacturers
      */
@@ -213,7 +213,7 @@ object HardwareDetector {
         data class HUAWEI_KIRIN(val model: String) : Chipset()
         object UNKNOWN : Chipset()
     }
-    
+
     /**
      * Available backend options for AI inference
      */
@@ -227,7 +227,7 @@ object HardwareDetector {
         MEDIATEK_APU,  // MediaTek AI Processing Unit
         XNNPACK        // Cross-platform neural network inference
     }
-    
+
     /**
      * Gets device information for debugging
      */

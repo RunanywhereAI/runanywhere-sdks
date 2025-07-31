@@ -4,40 +4,40 @@ import Foundation
 public struct GenerationResult {
     /// Generated text
     public let text: String
-    
+
     /// Number of tokens used
     public let tokensUsed: Int
-    
+
     /// Model used for generation
     public let modelUsed: String
-    
+
     /// Latency in milliseconds
     public let latencyMs: TimeInterval
-    
+
     /// Execution target (device/cloud/hybrid)
     public let executionTarget: ExecutionTarget
-    
+
     /// Amount saved by using on-device execution
     public let savedAmount: Double
-    
+
     /// Framework used for generation (if on-device)
     public let framework: LLMFramework?
-    
+
     /// Hardware acceleration used
     public let hardwareUsed: HardwareAcceleration
-    
+
     /// Memory used during generation (in bytes)
     public let memoryUsed: Int64
-    
+
     /// Tokenizer format used
     public let tokenizerFormat: TokenizerFormat?
-    
+
     /// Detailed performance metrics
     public let performanceMetrics: PerformanceMetrics
-    
+
     /// Additional metadata
     public let metadata: ResultMetadata?
-    
+
     /// Initializer
     internal init(
         text: String,
@@ -72,22 +72,22 @@ public struct GenerationResult {
 public struct PerformanceMetrics {
     /// Time spent on tokenization (milliseconds)
     public let tokenizationTimeMs: TimeInterval
-    
+
     /// Time spent on inference (milliseconds)
     public let inferenceTimeMs: TimeInterval
-    
+
     /// Time spent on post-processing (milliseconds)
     public let postProcessingTimeMs: TimeInterval
-    
+
     /// Tokens generated per second
     public let tokensPerSecond: Double
-    
+
     /// Peak memory usage during generation
     public let peakMemoryUsage: Int64
-    
+
     /// Queue wait time if any (milliseconds)
     public let queueWaitTimeMs: TimeInterval
-    
+
     public init(
         tokenizationTimeMs: TimeInterval = 0,
         inferenceTimeMs: TimeInterval = 0,
@@ -113,7 +113,7 @@ public struct ResultMetadata {
     public let modelVersion: String?
     public let experimentId: String?
     public let debugInfo: DebugInfo?
-    
+
     public init(
         routingReason: RoutingReasonType,
         fallbackUsed: Bool = false,
@@ -148,7 +148,7 @@ public struct DebugInfo {
     public let endTime: Date
     public let threadCount: Int
     public let deviceLoad: DeviceLoadLevel
-    
+
     public init(startTime: Date, endTime: Date, threadCount: Int, deviceLoad: DeviceLoadLevel) {
         self.startTime = startTime
         self.endTime = endTime
@@ -164,7 +164,7 @@ public enum DeviceLoadLevel {
     case moderate   // 40-60%
     case high       // 60-80%
     case critical   // 80-100%
-    
+
     public init(percentage: Double) {
         switch percentage {
         case 0..<0.2:

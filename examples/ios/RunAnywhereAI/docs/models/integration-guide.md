@@ -155,10 +155,10 @@ tflite_model = converter.convert()
    ```swift
    // Core ML
    let modelURL = Bundle.main.url(forResource: "GPT2", withExtension: "mlpackage")!
-   
+
    // TensorFlow Lite
    let tfliteURL = Bundle.main.url(forResource: "gemma-2b", withExtension: "tflite")!
-   
+
    // ONNX Runtime
    let onnxURL = Bundle.main.url(forResource: "phi3", withExtension: "onnxRuntime")!
    ```
@@ -169,26 +169,26 @@ tflite_model = converter.convert()
    ```swift
    class ModelDownloadManager {
        static let shared = ModelDownloadManager()
-       
-       func downloadModel(_ modelInfo: ModelInfo, 
+
+       func downloadModel(_ modelInfo: ModelInfo,
                          progress: @escaping (Double) -> Void) async throws -> URL {
            guard let downloadURL = modelInfo.downloadURL else {
                throw ModelError.noDownloadURL
            }
-           
+
            let session = URLSession(configuration: .default)
            let (localURL, response) = try await session.download(from: downloadURL)
-           
+
            // Move to permanent location
-           let documentsPath = FileManager.default.urls(for: .documentDirectory, 
+           let documentsPath = FileManager.default.urls(for: .documentDirectory,
                                                        in: .userDomainMask)[0]
            let modelDir = documentsPath.appendingPathComponent("Models/\(modelInfo.framework)")
-           try FileManager.default.createDirectory(at: modelDir, 
+           try FileManager.default.createDirectory(at: modelDir,
                                                  withIntermediateDirectories: true)
-           
+
            let finalURL = modelDir.appendingPathComponent(modelInfo.name)
            try FileManager.default.moveItem(at: localURL, to: finalURL)
-           
+
            return finalURL
        }
    }
@@ -213,15 +213,15 @@ import CloudKit
 func uploadModelToCloudKit(modelURL: URL, modelInfo: ModelInfo) async throws {
     let container = CKContainer.default()
     let database = container.publicCloudDatabase
-    
+
     let record = CKRecord(recordType: "Model")
     record["name"] = modelInfo.name
     record["format"] = modelInfo.format.rawValue
     record["version"] = modelInfo.version
-    
+
     let asset = CKAsset(fileURL: modelURL)
     record["modelFile"] = asset
-    
+
     try await database.save(record)
 }
 ```
@@ -254,7 +254,7 @@ func uploadModelToCloudKit(modelURL: URL, modelInfo: ModelInfo) async throws {
 ```swift
 struct ModelCDN {
     static let baseURL = "https://cdn.runanywhereai.com/models/"
-    
+
     static func modelURL(for model: ModelInfo) -> URL {
         let path = "\(model.framework)/\(model.version)/\(model.name)"
         return URL(string: baseURL + path)!
@@ -266,19 +266,19 @@ struct ModelCDN {
 ```swift
 func downloadFromCDN(model: ModelInfo) async throws -> URL {
     let cdnURL = ModelCDN.modelURL(for: model)
-    
+
     // Check cache first
     if let cachedURL = ModelCache.shared.getCachedModel(model) {
         return cachedURL
     }
-    
+
     // Download with resume capability
     let download = URLSession.shared.downloadTask(with: cdnURL)
     download.resume()
-    
+
     // Save to cache
     ModelCache.shared.cache(modelURL, for: model)
-    
+
     return modelURL
 }
 ```
@@ -297,10 +297,10 @@ struct ModelDelta {
 func applyModelDelta(_ delta: ModelDelta, to baseModel: URL) async throws -> URL {
     // Download delta
     let deltaData = try await downloadDelta(delta.deltaURL)
-    
+
     // Apply patch using bsdiff or similar
     let updatedModel = try applyPatch(baseModel, delta: deltaData)
-    
+
     return updatedModel
 }
 ```
@@ -316,12 +316,12 @@ struct ModelSecurity {
         let data = try Data(contentsOf: url)
         let hash = SHA256.hash(data: data)
         let hashString = hash.compactMap { String(format: "%02x", $0) }.joined()
-        
+
         guard hashString == expectedHash else {
             throw ModelError.invalidChecksum
         }
     }
-    
+
     // Sign models with developer certificate
     static func signModel(at url: URL) throws {
         // Implementation depends on signing method
@@ -346,13 +346,13 @@ func secureModelStorage() -> URL {
                                           appropriateFor: nil,
                                           create: true)!
     let secureDir = container.appendingPathComponent("SecureModels")
-    
+
     // Set protection level
     try! FileManager.default.setAttributes(
         [.protectionKey: FileProtectionType.complete],
         ofItemAtPath: secureDir.path
     )
-    
+
     return secureDir
 }
 ```
@@ -382,20 +382,20 @@ class ModelStorageManager {
             at: modelsDir,
             includingPropertiesForKeys: [.creationDateKey, .fileSizeKey]
         )
-        
+
         // Sort by creation date
         let sorted = contents.sorted { url1, url2 in
             let date1 = try! url1.resourceValues(forKeys: [.creationDateKey]).creationDate!
             let date2 = try! url2.resourceValues(forKeys: [.creationDateKey]).creationDate!
             return date1 > date2
         }
-        
+
         // Remove old models
         for modelURL in sorted.dropFirst(keepLatest) {
             try FileManager.default.removeItem(at: modelURL)
         }
     }
-    
+
     // Get storage usage
     func getStorageUsage() -> Int64 {
         let modelsDir = getModelsDirectory()
@@ -413,11 +413,11 @@ struct ModelVersion: Codable {
     let minor: Int
     let patch: Int
     let build: String
-    
+
     var string: String {
         "\(major).\(minor).\(patch)-\(build)"
     }
-    
+
     func isNewer(than other: ModelVersion) -> Bool {
         if major != other.major { return major > other.major }
         if minor != other.minor { return minor > other.minor }
@@ -431,7 +431,7 @@ class ModelVersionTracker {
     func getCurrentVersion(for model: String) -> ModelVersion? {
         UserDefaults.standard.object(forKey: "model_version_\(model)") as? ModelVersion
     }
-    
+
     func updateVersion(for model: String, version: ModelVersion) {
         UserDefaults.standard.set(version, forKey: "model_version_\(model)")
     }
@@ -446,7 +446,7 @@ class ModelPreloader {
     func preloadModelsForUser() async {
         // Get user's most used models
         let frequentModels = Analytics.shared.getMostUsedModels(limit: 3)
-        
+
         // Preload in background
         for modelId in frequentModels {
             Task.detached(priority: .background) {
@@ -454,7 +454,7 @@ class ModelPreloader {
             }
         }
     }
-    
+
     // Predictive preloading
     func predictivePreload(currentModel: String) {
         let nextLikelyModel = ModelPredictor.shared.predictNext(after: currentModel)
@@ -485,7 +485,7 @@ func checkStorageAvailable(for modelSize: Int64) -> Bool {
     let fileURL = URL(fileURLWithPath: NSHomeDirectory())
     let values = try? fileURL.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey])
     let available = values?.volumeAvailableCapacityForImportantUsage ?? 0
-    
+
     // Require 2x model size for safety
     return available > modelSize * 2
 }

@@ -30,11 +30,11 @@ fun ModelsScreen(
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val selectedModel by viewModel.selectedModel.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    
+
     LaunchedEffect(Unit) {
         viewModel.refreshModels()
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -79,7 +79,7 @@ fun ModelsScreen(
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
-                    
+
                     items(downloadedModels) { model ->
                         ModelCard(
                             model = model,
@@ -93,7 +93,7 @@ fun ModelsScreen(
                         )
                     }
                 }
-                
+
                 // Available models section
                 item {
                     Text(
@@ -103,7 +103,7 @@ fun ModelsScreen(
                         modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
-                
+
                 items(availableModels.filter { available ->
                     downloadedModels.none { it.id == available.id }
                 }) { model ->
@@ -161,15 +161,15 @@ fun ModelCard(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
-                    
+
                     Text(
                         text = model.description,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    
+
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssistChip(
                             onClick = { },
@@ -182,7 +182,7 @@ fun ModelCard(
                                 )
                             }
                         )
-                        
+
                         AssistChip(
                             onClick = { },
                             label = { Text(formatBytes(model.sizeBytes)) },
@@ -194,7 +194,7 @@ fun ModelCard(
                                 )
                             }
                         )
-                        
+
                         AssistChip(
                             onClick = { },
                             label = { Text(model.quantization) },
@@ -208,7 +208,7 @@ fun ModelCard(
                         )
                     }
                 }
-                
+
                 // Action buttons
                 if (model.isDownloaded) {
                     Row {
@@ -230,11 +230,11 @@ fun ModelCard(
                     }
                 }
             }
-            
+
             // Download progress
             downloadProgress?.let { progress ->
                 Spacer(modifier = Modifier.height(8.dp))
-                
+
                 when (val state = progress.progress) {
                     is DownloadProgress.Starting -> {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())

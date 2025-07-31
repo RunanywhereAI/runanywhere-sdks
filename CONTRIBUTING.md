@@ -111,7 +111,7 @@ docs: update README with new API examples
    # Android
    cd sdk/runanywhere-android/
    ./gradlew test lint
-   
+
    # iOS
    cd sdk/runanywhere-swift/
    swift test

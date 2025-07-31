@@ -45,22 +45,22 @@ data class MessageEntity(
 interface ConversationDao {
     @Query("SELECT * FROM conversations ORDER BY updatedAt DESC")
     fun getAllConversations(): Flow<List<ConversationEntity>>
-    
+
     @Query("SELECT * FROM conversations WHERE id = :id")
     suspend fun getConversation(id: String): ConversationEntity?
-    
+
     @Query("SELECT * FROM conversations WHERE title LIKE '%' || :query || '%' ORDER BY updatedAt DESC")
     fun searchConversations(query: String): Flow<List<ConversationEntity>>
-    
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertConversation(conversation: ConversationEntity)
-    
+
     @Update
     suspend fun updateConversation(conversation: ConversationEntity)
-    
+
     @Delete
     suspend fun deleteConversation(conversation: ConversationEntity)
-    
+
     @Query("DELETE FROM conversations WHERE updatedAt < :timestamp")
     suspend fun deleteOldConversations(timestamp: Instant)
 }
@@ -69,13 +69,13 @@ interface ConversationDao {
 interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationId = :conversationId ORDER BY timestamp ASC")
     fun getMessagesForConversation(conversationId: String): Flow<List<MessageEntity>>
-    
+
     @Insert
     suspend fun insertMessage(message: MessageEntity)
-    
+
     @Query("SELECT SUM(tokenCount) FROM messages WHERE conversationId = :conversationId")
     suspend fun getTotalTokensForConversation(conversationId: String): Int
-    
+
     @Query("DELETE FROM messages WHERE conversationId = :conversationId AND timestamp < :timestamp")
     suspend fun trimOldMessages(conversationId: String, timestamp: Instant)
 }
@@ -89,11 +89,11 @@ interface MessageDao {
 abstract class ConversationDatabase : RoomDatabase() {
     abstract fun conversationDao(): ConversationDao
     abstract fun messageDao(): MessageDao
-    
+
     companion object {
         @Volatile
         private var INSTANCE: ConversationDatabase? = null
-        
+
         fun getInstance(context: Context): ConversationDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -112,7 +112,7 @@ abstract class ConversationDatabase : RoomDatabase() {
 class Converters {
     @TypeConverter
     fun fromInstant(value: Instant?): Long? = value?.toEpochMilli()
-    
+
     @TypeConverter
     fun toInstant(value: Long?): Instant? = value?.let { Instant.ofEpochMilli(it) }
 }

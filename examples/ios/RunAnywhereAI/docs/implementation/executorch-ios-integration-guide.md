@@ -71,31 +71,31 @@ import ExecuTorch
 ```swift
 class ModelRunner {
     private var module: Module?
-    
+
     func loadModel(path: String) throws {
         // Create module instance
         module = Module(filePath: path)
-        
+
         // Load the model and prepare for execution
         try module?.load("forward")
     }
-    
+
     func runInference(input: [Float], shape: [Int]) throws -> [Float] {
         guard let module = module else {
             throw ModelError.notLoaded
         }
-        
+
         // Create input tensor
         let inputTensor = Tensor(input, shape: shape)
-        
+
         // Execute forward pass
         let outputs = try module.forward(inputTensor)
-        
+
         // Extract output tensor
         guard let outputTensor: Tensor<Float> = outputs.first?.toTensor() else {
             throw ModelError.invalidOutput
         }
-        
+
         // Get output data
         return try outputTensor.scalars()
     }
@@ -137,21 +137,21 @@ class LLMRunner {
     private let modelPath: String
     private let tokenizerPath: String
     private var runner: LLaMARunner?
-    
+
     init(modelPath: String, tokenizerPath: String) {
         self.modelPath = modelPath
         self.tokenizerPath = tokenizerPath
     }
-    
+
     func load() throws {
         runner = LLaMARunner(
             modelPath: modelPath,
             tokenizerPath: tokenizerPath
         )
-        
+
         try runner?.load()
     }
-    
+
     func generate(
         prompt: String,
         maxTokens: Int = 768,
@@ -160,7 +160,7 @@ class LLMRunner {
         guard let runner = runner else {
             throw LLMError.notLoaded
         }
-        
+
         try runner.generate(
             prompt,
             sequenceLength: maxTokens,
@@ -169,7 +169,7 @@ class LLMRunner {
             }
         )
     }
-    
+
     func stop() {
         runner?.stop()
     }
@@ -187,7 +187,7 @@ struct ChatView: View {
         modelPath: "path/to/model.pte",
         tokenizerPath: "path/to/tokenizer.bin"
     )
-    
+
     var body: some View {
         VStack {
             ScrollView {
@@ -195,11 +195,11 @@ struct ChatView: View {
                     MessageBubble(message: message)
                 }
             }
-            
+
             HStack {
                 TextField("Enter prompt...", text: $prompt)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
-                
+
                 Button(action: generateResponse) {
                     Image(systemName: isGenerating ? "stop.circle" : "arrow.up.circle.fill")
                 }
@@ -213,16 +213,16 @@ struct ChatView: View {
             }
         }
     }
-    
+
     private func generateResponse() {
         let userPrompt = prompt
         prompt = ""
         isGenerating = true
-        
+
         messages.append(Message(text: userPrompt, isUser: true))
         var responseMessage = Message(text: "", isUser: false)
         messages.append(responseMessage)
-        
+
         Task {
             do {
                 try llmRunner.generate(prompt: userPrompt) { token in
@@ -233,7 +233,7 @@ struct ChatView: View {
             } catch {
                 messages[messages.count - 1].text = "Error: \(error)"
             }
-            
+
             isGenerating = false
         }
     }
@@ -250,7 +250,7 @@ import UniformTypeIdentifiers
 struct ModelPicker: View {
     @Binding var modelPath: String?
     @State private var isImporting = false
-    
+
     var body: some View {
         Button("Select Model") {
             isImporting = true
@@ -280,13 +280,13 @@ class ModelManager: ObservableObject {
         for: .documentDirectory,
         in: .userDomainMask
     ).first!
-    
+
     func downloadModel(from url: URL) async throws {
         let (data, _) = try await URLSession.shared.data(from: url)
         let fileName = url.lastPathComponent
         let fileURL = documentsPath.appendingPathComponent(fileName)
         try data.write(to: fileURL)
-        
+
         await MainActor.run {
             availableModels.append(ModelInfo(
                 name: fileName,
@@ -294,7 +294,7 @@ class ModelManager: ObservableObject {
             ))
         }
     }
-    
+
     func loadModel(_ info: ModelInfo) throws -> Module {
         let module = Module(filePath: info.path)
         try module.load("forward")
@@ -322,17 +322,17 @@ OTHER_LDFLAGS = $(inherited) \
 class ResourceMonitor: ObservableObject {
     @Published var usedMemory: Int = 0
     private var timer: Timer?
-    
+
     func start() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             self.updateMemoryUsage()
         }
     }
-    
+
     private func updateMemoryUsage() {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(mach_task_self_,
@@ -341,7 +341,7 @@ class ResourceMonitor: ObservableObject {
                          &count)
             }
         }
-        
+
         if result == KERN_SUCCESS {
             usedMemory = Int(info.resident_size / 1024 / 1024)
         }
@@ -434,7 +434,7 @@ struct ImageClassifierView: View {
     @State private var prediction = ""
     @State private var isProcessing = false
     private let model = try? Module(filePath: Bundle.main.path(forResource: "mobilenet", ofType: "pte")!)
-    
+
     var body: some View {
         VStack {
             if let image = selectedImage {
@@ -443,15 +443,15 @@ struct ImageClassifierView: View {
                     .scaledToFit()
                     .frame(height: 300)
             }
-            
+
             Text(prediction)
                 .font(.headline)
                 .padding()
-            
+
             Button("Select Image") {
                 // Show image picker
             }
-            
+
             Button("Classify") {
                 classifyImage()
             }
@@ -461,27 +461,27 @@ struct ImageClassifierView: View {
             try? model?.load("forward")
         }
     }
-    
+
     private func classifyImage() {
         guard let image = selectedImage,
               let model = model else { return }
-        
+
         isProcessing = true
-        
+
         Task {
             do {
                 // Preprocess image to [1, 3, 224, 224]
                 let input = preprocessImage(image)
                 let inputTensor = Tensor(input, shape: [1, 3, 224, 224])
-                
+
                 // Run inference
                 let outputs = try model.forward(inputTensor)
-                
+
                 // Process results
                 if let logits: Tensor<Float> = outputs.first?.toTensor() {
                     let scores = try logits.scalars()
                     let topClass = scores.enumerated().max(by: { $0.1 < $1.1 })?.0 ?? 0
-                    
+
                     await MainActor.run {
                         prediction = "Class: \(topClass)"
                         isProcessing = false
@@ -495,7 +495,7 @@ struct ImageClassifierView: View {
             }
         }
     }
-    
+
     private func preprocessImage(_ image: UIImage) -> [Float] {
         // Image preprocessing logic
         // Resize to 224x224, normalize, convert to CHW format

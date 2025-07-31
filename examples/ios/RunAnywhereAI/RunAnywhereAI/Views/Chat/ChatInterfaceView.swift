@@ -141,9 +141,9 @@ struct ChatInterfaceView: View {
                                 .foregroundColor(.primary)
                                 .lineLimit(1)
                         }
-                        
+
                         Spacer()
-                        
+
                         // Model info
                         HStack(spacing: 12) {
                             if let quantization = model.quantization {
@@ -154,7 +154,7 @@ struct ChatInterfaceView: View {
                                     .background(Color(.tertiarySystemGroupedBackground))
                                     .cornerRadius(6)
                             }
-                            
+
                             Text(model.displaySize)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -179,7 +179,7 @@ struct ChatInterfaceView: View {
                     .background(Color(.systemGray6))
                     .cornerRadius(10)
                 }
-                
+
                 // Selection buttons
                 HStack(spacing: 8) {
                     // Framework selector
@@ -195,7 +195,7 @@ struct ChatInterfaceView: View {
                         .background(Color(.tertiarySystemBackground))
                         .cornerRadius(8)
                     }
-                    
+
                     // Model selector
                     Button(action: { showingModelPicker = true }) {
                         HStack {
@@ -214,7 +214,7 @@ struct ChatInterfaceView: View {
                 }
             }
             .padding(.horizontal)
-            
+
             // Performance metrics bar
             if viewModel.isGenerating {
                 HStack {
@@ -225,9 +225,9 @@ struct ChatInterfaceView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Spacer()
-                    
+
                     if let tokensPerSecond = viewModel.currentTokensPerSecond {
                         Label("\(String(format: "%.1f", tokensPerSecond)) tokens/s", systemImage: "speedometer")
                             .font(.caption)
@@ -236,7 +236,7 @@ struct ChatInterfaceView: View {
                 }
                 .padding(.horizontal)
             }
-            
+
             // Model loading indicator
             if viewModel.isLoadingModel {
                 HStack(spacing: 8) {
@@ -257,7 +257,7 @@ struct ChatInterfaceView: View {
         .padding(.vertical, 8)
         .background(Color(.secondarySystemBackground))
     }
-    
+
     private func frameworkIcon(for framework: LLMFramework) -> String {
         switch framework {
         case .coreML: return "brain.head.profile"
@@ -306,7 +306,7 @@ struct ChatInterfaceView: View {
 
     private func sendMessage() {
         guard !messageText.isEmpty else { return }
-        
+
         // Check if a model is selected
         guard viewModel.selectedModel != nil else {
             showingNoModelAlert = true
@@ -356,13 +356,13 @@ struct MessageBubbleView: View {
                                     Image(systemName: "cube.box.fill")
                                         .font(.system(size: 10))
                                         .foregroundColor(.accentColor)
-                                    
+
                                     Text(modelName)
                                         .font(.caption)
                                         .fontWeight(.medium)
                                         .foregroundColor(.accentColor)
                                         .lineLimit(1)
-                                    
+
                                     Image(systemName: "chevron.right")
                                         .font(.system(size: 8))
                                         .foregroundColor(.accentColor.opacity(0.7))
@@ -374,18 +374,18 @@ struct MessageBubbleView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                         }
-                        
+
                         // Performance metrics
                         if let metrics = message.generationMetrics as? EnhancedGenerationMetrics {
                             HStack(spacing: 8) {
                                 Label("\(metrics.tokenCount) tokens", systemImage: "text.word.spacing")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
-                                
+
                                 Label("\(String(format: "%.1f", metrics.tokensPerSecond)) t/s", systemImage: "speedometer")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
-                                
+
                                 if metrics.totalTime > 0 {
                                     Label("\(String(format: "%.1fs", metrics.totalTime))", systemImage: "clock")
                                         .font(.caption2)
@@ -395,7 +395,7 @@ struct MessageBubbleView: View {
                         }
                     }
                 }
-                
+
                 Text(message.timestamp.formatted(date: .omitted, time: .shortened))
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -532,29 +532,29 @@ struct ModelPickerView: View {
                 }
             }
     }
-    
+
     private func loadModels() async {
         await modelManager.refreshModelList()
-        
+
         // Get all models for this framework
         var allModels: [ModelInfo] = []
-        
+
         // First, get downloaded models
         let frameworkDownloaded = modelManager.downloadedModels.filter { $0.framework == framework }
-        
+
         // Also check available models that are downloaded
         let availableDownloaded = modelManager.availableModels.filter { model in
-            model.framework == framework && 
+            model.framework == framework &&
             modelManager.isModelDownloaded(model.name, framework: framework)
         }
-        
+
         // Combine both sources
         allModels = frameworkDownloaded + availableDownloaded
-        
+
         // Remove duplicates based on name similarity
         var uniqueModels: [ModelInfo] = []
         var seenNames: Set<String> = []
-        
+
         for model in allModels {
             let normalizedName = normalizeModelName(model.name)
             if !seenNames.contains(normalizedName) {
@@ -562,17 +562,17 @@ struct ModelPickerView: View {
                 uniqueModels.append(model)
             }
         }
-        
+
         // Filter for chat-compatible models only
         downloadedModels = uniqueModels.filter { model in
             isChatCompatibleModel(model)
         }
-        
+
         // DEBUG: Log what we found
         print("Downloaded models for \(framework.displayName): \(downloadedModels.map { $0.name })")
         print("Filtered out non-chat models: \(uniqueModels.filter { !isChatCompatibleModel($0) }.map { $0.name })")
     }
-    
+
     private func normalizeModelName(_ name: String) -> String {
         // Normalize model names to detect duplicates
         return name.lowercased()
@@ -585,7 +585,7 @@ struct ModelPickerView: View {
             .replacingOccurrences(of: ".onnx", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
+
     private func isChatCompatibleModel(_ model: ModelInfo) -> Bool {
         // Use the model type to determine if it's compatible with chat
         return model.modelType?.supportedInChat ?? true
@@ -615,7 +615,7 @@ struct ModelPickerView: View {
                         systemImage: "cube.box",
                         description: Text("You need to download \(framework.displayName) models to start chatting")
                     )
-                    
+
                     Button(action: {
                         // Dismiss the sheet and switch to Models tab
                         dismiss()
@@ -637,22 +637,22 @@ struct ModelPickerView: View {
                         let nonChatModels = modelManager.downloadedModels.filter { model in
                             model.framework == framework && !isChatCompatibleModel(model)
                         }
-                        
+
                         if !nonChatModels.isEmpty && downloadedModels.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: "info.circle.fill")
                                     .font(.largeTitle)
                                     .foregroundColor(.orange)
-                                
+
                                 Text("No Chat Models Available")
                                     .font(.headline)
-                                
+
                                 Text("You have \(nonChatModels.count) model(s) downloaded, but they are not suitable for text chat:")
                                     .font(.caption)
                                     .multilineTextAlignment(.center)
                                     .foregroundColor(.secondary)
                                     .padding(.horizontal)
-                                
+
                                 VStack(alignment: .leading, spacing: 2) {
                                     ForEach(nonChatModels.prefix(3), id: \.id) { model in
                                         Text("• \(model.name)")
@@ -666,13 +666,13 @@ struct ModelPickerView: View {
                                     }
                                 }
                                 .padding(.vertical, 4)
-                                
+
                                 Text("For chat, please download one of these \(framework.displayName) models:")
                                     .font(.caption)
                                     .fontWeight(.medium)
                                     .foregroundColor(.secondary)
                                     .padding(.top, 4)
-                                
+
                                 VStack(alignment: .leading, spacing: 4) {
                                     if framework == .coreML {
                                         Text("• GPT2-CoreML.mlpackage (548MB)")
@@ -695,7 +695,7 @@ struct ModelPickerView: View {
                             .background(Color.orange.opacity(0.1))
                             .cornerRadius(12)
                         }
-                        
+
                         ForEach(downloadedModels) { model in
                             downloadedModelCard(model)
                         }
@@ -725,19 +725,19 @@ struct ModelPickerView: View {
                     .padding(.vertical, 8)
                     .background(Color.accentColor)
                 }
-                
+
                 HStack {
                     // Model icon
                     ZStack {
                         Circle()
                             .fill(model.id == selectedModel?.id ? Color.accentColor.opacity(0.2) : Color(.systemGray5))
                             .frame(width: 50, height: 50)
-                        
+
                         Image(systemName: "cube.box.fill")
                             .font(.title2)
                             .foregroundColor(model.id == selectedModel?.id ? .accentColor : .secondary)
                     }
-                    
+
                     VStack(alignment: .leading, spacing: 6) {
                         Text(model.name)
                             .font(.headline)
@@ -754,7 +754,7 @@ struct ModelPickerView: View {
                                     .font(.caption)
                             }
                             .foregroundColor(.secondary)
-                            
+
                             // Quantization
                             if let quantization = model.quantization {
                                 Text(quantization)
@@ -765,14 +765,14 @@ struct ModelPickerView: View {
                                     .cornerRadius(4)
                             }
                         }
-                        
+
                         // Additional info
                         if let contextLength = model.contextLength {
                             Label("\(contextLength) token context", systemImage: "text.alignleft")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
-                        
+
                         // Downloaded file name if available
                         if let fileName = model.downloadedFileName {
                             Label(fileName, systemImage: "doc")
@@ -783,7 +783,7 @@ struct ModelPickerView: View {
                     }
 
                     Spacer()
-                    
+
                     // Selection indicator
                     Image(systemName: model.id == selectedModel?.id ? "checkmark.circle.fill" : "circle")
                         .font(.title2)

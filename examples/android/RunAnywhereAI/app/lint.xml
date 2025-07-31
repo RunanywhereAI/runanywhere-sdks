@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Severity Configuration -->
+    <issue id="all" severity="warning" />
+
+    <!-- Treat TODO comments without issue references as errors -->
+    <issue id="StopShip" severity="error">
+        <ignore regexp="TODO.*#\d+" />
+        <ignore regexp="FIXME.*#\d+" />
+        <ignore regexp="HACK.*#\d+" />
+        <ignore regexp="XXX.*#\d+" />
+        <ignore regexp="BUG.*#\d+" />
+        <ignore regexp="REFACTOR.*#\d+" />
+        <ignore regexp="OPTIMIZE.*#\d+" />
+    </issue>
+
+    <!-- Code Quality Issues -->
+    <issue id="HardcodedText" severity="error" />
+    <issue id="UnusedResources" severity="error" />
+    <issue id="UnusedIds" severity="error" />
+    <issue id="Deprecated" severity="error" />
+    <issue id="ObsoleteLintCustomCheck" severity="error" />
+
+    <!-- Performance Issues -->
+    <issue id="DrawAllocation" severity="error" />
+    <issue id="Wakelock" severity="error" />
+    <issue id="Recycle" severity="error" />
+    <issue id="StaticFieldLeak" severity="error" />
+    <issue id="LeakCanary" severity="error" />
+
+    <!-- Security Issues -->
+    <issue id="HardcodedDebugMode" severity="error" />
+    <issue id="ExportedService" severity="error" />
+    <issue id="ExportedContentProvider" severity="error" />
+    <issue id="SetJavaScriptEnabled" severity="error" />
+    <issue id="SecureRandom" severity="error" />
+    <issue id="TrustAllX509TrustManager" severity="error" />
+
+    <!-- Kotlin Specific -->
+    <issue id="KotlinPropertyAccess" severity="error" />
+    <issue id="LambdaLast" severity="error" />
+    <issue id="UnknownNullness" severity="error" />
+
+    <!-- API Usage -->
+    <issue id="NewApi" severity="error" />
+    <issue id="InlinedApi" severity="error" />
+    <issue id="Override" severity="error" />
+
+    <!-- Warnings as Errors -->
+    <issue id="MissingTranslation" severity="error" />
+    <issue id="ExtraTranslation" severity="error" />
+    <issue id="TypographyEllipsis" severity="error" />
+
+    <!-- Custom TODO Pattern Check Message -->
+    <issue id="StopShip">
+        <message>TODOs must reference a GitHub issue number (e.g., // TODO: #123 - Description)</message>
+    </issue>
+</lint>

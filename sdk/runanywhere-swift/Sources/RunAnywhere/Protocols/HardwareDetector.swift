@@ -8,31 +8,31 @@ public protocol HardwareDetector {
     /// Detect current device capabilities
     /// - Returns: Device capabilities
     func detectCapabilities() -> DeviceCapabilities
-    
+
     /// Get available memory
     /// - Returns: Available memory in bytes
     func getAvailableMemory() -> Int64
-    
+
     /// Get total memory
     /// - Returns: Total memory in bytes
     func getTotalMemory() -> Int64
-    
+
     /// Check if Neural Engine is available
     /// - Returns: Whether Neural Engine is available
     func hasNeuralEngine() -> Bool
-    
+
     /// Check if GPU is available
     /// - Returns: Whether GPU is available
     func hasGPU() -> Bool
-    
+
     /// Get processor information
     /// - Returns: Processor information
     func getProcessorInfo() -> ProcessorInfo
-    
+
     /// Get thermal state
     /// - Returns: Current thermal state
     func getThermalState() -> ProcessInfo.ThermalState
-    
+
     /// Get battery information
     /// - Returns: Battery information if available
     func getBatteryInfo() -> BatteryInfo?
@@ -49,7 +49,7 @@ public struct DeviceCapabilities {
     public let supportedAccelerators: [HardwareAcceleration]
     public let osVersion: OperatingSystemVersion
     public let modelIdentifier: String
-    
+
     public enum ProcessorType {
         case a14Bionic
         case a15Bionic
@@ -74,7 +74,7 @@ public struct DeviceCapabilities {
         case intel
         case unknown
     }
-    
+
     public init(
         totalMemory: Int64,
         availableMemory: Int64,
@@ -96,7 +96,7 @@ public struct DeviceCapabilities {
         self.osVersion = osVersion
         self.modelIdentifier = modelIdentifier
     }
-    
+
     /// Check if a hardware requirement is supported
     public func supports(_ requirement: HardwareRequirement) -> Bool {
         switch requirement {
@@ -139,7 +139,7 @@ public struct ProcessorInfo {
     public let efficiencyCoreCount: Int
     public let frequencyHz: Int64?
     public let hasARM64E: Bool
-    
+
     public init(
         name: String,
         architecture: String,
@@ -166,14 +166,14 @@ public struct BatteryInfo {
     public let level: Float  // 0.0 to 1.0
     public let state: BatteryState
     public let isLowPowerModeEnabled: Bool
-    
+
     public enum BatteryState {
         case unknown
         case unplugged
         case charging
         case full
     }
-    
+
     public init(
         level: Float,
         state: BatteryState,

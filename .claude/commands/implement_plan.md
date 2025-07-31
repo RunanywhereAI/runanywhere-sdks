@@ -64,5 +64,5 @@ If the plan has existing checkmarks:
 - Pick up from the first unchecked item
 - Verify previous work only if something seems off
 
-Remember: You're implementing a solution, not just checking boxes. Keep the end goal in mind and maintain forward momentum. 
+Remember: You're implementing a solution, not just checking boxes. Keep the end goal in mind and maintain forward momentum.
 **Commit your changes regularly using `/commit` to ensure a clean, reviewable history and to safeguard your progress.**

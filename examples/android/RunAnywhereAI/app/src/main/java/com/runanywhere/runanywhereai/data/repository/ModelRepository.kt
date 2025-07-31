@@ -23,20 +23,20 @@ class ModelRepository(private val context: Context) {
         private const val TAG = "ModelRepository"
         private const val MODELS_DIR = "llm_models"
     }
-    
+
     private val client = OkHttpClient()
     private val modelsDirectory: File by lazy {
         File(context.filesDir, MODELS_DIR).apply {
             if (!exists()) mkdirs()
         }
     }
-    
+
     /**
      * Get available models for download
      */
     fun getAvailableModels(): List<ModelInfo> {
         val models = mutableListOf<ModelInfo>()
-        
+
         // Add Gemini Nano if device supports it
         if (checkGeminiNanoAvailability()) {
             models.add(
@@ -53,7 +53,7 @@ class ModelRepository(private val context: Context) {
                 )
             )
         }
-        
+
         // Add other models
         models.addAll(listOf(
             ModelInfo(
@@ -136,7 +136,7 @@ class ModelRepository(private val context: Context) {
                 fileName = "stablelm-2-zephyr-1_6b.Q4_0.gguf",
                 quantization = "Q4_0"
             ),
-            
+
             // ExecuTorch models
             ModelInfo(
                 id = "llama2-7b-executorch",
@@ -171,7 +171,7 @@ class ModelRepository(private val context: Context) {
                 quantization = "INT8",
                 sha256Hash = "def789ghi012..."
             ),
-            
+
             // MLC-LLM models
             ModelInfo(
                 id = "llama2-7b-mlc",
@@ -206,7 +206,7 @@ class ModelRepository(private val context: Context) {
                 quantization = "q4f16_1",
                 sha256Hash = "mlc789ghi..."
             ),
-            
+
             // AI Core models (Android 14+)
             ModelInfo(
                 id = "gemini-nano-aicore",
@@ -219,7 +219,7 @@ class ModelRepository(private val context: Context) {
                 quantization = "INT8",
                 isDownloaded = checkAICoreAvailability()
             ),
-            
+
             // picoLLM models
             ModelInfo(
                 id = "picollm-phi2",
@@ -244,31 +244,31 @@ class ModelRepository(private val context: Context) {
                 sha256Hash = "pico456def..."
             )
         ))
-        
+
         return models
     }
-    
+
     /**
      * Get downloaded models
      */
     suspend fun getDownloadedModels(): List<ModelInfo> = withContext(Dispatchers.IO) {
         val downloadedModels = mutableListOf<ModelInfo>()
-        
+
         // Add Gemini Nano if available (it's system-managed, not file-based)
         getAvailableModels().find { it.framework == LLMFramework.GEMINI_NANO }?.let {
             downloadedModels.add(it)
         }
-        
+
         // Add AI Core models if available (they're system-managed)
         getAvailableModels().find { it.framework == LLMFramework.AI_CORE }?.let {
             downloadedModels.add(it)
         }
-        
+
         // Add file-based models
         modelsDirectory.listFiles()?.forEach { file ->
             // Match with available models (exclude system-managed frameworks)
-            getAvailableModels().find { 
-                it.fileName == file.name && 
+            getAvailableModels().find {
+                it.fileName == file.name &&
                 it.framework != LLMFramework.GEMINI_NANO &&
                 it.framework != LLMFramework.AI_CORE
             }?.let { modelInfo ->
@@ -278,10 +278,10 @@ class ModelRepository(private val context: Context) {
                 ))
             }
         }
-        
+
         downloadedModels
     }
-    
+
     /**
      * Check if Gemini Nano is available on this device
      */
@@ -290,7 +290,7 @@ class ModelRepository(private val context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             return false
         }
-        
+
         // Check with GeminiNanoService
         return try {
             val service = GeminiNanoService(context)
@@ -300,7 +300,7 @@ class ModelRepository(private val context: Context) {
             false
         }
     }
-    
+
     /**
      * Check if AI Core is available on this device
      */
@@ -309,58 +309,58 @@ class ModelRepository(private val context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             return false
         }
-        
+
         // Check for AI Core feature
         return context.packageManager.hasSystemFeature("android.software.ai.core") ||
                context.packageManager.hasSystemFeature("com.google.android.feature.AI_CORE")
     }
-    
+
     /**
      * Download a model with progress tracking
      */
     fun downloadModel(modelInfo: ModelInfo): Flow<DownloadProgress> = flow {
         try {
             val file = File(modelsDirectory, modelInfo.fileName)
-            
+
             // Check if already downloaded
             if (file.exists() && file.length() == modelInfo.sizeBytes) {
                 emit(DownloadProgress.Completed(file.absolutePath))
                 return@flow
             }
-            
+
             emit(DownloadProgress.Starting)
-            
+
             // Build request
             val request = Request.Builder()
                 .url(modelInfo.downloadUrl)
                 .build()
-            
+
             // Execute download
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     throw Exception("Download failed: ${response.code}")
                 }
-                
+
                 val body = response.body ?: throw Exception("Empty response body")
                 val contentLength = body.contentLength()
-                
+
                 // Download with progress
                 body.byteStream().use { input ->
                     FileOutputStream(file).use { output ->
                         val buffer = ByteArray(8192)
                         var totalBytesRead = 0L
                         var bytesRead: Int
-                        
+
                         while (input.read(buffer).also { bytesRead = it } != -1) {
                             output.write(buffer, 0, bytesRead)
                             totalBytesRead += bytesRead
-                            
+
                             val progress = if (contentLength > 0) {
                                 (totalBytesRead.toFloat() / contentLength)
                             } else {
                                 0f
                             }
-                            
+
                             emit(DownloadProgress.InProgress(
                                 progress = progress,
                                 bytesDownloaded = totalBytesRead,
@@ -370,7 +370,7 @@ class ModelRepository(private val context: Context) {
                     }
                 }
             }
-            
+
             // Verify downloaded file if hash is provided
             if (modelInfo.sha256Hash != null) {
                 emit(DownloadProgress.Verifying)
@@ -381,15 +381,15 @@ class ModelRepository(private val context: Context) {
                     return@flow
                 }
             }
-            
+
             emit(DownloadProgress.Completed(file.absolutePath))
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Download failed", e)
             emit(DownloadProgress.Failed(e.message ?: "Unknown error"))
         }
     }
-    
+
     /**
      * Delete a downloaded model
      */
@@ -402,14 +402,14 @@ class ModelRepository(private val context: Context) {
             false
         }
     }
-    
+
     /**
      * Get model file path
      */
     fun getModelPath(fileName: String): String {
         return File(modelsDirectory, fileName).absolutePath
     }
-    
+
     /**
      * Check if model exists
      */
@@ -417,11 +417,11 @@ class ModelRepository(private val context: Context) {
         val file = File(modelsDirectory, modelInfo.fileName)
         return file.exists() && file.length() > 0
     }
-    
+
     /**
      * Verify model file integrity using SHA-256 hash
      */
-    private suspend fun verifyModelIntegrity(file: File, expectedHash: String): Boolean = 
+    private suspend fun verifyModelIntegrity(file: File, expectedHash: String): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val calculatedHash = calculateSHA256(file)
@@ -431,7 +431,7 @@ class ModelRepository(private val context: Context) {
                 false
             }
         }
-    
+
     /**
      * Calculate SHA-256 hash of a file
      */
@@ -446,7 +446,7 @@ class ModelRepository(private val context: Context) {
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
-    
+
     /**
      * Get device available memory
      */
@@ -454,7 +454,7 @@ class ModelRepository(private val context: Context) {
         val runtime = Runtime.getRuntime()
         return runtime.maxMemory() - (runtime.totalMemory() - runtime.freeMemory())
     }
-    
+
     /**
      * Check if device has enough memory for model
      */

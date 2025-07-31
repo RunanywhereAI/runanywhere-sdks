@@ -113,7 +113,7 @@ LocalLLMiOS/
 struct LocalLLMApp: App {
     @StateObject private var llmManager = UnifiedLLMService()
     @StateObject private var modelManager = ModelManager()
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView()
@@ -126,7 +126,7 @@ struct LocalLLMApp: App {
 // Content View with Tab Navigation
 struct ContentView: View {
     @State private var selectedTab = 0
-    
+
     var body: some View {
         TabView(selection: $selectedTab) {
             ChatView()
@@ -134,19 +134,19 @@ struct ContentView: View {
                     Label("Chat", systemImage: "message")
                 }
                 .tag(0)
-            
+
             ModelListView()
                 .tabItem {
                     Label("Models", systemImage: "square.stack.3d.up")
                 }
                 .tag(1)
-            
+
             BenchmarkView()
                 .tabItem {
                     Label("Benchmark", systemImage: "speedometer")
                 }
                 .tag(2)
-            
+
             SettingsView()
                 .tabItem {
                     Label("Settings", systemImage: "gear")
@@ -162,7 +162,7 @@ struct ChatView: View {
     @EnvironmentObject var llmManager: UnifiedLLMService
     @State private var inputText = ""
     @FocusState private var isInputFocused: Bool
-    
+
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
@@ -171,7 +171,7 @@ struct ChatView: View {
                     selectedFramework: $viewModel.selectedFramework
                 )
                 .padding(.horizontal)
-                
+
                 // Messages
                 ScrollViewReader { proxy in
                     ScrollView {
@@ -180,7 +180,7 @@ struct ChatView: View {
                                 MessageBubble(message: message)
                                     .id(message.id)
                             }
-                            
+
                             if viewModel.isGenerating {
                                 TypingIndicator()
                                     .id("typing")
@@ -197,7 +197,7 @@ struct ChatView: View {
                         }
                     }
                 }
-                
+
                 // Input bar
                 HStack(spacing: 12) {
                     TextField("Type a message...", text: $inputText)
@@ -206,7 +206,7 @@ struct ChatView: View {
                         .onSubmit {
                             sendMessage()
                         }
-                    
+
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
@@ -228,17 +228,17 @@ struct ChatView: View {
                             }
                         }
                     } label: {
-                        Label(viewModel.currentModel?.name ?? "Select Model", 
+                        Label(viewModel.currentModel?.name ?? "Select Model",
                               systemImage: "cpu")
                     }
                 }
             }
         }
     }
-    
+
     private func sendMessage() {
         guard !inputText.isEmpty else { return }
-        
+
         Task {
             await viewModel.sendMessage(inputText)
             inputText = ""
@@ -249,11 +249,11 @@ struct ChatView: View {
 // Message Bubble Component
 struct MessageBubble: View {
     let message: ChatMessage
-    
+
     var body: some View {
         HStack {
             if message.role == .user { Spacer() }
-            
+
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
                 Text(message.content)
                     .padding(12)
@@ -262,12 +262,12 @@ struct MessageBubble: View {
                             .fill(message.role == .user ? Color.blue : Color(.secondarySystemBackground))
                     )
                     .foregroundColor(message.role == .user ? .white : .primary)
-                
+
                 HStack(spacing: 8) {
                     Text(message.timestamp, style: .time)
                         .font(.caption2)
                         .foregroundColor(.secondary)
-                    
+
                     if let metrics = message.metrics {
                         Text("(\(Int(metrics.tokensPerSecond)) tok/s)")
                             .font(.caption2)
@@ -275,9 +275,9 @@ struct MessageBubble: View {
                     }
                 }
             }
-            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, 
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.75,
                    alignment: message.role == .user ? .trailing : .leading)
-            
+
             if message.role == .assistant { Spacer() }
         }
     }
@@ -287,7 +287,7 @@ struct MessageBubble: View {
 struct ModelListView: View {
     @EnvironmentObject var modelManager: ModelManager
     @State private var showingDownloader = false
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -296,7 +296,7 @@ struct ModelListView: View {
                         ModelRow(model: model)
                     }
                 }
-                
+
                 Section("Available Models") {
                     ForEach(modelManager.availableModels) { model in
                         ModelDownloadRow(model: model)
@@ -323,7 +323,7 @@ struct BenchmarkView: View {
     @StateObject private var benchmarkRunner = BenchmarkRunner()
     @State private var selectedFrameworks: Set<LLMFramework> = []
     @State private var selectedModel: ModelInfo?
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -332,12 +332,12 @@ struct BenchmarkView: View {
                     FrameworkSelectionCard(
                         selectedFrameworks: $selectedFrameworks
                     )
-                    
+
                     // Model selection
                     ModelSelectionCard(
                         selectedModel: $selectedModel
                     )
-                    
+
                     // Run benchmark button
                     Button(action: runBenchmark) {
                         Label("Run Benchmark", systemImage: "play.fill")
@@ -349,7 +349,7 @@ struct BenchmarkView: View {
                     }
                     .disabled(selectedFrameworks.isEmpty || selectedModel == nil)
                     .padding(.horizontal)
-                    
+
                     // Results
                     if !benchmarkRunner.results.isEmpty {
                         BenchmarkResultsView(results: benchmarkRunner.results)
@@ -359,7 +359,7 @@ struct BenchmarkView: View {
             .navigationTitle("Benchmark")
         }
     }
-    
+
     private func runBenchmark() {
         Task {
             await benchmarkRunner.runBenchmark(
@@ -378,14 +378,14 @@ struct BenchmarkView: View {
 class UnifiedLLMService: ObservableObject {
     @Published var currentFramework: LLMFramework?
     @Published var isInitialized = false
-    
+
     private var services: [LLMFramework: LLMService] = [:]
     private var currentService: LLMService?
-    
+
     init() {
         registerAllServices()
     }
-    
+
     private func registerAllServices() {
         // Register all available frameworks
         if #available(iOS 18.0, *) {
@@ -399,30 +399,30 @@ class UnifiedLLMService: ObservableObject {
         services[.llamaCpp] = LlamaCppService()
         services[.tfLite] = TFLiteService()
     }
-    
+
     func selectFramework(_ framework: LLMFramework, modelPath: String) async throws {
         // Clean up previous service
         currentService?.cleanup()
-        
+
         guard let service = services[framework] else {
             throw LLMError.frameworkNotSupported
         }
-        
+
         currentService = service
         currentFramework = framework
-        
+
         try await service.initialize(modelPath: modelPath)
         isInitialized = true
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let service = currentService, isInitialized else {
             throw LLMError.notInitialized
         }
-        
+
         return try await service.generate(prompt: prompt, options: options)
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -431,7 +431,7 @@ class UnifiedLLMService: ObservableObject {
         guard let service = currentService, isInitialized else {
             throw LLMError.notInitialized
         }
-        
+
         try await service.streamGenerate(
             prompt: prompt,
             options: options,
@@ -448,15 +448,15 @@ class ChatViewModel: ObservableObject {
     @Published var selectedFramework: LLMFramework = .mlc
     @Published var currentModel: ModelInfo?
     @Published var availableModels: [ModelInfo] = []
-    
+
     private let llmService: UnifiedLLMService
     private let performanceMonitor = PerformanceMonitor()
-    
+
     init(llmService: UnifiedLLMService = UnifiedLLMService()) {
         self.llmService = llmService
         loadAvailableModels()
     }
-    
+
     func sendMessage(_ content: String) async {
         // Add user message
         let userMessage = ChatMessage(
@@ -465,11 +465,11 @@ class ChatViewModel: ObservableObject {
             timestamp: Date()
         )
         messages.append(userMessage)
-        
+
         // Start generating
         isGenerating = true
         performanceMonitor.startMeasurement()
-        
+
         // Add placeholder assistant message
         var assistantMessage = ChatMessage(
             role: .assistant,
@@ -478,7 +478,7 @@ class ChatViewModel: ObservableObject {
         )
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
-        
+
         do {
             // Stream generation
             try await llmService.streamGenerate(
@@ -490,18 +490,18 @@ class ChatViewModel: ObservableObject {
                     self.performanceMonitor.recordToken()
                 }
             }
-            
+
             // Update with metrics
             let metrics = performanceMonitor.endMeasurement()
             messages[messageIndex].metrics = metrics
-            
+
         } catch {
             messages[messageIndex].content = "Error: \(error.localizedDescription)"
         }
-        
+
         isGenerating = false
     }
-    
+
     func selectModel(_ model: ModelInfo) {
         currentModel = model
         Task {
@@ -523,21 +523,21 @@ class ModelManager: ObservableObject {
     @Published var downloadedModels: [ModelInfo] = []
     @Published var availableModels: [ModelInfo] = []
     @Published var downloadProgress: [String: Float] = [:]
-    
+
     private let documentsPath = FileManager.default.urls(
         for: .documentDirectory,
         in: .userDomainMask
     ).first!.appendingPathComponent("Models")
-    
+
     init() {
         createModelsDirectory()
         loadDownloadedModels()
         loadAvailableModels()
     }
-    
+
     func downloadModel(_ model: ModelInfo) async throws {
         let downloader = ModelDownloader()
-        
+
         for try await progress in downloader.download(
             url: model.downloadURL,
             to: documentsPath.appendingPathComponent(model.filename)
@@ -546,13 +546,13 @@ class ModelManager: ObservableObject {
                 downloadProgress[model.id] = progress
             }
         }
-        
+
         await MainActor.run {
             downloadedModels.append(model)
             downloadProgress.removeValue(forKey: model.id)
         }
     }
-    
+
     private func loadAvailableModels() {
         // Load from remote catalog or bundled list
         availableModels = [
@@ -627,7 +627,7 @@ LocalLLMAndroid/
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         setContent {
             LocalLLMTheme {
                 LocalLLMApp()
@@ -640,7 +640,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun LocalLLMApp() {
     val navController = rememberNavController()
-    
+
     Scaffold(
         bottomBar = {
             BottomNavigation(navController)
@@ -651,16 +651,16 @@ fun LocalLLMApp() {
             startDestination = Screen.Chat.route,
             modifier = Modifier.padding(paddingValues)
         ) {
-            composable(Screen.Chat.route) { 
+            composable(Screen.Chat.route) {
                 ChatScreen()
             }
-            composable(Screen.Models.route) { 
+            composable(Screen.Models.route) {
                 ModelListScreen()
             }
-            composable(Screen.Benchmark.route) { 
+            composable(Screen.Benchmark.route) {
                 BenchmarkScreen()
             }
-            composable(Screen.Settings.route) { 
+            composable(Screen.Settings.route) {
                 SettingsScreen()
             }
         }
@@ -676,11 +676,11 @@ fun BottomNavigation(navController: NavController) {
         Screen.Benchmark,
         Screen.Settings
     )
-    
+
     NavigationBar {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentRoute = navBackStackEntry?.destination?.route
-        
+
         items.forEach { screen ->
             NavigationBarItem(
                 icon = { Icon(screen.icon, contentDescription = null) },
@@ -707,11 +707,11 @@ fun ChatScreen(
     val isGenerating by viewModel.isGenerating.collectAsState()
     val selectedFramework by viewModel.selectedFramework.collectAsState()
     val currentModel by viewModel.currentModel.collectAsState()
-    
+
     var inputText by remember { mutableStateOf("") }
     val scrollState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
+
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -722,11 +722,11 @@ fun ChatScreen(
                 // Framework selector
                 Box {
                     var expanded by remember { mutableStateOf(false) }
-                    
+
                     IconButton(onClick = { expanded = true }) {
                         Icon(Icons.Default.Memory, contentDescription = "Select Framework")
                     }
-                    
+
                     DropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
@@ -742,7 +742,7 @@ fun ChatScreen(
                         }
                     }
                 }
-                
+
                 // Model selector
                 currentModel?.let { model ->
                     Text(
@@ -753,7 +753,7 @@ fun ChatScreen(
                 }
             }
         )
-        
+
         // Messages
         LazyColumn(
             state = scrollState,
@@ -769,7 +769,7 @@ fun ChatScreen(
                     )
                 )
             }
-            
+
             if (isGenerating) {
                 item {
                     TypingIndicator(
@@ -778,7 +778,7 @@ fun ChatScreen(
                 }
             }
         }
-        
+
         // Input Bar
         Row(
             modifier = Modifier
@@ -804,7 +804,7 @@ fun ChatScreen(
                     }
                 )
             )
-            
+
             IconButton(
                 onClick = {
                     if (inputText.isNotBlank() && !isGenerating) {
@@ -826,7 +826,7 @@ fun ChatScreen(
             }
         }
     }
-    
+
     // Auto-scroll to bottom when new messages arrive
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
@@ -872,7 +872,7 @@ fun MessageItem(
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
-                
+
                 Row(
                     modifier = Modifier.padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -887,7 +887,7 @@ fun MessageItem(
                             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         }
                     )
-                    
+
                     message.metrics?.let { metrics ->
                         Text(
                             text = "${metrics.tokensPerSecond.toInt()} tok/s",
@@ -913,7 +913,7 @@ fun ModelListScreen(
     val downloadedModels by viewModel.downloadedModels.collectAsState()
     val availableModels by viewModel.availableModels.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
-    
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -927,7 +927,7 @@ fun ModelListScreen(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
-        
+
         items(downloadedModels) { model ->
             ModelCard(
                 model = model,
@@ -935,7 +935,7 @@ fun ModelListScreen(
                 onDelete = { viewModel.deleteModel(model) }
             )
         }
-        
+
         // Available Models Section
         item {
             Text(
@@ -944,7 +944,7 @@ fun ModelListScreen(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
-        
+
         items(availableModels) { model ->
             ModelCard(
                 model = model,
@@ -965,7 +965,7 @@ fun BenchmarkScreen(
     val selectedModel by viewModel.selectedModel.collectAsState()
     val isRunning by viewModel.isRunning.collectAsState()
     val results by viewModel.results.collectAsState()
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -981,7 +981,7 @@ fun BenchmarkScreen(
                     text = "Select Frameworks",
                     style = MaterialTheme.typography.titleMedium
                 )
-                
+
                 LLMFramework.values().forEach { framework ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1001,7 +1001,7 @@ fun BenchmarkScreen(
                 }
             }
         }
-        
+
         // Model Selection
         Card {
             Column(
@@ -1011,18 +1011,18 @@ fun BenchmarkScreen(
                     text = "Select Model",
                     style = MaterialTheme.typography.titleMedium
                 )
-                
+
                 // Model dropdown or list
                 // ... implementation
             }
         }
-        
+
         // Run Benchmark Button
         Button(
             onClick = { viewModel.runBenchmark() },
             modifier = Modifier.fillMaxWidth(),
-            enabled = selectedFrameworks.isNotEmpty() && 
-                     selectedModel != null && 
+            enabled = selectedFrameworks.isNotEmpty() &&
+                     selectedModel != null &&
                      !isRunning
         ) {
             if (isRunning) {
@@ -1034,7 +1034,7 @@ fun BenchmarkScreen(
                 Text("Run Benchmark")
             }
         }
-        
+
         // Results
         if (results.isNotEmpty()) {
             LazyColumn {
@@ -1057,11 +1057,11 @@ class UnifiedLLMManager @Inject constructor(
 ) {
     private val services = mutableMapOf<LLMFramework, LLMService>()
     private var currentService: LLMService? = null
-    
+
     init {
         registerServices()
     }
-    
+
     private fun registerServices() {
         services[LLMFramework.GEMINI_NANO] = GeminiNanoService(context)
         services[LLMFramework.ONNX_RUNTIME] = ONNXRuntimeService(context)
@@ -1072,20 +1072,20 @@ class UnifiedLLMManager @Inject constructor(
         services[LLMFramework.LLAMA_CPP] = LlamaCppService(context)
         services[LLMFramework.PICOLLM] = PicoLLMService(context)
     }
-    
+
     suspend fun selectFramework(
         framework: LLMFramework,
         modelPath: String
     ) = withContext(Dispatchers.IO) {
         currentService?.release()
-        
-        val service = services[framework] 
+
+        val service = services[framework]
             ?: throw IllegalArgumentException("Framework not supported")
-        
+
         service.initialize(modelPath)
         currentService = service
     }
-    
+
     suspend fun generate(
         prompt: String,
         options: GenerationOptions
@@ -1093,7 +1093,7 @@ class UnifiedLLMManager @Inject constructor(
         currentService?.generate(prompt, options)
             ?: throw IllegalStateException("No service selected")
     }
-    
+
     fun generateStream(
         prompt: String,
         options: GenerationOptions
@@ -1111,16 +1111,16 @@ class ChatViewModel @Inject constructor(
 ) : ViewModel() {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
-    
+
     private val _isGenerating = MutableStateFlow(false)
     val isGenerating: StateFlow<Boolean> = _isGenerating.asStateFlow()
-    
+
     private val _selectedFramework = MutableStateFlow(LLMFramework.MLC_LLM)
     val selectedFramework: StateFlow<LLMFramework> = _selectedFramework.asStateFlow()
-    
+
     private val _currentModel = MutableStateFlow<ModelInfo?>(null)
     val currentModel: StateFlow<ModelInfo?> = _currentModel.asStateFlow()
-    
+
     fun sendMessage(content: String) {
         viewModelScope.launch {
             // Add user message
@@ -1129,10 +1129,10 @@ class ChatViewModel @Inject constructor(
                 content = content,
                 timestamp = System.currentTimeMillis()
             )
-            
+
             _isGenerating.value = true
             performanceMonitor.startMeasurement()
-            
+
             // Add assistant message placeholder
             val assistantMessage = ChatMessage(
                 role = ChatRole.ASSISTANT,
@@ -1140,7 +1140,7 @@ class ChatViewModel @Inject constructor(
                 timestamp = System.currentTimeMillis()
             )
             _messages.value += assistantMessage
-            
+
             try {
                 // Stream generation
                 llmManager.generateStream(
@@ -1154,7 +1154,7 @@ class ChatViewModel @Inject constructor(
                     }
                     performanceMonitor.recordToken()
                 }
-                
+
                 // Update with metrics
                 val metrics = performanceMonitor.endMeasurement()
                 _messages.value = _messages.value.map { msg ->
@@ -1162,7 +1162,7 @@ class ChatViewModel @Inject constructor(
                         msg.copy(metrics = metrics)
                     } else msg
                 }
-                
+
             } catch (e: Exception) {
                 _messages.value = _messages.value.map { msg ->
                     if (msg == assistantMessage) {
@@ -1174,10 +1174,10 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun selectFramework(framework: LLMFramework) {
         _selectedFramework.value = framework
-        
+
         _currentModel.value?.let { model ->
             viewModelScope.launch {
                 try {
@@ -1198,54 +1198,54 @@ class ModelRepository @Inject constructor(
     private val modelDao: ModelDao
 ) {
     private val modelsDir = File(context.filesDir, "models")
-    
+
     init {
         if (!modelsDir.exists()) {
             modelsDir.mkdirs()
         }
     }
-    
+
     suspend fun getDownloadedModels(): List<ModelInfo> {
         return modelDao.getAllModels()
     }
-    
+
     suspend fun downloadModel(
         model: ModelInfo,
         onProgress: (Float) -> Unit
     ) = withContext(Dispatchers.IO) {
         val url = URL(model.downloadUrl)
         val connection = url.openConnection() as HttpURLConnection
-        
+
         try {
             connection.connect()
             val fileLength = connection.contentLength
-            
+
             val input = BufferedInputStream(connection.inputStream)
             val output = FileOutputStream(File(modelsDir, model.filename))
-            
+
             val data = ByteArray(4096)
             var total = 0L
             var count: Int
-            
+
             while (input.read(data).also { count = it } != -1) {
                 total += count
                 output.write(data, 0, count)
-                
+
                 if (fileLength > 0) {
                     onProgress((total.toFloat() / fileLength))
                 }
             }
-            
+
             output.flush()
             output.close()
             input.close()
-            
+
             // Save to database
             modelDao.insertModel(model.copy(
                 path = File(modelsDir, model.filename).absolutePath,
                 downloadedAt = System.currentTimeMillis()
             ))
-            
+
         } finally {
             connection.disconnect()
         }
@@ -1262,7 +1262,7 @@ class ModelRepository @Inject constructor(
 class BenchmarkRunner: ObservableObject {
     @Published var results: [BenchmarkResult] = []
     @Published var isRunning = false
-    
+
     private let testPrompts = [
         "Write a simple Python function to calculate fibonacci numbers",
         "Explain quantum computing in simple terms",
@@ -1270,42 +1270,42 @@ class BenchmarkRunner: ObservableObject {
         "Translate 'Hello, how are you?' to Spanish",
         "Generate a haiku about technology"
     ]
-    
+
     func runBenchmark(
         frameworks: [LLMFramework],
         model: ModelInfo
     ) async {
         isRunning = true
         results = []
-        
+
         for framework in frameworks {
             let result = await benchmarkFramework(
                 framework: framework,
                 model: model
             )
-            
+
             await MainActor.run {
                 results.append(result)
             }
         }
-        
+
         isRunning = false
     }
-    
+
     private func benchmarkFramework(
         framework: LLMFramework,
         model: ModelInfo
     ) async -> BenchmarkResult {
         let service = createService(for: framework)
-        
+
         do {
             // Initialize
             let initStart = Date()
             try await service.initialize(modelPath: model.path)
             let initTime = Date().timeIntervalSince(initStart)
-            
+
             var promptResults: [PromptResult] = []
-            
+
             // Test each prompt
             for prompt in testPrompts {
                 let result = await benchmarkPrompt(
@@ -1314,10 +1314,10 @@ class BenchmarkRunner: ObservableObject {
                 )
                 promptResults.append(result)
             }
-            
+
             // Cleanup
             service.cleanup()
-            
+
             return BenchmarkResult(
                 framework: framework,
                 model: model,
@@ -1326,7 +1326,7 @@ class BenchmarkRunner: ObservableObject {
                 averageTokensPerSecond: calculateAverage(promptResults),
                 totalMemoryUsed: getMemoryUsage()
             )
-            
+
         } catch {
             return BenchmarkResult(
                 framework: framework,
@@ -1346,10 +1346,10 @@ class BenchmarkViewModel @Inject constructor(
 ) : ViewModel() {
     private val _results = MutableStateFlow<List<BenchmarkResult>>(emptyList())
     val results: StateFlow<List<BenchmarkResult>> = _results.asStateFlow()
-    
+
     private val _isRunning = MutableStateFlow(false)
     val isRunning: StateFlow<Boolean> = _isRunning.asStateFlow()
-    
+
     private val testPrompts = listOf(
         "Write a simple Python function to calculate fibonacci numbers",
         "Explain quantum computing in simple terms",
@@ -1357,21 +1357,21 @@ class BenchmarkViewModel @Inject constructor(
         "Translate 'Hello, how are you?' to Spanish",
         "Generate a haiku about technology"
     )
-    
+
     fun runBenchmark() {
         viewModelScope.launch {
             _isRunning.value = true
             _results.value = emptyList()
-            
+
             for (framework in selectedFrameworks.value) {
                 val result = benchmarkFramework(framework)
                 _results.value += result
             }
-            
+
             _isRunning.value = false
         }
     }
-    
+
     private suspend fun benchmarkFramework(
         framework: LLMFramework
     ): BenchmarkResult = withContext(Dispatchers.Default) {
@@ -1380,15 +1380,15 @@ class BenchmarkViewModel @Inject constructor(
             val initStart = System.currentTimeMillis()
             llmManager.selectFramework(framework, selectedModel.value!!.path)
             val initTime = System.currentTimeMillis() - initStart
-            
+
             val promptResults = mutableListOf<PromptResult>()
-            
+
             // Test each prompt
             for (prompt in testPrompts) {
                 val result = benchmarkPrompt(prompt)
                 promptResults.add(result)
             }
-            
+
             BenchmarkResult(
                 framework = framework,
                 model = selectedModel.value!!,
@@ -1397,7 +1397,7 @@ class BenchmarkViewModel @Inject constructor(
                 averageTokensPerSecond = calculateAverage(promptResults),
                 memoryUsed = getMemoryUsage()
             )
-            
+
         } catch (e: Exception) {
             BenchmarkResult(
                 framework = framework,
@@ -1417,7 +1417,7 @@ class BenchmarkViewModel @Inject constructor(
 // iOS Typing Indicator
 struct TypingIndicator: View {
     @State private var animationAmount = 0.0
-    
+
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3) { index in
@@ -1448,7 +1448,7 @@ fun TypingIndicator(
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition()
-    
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -1468,7 +1468,7 @@ fun TypingIndicator(
                     initialStartOffset = StartOffset(index * 400)
                 )
             )
-            
+
             Box(
                 modifier = Modifier
                     .size(8.dp)
@@ -1499,12 +1499,12 @@ class ModelDownloader: ObservableObject {
                     continuation.finish(throwing: error)
                     return
                 }
-                
+
                 guard let location = location else {
                     continuation.finish(throwing: DownloadError.noData)
                     return
                 }
-                
+
                 do {
                     try FileManager.default.moveItem(at: location, to: destination)
                     continuation.yield(1.0)
@@ -1513,14 +1513,14 @@ class ModelDownloader: ObservableObject {
                     continuation.finish(throwing: error)
                 }
             }
-            
+
             // Progress observation
             let observation = task.progress.observe(\.fractionCompleted) { progress, _ in
                 continuation.yield(Float(progress.fractionCompleted))
             }
-            
+
             task.resume()
-            
+
             continuation.onTermination = { _ in
                 observation.invalidate()
                 task.cancel()
@@ -1544,35 +1544,35 @@ class ModelDownloader @Inject constructor(
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
-        
+
         val request = Request.Builder()
             .url(url)
             .build()
-        
+
         val response = client.newCall(request).execute()
-        
+
         if (!response.isSuccessful) {
             throw IOException("Failed to download model: ${response.code}")
         }
-        
+
         val file = File(context.filesDir, "models/$fileName")
         file.parentFile?.mkdirs()
-        
+
         response.body?.let { body ->
             val contentLength = body.contentLength()
             val source = body.source()
             val sink = file.sink().buffer()
-            
+
             var totalBytesRead = 0L
             val bufferSize = 8 * 1024L
-            
+
             while (true) {
                 val bytesRead = source.read(sink.buffer, bufferSize)
                 if (bytesRead == -1L) break
-                
+
                 sink.emit()
                 totalBytesRead += bytesRead
-                
+
                 if (contentLength > 0) {
                     val progress = totalBytesRead.toFloat() / contentLength
                     withContext(Dispatchers.Main) {
@@ -1580,11 +1580,11 @@ class ModelDownloader @Inject constructor(
                     }
                 }
             }
-            
+
             sink.close()
             source.close()
         }
-        
+
         file
     }
 }
@@ -1601,32 +1601,32 @@ class PerformanceMonitor {
     private var firstTokenTime: CFAbsoluteTime = 0
     private var tokenCount = 0
     private var startMemory = 0
-    
+
     func startMeasurement() {
         startTime = CFAbsoluteTimeGetCurrent()
         firstTokenTime = 0
         tokenCount = 0
         startMemory = getMemoryUsage()
     }
-    
+
     func recordFirstToken() {
         if firstTokenTime == 0 {
             firstTokenTime = CFAbsoluteTimeGetCurrent()
         }
     }
-    
+
     func recordToken() {
         tokenCount += 1
         recordFirstToken()
     }
-    
+
     func endMeasurement() -> PerformanceMetrics {
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
         let timeToFirstToken = firstTokenTime > 0 ? firstTokenTime - startTime : 0
         let tokensPerSecond = Double(tokenCount) / totalTime
         let memoryUsed = getMemoryUsage() - startMemory
-        
+
         return PerformanceMetrics(
             totalTime: totalTime,
             timeToFirstToken: timeToFirstToken,
@@ -1637,11 +1637,11 @@ class PerformanceMonitor {
             batteryLevel: UIDevice.current.batteryLevel
         )
     }
-    
+
     private func getMemoryUsage() -> Int {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(mach_task_self_,
@@ -1650,7 +1650,7 @@ class PerformanceMonitor {
                          &count)
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int(info.resident_size) : 0
     }
 }
@@ -1666,32 +1666,32 @@ class PerformanceMonitor @Inject constructor(
     private var firstTokenTime = 0L
     private var tokenCount = 0
     private var startMemory = 0L
-    
+
     fun startMeasurement() {
         startTime = System.currentTimeMillis()
         firstTokenTime = 0L
         tokenCount = 0
         startMemory = getMemoryUsage()
     }
-    
+
     fun recordFirstToken() {
         if (firstTokenTime == 0L) {
             firstTokenTime = System.currentTimeMillis()
         }
     }
-    
+
     fun recordToken() {
         tokenCount++
         recordFirstToken()
     }
-    
+
     fun endMeasurement(): PerformanceMetrics {
         val endTime = System.currentTimeMillis()
         val totalTime = endTime - startTime
         val timeToFirstToken = if (firstTokenTime > 0) firstTokenTime - startTime else 0
         val tokensPerSecond = tokenCount.toFloat() / (totalTime / 1000f)
         val memoryUsed = getMemoryUsage() - startMemory
-        
+
         return PerformanceMetrics(
             totalTime = totalTime,
             timeToFirstToken = timeToFirstToken,
@@ -1702,17 +1702,17 @@ class PerformanceMonitor @Inject constructor(
             batteryLevel = getBatteryLevel()
         )
     }
-    
+
     private fun getMemoryUsage(): Long {
         val runtime = Runtime.getRuntime()
         return runtime.totalMemory() - runtime.freeMemory()
     }
-    
+
     private fun getCpuUsage(): Float {
         // Implementation for CPU usage
         return 0f
     }
-    
+
     private fun getBatteryLevel(): Float {
         val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
         return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) / 100f
@@ -1731,7 +1731,7 @@ struct SettingsView: View {
     @AppStorage("maxTokens") private var maxTokens = 150
     @AppStorage("temperature") private var temperature = 0.7
     @AppStorage("enableStreaming") private var enableStreaming = true
-    
+
     var body: some View {
         NavigationView {
             Form {
@@ -1741,27 +1741,27 @@ struct SettingsView: View {
                             Text(framework.displayName).tag(framework.rawValue)
                         }
                     }
-                    
+
                     Stepper("Max Tokens: \(maxTokens)", value: $maxTokens, in: 50...500, step: 50)
-                    
+
                     VStack(alignment: .leading) {
                         Text("Temperature: \(String(format: "%.1f", temperature))")
                         Slider(value: $temperature, in: 0...1, step: 0.1)
                     }
-                    
+
                     Toggle("Enable Streaming", isOn: $enableStreaming)
                 }
-                
+
                 Section("Performance") {
                     NavigationLink("Memory Management") {
                         MemorySettingsView()
                     }
-                    
+
                     NavigationLink("Battery Optimization") {
                         BatterySettingsView()
                     }
                 }
-                
+
                 Section("About") {
                     HStack {
                         Text("Version")
@@ -1769,7 +1769,7 @@ struct SettingsView: View {
                         Text(Bundle.main.appVersion)
                             .foregroundColor(.secondary)
                     }
-                    
+
                     Link("Documentation", destination: URL(string: "https://docs.example.com")!)
                 }
             }
@@ -1784,27 +1784,27 @@ struct SettingsView: View {
 @Composable
 fun SettingsScreen() {
     val context = LocalContext.current
-    val preferences = remember { 
-        context.getSharedPreferences("settings", Context.MODE_PRIVATE) 
+    val preferences = remember {
+        context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     }
-    
+
     var defaultFramework by remember {
         mutableStateOf(
             LLMFramework.valueOf(
-                preferences.getString("defaultFramework", LLMFramework.MLC_LLM.name) 
+                preferences.getString("defaultFramework", LLMFramework.MLC_LLM.name)
                     ?: LLMFramework.MLC_LLM.name
             )
         )
     }
-    
+
     var maxTokens by remember {
         mutableStateOf(preferences.getInt("maxTokens", 150))
     }
-    
+
     var temperature by remember {
         mutableStateOf(preferences.getFloat("temperature", 0.7f))
     }
-    
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp)
@@ -1816,7 +1816,7 @@ fun SettingsScreen() {
                 modifier = Modifier.padding(vertical = 8.dp)
             )
         }
-        
+
         item {
             Card {
                 Column(
@@ -1824,9 +1824,9 @@ fun SettingsScreen() {
                 ) {
                     // Default Framework
                     Text("Default Framework")
-                    
+
                     var expanded by remember { mutableStateOf(false) }
-                    
+
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { expanded = it }
@@ -1840,7 +1840,7 @@ fun SettingsScreen() {
                             },
                             modifier = Modifier.menuAnchor()
                         )
-                        
+
                         ExposedDropdownMenu(
                             expanded = expanded,
                             onDismissRequest = { expanded = false }
@@ -1859,14 +1859,14 @@ fun SettingsScreen() {
                             }
                         }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     // Max Tokens
                     Text("Max Tokens: $maxTokens")
                     Slider(
                         value = maxTokens.toFloat(),
-                        onValueChange = { 
+                        onValueChange = {
                             maxTokens = it.toInt()
                             preferences.edit()
                                 .putInt("maxTokens", maxTokens)
@@ -1875,14 +1875,14 @@ fun SettingsScreen() {
                         valueRange = 50f..500f,
                         steps = 9
                     )
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     // Temperature
                     Text("Temperature: %.1f".format(temperature))
                     Slider(
                         value = temperature,
-                        onValueChange = { 
+                        onValueChange = {
                             temperature = it
                             preferences.edit()
                                 .putFloat("temperature", temperature)

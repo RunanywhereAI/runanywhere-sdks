@@ -59,13 +59,13 @@ protocol UnifiedTokenizerProvider {
 class TokenizerManager: UnifiedTokenizerProvider {
     static let shared = TokenizerManager()
     private var tokenizers: [String: UnifiedTokenizer] = [:]
-    
+
     func getTokenizer(for model: ModelInfo) async throws -> UnifiedTokenizer {
         // Check cache first
         if let cached = tokenizers[model.id] {
             return cached
         }
-        
+
         // Auto-detect and create appropriate tokenizer
         let tokenizer = try await createTokenizer(for: model)
         tokenizers[model.id] = tokenizer
@@ -106,10 +106,10 @@ class ModelLifecycleStateMachine {
         case executing
         case error(Error)
     }
-    
+
     private(set) var currentState: State = .uninitialized
     private var stateObservers: [UUID: (State) -> Void] = [:]
-    
+
     func transition(to newState: State) throws {
         guard isValidTransition(from: currentState, to: newState) else {
             throw LLMError.invalidStateTransition
@@ -137,17 +137,17 @@ class ModelLifecycleStateMachine {
 private func extractTarGz(at sourceURL: URL, to directory: URL) throws -> URL {
     print("⚠️ MLX model extraction required")
     print("Model file: \(sourceURL.lastPathComponent)")
-    
+
     // For now, on iOS we'll need to handle this differently
     // The proper solution would be to:
     // 1. Use a library like libarchive or GzipSwift
     // 2. Or pre-extract models server-side
     // 3. Or use a different format like zip
-    
+
     // Create a directory for the model based on the tar.gz filename
     let modelName = sourceURL.deletingPathExtension().deletingPathExtension().lastPathComponent
     let modelDir = directory.appendingPathComponent(modelName)
-    
+
     // ... creates placeholder instead of extracting
 }
 ```
@@ -160,7 +160,7 @@ import Gzip // Add SPM dependency
 class EnhancedDownloadManager {
     func extractArchive(_ archive: URL) async throws -> URL {
         let ext = archive.pathExtension.lowercased()
-        
+
         switch ext {
         case "zip":
             return try await extractZip(archive)
@@ -172,7 +172,7 @@ class EnhancedDownloadManager {
             throw DownloadError.unsupportedArchive(ext)
         }
     }
-    
+
     private func extractTarGz(_ archive: URL) async throws -> URL {
         // Proper implementation with Gzip library
         let decompressed = try Data(contentsOf: archive).gunzipped()
@@ -228,11 +228,11 @@ override func cleanup() {
 class MemoryAwareModelManager {
     private var loadedModels: [String: LoadedModel] = [:]
     private var memoryPressureObserver: NSObjectProtocol?
-    
+
     init() {
         setupMemoryPressureHandling()
     }
-    
+
     private func setupMemoryPressureHandling() {
         memoryPressureObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
@@ -242,11 +242,11 @@ class MemoryAwareModelManager {
             self?.handleMemoryPressure()
         }
     }
-    
+
     private func handleMemoryPressure() {
         // Unload least recently used models
         let sortedModels = loadedModels.values.sorted { $0.lastUsed < $1.lastUsed }
-        
+
         for model in sortedModels {
             if getCurrentMemoryUsage() < getMemoryThreshold() {
                 break
@@ -284,7 +284,7 @@ if !hasInputIds {
 // CoreMLService
 throw LLMError.modelLoadFailed(reason: "...", framework: "Core ML")
 
-// TFLiteService  
+// TFLiteService
 throw LLMError.frameworkNotSupported
 
 // MLXService
@@ -299,11 +299,11 @@ enum UnifiedModelError: LocalizedError {
     case framework(FrameworkError)
     case resource(ResourceError)
     case inference(InferenceError)
-    
+
     var errorDescription: String? {
         // Detailed, user-friendly error messages
     }
-    
+
     var recoverySuggestion: String? {
         // Actionable recovery steps
     }
@@ -361,13 +361,13 @@ override var supportedModels: [ModelInfo] {
 class ModelDiscoveryService {
     func discoverLocalModels() async -> [DiscoveredModel] {
         var models: [DiscoveredModel] = []
-        
+
         // Scan model directories
         for framework in LLMFramework.allCases {
             let frameworkModels = await scanDirectory(for: framework)
             models.append(contentsOf: frameworkModels)
         }
-        
+
         // Auto-detect format and compatibility
         return models.map { model in
             var discovered = model
@@ -376,7 +376,7 @@ class ModelDiscoveryService {
             return discovered
         }
     }
-    
+
     func discoverOnlineModels() async -> [ModelInfo] {
         // Query model hubs
         let sources = [
@@ -384,14 +384,14 @@ class ModelDiscoveryService {
             AppleModelsHub(),
             MicrosoftModelsHub()
         ]
-        
+
         return await withTaskGroup(of: [ModelInfo].self) { group in
             for source in sources {
                 group.addTask {
                     await source.fetchAvailableModels()
                 }
             }
-            
+
             var allModels: [ModelInfo] = []
             for await models in group {
                 allModels.append(contentsOf: models)
@@ -437,10 +437,10 @@ class ModelProgressTracker {
         let bytesProcessed: Int64?
         let totalBytes: Int64?
     }
-    
+
     private var stages: [LifecycleStage: StageInfo] = [:]
     private var startTimes: [LifecycleStage: Date] = [:]
-    
+
     func startStage(_ stage: LifecycleStage) {
         startTimes[stage] = Date()
         notifyProgress(Progress(
@@ -451,7 +451,7 @@ class ModelProgressTracker {
             estimatedTimeRemaining: estimateTimeRemaining(for: stage)
         ))
     }
-    
+
     private func estimateTimeRemaining(for stage: LifecycleStage) -> TimeInterval? {
         // Use historical data to estimate
         let avgDuration = getAverageDuration(for: stage)
@@ -493,14 +493,14 @@ private func isNeuralEngineAvailable() async -> Bool {
 // Centralized hardware detection
 class HardwareCapabilityManager {
     static let shared = HardwareCapabilityManager()
-    
+
     private lazy var capabilities: DeviceCapabilities = {
         detectCapabilities()
     }()
-    
+
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfig {
         let config = HardwareConfig()
-        
+
         // Smart selection based on model and device
         if model.size > 3_000_000_000 && capabilities.hasNeuralEngine {
             config.primaryAccelerator = .neuralEngine
@@ -512,7 +512,7 @@ class HardwareCapabilityManager {
             config.primaryAccelerator = .cpu
             config.memoryMode = .conservative
         }
-        
+
         return config
     }
 }
@@ -548,14 +548,14 @@ protocol ModelAdapterRegistry {
 
 class AdapterManager: ModelAdapterRegistry {
     private var adapters: [(criteria: AdapterCriteria, type: ModelAdapter.Type)] = []
-    
+
     init() {
         // Auto-register known adapters
         registerAdapter(GPT2CoreMLAdapter.self, for: .modelType("gpt2"))
         registerAdapter(LlamaAdapter.self, for: .modelType("llama"))
         registerAdapter(GenericTransformerAdapter.self, for: .architecture("transformer"))
     }
-    
+
     func createAdapter(for model: ModelInfo) throws -> ModelAdapter {
         guard let adapterType = findAdapter(for: model) else {
             // Try generic adapter as fallback
@@ -600,21 +600,21 @@ class FrameworkConfigurationManager {
         model: ModelInfo,
         device: DeviceCapabilities
     ) -> FrameworkConfiguration {
-        
+
         let config = FrameworkConfiguration()
-        
+
         // Load base configuration
         config.merge(with: loadDefaultConfig(for: framework))
-        
+
         // Apply device-specific optimizations
         config.merge(with: deviceOptimizations(device, framework))
-        
+
         // Apply model-specific settings
         config.merge(with: modelRequirements(model, framework))
-        
+
         // User preferences override
         config.merge(with: UserDefaults.frameworkPreferences)
-        
+
         return config
     }
 }
@@ -690,7 +690,7 @@ enum FrameworkSelector {
 // Structured logging system
 class LLMLogger {
     enum LogLevel { case debug, info, warning, error }
-    
+
     func log(
         _ level: LogLevel,
         framework: LLMFramework,
@@ -718,7 +718,7 @@ class FrameworkIntegrationTests: XCTestCase {
     func testModelLifecycle() async throws {
         // Test each framework's complete lifecycle
     }
-    
+
     func testFrameworkSwitching() async throws {
         // Test switching between frameworks
     }
@@ -740,7 +740,7 @@ class PerformanceBenchmarks: XCTestCase {
 
 The current implementation has significant gaps in:
 1. **Abstraction** - Too much framework-specific code leaking up
-2. **Consistency** - Each framework handles things differently  
+2. **Consistency** - Each framework handles things differently
 3. **Error Handling** - Poor error messages and recovery
 4. **Resource Management** - No coordinated memory/storage handling
 5. **Extensibility** - Hard to add new frameworks

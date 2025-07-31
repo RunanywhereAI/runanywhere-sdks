@@ -78,8 +78,8 @@ class CoreMLService: BaseLLMService {
         let format = ModelFormat.from(extension: modelURL.pathExtension)
         let formatManager = ModelFormatManager.shared
         let handler = formatManager.getHandler(for: modelURL, format: format)
-        
-        guard handler.canHandle(url: modelURL, format: format) && 
+
+        guard handler.canHandle(url: modelURL, format: format) &&
               (format == .coreML || format == .mlPackage) else {
             throw LLMError.unsupportedFormat
         }
@@ -116,11 +116,11 @@ class CoreMLService: BaseLLMService {
                 // Compile single file model (e.g., .mlmodel)
                 print("Processing single file model...")
                 print("Model path: \(modelURL.path)")
-                
+
                 // Check if already compiled
                 let compiledModelName = modelURL.lastPathComponent + "c"
                 let compiledModelPath = modelURL.deletingLastPathComponent().appendingPathComponent(compiledModelName)
-                
+
                 let compiledURL: URL
                 if FileManager.default.fileExists(atPath: compiledModelPath.path) {
                     print("✅ Found existing compiled model at: \(compiledModelPath.path)")
@@ -128,7 +128,7 @@ class CoreMLService: BaseLLMService {
                 } else {
                     print("⏳ Compiling .mlmodel for first time... This may take a few minutes for large models.")
                     print("Note: Future loads will be much faster.")
-                    
+
                     do {
                         let compiledPath = try await MLModel.compileModel(at: modelURL)
                         compiledURL = compiledPath
@@ -138,7 +138,7 @@ class CoreMLService: BaseLLMService {
                         throw LLMError.modelLoadFailed(reason: "Failed to compile Core ML model: \(error.localizedDescription)", framework: "Core ML")
                     }
                 }
-                
+
                 print("Loading compiled model...")
                 model = try MLModel(contentsOf: compiledURL, configuration: configuration)
                 print("✅ Loaded compiled .mlmodel successfully")
@@ -148,23 +148,23 @@ class CoreMLService: BaseLLMService {
             guard let currentModelInfo = currentModelInfo else {
                 throw LLMError.initializationFailed("Model info not found")
             }
-            
+
             guard let loadedModel = model else {
                 throw LLMError.initializationFailed("Model loading failed")
             }
-            
+
             modelAdapter = CoreMLAdapterFactory.createAdapter(for: currentModelInfo, model: loadedModel)
-            
+
             guard let adapter = modelAdapter else {
                 throw LLMError.initializationFailed("No compatible adapter found for model: \(currentModelInfo.name)")
             }
-            
+
             print("✅ Using adapter: \(type(of: adapter)) for model: \(currentModelInfo.name)")
 
             // Try to load tokenizer adapter
             let modelDirectory = modelURL.deletingLastPathComponent().path
             tokenizerAdapter = TokenizerAdapterFactory.createAdapter(for: modelDirectory, framework: .coreML)
-            
+
             if let adapter = tokenizerAdapter {
                 print("✅ Loaded tokenizer adapter: \(type(of: adapter)) with \(adapter.vocabularySize) tokens")
             } else {
@@ -226,16 +226,16 @@ class CoreMLService: BaseLLMService {
             guard let model = model else {
                 throw LLMError.notInitialized()
             }
-            
+
             let inputNames = Array(model.modelDescription.inputDescriptionsByName.keys)
             let outputNames = Array(model.modelDescription.outputDescriptionsByName.keys)
-            
+
             print("Core ML Model Info:")
             print("- Input names: \(inputNames)")
             print("- Output names: \(outputNames)")
             print("- Using adapter: \(type(of: adapter))")
             print("- Max sequence length: \(adapter.maxSequenceLength)")
-            
+
             // Autoregressive generation loop using adapter
             for _ in 0..<options.maxTokens {
                 // Use sliding window approach for long sequences
@@ -245,10 +245,10 @@ class CoreMLService: BaseLLMService {
                 } else {
                     contextTokens = allTokens
                 }
-                
+
                 // Create input arrays using the adapter
                 let inputArrays = try adapter.createInputArrays(from: contextTokens)
-                
+
                 // Create feature provider from adapter's input arrays
                 let inputFeatures = try MLDictionaryFeatureProvider(dictionary: inputArrays.mapValues { MLFeatureValue(multiArray: $0) })
 
@@ -271,7 +271,7 @@ class CoreMLService: BaseLLMService {
                 // Decode and emit token using tokenizer adapter
                 let decodedText = tokenizerAdapter.decodeToken(Int(nextToken))
                 print("Tokenizer adapter decoded token \(nextToken) -> '\(decodedText)'")
-                
+
                 // Ensure we emit non-empty text
                 if !decodedText.isEmpty {
                     onToken(decodedText)
@@ -283,7 +283,7 @@ class CoreMLService: BaseLLMService {
 
                 // Core ML inference timing (Neural Engine is quite fast)
                 try await Task.sleep(nanoseconds: 30_000_000) // 30ms per token
-                
+
                 // Context length is now handled in the generation loop with sliding window
             }
 
