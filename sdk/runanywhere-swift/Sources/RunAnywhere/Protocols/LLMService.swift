@@ -39,7 +39,7 @@ public protocol LLMService: AnyObject {
     
     /// Set generation context
     /// - Parameter context: The context to use
-    func setContext(_ context: GenerationContext) async
+    func setContext(_ context: Context) async
     
     /// Clear generation context
     func clearContext() async
@@ -77,43 +77,6 @@ public struct LoadedModelInfo {
     }
 }
 
-/// Generation context for maintaining conversation state
-public struct GenerationContext {
-    public let messages: [Message]
-    public let systemPrompt: String?
-    public let maxContextLength: Int
-    public let temperature: Float
-    
-    public struct Message {
-        public let role: Role
-        public let content: String
-        public let timestamp: Date
-        
-        public enum Role {
-            case system
-            case user
-            case assistant
-        }
-        
-        public init(role: Role, content: String, timestamp: Date = Date()) {
-            self.role = role
-            self.content = content
-            self.timestamp = timestamp
-        }
-    }
-    
-    public init(
-        messages: [Message] = [],
-        systemPrompt: String? = nil,
-        maxContextLength: Int = 2048,
-        temperature: Float = 0.7
-    ) {
-        self.messages = messages
-        self.systemPrompt = systemPrompt
-        self.maxContextLength = maxContextLength
-        self.temperature = temperature
-    }
-}
 
 /// LLM service errors
 public enum LLMServiceError: LocalizedError {
@@ -144,7 +107,7 @@ public enum LLMServiceError: LocalizedError {
 
 /// Framework-specific errors
 public struct FrameworkError: LocalizedError {
-    public let framework: LLLMFramework
+    public let framework: LLMFramework
     public let underlying: Error
     public let context: String?
     

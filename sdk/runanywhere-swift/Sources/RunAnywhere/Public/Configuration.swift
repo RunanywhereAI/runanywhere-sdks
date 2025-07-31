@@ -23,6 +23,21 @@ public struct Configuration {
     /// Debug mode flag
     public var debugMode: Bool
     
+    /// Preferred frameworks for model execution
+    public var preferredFrameworks: [LLMFramework]
+    
+    /// Hardware preferences for model execution
+    public var hardwarePreferences: HardwareConfiguration?
+    
+    /// Model provider configurations
+    public var modelProviders: [ModelProviderConfig]
+    
+    /// Memory threshold for model loading (in bytes)
+    public var memoryThreshold: Int64
+    
+    /// Download configuration
+    public var downloadConfiguration: DownloadConfig
+    
     /// Initialize configuration with API key
     /// - Parameters:
     ///   - apiKey: Your RunAnywhere API key
@@ -40,6 +55,11 @@ public struct Configuration {
         self.telemetryConsent = telemetryConsent
         self.privacyMode = .standard
         self.debugMode = false
+        self.preferredFrameworks = []
+        self.hardwarePreferences = nil
+        self.modelProviders = []
+        self.memoryThreshold = 500_000_000 // 500MB default
+        self.downloadConfiguration = DownloadConfig()
     }
 }
 
@@ -137,5 +157,54 @@ public struct Message: Codable {
         self.role = role
         self.content = content
         self.timestamp = timestamp
+    }
+}
+
+/// Model provider configuration
+public struct ModelProviderConfig {
+    /// Provider name (e.g., "HuggingFace", "Kaggle")
+    public let provider: String
+    
+    /// Authentication credentials
+    public let credentials: ProviderCredentials?
+    
+    /// Whether this provider is enabled
+    public let enabled: Bool
+    
+    public init(
+        provider: String,
+        credentials: ProviderCredentials? = nil,
+        enabled: Bool = true
+    ) {
+        self.provider = provider
+        self.credentials = credentials
+        self.enabled = enabled
+    }
+}
+
+/// Download configuration
+public struct DownloadConfig {
+    /// Maximum concurrent downloads
+    public let maxConcurrentDownloads: Int
+    
+    /// Number of retry attempts
+    public let retryAttempts: Int
+    
+    /// Custom cache directory
+    public let cacheDirectory: URL?
+    
+    /// Download timeout in seconds
+    public let timeoutInterval: TimeInterval
+    
+    public init(
+        maxConcurrentDownloads: Int = 2,
+        retryAttempts: Int = 3,
+        cacheDirectory: URL? = nil,
+        timeoutInterval: TimeInterval = 300
+    ) {
+        self.maxConcurrentDownloads = maxConcurrentDownloads
+        self.retryAttempts = retryAttempts
+        self.cacheDirectory = cacheDirectory
+        self.timeoutInterval = timeoutInterval
     }
 }
