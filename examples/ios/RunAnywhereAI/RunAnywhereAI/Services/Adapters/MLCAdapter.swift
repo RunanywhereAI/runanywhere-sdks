@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - MLC Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -19,7 +19,7 @@ class MLCAdapter: BaseFrameworkAdapter {
             formats: [.mlc, .tvm] // MLC compiled formats
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedMLCService()
@@ -28,13 +28,13 @@ class MLCAdapter: BaseFrameworkAdapter {
     // func canHandle(model: ModelInfo) -> Bool {
     //     // Check format compatibility
     //     guard supportedFormats.contains(model.format) else { return false }
-    //     
+    //
     //     // MLC supports JIT compilation for various formats
     //     // Can also handle source models for compilation
     //     if canCompile(model) {
     //         return true
     //     }
-    //     
+    //
     //     return model.format == .mlc || model.format == .tvm
     // }
     //
@@ -56,24 +56,24 @@ class MLCAdapter: BaseFrameworkAdapter {
 class UnifiedMLCService {
     private let mlcService: MLCService
     private let compilationCache = CompilationCache.shared
-    
+
     init() {
         self.mlcService = MLCService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Check if model needs compilation
     //     let deviceId = HardwareCapabilityManager.shared.deviceIdentifier
     //     let cacheKey = "\(modelPath)-\(deviceId)"
-    //     
+    //
     //     var compiledPath = modelPath
-    //     
+    //
     //     if let cachedPath = compilationCache.getCompiledModel(key: cacheKey) {
     //         // Use cached compiled model
     //         compiledPath = cachedPath
@@ -85,10 +85,10 @@ class UnifiedMLCService {
     //         compilationCache.store(key: cacheKey, path: compiledPath)
     //         progressTracker.updateStage(.initialization, progress: 0.8, message: "Compilation complete")
     //     }
-    //     
+    //
     //     // Initialize the existing MLCService
     //     try await mlcService.initialize(modelPath: compiledPath)
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -117,14 +117,14 @@ class UnifiedMLCService {
     //
     // private func compileForDevice(_ modelPath: String) async throws -> String {
     //     let hardware = HardwareCapabilityManager.shared.capabilities
-    //     
+    //
     //     var target = "auto"
     //     if hardware.hasNeuralEngine {
     //         target = "apple-neural-engine"
     //     } else if hardware.hasGPU {
     //         target = "metal"
     //     }
-    //     
+    //
     //     return try await mlcService.compile(modelPath: modelPath, target: target)
     // }
 }
@@ -140,7 +140,7 @@ extension MLCAdapter {
         case neuralEngine = "apple-neural-engine"
         case cuda = "cuda"  // For future macOS support
     }
-    
+
     // Optimization levels
     enum OptimizationLevel: Int {
         case none = 0
@@ -154,13 +154,13 @@ extension MLCAdapter {
 
 class CompilationCache {
     static let shared = CompilationCache()
-    
+
     private var cache: [String: String] = [:]
-    
+
     func getCompiledModel(key: String) -> String? {
         return cache[key]
     }
-    
+
     func store(key: String, path: String) {
         cache[key] = path
     }

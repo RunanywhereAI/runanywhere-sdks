@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - ONNX Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -19,7 +19,7 @@ class ONNXFrameworkAdapter: BaseFrameworkAdapter {
             formats: [.onnx, .ort]
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedONNXService()
@@ -28,16 +28,16 @@ class ONNXFrameworkAdapter: BaseFrameworkAdapter {
     // func canHandle(model: ModelInfo) -> Bool {
     //     // Check format compatibility
     //     guard supportedFormats.contains(model.format) else { return false }
-    //     
+    //
     //     // ONNX specific checks
     //     // Check for execution provider availability
     //     let availableProviders = getAvailableExecutionProviders()
-    //     
+    //
     //     // Model might require specific providers
     //     if let requiredProviders = model.metadata?.requiredExecutionProviders {
     //         return !requiredProviders.isDisjoint(with: availableProviders)
     //     }
-    //     
+    //
     //     return true
     // }
     //
@@ -48,12 +48,12 @@ class ONNXFrameworkAdapter: BaseFrameworkAdapter {
     //
     // private func getAvailableExecutionProviders() -> Set<String> {
     //     var providers: Set<String> = ["CPUExecutionProvider"]
-    //     
+    //
     //     // Check for CoreML provider on iOS
     //     if #available(iOS 13.0, *) {
     //         providers.insert("CoreMLExecutionProvider")
     //     }
-    //     
+    //
     //     return providers
     // }
 }
@@ -63,27 +63,27 @@ class ONNXFrameworkAdapter: BaseFrameworkAdapter {
 
 class UnifiedONNXService {
     private let onnxService: ONNXService
-    
+
     init() {
         self.onnxService = ONNXService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Initialize the existing ONNXService
     //     try await onnxService.initialize(modelPath: modelPath)
-    //     
+    //
     //     // Register tokenizer with SDK
     //     if let tokenizer = onnxService.tokenizer {
     //         let unifiedTokenizer = ONNXTokenizerWrapper(existing: tokenizer)
     //         tokenizerManager.registerTokenizer(unifiedTokenizer, for: modelPath)
     //     }
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -95,7 +95,7 @@ class UnifiedONNXService {
     // func streamGenerate(prompt: String, options: GenerationOptions, onToken: @escaping (String) -> Void) async throws {
     //     // ONNX doesn't support streaming natively, simulate it
     //     let result = try await generate(prompt: prompt, options: options)
-    //     
+    //
     //     // Simulate streaming
     //     let tokens = result.split(separator: " ")
     //     for token in tokens {
@@ -120,30 +120,30 @@ extension ONNXFrameworkAdapter {
     // Execution provider selection based on hardware
     // func selectExecutionProviders(for hardware: HardwareConfiguration) -> [String] {
     //     var providers: [String] = []
-    //     
+    //
     //     // Priority order matters - first provider in list is preferred
     //     if hardware.primaryAccelerator == .neuralEngine {
     //         providers.append("CoreMLExecutionProvider")
     //     }
-    //     
+    //
     //     // Always add CPU as fallback
     //     providers.append("CPUExecutionProvider")
-    //     
+    //
     //     return providers
     // }
-    
+
     // Session options configuration
     // func configureSessionOptions() -> ORTSessionOptions {
     //     let options = ORTSessionOptions()
-    //     
+    //
     //     // Set optimization level
     //     options.setGraphOptimizationLevel(.all)
-    //     
+    //
     //     // Enable profiling in debug builds
     //     #if DEBUG
     //     options.enableProfiling = true
     //     #endif
-    //     
+    //
     //     return options
     // }
 }

@@ -66,6 +66,8 @@ public class EnhancedDownloadManager {
         case extractionFailed(String)
         case unsupportedArchive(String)
         case unknown
+        case invalidResponse
+        case httpError(Int)
 
         public var errorDescription: String? {
             switch self {
@@ -85,6 +87,10 @@ public class EnhancedDownloadManager {
                 return "Unsupported archive format: \(format)"
             case .unknown:
                 return "Unknown download error"
+            case .invalidResponse:
+                return "Invalid server response"
+            case .httpError(let code):
+                return "HTTP error: \(code)"
             }
         }
     }
@@ -239,6 +245,13 @@ public class EnhancedDownloadManager {
         let session = URLSession.shared
         let request = URLRequest(url: url, timeoutInterval: config.timeout)
 
+        // Check iOS version for bytes API
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *) else {
+            // Fallback for older iOS versions
+            let downloadURL = try await downloadWithDataTask(from: url, progressContinuation: progressContinuation)
+            return try Data(contentsOf: downloadURL)
+        }
+
         let (asyncBytes, response) = try await session.bytes(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
@@ -342,7 +355,8 @@ public class EnhancedDownloadManager {
         // Create output directory
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
-        // Extract using unzip
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         process.arguments = ["-q", archive.path, "-d", outputDir.path]
@@ -352,6 +366,11 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("unzip failed with status \(process.terminationStatus)")
         }
+        #else
+        // On iOS, use manual extraction or delegate to app
+        // For now, throw an error indicating the app needs to handle extraction
+        throw DownloadError.extractionFailed("ZIP extraction requires app-level implementation. Please handle extraction in your app delegate.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -367,6 +386,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xzf", archive.path, "-C", outputDir.path]
@@ -376,6 +397,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.GZ extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -388,6 +413,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xf", archive.path, "-C", outputDir.path]
@@ -397,6 +424,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -412,6 +443,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xjf", archive.path, "-C", outputDir.path]
@@ -421,6 +454,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.BZ2 extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -436,6 +473,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xJf", archive.path, "-C", outputDir.path]
@@ -445,11 +484,75 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.XZ extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
 
         return outputDir
+    }
+
+    // Fallback download method for iOS < 15.0
+    private func downloadWithDataTask(
+        from url: URL,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
+            var request = URLRequest(url: url)
+
+            let downloadTask = URLSession.shared.downloadTask(with: request) { tempURL, response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    continuation.resume(throwing: DownloadError.httpError(httpResponse.statusCode))
+                    return
+                }
+
+                guard let tempURL = tempURL else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                do {
+                    let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                    let destinationURL = documentsDir.appendingPathComponent(url.lastPathComponent)
+
+                    // Remove existing file if needed
+                    try? FileManager.default.removeItem(at: destinationURL)
+
+                    // Move downloaded file to destination
+                    try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+
+                    continuation.resume(returning: destinationURL)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            // Observe progress
+            let observation = downloadTask.progress.observe(\.fractionCompleted) { progress, _ in
+                let downloadProgress = DownloadProgress(
+                    bytesDownloaded: progress.completedUnitCount,
+                    totalBytes: progress.totalUnitCount,
+                    state: .downloading,
+                    estimatedTimeRemaining: nil
+                )
+                progressContinuation.yield(downloadProgress)
+            }
+
+            downloadTask.resume()
+        }
     }
 
     private func calculateChecksum(for data: Data) -> String {

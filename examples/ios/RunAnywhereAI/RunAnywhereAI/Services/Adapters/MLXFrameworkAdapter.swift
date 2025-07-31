@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - MLX Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -19,7 +19,7 @@ class MLXFrameworkAdapter: BaseFrameworkAdapter {
             formats: [.safetensors, .gguf, .mlx]
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedMLXService()
@@ -28,14 +28,14 @@ class MLXFrameworkAdapter: BaseFrameworkAdapter {
     // func canHandle(model: ModelInfo) -> Bool {
     //     // Check format compatibility
     //     guard supportedFormats.contains(model.format) else { return false }
-    //     
+    //
     //     // MLX specific checks - requires A17 Pro/M3+
     //     guard MLXService.isMLXSupported() else { return false }
-    //     
+    //
     //     // Check for unified memory architecture
     //     let hardware = HardwareCapabilityManager.shared.capabilities
     //     guard hardware.hasUnifiedMemory else { return false }
-    //     
+    //
     //     return true
     // }
     //
@@ -50,23 +50,23 @@ class MLXFrameworkAdapter: BaseFrameworkAdapter {
 
 class UnifiedMLXService {
     private let mlxService: MLXService
-    
+
     init() {
         self.mlxService = MLXService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Check device requirements first
     //     guard MLXService.isMLXSupported() else {
     //         throw UnifiedModelError.deviceNotSupported("MLX requires A17 Pro/M3+ processor")
     //     }
-    //     
+    //
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Handle archive extraction if needed
     //     var actualPath = modelPath
     //     if modelPath.hasSuffix(".tar.gz") {
@@ -74,16 +74,16 @@ class UnifiedMLXService {
     //         actualPath = try await sdk.downloadManager.extractArchive(URL(fileURLWithPath: modelPath)).path
     //         progressTracker.completeStage(.extraction)
     //     }
-    //     
+    //
     //     // Initialize the existing MLXService
     //     try await mlxService.initialize(modelPath: actualPath)
-    //     
+    //
     //     // Register tokenizer with SDK
     //     if let tokenizer = mlxService.tokenizer {
     //         let unifiedTokenizer = MLXTokenizerWrapper(existing: tokenizer)
     //         tokenizerManager.registerTokenizer(unifiedTokenizer, for: modelPath)
     //     }
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -113,13 +113,13 @@ extension MLXFrameworkAdapter {
     static func isMLXSupported() -> Bool {
         return MLXService.isMLXSupported()
     }
-    
+
     // MLX-specific model validation
     // private func validateMLXModel(_ model: ModelInfo) -> Bool {
     //     // Check for required files in model directory
     //     // MLX models typically have config.json and weights.safetensors
     //     guard let modelPath = model.localPath else { return false }
-    //     
+    //
     //     let requiredFiles = ["config.json", "weights.safetensors"]
     //     for file in requiredFiles {
     //         let filePath = modelPath.appendingPathComponent(file)
@@ -127,7 +127,7 @@ extension MLXFrameworkAdapter {
     //             return false
     //         }
     //     }
-    //     
+    //
     //     return true
     // }
 }

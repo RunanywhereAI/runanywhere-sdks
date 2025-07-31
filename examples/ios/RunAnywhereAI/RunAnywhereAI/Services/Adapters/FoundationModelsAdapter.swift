@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - Foundation Models Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -20,7 +20,7 @@ class FoundationModelsAdapter: BaseFrameworkAdapter {
             formats: [] // System-provided models, no file formats
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedFoundationModelsService()
@@ -30,10 +30,10 @@ class FoundationModelsAdapter: BaseFrameworkAdapter {
     //     // Foundation Models are system-provided
     //     // Check if model is a system model
     //     guard model.provider == .system else { return false }
-    //     
+    //
     //     // Check iOS version
     //     guard #available(iOS 18.0, *) else { return false }
-    //     
+    //
     //     return true
     // }
     //
@@ -48,25 +48,25 @@ class FoundationModelsAdapter: BaseFrameworkAdapter {
 @available(iOS 18.0, *)
 class UnifiedFoundationModelsService {
     private let foundationService: FoundationModelsService
-    
+
     init() {
         self.foundationService = FoundationModelsService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Foundation Models don't need a model path - they're system-provided
     //     // modelPath might be used as an identifier
-    //     
+    //
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Initialize the existing FoundationModelsService
     //     // Pass "system" or model identifier
     //     try await foundationService.initialize(modelPath: "system")
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -97,11 +97,11 @@ extension FoundationModelsAdapter {
     func configurePrivacy(options: PrivacyOptions) {
         // Configure differential privacy and on-device only options
     }
-    
+
     // System model availability check
     static func isSystemModelAvailable() -> Bool {
         guard #available(iOS 18.0, *) else { return false }
-        
+
         // Additional runtime checks for model availability
         return true
     }

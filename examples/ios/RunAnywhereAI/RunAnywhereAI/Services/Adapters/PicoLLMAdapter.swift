@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - PicoLLM Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -19,7 +19,7 @@ class PicoLLMAdapter: BaseFrameworkAdapter {
             formats: [.pllm] // PicoLLM proprietary format
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedPicoLLMService()
@@ -28,13 +28,13 @@ class PicoLLMAdapter: BaseFrameworkAdapter {
     // func canHandle(model: ModelInfo) -> Bool {
     //     // Check format compatibility
     //     guard supportedFormats.contains(model.format) else { return false }
-    //     
+    //
     //     // PicoLLM requires API key
     //     guard KeychainService.shared.getPicovoiceAPIKey() != nil else { return false }
-    //     
+    //
     //     // Check if model is ultra-compressed
     //     guard model.fileSize < 100_000_000 else { return false } // < 100MB
-    //     
+    //
     //     return true
     // }
     //
@@ -48,33 +48,33 @@ class PicoLLMAdapter: BaseFrameworkAdapter {
 
 class UnifiedPicoLLMService {
     private let picoService: PicoLLMService
-    
+
     init() {
         self.picoService = PicoLLMService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Check for Picovoice API key
     //     guard let apiKey = KeychainService.shared.getPicovoiceAPIKey() else {
     //         throw UnifiedModelError.authRequired("Picovoice API key required")
     //     }
-    //     
+    //
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Set API key
     //     picoService.setAPIKey(apiKey)
-    //     
+    //
     //     // Configure for edge optimization
     //     picoService.setLowLatencyMode(true)
     //     picoService.setMemoryOptimization(.aggressive)
-    //     
+    //
     //     // Initialize the existing PicoLLMService
     //     try await picoService.initialize(modelPath: modelPath)
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -106,18 +106,18 @@ extension PicoLLMAdapter {
         case moderate
         case aggressive
     }
-    
+
     // Validate ultra-compressed model
     // func validateUltraCompressedModel(_ model: ModelInfo) -> Bool {
     //     // PicoLLM models should be extremely small
     //     guard model.fileSize < 100_000_000 else { return false } // < 100MB
-    //     
+    //
     //     // Check compression ratio if available
     //     if let originalSize = model.metadata?.originalSize {
     //         let compressionRatio = Double(model.fileSize) / Double(originalSize)
     //         return compressionRatio < 0.1 // 90%+ compression
     //     }
-    //     
+    //
     //     return true
     // }
 }

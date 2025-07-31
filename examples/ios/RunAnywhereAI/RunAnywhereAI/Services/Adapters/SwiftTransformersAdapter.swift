@@ -7,7 +7,7 @@
 
 import Foundation
 // Import SDK when available
-// import RunAnywhere
+// import RunAnywhereSDK
 
 // MARK: - Swift Transformers Framework Adapter
 // This adapter will implement SDK's FrameworkAdapter protocol when SDK is available
@@ -19,7 +19,7 @@ class SwiftTransformersAdapter: BaseFrameworkAdapter {
             formats: [.mlmodel, .mlpackage]
         )
     }
-    
+
     // When SDK is available:
     // func createService() -> LLMService {
     //     return UnifiedSwiftTransformersService()
@@ -28,14 +28,14 @@ class SwiftTransformersAdapter: BaseFrameworkAdapter {
     // func canHandle(model: ModelInfo) -> Bool {
     //     // Check format compatibility
     //     guard supportedFormats.contains(model.format) else { return false }
-    //     
+    //
     //     // Swift Transformers has strict requirements
     //     // Model must have 'input_ids' input
     //     guard validateModelInputs(model) else { return false }
-    //     
+    //
     //     // Only supports transformer architectures
     //     guard model.architecture?.contains("transformer") == true else { return false }
-    //     
+    //
     //     return true
     // }
     //
@@ -55,30 +55,30 @@ class SwiftTransformersAdapter: BaseFrameworkAdapter {
 
 class UnifiedSwiftTransformersService {
     private let swiftTransformersService: SwiftTransformersService
-    
+
     init() {
         self.swiftTransformersService = SwiftTransformersService()
     }
-    
+
     // When SDK is available, this will implement LLMService protocol methods:
-    
+
     // func initialize(modelPath: String) async throws {
     //     // Use SDK's lifecycle management
     //     try await lifecycleManager.transitionTo(.initializing)
     //     progressTracker.startStage(.initialization)
-    //     
+    //
     //     // Validate model compatibility BEFORE initialization
     //     try validateModelCompatibility(modelPath)
-    //     
+    //
     //     // Initialize the existing SwiftTransformersService
     //     try await swiftTransformersService.initialize(modelPath: modelPath)
-    //     
+    //
     //     // Register tokenizer with SDK
     //     if let tokenizer = swiftTransformersService.tokenizer {
     //         let unifiedTokenizer = SwiftTransformersTokenizerWrapper(existing: tokenizer)
     //         tokenizerManager.registerTokenizer(unifiedTokenizer, for: modelPath)
     //     }
-    //     
+    //
     //     progressTracker.completeStage(.initialization)
     //     try await lifecycleManager.transitionTo(.initialized)
     // }
@@ -102,21 +102,21 @@ class UnifiedSwiftTransformersService {
     // private func validateModelCompatibility(_ modelPath: String) throws {
     //     // This is CRITICAL - Swift Transformers has very strict requirements
     //     // The model MUST have 'input_ids' as an input or it will crash
-    //     
+    //
     //     // Load model metadata to check inputs
     //     let url = URL(fileURLWithPath: modelPath)
-    //     
+    //
     //     // For mlpackage, check Metadata.json
     //     if url.pathExtension == "mlpackage" {
     //         let metadataURL = url.appendingPathComponent("Metadata.json")
     //         if let data = try? Data(contentsOf: metadataURL),
     //            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
     //            let inputs = json["inputs"] as? [[String: Any]] {
-    //             
+    //
     //             let hasInputIds = inputs.contains { input in
     //                 (input["name"] as? String) == "input_ids"
     //             }
-    //             
+    //
     //             if !hasInputIds {
     //                 throw UnifiedModelError.incompatibleModel(
     //                     "Model must have 'input_ids' input for Swift Transformers"

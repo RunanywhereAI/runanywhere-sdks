@@ -8,8 +8,8 @@ target 'RunAnywhereAI' do
   pod 'TensorFlowLiteSwift/Metal', '~> 2.17.0'    # GPU acceleration
   pod 'TensorFlowLiteSwift/CoreML', '~> 2.17.0'   # Neural Engine support
 
-  # ZIP handling moved to Swift Package Manager
-  # pod 'ZIPFoundation', '~> 0.9.19'
+  # ZIP handling - uncommented for SDK compatibility
+  pod 'ZIPFoundation', '~> 0.9.19'
 
   # PicoLLM - Proprietary SDK (Check actual pod name)
   # pod 'PicovoiceSDK', '~> 3.0.0'  # Correct Picovoice pod name

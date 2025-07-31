@@ -1,11 +1,12 @@
 #!/bin/bash
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models]
+# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models] [--build-sdk]
 # Examples:
 #   ./build_and_run.sh simulator "iPhone 16 Pro"
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
 #   ./build_and_run.sh device "YOUR_DEVICE_ID"
 #   ./build_and_run.sh device "Your Device Name" --add-models
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 
 set -e
 
@@ -32,28 +33,33 @@ print_warning() {
 TARGET_TYPE="${1:-device}"
 DEVICE_NAME="${2:-}"
 ADD_MODELS=false
+BUILD_SDK=false
 
 # Check for help flag
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models]"
+    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models] [--build-sdk]"
     echo ""
     echo "Arguments:"
     echo "  simulator|device    Target type (default: device)"
     echo "  device-name-or-id   Device name or ID (optional for simulator)"
     echo "  --add-models        Add model files to Xcode project (optional)"
+    echo "  --build-sdk         Build the RunAnywhere SDK before building the app (optional)"
     echo ""
     echo "Examples:"
     echo "  $0 simulator \"iPhone 16 Pro\""
     echo "  $0 simulator \"iPhone 16 Pro\" --add-models"
     echo "  $0 device"
     echo "  $0 device \"My iPhone\" --add-models"
+    echo "  $0 simulator \"iPhone 16 Pro\" --build-sdk"
     exit 0
 fi
 
-# Check for --add-models flag in any position after the first two arguments
+# Check for flags in any position after the first two arguments
 for arg in "${@:3}"; do
     if [ "$arg" = "--add-models" ]; then
         ADD_MODELS=true
+    elif [ "$arg" = "--build-sdk" ]; then
+        BUILD_SDK=true
     fi
 done
 
@@ -279,6 +285,30 @@ get_destination() {
 
 # Main execution
 print_status "Starting build process for $TARGET_TYPE..."
+
+# Build SDK if requested
+if [ "$BUILD_SDK" = true ]; then
+    print_status "Building RunAnywhere SDK..."
+    SDK_PATH="../../../sdk/runanywhere-swift"
+    if [ -d "$SDK_PATH" ]; then
+        pushd "$SDK_PATH" > /dev/null
+        if swift build 2>&1 | tee /tmp/sdk_build.log; then
+            print_status "SDK built successfully!"
+        else
+            # Check if it's just warnings
+            if grep -q "Build complete!" /tmp/sdk_build.log; then
+                print_status "SDK built successfully with warnings!"
+            else
+                print_error "SDK build failed!"
+                exit 1
+            fi
+        fi
+        popd > /dev/null
+    else
+        print_error "SDK directory not found at $SDK_PATH"
+        exit 1
+    fi
+fi
 
 # Ensure all model files are in the project (only if --add-models flag is set)
 if [ "$ADD_MODELS" = true ]; then
