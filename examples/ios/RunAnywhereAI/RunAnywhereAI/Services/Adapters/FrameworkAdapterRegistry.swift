@@ -16,10 +16,43 @@ class FrameworkAdapterRegistry {
     static let shared = FrameworkAdapterRegistry()
     
     // This will store our custom framework adapter implementations
-    // that extend SDK functionality for advanced use cases
+    // When SDK is available, these will be registered with the SDK
+    private var adapters: [LLMFramework: BaseFrameworkAdapter] = [:]
     
     private init() {
-        // Framework adapters will be registered here when SDK is available
-        // and we implement custom adapters for the sample app
+        registerDefaultAdapters()
+    }
+    
+    private func registerDefaultAdapters() {
+        // Register all framework adapters
+        register(CoreMLFrameworkAdapter())
+        register(TFLiteFrameworkAdapter())
+        register(MLXFrameworkAdapter())
+        register(SwiftTransformersAdapter())
+        register(ONNXFrameworkAdapter())
+        register(ExecuTorchAdapter())
+        register(LlamaCppFrameworkAdapter())
+        
+        if #available(iOS 18.0, *) {
+            register(FoundationModelsAdapter())
+        }
+        
+        register(PicoLLMAdapter())
+        register(MLCAdapter())
+    }
+    
+    func register(_ adapter: BaseFrameworkAdapter) {
+        adapters[adapter.framework] = adapter
+        
+        // When SDK is available:
+        // RunAnywhereSDK.shared.registerFrameworkAdapter(adapter)
+    }
+    
+    func getAdapter(for framework: LLMFramework) -> BaseFrameworkAdapter? {
+        return adapters[framework]
+    }
+    
+    func getAllAdapters() -> [BaseFrameworkAdapter] {
+        return Array(adapters.values)
     }
 }

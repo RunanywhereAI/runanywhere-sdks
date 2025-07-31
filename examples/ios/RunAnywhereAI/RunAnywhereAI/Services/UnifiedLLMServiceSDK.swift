@@ -41,7 +41,8 @@ class UnifiedLLMServiceSDK: ObservableObject {
             // try await sdk.initialize(apiKey: apiKey)
             
             // The SDK will auto-register its built-in components
-            // We only need to register our custom implementations
+            // We only need to register our custom framework adapters
+            registerFrameworkAdapters()
             
             // Discover available models
             // availableModels = try await sdk.discoverModels()
@@ -50,6 +51,18 @@ class UnifiedLLMServiceSDK: ObservableObject {
             self.error = error
             print("Failed to initialize SDK: \(error)")
         }
+    }
+    
+    private func registerFrameworkAdapters() {
+        // Get all adapters from the registry
+        let adapters = FrameworkAdapterRegistry.shared.getAllAdapters()
+        
+        // When SDK is available, register each adapter:
+        // for adapter in adapters {
+        //     sdk.registerFrameworkAdapter(adapter)
+        // }
+        
+        print("Registered \(adapters.count) framework adapters")
     }
     
     // MARK: - Public API
