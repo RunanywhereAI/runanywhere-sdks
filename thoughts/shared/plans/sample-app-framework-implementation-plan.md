@@ -581,7 +581,7 @@ struct ModelSelectionView: View {
 
 ## Service Orchestration
 
-### UnifiedLLMServiceSDK (Phase 1 Implementation)
+### UnifiedLLMServiceSDK (Phase 1 & 2 Implementation)
 
 ```swift
 // Services/UnifiedLLMServiceSDK.swift
@@ -616,7 +616,8 @@ class UnifiedLLMServiceSDK: ObservableObject {
             // try await sdk.initialize(apiKey: apiKey)
             
             // The SDK will auto-register its built-in components
-            // We only need to register our custom implementations
+            // We only need to register our custom framework adapters
+            registerFrameworkAdapters()
             
             // Discover available models
             // availableModels = try await sdk.discoverModels()
@@ -625,6 +626,18 @@ class UnifiedLLMServiceSDK: ObservableObject {
             self.error = error
             print("Failed to initialize SDK: \(error)")
         }
+    }
+    
+    private func registerFrameworkAdapters() {
+        // Get all adapters from the registry
+        let adapters = FrameworkAdapterRegistry.shared.getAllAdapters()
+        
+        // When SDK is available, register each adapter:
+        // for adapter in adapters {
+        //     sdk.registerFrameworkAdapter(adapter)
+        // }
+        
+        print("Registered \(adapters.count) framework adapters")
     }
     
     // Public API methods that purely consume SDK functionality
@@ -770,11 +783,44 @@ class FrameworkAdapterTests: XCTestCase {
 - **UnifiedLLMServiceSDK.swift**: New service that purely consumes SDK APIs, no legacy dependencies
 - **Removed SDK components**: Deleted hardware detection and other SDK-specific implementations
 
-### Phase 2: Framework Migration (Week 2-3)
-1. Move each framework service to new structure
-2. Create framework adapters implementing SDK protocols
-3. Preserve all framework-specific logic
-4. Update imports and dependencies
+### Phase 2: Framework Migration (Week 2-3) ✅ COMPLETED
+1. ✅ Move each framework service to new structure
+   - All existing framework services preserved in their original locations
+   - Created wrapper adapters instead of moving services
+2. ✅ Create framework adapters implementing SDK protocols
+   - Created all 10 framework adapters:
+     - `CoreMLFrameworkAdapter.swift` - Wraps CoreMLService
+     - `TFLiteFrameworkAdapter.swift` - Handles TensorFlow Lite with delegates
+     - `MLXFrameworkAdapter.swift` - Includes A17 Pro/M3+ device checking
+     - `SwiftTransformersAdapter.swift` - Strict input validation
+     - `ONNXFrameworkAdapter.swift` - Execution provider management
+     - `LlamaCppFrameworkAdapter.swift` - GGUF/GGML with quantization
+     - `ExecuTorchAdapter.swift` - PyTorch Edge format support
+     - `FoundationModelsAdapter.swift` - iOS 18+ system models
+     - `PicoLLMAdapter.swift` - Ultra-compressed models with API key
+     - `MLCAdapter.swift` - JIT compilation with caching
+3. ✅ Preserve all framework-specific logic
+   - Each adapter maintains unique requirements (device checks, validation, etc.)
+   - Original services remain untouched
+   - Framework-specific optimizations preserved
+4. ✅ Update imports and dependencies
+   - Updated `FrameworkAdapterRegistry` to register all adapters
+   - Updated `UnifiedLLMServiceSDK` to use the registry
+   - All adapters ready for SDK protocol implementation
+
+### Phase 2 Implementation Details:
+- **Adapter Pattern**: Each framework has both an adapter and a unified service wrapper
+- **Registry Pattern**: `FrameworkAdapterRegistry` manages all adapters and will register with SDK
+- **Clean Separation**: Adapters only prepare to consume SDK APIs, no SDK implementation
+- **Framework Specifics Preserved**:
+  - MLX: Device capability checking for A17 Pro/M3+
+  - SwiftTransformers: Strict 'input_ids' validation
+  - TFLite: Delegate configuration (CoreML/Metal)
+  - LlamaCpp: Quantization format detection
+  - PicoLLM: API key validation
+  - MLC: Compilation caching
+  - FoundationModels: System model handling
+- **Authentication Integration**: Kaggle and Picovoice API key checks included
 
 ### Phase 3: Tokenizer Migration (Week 4)
 1. Create tokenizer adapters for SDK protocol
@@ -1002,3 +1048,77 @@ When the SDK implementation is complete in the other branch:
 2. Uncomment SDK imports and API calls
 3. Implement SDK protocols in framework adapters
 4. Test integration with all 10 frameworks
+
+## Phase 2 Completion Summary
+
+Phase 2 of the sample app implementation has been successfully completed with the following achievements:
+
+### ✅ Completed Items:
+1. **Framework Adapters**: Created adapters for all 10 ML frameworks
+2. **Unified Services**: Each framework has a unified service wrapper ready for SDK integration
+3. **Registry Implementation**: `FrameworkAdapterRegistry` manages and registers all adapters
+4. **Framework Logic Preserved**: All framework-specific requirements and optimizations maintained
+5. **Clean Architecture**: Adapters wrap existing services without modifying them
+
+### 🏗️ Framework Adapter Details:
+| Framework | Adapter | Key Features Preserved |
+|-----------|---------|----------------------|
+| Core ML | `CoreMLFrameworkAdapter` | Model compilation, Neural Engine optimization |
+| TensorFlow Lite | `TFLiteFrameworkAdapter` | Delegate configuration, Kaggle auth |
+| MLX | `MLXFrameworkAdapter` | A17 Pro/M3+ device checking, archive extraction |
+| Swift Transformers | `SwiftTransformersAdapter` | Strict input_ids validation |
+| ONNX | `ONNXFrameworkAdapter` | Execution provider selection |
+| LlamaCpp | `LlamaCppFrameworkAdapter` | GGUF/GGML support, quantization detection |
+| ExecuTorch | `ExecuTorchAdapter` | PyTorch Edge format, edge optimization |
+| Foundation Models | `FoundationModelsAdapter` | iOS 18+ system models, privacy features |
+| PicoLLM | `PicoLLMAdapter` | Ultra-compression, API key validation |
+| MLC | `MLCAdapter` | JIT compilation, target-specific optimization |
+
+### 🔄 Architectural Achievements:
+- **Wrapper Pattern**: Each adapter wraps existing framework services without modification
+- **SDK Ready**: All adapters have commented code showing SDK integration points
+- **Authentication**: Integrated Kaggle and Picovoice authentication checks
+- **Hardware Awareness**: Device-specific optimizations preserved (MLX, Neural Engine, etc.)
+- **Format Support**: Each adapter declares its supported model formats
+
+### 📝 Ready for Phase 3:
+The framework migration establishes:
+- Complete adapter coverage for all 10 frameworks
+- Registry pattern for centralized adapter management
+- Clean separation between SDK consumption and framework implementation
+- Preservation of all framework-specific optimizations and requirements
+
+### 🎯 Phase 2 Impact:
+This phase successfully bridges the gap between the existing framework implementations and the upcoming SDK integration, ensuring that all framework-specific logic is preserved while preparing for the unified SDK interface.
+
+### 📂 Created Files:
+```
+Services/Adapters/
+├── BaseFrameworkAdapter.swift          # Base class for all framework adapters
+├── FrameworkAdapterRegistry.swift      # Manages all framework adapters
+├── CoreMLFrameworkAdapter.swift        # Core ML adapter implementation
+├── TFLiteFrameworkAdapter.swift        # TensorFlow Lite adapter
+├── MLXFrameworkAdapter.swift           # MLX adapter with device checks
+├── SwiftTransformersAdapter.swift      # Swift Transformers adapter
+├── ONNXFrameworkAdapter.swift          # ONNX Runtime adapter
+├── LlamaCppFrameworkAdapter.swift      # Llama.cpp adapter for GGUF/GGML
+├── ExecuTorchAdapter.swift             # ExecuTorch for edge devices
+├── FoundationModelsAdapter.swift       # Apple's Foundation Models
+├── PicoLLMAdapter.swift                # Picovoice's ultra-compressed models
+└── MLCAdapter.swift                    # Machine Learning Compilation adapter
+```
+
+### 🔗 Integration with UnifiedLLMServiceSDK:
+```swift
+private func registerFrameworkAdapters() {
+    // Get all adapters from the registry
+    let adapters = FrameworkAdapterRegistry.shared.getAllAdapters()
+    
+    // When SDK is available, register each adapter:
+    // for adapter in adapters {
+    //     sdk.registerFrameworkAdapter(adapter)
+    // }
+    
+    print("Registered \(adapters.count) framework adapters")
+}
+```
