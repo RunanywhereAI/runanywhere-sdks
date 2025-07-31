@@ -55,54 +55,6 @@ public struct ModelInfo {
     }
 }
 
-/// Model format types
-public enum ModelFormat: String, CaseIterable {
-    case mlmodel = "mlmodel"
-    case mlpackage = "mlpackage"
-    case tflite = "tflite"
-    case onnx = "onnx"
-    case ort = "ort"
-    case safetensors = "safetensors"
-    case gguf = "gguf"
-    case ggml = "ggml"
-    case pte = "pte" // PyTorch Edge
-    case bin = "bin"
-    case unknown = "unknown"
-}
-
-/// Hardware requirements
-public enum HardwareRequirement {
-    case neuralEngine
-    case gpu
-    case minMemory(Int64)
-    case minProcessorGeneration(String)
-    case accelerator(HardwareAcceleration)
-}
-
-/// Tokenizer format types
-public enum TokenizerFormat: String {
-    case huggingFace = "huggingface"
-    case sentencePiece = "sentencepiece"
-    case wordPiece = "wordpiece"
-    case bpe = "bpe"
-    case tflite = "tflite"
-    case coreML = "coreml"
-    case custom = "custom"
-}
-
-/// LLM Framework types
-public enum LLMFramework: String, CaseIterable {
-    case coreML = "CoreML"
-    case tfLite = "TFLite"
-    case mlx = "MLX"
-    case swiftTransformers = "SwiftTransformers"
-    case onnx = "ONNX"
-    case execuTorch = "ExecuTorch"
-    case llamaCpp = "LlamaCpp"
-    case foundationModels = "FoundationModels"
-    case picoLLM = "PicoLLM"
-    case mlc = "MLC"
-}
 
 /// Resource availability information
 public struct ResourceAvailability {

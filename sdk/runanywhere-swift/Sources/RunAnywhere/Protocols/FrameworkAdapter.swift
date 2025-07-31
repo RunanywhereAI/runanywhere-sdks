@@ -104,59 +104,6 @@ public protocol FrameworkAdapter {
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration
 }
 
-/// Model information structure
-public struct ModelInfo {
-    public let id: String
-    public let name: String
-    public let format: ModelFormat
-    public var localPath: URL?
-    public let downloadURL: URL?
-    public let alternativeDownloadURLs: [URL]?
-    public let checksum: String?
-    public let downloadSize: Int64?
-    public let estimatedMemory: Int64
-    public let contextLength: Int
-    public let compatibleFrameworks: [LLMFramework]
-    public let preferredFramework: LLMFramework?
-    public let hardwareRequirements: [HardwareRequirement]
-    public let metadata: ModelMetadata?
-    public let tokenizerFormat: TokenizerFormat?
-    
-    public init(
-        id: String,
-        name: String,
-        format: ModelFormat,
-        localPath: URL? = nil,
-        downloadURL: URL? = nil,
-        alternativeDownloadURLs: [URL]? = nil,
-        checksum: String? = nil,
-        downloadSize: Int64? = nil,
-        estimatedMemory: Int64,
-        contextLength: Int = 2048,
-        compatibleFrameworks: [LLMFramework],
-        preferredFramework: LLMFramework? = nil,
-        hardwareRequirements: [HardwareRequirement] = [],
-        metadata: ModelMetadata? = nil,
-        tokenizerFormat: TokenizerFormat? = nil
-    ) {
-        self.id = id
-        self.name = name
-        self.format = format
-        self.localPath = localPath
-        self.downloadURL = downloadURL
-        self.alternativeDownloadURLs = alternativeDownloadURLs
-        self.checksum = checksum
-        self.downloadSize = downloadSize
-        self.estimatedMemory = estimatedMemory
-        self.contextLength = contextLength
-        self.compatibleFrameworks = compatibleFrameworks
-        self.preferredFramework = preferredFramework
-        self.hardwareRequirements = hardwareRequirements
-        self.metadata = metadata
-        self.tokenizerFormat = tokenizerFormat
-    }
-}
-
 /// Hardware requirements for models
 public enum HardwareRequirement {
     case minimumMemory(Int64)
@@ -167,46 +114,3 @@ public enum HardwareRequirement {
     case specificChip(String)
 }
 
-/// Model metadata
-public struct ModelMetadata {
-    public var author: String?
-    public var description: String?
-    public var version: String?
-    public var modelType: String?
-    public var architecture: String?
-    public var quantization: String?
-    public var formatVersion: String?
-    public var inputShapes: [String: [Int]]?
-    public var outputShapes: [String: [Int]]?
-    public var contextLength: Int?
-    public var embeddingDimension: Int?
-    public var layerCount: Int?
-    public var parameterCount: Int64?
-    public var tensorCount: Int?
-    public var requirements: ModelRequirements?
-    
-    public init() {}
-}
-
-/// Model requirements structure
-public struct ModelRequirements {
-    public let minimumMemory: Int64
-    public let recommendedMemory: Int64
-    public let minimumStorage: Int64
-    public let supportedAccelerators: [HardwareAcceleration]
-    public let minimumOSVersion: OperatingSystemVersion?
-    
-    public init(
-        minimumMemory: Int64,
-        recommendedMemory: Int64,
-        minimumStorage: Int64,
-        supportedAccelerators: [HardwareAcceleration],
-        minimumOSVersion: OperatingSystemVersion? = nil
-    ) {
-        self.minimumMemory = minimumMemory
-        self.recommendedMemory = recommendedMemory
-        self.minimumStorage = minimumStorage
-        self.supportedAccelerators = supportedAccelerators
-        self.minimumOSVersion = minimumOSVersion
-    }
-}

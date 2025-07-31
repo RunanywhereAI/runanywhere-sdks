@@ -159,31 +159,7 @@ public struct ProcessorInfo {
     }
 }
 
-/// Thermal state enumeration
-public enum ThermalState {
-    case nominal
-    case fair
-    case serious
-    case critical
-    case unknown
-    
-    #if canImport(Foundation)
-    public init(from processInfoState: ProcessInfo.ThermalState) {
-        switch processInfoState {
-        case .nominal:
-            self = .nominal
-        case .fair:
-            self = .fair
-        case .serious:
-            self = .serious
-        case .critical:
-            self = .critical
-        @unknown default:
-            self = .unknown
-        }
-    }
-    #endif
-}
+// Using ProcessInfo.ThermalState from Foundation
 
 /// Battery information
 public struct BatteryInfo {
@@ -209,57 +185,4 @@ public struct BatteryInfo {
     }
 }
 
-/// Resource availability information
-public struct ResourceAvailability {
-    public let memoryAvailable: Int64
-    public let storageAvailable: Int64
-    public let acceleratorsAvailable: [HardwareAcceleration]
-    public let thermalState: ThermalState
-    public let batteryLevel: Float?
-    public let isLowPowerMode: Bool
-    
-    public init(
-        memoryAvailable: Int64,
-        storageAvailable: Int64,
-        acceleratorsAvailable: [HardwareAcceleration],
-        thermalState: ThermalState,
-        batteryLevel: Float? = nil,
-        isLowPowerMode: Bool = false
-    ) {
-        self.memoryAvailable = memoryAvailable
-        self.storageAvailable = storageAvailable
-        self.acceleratorsAvailable = acceleratorsAvailable
-        self.thermalState = thermalState
-        self.batteryLevel = batteryLevel
-        self.isLowPowerMode = isLowPowerMode
-    }
-    
-    /// Check if resources are available to load a model
-    public func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
-        // Check memory
-        if model.estimatedMemory > memoryAvailable {
-            let needed = ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)
-            let available = ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory)
-            return (false, "Insufficient memory: need \(needed), have \(available)")
-        }
-        
-        // Check storage
-        if let downloadSize = model.downloadSize, downloadSize > storageAvailable {
-            let needed = ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)
-            let available = ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file)
-            return (false, "Insufficient storage: need \(needed), have \(available)")
-        }
-        
-        // Check thermal state
-        if thermalState == .critical {
-            return (false, "Device is too hot, please wait for it to cool down")
-        }
-        
-        // Check battery in low power mode
-        if isLowPowerMode && batteryLevel != nil && batteryLevel! < 0.2 {
-            return (false, "Battery too low for model loading in Low Power Mode")
-        }
-        
-        return (true, nil)
-    }
-}
+// ResourceAvailability is defined in Types.swift

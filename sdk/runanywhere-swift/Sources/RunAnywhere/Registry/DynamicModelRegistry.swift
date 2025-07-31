@@ -1,47 +1,5 @@
 import Foundation
 
-/// Protocol for model registry operations
-public protocol ModelRegistry {
-    func discoverModels() async -> [ModelInfo]
-    func registerModel(_ model: ModelInfo) async
-    func unregisterModel(_ modelId: String) async
-    func getModel(_ modelId: String) -> ModelInfo?
-    func filterModels(by criteria: ModelCriteria) -> [ModelInfo]
-    func updateModel(_ model: ModelInfo) async
-}
-
-/// Criteria for filtering models
-public struct ModelCriteria {
-    public var framework: LLMFramework?
-    public var format: ModelFormat?
-    public var maxSize: Int64?
-    public var minContextLength: Int?
-    public var maxContextLength: Int?
-    public var requiresNeuralEngine: Bool?
-    public var quantization: String?
-    public var search: String?
-    
-    public init(
-        framework: LLMFramework? = nil,
-        format: ModelFormat? = nil,
-        maxSize: Int64? = nil,
-        minContextLength: Int? = nil,
-        maxContextLength: Int? = nil,
-        requiresNeuralEngine: Bool? = nil,
-        quantization: String? = nil,
-        search: String? = nil
-    ) {
-        self.framework = framework
-        self.format = format
-        self.maxSize = maxSize
-        self.minContextLength = minContextLength
-        self.maxContextLength = maxContextLength
-        self.requiresNeuralEngine = requiresNeuralEngine
-        self.quantization = quantization
-        self.search = search
-    }
-}
-
 /// Dynamic model registry with discovery capabilities
 public class DynamicModelRegistry: ModelRegistry {
     public static let shared = DynamicModelRegistry()
