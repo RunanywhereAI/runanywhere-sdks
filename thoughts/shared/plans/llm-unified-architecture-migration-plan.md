@@ -1,8 +1,26 @@
-# LLM Unified Architecture Migration Plan
+# LLM Unified Architecture Migration Plan - SDK vs Sample App Separation
 
 ## Executive Summary
 
-This document provides a comprehensive, step-by-step plan for migrating the current RunAnywhereAI iOS LLM framework implementation to the proposed unified architecture. The migration includes framework-specific details, cleanup instructions, and a phased approach that completely replaces the old implementation rather than maintaining parallel versions.
+This document provides a comprehensive, step-by-step plan for migrating the current RunAnywhereAI iOS LLM framework implementation to the proposed unified architecture. The migration separates common components into the RunAnywhere SDK while keeping framework-specific implementations in the sample app. This separation allows multiple developers to leverage the SDK's unified interface while implementing their own framework-specific adapters.
+
+### Architecture Summary
+
+**SDK (RunAnywhere Package)**
+- Provides protocols and abstract interfaces
+- Implements core infrastructure (lifecycle, memory, downloads)
+- Handles common functionality (progress, errors, validation)
+- Has minimal dependencies
+- Framework-agnostic
+
+**Sample App (RunAnywhereAI)**
+- Implements all SDK protocols
+- Contains all 10 framework adapters
+- Handles platform-specific code (iOS hardware detection)
+- Manages authentication (Keychain integration)
+- Provides UI and demonstrates best practices
+
+This clean separation ensures the SDK remains lightweight and flexible while the sample app serves as a comprehensive reference implementation.
 
 ## Current State Analysis
 
@@ -30,55 +48,251 @@ UnifiedLLMService (Facade)
 ## Migration Strategy
 
 ### Core Principles
-1. **Complete Replacement** - Replace old implementation entirely, no v1/v2 parallel systems
-2. **Clean Architecture** - Remove all legacy code and technical debt
-3. **Phased Approach** - Small, manageable phases with clear boundaries
-4. **Framework Preservation** - Maintain core framework logic while unifying interfaces
+1. **Modular SDK Design** - Core module with essential functionality, optional modules for specific features
+2. **Out-of-the-Box Functionality** - SDK includes working implementations, not just protocols
+3. **Progressive Enhancement** - Start simple with defaults, customize as needed
+4. **Clean Architecture** - Remove all legacy code and technical debt
+5. **Phased Approach** - Small, manageable phases with clear boundaries
+6. **Framework Preservation** - Maintain core framework logic while unifying interfaces
+7. **Developer Experience** - SDK provides powerful abstractions while allowing flexibility
 
-## Phase 1: Foundation Layer (Week 1-2)
+### Architectural Separation Guidelines
 
-### 1.1 Core Protocol Definitions
+#### SDK Responsibilities (What goes in the SDK):
+1. **Protocol Definitions** - All interfaces that implementations must conform to
+2. **Abstract Base Classes** - Common functionality that can be inherited
+3. **Core Infrastructure**:
+   - Model lifecycle state machine
+   - Memory management system
+   - Download manager with retry and archive support
+   - Progress tracking system
+   - Error recovery framework
+4. **Utilities**:
+   - Model validation framework
+   - Metadata caching
+   - Resource availability checking
+5. **Public API** - Clean, well-documented public interface
+
+#### Sample App Responsibilities (What stays in the app):
+1. **Advanced Framework Implementations**:
+   - Complex framework adapters not included in SDK modules
+   - Custom optimization strategies
+   - Experimental features
+2. **UI Components** - All views and view models
+3. **Integration Examples** - Best practices and usage patterns
+4. **Custom Extensions** - Examples of extending SDK functionality
+
+### Enhanced SDK Architecture (Following Industry Best Practices)
+
+#### Modular Design Pattern
+Based on patterns from Firebase, Stripe, and AWS SDK, the RunAnywhere SDK adopts a modular architecture:
+
+```swift
+// Core module (always required)
+import RunAnywhere
+
+// Optional modules as needed
+import RunAnywhereHuggingFace    // For HuggingFace models
+import RunAnywhereCorML          // For Core ML support
+import RunAnywhereGGUF           // For GGUF/llama.cpp models
+```
+
+#### Progressive Enhancement Approach
+
+**1. Basic Usage (Core Only)**
+```swift
+// Works out-of-the-box with built-in providers and formats
+let sdk = RunAnywhereSDK.shared
+try await sdk.initialize(apiKey: "...")
+
+// Discover local models automatically
+let models = await sdk.discoverModels()
+
+// Load with automatic framework selection
+try await sdk.loadModel("model-id")
+let result = try await sdk.generate("Hello!")
+```
+
+**2. With Optional Modules**
+```swift
+import RunAnywhereHuggingFace
+
+// Enhanced with HuggingFace provider
+let hfProvider = HuggingFaceProvider(token: "...")
+sdk.modelRegistry.registerProvider(hfProvider)
+
+// Now can discover HuggingFace models
+let hfModels = await sdk.discoverModels(from: .huggingFace)
+```
+
+**3. Custom Extensions**
+```swift
+// Implement custom framework adapter
+class MyCustomAdapter: FrameworkAdapter {
+    // Custom implementation
+}
+
+// Register with SDK
+sdk.registerFrameworkAdapter(MyCustomAdapter())
+```
+
+#### Benefits of This Architecture
+
+1. **Smaller App Size**: Include only what you need
+2. **Faster Integration**: Working defaults reduce setup time  
+3. **Clear Upgrade Path**: Start simple, add modules as needed
+4. **Community Friendly**: Easy to contribute new modules
+5. **Future Proof**: New frameworks can be added without breaking changes
+
+## SDK vs Sample App Architecture Division
+
+### Components for SDK (RunAnywhere Swift Package)
+
+#### Core Module (Always Included)
+```swift
+// Protocols with default implementations
+public protocol ModelLifecycleManager { }
+public protocol UnifiedTokenizer { }
+public protocol HardwareDetector { }
+public protocol MemoryManager { }
+public protocol ProgressTracker { }
+public protocol ErrorRecoveryStrategy { }
+public protocol ModelValidator { }
+public protocol ModelProvider { }
+public protocol MetadataExtractorProtocol { }
+public protocol FrameworkAdapter { }
+public protocol AuthProvider { }
+```
+
+#### Core Implementations (Built-in)
+- Model lifecycle state machine (concrete)
+- Unified memory manager with platform defaults
+- Enhanced download manager with archive support
+- Progress tracking system
+- Error recovery coordinator
+- Model validation framework
+- Dynamic model registry
+- Resource availability checker
+- Caching systems
+- **Token management framework** (NEW)
+- **Default platform implementations:**
+  - DefaultiOSHardwareDetector (iOS only)
+  - DefaultAndroidHardwareDetector (Android only)
+  - DefaultMemoryManager (per platform)
+- **Built-in format support:**
+  - CoreMLMetadataExtractor
+  - TFLiteMetadataExtractor
+  - ONNXMetadataExtractor
+  - SafetensorsMetadataExtractor
+  - GGUFMetadataExtractor
+- **Common tokenizer implementations:**
+  - BPETokenizerAdapter
+  - SentencePieceTokenizerAdapter
+  - WordPieceTokenizerAdapter
+
+#### Optional SDK Modules (Modular Architecture)
+```
+RunAnywhereProviders/ (Model discovery & download)
+├── RunAnywhereHuggingFace
+│   └── HuggingFaceProvider & Auth
+├── RunAnywhereOpenModels  
+│   ├── KaggleProvider & Auth
+│   └── MicrosoftModelsProvider
+└── RunAnywhereSystemModels
+    └── AppleModelsProvider (iOS only)
+
+RunAnywhereFrameworks/ (Ready-to-use adapters)
+├── RunAnywhereCorML (iOS only)
+│   └── CoreMLFrameworkAdapter
+├── RunAnywhereONNX (cross-platform)
+│   └── ONNXFrameworkAdapter  
+├── RunAnywhereGGUF (llama.cpp)
+│   └── LlamaCppFrameworkAdapter
+└── RunAnywhereSystemML
+    └── FoundationModelsAdapter (iOS 18+)
+```
+
+### Components for Sample App (Reduced Scope)
+
+#### Advanced Framework Implementations (Not in SDK modules)
+- MLXService & device checks (requires Metal Performance Shaders)
+- SwiftTransformersService (strict validation requirements)
+- ExecuTorchService (PyTorch Edge format)
+- PicoLLMService (requires API key)
+- MLCService (JIT compilation)
+- TFLiteService with advanced delegates
+
+#### Custom Extensions & Examples
+- Custom framework adapters showing extensibility
+- Advanced authentication providers
+- Custom routing policies
+- Performance optimization examples
+- UI components and view models
+- Integration examples and best practices
+
+## Phase 1: SDK Foundation Layer (Week 1-2)
+
+### 1.1 Core Protocol Definitions (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Protocols/`
 
 #### Tasks:
-1. Create new protocol files in `Services/UnifiedArchitecture/Protocols/`
-2. Define core interfaces without breaking existing code
+1. Create protocol files in SDK
+2. Define core interfaces for framework implementers
+3. Ensure extensibility for custom frameworks
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Protocols/ModelLifecycleProtocol.swift
-protocol ModelLifecycleManager {
+// SDK: Sources/RunAnywhere/Protocols/ModelLifecycleProtocol.swift
+public protocol ModelLifecycleManager {
     var currentState: ModelLifecycleState { get }
     func transitionTo(_ state: ModelLifecycleState) async throws
     func addObserver(_ observer: ModelLifecycleObserver)
 }
 
-// Services/UnifiedArchitecture/Protocols/UnifiedTokenizerProtocol.swift
-protocol UnifiedTokenizer {
+// SDK: Sources/RunAnywhere/Protocols/UnifiedTokenizerProtocol.swift
+public protocol UnifiedTokenizer {
     func encode(_ text: String) -> [Int]
     func decode(_ tokens: [Int]) -> String
     var vocabularySize: Int { get }
 }
 
-// Services/UnifiedArchitecture/Protocols/ModelLoaderProtocol.swift
-protocol UnifiedModelLoader {
-    func loadModel(_ model: ModelInfo) async throws -> LoadedModel
-    func detectOptimalFramework(for model: ModelInfo) -> LLMFramework
+// SDK: Sources/RunAnywhere/Protocols/FrameworkAdapter.swift
+public protocol FrameworkAdapter {
+    var framework: LLMFramework { get }
+    var supportedFormats: [ModelFormat] { get }
+    
+    func canHandle(model: ModelInfo) -> Bool
+    func createService() -> LLMService
+    func configure(with hardware: HardwareConfiguration) async
+}
+
+// SDK: Sources/RunAnywhere/Protocols/LLMService.swift
+public protocol LLMService {
+    func initialize(modelPath: String) async throws
+    func generate(prompt: String, options: GenerationOptions) async throws -> String
+    func streamGenerate(prompt: String, options: GenerationOptions, onToken: @escaping (String) -> Void) async throws
+    func cleanup() async
+    func getModelMemoryUsage() async throws -> Int64
 }
 ```
 
-### 1.2 State Machine Implementation
+### 1.2 State Machine Implementation (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Core/ModelLifecycleStateMachine.swift`
 
 #### Tasks:
-1. Implement `ModelLifecycleStateMachine` class
+1. Implement `ModelLifecycleStateMachine` class in SDK
 2. Add state transition validation
 3. Create observer pattern for state changes
+4. Make it public for framework implementers
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Core/ModelLifecycleStateMachine.swift
-class ModelLifecycleStateMachine: ModelLifecycleManager {
+// SDK: Sources/RunAnywhere/Core/ModelLifecycleStateMachine.swift
+public class ModelLifecycleStateMachine: ModelLifecycleManager {
     private var state: ModelLifecycleState = .uninitialized
     private var observers: [UUID: ModelLifecycleObserver] = [:]
     
@@ -116,18 +330,21 @@ class ModelLifecycleStateMachine: ModelLifecycleManager {
 }
 ```
 
-### 1.3 Unified Tokenizer System
+### 1.3 Unified Tokenizer System (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Tokenization/`
 
 #### Tasks:
-1. Create `UnifiedTokenizerManager` 
-2. Build tokenizer adapters for existing implementations
+1. Create `UnifiedTokenizerManager` in SDK
+2. Define tokenizer adapter protocol
 3. Implement automatic tokenizer discovery
+4. Leave actual tokenizer implementations to app
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Tokenization/UnifiedTokenizerManager.swift
-class UnifiedTokenizerManager {
+// SDK: Sources/RunAnywhere/Tokenization/UnifiedTokenizerManager.swift
+public class UnifiedTokenizerManager {
     static let shared = UnifiedTokenizerManager()
     
     private var tokenizers: [String: UnifiedTokenizer] = [:]
@@ -138,11 +355,9 @@ class UnifiedTokenizerManager {
     }
     
     private func registerDefaultAdapters() {
-        // Wrap existing tokenizers
-        adapters[.bpe] = BPETokenizerAdapter.self
-        adapters[.sentencePiece] = SentencePieceAdapter.self
-        adapters[.wordPiece] = WordPieceAdapter.self
-        adapters[.tflite] = TFLiteTokenizerAdapter.self
+        // SDK provides empty registry
+        // Sample app will register concrete implementations
+        // This allows SDK users to register their own tokenizer adapters
     }
     
     func getTokenizer(for model: ModelInfo) async throws -> UnifiedTokenizer {
@@ -193,44 +408,72 @@ class UnifiedTokenizerManager {
     }
 }
 
-// Adapter example wrapping existing tokenizer
-class BPETokenizerAdapter: UnifiedTokenizer {
-    private let wrapped: GenericBPETokenizer
-    
-    init(modelPath: URL) throws {
-        self.wrapped = try GenericBPETokenizer(modelPath: modelPath)
-    }
-    
-    func encode(_ text: String) -> [Int] {
-        return wrapped.encode(text)
-    }
-    
-    func decode(_ tokens: [Int]) -> String {
-        return wrapped.decode(tokens)
-    }
-}
+// SDK only defines the protocol
+// Concrete implementations like BPETokenizerAdapter go in the sample app
+// This allows SDK users to provide their own tokenizer implementations
 ```
 
-### 1.4 Hardware Abstraction Layer
+### 1.4 Hardware Abstraction Layer (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Hardware/`
 
 #### Tasks:
-1. Centralize hardware detection
+1. Centralize hardware detection in SDK
 2. Create capability-based configuration
-3. Remove duplicate detection code
+3. Provide hardware info to framework adapters
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Hardware/HardwareCapabilityManager.swift
-class HardwareCapabilityManager {
-    static let shared = HardwareCapabilityManager()
+// SDK: Sources/RunAnywhere/Hardware/HardwareCapabilityManager.swift
+public class HardwareCapabilityManager {
+    public static let shared = HardwareCapabilityManager()
     
-    private lazy var capabilities: DeviceCapabilities = detectCapabilities()
+    private var registeredHardwareDetector: HardwareDetector?
+    private var cachedCapabilities: DeviceCapabilities?
+    
+    /// Register a platform-specific hardware detector
+    public func registerHardwareDetector(_ detector: HardwareDetector) {
+        self.registeredHardwareDetector = detector
+        self.cachedCapabilities = nil // Clear cache
+    }
+    
+    /// Get current device capabilities
+    public var capabilities: DeviceCapabilities {
+        if let cached = cachedCapabilities {
+            return cached
+        }
+        
+        guard let detector = registeredHardwareDetector else {
+            // Return minimal defaults if no detector registered
+            return DeviceCapabilities(
+                totalMemory: 2_000_000_000, // 2GB default
+                availableMemory: 1_000_000_000, // 1GB default
+                hasNeuralEngine: false,
+                hasGPU: false,
+                processorCount: 2
+            )
+        }
+        
+        cachedCapabilities = detector.detectCapabilities()
+        return cachedCapabilities!
+    }
     
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         var config = HardwareConfiguration()
         
-        // Smart selection based on model size and device
+        // Use registered hardware detector (provided by sample app)
+        guard let detector = registeredHardwareDetector else {
+            // Fallback to conservative defaults
+            config.primaryAccelerator = .cpu
+            config.memoryMode = .conservative
+            config.threadCount = 2
+            return config
+        }
+        
+        let capabilities = detector.detectCapabilities()
+        
+        // Smart selection based on detected capabilities
         if model.estimatedMemory > 3_000_000_000 && capabilities.hasNeuralEngine {
             config.primaryAccelerator = .neuralEngine
             config.fallbackAccelerator = .gpu
@@ -242,26 +485,9 @@ class HardwareCapabilityManager {
             config.memoryMode = .conservative
         }
         
-        config.threadCount = ProcessInfo.processInfo.processorCount
+        config.threadCount = capabilities.processorCount
         
         return config
-    }
-    
-    private func detectCapabilities() -> DeviceCapabilities {
-        // Centralized detection logic
-        var caps = DeviceCapabilities()
-        
-        // Neural Engine detection
-        caps.hasNeuralEngine = detectNeuralEngine()
-        
-        // Memory
-        caps.totalMemory = ProcessInfo.processInfo.physicalMemory
-        caps.availableMemory = getAvailableMemory()
-        
-        // GPU
-        caps.hasGPU = MTLCreateSystemDefaultDevice() != nil
-        
-        return caps
     }
     
     func checkResourceAvailability() -> ResourceAvailability {
@@ -280,7 +506,7 @@ class HardwareCapabilityManager {
     }
 }
 
-struct ResourceAvailability {
+public struct ResourceAvailability {
     let memoryAvailable: Int64
     let storageAvailable: Int64
     let acceleratorsAvailable: [HardwareAcceleration]
@@ -314,23 +540,27 @@ struct ResourceAvailability {
 }
 ```
 
-## Phase 2: Core Services (Week 3-4)
+## Phase 2: SDK Core Services (Week 3-4)
 
-### 2.1 Enhanced Download Manager
+### 2.1 Enhanced Download Manager (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Download/`
 
 #### Tasks:
-1. Add queue-based download management
+1. Add queue-based download management in SDK
 2. Implement retry with exponential backoff
 3. Add comprehensive archive extraction support
 4. Create progress tracking system
+5. Make extensible for custom download sources
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Download/EnhancedDownloadManager.swift
-import Gzip // Add to Package.swift
+// SDK: Sources/RunAnywhere/Download/EnhancedDownloadManager.swift
+import Foundation
+import Gzip // Add to SDK Package.swift
 
-class EnhancedDownloadManager: ModelStorageManager {
+public class EnhancedDownloadManager: ModelStorageManager {
     private let downloadQueue = OperationQueue()
     private var activeTasks: [String: DownloadTask] = [:]
     
@@ -445,19 +675,22 @@ class EnhancedDownloadManager: ModelStorageManager {
 }
 ```
 
-### 2.2 Memory Management System
+### 2.2 Memory Management System (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Memory/`
 
 #### Tasks:
-1. Implement coordinated memory management
+1. Implement coordinated memory management in SDK
 2. Add memory pressure handling
 3. Create model unloading strategy
 4. Add memory usage tracking
+5. Provide hooks for framework-specific cleanup
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Memory/UnifiedMemoryManager.swift
-class UnifiedMemoryManager {
+// SDK: Sources/RunAnywhere/Memory/UnifiedMemoryManager.swift
+public class UnifiedMemoryManager {
     static let shared = UnifiedMemoryManager()
     
     private var loadedModels: [String: LoadedModelInfo] = [:]
@@ -538,19 +771,21 @@ class UnifiedMemoryManager {
 }
 ```
 
-### 2.3 Model Validation System
+### 2.3 Model Validation System (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Validation/`
 
 #### Tasks:
-1. Implement comprehensive model validation
+1. Implement comprehensive model validation in SDK
 2. Add checksum verification
-3. Create format validation
-4. Build dependency checking
+3. Create format validation protocol
+4. Allow framework-specific validation extensions
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Validation/ModelValidator.swift
-protocol ModelValidator {
+// SDK: Sources/RunAnywhere/Validation/ModelValidator.swift
+public protocol ModelValidator {
     func validateModel(_ model: ModelInfo, at path: URL) async throws -> ValidationResult
     func validateChecksum(_ file: URL, expected: String) async throws -> Bool
     func validateFormat(_ file: URL, expectedFormat: ModelFormat) async throws -> Bool
@@ -622,21 +857,22 @@ class UnifiedModelValidator: ModelValidator {
 }
 ```
 
-### 2.4 Model Registry & Discovery
+### 2.4 Model Registry & Discovery (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Registry/`
 
 #### Tasks:
-1. Create dynamic model discovery
+1. Create dynamic model discovery in SDK
 2. Build model compatibility matrix
 3. Implement runtime model detection
 4. Add model metadata caching
-5. Integrate authentication services
-6. Add storage monitoring
+5. Provide extension points for custom providers
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Registry/DynamicModelRegistry.swift
-class DynamicModelRegistry: ModelRegistry {
+// SDK: Sources/RunAnywhere/Registry/DynamicModelRegistry.swift
+public class DynamicModelRegistry: ModelRegistry {
     private var registeredModels: [String: ModelInfo] = [:]
     private let localStorage = ModelLocalStorage()
     private let storageMonitor = StorageMonitorService.shared
@@ -744,10 +980,12 @@ class DynamicModelRegistry: ModelRegistry {
 }
 ```
 
-### 2.5 Progress Tracking System
+### 2.5 Progress Tracking System (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Progress/`
 
 #### Tasks:
-1. Implement stage-based progress tracking
+1. Implement stage-based progress tracking in SDK
 2. Add time estimation
 3. Create unified progress reporting
 4. Build progress aggregation for multiple operations
@@ -755,8 +993,8 @@ class DynamicModelRegistry: ModelRegistry {
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Progress/UnifiedProgressTracker.swift
-class UnifiedProgressTracker: ProgressTracker {
+// SDK: Sources/RunAnywhere/Progress/UnifiedProgressTracker.swift
+public class UnifiedProgressTracker: ProgressTracker {
     private var stages: [LifecycleStage: StageInfo] = [:]
     private var observers: [UUID: ProgressObserver] = [:]
     private let progressSubject = PassthroughSubject<OverallProgress, Never>()
@@ -859,19 +1097,21 @@ class UnifiedProgressTracker: ProgressTracker {
 }
 ```
 
-### 2.6 Error Recovery Strategy
+### 2.6 Error Recovery Strategy (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/ErrorHandling/`
 
 #### Tasks:
-1. Implement comprehensive error recovery
+1. Implement comprehensive error recovery in SDK
 2. Create recovery strategies for different error types
 3. Add automatic retry mechanisms
-4. Build error context preservation
+4. Allow custom recovery strategies
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/ErrorHandling/ErrorRecoveryStrategy.swift
-protocol ErrorRecoveryStrategy {
+// SDK: Sources/RunAnywhere/ErrorHandling/ErrorRecoveryStrategy.swift
+public protocol ErrorRecoveryStrategy {
     func canRecover(from error: Error) -> Bool
     func recover(from error: Error, context: RecoveryContext) async throws
 }
@@ -1021,19 +1261,21 @@ class FrameworkErrorRecovery: ErrorRecoveryStrategy {
 }
 ```
 
-### 2.7 Model Metadata Extraction
+### 2.7 Model Metadata Extraction (SDK)
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Metadata/`
 
 #### Tasks:
-1. Implement metadata extraction for each model format
+1. Define metadata extraction protocol in SDK
 2. Create unified metadata structure
 3. Add caching for extracted metadata
-4. Build format-specific extractors
+4. Allow format-specific extractors in app
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Metadata/MetadataExtractor.swift
-class MetadataExtractor {
+// SDK: Sources/RunAnywhere/Metadata/MetadataExtractor.swift
+public class MetadataExtractor {
     private let cache = MetadataCache()
     
     func extractMetadata(from url: URL, format: ModelFormat) async -> ModelMetadata {
@@ -1270,28 +1512,23 @@ Based on the analysis of all framework implementations, here are the specific mi
 - **Memory Efficiency**: Optimized memory usage through compilation
 - **High Throughput**: Optimized for batch processing
 
-## Phase 4: Framework Adapters (Week 5-6)
+## Phase 3: Sample App Framework Adapters (Week 5-6)
 
-### 3.1 Base Framework Adapter
+### 3.1 Base Framework Adapter (Sample App)
+
+#### Location: `examples/ios/RunAnywhereAI/Services/UnifiedArchitecture/Adapters/`
 
 #### Tasks:
-1. Create base adapter class
-2. Define common adapter interface
-3. Implement shared functionality
+1. Create base adapter class in sample app
+2. Implement SDK's FrameworkAdapter protocol
+3. Use SDK's shared functionality
 4. Build adapter factory
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Adapters/BaseFrameworkAdapter.swift
-protocol FrameworkAdapter {
-    var framework: LLMFramework { get }
-    var supportedFormats: [ModelFormat] { get }
-    
-    func canHandle(model: ModelInfo) -> Bool
-    func createService() -> LLMService
-    func configure(with hardware: HardwareConfiguration) async
-}
+// Sample App: Services/UnifiedArchitecture/Adapters/BaseFrameworkAdapter.swift
+import RunAnywhere // Import SDK
 
 class BaseFrameworkAdapter: FrameworkAdapter {
     let framework: LLMFramework
@@ -1325,18 +1562,23 @@ class BaseFrameworkAdapter: FrameworkAdapter {
 }
 ```
 
-### 4.2 Framework-Specific Adapter Implementations
+### 3.2 Framework-Specific Adapter Implementations (Sample App)
+
+#### Location: `examples/ios/RunAnywhereAI/Services/UnifiedArchitecture/Adapters/`
 
 #### Tasks:
-1. Create adapter for each framework preserving core logic
-2. Extract framework-specific code into adapters
-3. Implement unified interface while maintaining functionality
+1. Create adapter for each framework in sample app
+2. Preserve all framework-specific logic
+3. Implement SDK's unified interface
 4. Handle framework-specific requirements
 
-#### Core ML Adapter (Preserving Existing Logic):
+#### Core ML Adapter (Sample App):
 
 ```swift
-// Services/UnifiedArchitecture/Adapters/CoreMLFrameworkAdapter.swift
+// Sample App: Services/UnifiedArchitecture/Adapters/CoreMLFrameworkAdapter.swift
+import RunAnywhere
+import CoreML
+
 class CoreMLFrameworkAdapter: BaseFrameworkAdapter {
     init() {
         super.init(
@@ -1630,18 +1872,22 @@ class UnifiedMLCAdapter: LLMService {
 }
 ```
 
-### 3.3 Adapter Registry & Factory
+### 3.3 Adapter Registry & Factory (Sample App)
+
+#### Location: `examples/ios/RunAnywhereAI/Services/UnifiedArchitecture/Adapters/`
 
 #### Tasks:
-1. Create adapter registry
-2. Implement automatic adapter selection
-3. Build adapter caching
+1. Create adapter registry in sample app
+2. Register all framework adapters
+3. Implement automatic adapter selection using SDK interfaces
 4. Add adapter configuration
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedArchitecture/Adapters/FrameworkAdapterRegistry.swift
+// Sample App: Services/UnifiedArchitecture/Adapters/FrameworkAdapterRegistry.swift
+import RunAnywhere
+
 class FrameworkAdapterRegistry {
     static let shared = FrameworkAdapterRegistry()
     
@@ -1718,7 +1964,296 @@ class FrameworkAdapterRegistry {
 }
 ```
 
-## Phase 5: Cleanup & Code Removal (Week 7)
+## SDK Package Structure
+
+### Target Directory Structure
+
+#### SDK Directory Structure
+```
+sdk/runanywhere-swift/
+├── Package.swift
+├── README.md
+├── Sources/
+│   ├── RunAnywhere/                    # Core module (always included)
+│   │   ├── Public/
+│   │   │   ├── RunAnywhereSDK.swift
+│   │   │   ├── Configuration.swift
+│   │   │   ├── GenerationOptions.swift
+│   │   │   └── GenerationResult.swift
+│   │   ├── Protocols/
+│   │   │   ├── ModelLifecycleProtocol.swift
+│   │   │   ├── UnifiedTokenizerProtocol.swift
+│   │   │   ├── FrameworkAdapter.swift
+│   │   │   ├── LLMService.swift
+│   │   │   ├── HardwareDetector.swift
+│   │   │   ├── ModelProvider.swift
+│   │   │   ├── MetadataExtractorProtocol.swift
+│   │   │   └── TokenizerAdapter.swift
+│   │   ├── Core/
+│   │   │   ├── ModelLifecycleStateMachine.swift
+│   │   │   ├── UnifiedMemoryManager.swift
+│   │   │   ├── UnifiedProgressTracker.swift
+│   │   │   ├── UnifiedErrorRecovery.swift
+│   │   │   └── ResourceAvailabilityChecker.swift
+│   │   ├── Hardware/
+│   │   │   ├── HardwareCapabilityManager.swift
+│   │   │   ├── DefaultiOSHardwareDetector.swift
+│   │   │   └── DefaultAndroidHardwareDetector.swift
+│   │   ├── Download/
+│   │   │   ├── EnhancedDownloadManager.swift
+│   │   │   ├── DownloadTask.swift
+│   │   │   └── ArchiveExtractor.swift
+│   │   ├── Registry/
+│   │   │   ├── DynamicModelRegistry.swift
+│   │   │   ├── ModelFormatDetector.swift
+│   │   │   └── ModelCompatibilityMatrix.swift
+│   │   ├── Tokenization/
+│   │   │   ├── UnifiedTokenizerManager.swift
+│   │   │   ├── TokenizerCache.swift
+│   │   │   └── TokenizerFormatDetector.swift
+│   │   ├── Validation/
+│   │   │   ├── UnifiedModelValidator.swift
+│   │   │   └── ChecksumValidator.swift
+│   │   ├── Metadata/
+│   │   │   ├── MetadataExtractor.swift
+│   │   │   ├── MetadataCache.swift
+│   │   │   └── Extractors/
+│   │   │       ├── CoreMLMetadataExtractor.swift
+│   │   │       ├── TFLiteMetadataExtractor.swift
+│   │   │       ├── ONNXMetadataExtractor.swift
+│   │   │       ├── SafetensorsMetadataExtractor.swift
+│   │   │       └── GGUFMetadataExtractor.swift
+│   │   └── Adapters/
+│   │       ├── BPETokenizerAdapter.swift
+│   │       ├── SentencePieceTokenizerAdapter.swift
+│   │       └── WordPieceTokenizerAdapter.swift
+│   ├── RunAnywhereHuggingFace/          # Optional module
+│   │   ├── HuggingFaceProvider.swift
+│   │   ├── HuggingFaceAuth.swift
+│   │   └── HuggingFaceTokenizer.swift
+│   ├── RunAnywhereCorML/                # Optional module (iOS only)
+│   │   ├── CoreMLFrameworkAdapter.swift
+│   │   ├── CoreMLOptimizations.swift
+│   │   └── CoreMLTokenizerAdapter.swift
+│   ├── RunAnywhereGGUF/                 # Optional module
+│   │   ├── LlamaCppFrameworkAdapter.swift
+│   │   ├── GGUFModelLoader.swift
+│   │   └── QuantizationSupport.swift
+│   ├── RunAnywhereONNX/                 # Optional module
+│   │   ├── ONNXFrameworkAdapter.swift
+│   │   ├── ONNXSessionManager.swift
+│   │   └── ONNXTokenizerAdapter.swift
+│   ├── RunAnywhereProviders/            # Optional module
+│   │   ├── KaggleProvider.swift
+│   │   ├── MicrosoftModelsProvider.swift
+│   │   └── OpenModelsProvider.swift
+│   └── RunAnywhereSystemModels/         # Optional module (iOS only)
+│       └── AppleModelsProvider.swift
+└── Tests/
+    └── RunAnywhereTests/
+        ├── CoreTests/
+        ├── HardwareTests/
+        ├── DownloadTests/
+        └── IntegrationTests/
+
+#### Sample App Directory Structure
+```
+examples/ios/RunAnywhereAI/
+├── RunAnywhereAI.xcodeproj
+├── Package.swift
+├── Podfile                              # For TensorFlow Lite
+├── Info.plist
+├── RunAnywhereAIApp.swift
+├── Services/
+│   ├── UnifiedArchitecture/             # New unified implementation
+│   │   ├── UnifiedLLMService.swift      # Main orchestrator
+│   │   ├── Adapters/
+│   │   │   ├── BaseFrameworkAdapter.swift
+│   │   │   ├── FrameworkAdapterRegistry.swift
+│   │   │   ├── CoreMLFrameworkAdapter.swift
+│   │   │   ├── TFLiteFrameworkAdapter.swift
+│   │   │   ├── MLXFrameworkAdapter.swift
+│   │   │   ├── SwiftTransformersAdapter.swift
+│   │   │   ├── ONNXFrameworkAdapter.swift
+│   │   │   ├── ExecuTorchAdapter.swift
+│   │   │   ├── LlamaCppFrameworkAdapter.swift
+│   │   │   ├── FoundationModelsAdapter.swift
+│   │   │   ├── PicoLLMFrameworkAdapter.swift
+│   │   │   └── MLCFrameworkAdapter.swift
+│   │   ├── Hardware/
+│   │   │   └── AdvancedHardwareDetector.swift
+│   │   └── Extensions/
+│   │       ├── CustomErrorRecovery.swift
+│   │       └── PerformanceOptimizations.swift
+│   ├── Frameworks/                      # Framework-specific services
+│   │   ├── CoreML/
+│   │   │   ├── CoreMLService.swift      # Existing implementation
+│   │   │   ├── CoreMLModelAdapter.swift
+│   │   │   └── CoreMLTokenizerAdapter.swift
+│   │   ├── TFLite/
+│   │   │   ├── TFLiteService.swift
+│   │   │   ├── TFLiteDelegate.swift
+│   │   │   └── TFLiteTokenizer.swift
+│   │   ├── MLX/
+│   │   │   ├── MLXService.swift
+│   │   │   ├── MLXModelWrapper.swift
+│   │   │   └── MLXTokenizer.swift
+│   │   ├── SwiftTransformers/
+│   │   │   └── SwiftTransformersService.swift
+│   │   ├── ONNX/
+│   │   │   ├── ONNXService.swift
+│   │   │   └── ONNXTokenizer.swift
+│   │   ├── ExecuTorch/
+│   │   │   └── ExecuTorchService.swift
+│   │   ├── LlamaCpp/
+│   │   │   └── LlamaCppService.swift
+│   │   ├── FoundationModels/
+│   │   │   └── FoundationModelsService.swift
+│   │   ├── PicoLLM/
+│   │   │   └── PicoLLMService.swift
+│   │   └── MLC/
+│   │       └── MLCService.swift
+│   ├── Providers/                       # Custom model providers
+│   │   ├── CustomHuggingFaceProvider.swift
+│   │   ├── KaggleProvider.swift
+│   │   └── AppleModelsProvider.swift
+│   ├── Tokenizers/                      # Custom tokenizer implementations
+│   │   ├── BPETokenizer.swift
+│   │   ├── SentencePieceTokenizer.swift
+│   │   └── TokenizerAdapters/
+│   │       └── CustomTokenizerAdapters.swift
+│   ├── Auth/
+│   │   ├── KeychainService.swift
+│   │   ├── HuggingFaceAuthService.swift
+│   │   └── KaggleAuthService.swift
+│   └── Storage/
+│       ├── ModelLocalStorage.swift
+│       └── CompilationCache.swift
+├── Views/
+│   ├── ContentView.swift
+│   ├── ModelSelectionView.swift
+│   ├── GenerationView.swift
+│   ├── ProgressView.swift
+│   ├── SettingsView.swift
+│   └── Components/
+│       ├── ModelRow.swift
+│       ├── FrameworkBadge.swift
+│       └── ProgressIndicator.swift
+├── ViewModels/
+│   ├── ModelViewModel.swift
+│   ├── GenerationViewModel.swift
+│   └── SettingsViewModel.swift
+├── Resources/
+│   ├── Assets.xcassets
+│   └── Localizable.strings
+└── Tests/
+    ├── FrameworkAdapterTests/
+    ├── TokenizerTests/
+    └── IntegrationTests/
+```
+
+### Package.swift for SDK
+
+```swift
+// sdk/runanywhere-swift/Package.swift
+import PackageDescription
+
+let package = Package(
+    name: "RunAnywhere",
+    platforms: [
+        .iOS(.v15),
+        .macOS(.v12),
+        .tvOS(.v15),
+        .watchOS(.v8)
+    ],
+    products: [
+        // Core module (always included)
+        .library(
+            name: "RunAnywhere",
+            targets: ["RunAnywhere"]
+        ),
+        // Optional modules
+        .library(
+            name: "RunAnywhereHuggingFace",
+            targets: ["RunAnywhereHuggingFace"]
+        ),
+        .library(
+            name: "RunAnywhereCorML",
+            targets: ["RunAnywhereCorML"]
+        ),
+        .library(
+            name: "RunAnywhereGGUF",
+            targets: ["RunAnywhereGGUF"]
+        ),
+        .library(
+            name: "RunAnywhereONNX",
+            targets: ["RunAnywhereONNX"]
+        ),
+        .library(
+            name: "RunAnywhereProviders",
+            targets: ["RunAnywhereProviders"]
+        ),
+        .library(
+            name: "RunAnywhereSystemModels",
+            targets: ["RunAnywhereSystemModels"]
+        ),
+    ],
+    dependencies: [
+        // Archive handling
+        .package(url: "https://github.com/1024jp/GzipSwift", from: "6.0.0"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation", from: "0.9.0"),
+    ],
+    targets: [
+        // Core module
+        .target(
+            name: "RunAnywhere",
+            dependencies: [
+                .product(name: "Gzip", package: "GzipSwift"),
+                "ZIPFoundation"
+            ],
+            path: "Sources/RunAnywhere"
+        ),
+        // Optional modules
+        .target(
+            name: "RunAnywhereHuggingFace",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereHuggingFace"
+        ),
+        .target(
+            name: "RunAnywhereCorML",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereCorML"
+        ),
+        .target(
+            name: "RunAnywhereGGUF",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereGGUF"
+        ),
+        .target(
+            name: "RunAnywhereONNX",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereONNX"
+        ),
+        .target(
+            name: "RunAnywhereProviders",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereProviders"
+        ),
+        .target(
+            name: "RunAnywhereSystemModels",
+            dependencies: ["RunAnywhere"],
+            path: "Sources/RunAnywhereSystemModels"
+        ),
+        // Tests
+        .testTarget(
+            name: "RunAnywhereTests",
+            dependencies: ["RunAnywhere"]
+        ),
+    ]
+)
+```
+
+## Phase 5: Sample App Cleanup & Code Removal (Week 7)
 
 ### 5.1 Remove Legacy Code
 
@@ -1817,20 +2352,165 @@ rm -rf Pods/
 # Update .gitignore
 ```
 
-## Phase 6: Integration Layer (Week 8)
+## SDK Public API Design
 
-### 6.1 Replace UnifiedLLMService
+### Core Public Interfaces
+
+The SDK exposes a minimal, clean public API:
+
+```swift
+// Main SDK entry point
+public class RunAnywhereSDK {
+    public static let shared = RunAnywhereSDK()
+    
+    // Framework registration
+    public func registerFrameworkAdapter(_ adapter: FrameworkAdapter)
+    public func registerHardwareDetector(_ detector: HardwareDetector)
+    public func registerModelProvider(_ provider: ModelProvider)
+    public func registerMetadataExtractor(_ extractor: MetadataExtractorProtocol)
+    public func registerTokenizerAdapter(_ adapter: TokenizerAdapter.Type, for format: TokenizerFormat)
+    
+    // Model operations
+    public func discoverModels() async throws -> [ModelInfo]
+    public func loadModel(_ identifier: String, preferredFramework: LLMFramework? = nil) async throws
+    public func generate(_ prompt: String, options: GenerationOptions? = nil) async throws -> GenerationResult
+    public func streamGenerate(_ prompt: String, options: GenerationOptions? = nil) async throws -> AsyncStream<String>
+    
+    // State management
+    public var currentModel: ModelInfo? { get }
+    public var isModelLoaded: Bool { get }
+    
+    // Progress and errors
+    public var progressPublisher: AnyPublisher<ProgressInfo, Never> { get }
+    public var errorRecoveryHandler: ((Error, RecoveryContext) async throws -> Void)?
+    public var memoryPressureHandler: ((MemoryPressureLevel) -> Void)?
+}
+
+// Public protocols that must be implemented
+public protocol FrameworkAdapter { }
+public protocol HardwareDetector { }
+public protocol ModelProvider { }
+public protocol MetadataExtractorProtocol { }
+public protocol TokenizerAdapter { }
+public protocol LLMService { }
+
+// Public data types
+public struct ModelInfo { }
+public struct GenerationOptions { }
+public struct GenerationResult { }
+public struct ProgressInfo { }
+public enum LLMFramework { }
+public enum ModelFormat { }
+```
+
+### Extension Points
+
+The SDK is designed for extensibility:
+
+1. **Custom Frameworks** - Implement `FrameworkAdapter` and `LLMService`
+2. **Custom Model Sources** - Implement `ModelProvider`
+3. **Custom Tokenizers** - Implement `TokenizerAdapter`
+4. **Platform-Specific Hardware** - Implement `HardwareDetector`
+5. **Custom Metadata** - Implement `MetadataExtractorProtocol`
+
+## Phase 4: SDK Integration into RunAnywhereSDK (Week 7)
+
+### 4.1 Update RunAnywhereSDK to Use Unified Architecture
+
+#### Location: `sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhereSDK.swift`
 
 #### Tasks:
-1. Replace existing UnifiedLLMService completely
-2. No v1/v2 versioning - direct replacement
-3. Maintain same public API for compatibility
-4. Remove all feature flags
+1. Integrate all unified components into SDK
+2. Provide clean public API
+3. Allow framework adapter registration
+4. Maintain backward compatibility
 
 #### Implementation:
 
 ```swift
-// Services/UnifiedLLMService.swift (REPLACE ENTIRE FILE)
+// SDK: Sources/RunAnywhere/Public/RunAnywhereSDK.swift
+import Foundation
+
+public class RunAnywhereSDK {
+    public static let shared = RunAnywhereSDK()
+    
+    // Unified components
+    private let lifecycleManager = ModelLifecycleStateMachine()
+    private let downloadManager = EnhancedDownloadManager()
+    private let memoryManager = UnifiedMemoryManager.shared
+    private let progressTracker = UnifiedProgressTracker.shared
+    private let modelRegistry = DynamicModelRegistry()
+    private let hardwareManager = HardwareCapabilityManager.shared
+    private let tokenizerManager = UnifiedTokenizerManager.shared
+    private let errorRecovery = UnifiedErrorRecovery()
+    
+    // Framework adapters registry
+    private var frameworkAdapters: [LLMFramework: FrameworkAdapter] = [:]
+    
+    // Current state
+    private var currentAdapter: FrameworkAdapter?
+    private var currentService: LLMService?
+    
+    /// Register a framework adapter
+    public func registerFrameworkAdapter(_ adapter: FrameworkAdapter) {
+        frameworkAdapters[adapter.framework] = adapter
+    }
+    
+    /// Load a model with optional framework preference
+    public func loadModel(_ identifier: String, preferredFramework: LLMFramework? = nil) async throws {
+        // Use unified architecture to load model
+        let model = try await modelRegistry.findModel(identifier: identifier)
+        
+        // Select best framework adapter
+        let adapter = preferredFramework.flatMap { frameworkAdapters[$0] }
+            ?? findBestAdapter(for: model)
+        
+        guard let adapter = adapter else {
+            throw SDKError.noCompatibleFramework
+        }
+        
+        // Use lifecycle manager for loading
+        try await loadModelWithAdapter(model, adapter: adapter)
+    }
+    
+    /// Generate text using loaded model
+    public func generate(_ prompt: String, options: GenerationOptions? = nil) async throws -> GenerationResult {
+        guard let service = currentService else {
+            throw SDKError.modelNotLoaded
+        }
+        
+        let result = try await service.generate(prompt: prompt, options: options ?? GenerationOptions())
+        
+        // Track usage for cost calculation
+        return GenerationResult(
+            text: result,
+            executionTarget: determineExecutionTarget(),
+            tokensUsed: calculateTokens(prompt: prompt, response: result),
+            costSaved: calculateCostSavings()
+        )
+    }
+}
+```
+
+## Phase 5: Sample App Integration (Week 8)
+
+### 5.1 Update Sample App to Use SDK
+
+#### Location: `examples/ios/RunAnywhereAI/Services/UnifiedLLMService.swift`
+
+#### Tasks:
+1. Update UnifiedLLMService to use SDK
+2. Register all framework adapters
+3. Remove duplicate code
+4. Maintain UI compatibility
+
+#### Implementation:
+
+```swift
+// Sample App: Services/UnifiedLLMService.swift
+import RunAnywhere
+import SwiftUI
+
 @MainActor
 class UnifiedLLMService: ObservableObject {
     static let shared = UnifiedLLMService()
@@ -2014,10 +2694,10 @@ print("Found \(existingModels.count) existing models to preserve")
 
 #### Step 2: Cutover Execution
 ```bash
-# 1. Stop the app
-# 2. Apply all changes from unified architecture
-# 3. Delete old files as listed in Phase 5.1
-# 4. Update imports in all Swift files
+# 1. Update Package.swift to use SDK
+# 2. Move framework services to new structure
+# 3. Delete old unified architecture files
+# 4. Update all imports to use SDK
 ```
 
 #### Step 3: Model Migration
@@ -2239,44 +2919,6 @@ Since we're replacing the entire implementation without maintaining parallel ver
 3. **License Compliance** (PicoLLM)
    - Mitigation: Clear documentation, license validation
 
-## Migration Validation
-
-### Validation Checklist
-
-```swift
-struct MigrationValidation {
-    static func validateMigration() async throws {
-        // 1. Verify all models in old registry exist in new
-        let oldModels = ModelURLRegistry.shared.getAllModels()
-        let newModels = await DynamicModelRegistry().discoverModels()
-        
-        for oldModel in oldModels {
-            assert(newModels.contains { $0.id == oldModel.id }, "Model \(oldModel.name) missing in new registry")
-        }
-        
-        // 2. Test each framework adapter
-        for framework in LLMFramework.allCases {
-            let adapter = FrameworkAdapterRegistry.shared.getAdapter(for: framework)
-            assert(adapter != nil, "\(framework) adapter missing")
-        }
-        
-        // 3. Verify no old code references remain
-        verifyNoLegacyReferences()
-        
-        // 4. Check memory usage is comparable or better
-        let oldMemoryUsage = measureOldImplementationMemory()
-        let newMemoryUsage = measureNewImplementationMemory()
-        assert(newMemoryUsage <= oldMemoryUsage * 1.1, "Memory usage regression detected")
-        
-        // 5. Validate all tokenizers work
-        try await validateAllTokenizers()
-        
-        // 6. Verify resource management
-        verifyResourceManagement()
-    }
-}
-```
-
 ### Performance Targets
 
 ```swift
@@ -2306,31 +2948,134 @@ struct PerformanceTargets {
 }
 ```
 
+## Missing Use Cases and Edge Cases
+
+### Edge Cases to Handle
+
+#### 1. Model Format Conflicts
+- **Issue**: Same model file with different framework interpretations
+- **Solution**: Framework priority system in SDK, override capability in app
+```swift
+// SDK provides priority mechanism
+public protocol FrameworkPriorityResolver {
+    func resolveConflict(model: ModelInfo, adapters: [FrameworkAdapter]) -> FrameworkAdapter?
+}
+```
+
+#### 2. Partial Download Recovery
+- **Issue**: Large model downloads interrupted
+- **Solution**: Resume capability in download manager
+```swift
+// SDK implementation
+class EnhancedDownloadManager {
+    func resumeDownload(taskId: String, from: Int64) async throws -> DownloadTask
+}
+```
+
+#### 3. Multi-Model Memory Pressure
+- **Issue**: Loading multiple models causing memory warnings
+- **Solution**: Intelligent model eviction and priority queuing
+```swift
+// SDK provides eviction policy
+enum EvictionPolicy {
+    case leastRecentlyUsed
+    case leastFrequentlyUsed
+    case largestFirst
+    case custom((LoadedModel, LoadedModel) -> Bool)
+}
+```
+
+#### 4. Framework Version Conflicts
+- **Issue**: Different frameworks requiring different versions of dependencies
+- **Solution**: Dynamic framework loading with version checking
+
+#### 5. Corrupted Model Recovery
+- **Issue**: Model files corrupted during download or storage
+- **Solution**: Checksum validation and automatic re-download
+
+### Additional Use Cases
+
+#### 1. Offline Model Management
+- **Requirement**: Work without network connectivity
+- **Implementation**: Local model discovery, offline-first design
+
+#### 2. Model Preloading
+- **Requirement**: Preload models for instant switching
+- **Implementation**: Background loading queue with priority
+
+#### 3. A/B Testing Support
+- **Requirement**: Compare different models/frameworks
+- **Implementation**: Parallel model loading and result comparison
+
+#### 4. Custom Model Formats
+- **Requirement**: Support proprietary model formats
+- **Implementation**: Extensible format detection and adapter system
+
+#### 5. Model Version Management
+- **Requirement**: Handle multiple versions of same model
+- **Implementation**: Version tracking in model registry
+
+#### 6. Cross-Device Model Sync
+- **Requirement**: Sync models across user's devices
+- **Implementation**: Model manifest with cloud sync capability
+
+#### 7. Background Model Updates
+- **Requirement**: Update models without user intervention
+- **Implementation**: Background download with notification system
+
+#### 8. Model Warmup
+- **Requirement**: Prepare models for first use
+- **Implementation**: Warmup protocol in framework adapter
+
+#### 9. Quantization Selection
+- **Requirement**: Choose optimal quantization based on device
+- **Implementation**: Automatic quantization level selection
+
+#### 10. Model Chaining
+- **Requirement**: Use output of one model as input to another
+- **Implementation**: Pipeline support in SDK
+
 ## Success Criteria
 
-1. **Functionality**
-   - All existing features work
-   - No increase in crash rate
-   - Better error messages
-   - All 10 frameworks functional
+### SDK Success Metrics
 
-2. **Performance**
-   - Model loading ≤ 5 seconds
-   - Memory usage ≤ 110% of current
-   - Inference speed maintained
-   - Tokenization ≥ 10k tokens/sec
+1. **API Design**
+   - Clean, intuitive public API
+   - Well-documented interfaces
+   - Easy framework adapter registration
+   - Flexible for different use cases
 
-3. **Maintainability**
-   - Reduced code duplication by 70%
-   - Consistent error handling
-   - Easy to add new frameworks
-   - Single source of truth for each concern
+2. **Functionality**
+   - All core features working
+   - Proper error propagation
+   - Progress tracking exposed
+   - Memory management effective
 
-4. **User Experience**
-   - Stage-based progress tracking
-   - Clearer error messages with recovery options
-   - Smoother model switching
-   - Resource availability warnings
+3. **Performance**
+   - Minimal overhead vs direct implementation
+   - Efficient resource management
+   - Fast model switching
+   - Low memory footprint
+
+### Sample App Success Metrics
+
+1. **Framework Coverage**
+   - All 10 frameworks implemented
+   - Framework-specific features preserved
+   - Proper adapter pattern usage
+   - Clean separation from SDK
+
+2. **Developer Experience**
+   - Clear example of SDK usage
+   - Well-organized code structure
+   - Easy to understand patterns
+   - Good testing coverage
+
+3. **User Experience**
+   - Intuitive UI for model selection
+   - Real-time progress updates
+   - Clear error messages
+   - Performance metrics display
 
 ## Detailed Cleanup Instructions
 
@@ -2417,14 +3162,121 @@ rm Utils/DeviceCapabilities.swift  # Merged into HardwareCapabilityManager
 6. API key management → KeychainService integration
 7. Compilation caching → CompilationCache
 
+## Enhanced SDK Architecture Benefits
+
+### Immediate Out-of-the-Box Value
+
+1. **Working Defaults**
+   - Built-in hardware detection for iOS/Android
+   - Common format support (CoreML, ONNX, GGUF, etc.)
+   - Popular tokenizers included
+   - Basic authentication framework
+
+2. **Modular Enhancement**
+   - Start with core, add modules as needed
+   - HuggingFace integration ready to use
+   - Framework adapters for quick prototyping
+   - Progressive complexity management
+
+3. **Developer Experience**
+   - Single line model loading with smart defaults
+   - Automatic framework selection
+   - Built-in progress tracking
+   - Comprehensive error recovery
+
+### For Advanced Users
+
+1. **Full Extensibility**
+   - Override any default implementation
+   - Create custom framework adapters
+   - Build proprietary model providers
+   - Implement specialized tokenizers
+
+2. **Performance Optimization**
+   - Custom hardware detection strategies
+   - Framework-specific optimizations
+   - Memory management customization
+   - Advanced caching strategies
+
+3. **Enterprise Features**
+   - Custom authentication providers
+   - Compliance and security extensions
+   - Advanced monitoring and analytics
+   - Multi-tenant support
+
+### Comparison with Top SDKs
+
+| Feature | RunAnywhere | Firebase | Stripe | AWS SDK |
+|---------|------------|----------|---------|----------|
+| Modular Architecture | ✓ | ✓ | ✓ | ✓ |
+| Working Defaults | ✓ | ✓ | ✓ | ✓ |
+| Optional Modules | ✓ | ✓ | ✓ | ✓ |
+| Custom Extensions | ✓ | ✓ | ✓ | ✓ |
+| Progressive Enhancement | ✓ | ✓ | ✓ | ✗ |
+| Built-in Providers | ✓ | ✓ | ✓ | ✓ |
+
+### Migration Impact
+
+1. **Reduced Sample App Complexity**
+   - Focus on advanced examples
+   - Demonstrate extensibility
+   - Show best practices
+   - UI/UX reference implementation
+
+2. **SDK Adoption**
+   - Lower barrier to entry
+   - Faster time to first model
+   - Clear upgrade path
+   - Community-friendly architecture
+
+## Implementation Guidelines
+
+### SDK Development
+
+1. **Keep It Lean**
+   - Only essential functionality
+   - Well-defined protocols
+   - Minimal dependencies
+   - Clear documentation
+
+2. **Design for Extension**
+   - Protocol-oriented design
+   - Dependency injection
+   - Observable patterns
+   - Async/await throughout
+
+3. **Provide Defaults**
+   - Sensible default implementations
+   - Common tokenizer formats
+   - Basic error recovery
+   - Standard progress tracking
+
+### Sample App Development
+
+1. **Showcase Best Practices**
+   - Clean adapter implementations
+   - Proper error handling
+   - UI/UX patterns
+   - Testing strategies
+
+2. **Document Thoroughly**
+   - Inline documentation
+   - Architecture decisions
+   - Framework quirks
+   - Performance tips
+
 ## Conclusion
 
-This migration plan provides a complete replacement strategy for the current LLM framework implementation. By removing all legacy code and technical debt while preserving framework-specific logic, we achieve:
+This migration plan separates the unified LLM architecture into:
 
-1. **Clean Architecture** - No v1/v2 confusion, single implementation
-2. **Preserved Functionality** - All framework features maintained
-3. **Unified Interface** - Consistent API across frameworks
-4. **Better Maintainability** - 70% less code duplication
-5. **Enhanced Features** - Progress tracking, memory management, dynamic discovery
+1. **RunAnywhere SDK** - Core infrastructure and abstractions
+2. **Sample App** - Framework implementations and UI
 
-The phased approach allows for systematic implementation with clear milestones and a definitive cutover point.
+This separation provides:
+
+- **Flexibility** for developers to implement custom frameworks
+- **Maintainability** through clear separation of concerns
+- **Reusability** of core components across projects
+- **Scalability** for adding new frameworks and features
+
+The SDK becomes a powerful foundation for any iOS app using on-device language models, while the sample app demonstrates best practices and provides reference implementations for all supported frameworks.
