@@ -1,5 +1,159 @@
 import Foundation
 
+// MARK: - Model Types
+
+/// Information about a model
+public struct ModelInfo {
+    public let id: String
+    public let name: String
+    public let format: ModelFormat
+    public let downloadURL: URL?
+    public var localPath: URL?
+    public let estimatedMemory: Int64
+    public let contextLength: Int
+    public let downloadSize: Int64?
+    public let checksum: String?
+    public let compatibleFrameworks: [LLMFramework]
+    public let preferredFramework: LLMFramework?
+    public let hardwareRequirements: [HardwareRequirement]
+    public let tokenizerFormat: TokenizerFormat?
+    public let metadata: [String: Any]?
+    public let alternativeDownloadURLs: [URL]?
+    
+    public init(
+        id: String,
+        name: String,
+        format: ModelFormat,
+        downloadURL: URL? = nil,
+        localPath: URL? = nil,
+        estimatedMemory: Int64 = 1_000_000_000, // 1GB default
+        contextLength: Int = 2048,
+        downloadSize: Int64? = nil,
+        checksum: String? = nil,
+        compatibleFrameworks: [LLMFramework] = [],
+        preferredFramework: LLMFramework? = nil,
+        hardwareRequirements: [HardwareRequirement] = [],
+        tokenizerFormat: TokenizerFormat? = nil,
+        metadata: [String: Any]? = nil,
+        alternativeDownloadURLs: [URL]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.format = format
+        self.downloadURL = downloadURL
+        self.localPath = localPath
+        self.estimatedMemory = estimatedMemory
+        self.contextLength = contextLength
+        self.downloadSize = downloadSize
+        self.checksum = checksum
+        self.compatibleFrameworks = compatibleFrameworks
+        self.preferredFramework = preferredFramework
+        self.hardwareRequirements = hardwareRequirements
+        self.tokenizerFormat = tokenizerFormat
+        self.metadata = metadata
+        self.alternativeDownloadURLs = alternativeDownloadURLs
+    }
+}
+
+/// Model format types
+public enum ModelFormat: String, CaseIterable {
+    case mlmodel = "mlmodel"
+    case mlpackage = "mlpackage"
+    case tflite = "tflite"
+    case onnx = "onnx"
+    case ort = "ort"
+    case safetensors = "safetensors"
+    case gguf = "gguf"
+    case ggml = "ggml"
+    case pte = "pte" // PyTorch Edge
+    case bin = "bin"
+    case unknown = "unknown"
+}
+
+/// Hardware requirements
+public enum HardwareRequirement {
+    case neuralEngine
+    case gpu
+    case minMemory(Int64)
+    case minProcessorGeneration(String)
+    case accelerator(HardwareAcceleration)
+}
+
+/// Tokenizer format types
+public enum TokenizerFormat: String {
+    case huggingFace = "huggingface"
+    case sentencePiece = "sentencepiece"
+    case wordPiece = "wordpiece"
+    case bpe = "bpe"
+    case tflite = "tflite"
+    case coreML = "coreml"
+    case custom = "custom"
+}
+
+/// LLM Framework types
+public enum LLMFramework: String, CaseIterable {
+    case coreML = "CoreML"
+    case tfLite = "TFLite"
+    case mlx = "MLX"
+    case swiftTransformers = "SwiftTransformers"
+    case onnx = "ONNX"
+    case execuTorch = "ExecuTorch"
+    case llamaCpp = "LlamaCpp"
+    case foundationModels = "FoundationModels"
+    case picoLLM = "PicoLLM"
+    case mlc = "MLC"
+}
+
+/// Resource availability information
+public struct ResourceAvailability {
+    public let memoryAvailable: Int64
+    public let storageAvailable: Int64
+    public let acceleratorsAvailable: [HardwareAcceleration]
+    public let thermalState: ProcessInfo.ThermalState
+    public let batteryLevel: Float?
+    public let isLowPowerMode: Bool
+    
+    public init(
+        memoryAvailable: Int64,
+        storageAvailable: Int64,
+        acceleratorsAvailable: [HardwareAcceleration],
+        thermalState: ProcessInfo.ThermalState,
+        batteryLevel: Float? = nil,
+        isLowPowerMode: Bool = false
+    ) {
+        self.memoryAvailable = memoryAvailable
+        self.storageAvailable = storageAvailable
+        self.acceleratorsAvailable = acceleratorsAvailable
+        self.thermalState = thermalState
+        self.batteryLevel = batteryLevel
+        self.isLowPowerMode = isLowPowerMode
+    }
+    
+    public func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
+        // Check memory
+        if model.estimatedMemory > memoryAvailable {
+            return (false, "Insufficient memory: need \(ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)), have \(ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory))")
+        }
+        
+        // Check storage
+        if let downloadSize = model.downloadSize, downloadSize > storageAvailable {
+            return (false, "Insufficient storage: need \(ByteCountFormatter.string(fromByteCount: downloadSize, countStyle: .file)), have \(ByteCountFormatter.string(fromByteCount: storageAvailable, countStyle: .file))")
+        }
+        
+        // Check thermal state
+        if thermalState == .critical {
+            return (false, "Device is too hot, please wait for it to cool down")
+        }
+        
+        // Check battery in low power mode
+        if isLowPowerMode && batteryLevel != nil && batteryLevel! < 0.2 {
+            return (false, "Battery too low for model loading in Low Power Mode")
+        }
+        
+        return (true, nil)
+    }
+}
+
 // MARK: - Internal Types
 
 /// Request for inference
