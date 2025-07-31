@@ -2,7 +2,6 @@ import XCTest
 @testable import RunAnywhereSDK
 
 final class RunAnywhereSDKTests: XCTestCase {
-    
     func testSDKInitialization() async throws {
         // Test that we can create a configuration
         let config = Configuration(apiKey: "test-api-key")
