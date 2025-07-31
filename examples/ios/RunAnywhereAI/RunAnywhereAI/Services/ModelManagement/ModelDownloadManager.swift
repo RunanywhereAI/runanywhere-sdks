@@ -57,13 +57,14 @@ class ModelDownloadManager: NSObject, ObservableObject {
     @Published var activeDownloads: [String: DownloadProgress] = [:]
     @Published var downloadQueue: [ModelInfo] = []
     @Published var isDownloading = false
+    @Published var currentStep: String = ""
 
     // MARK: - Private Properties
 
     private var downloadTasks: [String: URLSessionDownloadTask] = [:]
     private var progressHandlers: [String: (DownloadProgress) -> Void] = [:]
     private var completionHandlers: [String: (Result<URL, Error>) -> Void] = [:]
-    private var downloadStartTimes: [String: Date] = [:]
+    internal var downloadStartTimes: [String: Date] = [:]
     private var lastBytesWritten: [String: Int64] = [:]
     private var downloadInfoMap: [String: ModelInfo] = [:]
 
@@ -122,70 +123,24 @@ class ModelDownloadManager: NSObject, ObservableObject {
             return
         }
         
-        // Check if this is a .mlpackage URL on Hugging Face
-        if downloadURL.absoluteString.contains(".mlpackage") && 
-           downloadURL.host?.contains("huggingface") == true {
-            // Use the HuggingFace directory downloader for .mlpackage files
-            Task {
-                do {
-                    let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                    let modelsDirectory = documentsURL.appendingPathComponent("Models").appendingPathComponent(modelInfo.framework.directoryName)
-                    
-                    let finalURL = try await downloadHuggingFaceDirectory(
-                        modelInfo,
-                        to: modelsDirectory,
-                        progress: progress
-                    )
-                    
-                    completion(.success(finalURL))
-                } catch {
-                    completion(.failure(error))
-                }
-            }
-            return
-        }
-        var request = URLRequest(url: downloadURL)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 3600 // 1 hour
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        
-        // Add authentication headers if needed
-        if modelInfo.requiresAuth {
-            if downloadURL.host?.contains("kaggle") == true {
-                // Kaggle authentication
-                if let kaggleAuth = KaggleAuthService.shared.currentCredentials {
-                    request.setValue(kaggleAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
-                } else {
-                    completion(.failure(ModelDownloadError.authRequired))
-                    return
-                }
-            } else if downloadURL.host?.contains("huggingface") == true {
-                // Hugging Face authentication
-                if let hfAuth = HuggingFaceAuthService.shared.currentCredentials {
-                    request.setValue(hfAuth.authorizationHeader, forHTTPHeaderField: "Authorization")
-                } else {
-                    completion(.failure(ModelDownloadError.authRequired))
-                    return
-                }
+        // Use provider-based download
+        Task {
+            do {
+                let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let modelsDirectory = documentsURL.appendingPathComponent("Models").appendingPathComponent(modelInfo.framework.directoryName)
+                
+                let providerManager = ModelProviderManager.shared
+                let finalURL = try await providerManager.downloadModel(
+                    modelInfo,
+                    to: modelsDirectory,
+                    progress: progress
+                )
+                
+                completion(.success(finalURL))
+            } catch {
+                completion(.failure(error))
             }
         }
-        
-        // Create download task
-        let task = session.downloadTask(with: request)
-        downloadTasks[downloadId] = task
-
-        // Start download
-        task.resume()
-        isDownloading = true
-
-        // Add to active downloads
-        activeDownloads[downloadId] = DownloadProgress(
-            bytesWritten: 0,
-            totalBytes: estimatedSize,
-            fractionCompleted: 0,
-            estimatedTimeRemaining: nil,
-            downloadSpeed: 0
-        )
     }
 
     /// Download a model to a specific directory
@@ -518,7 +473,7 @@ class ModelDownloadManager: NSObject, ObservableObject {
         }
     }
 
-    private func parseSize(_ sizeString: String) -> Int64 {
+    internal func parseSize(_ sizeString: String) -> Int64 {
         // Try common formats
         if sizeString.hasSuffix("GB") {
             let value = Double(sizeString.dropLast(2).trimmingCharacters(in: .whitespaces)) ?? 0
@@ -755,3 +710,4 @@ extension ModelDownloadManager {
         return result
     }
 }
+

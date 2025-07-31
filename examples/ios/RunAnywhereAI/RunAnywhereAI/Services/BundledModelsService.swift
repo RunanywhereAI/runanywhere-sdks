@@ -11,6 +11,9 @@ class BundledModelsService {
     var bundledModels: [ModelInfo] {
         var models: [ModelInfo] = []
         
+        // DISABLED: OpenELM models are now downloaded dynamically from HuggingFace
+        // This reduces app size and allows for model updates without app updates
+        /*
         print("DEBUG: Searching for bundled models...")
         print("DEBUG: Bundle path: \(Bundle.main.bundlePath)")
         
@@ -64,6 +67,7 @@ class BundledModelsService {
                 }
             }
         }
+        */
         
         print("DEBUG: Total bundled models found: \(models.count)")
         

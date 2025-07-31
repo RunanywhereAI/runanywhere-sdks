@@ -96,8 +96,15 @@ class ModelManager: ObservableObject {
         let coreMLDir = Self.modelsDirectory.appendingPathComponent("CoreML")
         let swiftTransformersDir = Self.modelsDirectory.appendingPathComponent("SwiftTransformers")
         
-        // List of known Swift Transformers models
-        let swiftTransformersModels = ["distilgpt2-swift.mlmodel", "gpt2-base.mlmodel", "gpt2-medium.mlmodel"]
+        // List of known Swift Transformers models (including OpenELM)
+        let swiftTransformersModels = [
+            "distilgpt2-swift.mlmodel",
+            "gpt2-base.mlmodel", 
+            "gpt2-medium.mlmodel",
+            "OpenELM-270M-Instruct-128-float32.mlpackage",
+            "OpenELM-450M-Instruct-128-float32.mlpackage",
+            "OpenELM-1_1B-Instruct-128-float32.mlpackage"
+        ]
         
         for modelName in swiftTransformersModels {
             let oldPath = coreMLDir.appendingPathComponent(modelName)
@@ -113,6 +120,27 @@ class ModelManager: ObservableObject {
                 }
             }
         }
+        
+        // Also check root Models directory for any misplaced models
+        do {
+            let rootContents = try FileManager.default.contentsOfDirectory(
+                at: Self.modelsDirectory,
+                includingPropertiesForKeys: nil
+            )
+            
+            for item in rootContents {
+                let fileName = item.lastPathComponent
+                if swiftTransformersModels.contains(fileName) {
+                    let newPath = swiftTransformersDir.appendingPathComponent(fileName)
+                    if !FileManager.default.fileExists(atPath: newPath.path) {
+                        try FileManager.default.moveItem(at: item, to: newPath)
+                        print("Migrated \(fileName) from root to SwiftTransformers directory")
+                    }
+                }
+            }
+        } catch {
+            print("Error during model migration: \(error)")
+        }
     }
 
     func modelPath(for modelName: String, framework: LLMFramework? = nil) -> URL {
@@ -122,6 +150,18 @@ class ModelManager: ObservableObject {
                 .appendingPathComponent(modelName)
         }
         return Self.modelsDirectory.appendingPathComponent(modelName)
+    }
+    
+    /// Get the framework-specific model path, ensuring directory exists
+    func getFrameworkModelPath(modelName: String, framework: LLMFramework) -> URL {
+        let frameworkDir = Self.modelsDirectory.appendingPathComponent(framework.directoryName)
+        
+        // Ensure framework directory exists
+        if !FileManager.default.fileExists(atPath: frameworkDir.path) {
+            try? FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
+        }
+        
+        return frameworkDir.appendingPathComponent(modelName)
     }
 
     func isModelDownloaded(_ modelName: String, framework: LLMFramework? = nil) -> Bool {
@@ -281,14 +321,30 @@ class ModelManager: ObservableObject {
         }
     }
 
-    func getModelSize(_ modelName: String) -> Int64? {
-        let path = modelPath(for: modelName)
-        do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
-            return attributes[.size] as? Int64
-        } catch {
-            return nil
+    func getModelSize(_ modelName: String, framework: LLMFramework? = nil) -> Int64? {
+        // First check framework-specific paths
+        if let framework = framework {
+            let frameworkPath = getFrameworkModelPath(modelName: modelName, framework: framework)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
+            }
         }
+        
+        // Check all framework directories
+        for framework in LLMFramework.allCases {
+            let frameworkPath = getFrameworkModelPath(modelName: modelName, framework: framework)
+            if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                return ModelSizeManager.shared.calculateSize(at: frameworkPath, framework: framework)
+            }
+        }
+        
+        // Legacy path
+        let path = modelPath(for: modelName)
+        if FileManager.default.fileExists(atPath: path.path) {
+            return ModelSizeManager.shared.calculateSize(at: path)
+        }
+        
+        return nil
     }
 
     func getAvailableSpace() -> Int64 {
@@ -517,20 +573,12 @@ class ModelManager: ObservableObject {
     }
 
     private func verifyCoreMLModel(at url: URL) throws {
-        // For .mlpackage, check if it's a valid directory
-        if url.pathExtension == "mlpackage" {
-            var isDirectory: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
-                  isDirectory.boolValue else {
-                throw ModelError.verificationFailed
-            }
-
-            // Check for required files
-            let manifestPath = url.appendingPathComponent("Manifest.json")
-            guard FileManager.default.fileExists(atPath: manifestPath.path) else {
-                throw ModelError.verificationFailed
-            }
-        }
+        let format = ModelFormat.from(extension: url.pathExtension)
+        let formatManager = ModelFormatManager.shared
+        let handler = formatManager.getHandler(for: url, format: format)
+        
+        // Use the format handler to verify the model
+        try handler.verifyDownloadedModel(at: url)
     }
 
     private func verifyONNXModel(at url: URL) throws {

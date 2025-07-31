@@ -153,14 +153,86 @@ struct ModelDownloadProgressView: View {
                         .padding()
                     }
 
-                    // Current step description
+                    // Current step description and file info
                     if !isComplete {
-                        Text(currentStep.description)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                            .padding(.top, 20)
+                        VStack(spacing: 8) {
+                            Text(currentStep.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            // Show HuggingFace directory download status
+                            if currentStep == .downloading && 
+                               downloadInfo.downloadURL?.absoluteString.contains("huggingface.co") == true &&
+                               downloadInfo.format == .mlPackage {
+                                if !downloadManager.currentStep.isEmpty {
+                                    Text(downloadManager.currentStep)
+                                        .font(.caption2)
+                                        .foregroundColor(.blue)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 6)
+                                        .background(Color.blue.opacity(0.1))
+                                        .cornerRadius(8)
+                                        .animation(.easeInOut(duration: 0.3), value: downloadManager.currentStep)
+                                }
+                                
+                                // Show file count progress with visual indicator
+                                let downloader = HuggingFaceDirectoryDownloader.shared
+                                if downloader.totalFiles > 0 {
+                                    VStack(spacing: 12) {
+                                        // Progress ring for files
+                                        ZStack {
+                                            Circle()
+                                                .stroke(Color.blue.opacity(0.2), lineWidth: 4)
+                                                .frame(width: 40, height: 40)
+                                            
+                                            Circle()
+                                                .trim(from: 0, to: downloader.currentProgress)
+                                                .stroke(Color.blue, lineWidth: 4)
+                                                .frame(width: 40, height: 40)
+                                                .rotationEffect(.degrees(-90))
+                                                .animation(.easeInOut(duration: 0.3), value: downloader.currentProgress)
+                                            
+                                            Text("\(downloader.completedFiles)")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.blue)
+                                        }
+                                        
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "doc.on.doc.fill")
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                            
+                                            Text("\(downloader.completedFiles) of \(downloader.totalFiles) files")
+                                                .font(.caption2)
+                                                .foregroundColor(.blue)
+                                        }
+                                        
+                                        // Individual file progress
+                                        if downloader.isDownloadingFile && !downloader.currentFileSize.isEmpty {
+                                            VStack(spacing: 4) {
+                                                ProgressView(value: downloader.currentFileProgress)
+                                                    .progressViewStyle(LinearProgressViewStyle())
+                                                    .tint(.blue)
+                                                    .scaleEffect(y: 1.5)
+                                                    .frame(width: 150)
+                                                
+                                                Text("(\(downloader.currentFileSize))")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            .padding(.horizontal, 20)
+                                            .animation(.easeInOut(duration: 0.2), value: downloader.currentFileProgress)
+                                        }
+                                    }
+                                    .padding(.top, 8)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 20)
                     }
 
                     // Spacer for proper spacing in ScrollView
@@ -205,14 +277,32 @@ struct ModelDownloadProgressView: View {
             startDownload()
         }
         .alert("Download Error", isPresented: $showingError) {
-            Button("Retry") {
-                startDownload()
-            }
-            Button("Cancel", role: .cancel) {
-                isPresented = false
+            // Check if it's a terms not accepted error
+            if let kaggleError = error as? KaggleAuthError,
+               kaggleError == .termsNotAccepted,
+               let downloadURL = downloadInfo.downloadURL,
+               let modelPageURL = KaggleAuthService.shared.getModelPageURL(from: downloadURL) {
+                Button("Open Model Page") {
+                    UIApplication.shared.open(modelPageURL)
+                }
+                Button("Cancel", role: .cancel) {
+                    isPresented = false
+                }
+            } else {
+                Button("Retry") {
+                    startDownload()
+                }
+                Button("Cancel", role: .cancel) {
+                    isPresented = false
+                }
             }
         } message: {
-            Text(error?.localizedDescription ?? "Unknown error occurred")
+            if let kaggleError = error as? KaggleAuthError,
+               kaggleError == .termsNotAccepted {
+                Text("You need to accept the model's terms of use on Kaggle.com before downloading. Click 'Open Model Page' to visit the model page and accept the terms.")
+            } else {
+                Text(error?.localizedDescription ?? "Unknown error occurred")
+            }
         }
     }
 
@@ -227,12 +317,9 @@ struct ModelDownloadProgressView: View {
                 currentStep = .downloading
             }
 
-            // Check if this is a Kaggle model and handle separately
-            if downloadInfo.requiresAuth && downloadInfo.downloadURL?.host?.contains("kaggle") == true {
-                try await downloadKaggleModel()
-            } else {
-                // Start regular download
-                downloadManager.downloadModel(downloadInfo, progress: { progress in
+            // Use the unified download manager for all downloads
+            // The ModelProviderManager will handle Kaggle authentication
+            downloadManager.downloadModel(downloadInfo, progress: { progress in
                     Task { @MainActor in
                         self.downloadProgress = progress.fractionCompleted
 
@@ -271,28 +358,7 @@ struct ModelDownloadProgressView: View {
                         }
                     }
                 })
-            }
         }
-    }
-
-    private func downloadKaggleModel() async throws {
-        // Use separate Kaggle download service
-        let authService = KaggleAuthService.shared
-
-        let tempURL = try await authService.downloadModel(from: downloadInfo.downloadURL!) { progress in
-            Task { @MainActor in
-                self.downloadProgress = progress
-
-                // Format progress details
-                let formatter = ByteCountFormatter()
-                formatter.countStyle = .binary
-                self.downloadedSize = formatter.string(fromByteCount: Int64(progress * 100_000_000)) // Estimate
-                self.totalSize = formatter.string(fromByteCount: 100_000_000) // Estimate
-            }
-        }
-
-        // Continue with post-download processing
-        await processDownloadedModel(at: tempURL)
     }
 
     private func processDownloadedModel(at url: URL) async {
@@ -361,44 +427,18 @@ struct ModelDownloadProgressView: View {
                     try FileManager.default.copyItem(at: url, to: destinationURL)
                 }
             } else {
-                // Just copy the file
-                let destinationURL = modelDirectory.appendingPathComponent(downloadInfo.name)
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
+                // Use ModelFormatManager to handle the downloaded model
+                let formatManager = ModelFormatManager.shared
+                let handler = formatManager.getHandler(for: url, format: downloadInfo.format)
                 
-                // Ensure source file exists before copying
-                guard FileManager.default.fileExists(atPath: url.path) else {
-                    throw ModelDownloadError.networkError(NSError(
-                        domain: "ModelDownload",
-                        code: -2,
-                        userInfo: [NSLocalizedDescriptionKey: "Source file not found: \(url.lastPathComponent)"]
-                    ))
-                }
+                // Process the downloaded model using the appropriate handler
+                let finalURL = try await handler.processDownloadedModel(
+                    from: url,
+                    to: modelDirectory,
+                    modelInfo: downloadInfo
+                )
                 
-                print("Moving downloaded file:")
-                print("  From: \(url.path)")
-                print("  To: \(destinationURL.path)")
-                
-                do {
-                    // Try to move first, as it's more efficient
-                    try FileManager.default.moveItem(at: url, to: destinationURL)
-                    print("Successfully moved model to: \(destinationURL.path)")
-                } catch {
-                    print("Move failed, trying copy: \(error.localizedDescription)")
-                    // If move fails, try copy
-                    do {
-                        try FileManager.default.copyItem(at: url, to: destinationURL)
-                        // Clean up source file after successful copy
-                        try? FileManager.default.removeItem(at: url)
-                        print("Successfully copied model to: \(destinationURL.path)")
-                    } catch {
-                        print("Failed to copy file: \(error.localizedDescription)")
-                        print("Source: \(url.path)")
-                        print("Destination: \(destinationURL.path)")
-                        throw error
-                    }
-                }
+                print("✅ Model processed successfully at: \(finalURL.path)")
             }
 
             // Installing step (download tokenizers if needed)
@@ -434,6 +474,9 @@ struct ModelDownloadProgressView: View {
             
             // Refresh model list to show downloaded status
             await ModelManager.shared.refreshModelList()
+            
+            // Post notification for other views to update
+            NotificationCenter.default.post(name: Notification.Name("ModelDownloadCompleted"), object: nil)
         } catch {
             await MainActor.run {
                 self.error = error

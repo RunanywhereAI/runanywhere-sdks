@@ -99,7 +99,7 @@ enum LLMFramework: String, CaseIterable, Codable {
     /// Indicates if this framework is deferred (coming soon)
     var isDeferred: Bool {
         switch self {
-        case .execuTorch, .llamaCpp, .mlc, .picoLLM:
+        case .llamaCpp, .mlc, .picoLLM:
             return true
         default:
             return false
@@ -143,6 +143,40 @@ enum LLMFramework: String, CaseIterable, Codable {
         case .picoLLM: return .picoLLM
         case .pytorch: return .execuTorch
         default: return .coreML  // Default to Core ML instead of mock
+        }
+    }
+    
+    /// Get supported model formats for this framework
+    var supportedFormats: [ModelFormat] {
+        switch self {
+        case .foundationModels:
+            return [.other]
+        case .llamaCpp:
+            return [.gguf, .ggml]
+        case .coreML:
+            return [.coreML, .mlPackage]
+        case .mlx:
+            return [.mlx, .safetensors]
+        case .onnxRuntime:
+            return [.onnx, .onnxRuntime]
+        case .tensorFlowLite:
+            return [.tflite]
+        case .swiftTransformers:
+            return [.mlPackage, .coreML]
+        default:
+            return []
+        }
+    }
+    
+    /// Check if this framework supports directory-based models
+    var supportsDirectoryModels: Bool {
+        switch self {
+        case .coreML, .swiftTransformers:
+            return true // .mlpackage files are directories
+        case .mlx:
+            return true // MLX models can be directories
+        default:
+            return false
         }
     }
 }

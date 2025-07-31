@@ -56,7 +56,24 @@
       "Bash(xcrun swiftc:*)",
       "Bash(xcrun devicectl list:*)",
       "Bash(xcrun devicectl device logs stream:*)",
-      "Bash(./scripts/clean_build_and_run.sh:*)"
+      "Bash(./verify_urls.sh:*)",
+      "Bash(./scripts/verify_urls.sh:*)",
+      "Bash(./scripts/clean_build_and_run.sh:*)",
+      "Bash(./update_model_sizes.sh:*)",
+      "Bash(./scripts/update_model_sizes.sh:*)",
+      "Bash(bash:*)",
+      "Bash(chmod:*)",
+      "Bash(./update_sizes_simple.sh:*)",
+      "Bash(./update_model_sizes_fixed.sh:*)",
+      "Bash(./update_model_sizes_final.sh:*)",
+      "Bash(./scripts/clean_build_and_run.sh:*)",
+      "Bash(python:*)",
+      "Bash(./test_kaggle_curl.sh:*)",
+      "Bash(./test_kaggle_api_correct.sh:*)",
+      "Bash(./find_tflite_models.sh:*)",
+      "WebFetch(domain:www.kaggle.com)",
+      "Bash(./test_kaggle_correct_api.sh:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

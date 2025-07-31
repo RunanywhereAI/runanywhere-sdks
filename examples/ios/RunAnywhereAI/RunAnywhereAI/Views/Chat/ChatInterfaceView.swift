@@ -526,6 +526,11 @@ struct ModelPickerView: View {
             .task {
                 await loadModels()
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelDownloadCompleted"))) { _ in
+                Task {
+                    await loadModels()
+                }
+            }
     }
     
     private func loadModels() async {

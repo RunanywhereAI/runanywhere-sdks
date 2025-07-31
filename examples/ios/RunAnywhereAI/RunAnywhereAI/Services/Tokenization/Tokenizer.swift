@@ -465,6 +465,20 @@ class TokenizerFactory {
             // Apple's models might have their own format
             // For now, use base tokenizer
             break
+            
+        case .execuTorch:
+            // ExecuTorch uses tokenizer.bin files
+            let tokenizerPaths = [
+                "\(modelPath)/tokenizer.bin",
+                "\(modelPath).tokenizer"
+            ]
+            
+            for path in tokenizerPaths {
+                if FileManager.default.fileExists(atPath: path) {
+                    // For now, use base tokenizer as ExecuTorch has custom format
+                    return BaseTokenizer()
+                }
+            }
 
         default:
             break

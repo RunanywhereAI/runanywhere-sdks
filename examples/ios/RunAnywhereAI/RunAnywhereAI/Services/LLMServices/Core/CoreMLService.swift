@@ -74,8 +74,13 @@ class CoreMLService: BaseLLMService {
 
         let modelURL = URL(fileURLWithPath: modelPath)
 
-        // Verify it's a Core ML model package
-        guard modelPath.hasSuffix(".mlpackage") || modelPath.hasSuffix(".mlmodel") else {
+        // Verify it's a Core ML model using format manager
+        let format = ModelFormat.from(extension: modelURL.pathExtension)
+        let formatManager = ModelFormatManager.shared
+        let handler = formatManager.getHandler(for: modelURL, format: format)
+        
+        guard handler.canHandle(url: modelURL, format: format) && 
+              (format == .coreML || format == .mlPackage) else {
             throw LLMError.unsupportedFormat
         }
 
@@ -102,14 +107,14 @@ class CoreMLService: BaseLLMService {
             }
 
             // REAL Core ML model loading
-            if modelPath.hasSuffix(".mlpackage") {
-                // Load .mlpackage directly (preferred format)
-                print("Loading .mlpackage model from: \(modelURL.path)")
+            if handler.isDirectoryBasedModel(url: modelURL) {
+                // Load directory-based model (e.g., .mlpackage)
+                print("Loading directory-based model from: \(modelURL.path)")
                 model = try MLModel(contentsOf: modelURL, configuration: configuration)
-                print("✅ Loaded .mlpackage model successfully")
+                print("✅ Loaded directory-based model successfully")
             } else {
-                // Compile .mlmodel if needed, then load
-                print("Processing .mlmodel file...")
+                // Compile single file model (e.g., .mlmodel)
+                print("Processing single file model...")
                 print("Model path: \(modelURL.path)")
                 
                 // Check if already compiled

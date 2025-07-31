@@ -14,54 +14,7 @@ class ModelURLRegistry: ObservableObject {
     // 🔄 To verify URLs: Run `./scripts/verify_urls.sh` from the project root
     
     // MARK: Foundation Models (Built-in iOS/macOS)
-    private var _foundationModels: [ModelInfo] = [
-        ModelInfo(
-            id: "apple-intelligence-summary",
-            name: "Apple Intelligence - Text Summarization",
-            path: nil,
-            format: .other,
-            size: "Built-in",
-            framework: .foundationModels,
-            quantization: nil,
-            contextLength: nil,
-            isLocal: true,
-            downloadURL: URL(string: "builtin://foundation-models/summarization"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: false,
-            authType: .none,
-            alternativeURLs: [],
-            notes: "Built-in model for text summarization (iOS 18+)",
-            description: "Apple's built-in text summarization model",
-            minimumMemory: 0,
-            recommendedMemory: 0
-        ),
-        ModelInfo(
-            id: "apple-intelligence-writing",
-            name: "Apple Intelligence - Writing Tools",
-            path: nil,
-            format: .other,
-            size: "Built-in",
-            framework: .foundationModels,
-            quantization: nil,
-            contextLength: nil,
-            isLocal: true,
-            downloadURL: URL(string: "builtin://foundation-models/writing"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: false,
-            authType: .none,
-            alternativeURLs: [],
-            notes: "Built-in model for writing assistance (iOS 18+)",
-            description: "Apple's built-in writing assistance model",
-            minimumMemory: 0,
-            recommendedMemory: 0
-        )
-    ]
+    private var _foundationModels: [ModelInfo] = []
     
     // MARK: Core ML Models
     private var _coreMLModels: [ModelInfo] = [
@@ -70,7 +23,7 @@ class ModelURLRegistry: ObservableObject {
             name: "coreml-stable-diffusion-v1-5",
             path: nil,
             format: .mlPackage,
-            size: "1.2GB",
+            size: "1.4GB",
             framework: .coreML,
             quantization: "Palettized",
             contextLength: nil,
@@ -94,7 +47,7 @@ class ModelURLRegistry: ObservableObject {
             name: "BERT-SQuAD.mlmodel",
             path: nil,
             format: .coreML,
-            size: "218MB",
+            size: "207MB",
             framework: .coreML,
             quantization: "Float16",
             contextLength: 384,
@@ -112,36 +65,14 @@ class ModelURLRegistry: ObservableObject {
             minimumMemory: 250_000_000,
             recommendedMemory: 500_000_000
         ),
-        // OpenELM models for Core ML
-        ModelInfo(
-            id: "openelm-270m-instruct-coreml",
-            name: "OpenELM-270M-Instruct-128-float32.mlpackage",
-            path: nil,
-            format: .mlPackage,
-            size: "540MB",
-            framework: .coreML,
-            quantization: "Float32",
-            contextLength: 2048,
-            isLocal: false,
-            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
-            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage",
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,  // This is a directory, not a zip file
-            requiresAuth: true,  // Requires HF token
-            authType: .huggingFace,
-            alternativeURLs: [],
-            notes: "OpenELM 270M Instruct model. Requires Hugging Face authentication. Downloads as directory structure.",
-            description: "Apple's OpenELM 270M instruction-tuned model for Core ML",
-            minimumMemory: 600_000_000,
-            recommendedMemory: 1_000_000_000
-        ),
+        // Note: OpenELM models have been moved to Swift Transformers section
+        // as they are specifically designed for use with Swift Transformers framework
         ModelInfo(
             id: "gpt2-coreml",
             name: "distilgpt2-coreml.mlmodel",
             path: nil,
             format: .coreML,
-            size: "482MB",
+            size: "459MB",
             framework: .coreML,
             quantization: "Float16",
             contextLength: 256,
@@ -170,7 +101,7 @@ class ModelURLRegistry: ObservableObject {
             name: "Mistral-7B-Instruct-v0.3-4bit",
             path: nil,
             format: .safetensors,
-            size: "3.8GB",
+            size: "3.7GB",
             framework: .mlx,
             quantization: "4-bit",
             contextLength: 32768,
@@ -193,7 +124,7 @@ class ModelURLRegistry: ObservableObject {
             name: "phi-2",
             path: nil,
             format: .mlx,
-            size: "2.7GB",
+            size: "5.1GB",
             framework: .mlx,
             quantization: "Float16",
             contextLength: 2048,
@@ -216,7 +147,7 @@ class ModelURLRegistry: ObservableObject {
             name: "quantized-gemma-2b-it",
             path: nil,
             format: .safetensors,
-            size: "1.2GB",
+            size: "2GB",
             framework: .mlx,
             quantization: "4-bit",
             contextLength: 8192,
@@ -243,7 +174,7 @@ class ModelURLRegistry: ObservableObject {
             name: "Phi-3-mini-4k-instruct-onnx",
             path: nil,
             format: .onnx,
-            size: "236MB",
+            size: "217KB",
             framework: .onnxRuntime,
             quantization: "INT4",
             contextLength: 4096,
@@ -266,7 +197,7 @@ class ModelURLRegistry: ObservableObject {
             name: "Phi-3-mini-128k-instruct-onnx",
             path: nil,
             format: .onnx,
-            size: "236MB",
+            size: "49MB",
             framework: .onnxRuntime,
             quantization: "INT4",
             contextLength: 128000,
@@ -309,76 +240,130 @@ class ModelURLRegistry: ObservableObject {
         )
     ]
     
-    // MARK: TensorFlow Lite Models
+    // MARK: TensorFlow Lite Models (Validated URLs)
     private var _tfliteModels: [ModelInfo] = [
+        // ✅ Official Google AI Edge samples - Direct download, no auth required
         ModelInfo(
-            id: "gemma-2b-tflite",
+            id: "bert-classifier-tflite",
+            name: "bert_classifier.tflite",
+            path: nil,
+            format: .tflite,
+            size: "24.5MB",
+            framework: .tensorFlowLite,
+            quantization: "FP32",
+            contextLength: 512,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/bert_classifier.tflite"),
+            downloadedFileName: "bert_classifier.tflite",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "BERT model for text classification from official Google AI Edge samples. Ready to use with included vocabulary.",
+            description: "Official BERT classifier model optimized for mobile text classification tasks",
+            minimumMemory: 100_000_000,
+            recommendedMemory: 200_000_000
+        ),
+        
+        ModelInfo(
+            id: "average-word-classifier-tflite", 
+            name: "average_word_classifier.tflite",
+            path: nil,
+            format: .tflite,
+            size: "0.7MB",
+            framework: .tensorFlowLite,
+            quantization: "FP32",
+            contextLength: 256,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/ai-edge/interpreter-samples/text_classification/ios/average_word_classifier.tflite"),
+            downloadedFileName: "average_word_classifier.tflite",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Lightweight text classifier from official Google AI Edge samples. Perfect for testing TensorFlow Lite integration.",
+            description: "Efficient text classifier using average word embeddings",
+            minimumMemory: 25_000_000,
+            recommendedMemory: 50_000_000
+        ),
+        
+        // 📱 TensorFlow Model Garden - Public models  
+        ModelInfo(
+            id: "mobilenet-v1-tflite",
+            name: "mobilenet_v1_1.0_224_quant.tgz",
+            path: nil,
+            format: .tflite,
+            size: "33.4MB",
+            framework: .tensorFlowLite,
+            quantization: "INT8",
+            contextLength: nil,
+            isLocal: false,
+            downloadURL: URL(string: "https://storage.googleapis.com/download.tensorflow.org/models/mobilenet_v1_2018_08_02/mobilenet_v1_1.0_224_quant.tgz"),
+            downloadedFileName: "mobilenet_v1_1.0_224_quant.tgz",
+            modelType: .image,
+            sha256: nil,
+            requiresUnzip: true,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "MobileNet v1 for image classification. Quantized INT8 version for mobile efficiency.",
+            description: "MobileNet v1 1.0 224x224 with INT8 quantization for image classification",
+            minimumMemory: 15_000_000,
+            recommendedMemory: 30_000_000
+        ),
+        
+        // 🔒 Kaggle-hosted LLM models - Require authentication (placeholder for future integration)
+        // Note: These require Kaggle API credentials to download - current URLs return 404
+        ModelInfo(
+            id: "gemma-2b-tflite-gpu-int4",
             name: "gemma-2b-it-gpu-int4.tar.gz",
             path: nil,
             format: .tflite,
-            size: "1.35GB",
+            size: "~1.35GB",
             framework: .tensorFlowLite,
             quantization: "INT4",
             contextLength: 8192,
             isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/google/gemma/tfLite/gemma-2b-it-gpu-int4/3/download"),
-            downloadedFileName: nil,
+            downloadURL: URL(string: "https://www.kaggle.com/api/v1/models/google/gemma/tfLite/gemma-2b-it-gpu-int4/1/download"),
+            downloadedFileName: "gemma-2b-it-gpu-int4.tar.gz",
             modelType: .text,
             sha256: nil,
             requiresUnzip: true,
             requiresAuth: true,
             authType: .kaggle,
             alternativeURLs: [],
-            notes: "Requires Kaggle account for download",
-            description: "Google Gemma 2B instruction-tuned, GPU-optimized with INT4",
+            notes: "⚠️ Requires accepting Gemma terms on Kaggle.com before downloading. Visit: https://www.kaggle.com/models/google/gemma",
+            description: "Google Gemma 2B instruction-tuned, GPU-optimized with INT4 quantization",
             minimumMemory: 2_000_000_000,
             recommendedMemory: 4_000_000_000
         ),
+        
         ModelInfo(
-            id: "mobilebert-tflite",
-            name: "mobilebert_1_default_1.tflite",
+            id: "gemma-2b-cpu-int8-tflite",
+            name: "gemma-2b-it-cpu-int8.tar.gz",
             path: nil,
             format: .tflite,
-            size: "100MB",
-            framework: .tensorFlowLite,
-            quantization: "Float16",
-            contextLength: 512,
-            isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/google/mobilebert/tfLite/default"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: true,
-            authType: .kaggle,
-            alternativeURLs: [],
-            notes: "Now hosted on Kaggle - requires authentication",
-            description: "MobileBERT - BERT optimized for mobile devices",
-            minimumMemory: 200_000_000,
-            recommendedMemory: 500_000_000
-        ),
-        ModelInfo(
-            id: "efficientnet-lite-tflite",
-            name: "efficientnet-lite0-int8.tflite",
-            path: nil,
-            format: .tflite,
-            size: "5MB",
+            size: "~2.5GB",
             framework: .tensorFlowLite,
             quantization: "INT8",
-            contextLength: nil,
+            contextLength: 8192,
             isLocal: false,
-            downloadURL: URL(string: "https://www.kaggle.com/models/tensorflow/efficientnet/tfLite/lite0-int8"),
-            downloadedFileName: nil,
-            modelType: .image,
+            downloadURL: URL(string: "https://www.kaggle.com/api/v1/models/google/gemma/tfLite/gemma-2b-it-cpu-int8/1/download"),
+            downloadedFileName: "gemma-2b-it-cpu-int8.tar.gz",
+            modelType: .text,
             sha256: nil,
-            requiresUnzip: false,
+            requiresUnzip: true,
             requiresAuth: true,
             authType: .kaggle,
             alternativeURLs: [],
-            notes: "EfficientNet Lite - optimized for mobile. Kaggle account required",
-            description: "EfficientNet-Lite0 for image classification, INT8 quantized",
-            minimumMemory: 50_000_000,
-            recommendedMemory: 100_000_000
+            notes: "⚠️ Requires accepting Gemma terms on Kaggle.com before downloading. Visit: https://www.kaggle.com/models/google/gemma",
+            description: "Google Gemma 2B instruction-tuned, CPU-optimized with INT8 quantization",
+            minimumMemory: 3_000_000_000,
+            recommendedMemory: 4_000_000_000
         )
     ]
     
@@ -389,7 +374,7 @@ class ModelURLRegistry: ObservableObject {
             name: "TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "669MB",
+            size: "637MB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
@@ -412,7 +397,7 @@ class ModelURLRegistry: ObservableObject {
             name: "Phi-3-mini-4k-instruct-q4.gguf",
             path: nil,
             format: .gguf,
-            size: "2.3GB",
+            size: "2.2GB",
             framework: .llamaCpp,
             quantization: "Q4",
             contextLength: 4096,
@@ -435,7 +420,7 @@ class ModelURLRegistry: ObservableObject {
             name: "qwen2.5-0.5b-instruct-q5_k_m.gguf",
             path: nil,
             format: .gguf,
-            size: "397MB",
+            size: "497MB",
             framework: .llamaCpp,
             quantization: "Q5_K_M",
             contextLength: 32768,
@@ -458,7 +443,7 @@ class ModelURLRegistry: ObservableObject {
             name: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
             path: nil,
             format: .gguf,
-            size: "999MB",
+            size: "1GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 32768,
@@ -481,7 +466,7 @@ class ModelURLRegistry: ObservableObject {
             name: "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "2.0GB",
+            size: "1.8GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 128000,
@@ -504,7 +489,7 @@ class ModelURLRegistry: ObservableObject {
             name: "mistral-7b-instruct-v0.2.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "4.4GB",
+            size: "4GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 32768,
@@ -527,7 +512,7 @@ class ModelURLRegistry: ObservableObject {
             name: "gemma-2b-it-q4_k_m.gguf",
             path: nil,
             format: .gguf,
-            size: "1.5GB",
+            size: "1.3GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 8192,
@@ -550,7 +535,7 @@ class ModelURLRegistry: ObservableObject {
             name: "stablelm-zephyr-3b.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "1.8GB",
+            size: "1.5GB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 4096,
@@ -573,7 +558,7 @@ class ModelURLRegistry: ObservableObject {
             name: "SmolLM-135M-Instruct.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "105MB",
+            size: "100MB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
@@ -596,7 +581,7 @@ class ModelURLRegistry: ObservableObject {
             name: "SmolLM-360M-Instruct.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "270MB",
+            size: "258MB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
@@ -619,7 +604,7 @@ class ModelURLRegistry: ObservableObject {
             name: "SmolLM-1.7B-Instruct.Q4_K_M.gguf",
             path: nil,
             format: .gguf,
-            size: "1.03GB",
+            size: "1006MB",
             framework: .llamaCpp,
             quantization: "Q4_K_M",
             contextLength: 2048,
@@ -642,8 +627,195 @@ class ModelURLRegistry: ObservableObject {
     // MARK: Swift Transformers Models
     // NOTE: Swift Transformers requires models specifically designed for it, not generic Core ML models
     private var _swiftTransformersModels: [ModelInfo] = [
-        // Currently no properly formatted Swift Transformers models are available
-        // OpenELM models are Core ML models and should be used with Core ML framework
+        // OpenELM models for Swift Transformers
+        ModelInfo(
+            id: "openelm-270m-instruct-st",
+            name: "OpenELM-270M-Instruct-128-float32.mlpackage",
+            path: nil,
+            format: .mlPackage,
+            size: "1GB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-270M-Instruct/resolve/main/OpenELM-270M-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-270M-Instruct-128-float32.mlpackage",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,  // Public model, no auth required
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 270M for Swift Transformers. Requires Hugging Face authentication. Downloads as directory structure.",
+            description: "Apple's OpenELM 270M instruction-tuned model optimized for Swift Transformers",
+            minimumMemory: 600_000_000,
+            recommendedMemory: 1_000_000_000
+        ),
+        ModelInfo(
+            id: "openelm-450m-instruct-st",
+            name: "OpenELM-450M-Instruct-128-float32.mlpackage",
+            path: nil,
+            format: .mlPackage,
+            size: "1.7GB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-450M-Instruct/resolve/main/OpenELM-450M-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-450M-Instruct-128-float32.mlpackage",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,  // Public model, no auth required
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 450M for Swift Transformers. Requires Hugging Face authentication.",
+            description: "Apple's OpenELM 450M instruction-tuned model for Swift Transformers",
+            minimumMemory: 1_000_000_000,
+            recommendedMemory: 2_000_000_000
+        ),
+        ModelInfo(
+            id: "openelm-1.1b-instruct-st",
+            name: "OpenELM-1_1B-Instruct-128-float32.mlpackage",
+            path: nil,
+            format: .mlPackage,
+            size: "4GB",
+            framework: .swiftTransformers,
+            quantization: "Float32",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/corenet-community/coreml-OpenELM-1_1B-Instruct/resolve/main/OpenELM-1_1B-Instruct-128-float32.mlpackage"),
+            downloadedFileName: "OpenELM-1_1B-Instruct-128-float32.mlpackage",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,  // Public model, no auth required
+            authType: .huggingFace,
+            alternativeURLs: [],
+            notes: "OpenELM 1.1B for Swift Transformers. Larger model, requires more memory.",
+            description: "Apple's OpenELM 1.1B instruction-tuned model for Swift Transformers",
+            minimumMemory: 2_500_000_000,
+            recommendedMemory: 4_000_000_000
+        )
+    ]
+    
+    // MARK: ExecuTorch Models
+    private var _execuTorchModels: [ModelInfo] = [
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-executorch",
+            name: "Llama-3.2-1B-Instruct.pte",
+            path: nil,
+            format: .pte,
+            size: "2.47GB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-ET/resolve/main/Llama-3.2-1B-Instruct.pte"),
+            downloadedFileName: nil,
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B Instruct optimized for ExecuTorch with 128k context",
+            description: "Meta's Llama 3.2 1B instruction-tuned model for ExecuTorch",
+            minimumMemory: 3_000_000_000,
+            recommendedMemory: 4_000_000_000
+        ),
+        ModelInfo(
+            id: "smollm2-135m-executorch",
+            name: "model.pte",
+            path: nil,
+            format: .pte,
+            size: "543MB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/SmolLM2-135M/resolve/main/model.pte"),
+            downloadedFileName: "smollm2-135m.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "SmolLM2 135M - excellent for testing and mobile deployment",
+            description: "HuggingFace's SmolLM2 135M model optimized for ExecuTorch",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-int4-executorch",
+            name: "Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte",
+            path: nil,
+            format: .pte,
+            size: "1.1GB",
+            framework: .execuTorch,
+            quantization: "INT4",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8-ET/resolve/main/Llama-3.2-1B-Instruct-SpinQuant_INT4_EO8.pte"),
+            downloadedFileName: "llama-3.2-1b-spinquant-int4.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B with INT4 quantization using SpinQuant",
+            description: "Highly compressed Llama 3.2 1B with INT4 quantization for minimal memory usage",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "llama-3.2-1b-instruct-qlora-int4-executorch",
+            name: "Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte",
+            path: nil,
+            format: .pte,
+            size: "1.1GB",
+            framework: .execuTorch,
+            quantization: "INT4-QLORA",
+            contextLength: 128000,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/Llama-3.2-1B-Instruct-QLORA_INT4_EO8-ET/resolve/main/Llama-3.2-1B-Instruct-QLORA_INT4_EO8.pte"),
+            downloadedFileName: "llama-3.2-1b-qlora-int4.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "Llama 3.2 1B with QLORA INT4 quantization",
+            description: "Llama 3.2 1B using QLORA quantization for efficient edge deployment",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        ),
+        ModelInfo(
+            id: "smollm2-135m-sdpa-executorch",
+            name: "SmolLM2-135M-Custom_SDPA.pte",
+            path: nil,
+            format: .pte,
+            size: "~550MB",
+            framework: .execuTorch,
+            quantization: "FP16",
+            contextLength: 2048,
+            isLocal: false,
+            downloadURL: URL(string: "https://huggingface.co/executorch-community/SmolLM2-135M-Custom_SDPA/resolve/main/model.pte"),
+            downloadedFileName: "smollm2-135m-sdpa.pte",
+            modelType: .text,
+            sha256: nil,
+            requiresUnzip: false,
+            requiresAuth: false,
+            authType: .none,
+            alternativeURLs: [],
+            notes: "SmolLM2 with custom SDPA (Scaled Dot Product Attention)",
+            description: "SmolLM2 135M with optimized attention mechanism for ExecuTorch",
+            minimumMemory: 800_000_000,
+            recommendedMemory: 1_500_000_000
+        )
     ]
     
     // MARK: - Custom Models
@@ -658,6 +830,7 @@ class ModelURLRegistry: ObservableObject {
     var tfliteModels: [ModelInfo] { _tfliteModels }
     var llamaCppModels: [ModelInfo] { _llamaCppModels }
     var swiftTransformersModels: [ModelInfo] { _swiftTransformersModels }
+    var execuTorchModels: [ModelInfo] { _execuTorchModels }
     
     // MARK: - Public Methods
     
@@ -678,6 +851,8 @@ class ModelURLRegistry: ObservableObject {
             return llamaCppModels
         case .swiftTransformers:
             return swiftTransformersModels
+        case .execuTorch:
+            return execuTorchModels
         default:
             return []
         }
@@ -692,6 +867,8 @@ class ModelURLRegistry: ObservableObject {
         allModels.append(contentsOf: onnxModels)
         allModels.append(contentsOf: tfliteModels)
         allModels.append(contentsOf: llamaCppModels)
+        allModels.append(contentsOf: swiftTransformersModels)
+        allModels.append(contentsOf: execuTorchModels)
         allModels.append(contentsOf: customModels)
         return allModels
     }

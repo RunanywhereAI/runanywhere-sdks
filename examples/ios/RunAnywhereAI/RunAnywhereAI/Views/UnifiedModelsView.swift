@@ -203,10 +203,17 @@ struct UnifiedModelsView: View {
     }
 
     private func startDownload(_ downloadInfo: ModelInfo) {
-        // Show confirmation dialog first, don't start download immediately
-        let model = createModelInfo(from: downloadInfo)
-        selectedModel = model
-        showingModelDetails = true
+        // Check if download URL exists before showing confirmation
+        guard downloadInfo.downloadURL != nil else {
+            // Show error alert for missing URL
+            viewModel.errorMessage = "No download URL available for this model."
+            viewModel.showError = true
+            return
+        }
+        
+        // Directly show download progress without going through model details
+        selectedDownloadInfo = downloadInfo
+        showingDownloadProgress = true
     }
 
     private func confirmAndStartDownload(_ downloadInfo: ModelInfo) {
