@@ -4,12 +4,12 @@ import UIKit
 #endif
 
 /// Enhanced download manager with queue-based management, retry logic, and archive extraction
+@MainActor
 public class EnhancedDownloadManager {
     public static let shared: EnhancedDownloadManager = EnhancedDownloadManager()
 
     private let downloadQueue: OperationQueue = OperationQueue()
     private var activeTasks: [String: DownloadTask] = [:]
-    private let taskLock: NSLock = NSLock()
     private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
 
     /// Configuration for download behavior
@@ -119,11 +119,9 @@ public class EnhancedDownloadManager {
             result: Task {
                 defer {
                     progressContinuation.finish()
-                    // Clean up active tasks synchronously
+                    // Clean up active tasks
                     Task { @MainActor in
-                        taskLock.lock()
                         activeTasks.removeValue(forKey: taskId)
-                        taskLock.unlock()
                     }
                 }
 
@@ -148,33 +146,23 @@ public class EnhancedDownloadManager {
             }
         )
 
-        // Store task synchronously before returning
-        await withCheckedContinuation { continuation in
-            taskLock.lock()
-            activeTasks[taskId] = task
-            taskLock.unlock()
-            continuation.resume()
-        }
+        // Store task before returning
+        activeTasks[taskId] = task
 
         return task
     }
 
     /// Cancel a download task
     public func cancelDownload(taskId: String) {
-        taskLock.lock()
         if let task = activeTasks[taskId] {
             task.result.cancel()
             activeTasks.removeValue(forKey: taskId)
         }
-        taskLock.unlock()
     }
 
     /// Get all active downloads
     public func activeDownloads() -> [DownloadTask] {
-        taskLock.lock()
-        let tasks = Array(activeTasks.values)
-        taskLock.unlock()
-        return tasks
+        return Array(activeTasks.values)
     }
 
     // MARK: - Private Methods
@@ -586,10 +574,12 @@ public class EnhancedDownloadManager {
 // MARK: - Default Implementation
 
 extension EnhancedDownloadManager: ModelStorageManager {
-    public func deleteModel(_ modelId: String) async throws {
+    nonisolated public func deleteModel(_ modelId: String) async throws {
         // Cancel any active download
-        if let activeTask = activeTasks.values.first(where: { $0.modelId == modelId }) {
-            cancelDownload(taskId: activeTask.id)
+        await MainActor.run {
+            if let activeTask = activeTasks.values.first(where: { $0.modelId == modelId }) {
+                cancelDownload(taskId: activeTask.id)
+            }
         }
 
         // Remove from storage
@@ -598,7 +588,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func getModelPath(_ modelId: String) -> URL? {
+    nonisolated public func getModelPath(_ modelId: String) -> URL? {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsURL = documentsURL.appendingPathComponent("Models", isDirectory: true)
 
@@ -614,7 +604,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         return nil
     }
 
-    public func getAvailableStorage() -> Int64 {
+    nonisolated public func getAvailableStorage() -> Int64 {
         do {
             let systemAttributes = try FileManager.default.attributesOfFileSystem(
                 forPath: NSHomeDirectory()
@@ -630,20 +620,20 @@ extension EnhancedDownloadManager: ModelStorageManager {
         return 0
     }
 
-    public func getModelsDirectory() -> URL {
+    nonisolated public func getModelsDirectory() -> URL {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         return documentsURL.appendingPathComponent("Models", isDirectory: true)
     }
 
-    public func getModelPath(for modelId: String) -> URL {
+    nonisolated public func getModelPath(for modelId: String) -> URL {
         return getModelsDirectory().appendingPathComponent("\(modelId).model")
     }
 
-    public func modelExists(_ modelId: String) -> Bool {
+    nonisolated public func modelExists(_ modelId: String) -> Bool {
         return getModelPath(modelId) != nil
     }
 
-    public func getModelSize(_ modelId: String) -> Int64? {
+    nonisolated public func getModelSize(_ modelId: String) -> Int64? {
         guard let path = getModelPath(modelId) else { return nil }
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
@@ -653,11 +643,11 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func getAvailableSpace() -> Int64 {
+    nonisolated public func getAvailableSpace() -> Int64 {
         return getAvailableStorage()
     }
 
-    public func listStoredModels() -> [String] {
+    nonisolated public func listStoredModels() -> [String] {
         let modelsDir = getModelsDirectory()
         guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDir, includingPropertiesForKeys: nil) else {
             return []
@@ -672,7 +662,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func cleanupTemporaryFiles() async throws {
+    nonisolated public func cleanupTemporaryFiles() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let contents = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
 
@@ -683,7 +673,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func moveToStorage(from temporaryPath: URL, modelId: String) async throws -> URL {
+    nonisolated public func moveToStorage(from temporaryPath: URL, modelId: String) async throws -> URL {
         let finalPath = getModelPath(for: modelId)
 
         // Create models directory if needed

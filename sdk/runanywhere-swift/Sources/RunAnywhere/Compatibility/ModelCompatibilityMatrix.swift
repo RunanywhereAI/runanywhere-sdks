@@ -287,8 +287,8 @@ public class ModelCompatibilityMatrix {
         // Memory requirement
         let memoryReq = DeviceRequirement(
             type: .memory,
-            minimumValue: model.estimatedMemory,
-            currentValue: deviceInfo.totalMemory,
+            minimumValue: Double(model.estimatedMemory),
+            currentValue: Double(deviceInfo.totalMemory),
             isSatisfied: deviceInfo.totalMemory >= model.estimatedMemory
         )
         requirements.append(memoryReq)
@@ -348,7 +348,7 @@ public class ModelCompatibilityMatrix {
     private func extractQuantization(from model: ModelInfo) -> QuantizationType? {
         // Check metadata first
         if let quantLevel = model.metadata?.quantizationLevel {
-            return QuantizationType(rawValue: quantLevel.rawValue) ?? .none
+            return QuantizationType(rawValue: quantLevel.rawValue) ?? QuantizationType.none
         }
 
         // Try to extract from model name

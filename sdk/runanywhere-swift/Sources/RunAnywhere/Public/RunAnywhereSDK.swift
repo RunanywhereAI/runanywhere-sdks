@@ -35,7 +35,9 @@ public class RunAnywhereSDK {
     private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
 
     /// Error recovery system
-    private let errorRecovery: UnifiedErrorRecovery = UnifiedErrorRecovery()
+    private lazy var errorRecovery: UnifiedErrorRecovery = {
+        UnifiedErrorRecovery()
+    }()
 
     // MARK: - New Performance Components
 

@@ -43,7 +43,7 @@ public class RealtimePerformanceMonitor {
     )
 
     // Current generation tracking
-    private var activeGeneration: GenerationTracking?
+    private var activeGeneration: PerformanceGenerationTracking?
 
     // Callbacks for alerts
     private var alertCallbacks: [(PerformanceAlert) -> Void] = []
@@ -94,7 +94,7 @@ public class RealtimePerformanceMonitor {
         queue.async { [weak self] in
             guard let self = self else { return }
 
-            self.activeGeneration = GenerationTracking(
+            self.activeGeneration = PerformanceGenerationTracking(
                 id: UUID(),
                 framework: framework,
                 modelName: modelInfo.name,
@@ -474,8 +474,8 @@ public struct PerformanceSnapshot: Codable {
     public let activeFramework: LLMFramework?
 }
 
-/// Generation tracking information
-internal struct GenerationTracking {
+/// Generation tracking information for performance monitoring
+internal struct PerformanceGenerationTracking {
     let id: UUID
     let framework: LLMFramework
     let modelName: String

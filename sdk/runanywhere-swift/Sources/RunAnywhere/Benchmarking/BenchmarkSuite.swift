@@ -203,11 +203,11 @@ public class BenchmarkSuite {
             }
             tokenCount += 1
             generatedText += token
-            performanceMonitor.recordToken(token)
+            self.performanceMonitor.recordToken(token)
         }
 
         let endTime = CFAbsoluteTimeGetCurrent()
-        let summary = performanceMonitor.endGeneration()
+        let summary = self.performanceMonitor.endGeneration()
 
         return QuickBenchmarkResult(
             serviceName: serviceName,
@@ -333,12 +333,12 @@ public class BenchmarkSuite {
                 firstTokenTime = CFAbsoluteTimeGetCurrent()
             }
             tokens.append(token)
-            performanceMonitor.recordToken(token)
+            self.performanceMonitor.recordToken(token)
         }
 
         let endTime = CFAbsoluteTimeGetCurrent()
         let memoryAfter = getMemoryUsage()
-        let perfSummary = performanceMonitor.endGeneration()
+        let perfSummary = self.performanceMonitor.endGeneration()
 
         return SingleRunResult(
             serviceName: serviceName,
@@ -524,7 +524,7 @@ public struct BenchmarkPrompt {
 }
 
 /// Prompt categories for benchmarking
-public enum PromptCategory: String, CaseIterable {
+public enum PromptCategory: String, CaseIterable, Codable {
     case simple
     case reasoning
     case coding
@@ -534,7 +534,7 @@ public enum PromptCategory: String, CaseIterable {
 }
 
 /// Benchmark configuration options
-public struct BenchmarkOptions {
+public struct BenchmarkOptions: Codable {
     public let iterations: Int
     public let includeWarmup: Bool
     public let measureMemory: Bool
@@ -637,7 +637,7 @@ public struct ComparisonResult {
 }
 
 /// Service performance summary
-public struct ServiceSummary {
+public struct ServiceSummary: Codable {
     public let serviceName: String
     public let framework: LLMFramework?
     public let averageTokensPerSecond: Double
@@ -647,7 +647,7 @@ public struct ServiceSummary {
 }
 
 /// Overall benchmark summary
-public struct BenchmarkSummary {
+public struct BenchmarkSummary: Codable {
     public let serviceSummaries: [ServiceSummary]
     public let fastestService: String?
     public let mostEfficientService: String?

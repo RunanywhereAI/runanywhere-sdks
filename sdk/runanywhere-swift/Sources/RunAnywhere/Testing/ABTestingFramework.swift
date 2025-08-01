@@ -25,7 +25,13 @@ public class ABTestingFramework {
 
     // MARK: - Private Properties
 
-    private let logger = os.Logger(subsystem: "com.runanywhere.sdk", category: "ABTesting")
+    private let logger: os.Logger? = {
+        if #available(iOS 14.0, *) {
+            return os.Logger(subsystem: "com.runanywhere.sdk", category: "ABTesting")
+        } else {
+            return nil
+        }
+    }()
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.abtesting", qos: .userInitiated)
     private let performanceMonitor = RealtimePerformanceMonitor.shared
 
@@ -66,7 +72,9 @@ public class ABTestingFramework {
             testMetrics[test.id] = TestMetrics()
         }
 
-        logger.info("Created A/B test: \(name)")
+        if #available(iOS 14.0, *) {
+            logger?.info("Created A/B test: \(name)")
+        }
 
         return test
     }
@@ -82,7 +90,9 @@ public class ABTestingFramework {
             activeTests[index].startedAt = Date()
         }
 
-        logger.info("Started A/B test with ID: \(testId)")
+        if #available(iOS 14.0, *) {
+            logger?.info("Started A/B test with ID: \(testId)")
+        }
     }
 
     /// Stop an A/B test and generate results
@@ -110,7 +120,9 @@ public class ABTestingFramework {
         }
 
         if let test = test {
-            logger.info("Stopped A/B test: \(test.name)")
+            if #available(iOS 14.0, *) {
+                logger?.info("Stopped A/B test: \(test.name)")
+            }
         }
 
         // Notify callbacks

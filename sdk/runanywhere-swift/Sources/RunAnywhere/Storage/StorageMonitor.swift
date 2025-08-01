@@ -22,7 +22,13 @@ public class StorageMonitor {
 
     // MARK: - Private Properties
 
-    private let logger = os.Logger(subsystem: "com.runanywhere.sdk", category: "StorageMonitor")
+    private let logger: os.Logger? = {
+        if #available(iOS 14.0, *) {
+            return os.Logger(subsystem: "com.runanywhere.sdk", category: "StorageMonitor")
+        } else {
+            return nil
+        }
+    }()
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.storagemonitor", qos: .utility)
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 60.0 // Update every minute
@@ -47,7 +53,9 @@ public class StorageMonitor {
             guard let self = self, !self.isMonitoring else { return }
 
             self.isMonitoring = true
-            self.logger.info("Started storage monitoring")
+            if #available(iOS 14.0, *) {
+                self.logger?.info("Started storage monitoring")
+            }
 
             // Initial update
             Task {
@@ -75,7 +83,9 @@ public class StorageMonitor {
                 self.monitoringTimer?.invalidate()
                 self.monitoringTimer = nil
             }
-            self.logger.info("Stopped storage monitoring")
+            if #available(iOS 14.0, *) {
+                self.logger?.info("Stopped storage monitoring")
+            }
         }
     }
 
@@ -144,7 +154,9 @@ public class StorageMonitor {
                 cleanedSize += cleaned
             } catch {
                 errors.append(error)
-                logger.error("Failed to clean cache at \(cacheURL.path): \(error)")
+                if #available(iOS 14.0, *) {
+                    logger?.error("Failed to clean cache at \(cacheURL.path): \(error)")
+                }
             }
         }
 
@@ -163,7 +175,9 @@ public class StorageMonitor {
         let size = try await calculateSize(at: path)
 
         try FileManager.default.removeItem(at: path)
-        logger.info("Deleted model at \(path.path), freed \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
+        if #available(iOS 14.0, *) {
+            logger?.info("Deleted model at \(path.path), freed \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
+        }
 
         // Update storage info
         await updateStorageInfo()
@@ -277,7 +291,9 @@ public class StorageMonitor {
 
             return info
         } catch {
-            logger.error("Failed to update storage info: \(error)")
+            if #available(iOS 14.0, *) {
+                logger?.error("Failed to update storage info: \(error)")
+            }
             return StorageInfo.empty
         }
     }
@@ -337,7 +353,9 @@ public class StorageMonitor {
                 usedSpace: totalSpace - freeSpace
             )
         } catch {
-            logger.error("Failed to get device storage info: \(error)")
+            if #available(iOS 14.0, *) {
+                logger?.error("Failed to get device storage info: \(error)")
+            }
             return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
         }
     }
@@ -375,7 +393,9 @@ public class StorageMonitor {
                 models.append(model)
             }
         } catch {
-            logger.error("Failed to scan for models: \(error)")
+            if #available(iOS 14.0, *) {
+                logger?.error("Failed to scan for models: \(error)")
+            }
         }
 
         return models
@@ -436,7 +456,9 @@ public class StorageMonitor {
                 let size = try await calculateSize(at: cacheURL)
                 totalSize += size
             } catch {
-                logger.error("Failed to calculate cache size at \(cacheURL.path): \(error)")
+                if #available(iOS 14.0, *) {
+                    logger?.error("Failed to calculate cache size at \(cacheURL.path): \(error)")
+                }
             }
         }
 
@@ -459,7 +481,9 @@ public class StorageMonitor {
                 freedSpace += Int64(size)
             } catch {
                 // Continue with other files
-                logger.warning("Failed to delete cache file at \(fileURL.path): \(error)")
+                if #available(iOS 14.0, *) {
+                    logger?.warning("Failed to delete cache file at \(fileURL.path): \(error)")
+                }
             }
         }
 
@@ -502,13 +526,15 @@ public class StorageMonitor {
             callback(alert)
         }
 
-        switch type {
-        case .info:
-            logger.info("Storage alert: \(message)")
-        case .warning:
-            logger.warning("Storage warning: \(message)")
-        case .critical:
-            logger.error("Storage critical: \(message)")
+        if #available(iOS 14.0, *) {
+            switch type {
+            case .info:
+                logger?.info("Storage alert: \(message)")
+            case .warning:
+                logger?.warning("Storage warning: \(message)")
+            case .critical:
+                logger?.error("Storage critical: \(message)")
+            }
         }
     }
 }
