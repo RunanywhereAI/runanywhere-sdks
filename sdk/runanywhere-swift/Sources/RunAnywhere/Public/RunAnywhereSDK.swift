@@ -31,6 +31,12 @@ public class RunAnywhereSDK {
     /// Memory manager (to be provided by implementation)
     private var memoryManager: MemoryManager?
 
+    /// Simple model download manager using Alamofire
+    public let modelDownloadManager: ModelDownloadManager
+
+    /// Simple model storage manager using Files
+    public let modelStorageManager: SimpleModelStorageManager
+
     /// Progress tracker
     private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
 
@@ -65,6 +71,15 @@ public class RunAnywhereSDK {
 
     /// Private initializer to enforce singleton pattern
     private init() {
+        // Initialize new managers
+        do {
+            self.modelDownloadManager = try ModelDownloadManager()
+            self.modelStorageManager = try SimpleModelStorageManager()
+        } catch {
+            // If initialization fails, create dummy instances and log error
+            fatalError("Failed to initialize model managers: \(error)")
+        }
+
         setupLifecycleObserver()
     }
 
@@ -240,6 +255,74 @@ public class RunAnywhereSDK {
     public func updateConfiguration(_ config: Configuration) async throws {
         self.configuration = config
         // TODO: Update all components with new configuration
+    }
+
+    // MARK: - Model Management API
+
+    /// Download a model from URL using Alamofire
+    /// - Parameters:
+    ///   - url: The URL to download from
+    ///   - modelId: Unique identifier for the model
+    ///   - framework: The AI framework type
+    ///   - progressHandler: Optional progress callback
+    /// - Returns: Download result with model path
+    public func downloadModel(
+        from url: URL,
+        modelId: String,
+        framework: SimpleModelStorageManager.Framework,
+        progressHandler: ((ModelDownloadManager.DownloadProgress) -> Void)? = nil
+    ) async throws -> ModelDownloadManager.DownloadResult {
+        return try await modelDownloadManager.downloadModel(
+            url: url,
+            modelId: modelId,
+            framework: framework,
+            progressHandler: progressHandler
+        )
+    }
+
+    /// Check if a model exists in storage
+    /// - Parameters:
+    ///   - framework: The AI framework type
+    ///   - modelId: The model identifier
+    /// - Returns: True if model exists
+    public func modelExists(framework: SimpleModelStorageManager.Framework, modelId: String) -> Bool {
+        return modelStorageManager.modelExists(framework: framework, modelId: modelId)
+    }
+
+    /// Get path to a model if it exists
+    /// - Parameters:
+    ///   - framework: The AI framework type
+    ///   - modelId: The model identifier
+    /// - Returns: URL to model file if it exists
+    public func getModelPath(framework: SimpleModelStorageManager.Framework, modelId: String) throws -> URL? {
+        return try modelStorageManager.getModelPath(framework: framework, modelId: modelId)
+    }
+
+    /// List all models for a specific framework
+    /// - Parameter framework: The AI framework type
+    /// - Returns: Array of model identifiers
+    public func listModels(for framework: SimpleModelStorageManager.Framework) throws -> [String] {
+        return try modelStorageManager.listModels(for: framework)
+    }
+
+    /// Delete a model from storage
+    /// - Parameters:
+    ///   - framework: The AI framework type
+    ///   - modelId: The model identifier
+    public func deleteModel(framework: SimpleModelStorageManager.Framework, modelId: String) throws {
+        try modelStorageManager.deleteModel(framework: framework, modelId: modelId)
+    }
+
+    /// Cancel an active download
+    /// - Parameter modelId: The model identifier
+    public func cancelDownload(modelId: String) {
+        modelDownloadManager.cancelDownload(modelId: modelId)
+    }
+
+    /// Get list of active downloads
+    /// - Returns: Array of model identifiers currently being downloaded
+    public func getActiveDownloads() -> [String] {
+        return modelDownloadManager.getActiveDownloads()
     }
 }
 

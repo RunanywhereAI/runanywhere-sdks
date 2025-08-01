@@ -75,7 +75,9 @@
       "Bash(./test_kaggle_correct_api.sh:*)",
       "Bash(mv:*)",
       "Bash(pre-commit:*)",
-      "Bash(git rev-parse:*)"
+      "Bash(git rev-parse:*)",
+      "WebFetch(domain:www.swiftbysundell.com)",
+      "WebFetch(domain:swiftpackageindex.com)"
     ],
     "deny": []
   }
