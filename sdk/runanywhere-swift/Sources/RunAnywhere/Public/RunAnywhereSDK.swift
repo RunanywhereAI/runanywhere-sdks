@@ -37,6 +37,26 @@ public class RunAnywhereSDK {
     /// Error recovery system
     private let errorRecovery: UnifiedErrorRecovery = UnifiedErrorRecovery()
 
+    // MARK: - New Performance Components
+
+    /// Performance monitoring system
+    public let performanceMonitor: RealtimePerformanceMonitor = RealtimePerformanceMonitor.shared
+
+    /// Benchmarking suite
+    public let benchmarkSuite: BenchmarkSuite = BenchmarkSuite.shared
+
+    /// Memory profiler
+    public let memoryProfiler: MemoryProfiler = MemoryProfiler.shared
+
+    /// Model compatibility checker
+    public let compatibilityMatrix: ModelCompatibilityMatrix = ModelCompatibilityMatrix.shared
+
+    /// Storage monitor
+    public let storageMonitor: StorageMonitor = StorageMonitor.shared
+
+    /// A/B testing framework
+    public let abTesting: ABTestingFramework = ABTestingFramework.shared
+
     /// Currently loaded model
     private var currentModel: ModelInfo?
     private var currentService: LLMService?

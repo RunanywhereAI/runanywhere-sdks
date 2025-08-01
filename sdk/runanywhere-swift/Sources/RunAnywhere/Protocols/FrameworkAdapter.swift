@@ -12,6 +12,22 @@ public enum LLMFramework: String, CaseIterable {
     case foundationModels = "FoundationModels"
     case picoLLM = "PicoLLM"
     case mlc = "MLC"
+
+    /// Human-readable display name for the framework
+    public var displayName: String {
+        switch self {
+        case .coreML: return "Core ML"
+        case .tensorFlowLite: return "TensorFlow Lite"
+        case .mlx: return "MLX"
+        case .swiftTransformers: return "Swift Transformers"
+        case .onnx: return "ONNX Runtime"
+        case .execuTorch: return "ExecuTorch"
+        case .llamaCpp: return "llama.cpp"
+        case .foundationModels: return "Foundation Models"
+        case .picoLLM: return "Pico LLM"
+        case .mlc: return "MLC"
+        }
+    }
 }
 
 /// Model formats supported
