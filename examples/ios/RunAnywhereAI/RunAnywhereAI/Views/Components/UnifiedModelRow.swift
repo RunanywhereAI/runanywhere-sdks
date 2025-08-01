@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct UnifiedModelRow: View {
     let model: ModelInfo

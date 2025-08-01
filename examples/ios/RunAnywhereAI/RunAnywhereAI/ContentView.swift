@@ -25,20 +25,12 @@ struct ContentView: View {
                 .tag(1)
 
             NavigationView {
-                BenchmarkView()
-            }
-            .tabItem {
-                Label("Benchmark", systemImage: "speedometer")
-            }
-            .tag(2)
-
-            NavigationView {
                 SettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(3)
+            .tag(2)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
             selectedTab = 1

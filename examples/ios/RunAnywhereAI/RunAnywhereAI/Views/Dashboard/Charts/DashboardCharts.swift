@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Charts
+import RunAnywhereSDK
 
 // MARK: - Tokens Per Second Chart
 

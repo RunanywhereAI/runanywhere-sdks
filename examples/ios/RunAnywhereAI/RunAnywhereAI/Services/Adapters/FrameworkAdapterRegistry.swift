@@ -22,25 +22,33 @@ class FrameworkAdapterRegistry {
     }
 
     private func registerDefaultAdapters() {
-        // Register all framework adapters
-        register(CoreMLFrameworkAdapter())
-        register(TFLiteFrameworkAdapter())
-        register(MLXFrameworkAdapter())
-        register(SwiftTransformersAdapter())
-        register(ONNXFrameworkAdapter())
-        register(ExecuTorchAdapter())
-        register(LlamaCppFrameworkAdapter())
+        // Register only enabled framework adapters
 
+        // Foundation Models adapter (iOS 18+)
         if #available(iOS 18.0, *) {
             register(FoundationModelsAdapter())
         }
 
-        register(PicoLLMAdapter())
-        register(MLCAdapter())
+        // MediaPipe adapter
+        register(MediaPipeAdapter())
+
+        // Deferred adapters are not registered - they're moved to Deferred/ folder
+        // and can be enabled later by moving them back and adding here:
+
+        // Deferred frameworks (commented out):
+        // register(CoreMLFrameworkAdapter())
+        // register(TFLiteFrameworkAdapter())
+        // register(MLXFrameworkAdapter())
+        // register(SwiftTransformersAdapter())
+        // register(ONNXFrameworkAdapter())
+        // register(ExecuTorchAdapter())
+        // register(LlamaCppFrameworkAdapter())
+        // register(PicoLLMAdapter())
+        // register(MLCAdapter())
     }
 
     func register(_ adapter: BaseFrameworkAdapter) {
-        adapters[adapter.framework] = adapter
+        adapters[adapter.localFramework] = adapter
     }
 
     func getAdapter(for framework: LLMFramework) -> BaseFrameworkAdapter? {

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct UnifiedModelsView: View {
     @StateObject private var viewModel = ModelListViewModel()

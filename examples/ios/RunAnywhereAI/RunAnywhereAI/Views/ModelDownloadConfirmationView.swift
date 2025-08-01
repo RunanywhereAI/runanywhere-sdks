@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct ModelDownloadConfirmationView: View {
     let model: ModelInfo
