@@ -7,20 +7,20 @@ import java.nio.ByteBuffer
 
 /**
  * Utilities for JNI operations and native memory management
- * 
+ *
  * This class provides common functionality for working with native code
  * including memory allocation, buffer management, and native library utilities.
  */
 object JNIUtils {
     private const val TAG = "JNIUtils"
-    
+
     /**
      * Allocate direct ByteBuffer for native memory sharing
      */
     fun allocateDirectBuffer(sizeBytes: Int): ByteBuffer {
         return ByteBuffer.allocateDirect(sizeBytes)
     }
-    
+
     /**
      * Load file content into direct ByteBuffer for native processing
      */
@@ -31,7 +31,7 @@ object JNIUtils {
                 Log.e(TAG, "Cannot read file: $filePath")
                 return null
             }
-            
+
             val bytes = file.readBytes()
             val buffer = ByteBuffer.allocateDirect(bytes.size)
             buffer.put(bytes)
@@ -42,7 +42,7 @@ object JNIUtils {
             null
         }
     }
-    
+
     /**
      * Copy data from ByteBuffer to byte array
      */
@@ -51,7 +51,7 @@ object JNIUtils {
         buffer.get(array)
         return array
     }
-    
+
     /**
      * Copy byte array to direct ByteBuffer
      */
@@ -61,7 +61,7 @@ object JNIUtils {
         buffer.rewind()
         return buffer
     }
-    
+
     /**
      * Check if native library exists in APK
      */
@@ -73,27 +73,27 @@ object JNIUtils {
             false
         }
     }
-    
+
     /**
      * Get native library architecture information
      */
     external fun getNativeArchInfo(): NativeArchInfo?
-    
+
     /**
      * Check native memory availability
      */
     external fun getNativeMemoryInfo(): NativeMemoryInfo?
-    
+
     /**
      * Validate model file format in native code
      */
     external fun validateModelFormat(modelPath: String, expectedFormat: String): Boolean
-    
+
     /**
      * Get file checksum using native implementation (faster for large files)
      */
     external fun calculateNativeChecksum(filePath: String): String?
-    
+
     init {
         try {
             System.loadLibrary("jni-utils")
@@ -136,7 +136,7 @@ class NativeMemoryPool(
 ) {
     private val availableBuffers = mutableListOf<ByteBuffer>()
     private val usedBuffers = mutableSetOf<ByteBuffer>()
-    
+
     /**
      * Get a buffer from the pool or create new one
      */
@@ -153,7 +153,7 @@ class NativeMemoryPool(
             buffer
         }
     }
-    
+
     /**
      * Return buffer to the pool
      */
@@ -167,7 +167,7 @@ class NativeMemoryPool(
             // If pool is full, let buffer be garbage collected
         }
     }
-    
+
     /**
      * Clear all buffers and release memory
      */
@@ -176,7 +176,7 @@ class NativeMemoryPool(
         availableBuffers.clear()
         usedBuffers.clear()
     }
-    
+
     /**
      * Get pool statistics
      */
@@ -206,7 +206,7 @@ data class PoolStats(
  */
 object NativeTensorUtils {
     private const val TAG = "NativeTensorUtils"
-    
+
     /**
      * Create tensor metadata for native operations
      */
@@ -222,10 +222,10 @@ object NativeTensorUtils {
             TensorDataType.INT8 -> 1
             TensorDataType.UINT8 -> 1
         }
-        
+
         val totalElements = shape.fold(1) { acc, dim -> acc * dim }
         val totalBytes = totalElements * elementSize
-        
+
         return TensorMetadata(
             shape = shape,
             dataType = dataType,
@@ -235,7 +235,7 @@ object NativeTensorUtils {
             totalBytes = totalBytes
         )
     }
-    
+
     /**
      * Allocate tensor buffer with proper alignment
      */
@@ -244,7 +244,7 @@ object NativeTensorUtils {
         val paddedSize = ((metadata.totalBytes + alignment - 1) / alignment) * alignment
         return ByteBuffer.allocateDirect(paddedSize)
     }
-    
+
     // Native methods for tensor operations
     external fun nativeTransposeTensor(
         input: ByteBuffer,
@@ -252,14 +252,14 @@ object NativeTensorUtils {
         shape: IntArray,
         permutation: IntArray
     ): Boolean
-    
+
     external fun nativeReshapeTensor(
         input: ByteBuffer,
         output: ByteBuffer,
         oldShape: IntArray,
         newShape: IntArray
     ): Boolean
-    
+
     external fun nativeQuantizeTensor(
         input: ByteBuffer,
         output: ByteBuffer,
@@ -268,7 +268,7 @@ object NativeTensorUtils {
         inputType: Int,
         outputType: Int
     ): Boolean
-    
+
     init {
         try {
             System.loadLibrary("tensor-utils")
@@ -315,19 +315,19 @@ data class TensorMetadata(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
-        
+
         other as TensorMetadata
-        
+
         if (!shape.contentEquals(other.shape)) return false
         if (dataType != other.dataType) return false
         if (layout != other.layout) return false
         if (elementSize != other.elementSize) return false
         if (totalElements != other.totalElements) return false
         if (totalBytes != other.totalBytes) return false
-        
+
         return true
     }
-    
+
     override fun hashCode(): Int {
         var result = shape.contentHashCode()
         result = 31 * result + dataType.hashCode()

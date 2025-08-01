@@ -19,19 +19,19 @@ class ChatViewModel @Inject constructor(
     private val conversationRepository: ConversationRepository,
     private val llmManager: UnifiedLLMManager
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
-    
+
     private val _messages = MutableStateFlow<List<Message>>(emptyList())
     val messages: StateFlow<List<Message>> = _messages.asStateFlow()
-    
+
     private var currentConversationId: String? = null
-    
+
     fun loadConversation(conversationId: String) {
         viewModelScope.launch {
             currentConversationId = conversationId
-            
+
             // Load conversation messages
             conversationRepository.getConversationMessages(conversationId)
                 .collectLatest { messages ->
@@ -39,7 +39,7 @@ class ChatViewModel @Inject constructor(
                 }
         }
     }
-    
+
     fun createNewConversation(framework: LLMFramework, modelName: String) {
         viewModelScope.launch {
             val conversation = conversationRepository.createConversation(
@@ -51,14 +51,14 @@ class ChatViewModel @Inject constructor(
             _uiState.update { it.copy(conversation = conversation) }
         }
     }
-    
+
     fun sendMessage() {
         val input = _uiState.value.currentInput
         if (input.isBlank()) return
-        
+
         viewModelScope.launch {
             val conversationId = currentConversationId ?: return@launch
-            
+
             // Add user message
             conversationRepository.addMessage(
                 conversationId = conversationId,
@@ -66,24 +66,24 @@ class ChatViewModel @Inject constructor(
                 content = input,
                 tokenCount = input.split(" ").size // Simple token count
             )
-            
+
             // Clear input and start generation
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     currentInput = "",
                     isGenerating = true
                 )
             }
-            
+
             try {
                 // Generate response
                 val options = GenerationOptions(
                     maxTokens = 500,
                     temperature = 0.7f
                 )
-                
+
                 val result = llmManager.generate(input, options)
-                
+
                 // Add assistant message
                 conversationRepository.addMessage(
                     conversationId = conversationId,
@@ -94,7 +94,7 @@ class ChatViewModel @Inject constructor(
                 )
             } catch (e: Exception) {
                 // Handle error
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         error = e.message,
                         isGenerating = false
@@ -105,30 +105,30 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun updateInput(input: String) {
         _uiState.update { it.copy(currentInput = input) }
     }
-    
+
     fun selectModel(framework: LLMFramework, modelPath: String) {
         viewModelScope.launch {
             try {
                 llmManager.selectFramework(framework, modelPath)
                 val modelInfo = llmManager.getModelInfo()
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         currentModel = modelInfo,
                         currentFramework = framework
                     )
                 }
             } catch (e: Exception) {
-                _uiState.update { 
+                _uiState.update {
                     it.copy(error = e.message)
                 }
             }
         }
     }
-    
+
     fun clearConversation() {
         viewModelScope.launch {
             currentConversationId?.let { id ->
@@ -139,7 +139,7 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun exportConversation() {
         viewModelScope.launch {
             currentConversationId?.let { id ->
@@ -148,27 +148,27 @@ class ChatViewModel @Inject constructor(
             }
         }
     }
-    
+
     fun showConversationInfo() {
         // TODO: Show conversation info dialog
     }
-    
+
     fun showSettings() {
         // TODO: Navigate to settings
     }
-    
+
     fun editMessage(messageId: String) {
         // TODO: Implement message editing
     }
-    
+
     fun regenerateResponse(messageId: String) {
         // TODO: Implement response regeneration
     }
-    
+
     fun branchConversation(messageId: String) {
         // TODO: Implement conversation branching
     }
-    
+
     fun attachImage() {
         // TODO: Implement image attachment
     }

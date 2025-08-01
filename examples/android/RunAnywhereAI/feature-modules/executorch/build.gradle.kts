@@ -20,16 +20,16 @@ android {
             proguardFiles("proguard-rules.pro")
         }
     }
-    
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    
+
     kotlinOptions {
         jvmTarget = "17"
     }
-    
+
     ndk {
         abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
     }
@@ -37,15 +37,15 @@ android {
 
 dependencies {
     implementation(project(":app"))
-    
+
     // Core dependencies
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    
+
     // Dependency Injection
     implementation("com.google.dagger:hilt-android:2.48")
     kapt("com.google.dagger:hilt-compiler:2.48")
-    
+
     // ExecuTorch dependencies would be added here
     // implementation("org.pytorch:executorch-android:0.2.0")
 }

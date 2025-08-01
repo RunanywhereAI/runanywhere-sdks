@@ -124,6 +124,41 @@ Both SDKs include comprehensive test suites:
 swift test --enable-code-coverage
 ```
 
+## 🔍 Code Quality & Linting
+
+We enforce strict code quality standards including mandatory GitHub issue references for all TODO comments.
+
+### Running Lint Checks
+
+```bash
+# Run all lint checks (iOS + Android)
+./scripts/lint-all.sh
+
+# iOS-specific lint checks
+./scripts/lint-ios.sh
+
+# Android-specific lint checks
+./scripts/lint-android.sh
+
+# Find TODOs without issue references
+./scripts/fix-todos.sh
+```
+
+### TODO Policy
+
+All TODO-style comments must reference a GitHub issue:
+- ✅ Correct: `// TODO: #123 - Implement error handling`
+- ❌ Wrong: `// TODO: Implement error handling`
+
+See [TODO Policy](docs/TODO_POLICY.md) for details.
+
+### Pre-commit Hooks
+
+Install pre-commit hooks to catch issues before committing:
+```bash
+pre-commit install
+```
+
 ## 📖 Documentation
 
 - [Android SDK Documentation](sdk/runanywhere-android/README.md)

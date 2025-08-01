@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.ui.models.components
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,7 +12,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.GetApp
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Close as FilterListOff
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,7 +60,7 @@ fun ModelSearchAndFilter(
     modifier: Modifier = Modifier
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
-    
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -61,7 +73,7 @@ fun ModelSearchAndFilter(
             placeholder = { Text("Search models...") },
             leadingIcon = {
                 Icon(
-                    imageVector = Icons.Default.Search,
+                    imageVector = Icons.Filled.Search,
                     contentDescription = "Search"
                 )
             },
@@ -72,20 +84,20 @@ fun ModelSearchAndFilter(
                             onClick = { onSearchQueryChange("") }
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Clear,
+                                imageVector = Icons.Filled.Clear,
                                 contentDescription = "Clear search"
                             )
                         }
                     }
-                    
+
                     IconButton(
                         onClick = onToggleFilterExpanded
                     ) {
                         Icon(
                             imageVector = if (isFilterExpanded) {
-                                Icons.Default.FilterListOff
+                                Icons.Filled.FilterListOff
                             } else {
-                                Icons.Default.FilterList
+                                Icons.Filled.FilterList
                             },
                             contentDescription = if (isFilterExpanded) {
                                 "Hide filters"
@@ -106,7 +118,7 @@ fun ModelSearchAndFilter(
             singleLine = true,
             shape = RoundedCornerShape(12.dp)
         )
-        
+
         // Filter section
         AnimatedVisibility(
             visible = isFilterExpanded,
@@ -124,7 +136,7 @@ fun ModelSearchAndFilter(
                 onSortByChange = onSortByChange
             )
         }
-        
+
         // Active filters summary
         if (selectedFrameworks.isNotEmpty() || selectedSizeRange != SizeRange.ALL || showOnlyDownloaded) {
             ActiveFiltersSummary(
@@ -167,7 +179,7 @@ private fun FilterSection(
             // Framework filter
             FilterGroup(
                 title = "Frameworks",
-                icon = Icons.Default.Code
+                icon = Icons.Filled.Build
             ) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -181,11 +193,11 @@ private fun FilterSection(
                     }
                 }
             }
-            
+
             // Size filter
             FilterGroup(
                 title = "Model Size",
-                icon = Icons.Default.Storage
+                icon = Icons.Filled.Save
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -199,7 +211,7 @@ private fun FilterSection(
                     }
                 }
             }
-            
+
             // Sort and display options
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -212,9 +224,9 @@ private fun FilterSection(
                     onSortByChange = onSortByChange,
                     modifier = Modifier.weight(1f)
                 )
-                
+
                 Spacer(modifier = Modifier.width(16.dp))
-                
+
                 // Show only downloaded toggle
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -264,7 +276,7 @@ private fun FilterGroup(
                 fontWeight = FontWeight.SemiBold
             )
         }
-        
+
         content()
     }
 }
@@ -280,7 +292,7 @@ private fun FrameworkFilterChip(
     modifier: Modifier = Modifier
 ) {
     val (color, displayName) = getFrameworkDisplayInfo(framework)
-    
+
     FilterChip(
         selected = isSelected,
         onClick = onToggle,
@@ -291,14 +303,12 @@ private fun FrameworkFilterChip(
             selectedLabelColor = color,
             selectedLeadingIconColor = color
         ),
-        border = if (isSelected) {
-            FilterChipDefaults.filterChipBorder(
-                borderColor = color,
-                selectedBorderColor = color
-            )
-        } else {
-            FilterChipDefaults.filterChipBorder()
-        }
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = isSelected,
+            borderColor = if (!isSelected) MaterialTheme.colorScheme.outline else color,
+            selectedBorderColor = color
+        )
     )
 }
 
@@ -331,7 +341,7 @@ private fun SortByDropdown(
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
-    
+
     ExposedDropdownMenuBox(
         expanded = expanded,
         onExpandedChange = { expanded = !expanded },
@@ -349,7 +359,7 @@ private fun SortByDropdown(
                 .menuAnchor()
                 .fillMaxWidth()
         )
-        
+
         ExposedDropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
@@ -397,7 +407,7 @@ private fun ActiveFiltersSummary(
                 onRemove = { onFrameworkToggle(framework) }
             )
         }
-        
+
         // Size range filter
         if (selectedSizeRange != SizeRange.ALL) {
             item {
@@ -407,7 +417,7 @@ private fun ActiveFiltersSummary(
                 )
             }
         }
-        
+
         // Downloaded only filter
         if (showOnlyDownloaded) {
             item {
@@ -445,9 +455,9 @@ private fun ActiveFilterChip(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer
             )
-            
+
             Icon(
-                imageVector = Icons.Default.Close,
+                imageVector = Icons.Filled.Close,
                 contentDescription = "Remove filter",
                 modifier = Modifier
                     .size(16.dp)
@@ -473,12 +483,12 @@ enum class SizeRange(val displayName: String, val minBytes: Long, val maxBytes: 
  * Model sorting options
  */
 enum class ModelSortBy(val displayName: String, val icon: ImageVector) {
-    NAME("Name", Icons.Default.SortByAlpha),
-    SIZE_ASC("Size (Small to Large)", Icons.Default.ArrowUpward),
-    SIZE_DESC("Size (Large to Small)", Icons.Default.ArrowDownward),
-    FRAMEWORK("Framework", Icons.Default.Code),
-    DOWNLOAD_STATUS("Download Status", Icons.Default.Download),
-    PERFORMANCE("Performance", Icons.Default.Speed)
+    NAME("Name", Icons.Filled.List),
+    SIZE_ASC("Size (Small to Large)", Icons.Filled.KeyboardArrowUp),
+    SIZE_DESC("Size (Large to Small)", Icons.Filled.KeyboardArrowDown),
+    FRAMEWORK("Framework", Icons.Filled.Build),
+    DOWNLOAD_STATUS("Download Status", Icons.Filled.GetApp),
+    PERFORMANCE("Performance", Icons.Filled.Timer)
 }
 
 /**

@@ -51,14 +51,14 @@ struct UnifiedModelRow: View {
     private var isDownloading: Bool {
         downloadManager.activeDownloads.keys.contains(model.id)
     }
-    
+
     private var isModelDownloaded: Bool {
         if let downloadableModel = downloadableModel {
             return modelManager.isModelDownloaded(downloadableModel.name, framework: framework)
         }
         return modelManager.isModelDownloaded(model.name, framework: framework)
     }
-    
+
     private var effectiveModelType: ModelType {
         // Use modelType from downloadableModel if available, otherwise from model
         return downloadableModel?.modelType ?? model.modelType ?? .text
@@ -81,7 +81,7 @@ struct UnifiedModelRow: View {
                             .fontWeight(.medium)
                             .foregroundColor(.primary)
                             .lineLimit(1)
-                        
+
                         // Model type indicator
                         Image(systemName: effectiveModelType.icon)
                             .font(.caption)
@@ -101,15 +101,15 @@ struct UnifiedModelRow: View {
                                 .background(effectiveModelType.supportedInChat ? Color.blue.opacity(0.1) : Color.orange.opacity(0.1))
                                 .foregroundColor(effectiveModelType.supportedInChat ? .blue : .orange)
                                 .cornerRadius(4)
-                            
+
                             Text("•")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            
+
                             Text(model.displaySize)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             // Quantization
                             if let quantization = model.quantization {
                                 Text("•")
@@ -119,10 +119,10 @@ struct UnifiedModelRow: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            
+
                             Spacer()
                         }
-                        
+
                         // Second row: Status badges
                         HStack(spacing: 8) {
                             // Compatibility
@@ -136,7 +136,7 @@ struct UnifiedModelRow: View {
                                         .foregroundColor(.green)
                                 }
                             }
-                            
+
                             // Download status
                             if isModelDownloaded {
                                 HStack(spacing: 4) {
@@ -157,7 +157,7 @@ struct UnifiedModelRow: View {
                                         .foregroundColor(.green)
                                 }
                             }
-                            
+
                             Spacer()
                         }
                     }

@@ -35,15 +35,15 @@ fun ChatScreen(
     val isGenerating by viewModel.isGenerating.collectAsState()
     val currentModel by viewModel.currentModel.collectAsState()
     val error by viewModel.error.collectAsState()
-    
+
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Column {
                         Text("RunAnywhere Chat")
                         currentModel?.let { model ->
@@ -88,7 +88,7 @@ fun ChatScreen(
                     )
                 }
             }
-            
+
             // Messages list
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -101,7 +101,7 @@ fun ChatScreen(
                     MessageItem(message)
                 }
             }
-            
+
             // Input area
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -122,9 +122,9 @@ fun ChatScreen(
                         enabled = !isGenerating && currentModel != null,
                         maxLines = 4
                     )
-                    
+
                     Spacer(modifier = Modifier.width(8.dp))
-                    
+
                     FilledIconButton(
                         onClick = {
                             if (inputText.isNotBlank()) {
@@ -159,7 +159,7 @@ fun ChatScreen(
 fun MessageItem(message: ChatMessage) {
     val isUser = message.role == ChatRole.USER
     val dateFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-    
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
@@ -191,9 +191,9 @@ fun MessageItem(message: ChatMessage) {
                         MaterialTheme.colorScheme.onSurfaceVariant
                     }
                 )
-                
+
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 Text(
                     text = dateFormat.format(Date(message.timestamp)),
                     style = MaterialTheme.typography.bodySmall,

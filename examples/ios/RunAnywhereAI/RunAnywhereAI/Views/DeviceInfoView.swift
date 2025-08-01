@@ -173,7 +173,7 @@ struct DeviceInfoView: View {
                                         .foregroundColor(.secondary)
                                         .italic()
                                 }
-                                
+
                                 // Manage downloads button
                                 Button(action: {
                                     showingDownloadsManagement = true

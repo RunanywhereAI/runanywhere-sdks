@@ -66,14 +66,14 @@ BUNDLE_ID="com.runanywhere.RunAnywhereAI"
 # Function to fix Pods resources script for Xcode 16
 fix_pods_script() {
     local SCRIPT_PATH="Pods/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources.sh"
-    
+
     if [ ! -f "$SCRIPT_PATH" ]; then
         print_warning "Pods resources script not found. Running pod install..."
         pod install
     fi
-    
+
     print_status "Fixing Pods script for Xcode 16 sandbox compatibility..."
-    
+
     # Create the fixed script
     cat > "$SCRIPT_PATH" << 'EOF'
 #!/bin/sh
@@ -222,7 +222,7 @@ then
   fi
 fi
 EOF
-    
+
     chmod +x "$SCRIPT_PATH"
 }
 
@@ -317,7 +317,7 @@ fi
 if [ "$TARGET_TYPE" = "simulator" ]; then
     # For simulator
     print_status "Installing on simulator..."
-    
+
     # Get the app path - use correct path for simulator builds
     if [[ "$DESTINATION" == *"id="* ]]; then
         # For simulator builds, use Debug-iphonesimulator path
@@ -327,7 +327,7 @@ if [ "$TARGET_TYPE" = "simulator" ]; then
         APP_PATH=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings | grep "BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
         APP_PATH="$APP_PATH/$SCHEME.app"
     fi
-    
+
     # Extract simulator ID from destination if it's an ID-based destination
     if [[ "$DESTINATION" == *"id="* ]]; then
         SIMULATOR_ID=$(echo "$DESTINATION" | sed 's/.*id=//')
@@ -340,48 +340,48 @@ if [ "$TARGET_TYPE" = "simulator" ]; then
         fi
         xcrun simctl boot "$SIMULATOR_ID" 2>/dev/null || true
     fi
-    
+
     # Install app
     xcrun simctl install "$SIMULATOR_ID" "$APP_PATH"
-    
+
     # Launch app
     print_status "Launching app on simulator..."
     xcrun simctl launch "$SIMULATOR_ID" "$BUNDLE_ID"
-    
+
     # Open simulator
     open -a Simulator
-    
+
 else
     # For device
     # Extract Xcode device ID from destination
     XCODE_DEVICE_ID=$(echo "$DESTINATION" | sed 's/platform=iOS,id=//')
-    
+
     # Get the devicectl ID for the same device (needed for installation)
     # Map from Xcode device ID to devicectl device ID using device name
     DEVICE_NAME_FOR_INSTALL=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
-    
+
     if [ -n "$DEVICE_NAME_FOR_INSTALL" ]; then
         DEVICECTL_ID=$(xcrun devicectl list devices | grep "$DEVICE_NAME_FOR_INSTALL" | grep "connected" | head -1 | awk '{print $3}')
     else
         # Fallback: use first connected device
         DEVICECTL_ID=$(xcrun devicectl list devices | grep -E "iPhone|iPad" | grep "connected" | head -1 | awk '{print $3}')
     fi
-    
+
     if [ -z "$DEVICECTL_ID" ]; then
         print_error "Could not find device for installation!"
         exit 1
     fi
-    
+
     print_status "Using device: $DEVICE_NAME_FOR_INSTALL (Xcode: $XCODE_DEVICE_ID, devicectl: $DEVICECTL_ID)"
-    
+
     # Get the built app path
     APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphoneos/*" -not -path "*/Index.noindex/*" | head -1)
-    
+
     if [ -z "$APP_PATH" ]; then
         print_error "Could not find built app!"
         exit 1
     fi
-    
+
     print_status "Installing app on device..."
     if xcrun devicectl device install app --device "$DEVICECTL_ID" "$APP_PATH"; then
         print_status "App installed successfully!"
@@ -389,7 +389,7 @@ else
         print_error "Failed to install app!"
         exit 1
     fi
-    
+
     print_status "Launching app on device..."
     if xcrun devicectl device process launch --device "$DEVICECTL_ID" "$BUNDLE_ID"; then
         print_status "App launched successfully!"

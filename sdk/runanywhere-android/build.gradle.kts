@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -35,6 +36,7 @@ android {
         checkDependencies = true
         warningsAsErrors = true
         baseline = file("lint-baseline.xml")
+        lintConfig = file("lint.xml")
     }
 }
 
@@ -46,4 +48,12 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+// Detekt configuration
+detekt {
+    config.setFrom("$projectDir/detekt.yml")
+    buildUponDefaultConfig = true
+    allRules = false
+    baseline = file("$projectDir/detekt-baseline.xml")
 }

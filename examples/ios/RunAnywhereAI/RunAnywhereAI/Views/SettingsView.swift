@@ -77,7 +77,7 @@ struct SettingsView: View {
                     Label("API Credentials", systemImage: "key.fill")
                         .badge(getCredentialsStatus())
                 }
-                
+
                 NavigationLink(destination: ModelURLSettingsView()) {
                     Label("Model URLs", systemImage: "link")
                 }
@@ -86,12 +86,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Section("Maintenance") {
                 NavigationLink(destination: CleanupView()) {
                     Label("Clean Misplaced Files", systemImage: "trash")
                 }
-                
+
                 Text("Remove files that were downloaded to incorrect locations.")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -145,11 +145,11 @@ struct SettingsView: View {
         topK = 40
         showAdvancedSettings = false
     }
-    
+
     private func getCredentialsStatus() -> Text? {
         let hfConnected = HuggingFaceAuthService.shared.isAuthenticated
         let kaggleConnected = KaggleAuthService.shared.isAuthenticated
-        
+
         if hfConnected && kaggleConnected {
             return Text("All Connected")
                 .font(.caption)

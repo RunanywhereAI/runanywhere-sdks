@@ -160,9 +160,9 @@ struct ModelDownloadProgressView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
-                            
+
                             // Show HuggingFace directory download status
-                            if currentStep == .downloading && 
+                            if currentStep == .downloading &&
                                downloadInfo.downloadURL?.absoluteString.contains("huggingface.co") == true &&
                                downloadInfo.format == .mlPackage {
                                 if !downloadManager.currentStep.isEmpty {
@@ -176,7 +176,7 @@ struct ModelDownloadProgressView: View {
                                         .cornerRadius(8)
                                         .animation(.easeInOut(duration: 0.3), value: downloadManager.currentStep)
                                 }
-                                
+
                                 // Show file count progress with visual indicator
                                 let downloader = HuggingFaceDirectoryDownloader.shared
                                 if downloader.totalFiles > 0 {
@@ -186,30 +186,30 @@ struct ModelDownloadProgressView: View {
                                             Circle()
                                                 .stroke(Color.blue.opacity(0.2), lineWidth: 4)
                                                 .frame(width: 40, height: 40)
-                                            
+
                                             Circle()
                                                 .trim(from: 0, to: downloader.currentProgress)
                                                 .stroke(Color.blue, lineWidth: 4)
                                                 .frame(width: 40, height: 40)
                                                 .rotationEffect(.degrees(-90))
                                                 .animation(.easeInOut(duration: 0.3), value: downloader.currentProgress)
-                                            
+
                                             Text("\(downloader.completedFiles)")
                                                 .font(.caption)
                                                 .fontWeight(.medium)
                                                 .foregroundColor(.blue)
                                         }
-                                        
+
                                         HStack(spacing: 4) {
                                             Image(systemName: "doc.on.doc.fill")
                                                 .font(.caption2)
                                                 .foregroundColor(.blue)
-                                            
+
                                             Text("\(downloader.completedFiles) of \(downloader.totalFiles) files")
                                                 .font(.caption2)
                                                 .foregroundColor(.blue)
                                         }
-                                        
+
                                         // Individual file progress
                                         if downloader.isDownloadingFile && !downloader.currentFileSize.isEmpty {
                                             VStack(spacing: 4) {
@@ -218,7 +218,7 @@ struct ModelDownloadProgressView: View {
                                                     .tint(.blue)
                                                     .scaleEffect(y: 1.5)
                                                     .frame(width: 150)
-                                                
+
                                                 Text("(\(downloader.currentFileSize))")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
@@ -371,7 +371,7 @@ struct ModelDownloadProgressView: View {
                     userInfo: [NSLocalizedDescriptionKey: "Downloaded file not found at expected location"]
                 ))
             }
-            
+
             // Verifying step
             currentStep = .verifying
             try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
@@ -412,13 +412,13 @@ struct ModelDownloadProgressView: View {
                     // Since Process is not available on iOS, we'll just copy the file for now
                     // In a production app, you'd want to use a library for tar.gz extraction
                     let destinationURL = modelDirectory.appendingPathComponent(downloadInfo.name)
-                    
+
                     print("MLX Model download detected: \(url.lastPathComponent)")
                     print("Note: tar.gz extraction is not implemented on iOS. The model needs to be extracted manually.")
-                    
+
                     // Just copy the tar.gz file for now
                     try FileManager.default.copyItem(at: url, to: destinationURL)
-                    
+
                     // TODO: Implement tar.gz extraction using a third-party library
                     // For now, users will need to extract manually or use pre-extracted models
                 } else {
@@ -430,14 +430,14 @@ struct ModelDownloadProgressView: View {
                 // Use ModelFormatManager to handle the downloaded model
                 let formatManager = ModelFormatManager.shared
                 let handler = formatManager.getHandler(for: url, format: downloadInfo.format)
-                
+
                 // Process the downloaded model using the appropriate handler
                 let finalURL = try await handler.processDownloadedModel(
                     from: url,
                     to: modelDirectory,
                     modelInfo: downloadInfo
                 )
-                
+
                 print("✅ Model processed successfully at: \(finalURL.path)")
             }
 
@@ -471,10 +471,10 @@ struct ModelDownloadProgressView: View {
             // Haptic feedback
             let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
             impactFeedback.impactOccurred()
-            
+
             // Refresh model list to show downloaded status
             await ModelManager.shared.refreshModelList()
-            
+
             // Post notification for other views to update
             NotificationCenter.default.post(name: Notification.Name("ModelDownloadCompleted"), object: nil)
         } catch {

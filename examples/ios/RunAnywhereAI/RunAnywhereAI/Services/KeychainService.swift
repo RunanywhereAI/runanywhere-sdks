@@ -43,7 +43,7 @@ class KeychainService {
         }
         return nil
     }
-    
+
     func retrieve(key: String) throws -> Data? {
         read(key: key)
     }

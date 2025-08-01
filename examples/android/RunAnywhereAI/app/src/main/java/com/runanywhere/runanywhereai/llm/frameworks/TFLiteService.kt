@@ -18,7 +18,7 @@ import java.nio.FloatBuffer
 
 /**
  * TensorFlow Lite service implementation for on-device LLM inference
- * 
+ *
  * Supports various delegate options for hardware acceleration:
  * - GPU delegate for devices with compatible GPUs
  * - NNAPI delegate for devices with Neural Processing Units
@@ -28,52 +28,52 @@ class TFLiteService(private val context: Context) : LLMService {
     companion object {
         private const val TAG = "TFLiteService"
         private const val DEFAULT_NUM_THREADS = 4
-        
+
         // Common TFLite model configurations
         private const val MAX_SEQUENCE_LENGTH = 512
         private const val VOCAB_SIZE = 32000
     }
-    
+
     private var interpreter: Interpreter? = null
     private var delegate: org.tensorflow.lite.Delegate? = null
     private var modelInfo: ModelInfo? = null
-    
+
     // Model-specific parameters (to be determined from model metadata)
     private var inputShape: IntArray? = null
     private var outputShape: IntArray? = null
     private var vocabSize: Int = VOCAB_SIZE
     private var maxSeqLength: Int = MAX_SEQUENCE_LENGTH
-    
+
     override val name: String = "TensorFlow Lite"
-    
+
     override val isInitialized: Boolean
         get() = interpreter != null
-    
+
     override suspend fun initialize(modelPath: String) {
         withContext(Dispatchers.IO) {
             try {
                 release() // Clean up any existing instance
-                
+
                 val modelFile = File(modelPath)
                 if (!modelFile.exists()) {
                     throw IllegalArgumentException("Model file does not exist: $modelPath")
                 }
-                
+
                 // Create interpreter options
                 val options = Interpreter.Options().apply {
                     setNumThreads(DEFAULT_NUM_THREADS)
-                    
+
                     // Try to use hardware acceleration
                     delegate = createBestDelegate()
                     delegate?.let { addDelegate(it) }
                 }
-                
+
                 // Load the model
                 interpreter = Interpreter(modelFile, options)
-                
+
                 // Get model details
                 extractModelDetails()
-                
+
                 // Create model info
                 modelInfo = ModelInfo(
                     name = modelFile.nameWithoutExtension,
@@ -83,7 +83,7 @@ class TFLiteService(private val context: Context) : LLMService {
                     format = "TFLite",
                     framework = LLMFramework.TFLITE
                 )
-                
+
                 Log.d(TAG, "TFLite model loaded successfully with delegate: ${delegate?.javaClass?.simpleName ?: "CPU"}")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize TFLite model", e)
@@ -92,7 +92,7 @@ class TFLiteService(private val context: Context) : LLMService {
             }
         }
     }
-    
+
     override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return withContext(Dispatchers.Default) {
             val interp = interpreter ?: return@withContext GenerationResult(
@@ -101,34 +101,34 @@ class TFLiteService(private val context: Context) : LLMService {
                 timeMs = 0,
                 tokensPerSecond = 0f
             )
-            
+
             try {
                 val startTime = System.currentTimeMillis()
-                
+
                 // For demonstration, we'll implement a simplified generation
                 // In a real implementation, you'd need proper tokenization and decoding
-                
+
                 // Tokenize input (simplified - real implementation needs proper tokenizer)
                 val inputTokens = tokenizeSimple(prompt)
-                
+
                 // Prepare input tensor
                 val inputBuffer = prepareInputBuffer(inputTokens)
-                
+
                 // Prepare output buffer
                 val outputBuffer = ByteBuffer.allocateDirect(4 * vocabSize).order(ByteOrder.nativeOrder())
-                
+
                 // Run inference
                 interp.run(inputBuffer, outputBuffer)
-                
+
                 // Decode output (simplified)
                 val outputTokens = decodeOutput(outputBuffer, options)
-                
+
                 // Convert tokens to text (simplified)
                 val response = detokenizeSimple(outputTokens)
-                
+
                 val endTime = System.currentTimeMillis()
                 val tokensPerSecond = outputTokens.size.toFloat() / ((endTime - startTime) / 1000f)
-                
+
                 GenerationResult(
                     text = response,
                     tokensGenerated = outputTokens.size,
@@ -146,7 +146,7 @@ class TFLiteService(private val context: Context) : LLMService {
             }
         }
     }
-    
+
     override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationResult> = flow {
         val interp = interpreter ?: run {
             emit(GenerationResult(
@@ -157,37 +157,37 @@ class TFLiteService(private val context: Context) : LLMService {
             ))
             return@flow
         }
-        
+
         try {
             val startTime = System.currentTimeMillis()
             var tokenCount = 0
-            
+
             // For streaming, we would generate token by token
             // This is a simplified implementation
             val fullResponse = generate(prompt, options)
-            
+
             // If generation failed, emit the error result
             if (fullResponse.text.isEmpty()) {
                 emit(fullResponse)
                 return@flow
             }
-            
+
             // Emit the response in chunks to simulate streaming
             val words = fullResponse.text.split(" ")
             words.forEach { word ->
                 val chunk = "$word "
                 tokenCount++
-                
+
                 val currentTime = System.currentTimeMillis()
                 val tokensPerSecond = tokenCount.toFloat() / ((currentTime - startTime) / 1000f)
-                
+
                 emit(GenerationResult(
                     text = chunk,
                     tokensGenerated = tokenCount,
                     timeMs = currentTime - startTime,
                     tokensPerSecond = tokensPerSecond
                 ))
-                
+
                 kotlinx.coroutines.delay(50) // Simulate generation delay
             }
         } catch (e: Exception) {
@@ -200,9 +200,9 @@ class TFLiteService(private val context: Context) : LLMService {
             ))
         }
     }
-    
+
     override fun getModelInfo(): ModelInfo? = modelInfo
-    
+
     override suspend fun release() {
         withContext(Dispatchers.IO) {
             interpreter?.close()
@@ -213,7 +213,7 @@ class TFLiteService(private val context: Context) : LLMService {
             Log.d(TAG, "TFLite resources released")
         }
     }
-    
+
     /**
      * Create the best available delegate for hardware acceleration
      */
@@ -233,7 +233,7 @@ class TFLiteService(private val context: Context) : LLMService {
             null
         }
     }
-    
+
     /**
      * Create NNAPI delegate if available
      */
@@ -251,7 +251,7 @@ class TFLiteService(private val context: Context) : LLMService {
             null
         }
     }
-    
+
     /**
      * Extract model details from the interpreter
      */
@@ -260,28 +260,28 @@ class TFLiteService(private val context: Context) : LLMService {
             // Get input tensor details
             val inputTensor = interp.getInputTensor(0)
             inputShape = inputTensor.shape()
-            
+
             // Get output tensor details
             val outputTensor = interp.getOutputTensor(0)
             outputShape = outputTensor.shape()
-            
+
             // Update parameters based on actual model
             if (outputShape != null && outputShape!!.isNotEmpty()) {
                 vocabSize = outputShape!![outputShape!!.size - 1]
             }
-            
+
             Log.d(TAG, "Model input shape: ${inputShape?.contentToString()}")
             Log.d(TAG, "Model output shape: ${outputShape?.contentToString()}")
         }
     }
-    
+
     /**
      * Estimate parameter count based on model size and quantization
      */
     private fun estimateParameterCount(): Long {
         val modelSize = modelInfo?.sizeBytes ?: 0L
         val quantization = detectQuantization()
-        
+
         // Rough estimation based on quantization
         return when (quantization) {
             "INT8" -> modelSize * 1 // 1 byte per parameter
@@ -290,7 +290,7 @@ class TFLiteService(private val context: Context) : LLMService {
             else -> modelSize / 2 // Default assumption
         }
     }
-    
+
     /**
      * Detect quantization type (simplified)
      */
@@ -304,7 +304,7 @@ class TFLiteService(private val context: Context) : LLMService {
             }
         } ?: "UNKNOWN"
     }
-    
+
     /**
      * Simple tokenization (replace with proper tokenizer)
      */
@@ -312,7 +312,7 @@ class TFLiteService(private val context: Context) : LLMService {
         // This is a placeholder - real implementation needs proper tokenizer
         return text.split(" ").map { it.hashCode() % vocabSize }
     }
-    
+
     /**
      * Prepare input buffer for the model
      */
@@ -320,22 +320,22 @@ class TFLiteService(private val context: Context) : LLMService {
         val bufferSize = 4 * maxSeqLength // Assuming FLOAT32 input
         val buffer = ByteBuffer.allocateDirect(bufferSize).order(ByteOrder.nativeOrder())
         val floatBuffer = buffer.asFloatBuffer()
-        
+
         // Pad or truncate to max sequence length
         val paddedTokens = tokens.take(maxSeqLength).toMutableList()
         while (paddedTokens.size < maxSeqLength) {
             paddedTokens.add(0) // Padding token
         }
-        
+
         // Convert to float and put in buffer
         paddedTokens.forEach { token ->
             floatBuffer.put(token.toFloat())
         }
-        
+
         buffer.rewind()
         return buffer
     }
-    
+
     /**
      * Decode output from the model
      */
@@ -344,37 +344,37 @@ class TFLiteService(private val context: Context) : LLMService {
         val floatBuffer = outputBuffer.asFloatBuffer()
         val logits = FloatArray(vocabSize)
         floatBuffer.get(logits)
-        
+
         // Apply temperature and sampling
         val tokens = mutableListOf<Int>()
         repeat(options.maxTokens) {
             val sampledToken = sampleFromLogits(logits, options.temperature, options.topK)
             tokens.add(sampledToken)
-            
+
             // Stop if we hit a stop token (simplified)
             if (sampledToken == 0) return@repeat
         }
-        
+
         return tokens
     }
-    
+
     /**
      * Sample from logits with temperature and top-k
      */
     private fun sampleFromLogits(logits: FloatArray, temperature: Float, topK: Int): Int {
         // Apply temperature
         val scaledLogits = logits.map { it / temperature }.toFloatArray()
-        
+
         // Get top-k indices
         val topIndices = scaledLogits.indices
             .sortedByDescending { scaledLogits[it] }
             .take(topK)
-        
+
         // Simple sampling - just take the highest probability
         // Real implementation would use proper sampling
         return topIndices.first()
     }
-    
+
     /**
      * Simple detokenization (replace with proper tokenizer)
      */

@@ -83,13 +83,13 @@ format_bytes() {
 get_file_size() {
     local url="$1"
     local is_directory="$2"
-    
+
     # Skip if no URL provided
     if [ -z "$url" ] || [ "$url" == "nil" ]; then
         echo "0"
         return
     fi
-    
+
     # For .mlpackage directories on HuggingFace, we need special handling
     if [ "$is_directory" == "true" ] && [[ "$url" =~ huggingface\.co.*\.mlpackage$ ]]; then
         # Extract repo and path from URL
@@ -99,41 +99,41 @@ get_file_size() {
             local repo="${BASH_REMATCH[2]}"
             local branch="${BASH_REMATCH[3]}"
             local path="${BASH_REMATCH[4]}"
-            
+
             # Use HuggingFace API to get directory contents
             local api_url="https://huggingface.co/api/models/${owner}/${repo}/tree/${branch}/${path}"
-            
+
             # Build curl command with optional auth
             local curl_cmd="curl -sL --max-time 20"
             if [ -n "$HF_TOKEN" ]; then
                 curl_cmd="$curl_cmd --header \"Authorization: Bearer $HF_TOKEN\""
             fi
-            
+
             # Get directory listing and sum file sizes
             local total_size=$(eval "$curl_cmd \"$api_url\"" 2>/dev/null | \
                 grep -o '"size":[0-9]*' | \
                 sed 's/"size"://' | \
                 awk '{sum += $1} END {print sum}')
-            
+
             if [ -n "$total_size" ] && [ "$total_size" -gt 0 ]; then
                 echo "$total_size"
                 return
             fi
         fi
     fi
-    
+
     # For regular files, use HEAD request
     local curl_cmd="curl -sI -L --max-time 20"
     if [[ $url == *"huggingface.co"* ]] && [ -n "$HF_TOKEN" ]; then
         curl_cmd="$curl_cmd --header \"Authorization: Bearer $HF_TOKEN\""
     fi
-    
+
     local size=$(eval "$curl_cmd \"$url\"" 2>/dev/null | \
         grep -i "content-length" | \
         tail -1 | \
         awk '{print $2}' | \
         tr -d '\r\n')
-    
+
     if [ -n "$size" ] && [ "$size" -gt 0 ]; then
         echo "$size"
     else
@@ -149,50 +149,50 @@ check_url() {
     local expected_size="$4"
     local model_id="$5"
     local format="$6"
-    
+
     # Skip built-in URLs
     if [[ $url == "builtin://"* ]]; then
         echo -e "${BLUE}🏗️  $framework - $name (Built-in model)${NC}"
         return 0
     fi
-    
+
     # Build curl command with optional HuggingFace auth
     local curl_cmd="curl --head --silent --location --max-time 20 --retry 2 --user-agent \"RunAnywhereAI-URLVerifier/1.0\""
-    
+
     # Add HuggingFace auth if token is provided and URL is from HuggingFace
     if [[ $url == *"huggingface.co"* ]] && [ -n "$HF_TOKEN" ]; then
         curl_cmd="$curl_cmd --header \"Authorization: Bearer $HF_TOKEN\""
     fi
-    
+
     # Get headers including content-length
     local headers=$(eval "$curl_cmd \"$url\"" 2>&1)
     local curl_exit_code=$?
-    
+
     if [ $curl_exit_code -eq 0 ]; then
         # Extract content-length
         local content_length=$(echo "$headers" | grep -i "content-length" | tail -1 | awk '{print $2}' | tr -d '\r')
         local http_status=$(echo "$headers" | head -n 1 | awk '{print $2}')
-        
+
         # Check if it's a directory format
         local is_dir="false"
         if [ "$format" == "mlPackage" ] || [[ "$url" =~ \.mlpackage$ ]]; then
             is_dir="true"
         fi
-        
+
         # Get actual file size
         local actual_size_bytes=$(get_file_size "$url" "$is_dir")
-        
+
         # Format size for display
         local size_display="Unknown"
         if [ -n "$actual_size_bytes" ] && [ "$actual_size_bytes" -gt 0 ]; then
             size_display=$(format_bytes $actual_size_bytes)
         fi
-        
+
         # Update size if requested
         if [ "$UPDATE_SIZES" = true ] && [ "$actual_size_bytes" -gt 0 ] && [ -n "$model_id" ]; then
             update_model_size "$model_id" "$size_display"
         fi
-        
+
         # Check if size is suspiciously small (less than 1KB) - except for .mlpackage
         if [ -n "$actual_size_bytes" ] && [ "$actual_size_bytes" -lt 1024 ] && [ "$actual_size_bytes" -gt 0 ]; then
             if [[ $url == *".mlpackage"* ]] && [[ $url == *"huggingface.co"* ]]; then
@@ -200,12 +200,12 @@ check_url() {
                 local repo=$(echo "$url" | sed 's|https://huggingface.co/||' | cut -d'/' -f1-2)
                 local path=$(echo "$url" | sed 's|.*/resolve/main/||')
                 local api_url="https://huggingface.co/api/models/$repo/tree/main"
-                
+
                 local api_cmd="curl --silent --location --max-time 20"
                 if [ -n "$HF_TOKEN" ]; then
                     api_cmd="$api_cmd --header \"Authorization: Bearer $HF_TOKEN\""
                 fi
-                
+
                 if eval "$api_cmd \"$api_url\"" 2>&1 | grep -q "\"$path\""; then
                     echo -e "${GREEN}✅ $framework - $name (HF Directory verified)${NC}"
                     echo -e "${GREEN}   Note: .mlpackage is a directory structure on HuggingFace${NC}"
@@ -263,14 +263,14 @@ check_url() {
 update_model_size() {
     local model_id="$1"
     local new_size="$2"
-    
+
     # Create a temporary file for the update
     local temp_file="${REGISTRY_FILE}.tmp"
-    
+
     # Use sed to update the size for this specific model
     local in_model=false
     local updated=false
-    
+
     while IFS= read -r line; do
         # Check if we found the model ID
         if [[ "$line" =~ id:\ *\"$model_id\" ]]; then
@@ -293,7 +293,7 @@ update_model_size() {
             echo "$line"
         fi
     done < "$REGISTRY_FILE" > "$temp_file"
-    
+
     # Check if update was successful
     if [ -s "$temp_file" ]; then
         mv "$temp_file" "$REGISTRY_FILE"
@@ -311,7 +311,7 @@ extract_models() {
     local in_model=false
     local model_block=""
     local brace_count=0
-    
+
     while IFS= read -r line; do
         # Check if we're starting a ModelInfo block
         if [[ "$line" =~ ModelInfo\( ]]; then
@@ -320,16 +320,16 @@ extract_models() {
             brace_count=1
             continue
         fi
-        
+
         # If we're in a model, accumulate lines
         if [ "$in_model" = true ]; then
             model_block+=$'\n'"$line"
-            
+
             # Count braces to find the end
             local open_braces=$(echo "$line" | grep -o "(" | wc -l)
             local close_braces=$(echo "$line" | grep -o ")" | wc -l)
             brace_count=$((brace_count + open_braces - close_braces))
-            
+
             # When we've closed all braces, we have a complete model
             if [ $brace_count -eq 0 ]; then
                 # Extract model info from the block
@@ -339,11 +339,11 @@ extract_models() {
                 local size=$(echo "$model_block" | grep -o 'size: "[^"]*"' | head -1 | sed 's/size: "\([^"]*\)"/\1/')
                 local format=$(echo "$model_block" | grep -o 'format: \.[a-zA-Z]*' | head -1 | sed 's/format: \.//')
                 local framework=$(echo "$model_block" | grep -o 'framework: \.[a-zA-Z]*' | head -1 | sed 's/framework: \.//')
-                
+
                 if [ -n "$id" ] && [ -n "$url" ] && [ "$url" != "nil" ]; then
                     echo "$id|$name|$url|$size|$format|$framework"
                 fi
-                
+
                 in_model=false
                 model_block=""
                 brace_count=0
@@ -369,7 +369,7 @@ extract_models | sort -t'|' -k6,6 | while IFS='|' read -r model_id name url size
     if [ -z "$model_id" ] || [ -z "$url" ]; then
         continue
     fi
-    
+
     # Convert framework name for display
     case $framework in
         foundationModels) display_fw="Foundation Models" ;;
@@ -381,7 +381,7 @@ extract_models | sort -t'|' -k6,6 | while IFS='|' read -r model_id name url size
         swiftTransformers) display_fw="Swift Transformers" ;;
         *) display_fw="$framework" ;;
     esac
-    
+
     # Print framework header when it changes
     if [ "$framework" != "$last_framework" ]; then
         if [ -n "$last_framework" ]; then
@@ -390,9 +390,9 @@ extract_models | sort -t'|' -k6,6 | while IFS='|' read -r model_id name url size
         echo -e "${BLUE}=== $display_fw ===${NC}"
         last_framework="$framework"
     fi
-    
+
     ((total_urls++))
-    
+
     # Special handling for Kaggle URLs
     if [[ $url == *"kaggle.com"* ]]; then
         echo -e "${YELLOW}⚠️  $display_fw - $name (Requires Kaggle authentication)${NC}"

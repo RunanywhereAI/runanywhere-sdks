@@ -9,7 +9,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ClearAll
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Hardware
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,7 +58,7 @@ fun ModelComparisonView(
                 onClearAll = onClearAll,
                 onClose = onClose
             )
-            
+
             if (comparedModels.isEmpty()) {
                 // Empty state
                 Box(
@@ -61,7 +70,7 @@ fun ModelComparisonView(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Compare,
+                            imageVector = Icons.Filled.Compare,
                             contentDescription = null,
                             modifier = Modifier.size(64.dp),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
@@ -127,7 +136,7 @@ private fun ComparisonHeader(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
@@ -139,7 +148,7 @@ private fun ComparisonHeader(
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.ClearAll,
+                            imageVector = Icons.Filled.ClearAll,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp)
                         )
@@ -147,10 +156,10 @@ private fun ComparisonHeader(
                         Text("Clear All")
                     }
                 }
-                
+
                 IconButton(onClick = onClose) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Filled.Close,
                         contentDescription = "Close comparison"
                     )
                 }
@@ -172,7 +181,7 @@ private fun ComparisonTable(
 ) {
     val horizontalScrollState = rememberScrollState()
     val verticalScrollState = rememberScrollState()
-    
+
     Box(modifier = modifier) {
         Column(
             modifier = Modifier
@@ -185,46 +194,46 @@ private fun ComparisonTable(
                 models = models,
                 onRemoveModel = onRemoveModel
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             // Comparison categories
             ComparisonCategory(
                 title = "Basic Information",
-                icon = Icons.Default.Info
+                icon = Icons.Filled.Info
             ) {
                 BasicInfoRows(models = models)
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             ComparisonCategory(
                 title = "Performance Metrics",
-                icon = Icons.Default.Speed
+                icon = Icons.Filled.Speed
             ) {
                 PerformanceRows(
                     models = models,
                     performanceMetrics = performanceMetrics
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             ComparisonCategory(
                 title = "Hardware Requirements",
-                icon = Icons.Default.Hardware
+                icon = Icons.Filled.Hardware
             ) {
                 HardwareRows(
                     models = models,
                     hardwareRequirements = hardwareRequirements
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             ComparisonCategory(
                 title = "Framework Support",
-                icon = Icons.Default.Code
+                icon = Icons.Filled.Code
             ) {
                 FrameworkRows(models = models)
             }
@@ -256,7 +265,7 @@ private fun ModelHeaderRow(
                 fontWeight = FontWeight.Bold
             )
         }
-        
+
         // Model cards
         models.forEach { model ->
             ModelComparisonCard(
@@ -296,29 +305,29 @@ private fun ModelComparisonCard(
                         fontWeight = FontWeight.Bold,
                         maxLines = 2
                     )
-                    
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    
+
                     FrameworkBadge(
                         framework = model.framework,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                
+
                 IconButton(
                     onClick = onRemove,
                     modifier = Modifier.size(24.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Close,
+                        imageVector = Icons.Filled.Close,
                         contentDescription = "Remove from comparison",
                         modifier = Modifier.size(16.dp)
                     )
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
-            
+
             Text(
                 text = formatBytes(model.sizeBytes),
                 style = MaterialTheme.typography.bodyMedium,
@@ -358,7 +367,7 @@ private fun ComparisonCategory(
                 color = MaterialTheme.colorScheme.primary
             )
         }
-        
+
         content()
     }
 }
@@ -382,7 +391,7 @@ private fun BasicInfoRows(
                 fontWeight = FontWeight.Medium
             )
         }
-        
+
         ComparisonRow("Description") { model ->
             Text(
                 text = model.description,
@@ -390,7 +399,7 @@ private fun BasicInfoRows(
                 maxLines = 3
             )
         }
-        
+
         ComparisonRow("File Size") { model ->
             Text(
                 text = formatBytes(model.sizeBytes),
@@ -403,7 +412,7 @@ private fun BasicInfoRows(
                 )
             )
         }
-        
+
         ComparisonRow("Parameters") { model ->
             Text(
                 text = model.parameters?.let { formatParameters(it) } ?: "Unknown",
@@ -411,14 +420,14 @@ private fun BasicInfoRows(
                 fontWeight = FontWeight.Medium
             )
         }
-        
+
         ComparisonRow("Quantization") { model ->
             Text(
                 text = model.quantization ?: "None",
                 style = MaterialTheme.typography.bodyMedium
             )
         }
-        
+
         ComparisonRow("Downloaded") { model ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -426,9 +435,9 @@ private fun BasicInfoRows(
             ) {
                 Icon(
                     imageVector = if (model.isDownloaded) {
-                        Icons.Default.CheckCircle
+                        Icons.Filled.CheckCircle
                     } else {
-                        Icons.Default.Cancel
+                        Icons.Filled.Cancel
                     },
                     contentDescription = null,
                     tint = if (model.isDownloaded) {
@@ -486,7 +495,7 @@ private fun PerformanceRows(
                 )
             }
         }
-        
+
         ComparisonRow("Latency") { model ->
             val metrics = performanceMetrics[model.id]
             if (metrics != null) {
@@ -508,7 +517,7 @@ private fun PerformanceRows(
                 )
             }
         }
-        
+
         ComparisonRow("Memory Usage") { model ->
             val metrics = performanceMetrics[model.id]
             if (metrics != null) {
@@ -530,7 +539,7 @@ private fun PerformanceRows(
                 )
             }
         }
-        
+
         ComparisonRow("Power Consumption") { model ->
             val metrics = performanceMetrics[model.id]
             val power = metrics?.powerConsumptionMw
@@ -553,7 +562,7 @@ private fun PerformanceRows(
                 )
             }
         }
-        
+
         ComparisonRow("Benchmark Score") { model ->
             val metrics = performanceMetrics[model.id]
             val score = metrics?.benchmarkScore
@@ -613,7 +622,7 @@ private fun HardwareRows(
                 )
             }
         }
-        
+
         ComparisonRow("CPU Support") { model ->
             val requirements = hardwareRequirements[model.id]
             SupportIndicator(
@@ -621,7 +630,7 @@ private fun HardwareRows(
                 details = requirements?.cpuDetails ?: "Unknown"
             )
         }
-        
+
         ComparisonRow("GPU Support") { model ->
             val requirements = hardwareRequirements[model.id]
             SupportIndicator(
@@ -629,7 +638,7 @@ private fun HardwareRows(
                 details = requirements?.gpuDetails ?: "Unknown"
             )
         }
-        
+
         ComparisonRow("NPU Support") { model ->
             val requirements = hardwareRequirements[model.id]
             SupportIndicator(
@@ -637,7 +646,7 @@ private fun HardwareRows(
                 details = requirements?.npuDetails ?: "Unknown"
             )
         }
-        
+
         ComparisonRow("Thermal Optimized") { model ->
             val requirements = hardwareRequirements[model.id]
             SupportIndicator(
@@ -697,7 +706,7 @@ private fun SupportIndicator(
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
-            imageVector = if (isSupported) Icons.Default.CheckCircle else Icons.Default.Cancel,
+            imageVector = if (isSupported) Icons.Filled.CheckCircle else Icons.Filled.Cancel,
             contentDescription = null,
             tint = if (isSupported) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
             modifier = Modifier.size(16.dp)
@@ -726,24 +735,24 @@ private fun getComparisonColor(
     lowerIsBetter: Boolean
 ): Color {
     if (allValues.size <= 1) return Color.Unspecified
-    
+
     val min = allValues.minOrNull() ?: return Color.Unspecified
     val max = allValues.maxOrNull() ?: return Color.Unspecified
-    
+
     if (min == max) return Color.Unspecified
-    
+
     val isBest = if (lowerIsBetter) {
         currentValue == min
     } else {
         currentValue == max
     }
-    
+
     val isWorst = if (lowerIsBetter) {
         currentValue == max
     } else {
         currentValue == min
     }
-    
+
     return when {
         isBest -> Color(0xFF4CAF50) // Green for best
         isWorst -> Color(0xFFF44336) // Red for worst

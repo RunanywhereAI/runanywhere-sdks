@@ -22,13 +22,13 @@ import com.runanywhere.sdk.RunAnywhereSDK
 
 class MainActivity : ComponentActivity() {
     private val runAnywhereSDK = RunAnywhereSDK()
-    
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Initialize the SDK
         runAnywhereSDK.initialize("demo-api-key")
-        
+
         enableEdgeToEdge()
         setContent {
             RunAnywhereAITheme {
@@ -44,7 +44,7 @@ fun RunAnywhereApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -149,7 +149,7 @@ fun AboutScreen() {
                     )
                 }
             }
-            
+
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -168,7 +168,7 @@ fun AboutScreen() {
                     Text("• Privacy-focused - no data leaves device")
                 }
             }
-            
+
             Card(
                 modifier = Modifier.fillMaxWidth()
             ) {

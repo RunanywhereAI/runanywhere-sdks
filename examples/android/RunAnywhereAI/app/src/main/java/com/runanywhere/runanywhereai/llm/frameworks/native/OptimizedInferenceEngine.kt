@@ -8,7 +8,7 @@ import java.nio.ByteBuffer
 
 /**
  * Interface for optimized inference engines
- * 
+ *
  * This interface defines the contract for high-performance inference engines
  * that can be implemented using different optimization techniques like
  * quantization, pruning, tensor fusion, and hardware acceleration.
@@ -18,17 +18,17 @@ interface OptimizedInferenceEngine {
     val version: String
     val supportedDataTypes: List<TensorDataType>
     val supportedLayouts: List<TensorLayout>
-    
+
     /**
      * Initialize the inference engine with configuration
      */
     suspend fun initialize(config: InferenceConfig): Boolean
-    
+
     /**
      * Load and optimize a model for inference
      */
     suspend fun loadModel(modelData: ByteBuffer, optimizations: OptimizationConfig): Long
-    
+
     /**
      * Run inference on input data
      */
@@ -37,7 +37,7 @@ interface OptimizedInferenceEngine {
         inputTensors: List<Tensor>,
         outputSpec: List<TensorSpec>
     ): List<Tensor>
-    
+
     /**
      * Run streaming inference
      */
@@ -46,12 +46,12 @@ interface OptimizedInferenceEngine {
         inputTensors: List<Tensor>,
         outputSpec: List<TensorSpec>
     ): Flow<InferenceResult>
-    
+
     /**
      * Get model information and statistics
      */
     suspend fun getModelInfo(modelHandle: Long): ModelStatistics?
-    
+
     /**
      * Optimize model for specific hardware
      */
@@ -59,12 +59,12 @@ interface OptimizedInferenceEngine {
         modelHandle: Long,
         hardwareInfo: HardwareInfo
     ): OptimizationResult
-    
+
     /**
      * Release model resources
      */
     suspend fun releaseModel(modelHandle: Long)
-    
+
     /**
      * Clean up engine resources
      */
@@ -77,15 +77,15 @@ interface OptimizedInferenceEngine {
 class NativeOptimizedInferenceEngine(
     private val context: Context
 ) : OptimizedInferenceEngine {
-    
+
     companion object {
         private const val TAG = "OptimizedInferenceEngine"
         private var isNativeLibraryLoaded = false
-        
+
         // Native method declarations
         @JvmStatic
         external fun nativeInitializeEngine(configJson: String): Boolean
-        
+
         @JvmStatic
         external fun nativeLoadModel(
             modelData: ByteBuffer,
@@ -94,7 +94,7 @@ class NativeOptimizedInferenceEngine(
             useDSP: Boolean,
             quantization: Int
         ): Long
-        
+
         @JvmStatic
         external fun nativeRunInference(
             modelHandle: Long,
@@ -103,10 +103,10 @@ class NativeOptimizedInferenceEngine(
             outputBuffers: Array<ByteBuffer>,
             outputShapes: Array<IntArray>
         ): Boolean
-        
+
         @JvmStatic
         external fun nativeGetModelStats(modelHandle: Long): String? // JSON string
-        
+
         @JvmStatic
         external fun nativeOptimizeModel(
             modelHandle: Long,
@@ -114,13 +114,13 @@ class NativeOptimizedInferenceEngine(
             gpuInfo: String,
             availableMemory: Long
         ): String? // JSON result
-        
+
         @JvmStatic
         external fun nativeReleaseModel(modelHandle: Long)
-        
+
         @JvmStatic
         external fun nativeShutdownEngine()
-        
+
         init {
             try {
                 System.loadLibrary("optimized-inference")
@@ -132,7 +132,7 @@ class NativeOptimizedInferenceEngine(
             }
         }
     }
-    
+
     override val engineName: String = "Native Optimized Inference Engine"
     override val version: String = "1.0.0"
     override val supportedDataTypes = listOf(
@@ -146,28 +146,28 @@ class NativeOptimizedInferenceEngine(
         TensorLayout.NHWC,
         TensorLayout.NC
     )
-    
+
     private var isInitialized = false
     private val memoryPool = NativeMemoryPool()
-    
+
     override suspend fun initialize(config: InferenceConfig): Boolean {
         if (!isNativeLibraryLoaded) {
             Log.w(TAG, "Native library not loaded, using fallback implementation")
             return false
         }
-        
+
         val configJson = config.toJson()
         isInitialized = nativeInitializeEngine(configJson)
-        
+
         if (isInitialized) {
             Log.d(TAG, "Inference engine initialized successfully")
         } else {
             Log.e(TAG, "Failed to initialize inference engine")
         }
-        
+
         return isInitialized
     }
-    
+
     override suspend fun loadModel(
         modelData: ByteBuffer,
         optimizations: OptimizationConfig
@@ -175,7 +175,7 @@ class NativeOptimizedInferenceEngine(
         if (!isInitialized) {
             throw IllegalStateException("Engine not initialized")
         }
-        
+
         return nativeLoadModel(
             modelData = modelData,
             optimizationLevel = optimizations.level,
@@ -184,7 +184,7 @@ class NativeOptimizedInferenceEngine(
             quantization = optimizations.quantization.ordinal
         )
     }
-    
+
     override suspend fun runInference(
         modelHandle: Long,
         inputTensors: List<Tensor>,
@@ -193,11 +193,11 @@ class NativeOptimizedInferenceEngine(
         if (!isInitialized) {
             throw IllegalStateException("Engine not initialized")
         }
-        
+
         // Prepare input buffers
         val inputBuffers = inputTensors.map { it.data }.toTypedArray()
         val inputShapes = inputTensors.map { it.shape }.toTypedArray()
-        
+
         // Prepare output buffers
         val outputBuffers = outputSpec.map { spec ->
             val metadata = NativeTensorUtils.createTensorMetadata(
@@ -208,7 +208,7 @@ class NativeOptimizedInferenceEngine(
             NativeTensorUtils.allocateTensorBuffer(metadata)
         }.toTypedArray()
         val outputShapes = outputSpec.map { it.shape }.toTypedArray()
-        
+
         // Run inference
         val success = nativeRunInference(
             modelHandle,
@@ -217,11 +217,11 @@ class NativeOptimizedInferenceEngine(
             outputBuffers,
             outputShapes
         )
-        
+
         if (!success) {
             throw RuntimeException("Inference failed")
         }
-        
+
         // Create output tensors
         return outputSpec.mapIndexed { index, spec ->
             Tensor(
@@ -232,7 +232,7 @@ class NativeOptimizedInferenceEngine(
             )
         }
     }
-    
+
     override fun runStreamingInference(
         modelHandle: Long,
         inputTensors: List<Tensor>,
@@ -243,7 +243,7 @@ class NativeOptimizedInferenceEngine(
             val startTime = System.currentTimeMillis()
             val outputTensors = runInference(modelHandle, inputTensors, outputSpec)
             val endTime = System.currentTimeMillis()
-            
+
             emit(InferenceResult(
                 outputs = outputTensors,
                 inferenceTime = endTime - startTime,
@@ -251,16 +251,16 @@ class NativeOptimizedInferenceEngine(
             ))
         }
     }
-    
+
     override suspend fun getModelInfo(modelHandle: Long): ModelStatistics? {
         if (!isInitialized) return null
-        
+
         val statsJson = nativeGetModelStats(modelHandle)
         return statsJson?.let { json ->
             parseModelStatistics(json)
         }
     }
-    
+
     override suspend fun optimizeForHardware(
         modelHandle: Long,
         hardwareInfo: HardwareInfo
@@ -272,14 +272,14 @@ class NativeOptimizedInferenceEngine(
                 optimizations = emptyList()
             )
         }
-        
+
         val resultJson = nativeOptimizeModel(
             modelHandle,
             hardwareInfo.cpuInfo,
             hardwareInfo.gpuInfo,
             hardwareInfo.availableMemory
         )
-        
+
         return resultJson?.let { json ->
             parseOptimizationResult(json)
         } ?: OptimizationResult(
@@ -288,13 +288,13 @@ class NativeOptimizedInferenceEngine(
             optimizations = emptyList()
         )
     }
-    
+
     override suspend fun releaseModel(modelHandle: Long) {
         if (isInitialized) {
             nativeReleaseModel(modelHandle)
         }
     }
-    
+
     override suspend fun shutdown() {
         if (isInitialized) {
             nativeShutdownEngine()
@@ -302,7 +302,7 @@ class NativeOptimizedInferenceEngine(
             isInitialized = false
         }
     }
-    
+
     private fun parseModelStatistics(json: String): ModelStatistics {
         // In a real implementation, use a JSON parser like Gson or Moshi
         // For now, return dummy data
@@ -315,7 +315,7 @@ class NativeOptimizedInferenceEngine(
             averageInferenceTime = 100L
         )
     }
-    
+
     private fun parseOptimizationResult(json: String): OptimizationResult {
         // In a real implementation, parse JSON properly
         return OptimizationResult(
@@ -389,16 +389,16 @@ data class TensorSpec(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
-        
+
         other as TensorSpec
-        
+
         if (!shape.contentEquals(other.shape)) return false
         if (dataType != other.dataType) return false
         if (layout != other.layout) return false
-        
+
         return true
     }
-    
+
     override fun hashCode(): Int {
         var result = shape.contentHashCode()
         result = 31 * result + dataType.hashCode()
@@ -419,17 +419,17 @@ data class Tensor(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
-        
+
         other as Tensor
-        
+
         if (data != other.data) return false
         if (!shape.contentEquals(other.shape)) return false
         if (dataType != other.dataType) return false
         if (layout != other.layout) return false
-        
+
         return true
     }
-    
+
     override fun hashCode(): Int {
         var result = data.hashCode()
         result = 31 * result + shape.contentHashCode()

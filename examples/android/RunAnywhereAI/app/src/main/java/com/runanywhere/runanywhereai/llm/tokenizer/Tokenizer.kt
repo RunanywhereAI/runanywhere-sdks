@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.llm.tokenizer
 
 /**
  * Base interface for all tokenizer implementations
- * 
+ *
  * Tokenizers are responsible for converting text to tokens and vice versa.
  * Different models use different tokenization strategies (BPE, WordPiece, SentencePiece, etc.)
  */
@@ -11,42 +11,42 @@ interface Tokenizer {
      * Encode text into a list of token IDs
      */
     fun encode(text: String): List<Int>
-    
+
     /**
      * Decode a list of token IDs back into text
      */
     fun decode(tokens: List<Int>): String
-    
+
     /**
      * Get the vocabulary size
      */
     fun vocabSize(): Int
-    
+
     /**
      * Get special tokens used by this tokenizer
      */
     fun getSpecialTokens(): Map<String, Int>
-    
+
     /**
      * Get the padding token ID
      */
     fun getPadToken(): Int = getSpecialTokens()["<pad>"] ?: 0
-    
+
     /**
      * Get the unknown token ID
      */
     fun getUnkToken(): Int = getSpecialTokens()["<unk>"] ?: 0
-    
+
     /**
      * Get the beginning of sentence token ID
      */
     fun getBosToken(): Int? = getSpecialTokens()["<s>"]
-    
+
     /**
      * Get the end of sentence token ID
      */
     fun getEosToken(): Int? = getSpecialTokens()["</s>"]
-    
+
     /**
      * Encode text with special tokens (BOS/EOS)
      */
@@ -57,14 +57,14 @@ interface Tokenizer {
         getEosToken()?.let { tokens.add(it) }
         return tokens
     }
-    
+
     /**
      * Batch encode multiple texts
      */
     fun encodeBatch(texts: List<String>): List<List<Int>> {
         return texts.map { encode(it) }
     }
-    
+
     /**
      * Batch decode multiple token sequences
      */

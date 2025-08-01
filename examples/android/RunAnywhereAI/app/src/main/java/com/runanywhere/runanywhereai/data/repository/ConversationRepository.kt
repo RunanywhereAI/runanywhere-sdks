@@ -19,7 +19,7 @@ class ConversationRepository @Inject constructor(
             entities.map { it.toConversation() }
         }
     }
-    
+
     suspend fun createConversation(
         title: String,
         framework: String,
@@ -36,7 +36,7 @@ class ConversationRepository @Inject constructor(
         conversationDao.insertConversation(conversation)
         return conversation.toConversation()
     }
-    
+
     suspend fun addMessage(
         conversationId: String,
         role: String,
@@ -54,7 +54,7 @@ class ConversationRepository @Inject constructor(
             generationTimeMs = generationTimeMs
         )
         messageDao.insertMessage(message)
-        
+
         // Update conversation
         val conversation = conversationDao.getConversation(conversationId)
         conversation?.let {
@@ -66,34 +66,34 @@ class ConversationRepository @Inject constructor(
                 )
             )
         }
-        
+
         return message.toMessage()
     }
-    
+
     fun getConversationMessages(conversationId: String): Flow<List<Message>> {
         return messageDao.getMessagesForConversation(conversationId).map { entities ->
             entities.map { it.toMessage() }
         }
     }
-    
+
     suspend fun deleteConversation(conversationId: String) {
         conversationDao.getConversation(conversationId)?.let {
             conversationDao.deleteConversation(it)
         }
     }
-    
+
     suspend fun exportConversation(conversationId: String): String {
         // TODO: Implement export logic (JSON, TXT, etc.)
         return ""
     }
-    
+
     suspend fun manageContextWindow(
         conversationId: String,
         maxTokens: Int,
         strategy: ContextWindowStrategy = ContextWindowStrategy.SLIDING
     ) {
         val totalTokens = messageDao.getTotalTokensForConversation(conversationId)
-        
+
         if (totalTokens > maxTokens) {
             when (strategy) {
                 ContextWindowStrategy.SLIDING -> {

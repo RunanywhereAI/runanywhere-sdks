@@ -71,7 +71,7 @@ import FoundationModels
 - **Model Size**: ~3B parameters, enhanced 2-bit quantization with improved quality
 - **Performance**: 40-70 tokens/second (improved with iOS 18.5+ optimizations)
 - **Memory Usage**: ~1.8GB (optimized memory management)
-- **New Features in 2025**: 
+- **New Features in 2025**:
   - Enhanced text generation with better reasoning capabilities
   - Improved structured output with @Generable macro v2.0
   - Advanced tool calling with parallel execution support
@@ -87,29 +87,29 @@ import FoundationModels
 
 class FoundationModelsService: LLMProtocol {
     private var session: LanguageModelSession?
-    
+
     var name: String { "Apple Foundation Models" }
-    
+
     func initialize() async throws {
         // Check availability (beta API)
         let systemModel = SystemLanguageModel.default
-        
+
         // Create session
         session = LanguageModelSession()
     }
-    
+
     func generate(prompt: String) async throws -> String {
         guard let session = session else {
             throw LLMError.notInitialized
         }
-        
+
         // Simple API (as per WWDC 2025)
         let prompt = Prompt(prompt)
         let response = try await session.respond(to: prompt)
         return response.text
         return response
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -120,7 +120,7 @@ class FoundationModelsService: LLMProtocol {
             onToken(partialText)
         }
     }
-    
+
     // Structured output example
     @Generable
     struct CodeOutput {
@@ -128,7 +128,7 @@ class FoundationModelsService: LLMProtocol {
         let code: String
         let explanation: String
     }
-    
+
     func generateStructured(prompt: String) async throws -> CodeOutput {
         return try await session.respond(
             to: prompt,
@@ -189,49 +189,49 @@ import CoreML
 class CoreMLService: LLMProtocol {
     private var model: MLModel?
     private let modelURL: URL
-    
+
     var name: String { "Core ML" }
     var isInitialized: Bool { model != nil }
-    
+
     init(modelName: String) throws {
         guard let url = Bundle.main.url(forResource: modelName, withExtension: "mlpackage") else {
             throw LLMError.modelNotFound
         }
         self.modelURL = url
     }
-    
+
     func initialize(modelPath: String) async throws {
         let config = MLModelConfiguration()
         config.computeUnits = .all
-        
+
         // Enable flexible shapes (iOS 17+)
         if #available(iOS 17.0, *) {
             config.parameters = [
                 "inputShape": MLParameterKey.flexibleShape
             ]
         }
-        
+
         model = try await MLModel.load(contentsOf: modelURL, configuration: config)
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let model = model else { throw LLMError.notInitialized }
-        
+
         // Tokenize input
         let tokens = tokenize(prompt)
-        
+
         // Create MLMultiArray
         let inputArray = try MLMultiArray(shape: [1, tokens.count as NSNumber], dataType: .int32)
         for (index, token) in tokens.enumerated() {
             inputArray[index] = NSNumber(value: token)
         }
-        
+
         // Create input
         let input = ModelInput(tokens: inputArray)
-        
+
         // Run prediction
         let output = try model.prediction(from: input)
-        
+
         // Decode output
         return decodeTokens(output.tokens)
     }
@@ -245,14 +245,14 @@ class CoreMLService: LLMProtocol {
 @available(iOS 17.0, *)
 class StatefulCoreMLModel {
     private var session: MLPredictionSession?
-    
+
     func initializeSession() throws {
         session = try model.predictionSession()
     }
-    
+
     func generateWithState(tokens: [Int32]) async throws -> String {
         guard let session = session else { throw LLMError.notInitialized }
-        
+
         // Use stateful session for better performance
         let prediction = try await session.prediction(from: input)
         return decodeOutput(prediction)
@@ -306,61 +306,61 @@ import MLXLLM
 class MLXService: LLMProtocol {
     private var model: LLMModel?
     private var tokenizer: Tokenizer?
-    
+
     var name: String { "MLX" }
     var isInitialized: Bool { model != nil }
-    
+
     func initialize(modelPath: String) async throws {
         // Load model configuration
         let config = try await ModelConfiguration.load(from: modelPath)
-        
+
         // Initialize model
         model = try LLMModel(configuration: config)
-        
+
         // Load tokenizer
         tokenizer = try await Tokenizer.load(from: modelPath)
-        
+
         // Load weights
         try await model?.loadWeights(from: modelPath)
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let model = model, let tokenizer = tokenizer else {
             throw LLMError.notInitialized
         }
-        
+
         // Tokenize
         let tokens = tokenizer.encode(prompt)
         var inputTokens = MLXArray(tokens)
-        
+
         var generatedText = ""
-        
+
         for _ in 0..<options.maxTokens {
             // Forward pass
             let logits = model(inputTokens)
-            
+
             // Sample next token
             let nextToken = sampleToken(
                 logits: logits,
                 temperature: Float(options.temperature)
             )
-            
+
             // Decode
             let text = tokenizer.decode([nextToken])
             generatedText += text
-            
+
             // Update input
             inputTokens = MLXArray.concatenate([inputTokens, [nextToken]])
-            
+
             // Check for end token
             if nextToken == tokenizer.eosToken {
                 break
             }
         }
-        
+
         return generatedText
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -369,19 +369,19 @@ class MLXService: LLMProtocol {
         guard let model = model, let tokenizer = tokenizer else {
             throw LLMError.notInitialized
         }
-        
+
         let tokens = tokenizer.encode(prompt)
         var inputTokens = MLXArray(tokens)
-        
+
         for _ in 0..<options.maxTokens {
             let logits = model(inputTokens)
             let nextToken = sampleToken(logits: logits, temperature: Float(options.temperature))
-            
+
             let text = tokenizer.decode([nextToken])
             onToken(text)
-            
+
             inputTokens = MLXArray.concatenate([inputTokens, [nextToken]])
-            
+
             if nextToken == tokenizer.eosToken {
                 break
             }
@@ -402,13 +402,13 @@ class MLXModelConverter {
     ) async throws {
         // Download model
         let hfModel = try await HuggingFaceModel.download(modelId)
-        
+
         // Convert to MLX format
         let mlxModel = try MLXModel(from: hfModel)
-        
+
         // Quantize
         try mlxModel.quantize(bits: quantizeBits)
-        
+
         // Save
         try mlxModel.save(to: outputPath)
     }
@@ -459,10 +459,10 @@ import MLCSwift
 
 class MLCService: LLMProtocol {
     private var engine: MLCEngine?
-    
+
     var name: String { "MLC-LLM" }
     var isInitialized: Bool { engine != nil }
-    
+
     func initialize(modelPath: String) async throws {
         let config = MLCEngineConfig(
             model: modelPath,
@@ -471,15 +471,15 @@ class MLCService: LLMProtocol {
             maxBatchSize: 1,
             maxSequenceLength: 2048
         )
-        
+
         engine = try await MLCEngine(config: config)
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let engine = engine else {
             throw LLMError.notInitialized
         }
-        
+
         let request = ChatCompletionRequest(
             model: modelPath,
             messages: [ChatMessage(role: .user, content: prompt)],
@@ -487,11 +487,11 @@ class MLCService: LLMProtocol {
             maxTokens: options.maxTokens,
             stream: false
         )
-        
+
         let response = try await engine.chatCompletion(request)
         return response.choices.first?.message.content ?? ""
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -500,7 +500,7 @@ class MLCService: LLMProtocol {
         guard let engine = engine else {
             throw LLMError.notInitialized
         }
-        
+
         let request = ChatCompletionRequest(
             model: modelPath,
             messages: [ChatMessage(role: .user, content: prompt)],
@@ -508,9 +508,9 @@ class MLCService: LLMProtocol {
             maxTokens: options.maxTokens,
             stream: true
         )
-        
+
         let stream = try await engine.streamChatCompletion(request)
-        
+
         for try await chunk in stream {
             if let content = chunk.choices.first?.delta.content {
                 onToken(content)
@@ -529,7 +529,7 @@ class MLCModelManager {
         progress: @escaping (Double) -> Void
     ) async throws -> URL {
         let downloader = MLCModelDownloader()
-        
+
         return try await downloader.download(
             model: modelId,
             progressHandler: { downloadProgress in
@@ -539,7 +539,7 @@ class MLCModelManager {
             }
         )
     }
-    
+
     static func listAvailableModels() -> [MLCModel] {
         return [
             MLCModel(id: "Llama-3.2-3B-Instruct-q4f16_1-MLC", size: "1.7GB"),
@@ -590,44 +590,44 @@ import onnxruntime_objc
 class ONNXService: LLMProtocol {
     private var session: ORTSession?
     private var env: ORTEnv?
-    
+
     var name: String { "ONNX Runtime" }
     var isInitialized: Bool { session != nil }
-    
+
     func initialize(modelPath: String) async throws {
         // Create environment
         env = try ORTEnv(loggingLevel: .warning)
-        
+
         // Create session options
         let sessionOptions = try ORTSessionOptions()
         try sessionOptions.setGraphOptimizationLevel(.ortEnableAll)
         try sessionOptions.setInterOpNumThreads(4)
-        
+
         // Add CoreML execution provider
         let coreMLOptions = ORTCoreMLExecutionProviderOptions()
         coreMLOptions.enableOnSubgraphs = true
         coreMLOptions.onlyEnableDeviceWithANE = true
         try sessionOptions.appendCoreMLExecutionProvider(with: coreMLOptions)
-        
+
         // CPU fallback
         try sessionOptions.appendCPUExecutionProvider()
-        
+
         // Create session
         guard let env = env else { throw LLMError.environmentNotCreated }
         session = try ORTSession(env: env, modelPath: modelPath, sessionOptions: sessionOptions)
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let session = session else {
             throw LLMError.notInitialized
         }
-        
+
         // Tokenize input
         let tokens = tokenize(prompt)
         let inputTensor = try createTensor(from: tokens)
-        
+
         var generatedTokens: [Int64] = []
-        
+
         for _ in 0..<options.maxTokens {
             // Run inference
             let outputs = try session.run(
@@ -635,20 +635,20 @@ class ONNXService: LLMProtocol {
                 outputNames: ["logits"],
                 runOptions: nil
             )
-            
+
             guard let logits = outputs["logits"] else {
                 throw LLMError.outputNotFound
             }
-            
+
             // Sample next token
             let nextToken = try sampleToken(from: logits)
             generatedTokens.append(nextToken)
-            
+
             if nextToken == endTokenId {
                 break
             }
         }
-        
+
         return detokenize(generatedTokens)
     }
 }
@@ -676,7 +676,7 @@ PyTorch's edge AI framework providing efficient on-device inference for PyTorch 
 ```swift
 // Swift Package Manager - Use specific ExecuTorch branch for iOS
 dependencies: [
-    .package(url: "https://github.com/pytorch/executorch", 
+    .package(url: "https://github.com/pytorch/executorch",
              .revision("swiftpm-0.6.0")) // Use versioned Swift PM branch
 ]
 
@@ -698,17 +698,17 @@ import ExecuTorch
 
 class ExecuTorchService: LLMProtocol {
     private var module: ETModule?
-    
+
     var name: String { "ExecuTorch" }
     var isInitialized: Bool { module != nil }
-    
+
     func initialize(modelPath: String) async throws {
         guard let path = Bundle.main.path(forResource: modelPath, ofType: "pte") else {
             throw LLMError.modelNotFound
         }
-        
+
         module = try ETModule(contentsOf: path)
-        
+
         // Configure execution
         module?.executionConfig = ETExecutionConfig(
             backend: selectOptimalBackend(),
@@ -716,46 +716,46 @@ class ExecuTorchService: LLMProtocol {
             enableProfiling: false
         )
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let module = module else {
             throw LLMError.notInitialized
         }
-        
+
         // Tokenize input
         let tokenizer = ETTokenizer(vocabPath: "tokenizer.json")
         let inputIds = tokenizer.encode(prompt)
-        
+
         // Create input tensor
         let inputTensor = ETTensor(
             data: inputIds,
             shape: [1, inputIds.count],
             dtype: .int64
         )
-        
+
         var generatedIds: [Int64] = []
         var currentInput = inputTensor
-        
+
         for _ in 0..<options.maxTokens {
             // Forward pass
             let outputs = try await module.forward([currentInput])
-            
+
             guard let logits = outputs.first else {
                 throw LLMError.forwardFailed
             }
-            
+
             // Sample next token
             let nextToken = sampleFromLogits(
                 logits,
                 temperature: Float(options.temperature)
             )
-            
+
             generatedIds.append(nextToken)
-            
+
             if nextToken == tokenizer.eosTokenId {
                 break
             }
-            
+
             // Update input
             let allTokens = inputIds + generatedIds
             currentInput = ETTensor(
@@ -764,14 +764,14 @@ class ExecuTorchService: LLMProtocol {
                 dtype: .int64
             )
         }
-        
+
         return tokenizer.decode(generatedIds)
     }
-    
+
     private func selectOptimalBackend() -> ETBackend {
         let device = UIDevice.current
         let chipset = device.chipset // Custom extension
-        
+
         switch chipset {
         case .a17Pro, .a18, .a18Pro:
             return .coreml
@@ -848,92 +848,92 @@ import Foundation
 class LlamaCppService: LLMProtocol {
     private var context: OpaquePointer?
     private var model: OpaquePointer?
-    
+
     var name: String { "llama.cpp" }
     var isInitialized: Bool { context != nil }
-    
+
     func initialize(modelPath: String) async throws {
         // Initialize backend
         llama_backend_init()
-        
+
         // Model parameters
         var modelParams = llama_model_default_params()
         modelParams.n_gpu_layers = 1 // Use Metal
         modelParams.use_mmap = true
         modelParams.use_mlock = false
-        
+
         // Load model
         model = llama_load_model_from_file(modelPath, modelParams)
         guard model != nil else {
             throw LLMError.modelLoadFailed
         }
-        
+
         // Context parameters
         var contextParams = llama_context_default_params()
         contextParams.n_ctx = 2048
         contextParams.n_batch = 512
         contextParams.n_threads = Int32(ProcessInfo.processInfo.processorCount)
-        
+
         // Create context
         context = llama_new_context_with_model(model, contextParams)
         guard context != nil else {
             throw LLMError.contextCreationFailed
         }
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let context = context else { return "" }
-        
+
         // Tokenize prompt
         let tokens = tokenize(prompt)
-        
+
         // Prepare batch
         var batch = llama_batch_init(Int32(tokens.count), 0, 1)
         defer { llama_batch_free(batch) }
-        
+
         // Add tokens to batch
         for (i, token) in tokens.enumerated() {
             llama_batch_add(&batch, token, Int32(i), [0], false)
         }
         batch.logits[Int(batch.n_tokens - 1)] = 1
-        
+
         // Decode batch
         if llama_decode(context, batch) != 0 {
             throw LLMError.decodeFailed
         }
-        
+
         // Generation loop
         var generatedTokens: [llama_token] = []
         var nCur = batch.n_tokens
-        
+
         while generatedTokens.count < options.maxTokens {
             // Get logits
             let logits = llama_get_logits_ith(context, Int32(nCur - 1))
             let nVocab = llama_n_vocab(model)
-            
+
             // Sample token
             let newTokenId = sampleToken(
                 logits: logits,
                 nVocab: nVocab,
                 temperature: Float(options.temperature)
             )
-            
+
             if newTokenId == llama_token_eos(model) {
                 break
             }
-            
+
             generatedTokens.append(newTokenId)
-            
+
             // Prepare next batch
             llama_batch_clear(&batch)
             llama_batch_add(&batch, newTokenId, Int32(nCur), [0], true)
             nCur += 1
-            
+
             if llama_decode(context, batch) != 0 {
                 break
             }
         }
-        
+
         return detokenize(generatedTokens)
     }
 }
@@ -946,13 +946,13 @@ class GGUFModelManager {
     static func validateModel(at path: String) -> Bool {
         guard let file = fopen(path, "rb") else { return false }
         defer { fclose(file) }
-        
+
         var magic: UInt32 = 0
         fread(&magic, MemoryLayout<UInt32>.size, 1, file)
-        
+
         return magic == 0x46554747 // "GGUF"
     }
-    
+
     static func downloadModel(url: URL, progress: @escaping (Double) -> Void) async throws -> URL {
         // Download implementation
         return localURL
@@ -983,7 +983,7 @@ use_frameworks!
 
 target 'YourApp' do
   pod 'TensorFlowLiteSwift', '~> 2.17.0'
-  
+
   # Optional: Add delegates for hardware acceleration
   pod 'TensorFlowLiteSwift/Metal', '~> 2.17.0'    # GPU acceleration
   pod 'TensorFlowLiteSwift/CoreML', '~> 2.17.0'   # Neural Engine support
@@ -1008,14 +1008,14 @@ import TensorFlowLite
 class TFLiteService: BaseLLMService {
     private var interpreter: Interpreter?
     private var tokenizer: WordpieceTokenizer?
-    
+
     // Hardware acceleration delegates
     private var metalDelegate: MetalDelegate?
     private var coreMLDelegate: CoreMLDelegate?
-    
+
     var name: String { "TensorFlow Lite (LiteRT)" }
     var isInitialized: Bool { interpreter != nil }
-    
+
     func initialize(modelPath: String) async throws {
         guard let modelPath = Bundle.main.path(
             forResource: modelPath,
@@ -1023,10 +1023,10 @@ class TFLiteService: BaseLLMService {
         ) else {
             throw LLMError.modelNotFound
         }
-        
+
         // Configure interpreter options
         var options = Interpreter.Options()
-        
+
         // Determine best acceleration mode
         if DeviceCapabilities.hasNeuralEngine {
             // Use CoreML delegate for Neural Engine (A12+)
@@ -1047,13 +1047,13 @@ class TFLiteService: BaseLLMService {
             // CPU-only mode
             options.threadCount = ProcessInfo.processInfo.processorCount
         }
-        
+
         // Create interpreter
         interpreter = try Interpreter(modelPath: modelPath, options: options)
-        
+
         // Allocate tensors
         try interpreter?.allocateTensors()
-        
+
         // Initialize tokenizer (based on model type)
         if modelPath.contains("bert") {
             tokenizer = WordpieceTokenizer(vocabPath: "bert_vocab.txt")
@@ -1061,36 +1061,36 @@ class TFLiteService: BaseLLMService {
             tokenizer = WordpieceTokenizer(vocabPath: "average_vocab.txt")
         }
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let interpreter = interpreter else {
             throw LLMError.notInitialized
         }
-        
+
         // Tokenize input using WordPiece tokenizer
         let tokens = tokenizer.tokenize(prompt)
         let inputIds = tokenizer.convertToIDs(tokens: tokens)
-        
+
         // Get input tensor info
         let inputTensor = try interpreter.input(at: 0)
         let inputShape = inputTensor.shape.dimensions
-        
+
         // Prepare padded input
         var inputBuffer = [Int32](repeating: 0, count: inputShape[1])
-        inputBuffer.replaceSubrange(0..<min(inputIds.count, inputShape[1]), 
+        inputBuffer.replaceSubrange(0..<min(inputIds.count, inputShape[1]),
                                    with: inputIds.prefix(inputShape[1]))
-        
+
         // Convert to Data
         let inputData = Data(copyingBufferOf: inputBuffer)
         try interpreter.copy(inputData, toInputAt: 0)
-        
+
         // Run inference
         try interpreter.invoke()
-        
+
         // Process output
         let outputTensor = try interpreter.output(at: 0)
         let outputData = outputTensor.data
-        
+
         // For classification models (like BERT)
         if modelPath.contains("classifier") {
             let logits = outputData.toArray(type: Float32.self)
@@ -1108,77 +1108,77 @@ struct WordpieceTokenizer {
     let vocabularyIDs: [String: Int32]
     let reverseVocabulary: [Int: String]
     var vocabularySize: Int { vocabularyIDs.count }
-    
+
     private static let UNKNOWN_TOKEN = "[UNK]"
     private static let MAX_INPUT_CHARS_PER_WORD = 128
-    
+
     init(vocabPath: String) {
         // Load vocabulary from file
         let vocabURL = Bundle.main.url(forResource: vocabPath, withExtension: nil)!
         let vocabContent = try! String(contentsOf: vocabURL)
-        
+
         var vocab = [String: Int32]()
         for (index, line) in vocabContent.components(separatedBy: .newlines).enumerated() {
             if !line.isEmpty {
                 vocab[line] = Int32(index)
             }
         }
-        
+
         self.vocabularyIDs = vocab
         self.reverseVocabulary = vocab.reduce(into: [:]) { dict, pair in
             dict[Int(pair.value)] = pair.key
         }
     }
-    
+
     func tokenize(_ text: String) -> [String] {
         var outputTokens = [String]()
-        
+
         text.lowercased().components(separatedBy: .whitespaces).forEach { token in
             if token.count > Self.MAX_INPUT_CHARS_PER_WORD {
                 outputTokens.append(Self.UNKNOWN_TOKEN)
                 return
             }
-            
+
             let subwords = wordpieceTokenize(token)
             outputTokens.append(contentsOf: subwords)
         }
-        
+
         return outputTokens
     }
-    
+
     private func wordpieceTokenize(_ token: String) -> [String] {
         var start = token.startIndex
         var subwords = [String]()
-        
+
         while start < token.endIndex {
             var end = token.endIndex
             var foundSubword = false
-            
+
             while start < end {
                 var substr = String(token[start..<end])
                 if start > token.startIndex {
                     substr = "##" + substr
                 }
-                
+
                 if vocabularyIDs[substr] != nil {
                     foundSubword = true
                     subwords.append(substr)
                     break
                 }
-                
+
                 end = token.index(before: end)
             }
-            
+
             if foundSubword {
                 start = end
             } else {
                 return [Self.UNKNOWN_TOKEN]
             }
         }
-        
+
         return subwords
     }
-    
+
     func convertToIDs(tokens: [String]) -> [Int32] {
         return tokens.compactMap { vocabularyIDs[$0] }
     }
@@ -1195,7 +1195,7 @@ struct DeviceCapabilities {
         let neuralEngineDevices = ["iPhone11", "iPhone12", "iPhone13", "iPhone14", "iPhone15"]
         return neuralEngineDevices.contains { modelCode.contains($0) }
     }
-    
+
     static var hasHighPerformanceGPU: Bool {
         ProcessInfo.processInfo.processorCount >= 6
     }
@@ -1330,14 +1330,14 @@ import PicoLLM
 class PicoLLMService: LLMProtocol {
     private var picoLLM: PicoLLM?
     private let accessKey: String
-    
+
     var name: String { "picoLLM" }
     var isInitialized: Bool { picoLLM != nil }
-    
+
     init(accessKey: String) {
         self.accessKey = accessKey
     }
-    
+
     func initialize(modelPath: String) async throws {
         picoLLM = try PicoLLM(
             accessKey: accessKey,
@@ -1345,26 +1345,26 @@ class PicoLLMService: LLMProtocol {
             device: "auto"
         )
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let picoLLM = picoLLM else {
             throw LLMError.notInitialized
         }
-        
+
         let picoOptions = PicoLLMGenerateOptions(
             completionTokenLimit: options.maxTokens,
             temperature: Float(options.temperature),
             topP: Float(options.topP ?? 0.9)
         )
-        
+
         let completion = try picoLLM.generate(
             prompt: prompt,
             options: picoOptions
         )
-        
+
         return completion.text
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -1373,13 +1373,13 @@ class PicoLLMService: LLMProtocol {
         guard let picoLLM = picoLLM else {
             throw LLMError.notInitialized
         }
-        
+
         let picoOptions = PicoLLMGenerateOptions(
             completionTokenLimit: options.maxTokens,
             temperature: Float(options.temperature),
             topP: Float(options.topP ?? 0.9)
         )
-        
+
         try picoLLM.generate(
             prompt: prompt,
             options: picoOptions,
@@ -1438,40 +1438,40 @@ import CoreML
 class SwiftTransformersService: LLMProtocol {
     private var model: LanguageModel?
     private var tokenizer: GPT2Tokenizer?
-    
+
     var name: String { "Swift Transformers" }
     var isInitialized: Bool { model != nil }
-    
+
     func initialize(modelPath: String) async throws {
         // Download and prepare model
         let modelLoader = ModelLoader()
         let modelBundle = try await modelLoader.download(modelPath)
-        
+
         // Load Core ML model
         let config = MLModelConfiguration()
         config.computeUnits = .all
-        
+
         model = try LanguageModel(
             modelBundle: modelBundle,
             configuration: config
         )
-        
+
         // Initialize tokenizer
         tokenizer = try GPT2Tokenizer(
             vocabularyURL: modelBundle.vocabularyURL,
             mergesURL: modelBundle.mergesURL
         )
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let model = model,
               let tokenizer = tokenizer else {
             throw LLMError.notInitialized
         }
-        
+
         // Encode prompt
         let inputIds = tokenizer.encode(text: prompt)
-        
+
         // Generation config
         let config = GenerationConfig(
             maxLength: options.maxTokens,
@@ -1480,13 +1480,13 @@ class SwiftTransformersService: LLMProtocol {
             topP: options.topP ?? 0.95,
             doSample: true
         )
-        
+
         // Generate
         let output = try await model.generate(
             inputIds: inputIds,
             config: config
         )
-        
+
         // Decode output
         return tokenizer.decode(tokens: output)
     }
@@ -1506,20 +1506,20 @@ class UnifiedLLMService: ObservableObject {
     @Published var currentService: LLMProtocol?
     @Published var availableServices: [LLMProtocol] = []
     @Published var modelStatus: ModelStatus = .notLoaded
-    
+
     private let modelManager = ModelManager.shared
     private let performanceMonitor = PerformanceMonitor()
-    
+
     init() {
         setupServices()
     }
-    
+
     private func setupServices() {
         // Initialize all available services
         if #available(iOS 18.0, *) {
             availableServices.append(FoundationModelsService())
         }
-        
+
         availableServices.append(contentsOf: [
             CoreMLService(modelName: "llama-3b"),
             MLXService(),
@@ -1532,10 +1532,10 @@ class UnifiedLLMService: ObservableObject {
             SwiftTransformersService()
         ])
     }
-    
+
     func selectFramework(_ framework: LLMFramework) async throws {
         currentFramework = framework
-        
+
         switch framework {
         case .auto:
             currentService = selectBestFramework()
@@ -1560,16 +1560,16 @@ class UnifiedLLMService: ObservableObject {
         case .swiftTransformers:
             currentService = availableServices.first { $0 is SwiftTransformersService }
         }
-        
+
         if let service = currentService {
             try await loadModel(for: service)
         }
     }
-    
+
     private func selectBestFramework() -> LLMProtocol? {
         let device = UIDevice.current
         let memory = ProcessInfo.processInfo.physicalMemory
-        
+
         // Decision logic based on device capabilities
         if #available(iOS 18.0, *),
            device.userInterfaceIdiom == .phone,
@@ -1584,42 +1584,42 @@ class UnifiedLLMService: ObservableObject {
             return availableServices.first { $0 is LlamaCppService }
         }
     }
-    
+
     private func loadModel(for service: LLMProtocol) async throws {
         modelStatus = .loading
-        
+
         do {
             // Get appropriate model for framework
             let modelPath = try await modelManager.getModelPath(for: service)
-            
+
             // Initialize service
             try await service.initialize(modelPath: modelPath)
-            
+
             modelStatus = .ready
         } catch {
             modelStatus = .error(error)
             throw error
         }
     }
-    
+
     func generate(prompt: String, options: GenerationOptions) async throws -> String {
         guard let service = currentService else {
             throw LLMError.noServiceSelected
         }
-        
+
         performanceMonitor.startMeasurement()
-        
+
         let result = try await service.generate(
             prompt: prompt,
             options: options
         )
-        
+
         let metrics = performanceMonitor.endMeasurement()
         logPerformance(metrics)
-        
+
         return result
     }
-    
+
     func streamGenerate(
         prompt: String,
         options: GenerationOptions,
@@ -1628,9 +1628,9 @@ class UnifiedLLMService: ObservableObject {
         guard let service = currentService else {
             throw LLMError.noServiceSelected
         }
-        
+
         performanceMonitor.startMeasurement()
-        
+
         try await service.streamGenerate(
             prompt: prompt,
             options: options,
@@ -1639,7 +1639,7 @@ class UnifiedLLMService: ObservableObject {
                 onToken(token)
             }
         )
-        
+
         let metrics = performanceMonitor.endMeasurement()
         logPerformance(metrics)
     }
@@ -1655,10 +1655,10 @@ class UnifiedLLMService: ObservableObject {
 ```swift
 class ModelManager {
     static let shared = ModelManager()
-    
+
     private let fileManager = FileManager.default
     private let downloadSession: URLSession
-    
+
     var modelsDirectory: URL {
         let documentsPath = fileManager.urls(
             for: .documentDirectory,
@@ -1666,20 +1666,20 @@ class ModelManager {
         ).first!
         return documentsPath.appendingPathComponent("Models")
     }
-    
+
     init() {
         // Create models directory
         try? fileManager.createDirectory(
             at: modelsDirectory,
             withIntermediateDirectories: true
         )
-        
+
         // Configure download session
         let config = URLSessionConfiguration.default
         config.allowsCellularAccess = false
         downloadSession = URLSession(configuration: config)
     }
-    
+
     func downloadModel(
         url: URL,
         framework: LLMFramework,
@@ -1689,18 +1689,18 @@ class ModelManager {
         let destinationURL = modelsDirectory
             .appendingPathComponent(framework.rawValue)
             .appendingPathComponent(fileName)
-        
+
         // Check if already downloaded
         if fileManager.fileExists(atPath: destinationURL.path) {
             return destinationURL
         }
-        
+
         // Create framework directory
         try fileManager.createDirectory(
             at: destinationURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        
+
         // Download with progress
         let (tempURL, _) = try await downloadSession.download(
             from: url
@@ -1710,13 +1710,13 @@ class ModelManager {
                 progress(progress)
             }
         }
-        
+
         // Move to destination
         try fileManager.moveItem(at: tempURL, to: destinationURL)
-        
+
         return destinationURL
     }
-    
+
     func convertModel(
         inputPath: URL,
         targetFramework: LLMFramework
@@ -1732,27 +1732,27 @@ class ModelManager {
             throw ModelError.conversionNotSupported
         }
     }
-    
+
     func listInstalledModels() -> [ModelInfo] {
         var models: [ModelInfo] = []
-        
+
         do {
             let frameworkDirs = try fileManager.contentsOfDirectory(
                 at: modelsDirectory,
                 includingPropertiesForKeys: nil
             )
-            
+
             for frameworkDir in frameworkDirs {
                 let modelFiles = try fileManager.contentsOfDirectory(
                     at: frameworkDir,
                     includingPropertiesForKeys: [.fileSizeKey]
                 )
-                
+
                 for modelFile in modelFiles {
                     let resources = try modelFile.resourceValues(
                         forKeys: [.fileSizeKey]
                     )
-                    
+
                     models.append(ModelInfo(
                         name: modelFile.lastPathComponent,
                         framework: frameworkDir.lastPathComponent,
@@ -1764,14 +1764,14 @@ class ModelManager {
         } catch {
             print("Error listing models: \(error)")
         }
-        
+
         return models
     }
-    
+
     func deleteModel(_ model: ModelInfo) throws {
         try fileManager.removeItem(at: model.path)
     }
-    
+
     func validateModel(_ path: URL, framework: LLMFramework) -> Bool {
         switch framework {
         case .llamaCpp:
@@ -1800,7 +1800,7 @@ struct ModelConfiguration: Codable {
     let quantization: QuantizationType
     let contextLength: Int
     let recommended: DeviceRequirement
-    
+
     static let availableModels: [ModelConfiguration] = [
         // Small Models (1-3B)
         ModelConfiguration(
@@ -1830,7 +1830,7 @@ struct ModelConfiguration: Codable {
             contextLength: 8192,
             recommended: .gb6Plus
         ),
-        
+
         // Medium Models (7B)
         ModelConfiguration(
             id: "mistral-7b",
@@ -1858,10 +1858,10 @@ enum DeviceRequirement {
     case gb4Plus  // 4GB+ RAM
     case gb6Plus  // 6GB+ RAM
     case gb8Plus  // 8GB+ RAM
-    
+
     func isSatisfied(by device: UIDevice) -> Bool {
         let memory = ProcessInfo.processInfo.physicalMemory
-        
+
         switch self {
         case .anyDevice:
             return true
@@ -1887,18 +1887,18 @@ class MemoryOptimizer {
     static func configureForLLM() {
         // Increase memory limit
         let memoryLimit = ProcessInfo.processInfo.physicalMemory / 2
-        
+
         // Configure caches
         URLCache.shared.memoryCapacity = 50_000_000 // 50MB
         URLCache.shared.diskCapacity = 100_000_000 // 100MB
-        
+
         // Monitor memory pressure
         let queue = DispatchQueue.global(qos: .utility)
         let source = DispatchSource.makeMemoryPressureSource(
             eventMask: [.warning, .critical],
             queue: queue
         )
-        
+
         source.setEventHandler {
             let event = source.data
             if event.contains(.warning) {
@@ -1907,21 +1907,21 @@ class MemoryOptimizer {
                 self.handleMemoryCritical()
             }
         }
-        
+
         source.resume()
     }
-    
+
     static func handleMemoryWarning() {
         // Clear caches
         URLCache.shared.removeAllCachedResponses()
-        
+
         // Notify services to reduce memory usage
         NotificationCenter.default.post(
             name: .memoryWarning,
             object: nil
         )
     }
-    
+
     static func handleMemoryCritical() {
         // Emergency cleanup
         // Force clear all non-essential memory
@@ -1936,13 +1936,13 @@ class MemoryOptimizer {
 class BatteryOptimizer {
     private var observer: NSObjectProtocol?
     private var currentProfile: PerformanceProfile = .balanced
-    
+
     enum PerformanceProfile {
         case lowPower
         case balanced
         case highPerformance
     }
-    
+
     func startMonitoring() {
         observer = NotificationCenter.default.addObserver(
             forName: UIDevice.batteryLevelDidChangeNotification,
@@ -1951,15 +1951,15 @@ class BatteryOptimizer {
         ) { _ in
             self.adjustPerformance()
         }
-        
+
         UIDevice.current.isBatteryMonitoringEnabled = true
     }
-    
+
     func adjustPerformance() {
         let batteryLevel = UIDevice.current.batteryLevel
         let batteryState = UIDevice.current.batteryState
         let thermalState = ProcessInfo.processInfo.thermalState
-        
+
         // Determine performance profile
         if batteryLevel < 0.2 && batteryState == .unplugged {
             currentProfile = .lowPower
@@ -1970,11 +1970,11 @@ class BatteryOptimizer {
         } else {
             currentProfile = .balanced
         }
-        
+
         // Apply profile
         applyProfile(currentProfile)
     }
-    
+
     private func applyProfile(_ profile: PerformanceProfile) {
         switch profile {
         case .lowPower:
@@ -1982,12 +1982,12 @@ class BatteryOptimizer {
             GenerationOptions.default.temperature = 0.5
             // Use smaller models
             ModelManager.shared.preferSmallModels = true
-            
+
         case .balanced:
             GenerationOptions.default.maxTokens = 150
             GenerationOptions.default.temperature = 0.7
             ModelManager.shared.preferSmallModels = false
-            
+
         case .highPerformance:
             GenerationOptions.default.maxTokens = 500
             GenerationOptions.default.temperature = 0.8
@@ -2005,32 +2005,32 @@ class PerformanceMonitor {
     private var firstTokenTime: CFAbsoluteTime = 0
     private var tokenCount = 0
     private var measurements: [PerformanceMetrics] = []
-    
+
     func startMeasurement() {
         startTime = CFAbsoluteTimeGetCurrent()
         firstTokenTime = 0
         tokenCount = 0
     }
-    
+
     func recordFirstToken() {
         if firstTokenTime == 0 {
             firstTokenTime = CFAbsoluteTimeGetCurrent()
         }
     }
-    
+
     func recordToken() {
         tokenCount += 1
         if firstTokenTime == 0 {
             recordFirstToken()
         }
     }
-    
+
     func endMeasurement() -> PerformanceMetrics {
         let endTime = CFAbsoluteTimeGetCurrent()
         let totalTime = endTime - startTime
         let timeToFirstToken = firstTokenTime > 0 ? firstTokenTime - startTime : 0
         let tokensPerSecond = tokenCount > 0 ? Double(tokenCount) / totalTime : 0
-        
+
         let metrics = PerformanceMetrics(
             totalTime: totalTime,
             timeToFirstToken: timeToFirstToken,
@@ -2040,16 +2040,16 @@ class PerformanceMonitor {
             framework: UnifiedLLMService.shared.currentFramework,
             modelSize: getCurrentModelSize()
         )
-        
+
         measurements.append(metrics)
-        
+
         return metrics
     }
-    
+
     private func reportMemoryUsage() -> Int {
         var info = mach_task_basic_info()
         var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size) / 4
-        
+
         let result = withUnsafeMutablePointer(to: &info) {
             $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
                 task_info(
@@ -2060,23 +2060,23 @@ class PerformanceMonitor {
                 )
             }
         }
-        
+
         return result == KERN_SUCCESS ? Int(info.resident_size) : 0
     }
-    
+
     func generateReport() -> PerformanceReport {
         guard !measurements.isEmpty else {
             return PerformanceReport(measurements: [])
         }
-        
+
         let avgTokensPerSecond = measurements
             .map { $0.tokensPerSecond }
             .reduce(0, +) / Double(measurements.count)
-        
+
         let avgTimeToFirstToken = measurements
             .map { $0.timeToFirstToken }
             .reduce(0, +) / Double(measurements.count)
-        
+
         return PerformanceReport(
             measurements: measurements,
             averageTokensPerSecond: avgTokensPerSecond,
@@ -2084,15 +2084,15 @@ class PerformanceMonitor {
             frameworkComparison: compareFrameworks()
         )
     }
-    
+
     private func compareFrameworks() -> [FrameworkPerformance] {
         let grouped = Dictionary(grouping: measurements) { $0.framework }
-        
+
         return grouped.map { framework, metrics in
             let avgSpeed = metrics
                 .map { $0.tokensPerSecond }
                 .reduce(0, +) / Double(metrics.count)
-            
+
             return FrameworkPerformance(
                 framework: framework,
                 averageSpeed: avgSpeed,
@@ -2118,30 +2118,30 @@ class FrameworkSelector {
     ) -> LLMFramework {
         let memory = ProcessInfo.processInfo.physicalMemory
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
-        
+
         // Priority 1: Native Apple frameworks for latest devices
         if osVersion.majorVersion >= 18,
            memory >= 8_000_000_000,
            requirements.preferNative {
             return .foundationModels
         }
-        
+
         // Priority 2: Performance-critical applications
         if requirements.maxPerformance,
            memory >= 6_000_000_000 {
             return .mlx
         }
-        
+
         // Priority 3: Cross-platform consistency
         if requirements.crossPlatform {
             return .mlc
         }
-        
+
         // Priority 4: PyTorch ecosystem
         if requirements.pytorchCompatibility {
             return .execuTorch
         }
-        
+
         // Priority 5: Maximum compatibility
         return .llamaCpp
     }
@@ -2170,7 +2170,7 @@ enum LLMError: LocalizedError {
     case networkError(Error)
     case conversionFailed
     case inferenceError(String)
-    
+
     var errorDescription: String? {
         switch self {
         case .frameworkNotAvailable:
@@ -2199,10 +2199,10 @@ class ErrorHandler {
     static func handle(_ error: Error, context: String) {
         // Log error
         print("[\(context)] Error: \(error)")
-        
+
         // Analytics
         Analytics.logError(error, context: context)
-        
+
         // User notification if needed
         if error is LLMError {
             NotificationCenter.default.post(
@@ -2223,34 +2223,34 @@ class SecurityManager {
         guard isValidSignature(url) else {
             throw SecurityError.invalidSignature
         }
-        
+
         // Check file size
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let fileSize = attributes[.size] as? Int ?? 0
-        
+
         guard fileSize < 10_000_000_000 else { // 10GB limit
             throw SecurityError.fileTooLarge
         }
-        
+
         // Verify checksum
         let checksum = try calculateChecksum(url)
         guard verifyChecksum(checksum, for: url) else {
             throw SecurityError.checksumMismatch
         }
     }
-    
+
     static func sanitizePrompt(_ prompt: String) -> String {
         // Remove potential injection attempts
         var sanitized = prompt
-        
+
         // Remove control characters
         sanitized = sanitized.filter { !$0.isNewline && !$0.isWhitespace }
-        
+
         // Limit length
         if sanitized.count > 1000 {
             sanitized = String(sanitized.prefix(1000))
         }
-        
+
         return sanitized
     }
 }
@@ -2266,23 +2266,23 @@ class LLMTestSuite {
             "Explain quantum computing in simple terms",
             "Write a Swift function to sort an array"
         ]
-        
+
         var results: [TestResult] = []
-        
+
         for framework in LLMFramework.allCases {
             do {
                 try await UnifiedLLMService.shared.selectFramework(framework)
-                
+
                 for prompt in testPrompts {
                     let startTime = CFAbsoluteTimeGetCurrent()
-                    
+
                     let result = try await UnifiedLLMService.shared.generate(
                         prompt: prompt,
                         options: .default
                     )
-                    
+
                     let endTime = CFAbsoluteTimeGetCurrent()
-                    
+
                     results.append(TestResult(
                         framework: framework,
                         prompt: prompt,
@@ -2302,7 +2302,7 @@ class LLMTestSuite {
                 ))
             }
         }
-        
+
         // Generate report
         generateTestReport(results)
     }

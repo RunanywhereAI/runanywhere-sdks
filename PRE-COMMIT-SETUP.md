@@ -8,7 +8,7 @@ This guide explains how to set up and use pre-commit hooks for the ODLM SDKs pro
    ```bash
    # Using pip
    pip install pre-commit
-   
+
    # Using Homebrew (macOS)
    brew install pre-commit
    ```

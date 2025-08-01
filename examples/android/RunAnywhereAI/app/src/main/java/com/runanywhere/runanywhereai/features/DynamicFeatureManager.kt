@@ -22,17 +22,17 @@ class DynamicFeatureManager @Inject constructor(
     companion object {
         private const val TAG = "DynamicFeatureManager"
     }
-    
+
     private val splitInstallManager = SplitInstallManagerFactory.create(context)
     private val listeners = mutableSetOf<FeatureInstallListener>()
-    
+
     init {
         // Register for install state updates
         splitInstallManager.registerListener { state ->
             notifyListeners(state)
         }
     }
-    
+
     /**
      * Get list of available dynamic features
      */
@@ -104,7 +104,7 @@ class DynamicFeatureManager @Inject constructor(
             )
         )
     }
-    
+
     /**
      * Install a dynamic feature
      */
@@ -115,11 +115,11 @@ class DynamicFeatureManager @Inject constructor(
                 close()
                 return@callbackFlow
             }
-            
+
             val request = SplitInstallRequest.newBuilder()
                 .addModule(featureName)
                 .build()
-            
+
             splitInstallManager.startInstall(request)
                 .addOnSuccessListener { sessionId ->
                     Log.d(TAG, "Started install for $featureName with session $sessionId")
@@ -129,7 +129,7 @@ class DynamicFeatureManager @Inject constructor(
                     trySend(FeatureInstallProgress.Failed(featureName, exception.message ?: "Unknown error"))
                     close()
                 }
-            
+
             awaitClose {
                 // Cleanup if needed
             }
@@ -139,7 +139,7 @@ class DynamicFeatureManager @Inject constructor(
             close()
         }
     }
-    
+
     /**
      * Uninstall a dynamic feature
      */
@@ -148,7 +148,7 @@ class DynamicFeatureManager @Inject constructor(
             if (!isFeatureInstalled(featureName)) {
                 return@withContext true
             }
-            
+
             val uninstallRequest = listOf(featureName)
             splitInstallManager.deferredUninstall(uninstallRequest)
                 .addOnSuccessListener {
@@ -157,28 +157,28 @@ class DynamicFeatureManager @Inject constructor(
                 .addOnFailureListener { exception ->
                     Log.e(TAG, "Failed to uninstall $featureName", exception)
                 }
-            
+
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error uninstalling feature $featureName", e)
             false
         }
     }
-    
+
     /**
      * Check if a feature is installed
      */
     fun isFeatureInstalled(featureName: String): Boolean {
         return splitInstallManager.installedModules.contains(featureName)
     }
-    
+
     /**
      * Get installed features
      */
     fun getInstalledFeatures(): Set<String> {
         return splitInstallManager.installedModules
     }
-    
+
     /**
      * Cancel ongoing installation
      */
@@ -191,7 +191,7 @@ class DynamicFeatureManager @Inject constructor(
             false
         }
     }
-    
+
     /**
      * Get session states for all active installations
      */
@@ -208,21 +208,21 @@ class DynamicFeatureManager @Inject constructor(
             emptyList()
         }
     }
-    
+
     /**
      * Add feature install listener
      */
     fun addListener(listener: FeatureInstallListener) {
         listeners.add(listener)
     }
-    
+
     /**
      * Remove feature install listener
      */
     fun removeListener(listener: FeatureInstallListener) {
         listeners.remove(listener)
     }
-    
+
     /**
      * Check device compatibility for feature
      */
@@ -235,51 +235,51 @@ class DynamicFeatureManager @Inject constructor(
             else -> false
         }
     }
-    
+
     private fun checkLlamaCppSupport(): Boolean {
         val memoryInfo = android.app.ActivityManager.MemoryInfo()
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         activityManager.getMemoryInfo(memoryInfo)
-        
+
         val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
         return availableMemoryMB >= 2048 // 2GB minimum
     }
-    
+
     private fun checkExecuTorchSupport(): Boolean {
         val packageManager = context.packageManager
         val hasGPU = packageManager.hasSystemFeature("android.hardware.opengles.aep") ||
                     packageManager.hasSystemFeature("android.hardware.vulkan.level")
-        
+
         val memoryInfo = android.app.ActivityManager.MemoryInfo()
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         activityManager.getMemoryInfo(memoryInfo)
-        
+
         val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
         return availableMemoryMB >= 1536 && hasGPU // 1.5GB minimum + GPU
     }
-    
+
     private fun checkMLCLLMSupport(): Boolean {
         val packageManager = context.packageManager
         val hasVulkan = packageManager.hasSystemFeature("android.hardware.vulkan.level")
-        
+
         val memoryInfo = android.app.ActivityManager.MemoryInfo()
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         activityManager.getMemoryInfo(memoryInfo)
-        
+
         val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
         return availableMemoryMB >= 3072 && hasVulkan && // 3GB minimum + Vulkan
                android.os.Build.SUPPORTED_64_BIT_ABIS.contains("arm64-v8a")
     }
-    
+
     private fun checkONNXRuntimeSupport(): Boolean {
         val memoryInfo = android.app.ActivityManager.MemoryInfo()
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
         activityManager.getMemoryInfo(memoryInfo)
-        
+
         val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
         return availableMemoryMB >= 1024 // 1GB minimum
     }
-    
+
     private fun notifyListeners(state: SplitInstallSessionState) {
         val progress = when (state.status()) {
             SplitInstallSessionStatus.PENDING -> {
@@ -291,7 +291,7 @@ class DynamicFeatureManager @Inject constructor(
                 val progressPercent = if (totalBytes > 0) {
                     (downloadedBytes.toFloat() / totalBytes * 100).toInt()
                 } else 0
-                
+
                 FeatureInstallProgress.Downloading(
                     featureName = state.moduleNames().first(),
                     progress = progressPercent,
@@ -318,7 +318,7 @@ class DynamicFeatureManager @Inject constructor(
                 FeatureInstallProgress.Unknown(state.moduleNames().first(), state.status())
             }
         }
-        
+
         listeners.forEach { listener ->
             try {
                 listener.onProgressUpdate(progress)
@@ -352,27 +352,27 @@ data class FeatureRequirements(
 
 sealed class FeatureInstallProgress {
     abstract val featureName: String
-    
+
     data class Pending(override val featureName: String) : FeatureInstallProgress()
-    
+
     data class Downloading(
         override val featureName: String,
         val progress: Int,
         val downloadedBytes: Long,
         val totalBytes: Long
     ) : FeatureInstallProgress()
-    
+
     data class Installing(override val featureName: String) : FeatureInstallProgress()
-    
+
     data class Completed(override val featureName: String) : FeatureInstallProgress()
-    
+
     data class Failed(
         override val featureName: String,
         val error: String
     ) : FeatureInstallProgress()
-    
+
     data class Cancelled(override val featureName: String) : FeatureInstallProgress()
-    
+
     data class Unknown(
         override val featureName: String,
         val status: Int
@@ -390,23 +390,23 @@ fun FeatureRequirements.isCompatibleWith(context: Context): Boolean {
     if (android.os.Build.VERSION.SDK_INT < minSdkVersion) {
         return false
     }
-    
+
     // Check memory
     val memoryInfo = android.app.ActivityManager.MemoryInfo()
     val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
     activityManager.getMemoryInfo(memoryInfo)
-    
+
     val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
     if (availableMemoryMB < requiredMemoryMB) {
         return false
     }
-    
+
     // Check ABI support
     val deviceAbis = android.os.Build.SUPPORTED_ABIS.toList()
     if (supportedAbis.none { it in deviceAbis }) {
         return false
     }
-    
+
     // Check required features
     val packageManager = context.packageManager
     for (feature in requiredFeatures) {
@@ -414,7 +414,7 @@ fun FeatureRequirements.isCompatibleWith(context: Context): Boolean {
             return false
         }
     }
-    
+
     return true
 }
 
@@ -422,7 +422,7 @@ fun DynamicFeature.formatSize(): String {
     val kb = sizeBytes / 1024.0
     val mb = kb / 1024.0
     val gb = mb / 1024.0
-    
+
     return when {
         gb >= 1.0 -> "%.1f GB".format(gb)
         mb >= 1.0 -> "%.1f MB".format(mb)

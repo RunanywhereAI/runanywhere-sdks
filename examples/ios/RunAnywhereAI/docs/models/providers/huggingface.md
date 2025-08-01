@@ -20,7 +20,7 @@ This guide documents how the RunAnywhereAI iOS app handles HuggingFace model dow
 Based on our verification (see `scripts/verify_huggingface_auth_v2.py`), all Swift Transformers models in the app are **publicly accessible**:
 
 - ✅ OpenELM-270M-Instruct
-- ✅ OpenELM-450M-Instruct  
+- ✅ OpenELM-450M-Instruct
 - ✅ OpenELM-1.1B-Instruct
 - ✅ OpenELM-3B-Instruct
 
@@ -77,7 +77,7 @@ Swift Transformers models use the `.mlpackage` format, which is a **directory st
    - Files are downloaded individually and reconstructed locally
    - Progress is tracked across all files
 
-3. **URL Format**: 
+3. **URL Format**:
    ```
    https://huggingface.co/{owner}/{repo}/resolve/main/{path}
    ```

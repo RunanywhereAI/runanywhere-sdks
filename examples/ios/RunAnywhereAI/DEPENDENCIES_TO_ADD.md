@@ -59,7 +59,7 @@ UI Note: "Coming Soon - MLC-LLM (Universal Deployment)"
 Timeline: When manual integration is needed
 ```
 
-### Priority 2: ExecuTorch - BETA/NOT PRODUCTION READY 
+### Priority 2: ExecuTorch - BETA/NOT PRODUCTION READY
 ```
 URL: https://github.com/pytorch/executorch
 Status: BETA/PREVIEW - Explicitly not recommended for production (July 2025)
@@ -71,7 +71,7 @@ Timeline: Expected production-ready Q4 2025/Q1 2026
 
 ### Priority 3: llama.cpp via SpeziLLM - VERSION CONFLICTS
 ```
-URL: https://github.com/StanfordSpezi/SpeziLLM  
+URL: https://github.com/StanfordSpezi/SpeziLLM
 Status: CONFLICT - Blocked by MLX Examples version issues
 Reason: Popular GGUF format support, but dependency conflicts
 Products: SpeziLLMLocal, SpeziLLMLocalLlama
@@ -145,7 +145,7 @@ Action: Either fix version or remove dependency
 
 ### Core Implementation (Working Now) - 5 Frameworks
 1. ✅ **Foundation Models** - Apple's native AI (iOS 18+)
-2. ✅ **Core ML** - Apple's ML framework  
+2. ✅ **Core ML** - Apple's ML framework
 3. ✅ **ONNX Runtime** - Microsoft's inference engine
 4. ✅ **MLX** - Apple Silicon optimization (working with 0.25.6)
 5. ✅ **TensorFlow Lite** - Google's mobile framework (added via CocoaPods)
@@ -170,9 +170,9 @@ dependencies: [
     // ✅ Working Dependencies
     .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0"),
     .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.25.0"), // Working with 0.25.6
-    
+
     // ⚠️ MLC-LLM not available via SPM - requires manual integration
-    
+
     // ⏸️ Optional - Add after fixing conflicts
     // .package(url: "https://github.com/StanfordSpezi/SpeziLLM", from: "0.5.0"),
 ]
@@ -194,5 +194,5 @@ end
 
 ---
 
-*Updated: July 27, 2025*  
+*Updated: July 27, 2025*
 *Status: 5 core dependencies working, 6 deferred for future (including MLC-LLM)*

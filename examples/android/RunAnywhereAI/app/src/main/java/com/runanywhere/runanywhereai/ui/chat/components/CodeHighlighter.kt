@@ -9,7 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CopyAll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +40,7 @@ fun CodeBlock(
     val detectedLanguage = language ?: detectLanguage(code)
     val highlightedCode = highlightCode(code, detectedLanguage)
     val codeLines = code.split('\n')
-    
+
     Card(
         modifier = modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
@@ -63,7 +63,7 @@ fun CodeBlock(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 IconButton(
                     onClick = {
                         clipboardManager.setText(AnnotatedString(code))
@@ -71,23 +71,23 @@ fun CodeBlock(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ContentCopy,
+                        imageVector = Icons.Filled.CopyAll,
                         contentDescription = "Copy code",
                         modifier = Modifier.size(16.dp),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            
+
             Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            
+
             // Code content
             val displayLines = if (maxLines != null && codeLines.size > maxLines) {
                 codeLines.take(maxLines)
             } else {
                 codeLines
             }
-            
+
             SelectionContainer {
                 Row(
                     modifier = Modifier
@@ -111,13 +111,13 @@ fun CodeBlock(
                                 )
                             }
                         }
-                        
+
                         VerticalDivider(
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
                             modifier = Modifier.padding(end = 12.dp)
                         )
                     }
-                    
+
                     // Code content
                     Column(
                         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -133,7 +133,7 @@ fun CodeBlock(
                     }
                 }
             }
-            
+
             // Show truncation indicator if needed
             if (maxLines != null && codeLines.size > maxLines) {
                 Surface(
@@ -309,7 +309,7 @@ private fun detectLanguage(code: String): String {
             "echo\\s+"
         )
     )
-    
+
     for ((language, languagePatterns) in patterns) {
         var matches = 0
         for (pattern in languagePatterns) {
@@ -321,7 +321,7 @@ private fun detectLanguage(code: String): String {
             return language
         }
     }
-    
+
     return "text" // Default to plain text
 }
 
@@ -373,7 +373,7 @@ private fun applySyntaxHighlighting(
  */
 private fun applyOOPHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf(
         "class", "interface", "fun", "val", "var", "if", "else", "when", "for", "while",
@@ -381,23 +381,23 @@ private fun applyOOPHighlighting(builder: AnnotatedString.Builder, text: String)
         "override", "abstract", "final", "static", "const", "let", "func", "struct",
         "enum", "extension", "protocol", "@Composable", "@Override"
     )
-    
+
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?[fLdD]?\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "//.*$", colors.comment)
     applyPatternHighlighting(builder, text, "/\\*.*?\\*/", colors.comment)
-    
+
     // Annotations
     applyPatternHighlighting(builder, text, "@\\w+", colors.annotation)
-    
+
     // Types
     applyPatternHighlighting(builder, text, "\\b[A-Z]\\w*\\b", colors.type)
 }
@@ -407,28 +407,28 @@ private fun applyOOPHighlighting(builder: AnnotatedString.Builder, text: String)
  */
 private fun applyPythonHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf(
         "def", "class", "if", "elif", "else", "for", "while", "try", "except", "finally",
         "import", "from", "as", "return", "yield", "lambda", "with", "assert", "global",
         "nonlocal", "pass", "break", "continue", "and", "or", "not", "in", "is"
     )
-    
+
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "\"\"\".*?\"\"\"", colors.string)
     applyPatternHighlighting(builder, text, "'''.*?'''", colors.string)
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "#.*$", colors.comment)
-    
+
     // Built-ins
     val builtins = listOf("print", "len", "range", "enumerate", "zip", "map", "filter", "sorted")
     applyPatternHighlighting(builder, text, builtins.joinToString("|") { "\\b$it\\b" }, colors.builtin)
@@ -439,7 +439,7 @@ private fun applyPythonHighlighting(builder: AnnotatedString.Builder, text: Stri
  */
 private fun applyJavaScriptHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf(
         "function", "const", "let", "var", "if", "else", "for", "while", "do", "switch",
@@ -447,21 +447,21 @@ private fun applyJavaScriptHighlighting(builder: AnnotatedString.Builder, text: 
         "throw", "new", "this", "class", "extends", "import", "export", "from", "as",
         "interface", "type", "enum", "namespace", "async", "await"
     )
-    
+
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "`[^`]*`", colors.string) // Template literals
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "//.*$", colors.comment)
     applyPatternHighlighting(builder, text, "/\\*.*?\\*/", colors.comment)
-    
+
     // Built-ins
     val builtins = listOf("console", "window", "document", "Array", "Object", "String", "Number")
     applyPatternHighlighting(builder, text, builtins.joinToString("|") { "\\b$it\\b" }, colors.builtin)
@@ -472,7 +472,7 @@ private fun applyJavaScriptHighlighting(builder: AnnotatedString.Builder, text: 
  */
 private fun applyCStyleHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf(
         "int", "float", "double", "char", "void", "long", "short", "unsigned", "signed",
@@ -480,19 +480,19 @@ private fun applyCStyleHighlighting(builder: AnnotatedString.Builder, text: Stri
         "break", "continue", "struct", "union", "enum", "typedef", "sizeof",
         "fn", "let", "mut", "match", "impl", "use", "pub", "mod", "crate"
     )
-    
+
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Preprocessor directives
     applyPatternHighlighting(builder, text, "#\\w+", colors.preprocessor)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?[fLdD]?\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "//.*$", colors.comment)
     applyPatternHighlighting(builder, text, "/\\*.*?\\*/", colors.comment)
@@ -503,17 +503,17 @@ private fun applyCStyleHighlighting(builder: AnnotatedString.Builder, text: Stri
  */
 private fun applyMarkupHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Tags
     applyPatternHighlighting(builder, text, "</?\\w+[^>]*>", colors.tag)
-    
+
     // Attributes
     applyPatternHighlighting(builder, text, "\\w+(?=\\s*=)", colors.attribute)
-    
+
     // Attribute values
     applyPatternHighlighting(builder, text, "=\"[^\"]*\"", colors.string)
     applyPatternHighlighting(builder, text, "='[^']*'", colors.string)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "<!--.*?-->", colors.comment)
 }
@@ -523,21 +523,21 @@ private fun applyMarkupHighlighting(builder: AnnotatedString.Builder, text: Stri
  */
 private fun applyCSSHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Selectors
     applyPatternHighlighting(builder, text, "\\.[\\w-]+", colors.cssClass)
     applyPatternHighlighting(builder, text, "#[\\w-]+", colors.cssId)
     applyPatternHighlighting(builder, text, "\\b\\w+(?=\\s*\\{)", colors.tag)
-    
+
     // Properties
     applyPatternHighlighting(builder, text, "\\b[\\w-]+(?=\\s*:)", colors.attribute)
-    
+
     // Values
     applyPatternHighlighting(builder, text, ":\\s*[^;\\}]+", colors.string)
-    
+
     // Colors
     applyPatternHighlighting(builder, text, "#[0-9a-fA-F]{3,6}\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "/\\*.*?\\*/", colors.comment)
 }
@@ -547,16 +547,16 @@ private fun applyCSSHighlighting(builder: AnnotatedString.Builder, text: String)
  */
 private fun applyJSONHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keys
     applyPatternHighlighting(builder, text, "\"[^\"]*\"(?=\\s*:)", colors.jsonKey)
-    
+
     // String values
     applyPatternHighlighting(builder, text, ":\\s*\"[^\"]*\"", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, ":\\s*-?\\d+(\\.\\d+)?", colors.number)
-    
+
     // Booleans and null
     applyPatternHighlighting(builder, text, "\\b(true|false|null)\\b", colors.keyword)
 }
@@ -566,22 +566,22 @@ private fun applyJSONHighlighting(builder: AnnotatedString.Builder, text: String
  */
 private fun applySQLHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf(
         "SELECT", "FROM", "WHERE", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP",
         "ALTER", "INDEX", "TABLE", "DATABASE", "JOIN", "LEFT", "RIGHT", "INNER",
         "ON", "AS", "ORDER", "BY", "GROUP", "HAVING", "LIMIT", "OFFSET"
     )
-    
+
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?\\b", colors.number)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "--.*$", colors.comment)
 }
@@ -591,18 +591,18 @@ private fun applySQLHighlighting(builder: AnnotatedString.Builder, text: String)
  */
 private fun applyBashHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Keywords
     val keywords = listOf("if", "then", "else", "elif", "fi", "for", "while", "do", "done", "function")
     applyPatternHighlighting(builder, text, keywords.joinToString("|") { "\\b$it\\b" }, colors.keyword)
-    
+
     // Variables
     applyPatternHighlighting(builder, text, "\\$\\{?\\w+\\}?", colors.variable)
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Comments
     applyPatternHighlighting(builder, text, "#.*$", colors.comment)
 }
@@ -612,14 +612,14 @@ private fun applyBashHighlighting(builder: AnnotatedString.Builder, text: String
  */
 private fun applyGenericHighlighting(builder: AnnotatedString.Builder, text: String) {
     val colors = SyntaxColors()
-    
+
     // Strings
     applyPatternHighlighting(builder, text, "\"([^\"\\\\]|\\\\.)*\"", colors.string)
     applyPatternHighlighting(builder, text, "'([^'\\\\]|\\\\.)*'", colors.string)
-    
+
     // Numbers
     applyPatternHighlighting(builder, text, "\\b\\d+(\\.\\d+)?\\b", colors.number)
-    
+
     // Comments (common patterns)
     applyPatternHighlighting(builder, text, "//.*$", colors.comment)
     applyPatternHighlighting(builder, text, "#.*$", colors.comment)
@@ -638,7 +638,7 @@ private fun applyPatternHighlighting(
     try {
         val regex = Pattern.compile(pattern, Pattern.MULTILINE or Pattern.DOTALL)
         val matcher = regex.matcher(text)
-        
+
         while (matcher.find()) {
             builder.addStyle(
                 style = SpanStyle(color = color),
@@ -667,7 +667,7 @@ private fun SyntaxColors() = SyntaxColorScheme(
     tag = Color(0xFF569CD6),            // Blue
     attribute = Color(0xFF92C5F8),      // Light blue
     cssClass = Color(0xFFD7BA7D),       // Orange
-    cssId = Color(0xFFFFC66D),          // Light orange  
+    cssId = Color(0xFFFFC66D),          // Light orange
     jsonKey = Color(0xFF4FC1FF),        // Light blue
     variable = Color(0xFF9CDCFE)        // Very light blue
 )

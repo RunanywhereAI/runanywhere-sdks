@@ -51,7 +51,7 @@ platform :ios, '16.0'
 
 target 'RunAnywhereAI' do
   use_frameworks!
-  
+
   # Specify exact version
   pod 'TensorFlowLiteSwift', '~> 2.14.0'
   # Or try the C API version

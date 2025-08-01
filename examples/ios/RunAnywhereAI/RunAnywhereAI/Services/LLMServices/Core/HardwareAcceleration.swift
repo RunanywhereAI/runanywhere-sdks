@@ -13,13 +13,13 @@ import Foundation
 protocol HardwareAccelerated {
     /// Available acceleration modes for the service
     var supportedAccelerationModes: [AccelerationMode] { get }
-    
+
     /// Currently active acceleration mode
     var currentAccelerationMode: AccelerationMode { get }
-    
+
     /// Configure hardware acceleration based on device capabilities
     func configureAcceleration(mode: AccelerationMode) async throws
-    
+
     /// Get performance metrics for current acceleration
     func getAccelerationMetrics() -> AccelerationMetrics
 }
@@ -32,7 +32,7 @@ enum AccelerationMode: String, CaseIterable {
     case gpu = "GPU"
     case neuralEngine = "Neural Engine"
     case auto = "Auto"
-    
+
     var description: String {
         switch self {
         case .cpu:
@@ -56,7 +56,7 @@ struct AccelerationMetrics {
     let utilizationPercentage: Double?
     let estimatedSpeedup: Double?
     let powerEfficiency: PowerEfficiency?
-    
+
     enum PowerEfficiency: String {
         case low = "Low"
         case medium = "Medium"
@@ -70,10 +70,10 @@ struct AccelerationMetrics {
 protocol HardwareCapabilityDetector {
     /// Check if a specific acceleration mode is available
     func isAccelerationAvailable(_ mode: AccelerationMode) -> Bool
-    
+
     /// Get the recommended acceleration mode for current device
     func recommendedAccelerationMode() -> AccelerationMode
-    
+
     /// Get detailed hardware information
     func getHardwareInfo() -> HardwareInfo
 }
@@ -96,17 +96,17 @@ extension HardwareAccelerated {
     var supportedAccelerationModes: [AccelerationMode] {
         [.cpu]
     }
-    
+
     var currentAccelerationMode: AccelerationMode {
         .cpu
     }
-    
+
     func configureAcceleration(mode: AccelerationMode) async throws {
         guard mode == .cpu else {
             throw LLMError.custom("Only CPU mode is supported")
         }
     }
-    
+
     func getAccelerationMetrics() -> AccelerationMetrics {
         AccelerationMetrics(
             mode: .cpu,

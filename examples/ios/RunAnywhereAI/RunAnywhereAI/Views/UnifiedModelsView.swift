@@ -20,7 +20,7 @@ struct UnifiedModelsView: View {
     @State private var selectedDownloadInfo: ModelInfo?
     @State private var showingImportView = false
     @State private var showingDeviceInfo = false
-    
+
     private var mainContent: some View {
         VStack(spacing: 20) {
             // Device Status Overview
@@ -36,7 +36,7 @@ struct UnifiedModelsView: View {
         }
         .padding(.vertical)
     }
-    
+
     private var frameworksSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -72,11 +72,11 @@ struct UnifiedModelsView: View {
             .padding(.horizontal)
 
             frameworkCards
-            
+
             comingSoonSection
         }
     }
-    
+
     private var frameworkCards: some View {
         VStack(spacing: 12) {
             ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
@@ -105,7 +105,7 @@ struct UnifiedModelsView: View {
         }
         .padding(.horizontal)
     }
-    
+
     private var comingSoonSection: some View {
         Group {
             if !LLMFramework.allCases.filter({ $0.isDeferred }).isEmpty {
@@ -191,7 +191,7 @@ struct UnifiedModelsView: View {
 
     private func createModelInfo(from downloadInfo: ModelInfo) -> ModelInfo {
         let format = ModelFormat.from(extension: downloadInfo.downloadURL?.pathExtension ?? "")
-        
+
         return ModelInfo(
             id: downloadInfo.id,
             name: downloadInfo.name,
@@ -210,7 +210,7 @@ struct UnifiedModelsView: View {
             viewModel.showError = true
             return
         }
-        
+
         // Directly show download progress without going through model details
         selectedDownloadInfo = downloadInfo
         showingDownloadProgress = true

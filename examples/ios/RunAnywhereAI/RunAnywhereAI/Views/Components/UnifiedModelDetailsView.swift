@@ -41,7 +41,7 @@ struct UnifiedModelDetailsView: View {
 
         return nil
     }
-    
+
     private var isModelDownloaded: Bool {
         if let downloadInfo = downloadInfo {
             return modelManager.isModelDownloaded(downloadInfo.name, framework: model.framework)
@@ -115,7 +115,7 @@ struct UnifiedModelDetailsView: View {
                         if let contextLength = model.contextLength {
                             DetailRow(label: "Context Length", value: "\(contextLength) tokens")
                         }
-                        
+
                         if let downloadedFileName = model.downloadedFileName {
                             DetailRow(
                                 label: "Downloaded File",

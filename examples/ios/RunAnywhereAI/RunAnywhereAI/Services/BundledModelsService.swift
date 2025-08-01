@@ -10,13 +10,13 @@ class BundledModelsService {
     // Pre-defined sample models that come with the app
     var bundledModels: [ModelInfo] {
         var models: [ModelInfo] = []
-        
+
         // DISABLED: OpenELM models are now downloaded dynamically from HuggingFace
         // This reduces app size and allows for model updates without app updates
         /*
         print("DEBUG: Searching for bundled models...")
         print("DEBUG: Bundle path: \(Bundle.main.bundlePath)")
-        
+
         // Check if OpenELM model exists in bundle
         if let openELMPath = Bundle.main.path(forResource: "OpenELM-270M-Instruct-128-float32", ofType: "mlpackage") {
             print("DEBUG: Found OpenELM model at resource path: \(openELMPath)")
@@ -34,11 +34,11 @@ class BundledModelsService {
             ))
         } else {
             print("DEBUG: Bundle.main.path didn't find the model")
-            
+
             // Try alternate path - check in Models directory within bundle
             let bundleModelsPath = Bundle.main.bundleURL.appendingPathComponent("Models/OpenELM-270M-Instruct-128-float32.mlpackage")
             print("DEBUG: Checking alternate path: \(bundleModelsPath.path)")
-            
+
             if FileManager.default.fileExists(atPath: bundleModelsPath.path) {
                 print("DEBUG: Found OpenELM model at alternate path")
                 models.append(ModelInfo(
@@ -57,7 +57,7 @@ class BundledModelsService {
                 print("Warning: OpenELM model not found in bundle. Searched paths:")
                 print("  - Resource: OpenELM-270M-Instruct-128-float32.mlpackage")
                 print("  - Bundle Models: \(bundleModelsPath.path)")
-                
+
                 // List contents of bundle to debug
                 if let bundleContents = try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath) {
                     print("DEBUG: Bundle contents:")
@@ -68,11 +68,11 @@ class BundledModelsService {
             }
         }
         */
-        
+
         print("DEBUG: Total bundled models found: \(models.count)")
-        
+
         // Add more bundled models here as needed
-        
+
         return models
     }
 
@@ -88,11 +88,11 @@ class BundledModelsService {
             // Create framework-specific directory
             let frameworkDir = modelsDirectory.appendingPathComponent(model.framework.directoryName)
             try FileManager.default.createDirectory(at: frameworkDir, withIntermediateDirectories: true)
-            
+
             // Determine the resource name and extension
             let resourceName: String
             let resourceExtension: String
-            
+
             // For .mlpackage models, remove the extension from the name for resource lookup
             if model.format == .mlPackage && model.name.hasSuffix(".mlpackage") {
                 resourceName = String(model.name.dropLast(10)) // Remove ".mlpackage"
@@ -102,16 +102,16 @@ class BundledModelsService {
                 resourceName = model.id
                 resourceExtension = model.format.fileExtension
             }
-            
+
             // Check if the model exists in the app bundle
             if let bundleURL = Bundle.main.url(forResource: resourceName, withExtension: resourceExtension) {
                 let destinationURL = frameworkDir.appendingPathComponent(model.name)
-                
+
                 // Skip if already installed
                 if !FileManager.default.fileExists(atPath: destinationURL.path) {
                     try FileManager.default.copyItem(at: bundleURL, to: destinationURL)
                     print("Copied bundled model '\(model.name)' to: \(destinationURL.path)")
-                    
+
                     // Update model path
                     await ModelManager.shared.updateModelPath(modelId: model.id, path: destinationURL.path)
                 } else {
@@ -121,7 +121,7 @@ class BundledModelsService {
                 // For bundled models, check if they exist in the Models directory
                 let modelsDir = Bundle.main.bundleURL.appendingPathComponent("Models")
                 let modelPath = modelsDir.appendingPathComponent(model.name)
-                
+
                 if FileManager.default.fileExists(atPath: modelPath.path) {
                     print("Found bundled model at: \(modelPath.path)")
                     // Model is already bundled, no need to copy

@@ -10,18 +10,18 @@ import SwiftUI
 struct APICredentialsView: View {
     @StateObject private var kaggleAuth = KaggleAuthService.shared
     @StateObject private var huggingFaceAuth = HuggingFaceAuthService.shared
-    
+
     @State private var kaggleUsername = ""
     @State private var kaggleAPIKey = ""
     @State private var huggingFaceToken = ""
-    
+
     @State private var showingKaggleInstructions = false
     @State private var showingHuggingFaceInstructions = false
     @State private var isAuthenticating = false
     @State private var authError: String?
     @State private var showingSuccessAlert = false
     @State private var successMessage = ""
-    
+
     var body: some View {
         Form {
             // Hugging Face Section
@@ -39,26 +39,26 @@ struct APICredentialsView: View {
                                 .foregroundColor(.green)
                         }
                     }
-                    
+
                     if !huggingFaceAuth.isAuthenticated {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Access Token")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             SecureField("hf_...", text: $huggingFaceToken)
                                 .textFieldStyle(.roundedBorder)
                                 .autocapitalization(.none)
                                 .disableAutocorrection(true)
-                            
+
                             HStack {
                                 Button("How to Get Token") {
                                     showingHuggingFaceInstructions = true
                                 }
                                 .font(.caption)
-                                
+
                                 Spacer()
-                                
+
                                 Button("Connect") {
                                     authenticateHuggingFace()
                                 }
@@ -78,9 +78,9 @@ struct APICredentialsView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            
+
                             Spacer()
-                            
+
                             Button("Disconnect") {
                                 huggingFaceAuth.logout()
                                 huggingFaceToken = ""
@@ -95,7 +95,7 @@ struct APICredentialsView: View {
                 Text("Required for downloading models from Hugging Face. Your token is stored securely in Keychain.")
                     .font(.caption)
             }
-            
+
             // Kaggle Section
             Section {
                 VStack(alignment: .leading, spacing: 12) {
@@ -111,35 +111,35 @@ struct APICredentialsView: View {
                                 .foregroundColor(.green)
                         }
                     }
-                    
+
                     if !kaggleAuth.isAuthenticated {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Username")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             TextField("Your Kaggle username", text: $kaggleUsername)
                                 .textFieldStyle(.roundedBorder)
                                 .autocapitalization(.none)
                                 .disableAutocorrection(true)
-                            
+
                             Text("API Key")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            
+
                             SecureField("Your Kaggle API key", text: $kaggleAPIKey)
                                 .textFieldStyle(.roundedBorder)
                                 .autocapitalization(.none)
                                 .disableAutocorrection(true)
-                            
+
                             HStack {
                                 Button("How to Get API Key") {
                                     showingKaggleInstructions = true
                                 }
                                 .font(.caption)
-                                
+
                                 Spacer()
-                                
+
                                 Button("Connect") {
                                     authenticateKaggle()
                                 }
@@ -159,9 +159,9 @@ struct APICredentialsView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
-                            
+
                             Spacer()
-                            
+
                             Button("Disconnect") {
                                 kaggleAuth.logout()
                                 kaggleUsername = ""
@@ -177,17 +177,17 @@ struct APICredentialsView: View {
                 Text("Required for downloading models from Kaggle. Your credentials are stored securely in Keychain.")
                     .font(.caption)
             }
-            
+
             // Info Section
             Section {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Why are credentials needed?", systemImage: "info.circle")
                         .font(.headline)
-                    
+
                     Text("Some model providers require authentication to download their models. Your credentials are stored securely in the iOS Keychain and are only used for downloading models.")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
+
                     Text("• Credentials are never sent to our servers")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -231,11 +231,11 @@ struct APICredentialsView: View {
             }
         }
     }
-    
+
     private func authenticateHuggingFace() {
         isAuthenticating = true
         authError = nil
-        
+
         Task {
             do {
                 try await huggingFaceAuth.authenticate(token: huggingFaceToken)
@@ -254,11 +254,11 @@ struct APICredentialsView: View {
             }
         }
     }
-    
+
     private func authenticateKaggle() {
         isAuthenticating = true
         authError = nil
-        
+
         Task {
             do {
                 try await kaggleAuth.authenticate(username: kaggleUsername, apiKey: kaggleAPIKey)
@@ -284,7 +284,7 @@ struct APICredentialsView: View {
 
 struct HuggingFaceInstructionsView: View {
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -294,11 +294,11 @@ struct HuggingFaceInstructionsView: View {
                         Text("How to Get Your Hugging Face Token")
                             .font(.title2)
                             .fontWeight(.bold)
-                        
+
                         Text("Follow these steps to create your access token:")
                             .foregroundColor(.secondary)
                     }
-                    
+
                     // Steps
                     VStack(alignment: .leading, spacing: 16) {
                         instructionStep(number: 1, text: "Go to huggingface.co and sign in")
@@ -312,13 +312,13 @@ struct HuggingFaceInstructionsView: View {
                         instructionStep(number: 9, text: "Copy the token (starts with 'hf_')")
                         instructionStep(number: 10, text: "Paste it in the field above")
                     }
-                    
+
                     // Important Notes
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Important Notes:")
                             .font(.headline)
                             .foregroundColor(.orange)
-                        
+
                         VStack(alignment: .leading, spacing: 8) {
                             noteItem(icon: "lock.shield", text: "Keep your token secure - treat it like a password")
                             noteItem(icon: "shield", text: "The token will only be stored in your device's Keychain")
@@ -343,7 +343,7 @@ struct HuggingFaceInstructionsView: View {
             }
         }
     }
-    
+
     private func instructionStep(number: Int, text: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
@@ -353,15 +353,15 @@ struct HuggingFaceInstructionsView: View {
                 .frame(width: 24, height: 24)
                 .background(Color.accentColor)
                 .clipShape(Circle())
-            
+
             Text(text)
                 .font(.body)
                 .fixedSize(horizontal: false, vertical: true)
-            
+
             Spacer()
         }
     }
-    
+
     private func noteItem(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: icon)

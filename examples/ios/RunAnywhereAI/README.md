@@ -161,7 +161,7 @@ RunAnywhereAI/
 The app features a tab-based interface with four main sections:
 
 1. **Chat Tab**: Interactive chat interface with streaming responses
-2. **Models Tab**: Model management, loading, and framework selection  
+2. **Models Tab**: Model management, loading, and framework selection
 3. **Benchmark Tab**: Performance testing and analytics tools
 4. **Settings Tab**: Configuration options and advanced settings
 
@@ -169,7 +169,7 @@ The app features a tab-based interface with four main sections:
 
 ### Prerequisites
 - **iOS 15.0+** (iOS 17.0+ recommended for full feature support)
-- **Xcode 15.0+** 
+- **Xcode 15.0+**
 - **Swift 5.9+**
 - **macOS 12.0+** for development
 - **Apple Silicon Mac** recommended for MLX framework testing
@@ -312,7 +312,7 @@ This app demonstrates integration patterns for multiple LLM frameworks:
 ### Integration-Ready Services
 Each service includes the interface and architecture for:
 - **llama.cpp**: GGUF model support with C++ bridge
-- **Core ML**: Apple's native ML framework integration  
+- **Core ML**: Apple's native ML framework integration
 - **MLX**: Apple Silicon-optimized framework
 - **ONNX Runtime**: Cross-platform model execution
 - **TensorFlow Lite**: Mobile-optimized TensorFlow

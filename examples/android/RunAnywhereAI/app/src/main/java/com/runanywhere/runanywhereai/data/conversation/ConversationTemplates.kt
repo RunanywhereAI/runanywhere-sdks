@@ -16,17 +16,17 @@ class ConversationTemplateManager(private val context: Context) {
     companion object {
         private const val TEMPLATES_FILE = "conversation_templates.json"
     }
-    
+
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         prettyPrint = true
     }
-    
+
     private val templatesFile: File by lazy {
         File(context.filesDir, TEMPLATES_FILE)
     }
-    
+
     /**
      * Get all available conversation templates
      */
@@ -35,21 +35,21 @@ class ConversationTemplateManager(private val context: Context) {
         val customTemplates = loadCustomTemplates()
         builtInTemplates + customTemplates
     }
-    
+
     /**
      * Get templates by category
      */
     suspend fun getTemplatesByCategory(category: TemplateCategory): List<ConversationTemplate> {
         return getAllTemplates().filter { it.category == category }
     }
-    
+
     /**
      * Get template by ID
      */
     suspend fun getTemplate(id: String): ConversationTemplate? {
         return getAllTemplates().find { it.id == id }
     }
-    
+
     /**
      * Save custom template
      */
@@ -57,20 +57,20 @@ class ConversationTemplateManager(private val context: Context) {
         try {
             val customTemplates = loadCustomTemplates().toMutableList()
             val existingIndex = customTemplates.indexOfFirst { it.id == template.id }
-            
+
             if (existingIndex >= 0) {
                 customTemplates[existingIndex] = template
             } else {
                 customTemplates.add(template)
             }
-            
+
             saveCustomTemplates(customTemplates)
             true
         } catch (e: Exception) {
             false
         }
     }
-    
+
     /**
      * Delete custom template
      */
@@ -78,23 +78,23 @@ class ConversationTemplateManager(private val context: Context) {
         try {
             val customTemplates = loadCustomTemplates().toMutableList()
             val removed = customTemplates.removeAll { it.id == templateId }
-            
+
             if (removed) {
                 saveCustomTemplates(customTemplates)
             }
-            
+
             removed
         } catch (e: Exception) {
             false
         }
     }
-    
+
     /**
      * Apply template to create initial conversation state
      */
     fun applyTemplate(template: ConversationTemplate): ConversationFromTemplate {
         val messages = mutableListOf<TemplateMessage>()
-        
+
         // Add system message if present
         if (template.systemPrompt.isNotEmpty()) {
             messages.add(TemplateMessage(
@@ -103,10 +103,10 @@ class ConversationTemplateManager(private val context: Context) {
                 isEditable = template.allowSystemPromptEdit
             ))
         }
-        
+
         // Add initial messages
         messages.addAll(template.initialMessages)
-        
+
         return ConversationFromTemplate(
             templateId = template.id,
             templateName = template.name,
@@ -116,7 +116,7 @@ class ConversationTemplateManager(private val context: Context) {
             generationOptions = template.defaultGenerationOptions
         )
     }
-    
+
     /**
      * Replace variables in template content
      */
@@ -127,7 +127,7 @@ class ConversationTemplateManager(private val context: Context) {
         }
         return result
     }
-    
+
     private fun getBuiltInTemplates(): List<ConversationTemplate> {
         return listOf(
             // Coding Assistant Templates
@@ -161,7 +161,7 @@ Be specific in your suggestions and explain the reasoning behind your recommenda
                 tags = listOf("code-review", "best-practices", "debugging"),
                 isBuiltIn = true
             ),
-            
+
             ConversationTemplate(
                 id = "debug-helper",
                 name = "Debugging Assistant",
@@ -192,7 +192,7 @@ Ask clarifying questions when needed and provide clear, actionable advice.""",
                 tags = listOf("debugging", "error-fixing", "troubleshooting"),
                 isBuiltIn = true
             ),
-            
+
             // Writing Assistant Templates
             ConversationTemplate(
                 id = "essay-helper",
@@ -224,7 +224,7 @@ Focus on teaching good writing principles and helping users develop their own vo
                 tags = listOf("essay", "writing", "academic"),
                 isBuiltIn = true
             ),
-            
+
             // Learning Templates
             ConversationTemplate(
                 id = "concept-explainer",
@@ -256,7 +256,7 @@ Adapt your explanation style to the user's knowledge level and learning preferen
                 tags = listOf("learning", "explanation", "education"),
                 isBuiltIn = true
             ),
-            
+
             // Business Templates
             ConversationTemplate(
                 id = "meeting-planner",
@@ -288,7 +288,7 @@ Focus on efficiency and achieving meaningful outcomes.""",
                 tags = listOf("meeting", "planning", "business", "productivity"),
                 isBuiltIn = true
             ),
-            
+
             // Creative Templates
             ConversationTemplate(
                 id = "story-brainstorm",
@@ -320,7 +320,7 @@ Encourage creativity while providing practical storytelling advice.""",
                 tags = listOf("creative-writing", "storytelling", "brainstorming"),
                 isBuiltIn = true
             ),
-            
+
             // Problem Solving Templates
             ConversationTemplate(
                 id = "decision-maker",
@@ -354,7 +354,7 @@ Guide users through logical analysis while respecting their values and circumsta
             )
         )
     }
-    
+
     private fun loadCustomTemplates(): List<ConversationTemplate> {
         return try {
             if (templatesFile.exists()) {
@@ -367,7 +367,7 @@ Guide users through logical analysis while respecting their values and circumsta
             emptyList()
         }
     }
-    
+
     private fun saveCustomTemplates(templates: List<ConversationTemplate>) {
         try {
             val jsonData = json.encodeToString(templates)
@@ -478,7 +478,11 @@ fun List<ConversationTemplate>.filterByCategory(category: TemplateCategory): Lis
 fun List<ConversationTemplate>.filterByTags(tags: List<String>): List<ConversationTemplate> {
     if (tags.isEmpty()) return this
     return filter { template ->
-        tags.any { tag -> template.tags.contains(tag, ignoreCase = true) }
+        tags.any { tag ->
+            template.tags.any { templateTag ->
+                templateTag.equals(tag, ignoreCase = true)
+            }
+        }
     }
 }
 
@@ -494,7 +498,7 @@ fun List<ConversationTemplate>.search(query: String): List<ConversationTemplate>
 
 fun List<ConversationTemplate>.sortByRelevance(query: String): List<ConversationTemplate> {
     if (query.isBlank()) return sortedBy { it.name }
-    
+
     val searchQuery = query.lowercase()
     return sortedWith { a, b ->
         val scoreA = calculateRelevanceScore(a, searchQuery)
@@ -505,22 +509,22 @@ fun List<ConversationTemplate>.sortByRelevance(query: String): List<Conversation
 
 private fun calculateRelevanceScore(template: ConversationTemplate, query: String): Int {
     var score = 0
-    
+
     // Exact name match gets highest score
     if (template.name.lowercase() == query) score += 100
     else if (template.name.lowercase().contains(query)) score += 50
-    
+
     // Description match
     if (template.description.lowercase().contains(query)) score += 30
-    
+
     // Tag matches
     template.tags.forEach { tag ->
         if (tag.lowercase() == query) score += 40
         else if (tag.lowercase().contains(query)) score += 20
     }
-    
+
     // System prompt match (lower priority)
     if (template.systemPrompt.lowercase().contains(query)) score += 10
-    
+
     return score
 }

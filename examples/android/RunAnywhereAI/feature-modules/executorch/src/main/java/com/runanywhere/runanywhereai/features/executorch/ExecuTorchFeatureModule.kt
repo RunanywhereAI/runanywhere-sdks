@@ -18,7 +18,7 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object ExecuTorchFeatureModule {
-    
+
     @Provides
     @Singleton
     @Named("executorch")
@@ -35,21 +35,21 @@ class ExecuTorchFeature {
         const val FEATURE_NAME = "executorch"
         const val MIN_SDK_VERSION = 26 // Android 8.0+ for better native performance
         const val REQUIRED_MEMORY_MB = 1536 // 1.5GB minimum
-        
+
         fun isSupported(context: Context): Boolean {
             // Check for GPU/DSP support
             val packageManager = context.packageManager
             val hasVulkan = packageManager.hasSystemFeature("android.hardware.vulkan.level")
             val hasGPU = packageManager.hasSystemFeature("android.hardware.opengles.aep")
-            
+
             val memoryInfo = android.app.ActivityManager.MemoryInfo()
             val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
             activityManager.getMemoryInfo(memoryInfo)
-            
+
             val availableMemoryMB = memoryInfo.totalMem / (1024 * 1024)
             return availableMemoryMB >= REQUIRED_MEMORY_MB && (hasVulkan || hasGPU)
         }
-        
+
         fun getRequirements(): FeatureRequirements {
             return FeatureRequirements(
                 minSdkVersion = MIN_SDK_VERSION,
@@ -63,12 +63,12 @@ class ExecuTorchFeature {
                 description = "PyTorch ExecuTorch inference engine with GPU acceleration"
             )
         }
-        
+
         fun getSupportedBackends(context: Context): List<String> {
             val backends = mutableListOf<String>()
-            
+
             backends.add("XNNPACK") // Always available
-            
+
             val packageManager = context.packageManager
             if (packageManager.hasSystemFeature("android.hardware.vulkan.level")) {
                 backends.add("Vulkan")
@@ -76,19 +76,19 @@ class ExecuTorchFeature {
             if (packageManager.hasSystemFeature("android.hardware.opengles.aep")) {
                 backends.add("OpenGL")
             }
-            
+
             // Check for Qualcomm Hexagon DSP
             if (isQualcommDevice()) {
                 backends.add("QNN") // Qualcomm Neural Network SDK
             }
-            
+
             return backends
         }
-        
+
         private fun isQualcommDevice(): Boolean {
             val manufacturer = android.os.Build.MANUFACTURER.lowercase()
             val model = android.os.Build.MODEL.lowercase()
-            return manufacturer.contains("qualcomm") || 
+            return manufacturer.contains("qualcomm") ||
                    model.contains("snapdragon") ||
                    android.os.Build.HARDWARE.lowercase().contains("qcom")
         }
