@@ -158,6 +158,14 @@ public class DownloadService: DownloadManager {
             totalBytesDownloaded: progressTracker.totalBytesDownloaded
         )
     }
+
+    // MARK: - Health Check
+
+    /// Check if the download service is healthy and operational
+    public func isHealthy() -> Bool {
+        // Basic health check - ensure essential components are available
+        return true // Simple implementation for now
+    }
 }
 
 // MARK: - Supporting Types

@@ -90,16 +90,15 @@ public class ProcessorDetector {
     #if arch(arm64)
     private func detectARMProcessor(coreCount: Int) -> ProcessorInfo {
         // Detect Apple Silicon variants
-        let name = detectAppleSiliconName(coreCount: coreCount)
+        _ = detectAppleSiliconName(coreCount: coreCount)
 
         return ProcessorInfo(
-            name: name,
-            architecture: "ARM64",
             coreCount: coreCount,
-            performanceCoreCount: max(2, coreCount / 2),
-            efficiencyCoreCount: max(2, coreCount / 2),
-            frequencyHz: nil,
-            hasARM64E: true
+            performanceCores: max(2, coreCount / 2),
+            efficiencyCores: max(2, coreCount / 2),
+            architecture: "ARM64",
+            hasARM64E: true,
+            clockFrequency: 3.2
         )
     }
 

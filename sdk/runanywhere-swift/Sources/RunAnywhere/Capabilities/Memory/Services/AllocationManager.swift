@@ -19,7 +19,7 @@ class AllocationManager {
 
     // MARK: - Model Registration
 
-    func registerModel(_ model: LoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
+    func registerModel(_ model: MemoryLoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
         modelLock.lock()
         defer { modelLock.unlock() }
 

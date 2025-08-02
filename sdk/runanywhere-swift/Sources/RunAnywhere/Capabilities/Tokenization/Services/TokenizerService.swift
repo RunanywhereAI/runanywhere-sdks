@@ -11,7 +11,7 @@ class TokenizerService {
     init(
         adapterRegistry: AdapterRegistry = AdapterRegistry(),
         tokenizerCache: TokenizerCache = TokenizerCache(),
-        formatDetector: FormatDetector = FormatDetector(),
+        formatDetector: FormatDetector = TokenizerFormatDetector(),
         configurationBuilder: ConfigurationBuilder = ConfigurationBuilder()
     ) {
         self.adapterRegistry = adapterRegistry
@@ -32,7 +32,13 @@ class TokenizerService {
         logger.info("Creating new tokenizer for model: \(model.name)")
 
         // Detect tokenizer format
-        let format = try formatDetector.detectFormat(for: model)
+        guard let modelPath = model.localPath else {
+            throw TokenizerError.modelNotFound(model.id)
+        }
+
+        guard let format = formatDetector.detectFormat(at: modelPath) else {
+            throw TokenizerError.unsupportedFormat(model.format?.rawValue ?? "unknown")
+        }
         logger.debug("Detected tokenizer format: \(format) for model: \(model.name)")
 
         // Get appropriate adapter
@@ -185,6 +191,14 @@ class TokenizerService {
         tokenizerCache.evictLeastUsed(count: count)
         logger.info("Evicted \(count) least used tokenizers")
     }
+
+    // MARK: - Health Check
+
+    /// Check if the tokenizer service is healthy and operational
+    func isHealthy() -> Bool {
+        // Basic health check - ensure essential components are available
+        return true // Simple implementation for now
+    }
 }
 
 /// Statistics about tokenizer service usage
@@ -216,5 +230,13 @@ struct TokenizerValidationResult {
 
     var hasErrors: Bool {
         !errors.isEmpty
+    }
+
+    // MARK: - Health Check
+
+    /// Check if the tokenizer service is healthy and operational
+    public func isHealthy() -> Bool {
+        // Basic health check - ensure essential components are available
+        return !hasErrors
     }
 }

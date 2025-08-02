@@ -64,16 +64,14 @@ public class GzipExtractor: BaseArchiveExtractor {
     // MARK: - Private Methods
 
     private func decompress(data: Data) -> Data? {
-        return data.withUnsafeBytes { bytes in
-            let buffer = UnsafeRawBufferPointer(bytes)
-
-            return buffer.withMemoryRebound(to: UInt8.self) { bytes in
+        return data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            return bytes.withMemoryRebound(to: UInt8.self) { bytes in
                 let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: data.count * 4)
                 defer { destinationBuffer.deallocate() }
 
                 let decompressedSize = compression_decode_buffer(
                     destinationBuffer, data.count * 4,
-                    bytes.bindMemory(to: UInt8.self).baseAddress!, data.count,
+                    bytes.baseAddress!, data.count,
                     nil, COMPRESSION_ZLIB
                 )
 

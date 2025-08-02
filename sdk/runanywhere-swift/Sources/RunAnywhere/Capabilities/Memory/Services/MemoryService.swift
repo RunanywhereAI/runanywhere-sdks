@@ -6,7 +6,7 @@ import AppKit
 #endif
 
 /// Central memory management service
-class MemoryService {
+class MemoryService: MemoryManager {
     private let allocationManager: AllocationManager
     private let pressureHandler: PressureHandler
     private let cacheEviction: CacheEviction
@@ -54,7 +54,7 @@ class MemoryService {
 
     // MARK: - Model Memory Management
 
-    func registerModel(_ model: LoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
+    func registerModel(_ model: MemoryLoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
         allocationManager.registerModel(model, size: size, service: service, priority: priority)
 
         // Check for memory pressure after registration
@@ -88,6 +88,69 @@ class MemoryService {
 
     func releaseMemory(size: Int64) async {
         await allocationManager.releaseMemory(size: size)
+    }
+
+    // MARK: - MemoryManager Protocol
+
+    func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
+        let memoryModel = MemoryLoadedModel(
+            id: model.id,
+            name: model.name,
+            size: size,
+            framework: model.framework
+        )
+        registerModel(memoryModel, size: size, service: service)
+    }
+
+    func unregisterModel(_ modelId: String) {
+        allocationManager.unregisterModel(modelId)
+    }
+
+    func getCurrentMemoryUsage() -> Int64 {
+        return allocationManager.getTotalModelMemory()
+    }
+
+    func getAvailableMemory() -> Int64 {
+        return memoryMonitor.getAvailableMemory()
+    }
+
+    func hasAvailableMemory(for size: Int64) -> Bool {
+        return getAvailableMemory() >= size
+    }
+
+    func canAllocate(_ size: Int64) async throws -> Bool {
+        return await requestMemory(size: size)
+    }
+
+    func handleMemoryPressure() async {
+        await handleMemoryPressure(level: .warning)
+    }
+
+    func setMemoryThreshold(_ threshold: Int64) {
+        config.memoryThreshold = threshold
+    }
+
+    func getLoadedModels() -> [LoadedModel] {
+        let memoryModels = allocationManager.getLoadedModels()
+        return memoryModels.map { memModel in
+            LoadedModel(
+                id: memModel.id,
+                name: memModel.name,
+                framework: memModel.framework,
+                format: .unknown, // This would need to be stored in MemoryLoadedModel
+                estimatedMemory: memModel.size,
+                isReady: true
+            )
+        }
+    }
+
+    func requestMemory(size: Int64, priority: MemoryPriority) async -> Bool {
+        return await allocationManager.requestMemory(size: size, priority: priority)
+    }
+
+    func isHealthy() -> Bool {
+        // Basic health check - ensure all components are available
+        return memoryMonitor.getAvailableMemory() > 0
     }
 
     // MARK: - Memory Information
@@ -176,11 +239,6 @@ class MemoryService {
     }
 }
 
-/// Memory pressure levels
-enum MemoryPressureLevel {
-    case warning
-    case critical
-}
 
 /// Memory statistics
 struct MemoryStatistics {

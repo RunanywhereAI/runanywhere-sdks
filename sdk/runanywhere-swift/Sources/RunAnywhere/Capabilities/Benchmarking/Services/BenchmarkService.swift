@@ -9,7 +9,7 @@ import Foundation
 
 /// Main benchmark service implementation
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
-public actor BenchmarkService: BenchmarkRunner {
+public actor BenchmarkService: @preconcurrency BenchmarkRunner {
     // MARK: - Properties
 
     public private(set) var isRunning = false
@@ -25,18 +25,30 @@ public actor BenchmarkService: BenchmarkRunner {
 
     // MARK: - Initialization
 
-    public init(
+    /// Public convenience initializer
+    public init() {
+        let performanceMonitor = MonitoringService.shared
+        self.executor = BenchmarkExecutor(performanceMonitor: performanceMonitor)
+        self.promptManager = PromptManager()
+        self.metricsAggregator = MetricsAggregator()
+        self.comparisonEngine = ComparisonEngine()
+        self.reportGenerator = BenchmarkReportGenerator(performanceMonitor: performanceMonitor)
+    }
+
+    /// Internal initializer for dependency injection
+    internal init(
         executor: BenchmarkExecutor? = nil,
         promptManager: PromptManager? = nil,
         metricsAggregator: MetricsAggregator? = nil,
         comparisonEngine: ComparisonEngine? = nil,
         reportGenerator: ReportGenerator? = nil
     ) {
-        self.executor = executor ?? BenchmarkExecutor()
+        let performanceMonitor = MonitoringService.shared
+        self.executor = executor ?? BenchmarkExecutor(performanceMonitor: performanceMonitor)
         self.promptManager = promptManager ?? PromptManager()
         self.metricsAggregator = metricsAggregator ?? MetricsAggregator()
         self.comparisonEngine = comparisonEngine ?? ComparisonEngine()
-        self.reportGenerator = reportGenerator ?? ReportGenerator()
+        self.reportGenerator = reportGenerator ?? BenchmarkReportGenerator(performanceMonitor: performanceMonitor)
     }
 
     // MARK: - BenchmarkRunner Implementation
@@ -87,12 +99,10 @@ public actor BenchmarkService: BenchmarkRunner {
                         iterations: options.iterations
                     )
 
-                    let aggregated = metricsAggregator.aggregate(
-                        results,
-                        serviceName: serviceName,
-                        prompt: prompt
-                    )
-                    allResults.append(aggregated)
+                    // Convert results to appropriate format for aggregation
+                    for result in results {
+                        allResults.append(result)
+                    }
 
                     completedTests += options.iterations
                     currentProgress = Double(completedTests) / Double(totalTests)

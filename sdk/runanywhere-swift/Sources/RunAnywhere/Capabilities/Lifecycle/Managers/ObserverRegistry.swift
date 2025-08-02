@@ -238,7 +238,7 @@ class ObserverRegistry {
             ObserverInfo(
                 index: index,
                 type: String(describing: type(of: observer)),
-                memoryAddress: String(format: "%p", unsafeBitCast(observer, to: UnsafeRawPointer.self)),
+                memoryAddress: String(format: "%p", Unmanaged.passUnretained(observer).toOpaque()),
                 supportsProgress: observer is ModelLifecycleProgressObserver
             )
         }

@@ -138,6 +138,8 @@ public class RequirementMatcher {
         switch capabilities.memoryPressureLevel {
         case .high, .critical:
             warnings.append("High memory pressure detected - performance may be affected")
+        case .warning:
+            warnings.append("Memory pressure warning - consider freeing up memory")
         case .medium:
             warnings.append("Moderate memory pressure - monitor performance")
         case .low:

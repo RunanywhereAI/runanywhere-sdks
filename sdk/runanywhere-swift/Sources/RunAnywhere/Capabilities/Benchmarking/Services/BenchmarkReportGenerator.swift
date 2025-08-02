@@ -28,7 +28,7 @@ public class BenchmarkReportGenerator {
         results: [BenchmarkResult],
         options: BenchmarkOptions
     ) -> BenchmarkReport {
-        let performanceReport = performanceMonitor.generateReport()
+        let performanceReport = performanceMonitor.generateReport(timeRange: 3600) // 1 hour default
         let summary = generateSummary(from: results)
 
         return BenchmarkReport(

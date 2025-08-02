@@ -26,6 +26,11 @@ public protocol MemoryManager {
     /// - Returns: Whether enough memory is available
     func hasAvailableMemory(for size: Int64) -> Bool
 
+    /// Check if memory can be allocated for a specific size
+    /// - Parameter size: Required memory size
+    /// - Returns: Whether memory can be allocated
+    func canAllocate(_ size: Int64) async throws -> Bool
+
     /// Handle memory pressure
     func handleMemoryPressure() async
 
@@ -43,10 +48,14 @@ public protocol MemoryManager {
     ///   - priority: Priority of the request
     /// - Returns: Whether memory was allocated
     func requestMemory(size: Int64, priority: MemoryPriority) async -> Bool
+
+    /// Check if the memory manager is healthy and operational
+    /// - Returns: Whether the service is healthy
+    func isHealthy() -> Bool
 }
 
-/// Loaded model information
-public struct LoadedModel {
+/// Memory-tracked model information
+public struct MemoryLoadedModel {
     public let id: String
     public let name: String
     public let size: Int64

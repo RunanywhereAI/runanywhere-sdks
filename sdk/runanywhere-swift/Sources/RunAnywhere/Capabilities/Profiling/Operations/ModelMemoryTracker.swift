@@ -24,7 +24,7 @@ class ModelMemoryTracker {
             framework: framework,
             modelName: modelName,
             expectedSize: expectedSize,
-            startMemory: SystemMetrics.getCurrentMemoryUsage(),
+            startMemory: ProfilerSystemMetrics.getCurrentMemoryUsage(),
             startTime: Date()
         )
 
@@ -44,7 +44,7 @@ class ModelMemoryTracker {
             return nil
         }
 
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         let actualMemoryUsed = endMemory - tracking.startMemory
         let memoryOverhead = actualMemoryUsed - tracking.expectedSize
         let loadTime = Date().timeIntervalSince(tracking.startTime)

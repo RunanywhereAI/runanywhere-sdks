@@ -23,6 +23,7 @@ public struct ModelMetadata {
     public var createdDate: Date?
     public var lastModified: Date?
     public var checksum: String?
+    public var requirements: ModelRequirements?
     public var additionalInfo: [String: Any]?
 
     public init(
@@ -47,6 +48,7 @@ public struct ModelMetadata {
         createdDate: Date? = nil,
         lastModified: Date? = nil,
         checksum: String? = nil,
+        requirements: ModelRequirements? = nil,
         additionalInfo: [String: Any]? = nil
     ) {
         self.author = author
@@ -70,6 +72,7 @@ public struct ModelMetadata {
         self.createdDate = createdDate
         self.lastModified = lastModified
         self.checksum = checksum
+        self.requirements = requirements
         self.additionalInfo = additionalInfo
     }
 }

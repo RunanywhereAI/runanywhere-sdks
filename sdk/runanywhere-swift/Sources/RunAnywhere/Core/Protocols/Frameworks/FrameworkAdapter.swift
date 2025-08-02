@@ -17,6 +17,11 @@ public protocol FrameworkAdapter {
     /// - Returns: An LLMService implementation
     func createService() -> LLMService
 
+    /// Load a model using this adapter
+    /// - Parameter model: The model to load
+    /// - Returns: An LLMService instance with the loaded model
+    func loadModel(_ model: ModelInfo) async throws -> LLMService
+
     /// Configure the adapter with hardware settings
     /// - Parameter hardware: Hardware configuration
     func configure(with hardware: HardwareConfiguration) async

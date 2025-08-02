@@ -24,11 +24,11 @@ public class MonitoringService: PerformanceMonitor {
     // MARK: - Private Properties
 
     private let logger = SDKLogger(category: "MonitoringService")
-    private let metricsCollector = MetricsCollector()
-    private let generationTracker = GenerationTracker()
+    private let metricsCollector = SystemMetricsCollector()
+    private let generationTracker = PerformanceGenerationTracker()
     private let historyManager = HistoryManager()
     private let alertManager = AlertManager()
-    private let reportGenerator = ReportGenerator()
+    private let reportGenerator = PerformanceReportGenerator()
 
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 0.1 // 100ms updates

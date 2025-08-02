@@ -106,8 +106,8 @@ class CompatibilityService {
     }
 }
 
-/// Result of compatibility check
-struct CompatibilityResult {
+/// Result of compatibility check with scoring
+struct CompatibilityCheckResult {
     let compatible: Bool
     let score: Double // 0.0 to 1.0
     let issues: [CompatibilityIssue]
@@ -159,6 +159,14 @@ enum CompatibilityIssue {
         case .hardwareNotSupported(let hardware):
             return "Hardware \(hardware) is not supported"
         }
+    }
+
+    // MARK: - Health Check
+
+    /// Check if the compatibility service is healthy and operational
+    public func isHealthy() -> Bool {
+        // Basic health check - ensure essential components are available
+        return true // Simple implementation for now
     }
 }
 

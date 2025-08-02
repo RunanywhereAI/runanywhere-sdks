@@ -163,4 +163,17 @@ public class StorageService: StorageMonitoring {
             return StorageInfo.empty
         }
     }
+
+    // MARK: - Health Check
+
+    /// Check if the storage service is healthy and operational
+    public func isHealthy() async -> Bool {
+        // Basic health check - ensure storage is accessible
+        do {
+            _ = try await analyzer.analyzeStorage()
+            return true
+        } catch {
+            return false
+        }
+    }
 }

@@ -40,7 +40,7 @@ class CacheEviction {
 
     // MARK: - Eviction Strategies
 
-    private func selectModelsUsingStrategy(models: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectModelsUsingStrategy(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         switch config.unloadStrategy {
         case .leastRecentlyUsed:
             return selectByLeastRecentlyUsed(models: models, targetMemory: targetMemory, aggressive: aggressive)
@@ -53,22 +53,22 @@ class CacheEviction {
         }
     }
 
-    private func selectByLeastRecentlyUsed(models: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectByLeastRecentlyUsed(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         let sortedModels = models.sorted { $0.lastUsed < $1.lastUsed }
         return selectModelsToTarget(sortedModels: sortedModels, targetMemory: targetMemory, aggressive: aggressive)
     }
 
-    private func selectByLargestFirst(models: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectByLargestFirst(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         let sortedModels = models.sorted { $0.size > $1.size }
         return selectModelsToTarget(sortedModels: sortedModels, targetMemory: targetMemory, aggressive: aggressive)
     }
 
-    private func selectByOldestFirst(models: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectByOldestFirst(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         let sortedModels = models.sorted { $0.lastUsed < $1.lastUsed }
         return selectModelsToTarget(sortedModels: sortedModels, targetMemory: targetMemory, aggressive: aggressive)
     }
 
-    private func selectByPriority(models: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectByPriority(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         let sortedModels = models.sorted { lhs, rhs in
             // Lower priority models are evicted first
             if lhs.priority != rhs.priority {
@@ -80,7 +80,7 @@ class CacheEviction {
         return selectModelsToTarget(sortedModels: sortedModels, targetMemory: targetMemory, aggressive: aggressive)
     }
 
-    private func selectModelsToTarget(sortedModels: [LoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
+    private func selectModelsToTarget(sortedModels: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
         var modelsToEvict: [String] = []
         var freedMemory: Int64 = 0
 
@@ -107,7 +107,7 @@ class CacheEviction {
 
     // MARK: - Model Sorting
 
-    private func sortModelsByEvictionPriority(_ models: [LoadedModelInfo], aggressive: Bool) -> [LoadedModelInfo] {
+    private func sortModelsByEvictionPriority(_ models: [MemoryLoadedModelInfo], aggressive: Bool) -> [MemoryLoadedModelInfo] {
         return models.sorted { lhs, rhs in
             // In aggressive mode, ignore critical priority
             if !aggressive {
@@ -124,7 +124,7 @@ class CacheEviction {
         }
     }
 
-    private func sortModelsByImportance(_ models: [LoadedModelInfo]) -> [LoadedModelInfo] {
+    private func sortModelsByImportance(_ models: [MemoryLoadedModelInfo]) -> [MemoryLoadedModelInfo] {
         return models.sorted { lhs, rhs in
             // Higher priority = more important (lower eviction priority)
             if lhs.priority != rhs.priority {
@@ -136,7 +136,7 @@ class CacheEviction {
         }
     }
 
-    private func calculateEvictionScore(model: LoadedModelInfo) -> Double {
+    private func calculateEvictionScore(model: MemoryLoadedModelInfo) -> Double {
         let timeSinceUse = Date().timeIntervalSince(model.lastUsed)
         let priorityWeight = Double(model.priority.rawValue) * 1000 // Higher priority = higher score
         let recencyScore = timeSinceUse / 3600 // Hours since last use
@@ -147,17 +147,17 @@ class CacheEviction {
 
     // MARK: - Model Information
 
-    func getEvictionCandidates(minMemory: Int64) -> [LoadedModelInfo] {
+    func getEvictionCandidates(minMemory: Int64) -> [MemoryLoadedModelInfo] {
         let models = getCurrentModels()
         return models.filter { $0.size >= minMemory }
     }
 
-    func getModelsByPriority(_ priority: MemoryPriority) -> [LoadedModelInfo] {
+    func getModelsByPriority(_ priority: MemoryPriority) -> [MemoryLoadedModelInfo] {
         let models = getCurrentModels()
         return models.filter { $0.priority == priority }
     }
 
-    func getModelsByUsageAge(olderThan interval: TimeInterval) -> [LoadedModelInfo] {
+    func getModelsByUsageAge(olderThan interval: TimeInterval) -> [MemoryLoadedModelInfo] {
         let models = getCurrentModels()
         let cutoffDate = Date().addingTimeInterval(-interval)
         return models.filter { $0.lastUsed < cutoffDate }
@@ -186,7 +186,7 @@ class CacheEviction {
 
     // MARK: - Private Implementation
 
-    private func getCurrentModels() -> [LoadedModelInfo] {
+    private func getCurrentModels() -> [MemoryLoadedModelInfo] {
         // In real implementation, this would get models from AllocationManager
         // For now, return empty array
         return []

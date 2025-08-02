@@ -10,8 +10,10 @@ public enum ModelFormat: String, CaseIterable {
     case safetensors = "safetensors"
     case gguf = "gguf"
     case ggml = "ggml"
+    case mlx = "mlx"
     case pte = "pte"
     case bin = "bin"
     case weights = "weights"
     case checkpoint = "checkpoint"
+    case unknown = "unknown"
 }

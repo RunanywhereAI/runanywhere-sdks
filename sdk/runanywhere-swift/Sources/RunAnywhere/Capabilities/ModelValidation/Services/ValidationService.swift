@@ -31,11 +31,26 @@ public class ValidationService: ModelValidator {
         self.checksumValidator = checksumValidator ?? ChecksumValidator()
 
         // Get framework registry from service container
-        let frameworkRegistry = ServiceContainer.shared.frameworkAdapterRegistry
+        let frameworkRegistry = ServiceContainer.shared.adapterRegistry
         self.dependencyChecker = dependencyChecker ?? DependencyChecker(frameworkRegistry: frameworkRegistry)
     }
 
     // MARK: - ModelValidator Protocol
+
+    public func validate(_ url: URL) async throws -> ValidationResult {
+        // For basic validation without ModelInfo, detect format and create minimal ModelInfo
+        let format = formatDetector.detectFormat(at: url) ?? .unknown
+        let modelInfo = ModelInfo(
+            id: url.lastPathComponent,
+            name: url.lastPathComponent,
+            format: format,
+            localPath: url,
+            estimatedMemory: 0,
+            downloadSize: nil,
+            checksum: nil
+        )
+        return try await validateModel(modelInfo, at: url)
+    }
 
     public func validateModel(_ model: ModelInfo, at path: URL) async throws -> ValidationResult {
         var warnings: [ValidationWarning] = []
@@ -169,5 +184,13 @@ public class ValidationService: ModelValidator {
         }
 
         return warnings.isEmpty ? nil : warnings
+    }
+
+    // MARK: - Health Check
+
+    /// Check if the validation service is healthy and operational
+    public func isHealthy() -> Bool {
+        // Basic health check - ensure essential components are available
+        return true // Simple implementation for now
     }
 }

@@ -8,7 +8,7 @@
 import Foundation
 
 /// Utilities for gathering system memory metrics
-class SystemMetrics {
+class ProfilerSystemMetrics {
     /// Get current memory usage in bytes
     static func getCurrentMemoryUsage() -> Int64 {
         var info = mach_task_basic_info()

@@ -47,6 +47,8 @@ public struct DeviceCapabilities {
 
         if ratio < 0.1 {
             return .critical
+        } else if ratio < 0.15 {
+            return .warning
         } else if ratio < 0.2 {
             return .high
         } else if ratio < 0.4 {
@@ -99,6 +101,7 @@ public enum MemoryPressureLevel {
     case low
     case medium
     case high
+    case warning
     case critical
 }
 
@@ -125,5 +128,6 @@ public enum ProcessorType {
     case m4Pro
     case m4Max
     case intel
+    case arm
     case unknown
 }

@@ -151,7 +151,16 @@ public class RunAnywhereSDK {
             throw SDKError.notInitialized
         }
 
-        try await serviceContainer.storageService.deleteModel(modelIdentifier)
+        // Get model info to find the local path
+        guard let modelInfo = serviceContainer.modelRegistry.getModel(by: modelIdentifier) else {
+            throw SDKError.modelNotFound(modelIdentifier)
+        }
+
+        guard let localPath = modelInfo.localPath else {
+            throw SDKError.modelNotFound("Model '\(modelIdentifier)' not downloaded")
+        }
+
+        _ = try await serviceContainer.storageService.deleteModel(at: localPath)
     }
 
     // MARK: - Private Methods
@@ -175,7 +184,7 @@ extension RunAnywhereSDK {
     }
 
     /// Access to storage monitoring
-    public var storageMonitor: StorageMonitor {
+    public var storageMonitor: StorageMonitoring {
         serviceContainer.storageMonitor
     }
 

@@ -2,14 +2,14 @@ import Foundation
 
 /// Memory-specific information about a loaded model
 internal struct MemoryLoadedModelInfo {
-    let model: LoadedModel
+    let model: MemoryLoadedModel
     let size: Int64
     var lastUsed: Date
     weak var service: LLMService?
     let priority: MemoryPriority
 
     init(
-        model: LoadedModel,
+        model: MemoryLoadedModel,
         size: Int64,
         lastUsed: Date = Date(),
         service: LLMService? = nil,

@@ -22,7 +22,7 @@ class OperationProfiler {
         operation: () throws -> T
     ) throws -> (result: T, profile: OperationMemoryProfile) {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let startMemory = SystemMetrics.getCurrentMemoryUsage()
+        let startMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         let operationId = UUID().uuidString
 
         allocationTracker.beginTracking(id: operationId, name: name)
@@ -34,7 +34,7 @@ class OperationProfiler {
         let result = try operation()
 
         let endTime = CFAbsoluteTimeGetCurrent()
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
 
         let allocations = allocationTracker.getAllocations(for: operationId)
 
@@ -57,7 +57,7 @@ class OperationProfiler {
         operation: () async throws -> T
     ) async throws -> (result: T, profile: OperationMemoryProfile) {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let startMemory = SystemMetrics.getCurrentMemoryUsage()
+        let startMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         let operationId = UUID().uuidString
 
         allocationTracker.beginTracking(id: operationId, name: name)
@@ -70,7 +70,7 @@ class OperationProfiler {
         var peakMemory = startMemory
         let monitorTask = Task {
             while !Task.isCancelled {
-                let current = SystemMetrics.getCurrentMemoryUsage()
+                let current = ProfilerSystemMetrics.getCurrentMemoryUsage()
                 if current > peakMemory {
                     peakMemory = current
                 }
@@ -82,7 +82,7 @@ class OperationProfiler {
         monitorTask.cancel()
 
         let endTime = CFAbsoluteTimeGetCurrent()
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
 
         let allocations = allocationTracker.getAllocations(for: operationId)
 
