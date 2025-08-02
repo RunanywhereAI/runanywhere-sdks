@@ -102,5 +102,5 @@ public protocol MetadataExtractorProtocol {
     /// Get model requirements
     /// - Parameter url: URL to the model file
     /// - Returns: Model requirements
-    func getRequirements(for url: URL) async throws -> ModelRequirements
+    func getRequirements(for url: URL) async throws -> [HardwareRequirement]
 }

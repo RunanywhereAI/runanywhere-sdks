@@ -27,7 +27,7 @@ public class ServiceContainer {
             registry: modelRegistry,
             adapterRegistry: adapterRegistry,
             validationService: validationService,
-            memoryService: memoryService
+            memoryService: unifiedMemoryManager
         )
     }()
 
@@ -87,15 +87,7 @@ public class ServiceContainer {
         )
     }()
 
-    /// Memory service
-    private(set) lazy var memoryService: MemoryService = {
-        MemoryService(memoryMonitor: memoryMonitor)
-    }()
-
-    /// Memory monitor
-    private(set) lazy var memoryMonitor: MemoryMonitor = {
-        MemoryMonitor()
-    }()
+    // Memory service and monitor placeholders removed - using unifiedMemoryManager instead
 
     // MARK: - Monitoring Services
 
@@ -124,6 +116,11 @@ public class ServiceContainer {
     /// Hardware manager
     private(set) lazy var hardwareManager: HardwareCapabilityManager = {
         HardwareCapabilityManager()
+    }()
+
+    /// Unified memory manager (implements MemoryManager protocol)
+    private(set) lazy var unifiedMemoryManager: MemoryManager = {
+        UnifiedMemoryManager()
     }()
 
     /// Logger

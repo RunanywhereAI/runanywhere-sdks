@@ -10,7 +10,7 @@ public class EnhancedDownloadManager {
 
     private let downloadQueue: OperationQueue = OperationQueue()
     private var activeTasks: [String: DownloadTask] = [:]
-    private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
+    private let progressTracker: ProgressService = ProgressService()
 
     /// Configuration for download behavior
     public struct DownloadConfig {

@@ -1,17 +1,11 @@
 import Foundation
 
-/// Result of loading a model
-public struct LoadedModel {
-    public let model: ModelInfo
-    public let service: LLMService
-}
-
 /// Service responsible for loading models
 public class ModelLoadingService {
     private let registry: ModelRegistry
     private let adapterRegistry: FrameworkAdapterRegistry
     private let validationService: ValidationService
-    private let memoryService: MemoryService
+    private let memoryService: MemoryManager // Using MemoryManager protocol for now
 
     private var loadedModels: [String: LoadedModel] = [:]
 
@@ -19,7 +13,7 @@ public class ModelLoadingService {
         registry: ModelRegistry,
         adapterRegistry: FrameworkAdapterRegistry,
         validationService: ValidationService,
-        memoryService: MemoryService
+        memoryService: MemoryManager
     ) {
         self.registry = registry
         self.adapterRegistry = adapterRegistry

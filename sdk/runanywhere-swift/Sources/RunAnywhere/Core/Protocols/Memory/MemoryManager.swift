@@ -86,41 +86,8 @@ public enum MemoryPriority: Int, Comparable {
     }
 }
 
-/// Protocol for progress tracking
-public protocol ProgressTracker {
-    /// Start a new stage
-    /// - Parameter stage: The lifecycle stage
-    func startStage(_ stage: LifecycleStage)
-
-    /// Update stage progress
-    /// - Parameters:
-    ///   - stage: The lifecycle stage
-    ///   - progress: Progress value (0.0 to 1.0)
-    ///   - message: Optional status message
-    func updateStageProgress(_ stage: LifecycleStage, progress: Double, message: String?)
-
-    /// Complete a stage
-    /// - Parameter stage: The lifecycle stage
-    func completeStage(_ stage: LifecycleStage)
-
-    /// Fail a stage
-    /// - Parameters:
-    ///   - stage: The lifecycle stage
-    ///   - error: The error that occurred
-    func failStage(_ stage: LifecycleStage, error: Error)
-
-    /// Get current overall progress
-    /// - Returns: Overall progress information
-    func getCurrentProgress() -> OverallProgress
-
-    /// Add a progress observer
-    /// - Parameter observer: The observer to add
-    func addObserver(_ observer: ProgressObserver)
-
-    /// Remove a progress observer
-    /// - Parameter observer: The observer to remove
-    func removeObserver(_ observer: ProgressObserver)
-}
+// ProgressTracker protocol has been moved to Capabilities/Progress/Protocols/ProgressTracker.swift
+// Import the module or use the ProgressTracker from there
 
 /// Lifecycle stages for progress tracking
 public enum LifecycleStage: String, CaseIterable {
