@@ -1,7 +1,7 @@
 import Foundation
 
 /// Detects tokenizer formats from model information and files
-class FormatDetector {
+class TokenizerFormatDetector {
     private let logger = SDKLogger(category: "FormatDetector")
 
     // File patterns for different tokenizer formats

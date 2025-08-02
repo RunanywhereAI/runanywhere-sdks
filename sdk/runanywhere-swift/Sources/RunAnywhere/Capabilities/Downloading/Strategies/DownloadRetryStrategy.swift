@@ -1,7 +1,7 @@
 import Foundation
 
 /// Strategy for handling download retries
-public class RetryStrategy {
+public class DownloadRetryStrategy {
 
     // MARK: - Properties
 

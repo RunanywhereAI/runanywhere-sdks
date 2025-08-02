@@ -1,5 +1,5 @@
 //
-//  GenerationTracker.swift
+//  PerformanceGenerationTracker.swift
 //  RunAnywhere SDK
 //
 //  Tracks performance during generation
@@ -20,7 +20,7 @@ internal struct PerformanceGenerationTracking {
 }
 
 /// Tracks generation performance
-internal class GenerationTracker {
+internal class PerformanceGenerationTracker {
     private let logger = SDKLogger(category: "GenerationTracker")
     private var activeGeneration: PerformanceGenerationTracking?
 

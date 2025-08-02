@@ -13,6 +13,11 @@ public struct ModelMetadata {
     public var embeddingDimension: Int?
     public var layers: Int?
     public var parameters: Int64?
+    public var parameterCount: Int64?
+    public var formatVersion: String?
+    public var tensorCount: Int?
+    public var inputShapes: [String: [Int]]?
+    public var outputShapes: [String: [Int]]?
     public var license: String?
     public var tags: [String]?
     public var createdDate: Date?
@@ -32,6 +37,11 @@ public struct ModelMetadata {
         embeddingDimension: Int? = nil,
         layers: Int? = nil,
         parameters: Int64? = nil,
+        parameterCount: Int64? = nil,
+        formatVersion: String? = nil,
+        tensorCount: Int? = nil,
+        inputShapes: [String: [Int]]? = nil,
+        outputShapes: [String: [Int]]? = nil,
         license: String? = nil,
         tags: [String]? = nil,
         createdDate: Date? = nil,
@@ -50,6 +60,11 @@ public struct ModelMetadata {
         self.embeddingDimension = embeddingDimension
         self.layers = layers
         self.parameters = parameters
+        self.parameterCount = parameterCount
+        self.formatVersion = formatVersion
+        self.tensorCount = tensorCount
+        self.inputShapes = inputShapes
+        self.outputShapes = outputShapes
         self.license = license
         self.tags = tags
         self.createdDate = createdDate

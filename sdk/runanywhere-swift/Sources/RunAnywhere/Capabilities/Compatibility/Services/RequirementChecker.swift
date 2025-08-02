@@ -1,6 +1,8 @@
 import Foundation
 import Metal
+#if canImport(UIKit)
 import UIKit
+#endif
 
 /// Service for checking device and system requirements
 class RequirementChecker {

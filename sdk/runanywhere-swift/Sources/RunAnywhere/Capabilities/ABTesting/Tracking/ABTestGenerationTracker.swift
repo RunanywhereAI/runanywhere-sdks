@@ -1,5 +1,5 @@
 //
-//  GenerationTracker.swift
+//  ABTestGenerationTracker.swift
 //  RunAnywhere SDK
 //
 //  Tracks generation metrics for A/B tests
@@ -8,7 +8,7 @@
 import Foundation
 
 /// Tracks generation performance for A/B testing
-public class GenerationTracker {
+public class ABTestGenerationTracker {
     // MARK: - Properties
 
     private let performanceMonitor = RealtimePerformanceMonitor.shared

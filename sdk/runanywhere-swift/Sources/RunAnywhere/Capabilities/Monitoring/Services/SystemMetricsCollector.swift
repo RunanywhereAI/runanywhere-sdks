@@ -1,5 +1,5 @@
 //
-//  MetricsCollector.swift
+//  SystemMetricsCollector.swift
 //  RunAnywhere SDK
 //
 //  Collects and updates performance metrics
@@ -8,7 +8,7 @@
 import Foundation
 
 /// Collects and updates performance metrics
-internal class MetricsCollector {
+internal class SystemMetricsCollector {
     private let logger = SDKLogger(category: "MetricsCollector")
     private let systemMetrics = SystemMetrics()
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.metricscollector")

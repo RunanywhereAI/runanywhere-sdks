@@ -8,7 +8,7 @@ public class DownloadCoordinator {
     private let queue: DownloadQueue
     private let session: DownloadSession
     private let progressTracker: DownloadProgressTracker
-    private let retryStrategy: RetryStrategy
+    private let retryStrategy: DownloadRetryStrategy
     private let logger = SDKLogger(category: "DownloadCoordinator")
 
     // MARK: - Initialization
@@ -17,12 +17,12 @@ public class DownloadCoordinator {
         queue: DownloadQueue,
         session: DownloadSession,
         progressTracker: DownloadProgressTracker,
-        retryStrategy: RetryStrategy? = nil
+        retryStrategy: DownloadRetryStrategy? = nil
     ) {
         self.queue = queue
         self.session = session
         self.progressTracker = progressTracker
-        self.retryStrategy = retryStrategy ?? RetryStrategy()
+        self.retryStrategy = retryStrategy ?? DownloadRetryStrategy()
     }
 
     // MARK: - Public Methods

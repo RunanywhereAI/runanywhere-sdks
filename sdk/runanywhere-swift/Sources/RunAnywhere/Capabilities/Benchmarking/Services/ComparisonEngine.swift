@@ -74,9 +74,9 @@ public class ComparisonEngine {
         }
 
         // Tertiary metric: memory usage
-        if result1.memoryUsed < result2.memoryUsed * 0.8 {
+        if result1.memoryUsed < Int64(Double(result2.memoryUsed) * 0.8) {
             return 1
-        } else if result2.memoryUsed < result1.memoryUsed * 0.8 {
+        } else if result2.memoryUsed < Int64(Double(result1.memoryUsed) * 0.8) {
             return 2
         }
 

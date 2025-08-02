@@ -1,5 +1,5 @@
 //
-//  MetricsCollector.swift
+//  BenchmarkMetricsCollector.swift
 //  RunAnywhere SDK
 //
 //  Protocol for collecting benchmark metrics
@@ -8,7 +8,7 @@
 import Foundation
 
 /// Protocol for collecting benchmark metrics
-public protocol MetricsCollector {
+public protocol BenchmarkMetricsCollector {
     /// Start collecting metrics for a benchmark run
     func beginCollection(serviceName: String, promptId: String)
 
