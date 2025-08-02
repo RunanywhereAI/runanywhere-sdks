@@ -6,7 +6,9 @@
 //
 
 import SwiftUI
+#if canImport(Charts)
 import Charts
+#endif
 
 struct PerformanceDashboardView: View {
     @State private var tokensPerSecond: Double = 0
@@ -44,18 +46,36 @@ struct PerformanceDashboardView: View {
                             .font(.headline)
                             .padding(.horizontal)
 
-                        Chart(performanceHistory) { point in
-                            LineMark(
-                                x: .value("Time", point.timestamp),
-                                y: .value("Tokens/s", point.tokensPerSecond)
-                            )
-                            .foregroundStyle(.blue)
+                        #if canImport(Charts) && os(iOS)
+                        if #available(iOS 16.0, *) {
+                            Chart(performanceHistory) { point in
+                                LineMark(
+                                    x: .value("Time", point.timestamp),
+                                    y: .value("Tokens/s", point.tokensPerSecond)
+                                )
+                                .foregroundStyle(.blue)
+                            }
+                            .frame(height: 200)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        } else {
+                            Text("Charts require iOS 16+")
+                                .frame(height: 200)
+                                .frame(maxWidth: .infinity)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                                .padding(.horizontal)
                         }
-                        .frame(height: 200)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
+                        #else
+                        Text("Charts not available")
+                            .frame(height: 200)
+                            .frame(maxWidth: .infinity)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        #endif
                     }
                 }
 

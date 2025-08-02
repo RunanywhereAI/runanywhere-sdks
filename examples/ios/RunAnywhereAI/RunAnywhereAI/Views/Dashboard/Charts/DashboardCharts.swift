@@ -2,12 +2,47 @@
 //  DashboardCharts.swift
 //  RunAnywhereAI
 //
-//  Created by Sanchit Monga on 7/27/25.
+//  Simplified version for direct SDK consumption
 //
 
 import SwiftUI
+#if canImport(Charts)
 import Charts
+#endif
 import RunAnywhereSDK
+
+// MARK: - Simple Data Types
+
+struct MemorySnapshot {
+    let timestamp: Date
+    let usedMemory: Int64
+}
+
+struct BenchmarkResult {
+    let framework: LLMFramework
+    let avgTokensPerSecond: Double
+    let avgMemoryUsed: Int64
+}
+
+// MARK: - LLMFramework Extensions
+
+extension LLMFramework {
+    var displayName: String {
+        switch self {
+        case .llamaCpp: return "LlamaC++"
+        case .coreML: return "CoreML"
+        case .mlx: return "MLX"
+        case .onnx: return "ONNX"
+        case .execuTorch: return "ExecuTorch"
+        case .tensorFlowLite: return "TFLite"
+        case .picoLLM: return "PicoLLM"
+        case .swiftTransformers: return "SwiftTransformers"
+        case .mlc: return "MLC"
+        case .foundationModels: return "Foundation"
+        case .mediaPipe: return "MediaPipe"
+        }
+    }
+}
 
 // MARK: - Tokens Per Second Chart
 

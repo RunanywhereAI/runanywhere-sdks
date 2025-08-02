@@ -105,7 +105,7 @@ struct ModelDownloadConfirmationView: View {
                             .font(.headline)
                             .padding(.horizontal)
 
-                        ForEach(availableDownloads) { download in
+                        ForEach(availableDownloads, id: \.id) { download in
                             DownloadOptionRow(
                                 downloadInfo: download,
                                 isSelected: selectedURL == download.downloadURL
@@ -121,13 +121,13 @@ struct ModelDownloadConfirmationView: View {
                     // Download details
                     if let info = downloadInfo {
                         VStack(alignment: .leading, spacing: 8) {
-                            if info.requiresAuth {
+                            if false { // Auth check placeholder
                                 Label("Requires authentication", systemImage: "lock.fill")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
 
-                            if info.requiresUnzip {
+                            if false { // Unzip check placeholder
                                 Label("Will be extracted after download", systemImage: "doc.zipper")
                                     .font(.caption)
                                     .foregroundColor(.blue)
