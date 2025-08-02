@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct KaggleAuthView: View {
     let model: ModelInfo
@@ -362,24 +363,19 @@ struct KaggleInstructionsView: View {
         model: ModelInfo(
             id: "test-kaggle-model",
             name: "Test Kaggle Model",
-            path: nil,
             format: .gguf,
-            size: "1.0GB",
-            framework: .llamaCpp,
-            quantization: nil,
-            contextLength: nil,
-            isLocal: false,
             downloadURL: URL(string: "https://www.kaggle.com/models/google/test"),
-            downloadedFileName: nil,
-            modelType: .text,
-            sha256: nil,
-            requiresUnzip: false,
-            requiresAuth: true,
-            alternativeURLs: [],
-            notes: nil,
-            description: "Test Kaggle model for preview",
-            minimumMemory: 0,
-            recommendedMemory: 0
+            localPath: nil,
+            estimatedMemory: 1_000_000_000,
+            contextLength: 2048,
+            downloadSize: 1_000_000_000,
+            checksum: nil,
+            compatibleFrameworks: [.llamaCpp],
+            preferredFramework: .llamaCpp,
+            hardwareRequirements: [],
+            tokenizerFormat: nil,
+            metadata: nil,
+            alternativeDownloadURLs: []
         ),
         onSuccess: { },
         onCancel: { }

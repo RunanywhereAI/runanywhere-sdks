@@ -6,6 +6,12 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
+
+// Helper function
+private func formatSize(_ bytes: Int64) -> String {
+    ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+}
 
 struct UnifiedModelDetailsView: View {
     let model: ModelInfo
@@ -19,7 +25,8 @@ struct UnifiedModelDetailsView: View {
     @State private var showingCompatibilityDetails = false
 
     private var downloadInfo: ModelInfo? {
-        let modelsWithURLs = modelURLRegistry.getAllModels(for: model.framework)
+        let framework = model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels
+        let modelsWithURLs = modelURLRegistry.getAllModels(for: framework)
         return modelsWithURLs.first { downloadInfo in
             downloadInfo.name == model.name ||
                 downloadInfo.id == model.id ||
@@ -44,9 +51,11 @@ struct UnifiedModelDetailsView: View {
 
     private var isModelDownloaded: Bool {
         if let downloadInfo = downloadInfo {
-            return modelManager.isModelDownloaded(downloadInfo.name, framework: model.framework)
+            let framework = model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels
+            return modelManager.isModelDownloaded(downloadInfo.name, framework: framework)
         }
-        return modelManager.isModelDownloaded(model.name, framework: model.framework)
+        let framework = model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels
+        return modelManager.isModelDownloaded(model.name, framework: framework)
     }
 
     var body: some View {
@@ -64,7 +73,7 @@ struct UnifiedModelDetailsView: View {
                                 .font(.title2)
                                 .fontWeight(.bold)
 
-                            Text(model.framework.displayName)
+                            Text((model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels).rawValue)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -81,12 +90,12 @@ struct UnifiedModelDetailsView: View {
                         )
 
                         StatusBadge(
-                            text: model.isCompatible ? "Compatible" : "Incompatible",
-                            systemImage: model.isCompatible ? "checkmark.circle.fill" : "xmark.circle.fill",
-                            color: model.isCompatible ? .green : .red
+                            text: !model.compatibleFrameworks.isEmpty ? "Compatible" : "Incompatible",
+                            systemImage: !model.compatibleFrameworks.isEmpty ? "checkmark.circle.fill" : "xmark.circle.fill",
+                            color: !model.compatibleFrameworks.isEmpty ? .green : .red
                         )
 
-                        if downloadInfo?.requiresAuth == true {
+                        if false { // Auth check placeholder
                             StatusBadge(
                                 text: "Auth Required",
                                 systemImage: "lock.fill",
@@ -105,21 +114,21 @@ struct UnifiedModelDetailsView: View {
                         .font(.headline)
 
                     VStack(spacing: 12) {
-                        DetailRow(label: "Format", value: model.format.displayName)
-                        DetailRow(label: "Size", value: model.displaySize)
+                        DetailRow(label: "Format", value: model.format.rawValue)
+                        DetailRow(label: "Size", value: formatSize(model.downloadSize ?? model.estimatedMemory))
 
-                        if let quantization = model.quantization {
-                            DetailRow(label: "Quantization", value: quantization)
+                        if let quantization = model.metadata?.quantizationLevel {
+                            DetailRow(label: "Quantization", value: quantization.rawValue)
                         }
 
-                        if let contextLength = model.contextLength {
-                            DetailRow(label: "Context Length", value: "\(contextLength) tokens")
+                        if model.contextLength > 0 {
+                            DetailRow(label: "Context Length", value: "\(model.contextLength) tokens")
                         }
 
-                        if let downloadedFileName = model.downloadedFileName {
+                        if let localPath = model.localPath {
                             DetailRow(
                                 label: "Downloaded File",
-                                value: downloadedFileName,
+                                value: localPath.lastPathComponent,
                                 valueColor: .green
                             )
                         } else if let downloadInfo = downloadInfo {
@@ -136,11 +145,11 @@ struct UnifiedModelDetailsView: View {
                                 isURL: true
                             )
 
-                            if downloadInfo.requiresUnzip {
+                            if false { // Unzip check placeholder
                                 DetailRow(label: "Format", value: "ZIP Archive")
                             }
 
-                            if let notes = downloadInfo.notes {
+                            if let notes = downloadInfo.metadata?.description {
                                 DetailRow(label: "Notes", value: notes)
                             }
                         }
@@ -170,14 +179,14 @@ struct UnifiedModelDetailsView: View {
                     VStack(spacing: 12) {
                         CompatibilityRow(
                             title: "Memory Required",
-                            isCompatible: deviceMemory >= model.minimumMemory,
-                            message: ByteCountFormatter.string(fromByteCount: model.minimumMemory, countStyle: .memory)
+                            isCompatible: deviceMemory >= model.estimatedMemory,
+                            message: ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .memory)
                         )
 
                         CompatibilityRow(
                             title: "Recommended Memory",
-                            isCompatible: deviceMemory >= model.recommendedMemory,
-                            message: ByteCountFormatter.string(fromByteCount: model.recommendedMemory, countStyle: .memory)
+                            isCompatible: deviceMemory >= (model.estimatedMemory * 2),
+                            message: ByteCountFormatter.string(fromByteCount: model.estimatedMemory * 2, countStyle: .memory)
                         )
 
                         if let deviceInfo = deviceInfoService.deviceInfo {
@@ -190,8 +199,8 @@ struct UnifiedModelDetailsView: View {
 
                         CompatibilityRow(
                             title: "Framework Support",
-                            isCompatible: !model.framework.isDeferred,
-                            message: model.framework.displayName
+                            isCompatible: true,
+                            message: (model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels).rawValue
                         )
                     }
                 }
@@ -391,13 +400,21 @@ struct DetailRow: View {
     NavigationView {
         UnifiedModelDetailsView(
             model: ModelInfo(
+                id: "test-model-id",
                 name: "Test Model",
                 format: .gguf,
-                size: "1.2GB",
-                framework: .coreML,
-                quantization: "Q4_K_M",
-                isLocal: false,
-                description: "A test model for preview"
+                downloadURL: nil,
+                localPath: nil,
+                estimatedMemory: 1_200_000_000,
+                contextLength: 2048,
+                downloadSize: 1_200_000_000,
+                checksum: nil,
+                compatibleFrameworks: [.coreML],
+                preferredFramework: .coreML,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
             )
         )            { _ in }
     }

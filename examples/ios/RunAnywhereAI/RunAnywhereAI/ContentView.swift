@@ -18,14 +18,14 @@ struct ContentView: View {
             }
             .tag(0)
 
-            UnifiedModelsView()
+            SimplifiedModelsView()
                 .tabItem {
                     Label("Models", systemImage: "cube")
                 }
                 .tag(1)
 
             NavigationView {
-                SettingsView()
+                SimplifiedSettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")

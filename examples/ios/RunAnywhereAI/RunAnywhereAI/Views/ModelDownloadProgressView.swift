@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import CryptoKit
 import ZIPFoundation
+import RunAnywhereSDK
 
 enum DownloadStep: String, CaseIterable {
     case preparing = "Preparing"

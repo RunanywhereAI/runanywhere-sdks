@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RunAnywhereSDK
 
 // Make ChatMessage support the additional properties
 private var frameworkKey: UInt8 = 0

@@ -5,6 +5,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import RunAnywhereSDK
 
 struct ModelImportView: View {
     @Environment(\.dismiss) private var dismiss
@@ -115,7 +116,7 @@ struct ModelImportView: View {
             return "GGUF format used by llama.cpp. Efficient quantized models."
         case .coreML:
             return "Apple Core ML format. Optimized for Apple hardware."
-        case .onnxRuntime:
+        case .onnx:
             return "Open Neural Network Exchange format. Cross-platform."
         case .mlx:
             return "MLX format for Apple Silicon. High performance."
@@ -131,7 +132,7 @@ struct ModelImportView: View {
         case .coreML:
             return [UTType(filenameExtension: "mlpackage") ?? .folder,
                     UTType(filenameExtension: "mlmodel") ?? .data]
-        case .onnxRuntime:
+        case .onnx:
             return [UTType(filenameExtension: "onnx") ?? .data]
         case .mlx:
             return [.folder] // MLX models are typically directories
@@ -209,7 +210,7 @@ struct ModelImportView: View {
             return .llamaCpp
         case .coreML:
             return .coreML
-        case .onnxRuntime:
+        case .onnx:
             return .onnxRuntime
         case .mlx:
             return .mlx

@@ -86,7 +86,7 @@ struct MemoryUsageChart: View {
 
 @available(iOS 16.0, *)
 struct FrameworkPerformanceChart: View {
-    let results: [BenchmarkSuiteResult]
+    let results: [BenchmarkResult]
 
     private var aggregatedData: [(framework: LLMFramework, speed: Double, memory: Double)] {
         let grouped = Dictionary(grouping: results) { $0.framework }

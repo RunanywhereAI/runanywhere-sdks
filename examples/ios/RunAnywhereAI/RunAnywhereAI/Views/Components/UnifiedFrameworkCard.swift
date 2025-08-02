@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct UnifiedFrameworkCard: View {
     let framework: LLMFramework

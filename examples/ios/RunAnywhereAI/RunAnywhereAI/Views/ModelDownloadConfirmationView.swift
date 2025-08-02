@@ -18,7 +18,9 @@ struct ModelDownloadConfirmationView: View {
 
     private var availableDownloads: [ModelInfo] {
         let registry = ModelURLRegistry.shared
-        let allModels = registry.getAllModels(for: model.framework)
+        // Use preferred framework or first compatible framework
+        let framework = model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels
+        let allModels = registry.getAllModels(for: framework)
 
         return allModels.filter { downloadInfo in
             // Exact match

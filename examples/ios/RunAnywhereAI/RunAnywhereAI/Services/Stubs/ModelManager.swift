@@ -59,6 +59,12 @@ class ModelManager: ObservableObject {
     func isModelLoaded(_ modelId: String) -> Bool {
         return sdk.currentModel?.id == modelId
     }
+
+    func isModelDownloaded(_ modelName: String, framework: LLMFramework) -> Bool {
+        // Check if model exists locally
+        // For now, return false unless it's Foundation Models which are built-in
+        return framework == .foundationModels
+    }
 }
 
 // MARK: - ModelInfo Extension

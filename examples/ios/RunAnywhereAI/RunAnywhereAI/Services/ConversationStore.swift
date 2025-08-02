@@ -193,8 +193,8 @@ struct Conversation: Identifiable, Codable {
     let createdAt: Date
     var updatedAt: Date
     var messages: [Message]
-    var modelInfo: RunAnywhereSDK.ModelInfo?
-    var framework: RunAnywhereSDK.LLMFramework?
+    var modelName: String?
+    var frameworkName: String?
 
     var summary: String {
         guard !messages.isEmpty else { return "No messages" }

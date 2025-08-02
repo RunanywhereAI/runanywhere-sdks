@@ -113,7 +113,7 @@ class DeviceInfoService: ObservableObject {
 
 // MARK: - SDK DeviceInfo Extension
 
-extension RunAnywhereSDK.DeviceInfo {
+extension DeviceInfo {
     var modelName: String? {
         // Assuming SDK has device model name
         return nil // Replace with actual SDK property when available

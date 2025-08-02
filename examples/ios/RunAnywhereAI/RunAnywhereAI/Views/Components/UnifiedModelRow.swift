@@ -8,6 +8,11 @@
 import SwiftUI
 import RunAnywhereSDK
 
+// Helper function
+private func formatSize(_ bytes: Int64) -> String {
+    ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+}
+
 struct UnifiedModelRow: View {
     let model: ModelInfo
     let framework: LLMFramework
@@ -60,9 +65,9 @@ struct UnifiedModelRow: View {
         return modelManager.isModelDownloaded(model.name, framework: framework)
     }
 
-    private var effectiveModelType: ModelType {
-        // Use modelType from downloadableModel if available, otherwise from model
-        return downloadableModel?.modelType ?? model.modelType ?? .text
+    private var effectiveModelType: String {
+        // Default to "text" for now
+        return "text"
     }
 
     var body: some View {
@@ -84,10 +89,10 @@ struct UnifiedModelRow: View {
                             .lineLimit(1)
 
                         // Model type indicator
-                        Image(systemName: effectiveModelType.icon)
+                        Image(systemName: "text.bubble")
                             .font(.caption)
-                            .foregroundColor(effectiveModelType.supportedInChat ? .blue : .orange)
-                            .help(effectiveModelType.rawValue)
+                            .foregroundColor(.blue)
+                            .help("Text Model")
                     }
 
                     // Status indicators
@@ -95,28 +100,28 @@ struct UnifiedModelRow: View {
                         // First row: Type and size
                         HStack(spacing: 8) {
                             // Model type badge
-                            Text(effectiveModelType.rawValue)
+                            Text("Text")
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(effectiveModelType.supportedInChat ? Color.blue.opacity(0.1) : Color.orange.opacity(0.1))
-                                .foregroundColor(effectiveModelType.supportedInChat ? .blue : .orange)
+                                .background(Color.blue.opacity(0.1))
+                                .foregroundColor(.blue)
                                 .cornerRadius(4)
 
                             Text("•")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
 
-                            Text(model.displaySize)
+                            Text(formatSize(model.downloadSize ?? model.estimatedMemory))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
                             // Quantization
-                            if let quantization = model.quantization {
+                            if let quantization = model.metadata?.quantizationLevel {
                                 Text("•")
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
-                                Text(quantization)
+                                Text(quantization.rawValue)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -127,7 +132,7 @@ struct UnifiedModelRow: View {
                         // Second row: Status badges
                         HStack(spacing: 8) {
                             // Compatibility
-                            if model.isCompatible {
+                            if !model.compatibleFrameworks.isEmpty {
                                 HStack(spacing: 4) {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 10))
@@ -202,7 +207,7 @@ struct UnifiedModelRow: View {
 
                     // Show status for local models
                     if isModelDownloaded {
-                        if !effectiveModelType.supportedInChat {
+                        if false { // All text models are supported
                             // Coming Soon badge for unsupported model types
                             VStack(spacing: 2) {
                                 Image(systemName: "clock.badge.exclamationmark")
@@ -258,7 +263,7 @@ struct DownloadOnlyModelRow: View {
 
     private var isDownloaded: Bool {
         // Try to determine framework from modelInfo
-        let framework = modelInfo.framework
+        let framework = modelInfo.preferredFramework ?? modelInfo.compatibleFrameworks.first ?? .foundationModels
         return ModelManager.shared.isModelDownloaded(modelInfo.name, framework: framework)
     }
 
@@ -269,9 +274,9 @@ struct DownloadOnlyModelRow: View {
     var body: some View {
         HStack(spacing: 12) {
             // Model icon
-            Image(systemName: modelInfo.isLocal ? "apple.logo" : (isDownloaded ? "checkmark.circle.fill" : "arrow.down.circle"))
+            Image(systemName: modelInfo.localPath != nil ? "apple.logo" : (isDownloaded ? "checkmark.circle.fill" : "arrow.down.circle"))
                 .font(.title3)
-                .foregroundColor(modelInfo.isLocal ? .blue : (isDownloaded ? .green : .orange))
+                .foregroundColor(modelInfo.localPath != nil ? .blue : (isDownloaded ? .green : .orange))
                 .frame(width: 40)
 
             // Model info
@@ -289,7 +294,7 @@ struct DownloadOnlyModelRow: View {
                         Label("Downloaded", systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundColor(.green)
-                    } else if modelInfo.isLocal {
+                    } else if modelInfo.localPath != nil {
                         Label("Built-in", systemImage: "apple.logo")
                             .font(.caption)
                             .foregroundColor(.blue)
@@ -312,7 +317,7 @@ struct DownloadOnlyModelRow: View {
                 }
 
                 // Model size
-                Text(modelInfo.displaySize)
+                Text(formatSize(modelInfo.downloadSize ?? modelInfo.estimatedMemory))
                     .font(.caption2)
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -337,7 +342,7 @@ struct DownloadOnlyModelRow: View {
                 }
             } else if !isDownloaded {
                 Button(action: onDownload) {
-                    if modelInfo.isLocal {
+                    if modelInfo.localPath != nil {
                         Image(systemName: "apple.logo")
                             .font(.title2)
                             .foregroundColor(.blue)
@@ -351,7 +356,7 @@ struct DownloadOnlyModelRow: View {
                             .foregroundColor(.blue)
                     }
                 }
-                .disabled(modelInfo.downloadURL == nil && !modelInfo.isLocal && !isDownloaded)
+                .disabled(modelInfo.downloadURL == nil && modelInfo.localPath == nil && !isDownloaded)
             } else {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.title2)
@@ -365,7 +370,7 @@ struct DownloadOnlyModelRow: View {
                 onDownload()
             }
         }
-        .opacity((modelInfo.downloadURL == nil && !modelInfo.isLocal && !isDownloaded) ? 0.6 : 1.0)
+        .opacity((modelInfo.downloadURL == nil && modelInfo.localPath == nil && !isDownloaded) ? 0.6 : 1.0)
     }
 }
 
@@ -373,12 +378,12 @@ struct DownloadOnlyModelRow: View {
     VStack {
         UnifiedModelRow(
             model: ModelInfo(
+                id: "test-model",
                 name: "Test Model",
                 format: .gguf,
-                size: "1.2GB",
-                framework: .coreML,
-                quantization: "Q4_K_M",
-                isLocal: false
+                downloadSize: 1_200_000_000,
+                compatibleFrameworks: [.coreML],
+                metadata: ModelInfoMetadata(quantizationLevel: .int4)
             ),
             framework: .coreML,
             onTap: {},
@@ -388,12 +393,12 @@ struct DownloadOnlyModelRow: View {
 
         DownloadOnlyModelRow(
             modelInfo: ModelInfo(
+                id: "test-download",
                 name: "Test Download Model",
                 format: .gguf,
-                size: "2.1GB",
-                framework: .llamaCpp,
-                isLocal: false,
-                downloadURL: URL(string: "https://example.com/model.gguf")
+                downloadURL: URL(string: "https://example.com/model.gguf"),
+                downloadSize: 2_100_000_000,
+                compatibleFrameworks: [.llamaCpp]
             )
         ) {}
     }

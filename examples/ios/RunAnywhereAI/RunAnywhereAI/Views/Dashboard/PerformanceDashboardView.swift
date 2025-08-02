@@ -2,127 +2,153 @@
 //  PerformanceDashboardView.swift
 //  RunAnywhereAI
 //
-//  Simplified performance view using SDK directly
+//  Simplified performance view
 //
 
 import SwiftUI
 import Charts
-import RunAnywhereSDK
 
 struct PerformanceDashboardView: View {
-    @State private var metrics: RunAnywhereSDK.PerformanceMetrics?
-    @State private var memoryInfo: RunAnywhereSDK.MemoryReport?
+    @State private var tokensPerSecond: Double = 0
+    @State private var memoryUsage: Double = 0
     @State private var isMonitoring = false
+    @State private var performanceHistory: [PerformanceDataPoint] = []
 
-    private let sdk = RunAnywhereSDK.shared
     private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Monitoring toggle
-                    Toggle("Enable Monitoring", isOn: $isMonitoring)
+        ScrollView {
+            VStack(spacing: 16) {
+                // Current Performance
+                HStack(spacing: 16) {
+                    MetricCard(
+                        title: "Tokens/Sec",
+                        value: String(format: "%.1f", tokensPerSecond),
+                        icon: "speedometer",
+                        color: .blue
+                    )
+
+                    MetricCard(
+                        title: "Memory",
+                        value: String(format: "%.0f%%", memoryUsage),
+                        icon: "memorychip",
+                        color: .green
+                    )
+                }
+                .padding(.horizontal)
+
+                // Performance Chart
+                if !performanceHistory.isEmpty {
+                    VStack(alignment: .leading) {
+                        Text("Performance History")
+                            .font(.headline)
+                            .padding(.horizontal)
+
+                        Chart(performanceHistory) { point in
+                            LineMark(
+                                x: .value("Time", point.timestamp),
+                                y: .value("Tokens/s", point.tokensPerSecond)
+                            )
+                            .foregroundStyle(.blue)
+                        }
+                        .frame(height: 200)
                         .padding()
-                        .onChange(of: isMonitoring) { _, newValue in
-                            if newValue {
-                                sdk.performanceMonitor.startMonitoring()
-                                sdk.memoryProfiler.startProfiling()
-                            } else {
-                                sdk.performanceMonitor.stopMonitoring()
-                                sdk.memoryProfiler.stopProfiling()
-                            }
-                        }
-
-                    // Performance metrics
-                    if let metrics = metrics {
-                        performanceCard(metrics: metrics)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
+                }
 
-                    // Memory info
-                    if let memory = memoryInfo {
-                        memoryCard(memory: memory)
+                // Control Button
+                Button(action: toggleMonitoring) {
+                    HStack {
+                        Image(systemName: isMonitoring ? "pause.circle.fill" : "play.circle.fill")
+                        Text(isMonitoring ? "Stop Monitoring" : "Start Monitoring")
                     }
-
-                    // Run benchmark button
-                    Button("Run Benchmark") {
-                        Task {
-                            await runBenchmark()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(isMonitoring ? Color.red : Color.blue)
+                    .cornerRadius(10)
                 }
                 .padding()
             }
-            .navigationTitle("Performance")
-            .onReceive(timer) { _ in
-                if isMonitoring {
-                    updateMetrics()
-                }
+        }
+        .navigationTitle("Performance")
+        .navigationBarTitleDisplayMode(.large)
+        .onReceive(timer) { _ in
+            if isMonitoring {
+                updateMetrics()
             }
         }
     }
 
-    private func performanceCard(metrics: RunAnywhereSDK.PerformanceMetrics) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Performance Metrics")
-                .font(.headline)
-
-            HStack {
-                Label("\(metrics.tokensPerSecond, specifier: "%.1f") tokens/s", systemImage: "speedometer")
-                Spacer()
-                Label("\(metrics.latency, specifier: "%.0f") ms", systemImage: "clock")
-            }
-
-            if metrics.cpuUsage > 0 {
-                ProgressView(value: metrics.cpuUsage / 100)
-                    .progressViewStyle(.linear)
-                Text("CPU: \(metrics.cpuUsage, specifier: "%.0f")%")
-                    .font(.caption)
-            }
+    private func toggleMonitoring() {
+        isMonitoring.toggle()
+        if !isMonitoring {
+            // Clear history when stopping
+            performanceHistory.removeAll()
+            tokensPerSecond = 0
+            memoryUsage = 0
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 2)
-    }
-
-    private func memoryCard(memory: RunAnywhereSDK.MemoryReport) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Memory Usage")
-                .font(.headline)
-
-            HStack {
-                Label("\(memory.usedMemory / 1_000_000) MB", systemImage: "memorychip")
-                Spacer()
-                Text("\(memory.availableMemory / 1_000_000) MB free")
-                    .foregroundColor(.secondary)
-            }
-
-            if memory.peakMemory > 0 {
-                Text("Peak: \(memory.peakMemory / 1_000_000) MB")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-        }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(radius: 2)
     }
 
     private func updateMetrics() {
-        metrics = sdk.performanceMonitor.currentMetrics
-        memoryInfo = sdk.memoryProfiler.generateReport()
-    }
+        // Simulate performance data
+        tokensPerSecond = Double.random(in: 10...50)
+        memoryUsage = Double.random(in: 30...70)
 
-    private func runBenchmark() async {
-        do {
-            let results = try await sdk.benchmarkSuite.runBenchmark()
-            // Handle benchmark results
-            print("Benchmark completed: \(results)")
-        } catch {
-            print("Benchmark failed: \(error)")
+        // Add to history
+        let dataPoint = PerformanceDataPoint(
+            timestamp: Date(),
+            tokensPerSecond: tokensPerSecond,
+            memoryUsage: memoryUsage
+        )
+        performanceHistory.append(dataPoint)
+
+        // Keep only last 60 points (1 minute)
+        if performanceHistory.count > 60 {
+            performanceHistory.removeFirst()
         }
+    }
+}
+
+struct MetricCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 30))
+                .foregroundColor(color)
+
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+}
+
+struct PerformanceDataPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let tokensPerSecond: Double
+    let memoryUsage: Double
+}
+
+#Preview {
+    NavigationView {
+        PerformanceDashboardView()
     }
 }

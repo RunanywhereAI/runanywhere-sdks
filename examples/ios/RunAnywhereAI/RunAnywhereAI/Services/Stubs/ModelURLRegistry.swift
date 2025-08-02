@@ -96,6 +96,25 @@ class ModelURLRegistry: ObservableObject {
         print("Would add custom URL: \(url) for model: \(modelName) in framework: \(framework)")
     }
 
+    func getAllModels(for framework: LLMFramework) -> [ModelInfo] {
+        // Convert SDK framework to local framework for URL lookup
+        let localFramework = framework.toLocalFramework ?? LLMFramework.foundationModels
+
+        // Return ModelInfo objects for models that have URLs
+        let urls = getModelURLs(for: localFramework)
+        return urls.compactMap { name, url in
+            ModelInfo(
+                id: "\(framework.rawValue)-\(name)",
+                name: name,
+                format: framework == .mediaPipe ? .tflite : .gguf,
+                downloadURL: url,
+                estimatedMemory: 1_000_000_000, // 1GB default
+                compatibleFrameworks: [framework],
+                preferredFramework: framework
+            )
+        }
+    }
+
     // MARK: - Private Methods
 
     private func validateURL(_ url: URL) async -> Bool {

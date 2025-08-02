@@ -1,4 +1,5 @@
 import SwiftUI
+import RunAnywhereSDK
 
 struct ModelURLSettingsView: View {
     @State private var selectedFramework: LLMFramework = .coreML

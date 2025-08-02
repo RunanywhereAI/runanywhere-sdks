@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import RunAnywhereSDK
 
 @MainActor
 class FrameworkCapabilityExplorerViewModel: ObservableObject {
@@ -38,7 +39,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 topFeatures: ["Unified Memory", "NumPy-like", "Auto Differentiation"]
             )
 
-        case .onnxRuntime:
+        case .onnx:
             return FrameworkCapabilities(
                 supportsStreaming: false,
                 supportsQuantization: true,
@@ -125,7 +126,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return PerformanceProfile(speed: 0.95, memoryEfficiency: 0.8, modelSizeSupport: 0.7, easeOfUse: 0.85)
         case .mlx:
             return PerformanceProfile(speed: 0.9, memoryEfficiency: 0.95, modelSizeSupport: 0.8, easeOfUse: 0.75)
-        case .onnxRuntime:
+        case .onnx:
             return PerformanceProfile(speed: 0.85, memoryEfficiency: 0.75, modelSizeSupport: 0.9, easeOfUse: 0.8)
         case .execuTorch:
             return PerformanceProfile(speed: 0.7, memoryEfficiency: 0.85, modelSizeSupport: 0.6, easeOfUse: 0.65)
@@ -150,7 +151,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return ["Apple ecosystem apps", "Neural Engine optimization", "Production iOS apps"]
         case .mlx:
             return ["Research and experimentation", "Apple Silicon optimization", "Custom model training"]
-        case .onnxRuntime:
+        case .onnx:
             return ["Cross-platform deployment", "Enterprise applications", "Model interoperability"]
         case .execuTorch:
             return ["PyTorch model deployment", "Edge computing", "Mobile AI applications"]
@@ -187,7 +188,7 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             try await service.loadModel("model.npz")
             let result = try await service.generate(prompt: "Hello")
             """
-        case .onnxRuntime:
+        case .onnx:
             return """
             let service = ONNXService()
             try await service.loadModel("model.onnx")
@@ -257,7 +258,7 @@ extension LLMFramework {
         case .llamaCpp: return "cube.fill"
         case .coreML: return "brain.head.profile"
         case .mlx: return "memorychip.fill"
-        case .onnxRuntime: return "network"
+        case .onnx: return "network"
         case .execuTorch: return "flame.fill"
         case .tensorFlowLite: return "cpu.fill"
         case .picoLLM: return "mic.fill"
@@ -272,7 +273,7 @@ extension LLMFramework {
         case .llamaCpp: return "C++ implementation for GGUF models"
         case .coreML: return "Apple's machine learning framework"
         case .mlx: return "Apple Silicon optimized framework"
-        case .onnxRuntime: return "Open Neural Network Exchange"
+        case .onnx: return "Open Neural Network Exchange"
         case .execuTorch: return "PyTorch on-device inference"
         case .tensorFlowLite: return "TensorFlow mobile framework"
         case .picoLLM: return "Ultra-compressed voice-optimized LLM"

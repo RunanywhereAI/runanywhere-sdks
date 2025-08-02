@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct SettingsView: View {
     @AppStorage("temperature") private var temperature: Double = 0.7

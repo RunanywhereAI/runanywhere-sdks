@@ -13,8 +13,8 @@ import RunAnywhereSDK
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
 
-    @Published var availableModels: [RunAnywhereSDK.ModelInfo] = []
-    @Published var currentModel: RunAnywhereSDK.ModelInfo?
+    @Published var availableModels: [ModelInfo] = []
+    @Published var currentModel: ModelInfo?
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -41,7 +41,7 @@ class ModelListViewModel: ObservableObject {
         isLoading = false
     }
 
-    func selectModel(_ model: RunAnywhereSDK.ModelInfo) async {
+    func selectModel(_ model: ModelInfo) async {
         isLoading = true
         errorMessage = nil
 
