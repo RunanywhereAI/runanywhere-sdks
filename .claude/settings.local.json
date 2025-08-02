@@ -76,6 +76,8 @@
       "Bash(mv:*)",
       "Bash(pre-commit:*)",
       "Bash(git rev-parse:*)",
+      "WebFetch(domain:www.swiftbysundell.com)",
+      "WebFetch(domain:swiftpackageindex.com)",
       "Bash(/Users/sanchitmonga/development/ODLM/sdks/examples/ios/RunAnywhereAI/scripts/build_and_run.sh simulator \"iPhone 16 Pro\")",
       "Bash(rm:*)",
       "Bash(./scripts/fix_pods_sandbox.sh:*)",

@@ -1,6 +1,15 @@
 {
-  "originHash" : "2b278722b895e6ca8294366a60714c1393271a5307a1d760a98656563e0f7b05",
+  "originHash" : "bb752bbdcc5ff5e2e283c139db86eb98e262fefdf588921b44034c8f346a3f5d",
   "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : {
+        "revision" : "513364f870f6bfc468f9d2ff0a95caccc10044c5",
+        "version" : "5.10.2"
+      }
+    },
     {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
@@ -8,6 +17,15 @@
       "state" : {
         "branch" : "swiftpm-0.7.0",
         "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
+      }
+    },
+    {
+      "identity" : "files",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/JohnSundell/Files.git",
+      "state" : {
+        "revision" : "e85f2b4a8dfa0f242889f45236f3867d16e40480",
+        "version" : "4.3.0"
       }
     },
     {
