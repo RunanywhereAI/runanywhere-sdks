@@ -68,17 +68,6 @@ public struct SpecialTokens {
     }
 }
 
-/// Tokenizer formats supported
-public enum TokenizerFormat: String, CaseIterable {
-    case huggingFace = "huggingface"
-    case sentencePiece = "sentencepiece"
-    case wordPiece = "wordpiece"
-    case bpe = "bpe"
-    case tflite = "tflite"
-    case coreML = "coreml"
-    case custom = "custom"
-}
-
 /// Protocol for tokenizer adapters
 public protocol TokenizerAdapter: UnifiedTokenizer {
     /// The format this adapter handles
