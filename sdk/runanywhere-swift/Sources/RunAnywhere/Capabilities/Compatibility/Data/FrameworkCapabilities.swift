@@ -85,7 +85,7 @@ struct FrameworkCapabilities {
         )
     ]
 
-    static func getCapability(for framework: LLMFramework) -> FrameworkCapability? {
+    internal static func getCapability(for framework: LLMFramework) -> InternalFrameworkCapability? {
         return capabilities[framework]
     }
 
@@ -97,7 +97,7 @@ struct FrameworkCapabilities {
 }
 
 /// Internal capability information for a framework
-private struct InternalFrameworkCapability {
+internal struct InternalFrameworkCapability {
     let supportedFormats: Set<ModelFormat>
     let supportedQuantizations: Set<QuantizationLevel>
     let maxModelSize: Int64

@@ -30,14 +30,15 @@ public class ModelInstaller {
             throw DownloadError.modelNotFound
         }
 
-        // Get installation directory
-        let installDirectory = modelStorage.getModelDirectory(for: modelInfo)
+        // Get installation path
+        let installPath = modelStorage.getModelPath(for: modelInfo.id)
+        let installDirectory = installPath.deletingLastPathComponent()
 
         // Create model directory if needed
         try fileManager.createDirectory(at: installDirectory, withIntermediateDirectories: true)
 
         // Determine final filename
-        let filename = modelInfo.filename ?? downloadedURL.lastPathComponent
+        let filename = downloadedURL.lastPathComponent
         let installedURL = installDirectory.appendingPathComponent(filename)
 
         // Handle existing file
@@ -80,7 +81,8 @@ public class ModelInstaller {
 
     /// Uninstall a model
     public func uninstallModel(_ modelInfo: ModelInfo) throws {
-        let installDirectory = modelStorage.getModelDirectory(for: modelInfo)
+        let installPath = modelStorage.getModelPath(for: modelInfo.id)
+        let installDirectory = installPath.deletingLastPathComponent()
 
         if fileManager.fileExists(atPath: installDirectory.path) {
             try fileManager.removeItem(at: installDirectory)
@@ -90,20 +92,14 @@ public class ModelInstaller {
 
     /// Check if model is installed
     public func isModelInstalled(_ modelInfo: ModelInfo) -> Bool {
-        let installDirectory = modelStorage.getModelDirectory(for: modelInfo)
-        let filename = modelInfo.filename ?? "\(modelInfo.id).model"
-        let modelURL = installDirectory.appendingPathComponent(filename)
-
-        return fileManager.fileExists(atPath: modelURL.path)
+        return modelStorage.modelExists(modelInfo.id)
     }
 
     /// Get installed model URL
     public func getInstalledModelURL(_ modelInfo: ModelInfo) -> URL? {
         guard isModelInstalled(modelInfo) else { return nil }
 
-        let installDirectory = modelStorage.getModelDirectory(for: modelInfo)
-        let filename = modelInfo.filename ?? "\(modelInfo.id).model"
-        return installDirectory.appendingPathComponent(filename)
+        return modelStorage.getModelPath(for: modelInfo.id)
     }
 
     // MARK: - Private Methods
@@ -111,14 +107,21 @@ public class ModelInstaller {
     private func updateModelMetadata(modelInfo: ModelInfo, installedURL: URL) async {
         // Update model metadata with installation info
         var metadata = modelInfo
-        metadata.localPath = installedURL.path
+        metadata.localPath = installedURL
         metadata.installDate = Date()
 
-        // Store metadata
+        // Store basic metadata as a simple JSON
         let metadataURL = installedURL.deletingLastPathComponent()
             .appendingPathComponent("metadata.json")
 
-        if let data = try? JSONEncoder().encode(metadata) {
+        let basicMetadata: [String: Any] = [
+            "id": metadata.id,
+            "name": metadata.name,
+            "installedPath": installedURL.path,
+            "installDate": ISO8601DateFormatter().string(from: Date())
+        ]
+
+        if let data = try? JSONSerialization.data(withJSONObject: basicMetadata) {
             try? data.write(to: metadataURL)
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Routing decision for a request
-internal enum RoutingDecision {
+public enum RoutingDecision {
     case onDevice(framework: LLMFramework?, reason: RoutingReason)
     case cloud(provider: String?, reason: RoutingReason)
     case hybrid(devicePortion: Double, framework: LLMFramework?, reason: RoutingReason)

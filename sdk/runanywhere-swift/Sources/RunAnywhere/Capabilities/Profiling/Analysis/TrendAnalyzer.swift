@@ -15,11 +15,11 @@ class TrendAnalyzer {
     func analyzeTrends(snapshots: [MemorySnapshot]) -> TrendAnalysis {
         guard snapshots.count >= 2 else {
             return TrendAnalysis(
-                trend: .stable,
+                trend: MemoryAnalyzer.MemoryTrend.stable,
                 growthRate: 0,
                 acceleration: 0,
-                predictedUsage: nil,
-                timeToLimit: nil
+                predictedUsage: nil as PredictedUsage?,
+                timeToLimit: nil as TimeInterval?
             )
         }
 
@@ -251,7 +251,7 @@ class TrendAnalyzer {
 
 /// Trend analysis results
 struct TrendAnalysis {
-    let trend: MemoryTrend
+    let trend: MemoryAnalyzer.MemoryTrend
     let growthRate: Double // bytes per second
     let acceleration: Double // change in growth rate
     let predictedUsage: PredictedUsage?

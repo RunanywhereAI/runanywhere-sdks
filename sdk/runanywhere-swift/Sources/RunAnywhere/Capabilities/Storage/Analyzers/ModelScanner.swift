@@ -99,8 +99,10 @@ public class ModelScanner {
 
         do {
             let data = try Data(contentsOf: metadataURL)
-            let metadata = try JSONDecoder().decode(ModelInfo.self, from: data)
-            return metadata
+            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return parseModelInfoFromJSON(json, url: modelURL)
+            }
+            return nil
         } catch {
             logger.debug("No metadata found for model at \(modelURL.path)")
             return nil
@@ -151,9 +153,54 @@ public class ModelScanner {
         default:
             // Try to infer from metadata
             if let metadata = await getModelMetadata(at: url) {
-                return metadata.framework
+                return metadata.preferredFramework
             }
             return nil
         }
+    }
+
+    /// Parse ModelInfo from JSON dictionary
+    private func parseModelInfoFromJSON(_ json: [String: Any], url: URL) -> ModelInfo? {
+        guard let id = json["id"] as? String,
+              let name = json["name"] as? String,
+              let formatString = json["format"] as? String,
+              let format = ModelFormat(rawValue: formatString) else {
+            return nil
+        }
+
+        let downloadURL = (json["downloadURL"] as? String).flatMap { URL(string: $0) }
+        let estimatedMemory = json["estimatedMemory"] as? Int64 ?? 1_000_000_000
+        let contextLength = json["contextLength"] as? Int ?? 2048
+        let downloadSize = json["downloadSize"] as? Int64
+        let checksum = json["checksum"] as? String
+
+        let compatibleFrameworks: [LLMFramework] = {
+            if let frameworkStrings = json["compatibleFrameworks"] as? [String] {
+                return frameworkStrings.compactMap { LLMFramework(rawValue: $0) }
+            }
+            return []
+        }()
+
+        let preferredFramework: LLMFramework? = {
+            if let frameworkString = json["preferredFramework"] as? String {
+                return LLMFramework(rawValue: frameworkString)
+            }
+            return nil
+        }()
+
+        return ModelInfo(
+            id: id,
+            name: name,
+            format: format,
+            downloadURL: downloadURL,
+            localPath: url,
+            estimatedMemory: estimatedMemory,
+            contextLength: contextLength,
+            downloadSize: downloadSize,
+            checksum: checksum,
+            compatibleFrameworks: compatibleFrameworks,
+            preferredFramework: preferredFramework,
+            additionalProperties: json
+        )
     }
 }

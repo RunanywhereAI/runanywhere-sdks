@@ -2,6 +2,9 @@ import Foundation
 
 /// Protocol for storage analysis operations
 public protocol StorageAnalyzer {
+    /// Analyze overall storage situation
+    func analyzeStorage() async -> StorageInfo
+
     /// Get model storage usage information
     func getModelStorageUsage() async -> ModelStorageInfo
 

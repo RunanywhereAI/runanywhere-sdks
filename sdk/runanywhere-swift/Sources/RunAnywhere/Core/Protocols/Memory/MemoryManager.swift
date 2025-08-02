@@ -99,7 +99,7 @@ public enum MemoryPriority: Int, Comparable {
 // Import the module or use the ProgressTracker from there
 
 /// Lifecycle stages for progress tracking
-public enum LifecycleStage: String, CaseIterable {
+public enum LifecycleStage: String, CaseIterable, Comparable {
     case discovery = "Discovery"
     case download = "Download"
     case extraction = "Extraction"
@@ -126,6 +126,23 @@ public enum LifecycleStage: String, CaseIterable {
         case .ready:
             return "Model ready"
         }
+    }
+
+    /// Order for sorting stages chronologically
+    private var sortOrder: Int {
+        switch self {
+        case .discovery: return 0
+        case .download: return 1
+        case .extraction: return 2
+        case .validation: return 3
+        case .initialization: return 4
+        case .loading: return 5
+        case .ready: return 6
+        }
+    }
+
+    public static func < (lhs: LifecycleStage, rhs: LifecycleStage) -> Bool {
+        return lhs.sortOrder < rhs.sortOrder
     }
 }
 

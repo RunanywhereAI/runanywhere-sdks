@@ -147,7 +147,7 @@ class MemoryMonitor {
     private var memoryHistory: [MemoryMonitoringStats] = []
     private let maxHistoryEntries = 100
 
-    func getMemoryTrend(duration: TimeInterval) -> MemoryTrend? {
+    func getMemoryTrend(duration: TimeInterval) -> MemoryUsageTrend? {
         let cutoffTime = Date().addingTimeInterval(-duration)
         let recentHistory = memoryHistory.filter { $0.timestamp >= cutoffTime }
 
@@ -163,7 +163,7 @@ class MemoryMonitor {
 
         let rate = Double(memoryDelta) / timeDelta // bytes per second
 
-        return MemoryTrend(
+        return MemoryUsageTrend(
             direction: memoryDelta > 0 ? .increasing : .decreasing,
             rate: abs(rate),
             confidence: calculateTrendConfidence(entries: recentHistory)
@@ -258,7 +258,7 @@ struct MemoryMonitoringStats {
 }
 
 /// Memory usage trend information
-struct MemoryTrend {
+struct MemoryUsageTrend {
     let direction: TrendDirection
     let rate: Double // bytes per second
     let confidence: Double // 0.0 to 1.0

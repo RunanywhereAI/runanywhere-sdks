@@ -20,7 +20,7 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
     private let promptManager: PromptManager
     private let metricsAggregator: MetricsAggregator
     private let comparisonEngine: ComparisonEngine
-    private let reportGenerator: ReportGenerator
+    private let reportGenerator: BenchmarkReportGenerator
     private let logger = SDKLogger(category: "BenchmarkService")
 
     // MARK: - Initialization
@@ -41,7 +41,7 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
         promptManager: PromptManager? = nil,
         metricsAggregator: MetricsAggregator? = nil,
         comparisonEngine: ComparisonEngine? = nil,
-        reportGenerator: ReportGenerator? = nil
+        reportGenerator: BenchmarkReportGenerator? = nil
     ) {
         let performanceMonitor = MonitoringService.shared
         self.executor = executor ?? BenchmarkExecutor(performanceMonitor: performanceMonitor)
@@ -78,7 +78,8 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
         let benchmarkPrompts = prompts ?? promptManager.defaultPrompts
         let totalTests = services.count * benchmarkPrompts.count * options.iterations
         var completedTests = 0
-        var allResults: [BenchmarkResult] = []
+        var allSingleResults: [SingleRunResult] = []
+        var errorResults: [BenchmarkResult] = []
 
         // Execute benchmarks for each service
         for (serviceName, service) in services {
@@ -99,9 +100,9 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
                         iterations: options.iterations
                     )
 
-                    // Convert results to appropriate format for aggregation
+                    // Collect single results for aggregation
                     for result in results {
-                        allResults.append(result)
+                        allSingleResults.append(result)
                     }
 
                     completedTests += options.iterations
@@ -109,13 +110,40 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
                 }
             } catch {
                 logger.error("Failed to benchmark \(serviceName): \(error)")
-                allResults.append(createErrorResult(
+                errorResults.append(createErrorResult(
                     serviceName: serviceName,
                     framework: service.modelInfo?.framework,
                     error: error
                 ))
             }
         }
+
+        // Aggregate single results into benchmark results
+        var aggregatedResults: [BenchmarkResult] = []
+
+        // Group results by service and prompt
+        let groupedResults = Dictionary(grouping: allSingleResults) { result in
+            "\(result.serviceName)-\(result.promptId)"
+        }
+
+        for (_, results) in groupedResults {
+            if let firstResult = results.first {
+                // Create a basic prompt for aggregation
+                let prompt = BenchmarkPrompt(
+                    id: firstResult.promptId,
+                    text: "Generated prompt",
+                    category: .custom
+                )
+                let aggregated = metricsAggregator.aggregate(
+                    results,
+                    serviceName: firstResult.serviceName,
+                    prompt: prompt
+                )
+                aggregatedResults.append(aggregated)
+            }
+        }
+
+        let allResults = aggregatedResults + errorResults
 
         // Generate report
         return reportGenerator.generateReport(

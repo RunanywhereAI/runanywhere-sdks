@@ -1,7 +1,6 @@
 import Foundation
 
 /// Main download service orchestrating all download operations
-@MainActor
 public class DownloadService: DownloadManager {
 
     // MARK: - Properties

@@ -78,7 +78,11 @@ class FrameworkRecommender {
 
         // Base compatibility score
         let compatibilityResult = compatibilityService.checkCompatibility(model: model, framework: framework)
-        score += compatibilityResult.score * 0.4
+        let compatibilityScore = compatibilityResult.isCompatible ?
+            (compatibilityResult.confidence == .high ? 1.0 :
+             compatibilityResult.confidence == .medium ? 0.8 :
+             compatibilityResult.confidence == .low ? 0.6 : 0.4) : 0.0
+        score += compatibilityScore * 0.4
 
         // Performance preference
         let performanceScore = getPerformanceScore(framework: framework, model: model)
@@ -148,6 +152,8 @@ class FrameworkRecommender {
             return 0.55 // Swift implementation
         case .picoLLM:
             return 0.50 // Small models only
+        case .mediaPipe:
+            return 0.60 // Optimized for specific model types
         }
     }
 
@@ -174,6 +180,8 @@ class FrameworkRecommender {
             return 0.60 // Apple handles optimization
         case .swiftTransformers:
             return 0.55 // Less optimized
+        case .mediaPipe:
+            return 0.70 // Efficient for specific models
         }
     }
 
@@ -199,6 +207,8 @@ class FrameworkRecommender {
             return 0.50 // More complex setup
         case .picoLLM:
             return 0.80 // Simple for small models
+        case .mediaPipe:
+            return 0.75 // Good integration with Google tools
         }
     }
 
@@ -224,6 +234,8 @@ class FrameworkRecommender {
             return 0.60 // Research project
         case .picoLLM:
             return 0.70 // Simple and stable
+        case .mediaPipe:
+            return 0.85 // Google-maintained, stable
         }
     }
 

@@ -17,6 +17,7 @@ public struct ModelInfo {
     public let tokenizerFormat: TokenizerFormat?
     public let metadata: ModelInfoMetadata?
     public let alternativeDownloadURLs: [URL]?
+    public var additionalProperties: [String: Any] = [:]
 
     public init(
         id: String,
@@ -33,7 +34,8 @@ public struct ModelInfo {
         hardwareRequirements: [HardwareRequirement] = [],
         tokenizerFormat: TokenizerFormat? = nil,
         metadata: ModelInfoMetadata? = nil,
-        alternativeDownloadURLs: [URL]? = nil
+        alternativeDownloadURLs: [URL]? = nil,
+        additionalProperties: [String: Any] = [:]
     ) {
         self.id = id
         self.name = name
@@ -50,5 +52,6 @@ public struct ModelInfo {
         self.tokenizerFormat = tokenizerFormat
         self.metadata = metadata
         self.alternativeDownloadURLs = alternativeDownloadURLs
+        self.additionalProperties = additionalProperties
     }
 }

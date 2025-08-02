@@ -1,7 +1,7 @@
 import Foundation
 
 /// Reason for routing decision
-internal enum RoutingReason {
+public enum RoutingReason {
     case privacySensitive
     case insufficientResources(String)
     case lowComplexity

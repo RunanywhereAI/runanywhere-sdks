@@ -28,7 +28,7 @@ public class MonitoringService: PerformanceMonitor {
     private let generationTracker = PerformanceGenerationTracker()
     private let historyManager = HistoryManager()
     private let alertManager = AlertManager()
-    private let reportGenerator = PerformanceReportGenerator()
+    private let reportGenerator = ReportGenerator()
 
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 0.1 // 100ms updates

@@ -1,17 +1,17 @@
 import Foundation
 
 /// Central tokenizer service for managing tokenizer instances and operations
-class TokenizerService {
+public class TokenizerService {
     private let adapterRegistry: AdapterRegistry
     private let tokenizerCache: TokenizerCache
     private let formatDetector: FormatDetector
     private let configurationBuilder: ConfigurationBuilder
     private let logger = SDKLogger(category: "TokenizerService")
 
-    init(
+    internal init(
         adapterRegistry: AdapterRegistry = AdapterRegistry(),
         tokenizerCache: TokenizerCache = TokenizerCache(),
-        formatDetector: FormatDetector = TokenizerFormatDetector(),
+        formatDetector: FormatDetector = FormatDetectorImpl(),
         configurationBuilder: ConfigurationBuilder = ConfigurationBuilder()
     ) {
         self.adapterRegistry = adapterRegistry

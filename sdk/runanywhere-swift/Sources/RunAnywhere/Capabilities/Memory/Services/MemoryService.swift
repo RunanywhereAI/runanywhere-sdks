@@ -102,10 +102,6 @@ class MemoryService: MemoryManager {
         registerModel(memoryModel, size: size, service: service)
     }
 
-    func unregisterModel(_ modelId: String) {
-        allocationManager.unregisterModel(modelId)
-    }
-
     func getCurrentMemoryUsage() -> Int64 {
         return allocationManager.getTotalModelMemory()
     }
@@ -142,10 +138,6 @@ class MemoryService: MemoryManager {
                 isReady: true
             )
         }
-    }
-
-    func requestMemory(size: Int64, priority: MemoryPriority) async -> Bool {
-        return await allocationManager.requestMemory(size: size, priority: priority)
     }
 
     func isHealthy() -> Bool {
@@ -223,6 +215,10 @@ class MemoryService: MemoryManager {
 
     private func calculateTargetMemory(for level: MemoryPressureLevel) -> Int64 {
         switch level {
+        case .low, .medium:
+            return config.memoryThreshold
+        case .high:
+            return config.memoryThreshold * 1.5
         case .warning:
             return config.memoryThreshold * 2
         case .critical:

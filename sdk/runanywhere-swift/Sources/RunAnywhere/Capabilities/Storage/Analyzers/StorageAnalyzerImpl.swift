@@ -12,7 +12,28 @@ public class StorageAnalyzerImpl: StorageAnalyzer {
     private let warningThreshold: Double = 0.90 // 90% full
     private let criticalThreshold: Double = 0.95 // 95% full
 
+    // MARK: - Initialization
+
+    public init() {}
+
     // MARK: - StorageAnalyzer Protocol
+
+    public func analyzeStorage() async -> StorageInfo {
+        let deviceInfo = await getDeviceStorageInfo()
+        let appInfo = await getAppStorageInfo()
+        let modelInfo = await getModelStorageUsage()
+        let models = await scanForModels()
+        let cacheSize = await calculateCacheSize()
+
+        return StorageInfo(
+            appStorage: appInfo,
+            deviceStorage: deviceInfo,
+            modelStorage: modelInfo,
+            cacheSize: cacheSize,
+            storedModels: models,
+            lastUpdated: Date()
+        )
+    }
 
     public func getModelStorageUsage() async -> ModelStorageInfo {
         let modelsDirectory = getModelsDirectory()
@@ -134,6 +155,37 @@ public class StorageAnalyzerImpl: StorageAnalyzer {
 
     // MARK: - Internal Methods
 
+    private func getDeviceStorageInfo() async -> DeviceStorageInfo {
+        do {
+            let systemAttributes = try fileManager.attributesOfFileSystem(forPath: NSHomeDirectory())
+            let totalSpace = systemAttributes[.systemSize] as? Int64 ?? 0
+            let freeSpace = systemAttributes[.systemFreeSize] as? Int64 ?? 0
+
+            return DeviceStorageInfo(
+                totalSpace: totalSpace,
+                freeSpace: freeSpace,
+                usedSpace: totalSpace - freeSpace
+            )
+        } catch {
+            logger.error("Failed to get device storage info: \(error)")
+            return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
+        }
+    }
+
+    private func getAppStorageInfo() async -> AppStorageInfo {
+        do {
+            return try await calculateAppStorageUsage()
+        } catch {
+            logger.error("Failed to get app storage info: \(error)")
+            return AppStorageInfo(
+                documentsSize: 0,
+                cacheSize: 0,
+                appSupportSize: 0,
+                totalSize: 0
+            )
+        }
+    }
+
     func calculateAppStorageUsage() async throws -> AppStorageInfo {
         let documentsURL = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
         let cacheURL = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first!
@@ -180,7 +232,7 @@ public class StorageAnalyzerImpl: StorageAnalyzer {
 
             for url in contents {
                 // Check if it's a model file based on extension
-                guard let format = ModelFormat(rawValue: url.pathExtension) else { continue }
+                let format = ModelFormat(rawValue: url.pathExtension) ?? .unknown
 
                 let resourceValues = try url.resourceValues(
                     forKeys: [.fileSizeKey, .creationDateKey, .contentModificationDateKey]

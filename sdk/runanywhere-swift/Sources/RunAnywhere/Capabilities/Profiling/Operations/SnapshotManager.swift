@@ -37,10 +37,10 @@ class SnapshotManager {
     func captureSnapshot() -> MemorySnapshot {
         let snapshot = MemorySnapshot(
             timestamp: Date(),
-            usedMemory: SystemMetrics.getCurrentMemoryUsage(),
-            availableMemory: SystemMetrics.getAvailableMemory(),
+            usedMemory: ProfilerSystemMetrics.getCurrentMemoryUsage(),
+            availableMemory: ProfilerSystemMetrics.getAvailableMemory(),
             allocations: 0, // Will be updated by caller if needed
-            pressure: SystemMetrics.getMemoryPressure()
+            pressure: ProfilerSystemMetrics.getMemoryPressure()
         )
 
         addSnapshot(snapshot)

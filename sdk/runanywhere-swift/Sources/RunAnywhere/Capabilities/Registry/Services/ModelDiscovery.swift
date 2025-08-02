@@ -84,13 +84,13 @@ class ModelDiscovery {
         } catch {
             // Create minimal metadata if extraction fails
             metadata = ModelMetadata(
-                description: url.deletingPathExtension().lastPathComponent,
                 author: nil,
+                description: url.deletingPathExtension().lastPathComponent,
                 version: nil,
                 modelType: nil,
                 architecture: nil,
-                contextLength: nil,
                 quantization: nil,
+                contextLength: nil,
                 inputShapes: nil,
                 outputShapes: nil
             )

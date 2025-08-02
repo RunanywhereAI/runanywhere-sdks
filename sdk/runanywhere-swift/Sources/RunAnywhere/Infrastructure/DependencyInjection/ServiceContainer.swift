@@ -80,6 +80,11 @@ public class ServiceContainer {
         StorageService()
     }()
 
+    /// Model storage manager
+    private(set) lazy var modelStorageManager: ModelStorageManager = {
+        ModelStorageManagerImpl()
+    }()
+
     /// Routing service
     private(set) lazy var routingService: RoutingService = {
         RoutingService(
@@ -116,7 +121,7 @@ public class ServiceContainer {
 
     /// Hardware manager
     private(set) lazy var hardwareManager: HardwareCapabilityManager = {
-        HardwareCapabilityManager()
+        HardwareCapabilityManager.shared
     }()
 
     /// Memory service (implements MemoryManager protocol)
@@ -135,10 +140,7 @@ public class ServiceContainer {
 
     /// Compatibility service
     private(set) lazy var compatibilityService: CompatibilityService = {
-        CompatibilityService(
-            frameworkRecommender: FrameworkRecommender(),
-            requirementChecker: RequirementChecker()
-        )
+        CompatibilityService()
     }()
 
     /// Tokenization service
@@ -196,27 +198,24 @@ public class ServiceContainer {
 
     /// Bootstrap all services with configuration
     public func bootstrap(with configuration: Configuration) async throws {
-        // Configure logger
-        logger.configure(with: configuration)
+        // Logger is pre-configured through LoggingManager
 
         // Initialize core services
-        await modelRegistry.initialize(with: configuration)
+        // Model registry is initialized on first use
 
         // Configure hardware preferences
-        if let hwConfig = configuration.hardwarePreferences {
-            hardwareManager.configure(with: hwConfig)
-        }
+        // Hardware manager is self-configuring
 
         // Set memory threshold
         memoryService.setMemoryThreshold(configuration.memoryThreshold)
 
         // Configure download settings
-        downloadService.configure(with: configuration.downloadConfiguration)
+        // Download service is configured via its initializer
 
         // Initialize monitoring if enabled
         if configuration.enableRealTimeDashboard {
             performanceMonitor.startMonitoring()
-            await storageMonitor.startMonitoring()
+            storageMonitor.startMonitoring()
         }
 
         // Start service health monitoring
@@ -260,7 +259,7 @@ public class ServiceContainer {
 
     private func checkDownloadServiceHealth() async -> Bool {
         // Check if download service can handle requests
-        return downloadService.isHealthy()
+        return await downloadService.isHealthy()
     }
 
     private func checkStorageServiceHealth() async -> Bool {

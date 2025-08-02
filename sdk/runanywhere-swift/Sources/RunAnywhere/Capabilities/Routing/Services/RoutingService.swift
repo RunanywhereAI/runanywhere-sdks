@@ -20,7 +20,7 @@ public class RoutingService {
         options: GenerationOptions
     ) async throws -> RoutingDecision {
         // Check user preference first
-        if let userTarget = options.executionTarget {
+        if let userTarget = options.preferredExecutionTarget {
             return try await handleUserPreference(userTarget, prompt: prompt, context: context, options: options)
         }
 
@@ -215,7 +215,7 @@ public class ResourceChecker {
 
     public func checkDeviceResources() async -> Bool {
         // Check if device has sufficient resources
-        let capabilities = hardwareManager.getDeviceCapabilities()
+        let capabilities = hardwareManager.capabilities
 
         // Simple check: ensure we have Neural Engine or GPU
         return capabilities.hasNeuralEngine || capabilities.hasGPU

@@ -39,6 +39,12 @@ class PressureHandler {
         var totalFreed: Int64 = 0
 
         switch level {
+        case .low, .medium:
+            // No action needed for low/medium pressure
+            totalFreed = 0
+        case .high:
+            // Light cleanup for high pressure
+            totalFreed = await handleWarningPressure(modelsToEvict: modelsToEvict)
         case .warning:
             totalFreed = await handleWarningPressure(modelsToEvict: modelsToEvict)
         case .critical:
@@ -167,6 +173,10 @@ class PressureHandler {
 
     private func calculateTargetFreedMemory(for level: MemoryPressureLevel) -> Int64 {
         switch level {
+        case .low, .medium:
+            return 0
+        case .high:
+            return config.memoryThreshold / 2
         case .warning:
             return config.memoryThreshold
         case .critical:

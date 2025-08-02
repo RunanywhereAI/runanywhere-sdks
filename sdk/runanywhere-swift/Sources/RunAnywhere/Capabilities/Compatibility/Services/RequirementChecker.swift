@@ -84,7 +84,7 @@ class RequirementChecker {
             return false
         }
 
-        return currentVersion >= minimumVersion
+        return compareVersions(currentVersion, minimumVersion) >= 0
     }
 
     private func isArchitectureSupported(supportedArchitectures: [String]) -> Bool {
@@ -159,6 +159,23 @@ class RequirementChecker {
                 critical: true,
                 message: isCompatible ? "" : "Requires \(chip) or compatible chip"
             )
+
+        case .minimumCompute(let compute):
+            // For now, just check if we have any compute capability
+            let hasCompute = hasNeuralEngine() || isMetalAvailable()
+            return HardwareRequirementResult(
+                satisfied: hasCompute,
+                critical: false,
+                message: hasCompute ? "" : "Insufficient compute capability"
+            )
+
+        case .minimumOSVersion(let version):
+            let isSupported = isOSVersionSupported(minimumVersion: version)
+            return HardwareRequirementResult(
+                satisfied: isSupported,
+                critical: true,
+                message: isSupported ? "" : "Requires OS version \(version) or later"
+            )
         }
     }
 
@@ -178,7 +195,12 @@ class RequirementChecker {
     // MARK: - System Information
 
     private func getCurrentOSVersion() -> String {
+        #if canImport(UIKit)
         return UIDevice.current.systemVersion
+        #else
+        let version = ProcessInfo.processInfo.operatingSystemVersion
+        return "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
+        #endif
     }
 
     private func getCurrentArchitecture() -> String {
@@ -251,6 +273,22 @@ class RequirementChecker {
     private func parseVersion(_ version: String) -> [Int]? {
         let components = version.split(separator: ".").compactMap { Int($0) }
         return components.isEmpty ? nil : components
+    }
+
+    private func compareVersions(_ version1: [Int], _ version2: [Int]) -> Int {
+        let maxLength = max(version1.count, version2.count)
+
+        for i in 0..<maxLength {
+            let v1 = i < version1.count ? version1[i] : 0
+            let v2 = i < version2.count ? version2[i] : 0
+
+            if v1 < v2 {
+                return -1
+            } else if v1 > v2 {
+                return 1
+            }
+        }
+        return 0
     }
 }
 

@@ -63,7 +63,7 @@ public class ProfilerService: MemoryProfiler {
             guard let self = self, !self.isProfileActive else { return }
 
             self.isProfileActive = true
-            self.baselineMemory = SystemMetrics.getCurrentMemoryUsage()
+            self.baselineMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
             self.memorySnapshots.removeAll()
             self.memoryLeaks.removeAll()
 
@@ -104,7 +104,7 @@ public class ProfilerService: MemoryProfiler {
         operation: () async throws -> T
     ) async throws -> (result: T, profile: OperationMemoryProfile) {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let startMemory = SystemMetrics.getCurrentMemoryUsage()
+        let startMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         let operationId = UUID().uuidString
 
         allocationTracker.beginTracking(id: operationId, name: name)
@@ -112,7 +112,7 @@ public class ProfilerService: MemoryProfiler {
         let result = try await operation()
 
         let endTime = CFAbsoluteTimeGetCurrent()
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         allocationTracker.endTracking(id: operationId)
 
         let allocations = allocationTracker.getAllocations(for: operationId)
@@ -136,12 +136,12 @@ public class ProfilerService: MemoryProfiler {
         loadOperation: () async throws -> Void
     ) async throws -> ModelMemoryProfile {
         let startTime = CFAbsoluteTimeGetCurrent()
-        let startMemory = SystemMetrics.getCurrentMemoryUsage()
+        let startMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
 
         try await loadOperation()
 
         let endTime = CFAbsoluteTimeGetCurrent()
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
 
         let actualMemoryUsed = endMemory - startMemory
         let memoryOverhead = actualMemoryUsed - expectedSize
@@ -187,8 +187,8 @@ public class ProfilerService: MemoryProfiler {
     }
 
     public func getCurrentStats() -> MemoryStats {
-        let current = SystemMetrics.getCurrentMemoryUsage()
-        let available = SystemMetrics.getAvailableMemory()
+        let current = ProfilerSystemMetrics.getCurrentMemoryUsage()
+        let available = ProfilerSystemMetrics.getAvailableMemory()
         let total = ProcessInfo.processInfo.physicalMemory
 
         return MemoryStats(
@@ -196,7 +196,7 @@ public class ProfilerService: MemoryProfiler {
             availableMemory: available,
             totalMemory: Int64(total),
             usagePercentage: Double(current) / Double(total),
-            pressure: SystemMetrics.getMemoryPressure()
+            pressure: ProfilerSystemMetrics.getMemoryPressure()
         )
     }
 
@@ -217,10 +217,10 @@ public class ProfilerService: MemoryProfiler {
     private func captureSnapshot() {
         let snapshot = MemorySnapshot(
             timestamp: Date(),
-            usedMemory: SystemMetrics.getCurrentMemoryUsage(),
-            availableMemory: SystemMetrics.getAvailableMemory(),
+            usedMemory: ProfilerSystemMetrics.getCurrentMemoryUsage(),
+            availableMemory: ProfilerSystemMetrics.getAvailableMemory(),
             allocations: allocationTracker.activeAllocations.count,
-            pressure: SystemMetrics.getMemoryPressure()
+            pressure: ProfilerSystemMetrics.getMemoryPressure()
         )
 
         memorySnapshots.append(snapshot)
@@ -247,11 +247,11 @@ public class ProfilerService: MemoryProfiler {
         let relevantSnapshots = memorySnapshots.filter {
             $0.timestamp.timeIntervalSince1970 >= startTime
         }
-        return relevantSnapshots.map { $0.usedMemory }.max() ?? SystemMetrics.getCurrentMemoryUsage()
+        return relevantSnapshots.map { $0.usedMemory }.max() ?? ProfilerSystemMetrics.getCurrentMemoryUsage()
     }
 
     private func generateReport() -> MemoryProfilingReport {
-        let endMemory = SystemMetrics.getCurrentMemoryUsage()
+        let endMemory = ProfilerSystemMetrics.getCurrentMemoryUsage()
         let totalAllocated = endMemory - baselineMemory
 
         return MemoryProfilingReport(

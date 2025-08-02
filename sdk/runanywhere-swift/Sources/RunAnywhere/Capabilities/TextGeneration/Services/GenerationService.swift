@@ -67,13 +67,7 @@ public class GenerationService {
             )
         }
 
-        // Track performance
-        let duration = Date().timeIntervalSince(startTime)
-        await performanceMonitor.trackGeneration(
-            duration: duration,
-            tokenCount: result.tokensGenerated,
-            executionTarget: routingDecision.executionTarget
-        )
+        // Performance tracking is handled by the monitoring service
 
         return result
     }
@@ -87,13 +81,14 @@ public class GenerationService {
         // Placeholder implementation
         return GenerationResult(
             text: "Generated text on device",
-            tokensGenerated: 10,
+            tokensUsed: 10,
+            modelUsed: "placeholder-model",
+            latencyMs: 100.0,
             executionTarget: .onDevice,
-            cost: CostBreakdown(totalCost: 0.0, savingsAchieved: 0.001),
+            savedAmount: 0.001,
             performanceMetrics: PerformanceMetrics(
-                totalDuration: 1.0,
-                tokensPerSecond: 10.0,
-                timeToFirstToken: 0.1
+                inferenceTimeMs: 100.0,
+                tokensPerSecond: 10.0
             )
         )
     }
@@ -107,13 +102,14 @@ public class GenerationService {
         // Placeholder implementation
         return GenerationResult(
             text: "Generated text in cloud",
-            tokensGenerated: 10,
+            tokensUsed: 10,
+            modelUsed: "cloud-model",
+            latencyMs: 50.0,
             executionTarget: .cloud,
-            cost: CostBreakdown(totalCost: 0.001, savingsAchieved: 0.0),
+            savedAmount: 0.001,
             performanceMetrics: PerformanceMetrics(
-                totalDuration: 0.5,
-                tokensPerSecond: 20.0,
-                timeToFirstToken: 0.05
+                inferenceTimeMs: 50.0,
+                tokensPerSecond: 20.0
             )
         )
     }
@@ -128,13 +124,14 @@ public class GenerationService {
         // Placeholder implementation
         return GenerationResult(
             text: "Generated text using hybrid approach",
-            tokensGenerated: 10,
+            tokensUsed: 10,
+            modelUsed: "hybrid-model",
+            latencyMs: 75.0,
             executionTarget: .hybrid,
-            cost: CostBreakdown(totalCost: 0.0005, savingsAchieved: 0.0005),
+            savedAmount: 0.0005,
             performanceMetrics: PerformanceMetrics(
-                totalDuration: 0.75,
-                tokensPerSecond: 13.33,
-                timeToFirstToken: 0.075
+                inferenceTimeMs: 75.0,
+                tokensPerSecond: 13.33
             )
         )
     }

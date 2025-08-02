@@ -25,8 +25,8 @@ class AllocationTracker {
             self?.allocations[id] = AllocationInfo(
                 id: id,
                 name: name,
-                initialSize: SystemMetrics.getCurrentMemoryUsage(),
-                currentSize: SystemMetrics.getCurrentMemoryUsage(),
+                initialSize: ProfilerSystemMetrics.getCurrentMemoryUsage(),
+                currentSize: ProfilerSystemMetrics.getCurrentMemoryUsage(),
                 startTime: Date(),
                 isActive: true
             )
@@ -38,7 +38,7 @@ class AllocationTracker {
         queue.async(flags: .barrier) { [weak self] in
             if var allocation = self?.allocations[id] {
                 allocation.isActive = false
-                allocation.currentSize = SystemMetrics.getCurrentMemoryUsage()
+                allocation.currentSize = ProfilerSystemMetrics.getCurrentMemoryUsage()
                 self?.allocations[id] = allocation
             }
         }
