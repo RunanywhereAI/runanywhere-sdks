@@ -76,7 +76,8 @@
       "Bash(mv:*)",
       "Bash(pre-commit:*)",
       "Bash(git rev-parse:*)",
-      "Bash(/Users/sanchitmonga/development/ODLM/sdks/examples/ios/RunAnywhereAI/scripts/build_and_run.sh simulator \"iPhone 16 Pro\")"
+      "Bash(/Users/sanchitmonga/development/ODLM/sdks/examples/ios/RunAnywhereAI/scripts/build_and_run.sh simulator \"iPhone 16 Pro\")",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

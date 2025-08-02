@@ -25,12 +25,34 @@ struct UnifiedModelDetailsView: View {
         case .onnx: return "cpu.fill"
         case .tensorFlowLite: return "square.stack.3d.up.fill"
         case .foundationModels: return "sparkles"
-        default: return "cube"
+        case .llamaCpp: return "terminal.fill"
+        case .mediaPipe: return "brain.filled.head.profile"
+        case .swiftTransformers: return "swift"
+        case .execuTorch: return "flame.fill"
+        case .picoLLM: return "waveform"
+        case .mlc: return "gear.badge"
         }
     }
 
     private var isDownloading: Bool {
         downloadManager.isDownloading(model.id)
+    }
+
+    private func hardwareRequirementDescription(_ requirement: HardwareRequirement) -> String {
+        switch requirement {
+        case .minimumMemory(let bytes):
+            return "Minimum Memory: \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory))"
+        case .minimumCompute(let compute):
+            return "Minimum Compute: \(compute)"
+        case .requiresNeuralEngine:
+            return "Requires Neural Engine"
+        case .requiresGPU:
+            return "Requires GPU"
+        case .minimumOSVersion(let version):
+            return "Minimum OS: \(version)"
+        case .specificChip(let chip):
+            return "Requires: \(chip)"
+        }
     }
 
     var body: some View {
@@ -121,11 +143,11 @@ struct UnifiedModelDetailsView: View {
                             .font(.headline)
 
                         VStack(spacing: 8) {
-                            ForEach(model.hardwareRequirements, id: \.self) { requirement in
+                            ForEach(Array(model.hardwareRequirements.enumerated()), id: \.offset) { index, requirement in
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
-                                    Text(requirement.rawValue)
+                                    Text(hardwareRequirementDescription(requirement))
                                         .font(.subheadline)
                                     Spacer()
                                 }
