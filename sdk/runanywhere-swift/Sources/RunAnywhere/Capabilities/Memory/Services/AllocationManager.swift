@@ -2,7 +2,7 @@ import Foundation
 
 /// Manages memory allocation and model registration
 class AllocationManager {
-    private var loadedModels: [String: LoadedModelInfo] = [:]
+    private var loadedModels: [String: MemoryLoadedModelInfo] = [:]
     private let modelLock = NSLock()
     private var pressureCallback: (() -> Void)?
     private let logger = SDKLogger(category: "AllocationManager")
@@ -23,7 +23,7 @@ class AllocationManager {
         modelLock.lock()
         defer { modelLock.unlock() }
 
-        let modelInfo = LoadedModelInfo(
+        let modelInfo = MemoryLoadedModelInfo(
             model: model,
             size: size,
             service: service,
@@ -107,7 +107,7 @@ class AllocationManager {
         return loadedModels.count
     }
 
-    func getLoadedModels() -> [LoadedModelInfo] {
+    func getLoadedModels() -> [MemoryLoadedModelInfo] {
         modelLock.lock()
         defer { modelLock.unlock() }
 
@@ -128,7 +128,7 @@ class AllocationManager {
         return loadedModels[modelId]?.size
     }
 
-    func getModelsForEviction() -> [LoadedModelInfo] {
+    func getModelsForEviction() -> [MemoryLoadedModelInfo] {
         modelLock.lock()
         defer { modelLock.unlock() }
 

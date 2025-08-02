@@ -73,14 +73,14 @@ class ModelDiscovery {
         }
 
         // Detect format
-        guard let format = formatDetector.detectFormat(url) else {
+        guard let format = formatDetector.detectFormat(at: url) else {
             return nil
         }
 
         // Extract metadata
         let metadata: ModelMetadata
         do {
-            metadata = try await metadataExtractor.extract(from: url)
+            metadata = await metadataExtractor.extractMetadata(from: url, format: format)
         } catch {
             // Create minimal metadata if extraction fails
             metadata = ModelMetadata(
@@ -90,11 +90,9 @@ class ModelDiscovery {
                 modelType: nil,
                 architecture: nil,
                 contextLength: nil,
-                vocabulary: nil,
                 quantization: nil,
                 inputShapes: nil,
-                outputShapes: nil,
-                requirements: nil
+                outputShapes: nil
             )
         }
 

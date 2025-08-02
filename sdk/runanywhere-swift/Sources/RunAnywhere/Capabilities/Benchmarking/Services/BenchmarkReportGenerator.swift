@@ -8,16 +8,18 @@
 import Foundation
 
 /// Generates benchmark reports
-public class ReportGenerator {
+public class BenchmarkReportGenerator {
     // MARK: - Properties
 
-    private let performanceMonitor = RealtimePerformanceMonitor.shared
-    private let metricsAggregator = MetricsAggregator()
+    private let performanceMonitor: PerformanceMonitor
+    private let metricsAggregator = BenchmarkMetricsAggregator()
     private let statisticsCalculator = StatisticsCalculator()
 
     // MARK: - Initialization
 
-    public init() {}
+    public init(performanceMonitor: PerformanceMonitor) {
+        self.performanceMonitor = performanceMonitor
+    }
 
     // MARK: - Public Methods
 

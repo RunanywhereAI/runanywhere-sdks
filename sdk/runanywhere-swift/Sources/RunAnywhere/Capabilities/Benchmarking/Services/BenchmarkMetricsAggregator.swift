@@ -8,7 +8,7 @@
 import Foundation
 
 /// Aggregates benchmark metrics from multiple runs
-public class MetricsAggregator {
+public class BenchmarkMetricsAggregator {
     // MARK: - Properties
 
     private let statisticsCalculator = StatisticsCalculator()

@@ -2,6 +2,8 @@ import Foundation
 
 /// Service container for dependency injection
 public class ServiceContainer {
+    /// Shared instance
+    public static let shared: ServiceContainer = ServiceContainer()
     // MARK: - Core Services
 
     /// Configuration validator
@@ -57,11 +59,7 @@ public class ServiceContainer {
 
     /// Download service
     private(set) lazy var downloadService: DownloadService = {
-        DownloadService(
-            downloadQueue: downloadQueue,
-            progressTracker: progressService,
-            storageService: storageService
-        )
+        DownloadService()
     }()
 
     /// Download queue
@@ -79,7 +77,7 @@ public class ServiceContainer {
 
     /// Storage service
     private(set) lazy var storageService: StorageService = {
-        StorageService(storageMonitor: storageMonitor)
+        StorageService()
     }()
 
     /// Routing service
@@ -100,7 +98,7 @@ public class ServiceContainer {
     }()
 
     /// Storage monitor
-    private(set) lazy var storageMonitor: StorageMonitor = {
+    private(set) lazy var storageMonitor: StorageMonitoring = {
         StorageMonitorImpl()
     }()
 
@@ -145,11 +143,17 @@ public class ServiceContainer {
 
     /// Tokenization service
     private(set) lazy var tokenizerService: TokenizerService = {
-        TokenizerService(
-            formatDetector: FormatDetector(),
-            tokenizerCache: TokenizerCache(),
-            configurationBuilder: ConfigurationBuilder()
-        )
+        TokenizerService()
+    }()
+
+    /// Format detector for model validation
+    private(set) lazy var formatDetector: FormatDetector = {
+        FormatDetectorImpl()
+    }()
+
+    /// Metadata extractor for model validation
+    private(set) lazy var metadataExtractor: MetadataExtractor = {
+        MetadataExtractorImpl()
     }()
 
     /// Logger

@@ -116,7 +116,7 @@ class MemoryService {
         return allocationManager.getModelMemoryUsage(modelId)
     }
 
-    func getLoadedModels() -> [LoadedModelInfo] {
+    func getLoadedModels() -> [MemoryLoadedModelInfo] {
         return allocationManager.getLoadedModels()
     }
 
@@ -197,28 +197,5 @@ struct MemoryStatistics {
 
     var modelMemoryPercentage: Double {
         Double(modelMemory) / Double(totalMemory) * 100
-    }
-}
-
-/// Information about a loaded model
-struct LoadedModelInfo {
-    let model: LoadedModel
-    let size: Int64
-    var lastUsed: Date
-    weak var service: LLMService?
-    let priority: MemoryPriority
-
-    init(
-        model: LoadedModel,
-        size: Int64,
-        lastUsed: Date = Date(),
-        service: LLMService? = nil,
-        priority: MemoryPriority = .normal
-    ) {
-        self.model = model
-        self.size = size
-        self.lastUsed = lastUsed
-        self.service = service
-        self.priority = priority
     }
 }

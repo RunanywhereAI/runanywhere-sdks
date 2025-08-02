@@ -12,13 +12,15 @@ import Foundation
 public class BenchmarkExecutor {
     // MARK: - Properties
 
-    private let performanceMonitor = RealtimePerformanceMonitor.shared
+    private let performanceMonitor: PerformanceMonitor
     private let memoryTracker = MemoryTracker()
     private let logger = SDKLogger(category: "BenchmarkExecutor")
 
     // MARK: - Initialization
 
-    public init() {}
+    public init(performanceMonitor: PerformanceMonitor) {
+        self.performanceMonitor = performanceMonitor
+    }
 
     // MARK: - Public Methods
 

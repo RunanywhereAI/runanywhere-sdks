@@ -84,7 +84,10 @@
       "Bash(xcrun simctl uninstall:*)",
       "Bash(true)",
       "Bash(cp:*)",
-      "Bash(echo)"
+      "Bash(echo)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)"
     ],
     "deny": []
   }

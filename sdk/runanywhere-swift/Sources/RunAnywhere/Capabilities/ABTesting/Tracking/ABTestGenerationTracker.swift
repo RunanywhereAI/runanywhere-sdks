@@ -11,14 +11,18 @@ import Foundation
 public class ABTestGenerationTracker {
     // MARK: - Properties
 
-    private let performanceMonitor = RealtimePerformanceMonitor.shared
+    private let performanceMonitor: PerformanceMonitor
     private let abTestService: ABTestService
     private let logger = SDKLogger(category: "GenerationTracker")
 
     // MARK: - Initialization
 
-    public init(abTestService: ABTestService) {
+    public init(
+        abTestService: ABTestService,
+        performanceMonitor: PerformanceMonitor
+    ) {
         self.abTestService = abTestService
+        self.performanceMonitor = performanceMonitor
     }
 
     // MARK: - Public Methods

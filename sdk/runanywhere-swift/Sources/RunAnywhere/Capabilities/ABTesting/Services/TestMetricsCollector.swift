@@ -8,9 +8,11 @@
 import Foundation
 
 /// Metrics storage structure
-struct TestMetrics {
-    var variantMetrics: [UUID: [ABTestMetric]] = [:]
-    var totalSamples: Int = 0
+public struct TestMetrics {
+    public var variantMetrics: [UUID: [ABTestMetric]] = [:]
+    public var totalSamples: Int = 0
+
+    public init() {}
 }
 
 /// Collects metrics for A/B tests

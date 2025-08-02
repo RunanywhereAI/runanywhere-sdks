@@ -2,8 +2,8 @@ import Foundation
 
 /// Framework capability definitions
 struct FrameworkCapabilities {
-    static let capabilities: [LLMFramework: FrameworkCapability] = [
-        .foundationModels: FrameworkCapability(
+    fileprivate static let capabilities: [LLMFramework: InternalFrameworkCapability] = [
+        .foundationModels: InternalFrameworkCapability(
             supportedFormats: [.mlmodel, .mlpackage],
             supportedQuantizations: [.q4_0],
             maxModelSize: 3_000_000_000,
@@ -11,7 +11,7 @@ struct FrameworkCapabilities {
             minimumOS: "18.0",
             supportedArchitectures: ["arm64e"]
         ),
-        .coreML: FrameworkCapability(
+        .coreML: InternalFrameworkCapability(
             supportedFormats: [.mlmodel, .mlpackage],
             supportedQuantizations: [.f16, .q8_0, .q4_0],
             maxModelSize: 15_000_000_000,
@@ -19,7 +19,7 @@ struct FrameworkCapabilities {
             minimumOS: "11.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .mlx: FrameworkCapability(
+        .mlx: InternalFrameworkCapability(
             supportedFormats: [.safetensors, .weights],
             supportedQuantizations: [.q4_0, .q4_K_M, .q8_0],
             maxModelSize: 30_000_000_000,
@@ -27,7 +27,7 @@ struct FrameworkCapabilities {
             minimumOS: "14.0",
             supportedArchitectures: ["arm64e"]
         ),
-        .mlc: FrameworkCapability(
+        .mlc: InternalFrameworkCapability(
             supportedFormats: [.safetensors, .bin],
             supportedQuantizations: [.q3_K_M, .q4_K_M],
             maxModelSize: 20_000_000_000,
@@ -35,7 +35,7 @@ struct FrameworkCapabilities {
             minimumOS: "14.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .onnx: FrameworkCapability(
+        .onnx: InternalFrameworkCapability(
             supportedFormats: [.onnx, .ort],
             supportedQuantizations: [.f32, .f16, .q8_0],
             maxModelSize: 10_000_000_000,
@@ -43,7 +43,7 @@ struct FrameworkCapabilities {
             minimumOS: "11.0",
             supportedArchitectures: ["arm64", "arm64e", "x86_64"]
         ),
-        .execuTorch: FrameworkCapability(
+        .execuTorch: InternalFrameworkCapability(
             supportedFormats: [.pte],
             supportedQuantizations: [.q4_0, .q8_0],
             maxModelSize: 15_000_000_000,
@@ -51,7 +51,7 @@ struct FrameworkCapabilities {
             minimumOS: "12.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .llamaCpp: FrameworkCapability(
+        .llamaCpp: InternalFrameworkCapability(
             supportedFormats: [.gguf, .ggml],
             supportedQuantizations: [.q2_K, .q3_K_S, .q3_K_M, .q3_K_L, .q4_0, .q4_K_S, .q4_K_M, .q5_0, .q5_K_S, .q5_K_M, .q6_K, .q8_0],
             maxModelSize: 50_000_000_000,
@@ -59,7 +59,7 @@ struct FrameworkCapabilities {
             minimumOS: "10.0",
             supportedArchitectures: ["arm64", "arm64e", "x86_64"]
         ),
-        .tensorFlowLite: FrameworkCapability(
+        .tensorFlowLite: InternalFrameworkCapability(
             supportedFormats: [.tflite],
             supportedQuantizations: [.f32, .f16, .q8_0],
             maxModelSize: 5_000_000_000,
@@ -67,7 +67,7 @@ struct FrameworkCapabilities {
             minimumOS: "11.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .picoLLM: FrameworkCapability(
+        .picoLLM: InternalFrameworkCapability(
             supportedFormats: [.bin],
             supportedQuantizations: [.q4_0, .q8_0],
             maxModelSize: 2_000_000_000,
@@ -75,7 +75,7 @@ struct FrameworkCapabilities {
             minimumOS: "11.0",
             supportedArchitectures: ["arm64", "arm64e"]
         ),
-        .swiftTransformers: FrameworkCapability(
+        .swiftTransformers: InternalFrameworkCapability(
             supportedFormats: [.mlmodel, .mlpackage],
             supportedQuantizations: [.f16, .q8_0],
             maxModelSize: 10_000_000_000,
@@ -96,8 +96,8 @@ struct FrameworkCapabilities {
     }
 }
 
-/// Capability information for a framework
-struct FrameworkCapability {
+/// Internal capability information for a framework
+private struct InternalFrameworkCapability {
     let supportedFormats: Set<ModelFormat>
     let supportedQuantizations: Set<QuantizationLevel>
     let maxModelSize: Int64
