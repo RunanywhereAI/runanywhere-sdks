@@ -65,13 +65,13 @@ struct ModelDownloadConfirmationView: View {
                         .font(.headline)
 
                     HStack {
-                        Label(model.framework.displayName, systemImage: "cpu")
+                        Label(model.preferredFramework?.displayName ?? "Unknown", systemImage: "cpu")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
                         Spacer()
 
-                        Label(model.displaySize, systemImage: "internaldrive")
+                        Label(ByteCountFormatter.string(fromByteCount: model.estimatedMemory ?? 0, countStyle: .file), systemImage: "internaldrive")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -208,11 +208,21 @@ struct ModelDownloadConfirmationView_Previews: PreviewProvider {
     static var previews: some View {
         ModelDownloadConfirmationView(
             model: ModelInfo(
+                id: "llama-3.2-3b",
                 name: "Llama 3.2 3B",
                 format: .gguf,
-                size: "2.4 GB",
-                framework: .llamaCpp,
-                quantization: "Q4_K_M"
+                downloadURL: URL(string: "https://example.com/model.gguf"),
+                localPath: nil,
+                estimatedMemory: 2_400_000_000,
+                contextLength: 2048,
+                downloadSize: 2_400_000_000,
+                checksum: nil,
+                compatibleFrameworks: [.llamaCpp],
+                preferredFramework: .llamaCpp,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
             )
         )            { _ in }
     }

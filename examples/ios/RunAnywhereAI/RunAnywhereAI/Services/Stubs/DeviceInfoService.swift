@@ -52,30 +52,21 @@ class DeviceInfoService: ObservableObject {
     // MARK: - Private Helper Methods
 
     private func getDeviceModelName() async -> String {
-        // Try to get from SDK first
-        if let sdkDeviceInfo = await sdk.deviceCapabilities?.getDeviceInfo() {
-            return sdkDeviceInfo.modelName ?? UIDevice.current.model
-        }
-
-        // Fallback to system info
+        // Use system info directly since SDK methods are private
         var systemInfo = utsname()
         uname(&systemInfo)
         let machineMirror = Mirror(reflecting: systemInfo.machine)
         let identifier = machineMirror.children.reduce("") { identifier, element in
             guard let value = element.value as? Int8, value != 0 else { return identifier }
-            return identifier + String(UnicodeScalar(UInt8(value))!)
+            let unicodeScalar = UnicodeScalar(UInt8(value))
+            return identifier + String(unicodeScalar)
         }
 
-        return identifier
+        return identifier.isEmpty ? UIDevice.current.model : identifier
     }
 
     private func getChipName() async -> String {
-        // Try to get from SDK
-        if let sdkDeviceInfo = await sdk.deviceCapabilities?.getDeviceInfo() {
-            return sdkDeviceInfo.chipName ?? "Unknown"
-        }
-
-        // Fallback detection
+        // Direct chip detection since SDK properties are private
         let modelName = await getDeviceModelName()
         if modelName.contains("arm64") || modelName.contains("iPhone") {
             return "Apple Silicon"
@@ -84,10 +75,7 @@ class DeviceInfoService: ObservableObject {
     }
 
     private func getMemoryInfo() async -> (total: Int64, available: Int64) {
-        // Try to get from SDK
-        if let sdkDeviceInfo = await sdk.deviceCapabilities?.getDeviceInfo() {
-            return (sdkDeviceInfo.totalMemory ?? 0, sdkDeviceInfo.availableMemory ?? 0)
-        }
+        // Direct memory detection since SDK properties are private
 
         // Fallback to system info
         let totalMemory = ProcessInfo.processInfo.physicalMemory
@@ -97,10 +85,7 @@ class DeviceInfoService: ObservableObject {
     }
 
     private func isNeuralEngineAvailable() async -> Bool {
-        // Try to get from SDK
-        if let sdkDeviceInfo = await sdk.deviceCapabilities?.getDeviceInfo() {
-            return sdkDeviceInfo.neuralEngineAvailable ?? false
-        }
+        // Direct neural engine detection since SDK properties are private
 
         // Fallback - assume true for modern devices
         return true

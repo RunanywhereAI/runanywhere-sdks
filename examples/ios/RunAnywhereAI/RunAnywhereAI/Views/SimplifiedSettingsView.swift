@@ -137,15 +137,11 @@ struct SimplifiedSettingsView: View {
     }
 
     private func updateSDKConfiguration() {
+        // Use SDK's actual Configuration constructor signature
         let config = Configuration(
-            apiKey: apiKey.isEmpty ? nil : apiKey,
-            routingPolicy: routingPolicy,
-            enableCloudRouting: enableCloudRouting,
-            privacyMode: privacyMode,
-            defaultGenerationOptions: GenerationOptions(
-                temperature: defaultTemperature,
-                maxTokens: defaultMaxTokens
-            )
+            apiKey: apiKey.isEmpty ? "demo-key" : apiKey,
+            enableRealTimeDashboard: enableCloudRouting,
+            telemetryConsent: privacyMode ? .denied : .granted
         )
 
         // Note: In a real app, you would update the SDK configuration
@@ -155,7 +151,8 @@ struct SimplifiedSettingsView: View {
 
     private func loadCurrentConfiguration() {
         // Load from SDK or UserDefaults
-        if let savedApiKey = KeychainService.shared.retrieve(key: "runanywhere_api_key") {
+        if let savedApiKeyData = try? KeychainService.shared.retrieve(key: "runanywhere_api_key"),
+           let savedApiKey = String(data: savedApiKeyData, encoding: .utf8) {
             apiKey = savedApiKey
         }
 
@@ -176,7 +173,9 @@ struct SimplifiedSettingsView: View {
     }
 
     private func saveApiKey() {
-        KeychainService.shared.save(key: "runanywhere_api_key", value: apiKey)
+        if let apiKeyData = apiKey.data(using: .utf8) {
+            try? KeychainService.shared.save(key: "runanywhere_api_key", data: apiKeyData)
+        }
         updateSDKConfiguration()
     }
 }

@@ -40,8 +40,8 @@ class ConversationStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             messages: [],
-            modelInfo: nil,
-            framework: nil
+            modelName: nil,
+            frameworkName: nil
         )
 
         conversations.insert(conversation, at: 0)
@@ -296,8 +296,8 @@ struct ConversationRow: View {
 
                 Spacer()
 
-                if let framework = conversation.framework {
-                    Text(framework.displayName)
+                if let frameworkName = conversation.frameworkName {
+                    Text(frameworkName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)

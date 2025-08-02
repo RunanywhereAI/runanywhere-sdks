@@ -147,8 +147,8 @@ struct ChatView: View {
         guard var conversation = conversationStore.currentConversation else { return }
 
         conversation.messages = viewModel.messages
-        conversation.framework = RunAnywhereSDK.shared.currentFramework?.toLocalFramework
-        conversation.modelInfo = RunAnywhereSDK.shared.currentModel
+        conversation.frameworkName = nil  // SDK properties are private
+        conversation.modelName = nil     // SDK properties are private
 
         conversationStore.updateConversation(conversation)
     }

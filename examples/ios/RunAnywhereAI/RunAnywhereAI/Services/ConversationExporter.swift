@@ -65,11 +65,11 @@ struct ConversationExporter {
         markdown += "**Created:** \(formatDate(conversation.createdAt))\n"
         markdown += "**Updated:** \(formatDate(conversation.updatedAt))\n"
 
-        if let model = conversation.modelInfo {
-            markdown += "**Model:** \(model.name)\n"
+        if let modelName = conversation.modelName {
+            markdown += "**Model:** \(modelName)\n"
         }
-        if let framework = conversation.framework {
-            markdown += "**Framework:** \(framework.displayName)\n"
+        if let frameworkName = conversation.frameworkName {
+            markdown += "**Framework:** \(frameworkName)\n"
         }
 
         markdown += "\n---\n\n"

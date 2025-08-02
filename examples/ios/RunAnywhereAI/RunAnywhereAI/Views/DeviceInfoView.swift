@@ -2,7 +2,7 @@
 //  DeviceInfoView.swift
 //  RunAnywhereAI
 //
-//  Created by Assistant on 7/27/25.
+//  Simplified device info view
 //
 
 import SwiftUI
@@ -13,167 +13,69 @@ struct DeviceInfoView: View {
 
     var body: some View {
         NavigationView {
-            if let info = deviceInfoService.deviceInfo {
-                List {
-                    Section("Device") {
-                        DeviceInfoRow(label: "Model", value: info.modelName)
-                        DeviceInfoRow(label: "OS Version", value: info.osVersion)
-                        DeviceInfoRow(label: "Processor", value: info.processorType)
-                        DeviceInfoRow(label: "CPU Cores", value: "\(info.coreCount)")
-                        DeviceInfoRow(label: "Neural Engine", value: info.neuralEngineAvailable ? "Available" : "Not Available",
-                                      valueColor: info.neuralEngineAvailable ? .green : .secondary)
-                    }
-
-                    Section("Memory") {
-                        DeviceInfoRow(label: "Total Memory", value: info.totalMemory)
-                        DeviceInfoRow(label: "Available", value: info.availableMemory,
-                                      valueColor: .green)
-                        DeviceInfoRow(label: "Used", value: info.usedMemory,
-                                      valueColor: .orange)
-                        DeviceInfoRow(label: "Memory Pressure", value: info.memoryPressure,
-                                      valueColor: memoryPressureColor(for: info.memoryPressure))
-                    }
-
-                    Section("Battery") {
-                        DeviceInfoRow(label: "Battery Level", value: "\(info.batteryLevel)%",
-                                      valueColor: batteryColor(for: info.batteryLevel))
-                        DeviceInfoRow(label: "Battery State", value: info.batteryState)
-                    }
-
-                    Section("System Status") {
-                        DeviceInfoRow(label: "Thermal State", value: info.thermalState,
-                                      valueColor: thermalStateColor(for: info.thermalState))
-                    }
-
-                    Section("AI Capabilities") {
-                        if info.neuralEngineAvailable {
-                            Label("Neural Engine accelerated inference", systemImage: "cpu")
-                                .foregroundColor(.green)
+            List {
+                if let info = deviceInfoService.deviceInfo {
+                    Section("Device Information") {
+                        HStack {
+                            Text("Model")
+                            Spacer()
+                            Text(info.modelName)
+                                .foregroundColor(.secondary)
                         }
 
-                        Label("Core ML optimizations available", systemImage: "brain")
-                            .foregroundColor(.blue)
+                        HStack {
+                            Text("OS Version")
+                            Spacer()
+                            Text(info.osVersion)
+                                .foregroundColor(.secondary)
+                        }
 
-                        if info.totalMemory.contains("GB") {
-                            if let memoryGB = extractGBValue(from: info.totalMemory), memoryGB >= 6 {
-                                Label("Sufficient memory for large models", systemImage: "memorychip")
-                                    .foregroundColor(.green)
-                            } else {
-                                Label("Limited memory for large models", systemImage: "memorychip")
-                                    .foregroundColor(.orange)
-                            }
+                        HStack {
+                            Text("Chip")
+                            Spacer()
+                            Text(info.chipName)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Total Memory")
+                            Spacer()
+                            Text(info.totalMemory.formattedFileSize)
+                                .foregroundColor(.secondary)
+                        }
+
+                        HStack {
+                            Text("Neural Engine")
+                            Spacer()
+                            Text(info.neuralEngineAvailable ? "Available" : "Not Available")
+                                .foregroundColor(info.neuralEngineAvailable ? .green : .secondary)
                         }
                     }
-
-                    // Simplified storage section
-                    Section("Storage") {
-                        DeviceInfoRow(label: "Available for Models", value: "Check device storage in Settings")
-                    }
-                }
-                .navigationTitle("Device Information")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Done") {
-                            dismiss()
+                } else {
+                    Section {
+                        HStack {
+                            ProgressView()
+                            Text("Loading device information...")
                         }
                     }
                 }
-                .onAppear {
-                    deviceInfoService.startMonitoring()
-                }
-                .onDisappear {
-                    deviceInfoService.stopMonitoring()
-                }
-            } else {
-                ProgressView("Loading device information...")
-                    .navigationTitle("Device Information")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
-                                dismiss()
-                            }
-                        }
+            }
+            .navigationTitle("Device Info")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
                     }
+                }
             }
         }
-    }
-
-    private func memoryPressureColor(for pressure: String) -> Color {
-        switch pressure {
-        case "Low":
-            return .green
-        case "Moderate":
-            return .yellow
-        case "High":
-            return .orange
-        case "Critical":
-            return .red
-        default:
-            return .secondary
-        }
-    }
-
-    private func batteryColor(for level: Int) -> Color {
-        switch level {
-        case 0..<20:
-            return .red
-        case 20..<50:
-            return .orange
-        case 50..<80:
-            return .yellow
-        default:
-            return .green
-        }
-    }
-
-    private func thermalStateColor(for state: String) -> Color {
-        switch state {
-        case "Normal":
-            return .green
-        case "Fair":
-            return .yellow
-        case "Serious":
-            return .orange
-        case "Critical":
-            return .red
-        default:
-            return .secondary
-        }
-    }
-
-    private func extractGBValue(from memory: String) -> Double? {
-        let pattern = #"(\d+\.?\d*)\s*GB"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: memory, range: NSRange(memory.startIndex..., in: memory)),
-              let numberRange = Range(match.range(at: 1), in: memory) else {
-            return nil
-        }
-
-        return Double(memory[numberRange])
-    }
-}
-
-struct DeviceInfoRow: View {
-    let label: String
-    let value: String
-    var valueColor: Color = .primary
-
-    var body: some View {
-        HStack {
-            Text(label)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .foregroundColor(valueColor)
-                .fontWeight(.medium)
+        .task {
+            await deviceInfoService.refreshDeviceInfo()
         }
     }
 }
 
-struct DeviceInfoView_Previews: PreviewProvider {
-    static var previews: some View {
-        DeviceInfoView()
-    }
+#Preview {
+    DeviceInfoView()
 }

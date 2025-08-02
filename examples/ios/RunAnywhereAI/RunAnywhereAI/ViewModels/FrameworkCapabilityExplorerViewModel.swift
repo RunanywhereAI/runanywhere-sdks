@@ -115,6 +115,17 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 supportsCustomModels: false,
                 topFeatures: ["Apple Silicon", "Privacy First", "System Integration"]
             )
+
+        case .mediaPipe:
+            return FrameworkCapabilities(
+                supportsStreaming: false,
+                supportsQuantization: true,
+                supportsBatching: true,
+                supportsMultiModal: true,
+                supportsGPUAcceleration: true,
+                supportsCustomModels: true,
+                topFeatures: ["Cross-platform", "Google ML", "Mobile Optimized"]
+            )
         }
     }
 
@@ -140,6 +151,8 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return PerformanceProfile(speed: 0.85, memoryEfficiency: 0.8, modelSizeSupport: 0.85, easeOfUse: 0.7)
         case .foundationModels:
             return PerformanceProfile(speed: 0.9, memoryEfficiency: 0.9, modelSizeSupport: 0.5, easeOfUse: 0.95)
+        case .mediaPipe:
+            return PerformanceProfile(speed: 0.8, memoryEfficiency: 0.8, modelSizeSupport: 0.75, easeOfUse: 0.8)
         }
     }
 
@@ -165,6 +178,8 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
             return ["Universal deployment", "Hardware optimization", "OpenAI-compatible API"]
         case .foundationModels:
             return ["iOS 18+ applications", "Privacy-focused apps", "System-integrated AI"]
+        case .mediaPipe:
+            return ["Cross-platform ML apps", "Mobile computer vision", "Google ML models"]
         }
     }
 
@@ -231,6 +246,12 @@ class FrameworkCapabilityExplorerViewModel: ObservableObject {
                 let result = try await service.generate(prompt: "Hello")
             }
             """
+        case .mediaPipe:
+            return """
+            let service = MediaPipeService()
+            try await service.loadModel("model.tflite")
+            let result = try await service.generate(prompt: "Hello")
+            """
         }
     }
 }
@@ -265,6 +286,7 @@ extension LLMFramework {
         case .swiftTransformers: return "swift"
         case .mlc: return "gearshape.fill"
         case .foundationModels: return "apple.logo"
+        case .mediaPipe: return "brain.filled.head.profile"
         }
     }
 
@@ -280,6 +302,7 @@ extension LLMFramework {
         case .swiftTransformers: return "Native Swift transformer implementation"
         case .mlc: return "Machine Learning Compilation for LLMs"
         case .foundationModels: return "Apple Foundation Models (iOS 18+)"
+        case .mediaPipe: return "Google's cross-platform ML framework"
         }
     }
 }

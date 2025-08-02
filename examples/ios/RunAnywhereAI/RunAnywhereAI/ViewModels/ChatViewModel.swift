@@ -53,14 +53,12 @@ class ChatViewModel: ObservableObject {
 
         generationTask = Task {
             do {
-                // Direct SDK usage - no wrappers!
-                try await sdk.streamGenerate(prompt) { [weak self] token in
-                    guard let self = self else { return }
-                    Task { @MainActor in
-                        if messageIndex < self.messages.count {
-                            self.messages[messageIndex].content += token
-                        }
-                    }
+                // Direct SDK usage - simple generate call for now
+                let response = try await sdk.generate(prompt)
+
+                // Update the assistant message with the response
+                if messageIndex < self.messages.count {
+                    self.messages[messageIndex].content = response.text
                 }
             } catch {
                 await MainActor.run {

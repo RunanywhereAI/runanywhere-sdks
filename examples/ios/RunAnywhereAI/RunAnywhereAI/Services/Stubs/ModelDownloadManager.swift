@@ -12,7 +12,7 @@ import RunAnywhereSDK
 class ModelDownloadManager: ObservableObject {
     static let shared = ModelDownloadManager()
 
-    @Published var activeDownloads: [String] = []
+    @Published var activeDownloads: [String: Double] = [:]
     @Published var downloadProgress: [String: Double] = [:]
     @Published var downloadErrors: [String: Error] = [:]
 
@@ -35,13 +35,13 @@ class ModelDownloadManager: ObservableObject {
         let modelId = modelInfo.id
 
         // Check if already downloading
-        if activeDownloads.contains(modelId) {
+        if activeDownloads[modelId] != nil {
             completion(.failure(DownloadError.alreadyDownloading))
             return
         }
 
         // Add to active downloads
-        activeDownloads.append(modelId)
+        activeDownloads[modelId] = 0.0
         downloadProgress[modelId] = 0.0
 
         // Create download task
@@ -61,16 +61,14 @@ class ModelDownloadManager: ObservableObject {
         downloadTasks[modelId]?.cancel()
         downloadTasks.removeValue(forKey: modelId)
 
-        if let index = activeDownloads.firstIndex(of: modelId) {
-            activeDownloads.remove(at: index)
-        }
+        activeDownloads.removeValue(forKey: modelId)
 
         downloadProgress.removeValue(forKey: modelId)
         downloadErrors.removeValue(forKey: modelId)
     }
 
     func isDownloading(_ modelId: String) -> Bool {
-        return activeDownloads.contains(modelId)
+        return activeDownloads[modelId] != nil
     }
 
     func getProgress(for modelId: String) -> Double {
@@ -88,9 +86,7 @@ class ModelDownloadManager: ObservableObject {
         defer {
             Task { @MainActor in
                 // Clean up
-                if let index = activeDownloads.firstIndex(of: modelId) {
-                    activeDownloads.remove(at: index)
-                }
+                activeDownloads.removeValue(forKey: modelId)
                 downloadTasks.removeValue(forKey: modelId)
             }
         }

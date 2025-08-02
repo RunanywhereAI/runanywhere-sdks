@@ -18,9 +18,11 @@ class ModelURLRegistry: ObservableObject {
     // Sample model URLs for demonstration
     private let modelURLs: [LLMFramework: [String: URL]] = [
         .foundationModels: [:], // Foundation Models don't have URLs - they're system provided
-        .mediaPipe: [
-            "gemma-2b": URL(string: "https://huggingface.co/google/gemma-2b/resolve/main/model.tflite")!,
-            "efficientnet": URL(string: "https://tfhub.dev/tensorflow/efficientnet/lite0/classification/2")!
+        .coreML: [
+            "gemma-2b": URL(string: "https://huggingface.co/google/gemma-2b/resolve/main/model.mlmodel")!
+        ],
+        .llamaCpp: [
+            "phi-3-mini": URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!
         ]
     ]
 
@@ -73,8 +75,9 @@ class ModelURLRegistry: ObservableObject {
         isValidating = true
         defer { isValidating = false }
 
-        // Validate URLs for all frameworks
-        for framework in LLMFramework.availableFrameworks {
+        // Validate URLs for all frameworks - use actual framework values
+        let frameworks: [LLMFramework] = [.foundationModels, .coreML, .llamaCpp, .mlx]
+        for framework in frameworks {
             await validateURLs(for: framework)
 
             // Small delay between validations
@@ -97,16 +100,14 @@ class ModelURLRegistry: ObservableObject {
     }
 
     func getAllModels(for framework: LLMFramework) -> [ModelInfo] {
-        // Convert SDK framework to local framework for URL lookup
-        let localFramework = framework.toLocalFramework ?? LLMFramework.foundationModels
-
+        // Use framework directly since SDK and local frameworks are now aligned
         // Return ModelInfo objects for models that have URLs
-        let urls = getModelURLs(for: localFramework)
+        let urls = getModelURLs(for: framework)
         return urls.compactMap { name, url in
             ModelInfo(
                 id: "\(framework.rawValue)-\(name)",
                 name: name,
-                format: framework == .mediaPipe ? .tflite : .gguf,
+                format: .gguf, // Use consistent format for all
                 downloadURL: url,
                 estimatedMemory: 1_000_000_000, // 1GB default
                 compatibleFrameworks: [framework],
