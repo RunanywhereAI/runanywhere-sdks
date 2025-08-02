@@ -82,7 +82,9 @@
       "Bash(rm:*)",
       "Bash(./scripts/fix_pods_sandbox.sh:*)",
       "Bash(xcrun simctl uninstall:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(cp:*)",
+      "Bash(echo)"
     ],
     "deny": []
   }
