@@ -27,7 +27,7 @@ public class ServiceContainer {
             registry: modelRegistry,
             adapterRegistry: adapterRegistry,
             validationService: validationService,
-            memoryService: unifiedMemoryManager
+            memoryService: memoryService
         )
     }()
 
@@ -59,7 +59,7 @@ public class ServiceContainer {
     private(set) lazy var downloadService: DownloadService = {
         DownloadService(
             downloadQueue: downloadQueue,
-            progressTracker: progressTracker,
+            progressTracker: progressService,
             storageService: storageService
         )
     }()
@@ -69,9 +69,12 @@ public class ServiceContainer {
         DownloadQueue()
     }()
 
-    /// Progress tracker
-    private(set) lazy var progressTracker: ProgressTracker = {
-        ProgressTracker()
+    /// Progress service (implements ProgressTracker protocol)
+    private(set) lazy var progressService: ProgressTracker = {
+        ProgressService(
+            stageManager: StageManager(),
+            progressAggregator: ProgressAggregator()
+        )
     }()
 
     /// Storage service
@@ -118,15 +121,68 @@ public class ServiceContainer {
         HardwareCapabilityManager()
     }()
 
-    /// Unified memory manager (implements MemoryManager protocol)
-    private(set) lazy var unifiedMemoryManager: MemoryManager = {
-        UnifiedMemoryManager()
+    /// Memory service (implements MemoryManager protocol)
+    private(set) lazy var memoryService: MemoryManager = {
+        MemoryService(
+            allocationManager: AllocationManager(),
+            pressureHandler: PressureHandler(),
+            cacheEviction: CacheEviction()
+        )
+    }()
+
+    /// Error recovery service
+    private(set) lazy var errorRecoveryService: ErrorRecoveryService = {
+        ErrorRecoveryService()
+    }()
+
+    /// Compatibility service
+    private(set) lazy var compatibilityService: CompatibilityService = {
+        CompatibilityService(
+            frameworkRecommender: FrameworkRecommender(),
+            requirementChecker: RequirementChecker()
+        )
+    }()
+
+    /// Tokenization service
+    private(set) lazy var tokenizerService: TokenizerService = {
+        TokenizerService(
+            formatDetector: FormatDetector(),
+            tokenizerCache: TokenizerCache(),
+            configurationBuilder: ConfigurationBuilder()
+        )
     }()
 
     /// Logger
     private(set) lazy var logger: SDKLogger = {
         SDKLogger()
     }()
+
+    // MARK: - Public Service Access
+
+    /// Get error recovery service
+    public var errorRecovery: ErrorRecoveryService {
+        return errorRecoveryService
+    }
+
+    /// Get compatibility service
+    public var compatibility: CompatibilityService {
+        return compatibilityService
+    }
+
+    /// Get tokenizer service
+    public var tokenizer: TokenizerService {
+        return tokenizerService
+    }
+
+    /// Get memory service
+    public var memory: MemoryManager {
+        return memoryService
+    }
+
+    /// Get progress service
+    public var progress: ProgressTracker {
+        return progressService
+    }
 
     // MARK: - Initialization
 
@@ -148,7 +204,7 @@ public class ServiceContainer {
         }
 
         // Set memory threshold
-        unifiedMemoryManager.setMemoryThreshold(configuration.memoryThreshold)
+        memoryService.setMemoryThreshold(configuration.memoryThreshold)
 
         // Configure download settings
         downloadService.configure(with: configuration.downloadConfiguration)
@@ -158,6 +214,69 @@ public class ServiceContainer {
             performanceMonitor.startMonitoring()
             await storageMonitor.startMonitoring()
         }
+
+        // Start service health monitoring
+        await startHealthMonitoring()
+    }
+
+    /// Check health of all services
+    public func checkServiceHealth() async -> [String: Bool] {
+        var health: [String: Bool] = [:]
+
+        health["memory"] = await checkMemoryServiceHealth()
+        health["download"] = await checkDownloadServiceHealth()
+        health["storage"] = await checkStorageServiceHealth()
+        health["validation"] = await checkValidationServiceHealth()
+        health["compatibility"] = await checkCompatibilityServiceHealth()
+        health["tokenizer"] = await checkTokenizerServiceHealth()
+
+        return health
+    }
+
+    private func startHealthMonitoring() async {
+        // Start periodic health checks every 30 seconds
+        Task {
+            while !Task.isCancelled {
+                let health = await checkServiceHealth()
+                let unhealthyServices = health.filter { !$0.value }.map { $0.key }
+
+                if !unhealthyServices.isEmpty {
+                    logger.warning("Unhealthy services detected: \(unhealthyServices.joined(separator: ", "))")
+                }
+
+                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+            }
+        }
+    }
+
+    private func checkMemoryServiceHealth() async -> Bool {
+        // Basic health check - ensure memory service is responsive
+        return memoryService.isHealthy()
+    }
+
+    private func checkDownloadServiceHealth() async -> Bool {
+        // Check if download service can handle requests
+        return downloadService.isHealthy()
+    }
+
+    private func checkStorageServiceHealth() async -> Bool {
+        // Check storage service health
+        return await storageService.isHealthy()
+    }
+
+    private func checkValidationServiceHealth() async -> Bool {
+        // Check validation service
+        return validationService.isHealthy()
+    }
+
+    private func checkCompatibilityServiceHealth() async -> Bool {
+        // Check compatibility service
+        return compatibilityService.isHealthy()
+    }
+
+    private func checkTokenizerServiceHealth() async -> Bool {
+        // Check tokenizer service
+        return tokenizerService.isHealthy()
     }
 }
 
