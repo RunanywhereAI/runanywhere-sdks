@@ -12,6 +12,7 @@ public enum LLMFramework: String, CaseIterable, Codable {
     case foundationModels = "FoundationModels"
     case picoLLM = "PicoLLM"
     case mlc = "MLC"
+    case mediaPipe = "MediaPipe"
 
     /// Human-readable display name for the framework
     public var displayName: String {
@@ -26,6 +27,7 @@ public enum LLMFramework: String, CaseIterable, Codable {
         case .foundationModels: return "Foundation Models"
         case .picoLLM: return "Pico LLM"
         case .mlc: return "MLC"
+        case .mediaPipe: return "MediaPipe"
         }
     }
 }

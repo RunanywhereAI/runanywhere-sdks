@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// Real-time performance monitoring for on-device AI inference
 public class RealtimePerformanceMonitor {
@@ -28,7 +27,7 @@ public class RealtimePerformanceMonitor {
 
     // MARK: - Private Properties
 
-    private let logger = os.Logger(subsystem: "com.runanywhere.sdk", category: "PerformanceMonitoring")
+    private let logger = SDKLogger(category: "PerformanceMonitoring")
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 0.1 // 100ms updates
     private let historyLimit = 300 // Keep last 30 seconds at 100ms intervals

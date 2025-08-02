@@ -6,13 +6,12 @@
 //
 
 import Foundation
-import os.log
 
 /// Model compatibility matrix for determining which models work with which frameworks
 public class ModelCompatibilityMatrix {
     public static let shared = ModelCompatibilityMatrix()
 
-    private let logger = os.Logger(subsystem: "com.runanywhere.sdk", category: "Compatibility")
+    private let logger = SDKLogger(category: "Compatibility")
 
     // MARK: - Compatibility Data
 
