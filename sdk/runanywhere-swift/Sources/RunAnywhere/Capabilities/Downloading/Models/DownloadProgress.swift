@@ -4,24 +4,23 @@ import Foundation
 public struct DownloadProgress {
     public let bytesDownloaded: Int64
     public let totalBytes: Int64
-    public let percentComplete: Double
+    public let state: DownloadState
     public let estimatedTimeRemaining: TimeInterval?
-    public let downloadSpeed: Double // bytes per second
-    public let status: DownloadStatus
+
+    public var percentage: Double {
+        guard totalBytes > 0 else { return 0 }
+        return Double(bytesDownloaded) / Double(totalBytes)
+    }
 
     public init(
         bytesDownloaded: Int64,
         totalBytes: Int64,
-        percentComplete: Double,
-        estimatedTimeRemaining: TimeInterval? = nil,
-        downloadSpeed: Double = 0,
-        status: DownloadStatus = .downloading
+        state: DownloadState,
+        estimatedTimeRemaining: TimeInterval? = nil
     ) {
         self.bytesDownloaded = bytesDownloaded
         self.totalBytes = totalBytes
-        self.percentComplete = percentComplete
+        self.state = state
         self.estimatedTimeRemaining = estimatedTimeRemaining
-        self.downloadSpeed = downloadSpeed
-        self.status = status
     }
 }

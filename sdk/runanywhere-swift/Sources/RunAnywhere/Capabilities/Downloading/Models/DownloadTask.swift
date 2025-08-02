@@ -1,6 +1,6 @@
 import Foundation
 
-/// Download task representation
+/// Download task information
 public struct DownloadTask {
     public let id: String
     public let modelId: String
