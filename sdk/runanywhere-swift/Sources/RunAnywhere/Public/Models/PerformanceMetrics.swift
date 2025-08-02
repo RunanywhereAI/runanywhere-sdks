@@ -1,23 +1,38 @@
 import Foundation
 
-/// Simplified performance metrics
+/// Detailed performance metrics
 public struct PerformanceMetrics {
-    /// Total duration in seconds
-    public let totalDuration: TimeInterval
+    /// Time spent on tokenization (milliseconds)
+    public let tokenizationTimeMs: TimeInterval
+
+    /// Time spent on inference (milliseconds)
+    public let inferenceTimeMs: TimeInterval
+
+    /// Time spent on post-processing (milliseconds)
+    public let postProcessingTimeMs: TimeInterval
 
     /// Tokens generated per second
     public let tokensPerSecond: Double
 
-    /// Time to first token
-    public let timeToFirstToken: TimeInterval?
+    /// Peak memory usage during generation
+    public let peakMemoryUsage: Int64
+
+    /// Queue wait time if any (milliseconds)
+    public let queueWaitTimeMs: TimeInterval
 
     public init(
-        totalDuration: TimeInterval,
-        tokensPerSecond: Double,
-        timeToFirstToken: TimeInterval? = nil
+        tokenizationTimeMs: TimeInterval = 0,
+        inferenceTimeMs: TimeInterval = 0,
+        postProcessingTimeMs: TimeInterval = 0,
+        tokensPerSecond: Double = 0,
+        peakMemoryUsage: Int64 = 0,
+        queueWaitTimeMs: TimeInterval = 0
     ) {
-        self.totalDuration = totalDuration
+        self.tokenizationTimeMs = tokenizationTimeMs
+        self.inferenceTimeMs = inferenceTimeMs
+        self.postProcessingTimeMs = postProcessingTimeMs
         self.tokensPerSecond = tokensPerSecond
-        self.timeToFirstToken = timeToFirstToken
+        self.peakMemoryUsage = peakMemoryUsage
+        self.queueWaitTimeMs = queueWaitTimeMs
     }
 }
