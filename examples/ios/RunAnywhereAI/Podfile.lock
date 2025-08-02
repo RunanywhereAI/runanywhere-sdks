@@ -20,25 +20,21 @@ PODS:
     - TensorFlowLiteSwift/Core (= 2.17.0)
     - TensorFlowLiteSwift/Privacy (= 2.17.0)
   - TensorFlowLiteSwift/Privacy (2.17.0)
-  - ZIPFoundation (0.9.19)
 
 DEPENDENCIES:
   - TensorFlowLiteSwift (~> 2.17.0)
   - TensorFlowLiteSwift/CoreML (~> 2.17.0)
   - TensorFlowLiteSwift/Metal (~> 2.17.0)
-  - ZIPFoundation (~> 0.9.19)
 
 SPEC REPOS:
   trunk:
     - TensorFlowLiteC
     - TensorFlowLiteSwift
-    - ZIPFoundation
 
 SPEC CHECKSUMS:
   TensorFlowLiteC: eac6d689a8d391d1b202dc59e3d9165ba64aaf73
   TensorFlowLiteSwift: 723fe42222815e72490c79feeff05305530de393
-  ZIPFoundation: b8c29ea7ae353b309bc810586181fd073cb3312c
 
-PODFILE CHECKSUM: 952d811c75fbeb8aaf350586be6d06cbe6445a9f
+PODFILE CHECKSUM: 2ac711fcb0e82bcfc1a2bd0dbc593b96a790ef67
 
 COCOAPODS: 1.16.2

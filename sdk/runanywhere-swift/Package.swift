@@ -13,11 +13,6 @@ let package = Package(
         .library(
             name: "RunAnywhereSDK",
             targets: ["RunAnywhereSDK"]
-        ),
-        .library(
-            name: "RunAnywhereSDKDynamic",
-            type: .dynamic,
-            targets: ["RunAnywhereSDK"]
         )
     ],
     dependencies: [
