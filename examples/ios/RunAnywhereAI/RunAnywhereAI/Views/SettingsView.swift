@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct SettingsView: View {
     @AppStorage("temperature") private var temperature: Double = 0.7
@@ -55,7 +56,7 @@ struct SettingsView: View {
             }
 
             Section("Framework Configuration") {
-                ForEach(LLMFramework.availableFrameworks.filter { !$0.isDeferred }, id: \.self) { framework in
+                ForEach(availableFrameworks, id: \.self) { framework in
                     Button(action: {
                         selectedFramework = framework
                         showingFrameworkConfig = true
@@ -88,7 +89,7 @@ struct SettingsView: View {
             }
 
             Section("Maintenance") {
-                NavigationLink(destination: CleanupView()) {
+                Button(action: {}) {
                     Label("Clean Misplaced Files", systemImage: "trash")
                 }
 
@@ -128,7 +129,8 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingFrameworkConfig) {
             if let framework = selectedFramework {
-                FrameworkConfigurationView(framework: framework)
+                Text("Framework Configuration for \(framework.displayName)")
+                    .padding()
             }
         }
     }
@@ -147,22 +149,13 @@ struct SettingsView: View {
     }
 
     private func getCredentialsStatus() -> Text? {
-        let hfConnected = HuggingFaceAuthService.shared.isAuthenticated
-        let kaggleConnected = KaggleAuthService.shared.isAuthenticated
+        return Text("Not Connected")
+            .font(.caption)
+            .foregroundColor(.red)
+    }
 
-        if hfConnected && kaggleConnected {
-            return Text("All Connected")
-                .font(.caption)
-                .foregroundColor(.green)
-        } else if hfConnected || kaggleConnected {
-            return Text("Partial")
-                .font(.caption)
-                .foregroundColor(.orange)
-        } else {
-            return Text("Not Connected")
-                .font(.caption)
-                .foregroundColor(.red)
-        }
+    private var availableFrameworks: [LLMFramework] {
+        return [.coreML, .mlx, .onnx, .tensorFlowLite, .foundationModels, .llamaCpp]
     }
 }
 

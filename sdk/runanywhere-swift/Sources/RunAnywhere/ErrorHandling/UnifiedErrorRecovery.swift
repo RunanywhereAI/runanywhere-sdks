@@ -5,7 +5,6 @@ public class UnifiedErrorRecovery {
     // MARK: - Properties
 
     private var strategies: [ErrorType: ErrorRecoveryStrategy] = [:]
-    private let strategyLock: NSLock = NSLock()
 
     // MARK: - Initialization
 
@@ -17,8 +16,6 @@ public class UnifiedErrorRecovery {
 
     /// Register a recovery strategy for an error type
     public func registerStrategy(_ strategy: ErrorRecoveryStrategy, for errorType: ErrorType) {
-        strategyLock.lock()
-        defer { strategyLock.unlock() }
         strategies[errorType] = strategy
     }
 
@@ -26,9 +23,7 @@ public class UnifiedErrorRecovery {
     public func attemptRecovery(from error: Error, in context: RecoveryContext) async throws {
         let errorType = ErrorType(from: error)
 
-        strategyLock.lock()
         let strategy = strategies[errorType]
-        strategyLock.unlock()
 
         if let strategy = strategy, strategy.canRecover(from: error) {
             try await strategy.recover(from: error, context: context)
@@ -40,11 +35,7 @@ public class UnifiedErrorRecovery {
     /// Get recovery suggestions for an error
     public func getRecoverySuggestions(for error: Error) -> [RecoverySuggestion] {
         let errorType = ErrorType(from: error)
-
-        strategyLock.lock()
         let strategy = strategies[errorType]
-        strategyLock.unlock()
-
         return strategy?.getRecoverySuggestions(for: error) ?? getDefaultSuggestions(for: error)
     }
 

@@ -2,11 +2,12 @@
 //  ChatViewModel.swift
 //  RunAnywhereAI
 //
-//  Created by Sanchit Monga on 7/26/25.
+//  Simplified version that uses SDK directly
 //
 
 import Foundation
 import SwiftUI
+import RunAnywhereSDK
 
 @MainActor
 class ChatViewModel: ObservableObject {
@@ -15,17 +16,14 @@ class ChatViewModel: ObservableObject {
     @Published var currentInput = ""
     @Published var error: Error?
 
-    private let llmService: UnifiedLLMService
+    private let sdk = RunAnywhereSDK.shared
     private var generationTask: Task<Void, Never>?
-    private let performanceMonitor = PerformanceMonitor()
 
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating
     }
 
-    @MainActor
-    init(llmService: UnifiedLLMService? = nil) {
-        self.llmService = llmService ?? .shared
+    init() {
         addSystemMessage()
     }
 
@@ -53,27 +51,15 @@ class ChatViewModel: ObservableObject {
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
 
-        performanceMonitor.startMeasurement()
-
         generationTask = Task {
             do {
-                try await llmService.streamGenerate(
-                    prompt: prompt,
-                    options: .default
-                ) { [weak self] token in
-                    guard let self = self else { return }
-                    self.performanceMonitor.recordToken()
-                    Task { @MainActor in
-                        if messageIndex < self.messages.count {
-                            self.messages[messageIndex].content += token
-                        }
-                    }
-                }
+                // Direct SDK usage - simple generate call for now
+                let response = try await sdk.generate(prompt)
 
-                let metrics = self.performanceMonitor.endMeasurement()
-                let metricsMessage = "Generation completed - \(metrics.tokenCount) tokens at " +
-                    "\(String(format: "%.1f", metrics.tokensPerSecond)) tokens/sec"
-                print(metricsMessage)
+                // Update the assistant message with the response
+                if messageIndex < self.messages.count {
+                    self.messages[messageIndex].content = response.text
+                }
             } catch {
                 await MainActor.run {
                     self.error = error

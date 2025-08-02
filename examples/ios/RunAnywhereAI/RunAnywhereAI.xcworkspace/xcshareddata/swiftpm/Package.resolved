@@ -1,10 +1,10 @@
 {
-  "originHash" : "8852f392df44ee8c05bc816827f623837cf7b4e50faeefe914082bdcd4fcc0c4",
+  "originHash" : "2b278722b895e6ca8294366a60714c1393271a5307a1d760a98656563e0f7b05",
   "pins" : [
     {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch",
+      "location" : "https://github.com/pytorch/executorch.git",
       "state" : {
         "branch" : "swiftpm-0.7.0",
         "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
@@ -65,12 +65,30 @@
       }
     },
     {
+      "identity" : "swift-asn1",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-asn1.git",
+      "state" : {
+        "revision" : "f70225981241859eb4aa1a18a75531d26637c8cc",
+        "version" : "1.4.0"
+      }
+    },
+    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
       "state" : {
         "revision" : "8c0c0a8b49e080e54e5e328cc552821ff07cd341",
         "version" : "1.2.1"
+      }
+    },
+    {
+      "identity" : "swift-crypto",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-crypto.git",
+      "state" : {
+        "revision" : "176abc28e002a9952470f08745cd26fad9286776",
+        "version" : "3.13.3"
       }
     },
     {

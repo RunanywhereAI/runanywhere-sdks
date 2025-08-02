@@ -23,14 +23,11 @@ struct RunAnywhereAIApp: App {
     }
 
     private func initializeBundledModels() async {
-        do {
-            // Install bundled models from app bundle
-            try await BundledModelsService.shared.installBundledModels()
+        // Install bundled models from app bundle
+        let success = await BundledModelsService.shared.installBundledModels()
 
-            // Refresh model list
-            await modelManager.refreshModelList()
-        } catch {
-            print("Failed to initialize bundled models: \(error)")
+        if !success {
+            print("Failed to initialize bundled models")
         }
     }
 }

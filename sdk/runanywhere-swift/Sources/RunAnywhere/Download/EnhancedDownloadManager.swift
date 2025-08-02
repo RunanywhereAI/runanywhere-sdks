@@ -4,12 +4,12 @@ import UIKit
 #endif
 
 /// Enhanced download manager with queue-based management, retry logic, and archive extraction
+@MainActor
 public class EnhancedDownloadManager {
     public static let shared: EnhancedDownloadManager = EnhancedDownloadManager()
 
     private let downloadQueue: OperationQueue = OperationQueue()
     private var activeTasks: [String: DownloadTask] = [:]
-    private let taskLock: NSLock = NSLock()
     private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
 
     /// Configuration for download behavior
@@ -66,6 +66,8 @@ public class EnhancedDownloadManager {
         case extractionFailed(String)
         case unsupportedArchive(String)
         case unknown
+        case invalidResponse
+        case httpError(Int)
 
         public var errorDescription: String? {
             switch self {
@@ -85,6 +87,10 @@ public class EnhancedDownloadManager {
                 return "Unsupported archive format: \(format)"
             case .unknown:
                 return "Unknown download error"
+            case .invalidResponse:
+                return "Invalid server response"
+            case .httpError(let code):
+                return "HTTP error: \(code)"
             }
         }
     }
@@ -113,11 +119,9 @@ public class EnhancedDownloadManager {
             result: Task {
                 defer {
                     progressContinuation.finish()
-                    // Clean up active tasks synchronously
+                    // Clean up active tasks
                     Task { @MainActor in
-                        taskLock.lock()
                         activeTasks.removeValue(forKey: taskId)
-                        taskLock.unlock()
                     }
                 }
 
@@ -142,33 +146,23 @@ public class EnhancedDownloadManager {
             }
         )
 
-        // Store task synchronously before returning
-        await withCheckedContinuation { continuation in
-            taskLock.lock()
-            activeTasks[taskId] = task
-            taskLock.unlock()
-            continuation.resume()
-        }
+        // Store task before returning
+        activeTasks[taskId] = task
 
         return task
     }
 
     /// Cancel a download task
     public func cancelDownload(taskId: String) {
-        taskLock.lock()
         if let task = activeTasks[taskId] {
             task.result.cancel()
             activeTasks.removeValue(forKey: taskId)
         }
-        taskLock.unlock()
     }
 
     /// Get all active downloads
     public func activeDownloads() -> [DownloadTask] {
-        taskLock.lock()
-        let tasks = Array(activeTasks.values)
-        taskLock.unlock()
-        return tasks
+        return Array(activeTasks.values)
     }
 
     // MARK: - Private Methods
@@ -238,6 +232,13 @@ public class EnhancedDownloadManager {
     ) async throws -> Data {
         let session = URLSession.shared
         let request = URLRequest(url: url, timeoutInterval: config.timeout)
+
+        // Check iOS version for bytes API
+        guard #available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *) else {
+            // Fallback for older iOS versions
+            let downloadURL = try await downloadWithDataTask(from: url, progressContinuation: progressContinuation)
+            return try Data(contentsOf: downloadURL)
+        }
 
         let (asyncBytes, response) = try await session.bytes(for: request)
 
@@ -342,7 +343,8 @@ public class EnhancedDownloadManager {
         // Create output directory
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
-        // Extract using unzip
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
         process.arguments = ["-q", archive.path, "-d", outputDir.path]
@@ -352,6 +354,11 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("unzip failed with status \(process.terminationStatus)")
         }
+        #else
+        // On iOS, use manual extraction or delegate to app
+        // For now, throw an error indicating the app needs to handle extraction
+        throw DownloadError.extractionFailed("ZIP extraction requires app-level implementation. Please handle extraction in your app delegate.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -367,6 +374,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xzf", archive.path, "-C", outputDir.path]
@@ -376,6 +385,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.GZ extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -388,6 +401,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xf", archive.path, "-C", outputDir.path]
@@ -397,6 +412,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -412,6 +431,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xjf", archive.path, "-C", outputDir.path]
@@ -421,6 +442,10 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.BZ2 extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
@@ -436,6 +461,8 @@ public class EnhancedDownloadManager {
 
         try FileManager.default.createDirectory(at: outputDir, withIntermediateDirectories: true)
 
+        #if os(macOS)
+        // Use Process on macOS
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
         process.arguments = ["-xJf", archive.path, "-C", outputDir.path]
@@ -445,11 +472,75 @@ public class EnhancedDownloadManager {
         if process.terminationStatus != 0 {
             throw DownloadError.extractionFailed("tar failed with status \(process.terminationStatus)")
         }
+        #else
+        // Use manual extraction on iOS
+        throw DownloadError.extractionFailed("TAR.XZ extraction not implemented for iOS. Please use a third-party library.")
+        #endif
 
         // Clean up archive
         try? FileManager.default.removeItem(at: archive)
 
         return outputDir
+    }
+
+    // Fallback download method for iOS < 15.0
+    private func downloadWithDataTask(
+        from url: URL,
+        progressContinuation: AsyncStream<DownloadProgress>.Continuation
+    ) async throws -> URL {
+        return try await withCheckedThrowingContinuation { continuation in
+            var request = URLRequest(url: url)
+
+            let downloadTask = URLSession.shared.downloadTask(with: request) { tempURL, response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                guard (200...299).contains(httpResponse.statusCode) else {
+                    continuation.resume(throwing: DownloadError.httpError(httpResponse.statusCode))
+                    return
+                }
+
+                guard let tempURL = tempURL else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                do {
+                    let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                    let destinationURL = documentsDir.appendingPathComponent(url.lastPathComponent)
+
+                    // Remove existing file if needed
+                    try? FileManager.default.removeItem(at: destinationURL)
+
+                    // Move downloaded file to destination
+                    try FileManager.default.moveItem(at: tempURL, to: destinationURL)
+
+                    continuation.resume(returning: destinationURL)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+
+            // Observe progress
+            let observation = downloadTask.progress.observe(\.fractionCompleted) { progress, _ in
+                let downloadProgress = DownloadProgress(
+                    bytesDownloaded: progress.completedUnitCount,
+                    totalBytes: progress.totalUnitCount,
+                    state: .downloading,
+                    estimatedTimeRemaining: nil
+                )
+                progressContinuation.yield(downloadProgress)
+            }
+
+            downloadTask.resume()
+        }
     }
 
     private func calculateChecksum(for data: Data) -> String {
@@ -483,10 +574,12 @@ public class EnhancedDownloadManager {
 // MARK: - Default Implementation
 
 extension EnhancedDownloadManager: ModelStorageManager {
-    public func deleteModel(_ modelId: String) async throws {
+    nonisolated public func deleteModel(_ modelId: String) async throws {
         // Cancel any active download
-        if let activeTask = activeTasks.values.first(where: { $0.modelId == modelId }) {
-            cancelDownload(taskId: activeTask.id)
+        await MainActor.run {
+            if let activeTask = activeTasks.values.first(where: { $0.modelId == modelId }) {
+                cancelDownload(taskId: activeTask.id)
+            }
         }
 
         // Remove from storage
@@ -495,7 +588,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func getModelPath(_ modelId: String) -> URL? {
+    nonisolated public func getModelPath(_ modelId: String) -> URL? {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let modelsURL = documentsURL.appendingPathComponent("Models", isDirectory: true)
 
@@ -511,7 +604,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         return nil
     }
 
-    public func getAvailableStorage() -> Int64 {
+    nonisolated public func getAvailableStorage() -> Int64 {
         do {
             let systemAttributes = try FileManager.default.attributesOfFileSystem(
                 forPath: NSHomeDirectory()
@@ -527,20 +620,20 @@ extension EnhancedDownloadManager: ModelStorageManager {
         return 0
     }
 
-    public func getModelsDirectory() -> URL {
+    nonisolated public func getModelsDirectory() -> URL {
         let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         return documentsURL.appendingPathComponent("Models", isDirectory: true)
     }
 
-    public func getModelPath(for modelId: String) -> URL {
+    nonisolated public func getModelPath(for modelId: String) -> URL {
         return getModelsDirectory().appendingPathComponent("\(modelId).model")
     }
 
-    public func modelExists(_ modelId: String) -> Bool {
+    nonisolated public func modelExists(_ modelId: String) -> Bool {
         return getModelPath(modelId) != nil
     }
 
-    public func getModelSize(_ modelId: String) -> Int64? {
+    nonisolated public func getModelSize(_ modelId: String) -> Int64? {
         guard let path = getModelPath(modelId) else { return nil }
         do {
             let attributes = try FileManager.default.attributesOfItem(atPath: path.path)
@@ -550,11 +643,11 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func getAvailableSpace() -> Int64 {
+    nonisolated public func getAvailableSpace() -> Int64 {
         return getAvailableStorage()
     }
 
-    public func listStoredModels() -> [String] {
+    nonisolated public func listStoredModels() -> [String] {
         let modelsDir = getModelsDirectory()
         guard let contents = try? FileManager.default.contentsOfDirectory(at: modelsDir, includingPropertiesForKeys: nil) else {
             return []
@@ -569,7 +662,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func cleanupTemporaryFiles() async throws {
+    nonisolated public func cleanupTemporaryFiles() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let contents = try FileManager.default.contentsOfDirectory(at: tempDir, includingPropertiesForKeys: nil)
 
@@ -580,7 +673,7 @@ extension EnhancedDownloadManager: ModelStorageManager {
         }
     }
 
-    public func moveToStorage(from temporaryPath: URL, modelId: String) async throws -> URL {
+    nonisolated public func moveToStorage(from temporaryPath: URL, modelId: String) async throws -> URL {
         let finalPath = getModelPath(for: modelId)
 
         // Create models directory if needed

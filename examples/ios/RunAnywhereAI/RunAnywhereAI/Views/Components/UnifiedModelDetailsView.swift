@@ -2,57 +2,63 @@
 //  UnifiedModelDetailsView.swift
 //  RunAnywhereAI
 //
-//  Created by Sanchit Monga on 7/28/25.
+//  Simplified version for direct SDK consumption
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct UnifiedModelDetailsView: View {
     let model: ModelInfo
     let onDownload: (ModelInfo) -> Void
 
-    @StateObject private var modelURLRegistry = ModelURLRegistry.shared
-    @StateObject private var deviceInfoService = DeviceInfoService.shared
     @StateObject private var downloadManager = ModelDownloadManager.shared
-    @StateObject private var modelManager = ModelManager.shared
 
-    @State private var showingCompatibilityDetails = false
+    private var frameworkIcon: String {
+        guard let framework = model.preferredFramework ?? model.compatibleFrameworks.first else {
+            return "cube"
+        }
 
-    private var downloadInfo: ModelInfo? {
-        let modelsWithURLs = modelURLRegistry.getAllModels(for: model.framework)
-        return modelsWithURLs.first { downloadInfo in
-            downloadInfo.name == model.name ||
-                downloadInfo.id == model.id ||
-                isModelNameMatch(model.name, downloadInfo.name)
+        switch framework {
+        case .coreML: return "brain.head.profile"
+        case .mlx: return "cube.fill"
+        case .onnx: return "cpu.fill"
+        case .tensorFlowLite: return "square.stack.3d.up.fill"
+        case .foundationModels: return "sparkles"
+        case .llamaCpp: return "terminal.fill"
+        case .mediaPipe: return "brain.filled.head.profile"
+        case .swiftTransformers: return "swift"
+        case .execuTorch: return "flame.fill"
+        case .picoLLM: return "waveform"
+        case .mlc: return "gear.badge"
         }
     }
 
-    private var repositoryURL: URL? {
-        guard let downloadInfo = downloadInfo else { return nil }
-
-        // Extract repository URL from Hugging Face URLs
-        if downloadInfo.downloadURL?.host?.contains("huggingface.co") == true {
-            let pathComponents = downloadInfo.downloadURL?.pathComponents ?? []
-            if pathComponents.count >= 3 {
-                let repo = "\(pathComponents[1])/\(pathComponents[2])"
-                return URL(string: "https://huggingface.co/\(repo)")
-            }
-        }
-
-        return nil
+    private var isDownloading: Bool {
+        downloadManager.isDownloading(model.id)
     }
 
-    private var isModelDownloaded: Bool {
-        if let downloadInfo = downloadInfo {
-            return modelManager.isModelDownloaded(downloadInfo.name, framework: model.framework)
+    private func hardwareRequirementDescription(_ requirement: HardwareRequirement) -> String {
+        switch requirement {
+        case .minimumMemory(let bytes):
+            return "Minimum Memory: \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .memory))"
+        case .minimumCompute(let compute):
+            return "Minimum Compute: \(compute)"
+        case .requiresNeuralEngine:
+            return "Requires Neural Engine"
+        case .requiresGPU:
+            return "Requires GPU"
+        case .minimumOSVersion(let version):
+            return "Minimum OS: \(version)"
+        case .specificChip(let chip):
+            return "Requires: \(chip)"
         }
-        return modelManager.isModelDownloaded(model.name, framework: model.framework)
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Header Section
+                // Header
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
                         Image(systemName: frameworkIcon)
@@ -64,85 +70,65 @@ struct UnifiedModelDetailsView: View {
                                 .font(.title2)
                                 .fontWeight(.bold)
 
-                            Text(model.framework.displayName)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                            if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+                                Text(framework.rawValue)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                         }
 
                         Spacer()
                     }
 
-                    // Status badges
+                    // Status
                     HStack(spacing: 8) {
                         StatusBadge(
-                            text: isModelDownloaded ? "Downloaded" : "Not Downloaded",
-                            systemImage: isModelDownloaded ? "checkmark.circle.fill" : "circle",
-                            color: isModelDownloaded ? .green : .orange
+                            text: model.localPath != nil ? "Downloaded" : "Available",
+                            systemImage: model.localPath != nil ? "checkmark.circle.fill" : "circle",
+                            color: model.localPath != nil ? .green : .orange
                         )
 
                         StatusBadge(
-                            text: model.isCompatible ? "Compatible" : "Incompatible",
-                            systemImage: model.isCompatible ? "checkmark.circle.fill" : "xmark.circle.fill",
-                            color: model.isCompatible ? .green : .red
+                            text: "Compatible",
+                            systemImage: "checkmark.circle.fill",
+                            color: .green
                         )
-
-                        if downloadInfo?.requiresAuth == true {
-                            StatusBadge(
-                                text: "Auth Required",
-                                systemImage: "lock.fill",
-                                color: .orange
-                            )
-                        }
                     }
                 }
                 .padding()
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
 
-                // Model Details Section
+                // Model Details
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Model Details")
                         .font(.headline)
 
                     VStack(spacing: 12) {
-                        DetailRow(label: "Format", value: model.format.displayName)
-                        DetailRow(label: "Size", value: model.displaySize)
+                        DetailRow(label: "Format", value: model.format.rawValue)
 
-                        if let quantization = model.quantization {
-                            DetailRow(label: "Quantization", value: quantization)
+                        if model.estimatedMemory > 0 {
+                            DetailRow(label: "Size", value: ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .file))
                         }
 
-                        if let contextLength = model.contextLength {
-                            DetailRow(label: "Context Length", value: "\(contextLength) tokens")
+                        if model.contextLength > 0 {
+                            DetailRow(label: "Context Length", value: "\(model.contextLength) tokens")
                         }
 
-                        if let downloadedFileName = model.downloadedFileName {
+                        if let localPath = model.localPath {
                             DetailRow(
-                                label: "Downloaded File",
-                                value: downloadedFileName,
+                                label: "Local Path",
+                                value: localPath.lastPathComponent,
                                 valueColor: .green
                             )
-                        } else if let downloadInfo = downloadInfo {
-                            DetailRow(
-                                label: "File Name",
-                                value: downloadInfo.name
-                            )
                         }
 
-                        if let downloadInfo = downloadInfo {
+                        if let downloadURL = model.downloadURL {
                             DetailRow(
                                 label: "Download URL",
-                                value: downloadInfo.downloadURL?.absoluteString ?? "No URL",
+                                value: downloadURL.absoluteString,
                                 isURL: true
                             )
-
-                            if downloadInfo.requiresUnzip {
-                                DetailRow(label: "Format", value: "ZIP Archive")
-                            }
-
-                            if let notes = downloadInfo.notes {
-                                DetailRow(label: "Notes", value: notes)
-                            }
                         }
                     }
                 }
@@ -150,86 +136,22 @@ struct UnifiedModelDetailsView: View {
                 .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(12)
 
-                // Compatibility Section
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text("Device Compatibility")
-                            .font(.headline)
-
-                        Spacer()
-
-                        Button(action: {
-                            showingCompatibilityDetails = true
-                        }) {
-                            Text("View Details")
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
-
-                    VStack(spacing: 12) {
-                        CompatibilityRow(
-                            title: "Memory Required",
-                            isCompatible: deviceMemory >= model.minimumMemory,
-                            message: ByteCountFormatter.string(fromByteCount: model.minimumMemory, countStyle: .memory)
-                        )
-
-                        CompatibilityRow(
-                            title: "Recommended Memory",
-                            isCompatible: deviceMemory >= model.recommendedMemory,
-                            message: ByteCountFormatter.string(fromByteCount: model.recommendedMemory, countStyle: .memory)
-                        )
-
-                        if let deviceInfo = deviceInfoService.deviceInfo {
-                            CompatibilityRow(
-                                title: "Neural Engine",
-                                isCompatible: deviceInfo.neuralEngineAvailable,
-                                message: deviceInfo.neuralEngineAvailable ? "Available" : "Not Available"
-                            )
-                        }
-
-                        CompatibilityRow(
-                            title: "Framework Support",
-                            isCompatible: !model.framework.isDeferred,
-                            message: model.framework.displayName
-                        )
-                    }
-                }
-                .padding()
-                .background(Color(.secondarySystemGroupedBackground))
-                .cornerRadius(12)
-
-                // Repository Section
-                if let repoURL = repositoryURL {
+                // Hardware Requirements
+                if !model.hardwareRequirements.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Repository")
+                        Text("Hardware Requirements")
                             .font(.headline)
 
-                        Link(destination: repoURL) {
-                            HStack {
-                                Image(systemName: "link")
-                                    .foregroundColor(.blue)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("View on Hugging Face")
+                        VStack(spacing: 8) {
+                            ForEach(Array(model.hardwareRequirements.enumerated()), id: \.offset) { index, requirement in
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text(hardwareRequirementDescription(requirement))
                                         .font(.subheadline)
-                                        .foregroundColor(.blue)
-
-                                    Text(repoURL.absoluteString)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
+                                    Spacer()
                                 }
-
-                                Spacer()
-
-                                Image(systemName: "arrow.up.right")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
                             }
-                            .padding()
-                            .background(Color(.tertiarySystemGroupedBackground))
-                            .cornerRadius(8)
                         }
                     }
                     .padding()
@@ -237,93 +159,50 @@ struct UnifiedModelDetailsView: View {
                     .cornerRadius(12)
                 }
 
-                // Action Buttons
+                // Actions
                 VStack(spacing: 12) {
-                    if !isModelDownloaded, let downloadInfo = downloadInfo {
-                        Button(action: {
-                            onDownload(downloadInfo)
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.down.circle.fill")
-                                Text("Download Model")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                    if model.localPath != nil {
+                        Button(action: {}) {
+                            Label("Model Ready", systemImage: "checkmark.circle.fill")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.green.opacity(0.1))
+                                .foregroundColor(.green)
+                                .cornerRadius(12)
                         }
-                        .disabled(downloadManager.activeDownloads.keys.contains(model.id))
-                    }
-
-                    if isModelDownloaded {
+                        .disabled(true)
+                    } else if isDownloading {
                         Button(action: {
-                            // TODO: Implement model loading
+                            downloadManager.cancelDownload(model.id)
                         }) {
-                            HStack {
-                                Image(systemName: "play.circle.fill")
-                                Text("Load Model")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(model.isCompatible ? Color.green : Color.gray)
-                            .foregroundColor(.white)
-                            .cornerRadius(12)
+                            Label("Cancel Download", systemImage: "xmark.circle")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red.opacity(0.1))
+                                .foregroundColor(.red)
+                                .cornerRadius(12)
                         }
-                        .disabled(!model.isCompatible)
+                    } else {
+                        Button(action: {
+                            onDownload(model)
+                        }) {
+                            Label("Download Model", systemImage: "arrow.down.circle")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                        }
                     }
                 }
-                .padding()
+                .padding(.horizontal)
             }
             .padding()
         }
         .navigationTitle("Model Details")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingCompatibilityDetails) {
-            NavigationView {
-                ModelCompatibilityView(model: model, framework: model.framework)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Done") {
-                                showingCompatibilityDetails = false
-                            }
-                        }
-                    }
-            }
-        }
-    }
-
-    private var frameworkIcon: String {
-        switch model.framework {
-        case .coreML: return "brain.head.profile"
-        case .mlx: return "cube.fill"
-        case .onnxRuntime: return "cpu.fill"
-        case .tensorFlowLite: return "square.stack.3d.up.fill"
-        case .foundationModels: return "sparkles"
-        default: return "cube"
-        }
-    }
-
-    private var deviceMemory: Int64 {
-        Int64(ProcessInfo.processInfo.physicalMemory)
-    }
-
-    private func isModelNameMatch(_ modelName: String, _ downloadName: String) -> Bool {
-        let modelLower = modelName.lowercased()
-        let downloadLower = downloadName.lowercased()
-
-        let patterns = ["phi", "tinyllama", "llama-3.2", "mistral", "gemma", "qwen"]
-        for pattern in patterns {
-            if modelLower.contains(pattern) && downloadLower.contains(pattern) {
-                return true
-            }
-        }
-
-        return false
     }
 }
-
-// MARK: - Supporting Views
 
 struct StatusBadge: View {
     let text: String
@@ -331,74 +210,67 @@ struct StatusBadge: View {
     let color: Color
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.caption)
-            Text(text)
-                .font(.caption)
-                .fontWeight(.medium)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(color.opacity(0.1))
-        .foregroundColor(color)
-        .cornerRadius(8)
+        Label(text, systemImage: systemImage)
+            .font(.caption)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.1))
+            .foregroundColor(color)
+            .cornerRadius(8)
     }
 }
 
 struct DetailRow: View {
     let label: String
     let value: String
-    let isURL: Bool
-    let valueColor: Color?
-
-    init(label: String, value: String, isURL: Bool = false, valueColor: Color? = nil) {
-        self.label = label
-        self.value = value
-        self.isURL = isURL
-        self.valueColor = valueColor
-    }
+    var valueColor: Color = .primary
+    var isURL: Bool = false
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack {
             Text(label)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .frame(width: 100, alignment: .leading)
 
-            if isURL, let url = URL(string: value) {
-                Link(destination: url) {
-                    Text(value)
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                        .multilineTextAlignment(.leading)
-                }
+            Spacer()
+
+            if isURL {
+                Text(value)
+                    .font(.caption)
+                    .foregroundColor(.blue)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
             } else {
                 Text(value)
                     .font(.subheadline)
-                    .foregroundColor(valueColor ?? .primary)
-                    .multilineTextAlignment(.leading)
+                    .foregroundColor(valueColor)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.trailing)
             }
-
-            Spacer()
         }
     }
 }
-
-// Using existing CompatibilityRow from ModelCompatibilityView.swift
 
 #Preview {
     NavigationView {
         UnifiedModelDetailsView(
             model: ModelInfo(
-                name: "Test Model",
+                id: "llama-3.2-3b",
+                name: "Llama 3.2 3B",
                 format: .gguf,
-                size: "1.2GB",
-                framework: .coreML,
-                quantization: "Q4_K_M",
-                isLocal: false,
-                description: "A test model for preview"
+                downloadURL: URL(string: "https://example.com/model.gguf"),
+                localPath: nil,
+                estimatedMemory: 2_400_000_000,
+                contextLength: 2048,
+                downloadSize: 2_400_000_000,
+                checksum: nil,
+                compatibleFrameworks: [.llamaCpp],
+                preferredFramework: .llamaCpp,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
             )
-        )            { _ in }
+        ) { _ in }
     }
 }

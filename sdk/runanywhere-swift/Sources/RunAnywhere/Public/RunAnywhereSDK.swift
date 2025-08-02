@@ -35,7 +35,29 @@ public class RunAnywhereSDK {
     private let progressTracker: UnifiedProgressTracker = UnifiedProgressTracker()
 
     /// Error recovery system
-    private let errorRecovery: UnifiedErrorRecovery = UnifiedErrorRecovery()
+    private lazy var errorRecovery: UnifiedErrorRecovery = {
+        UnifiedErrorRecovery()
+    }()
+
+    // MARK: - New Performance Components
+
+    /// Performance monitoring system
+    public let performanceMonitor: RealtimePerformanceMonitor = RealtimePerformanceMonitor.shared
+
+    /// Benchmarking suite
+    public let benchmarkSuite: BenchmarkSuite = BenchmarkSuite.shared
+
+    /// Memory profiler
+    public let memoryProfiler: MemoryProfiler = MemoryProfiler.shared
+
+    /// Model compatibility checker
+    public let compatibilityMatrix: ModelCompatibilityMatrix = ModelCompatibilityMatrix.shared
+
+    /// Storage monitor
+    public let storageMonitor: StorageMonitor = StorageMonitor.shared
+
+    /// A/B testing framework
+    public let abTesting: ABTestingFramework = ABTestingFramework.shared
 
     /// Currently loaded model
     private var currentModel: ModelInfo?
@@ -299,6 +321,113 @@ public extension RunAnywhereSDK {
     /// Register hardware detector
     func registerHardwareDetector(_ detector: HardwareDetector) {
         hardwareManager.registerHardwareDetector(detector)
+    }
+}
+
+// MARK: - Default Initialization
+
+public extension RunAnywhereSDK {
+
+    /// Initialize SDK with optimal defaults for immediate usability
+    /// This method sets up the SDK with platform-specific optimizations
+    /// and sensible defaults that work out-of-the-box for local-only usage
+    func initializeWithDefaults() async throws {
+        // Register platform-specific hardware detector
+        #if os(iOS) || os(tvOS)
+        let hardwareManager = HardwareCapabilityManager.shared
+        if hardwareManager.capabilities.processorType == .unknown {
+            hardwareManager.registerHardwareDetector(iOSHardwareDetector())
+        }
+        #endif
+
+        // Configure model discovery with standard directories
+        let registry = DynamicModelRegistry.shared
+        var discoveryConfig = DynamicModelRegistry.DiscoveryConfig()
+        discoveryConfig.includeLocalModels = true
+        discoveryConfig.includeOnlineModels = false // Apps can enable this explicitly
+        registry.configure(discoveryConfig)
+
+        // Register the registry
+        registerModelRegistry(registry)
+
+        // Initialize SDK with default configuration (local-only)
+        let config = Configuration(apiKey: "local-only")
+        try await initialize(with: config)
+
+        // Trigger initial model discovery
+        _ = await registry.discoverModels()
+    }
+
+    /// Quick setup for development and testing
+    /// Includes more permissive settings suitable for development
+    func initializeForDevelopment() async throws {
+        try await initializeWithDefaults()
+
+        // Enable online model discovery for development
+        let registry = DynamicModelRegistry.shared
+        var discoveryConfig = DynamicModelRegistry.DiscoveryConfig()
+        discoveryConfig.includeLocalModels = true
+        discoveryConfig.includeOnlineModels = true
+        discoveryConfig.cacheTimeout = 300 // 5 minutes for development
+        registry.configure(discoveryConfig)
+    }
+
+    /// Production-ready initialization with conservative settings
+    func initializeForProduction(apiKey: String) async throws {
+        // Register platform-specific hardware detector
+        #if os(iOS) || os(tvOS)
+        let hardwareManager = HardwareCapabilityManager.shared
+        if hardwareManager.capabilities.processorType == .unknown {
+            hardwareManager.registerHardwareDetector(iOSHardwareDetector())
+        }
+        #endif
+
+        // Configure model discovery with conservative settings
+        let registry = DynamicModelRegistry.shared
+        var discoveryConfig = DynamicModelRegistry.DiscoveryConfig()
+        discoveryConfig.includeLocalModels = true
+        discoveryConfig.includeOnlineModels = false
+        discoveryConfig.cacheTimeout = 3600 // 1 hour
+        registry.configure(discoveryConfig)
+
+        // Register the registry
+        registerModelRegistry(registry)
+
+        // Initialize SDK with production configuration
+        let config = Configuration(apiKey: apiKey)
+        try await initialize(with: config)
+
+        // Trigger initial model discovery
+        _ = await registry.discoverModels()
+    }
+
+    /// Initialize with a custom API key for cloud features
+    /// - Parameter apiKey: Your RunAnywhere API key
+    func initializeWithAPIKey(_ apiKey: String) async throws {
+        // Register platform-specific hardware detector
+        #if os(iOS) || os(tvOS)
+        let hardwareManager = HardwareCapabilityManager.shared
+        if hardwareManager.capabilities.processorType == .unknown {
+            hardwareManager.registerHardwareDetector(iOSHardwareDetector())
+        }
+        #endif
+
+        // Configure model discovery
+        let registry = DynamicModelRegistry.shared
+        var discoveryConfig = DynamicModelRegistry.DiscoveryConfig()
+        discoveryConfig.includeLocalModels = true
+        discoveryConfig.includeOnlineModels = true
+        registry.configure(discoveryConfig)
+
+        // Register the registry
+        registerModelRegistry(registry)
+
+        // Initialize SDK with provided API key
+        let config = Configuration(apiKey: apiKey)
+        try await initialize(with: config)
+
+        // Trigger initial model discovery
+        _ = await registry.discoverModels()
     }
 }
 

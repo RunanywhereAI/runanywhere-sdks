@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F359D66AAFABB8AF3FABD91 /* Pods_RunAnywhereAI.framework */; };
+		541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22712E3BE21300EBF8FA /* RunAnywhereSDK */; };
 		547F709A2E35CC650061BAED /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70992E35CC650061BAED /* MLX */; };
 		547F709C2E35CC650061BAED /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709B2E35CC650061BAED /* MLXFFT */; };
 		547F709E2E35CC650061BAED /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709D2E35CC650061BAED /* MLXFast */; };
@@ -111,6 +112,7 @@
 				547F70A62E35CC650061BAED /* MLXRandom in Frameworks */,
 				54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
+				541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */,
 				0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -220,6 +222,7 @@
 				54F5961C2E39C32A0057B6CE /* kernels_custom */,
 				54F5961E2E39C32A0057B6CE /* kernels_optimized */,
 				54F596202E39C32A0057B6CE /* kernels_quantized */,
+				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -308,6 +311,7 @@
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */,
+				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -793,6 +797,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../sdk/runanywhere-swift";
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -845,6 +856,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RunAnywhereSDK;
+		};
 		547F70992E35CC650061BAED /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;

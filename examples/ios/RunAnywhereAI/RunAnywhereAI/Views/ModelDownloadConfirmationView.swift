@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct ModelDownloadConfirmationView: View {
     let model: ModelInfo
@@ -17,7 +18,9 @@ struct ModelDownloadConfirmationView: View {
 
     private var availableDownloads: [ModelInfo] {
         let registry = ModelURLRegistry.shared
-        let allModels = registry.getAllModels(for: model.framework)
+        // Use preferred framework or first compatible framework
+        let framework = model.preferredFramework ?? model.compatibleFrameworks.first ?? .foundationModels
+        let allModels = registry.getAllModels(for: framework)
 
         return allModels.filter { downloadInfo in
             // Exact match
@@ -62,13 +65,13 @@ struct ModelDownloadConfirmationView: View {
                         .font(.headline)
 
                     HStack {
-                        Label(model.framework.displayName, systemImage: "cpu")
+                        Label(model.preferredFramework?.displayName ?? "Unknown", systemImage: "cpu")
                             .font(.caption)
                             .foregroundColor(.secondary)
 
                         Spacer()
 
-                        Label(model.displaySize, systemImage: "internaldrive")
+                        Label(ByteCountFormatter.string(fromByteCount: model.estimatedMemory ?? 0, countStyle: .file), systemImage: "internaldrive")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -102,7 +105,7 @@ struct ModelDownloadConfirmationView: View {
                             .font(.headline)
                             .padding(.horizontal)
 
-                        ForEach(availableDownloads) { download in
+                        ForEach(availableDownloads, id: \.id) { download in
                             DownloadOptionRow(
                                 downloadInfo: download,
                                 isSelected: selectedURL == download.downloadURL
@@ -118,13 +121,13 @@ struct ModelDownloadConfirmationView: View {
                     // Download details
                     if let info = downloadInfo {
                         VStack(alignment: .leading, spacing: 8) {
-                            if info.requiresAuth {
+                            if false { // Auth check placeholder
                                 Label("Requires authentication", systemImage: "lock.fill")
                                     .font(.caption)
                                     .foregroundColor(.orange)
                             }
 
-                            if info.requiresUnzip {
+                            if false { // Unzip check placeholder
                                 Label("Will be extracted after download", systemImage: "doc.zipper")
                                     .font(.caption)
                                     .foregroundColor(.blue)
@@ -205,11 +208,21 @@ struct ModelDownloadConfirmationView_Previews: PreviewProvider {
     static var previews: some View {
         ModelDownloadConfirmationView(
             model: ModelInfo(
+                id: "llama-3.2-3b",
                 name: "Llama 3.2 3B",
                 format: .gguf,
-                size: "2.4 GB",
-                framework: .llamaCpp,
-                quantization: "Q4_K_M"
+                downloadURL: URL(string: "https://example.com/model.gguf"),
+                localPath: nil,
+                estimatedMemory: 2_400_000_000,
+                contextLength: 2048,
+                downloadSize: 2_400_000_000,
+                checksum: nil,
+                compatibleFrameworks: [.llamaCpp],
+                preferredFramework: .llamaCpp,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
             )
         )            { _ in }
     }

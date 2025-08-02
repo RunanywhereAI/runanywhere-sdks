@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct CustomURLDialog: View {
     let model: ModelInfo
@@ -156,15 +157,16 @@ struct CustomURLDialog: View {
     }
 }
 
+/*
 #Preview {
     CustomURLDialog(
         model: ModelInfo(
             id: "test-model",
             name: "Test Model",
             path: nil,
-            format: .gguf,
+            format: ModelFormat.gguf,
             size: "1.0GB",
-            framework: .llamaCpp,
+            framework: LLMFramework.llamaCpp,
             quantization: nil,
             contextLength: nil,
             isLocal: false,
@@ -184,3 +186,4 @@ struct CustomURLDialog: View {
         onCancel: { }
     )
 }
+*/

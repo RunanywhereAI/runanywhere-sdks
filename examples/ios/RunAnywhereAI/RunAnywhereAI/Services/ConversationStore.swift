@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import RunAnywhereSDK
 
 // MARK: - Conversation Store
 
@@ -39,8 +40,8 @@ class ConversationStore: ObservableObject {
             createdAt: Date(),
             updatedAt: Date(),
             messages: [],
-            modelInfo: nil,
-            framework: nil
+            modelName: nil,
+            frameworkName: nil
         )
 
         conversations.insert(conversation, at: 0)
@@ -192,8 +193,8 @@ struct Conversation: Identifiable, Codable {
     let createdAt: Date
     var updatedAt: Date
     var messages: [Message]
-    var modelInfo: ModelInfo?
-    var framework: LLMFramework?
+    var modelName: String?
+    var frameworkName: String?
 
     var summary: String {
         guard !messages.isEmpty else { return "No messages" }
@@ -295,8 +296,8 @@ struct ConversationRow: View {
 
                 Spacer()
 
-                if let framework = conversation.framework {
-                    Text(framework.displayName)
+                if let frameworkName = conversation.frameworkName {
+                    Text(frameworkName)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 6)
