@@ -148,14 +148,14 @@ public class ServiceContainer {
         }
 
         // Set memory threshold
-        memoryService.setMemoryThreshold(configuration.memoryThreshold)
+        unifiedMemoryManager.setMemoryThreshold(configuration.memoryThreshold)
 
         // Configure download settings
         downloadService.configure(with: configuration.downloadConfiguration)
 
         // Initialize monitoring if enabled
         if configuration.enableRealTimeDashboard {
-            await performanceMonitor.initialize()
+            performanceMonitor.startMonitoring()
             await storageMonitor.startMonitoring()
         }
     }
