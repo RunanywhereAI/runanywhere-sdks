@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// Storage monitoring service for tracking model storage and device capacity
 public class StorageMonitor {
@@ -22,13 +21,7 @@ public class StorageMonitor {
 
     // MARK: - Private Properties
 
-    private let logger: os.Logger? = {
-        if #available(iOS 14.0, *) {
-            return os.Logger(subsystem: "com.runanywhere.sdk", category: "StorageMonitor")
-        } else {
-            return nil
-        }
-    }()
+    private let logger = SDKLogger(category: "StorageMonitor")
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.storagemonitor", qos: .utility)
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 60.0 // Update every minute
@@ -53,9 +46,7 @@ public class StorageMonitor {
             guard let self = self, !self.isMonitoring else { return }
 
             self.isMonitoring = true
-            if #available(iOS 14.0, *) {
-                self.logger?.info("Started storage monitoring")
-            }
+            self.logger.info("Started storage monitoring")
 
             // Initial update
             Task {
@@ -83,9 +74,7 @@ public class StorageMonitor {
                 self.monitoringTimer?.invalidate()
                 self.monitoringTimer = nil
             }
-            if #available(iOS 14.0, *) {
-                self.logger?.info("Stopped storage monitoring")
-            }
+            self.logger.info("Stopped storage monitoring")
         }
     }
 
@@ -155,7 +144,7 @@ public class StorageMonitor {
             } catch {
                 errors.append(error)
                 if #available(iOS 14.0, *) {
-                    logger?.error("Failed to clean cache at \(cacheURL.path): \(error)")
+                    logger.error("Failed to clean cache at \(cacheURL.path): \(error)")
                 }
             }
         }
@@ -176,7 +165,7 @@ public class StorageMonitor {
 
         try FileManager.default.removeItem(at: path)
         if #available(iOS 14.0, *) {
-            logger?.info("Deleted model at \(path.path), freed \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
+            logger.info("Deleted model at \(path.path), freed \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
         }
 
         // Update storage info
@@ -292,7 +281,7 @@ public class StorageMonitor {
             return info
         } catch {
             if #available(iOS 14.0, *) {
-                logger?.error("Failed to update storage info: \(error)")
+                logger.error("Failed to update storage info: \(error)")
             }
             return StorageInfo.empty
         }
@@ -354,7 +343,7 @@ public class StorageMonitor {
             )
         } catch {
             if #available(iOS 14.0, *) {
-                logger?.error("Failed to get device storage info: \(error)")
+                logger.error("Failed to get device storage info: \(error)")
             }
             return DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0)
         }
@@ -394,7 +383,7 @@ public class StorageMonitor {
             }
         } catch {
             if #available(iOS 14.0, *) {
-                logger?.error("Failed to scan for models: \(error)")
+                logger.error("Failed to scan for models: \(error)")
             }
         }
 
@@ -457,7 +446,7 @@ public class StorageMonitor {
                 totalSize += size
             } catch {
                 if #available(iOS 14.0, *) {
-                    logger?.error("Failed to calculate cache size at \(cacheURL.path): \(error)")
+                    logger.error("Failed to calculate cache size at \(cacheURL.path): \(error)")
                 }
             }
         }
@@ -482,7 +471,7 @@ public class StorageMonitor {
             } catch {
                 // Continue with other files
                 if #available(iOS 14.0, *) {
-                    logger?.warning("Failed to delete cache file at \(fileURL.path): \(error)")
+                    logger.warning("Failed to delete cache file at \(fileURL.path): \(error)")
                 }
             }
         }
@@ -529,11 +518,11 @@ public class StorageMonitor {
         if #available(iOS 14.0, *) {
             switch type {
             case .info:
-                logger?.info("Storage alert: \(message)")
+                logger.info("Storage alert: \(message)")
             case .warning:
-                logger?.warning("Storage warning: \(message)")
+                logger.warning("Storage warning: \(message)")
             case .critical:
-                logger?.error("Storage critical: \(message)")
+                logger.error("Storage critical: \(message)")
             }
         }
     }

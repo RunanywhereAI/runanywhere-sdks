@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// Advanced memory profiling tools for LLM frameworks
 public class MemoryProfiler {
@@ -28,13 +27,7 @@ public class MemoryProfiler {
 
     // MARK: - Private Properties
 
-    private let logger: os.Logger? = {
-        if #available(iOS 14.0, *) {
-            return os.Logger(subsystem: "com.runanywhere.sdk", category: "MemoryProfiler")
-        } else {
-            return nil
-        }
-    }()
+    private let logger = SDKLogger(category: "MemoryProfiler")
     private var profilingTimer: Timer?
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.memoryprofiler", qos: .userInitiated)
 
@@ -68,9 +61,7 @@ public class MemoryProfiler {
             self.memorySnapshots.removeAll()
             self.memoryLeaks.removeAll()
 
-            if #available(iOS 14.0, *) {
-                self.logger?.info("Started memory profiling. Baseline: \(ByteCountFormatter.string(fromByteCount: self.baselineMemory, countStyle: .memory))")
-            }
+            self.logger.info("Started memory profiling. Baseline: \(ByteCountFormatter.string(fromByteCount: self.baselineMemory, countStyle: .memory))")
 
             // Start periodic snapshots on main queue for timer
             DispatchQueue.main.async {
@@ -96,9 +87,7 @@ public class MemoryProfiler {
                 self.profilingTimer = nil
             }
 
-            if #available(iOS 14.0, *) {
-                self.logger?.info("Stopped memory profiling")
-            }
+            self.logger.info("Stopped memory profiling")
             report = self.generateReport()
         }
 
@@ -138,14 +127,12 @@ public class MemoryProfiler {
                 allocations: getAllocations(for: allocationId)
             )
 
-            if #available(iOS 14.0, *) {
-                logger?.info("""
+            logger.info("""
                 Memory profile for '\(name)':
                 - Memory used: \(ByteCountFormatter.string(fromByteCount: profile.memoryUsed, countStyle: .memory))
                 - Peak memory: \(ByteCountFormatter.string(fromByteCount: profile.peakMemory, countStyle: .memory))
                 - Duration: \(String(format: "%.2f", profile.duration))s
                 """)
-            }
 
             return (result, profile)
         } catch {
@@ -188,8 +175,7 @@ public class MemoryProfiler {
             compressionRatio: tracking.expectedSize > 0 ? Double(tracking.expectedSize) / Double(actualMemoryUsed) : 1.0
         )
 
-        if #available(iOS 14.0, *) {
-            logger?.info("""
+        logger.info("""
                 Model memory profile for \(tracking.framework.displayName):
                 - Model: \(tracking.modelName)
                 - Expected size: \(ByteCountFormatter.string(fromByteCount: tracking.expectedSize, countStyle: .memory))
@@ -197,7 +183,6 @@ public class MemoryProfiler {
                 - Overhead: \(ByteCountFormatter.string(fromByteCount: profile.memoryOverhead, countStyle: .memory))
                 - Compression ratio: \(String(format: "%.2f", profile.compressionRatio))
                 """)
-        }
 
         return profile
     }
@@ -231,9 +216,7 @@ public class MemoryProfiler {
             memoryLeaks = detectedLeaks
 
             if !detectedLeaks.isEmpty {
-                if #available(iOS 14.0, *) {
-                    logger?.warning("Detected \(detectedLeaks.count) potential memory leaks")
-                }
+                logger.warning("Detected \(detectedLeaks.count) potential memory leaks")
             }
 
             return detectedLeaks
@@ -448,9 +431,7 @@ public class MemoryProfiler {
     }
 
     @objc private func handleMemoryWarning() {
-        if #available(iOS 14.0, *) {
-            logger?.warning("Received system memory warning")
-        }
+        logger.warning("Received system memory warning")
 
         // Capture critical snapshot
         captureSnapshot()

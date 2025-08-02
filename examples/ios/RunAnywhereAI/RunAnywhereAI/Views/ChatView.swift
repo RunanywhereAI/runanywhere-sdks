@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct ChatView: View {
     @StateObject private var viewModel: ChatViewModel
@@ -14,9 +15,8 @@ struct ChatView: View {
     @State private var showingConversationList = false
     @State private var showingExportView = false
 
-    @MainActor
-    init(llmService: UnifiedLLMService? = nil) {
-        _viewModel = StateObject(wrappedValue: ChatViewModel(llmService: llmService))
+    init() {
+        _viewModel = StateObject(wrappedValue: ChatViewModel())
     }
 
     var body: some View {
@@ -147,8 +147,8 @@ struct ChatView: View {
         guard var conversation = conversationStore.currentConversation else { return }
 
         conversation.messages = viewModel.messages
-        conversation.framework = UnifiedLLMService.shared.currentFramework
-        conversation.modelInfo = UnifiedLLMService.shared.currentModel
+        conversation.frameworkName = nil  // SDK properties are private
+        conversation.modelName = nil     // SDK properties are private
 
         conversationStore.updateConversation(conversation)
     }

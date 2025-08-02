@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// A/B testing framework for comparing LLM models and configurations
 public class ABTestingFramework {
@@ -25,13 +24,7 @@ public class ABTestingFramework {
 
     // MARK: - Private Properties
 
-    private let logger: os.Logger? = {
-        if #available(iOS 14.0, *) {
-            return os.Logger(subsystem: "com.runanywhere.sdk", category: "ABTesting")
-        } else {
-            return nil
-        }
-    }()
+    private let logger = SDKLogger(category: "ABTesting")
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.abtesting", qos: .userInitiated)
     private let performanceMonitor = RealtimePerformanceMonitor.shared
 
@@ -73,7 +66,7 @@ public class ABTestingFramework {
         }
 
         if #available(iOS 14.0, *) {
-            logger?.info("Created A/B test: \(name)")
+            logger.info("Created A/B test: \(name)")
         }
 
         return test
@@ -91,7 +84,7 @@ public class ABTestingFramework {
         }
 
         if #available(iOS 14.0, *) {
-            logger?.info("Started A/B test with ID: \(testId)")
+            logger.info("Started A/B test with ID: \(testId)")
         }
     }
 
@@ -121,7 +114,7 @@ public class ABTestingFramework {
 
         if let test = test {
             if #available(iOS 14.0, *) {
-                logger?.info("Stopped A/B test: \(test.name)")
+                logger.info("Stopped A/B test: \(test.name)")
             }
         }
 

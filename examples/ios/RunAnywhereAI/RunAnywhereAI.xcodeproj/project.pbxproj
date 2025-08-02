@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F359D66AAFABB8AF3FABD91 /* Pods_RunAnywhereAI.framework */; };
 		541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22712E3BE21300EBF8FA /* RunAnywhereSDK */; };
-		541E22742E3BE21300EBF8FA /* RunAnywhereSDKDynamic in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22732E3BE21300EBF8FA /* RunAnywhereSDKDynamic */; };
 		547F709A2E35CC650061BAED /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70992E35CC650061BAED /* MLX */; };
 		547F709C2E35CC650061BAED /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709B2E35CC650061BAED /* MLXFFT */; };
 		547F709E2E35CC650061BAED /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709D2E35CC650061BAED /* MLXFast */; };
@@ -114,7 +113,6 @@
 				54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
 				541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */,
-				541E22742E3BE21300EBF8FA /* RunAnywhereSDKDynamic in Frameworks */,
 				0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -195,7 +193,6 @@
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
 				8579FBF889325A8363A81AA3 /* [CP] Copy Pods Resources */,
-				2027DD69A7A4D6316E152195 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -226,7 +223,6 @@
 				54F5961E2E39C32A0057B6CE /* kernels_optimized */,
 				54F596202E39C32A0057B6CE /* kernels_quantized */,
 				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
-				541E22732E3BE21300EBF8FA /* RunAnywhereSDKDynamic */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -396,23 +392,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		2027DD69A7A4D6316E152195 /* [CP] Embed Pods Frameworks */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			name = "[CP] Embed Pods Frameworks";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 		5CB305FB45E2E4F5925D3175 /* [CP] Check Pods Manifest.lock */ = {
@@ -880,10 +859,6 @@
 		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RunAnywhereSDK;
-		};
-		541E22732E3BE21300EBF8FA /* RunAnywhereSDKDynamic */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = RunAnywhereSDKDynamic;
 		};
 		547F70992E35CC650061BAED /* MLX */ = {
 			isa = XCSwiftPackageProductDependency;

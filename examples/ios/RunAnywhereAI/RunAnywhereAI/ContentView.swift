@@ -18,27 +18,19 @@ struct ContentView: View {
             }
             .tag(0)
 
-            UnifiedModelsView()
+            SimplifiedModelsView()
                 .tabItem {
                     Label("Models", systemImage: "cube")
                 }
                 .tag(1)
 
             NavigationView {
-                BenchmarkView()
-            }
-            .tabItem {
-                Label("Benchmark", systemImage: "speedometer")
-            }
-            .tag(2)
-
-            NavigationView {
-                SettingsView()
+                SimplifiedSettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(3)
+            .tag(2)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
             selectedTab = 1

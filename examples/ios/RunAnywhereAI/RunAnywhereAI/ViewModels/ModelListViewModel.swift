@@ -2,122 +2,101 @@
 //  ModelListViewModel.swift
 //  RunAnywhereAI
 //
-//  Created by Sanchit Monga on 7/26/25.
+//  Simplified version that uses SDK directly
 //
 
 import Foundation
 import SwiftUI
+import RunAnywhereSDK
 
 @MainActor
 class ModelListViewModel: ObservableObject {
     static let shared = ModelListViewModel()
 
-    @Published var availableServices: [LLMService] = []
-    @Published var currentService: LLMService?
-    @Published var downloadedModels: [ModelInfo] = []
+    @Published var availableModels: [ModelInfo] = []
+    @Published var currentModel: ModelInfo?
     @Published var isLoading = false
-    @Published var showError = false
-    @Published var errorMessage = ""
+    @Published var errorMessage: String?
 
-    private let llmService = UnifiedLLMService.shared
+    private let sdk = RunAnywhereSDK.shared
 
     init() {
-        loadServices()
-        loadDownloadedModels()
+        Task {
+            await loadModels()
+        }
     }
 
-    func loadServices() {
-        availableServices = llmService.availableServices
-        currentService = llmService.currentService
-    }
-
-    func refreshServices() async {
-        // In a real app, this might check for new services or download models
-        loadServices()
-    }
-
-    func selectService(_ service: LLMService) {
-        currentService = service
-        llmService.selectService(named: service.name)
-    }
-
-    func loadModel(_ model: ModelInfo) async {
+    func loadModels() async {
         isLoading = true
-        showError = false
+        errorMessage = nil
+
+        // Stub implementation - normally would use SDK
+        // For now, create sample models since SDK properties are private
+        availableModels = createSampleModels()
+        currentModel = nil
+
+        isLoading = false
+    }
+
+    func selectModel(_ model: ModelInfo) async {
+        isLoading = true
+        errorMessage = nil
 
         do {
-            // In a real implementation, this would download/load the model
-            // For now, we'll simulate initialization
-            if let service = currentService {
-                try await service.initialize(modelPath: model.path ?? "")
-            }
+            // Direct SDK usage
+            try await sdk.loadModel(model.id)
+            currentModel = model
         } catch {
-            errorMessage = error.localizedDescription
-            showError = true
+            errorMessage = "Failed to load model: \(error.localizedDescription)"
         }
 
         isLoading = false
     }
 
-    func loadDownloadedModels() {
-        Task {
-            let modelManager = ModelManager.shared
-            let modelFiles = await modelManager.listDownloadedModels()
-
-            // Convert file names to ModelInfo
-            var models: [ModelInfo] = []
-            for fileName in modelFiles {
-                let path = await modelManager.modelPath(for: fileName)
-                let size = await modelManager.getModelSize(fileName) ?? 0
-
-                let model = ModelInfo(
-                    id: fileName,
-                    name: fileName.replacingOccurrences(of: ".gguf", with: "")
-                        .replacingOccurrences(of: ".mlpackage", with: "")
-                        .replacingOccurrences(of: ".onnxRuntime", with: ""),
-                    path: path.path,
-                    format: detectFormat(from: fileName),
-                    size: ByteCountFormatter.string(fromByteCount: size, countStyle: .file),
-                    framework: frameworkForFormat(detectFormat(from: fileName))
-                )
-                models.append(model)
-            }
-            downloadedModels = models
-        }
+    func refreshModels() async {
+        await loadModels()
     }
 
-    func addDownloadedModel(_ model: ModelInfo) {
-        downloadedModels.append(model)
+    func addImportedModel(_ model: ModelInfo) async {
+        availableModels.append(model)
     }
 
-    func addImportedModel(_ model: ModelInfo) {
-        downloadedModels.append(model)
-    }
-
-    private func detectFormat(from fileName: String) -> ModelFormat {
-        if fileName.hasSuffix(".gguf") {
-            return .gguf
-        } else if fileName.hasSuffix(".mlpackage") || fileName.hasSuffix(".mlmodel") {
-            return .coreML
-        } else if fileName.hasSuffix(".onnxRuntime") {
-            return .onnxRuntime
-        } else {
-            return .other
-        }
-    }
-
-    private func frameworkForFormat(_ format: ModelFormat) -> LLMFramework {
-        switch format {
-        case .gguf:
-            return .llamaCpp
-        case .coreML:
-            return .coreML
-        case .onnxRuntime:
-            return .onnxRuntime
-        case .mlx:
-            return .mlx
-        default:
-            return .coreML  // Default to Core ML instead of mock
-        }
+    private func createSampleModels() -> [ModelInfo] {
+        return [
+            ModelInfo(
+                id: "foundation-phi-3-mini",
+                name: "Phi-3 Mini (Foundation Models)",
+                format: .gguf,
+                downloadURL: nil,
+                localPath: nil,
+                estimatedMemory: 2_000_000_000,
+                contextLength: 4096,
+                downloadSize: 0,
+                checksum: nil,
+                compatibleFrameworks: [.coreML],
+                preferredFramework: .coreML,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
+            ),
+            ModelInfo(
+                id: "mediapipe-gemma-2b",
+                name: "Gemma 2B (MediaPipe)",
+                format: .gguf,
+                downloadURL: nil,
+                localPath: nil,
+                estimatedMemory: 2_500_000_000,
+                contextLength: 2048,
+                downloadSize: 0,
+                checksum: nil,
+                compatibleFrameworks: [.llamaCpp],
+                preferredFramework: .llamaCpp,
+                hardwareRequirements: [],
+                tokenizerFormat: nil,
+                metadata: nil,
+                alternativeDownloadURLs: []
+            )
+        ]
     }
 }

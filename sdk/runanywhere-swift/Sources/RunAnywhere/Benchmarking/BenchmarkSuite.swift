@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import os.log
 
 /// Comprehensive benchmark suite for evaluating LLM framework performance
 public class BenchmarkSuite {
@@ -28,7 +27,7 @@ public class BenchmarkSuite {
 
     // MARK: - Private Properties
 
-    private let logger = os.Logger(subsystem: "com.runanywhere.sdk", category: "Benchmark")
+    private let logger = SDKLogger(category: "Benchmark")
     private let queue = DispatchQueue(label: "com.runanywhere.sdk.benchmark", qos: .userInitiated)
     private let performanceMonitor = RealtimePerformanceMonitor.shared
 
@@ -476,7 +475,10 @@ public class BenchmarkSuite {
 
     private func generateMarkdown() -> String {
         var markdown = "# Benchmark Results\n\n"
-        markdown += "Date: \(Date().formatted())\n\n"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .medium
+        markdown += "Date: \(dateFormatter.string(from: Date()))\n\n"
 
         if let summary = generateSummary() as BenchmarkSummary? {
             markdown += "## Summary\n\n"

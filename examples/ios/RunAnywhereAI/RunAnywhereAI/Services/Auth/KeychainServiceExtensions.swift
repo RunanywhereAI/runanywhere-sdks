@@ -9,7 +9,7 @@ import Foundation
 
 extension KeychainService {
     // MARK: - API Key Management
-    
+
     /// Retrieve API key for a specific service
     func retrieveAPIKey(for service: String) throws -> String? {
         let key = "\(service)_api_key"
@@ -18,7 +18,7 @@ extension KeychainService {
         }
         return String(data: data, encoding: .utf8)
     }
-    
+
     /// Store API key for a specific service
     func storeAPIKey(_ apiKey: String, for service: String) throws {
         let key = "\(service)_api_key"
@@ -27,21 +27,21 @@ extension KeychainService {
         }
         try save(key: key, data: data)
     }
-    
+
     // MARK: - HuggingFace Authentication
-    
+
     /// Get HuggingFace token
     func getHuggingFaceToken() -> String? {
         return try? retrieveAPIKey(for: "huggingface")
     }
-    
+
     /// Store HuggingFace token
     func setHuggingFaceToken(_ token: String) throws {
         try storeAPIKey(token, for: "huggingface")
     }
-    
+
     // MARK: - Kaggle Authentication
-    
+
     /// Get Kaggle credentials
     func getKaggleCredentials() -> (username: String, key: String)? {
         guard let username = try? retrieve(key: "kaggle_username"),
@@ -51,7 +51,7 @@ extension KeychainService {
         }
         return (username: usernameString, key: key)
     }
-    
+
     /// Store Kaggle credentials
     func setKaggleCredentials(username: String, key: String) throws {
         // Store username
@@ -59,42 +59,42 @@ extension KeychainService {
             throw KeychainError.saveFailed
         }
         try save(key: "kaggle_username", data: usernameData)
-        
+
         // Store API key
         try storeAPIKey(key, for: "kaggle")
     }
-    
+
     // MARK: - Picovoice Authentication
-    
+
     /// Get Picovoice API key
     func getPicovoiceAPIKey() -> String? {
         return try? retrieveAPIKey(for: "picovoice")
     }
-    
+
     /// Store Picovoice API key
     func setPicovoiceAPIKey(_ apiKey: String) throws {
         try storeAPIKey(apiKey, for: "picovoice")
     }
-    
+
     // MARK: - RunAnywhere SDK Authentication
-    
+
     /// Get RunAnywhere SDK API key
     func getRunAnywhereAPIKey() -> String? {
         return try? retrieveAPIKey(for: "runanywhere")
     }
-    
+
     /// Store RunAnywhere SDK API key
     func setRunAnywhereAPIKey(_ apiKey: String) throws {
         try storeAPIKey(apiKey, for: "runanywhere")
     }
-    
+
     // MARK: - Utility Methods
-    
+
     /// Check if credentials exist for a service
     func hasCredentials(for service: String) -> Bool {
-        return retrieveAPIKey(for: service) != nil
+        return (try? retrieveAPIKey(for: service)) != nil
     }
-    
+
     /// Clear all API keys (useful for logout)
     func clearAllAPIKeys() throws {
         let services = ["huggingface", "kaggle", "picovoice", "runanywhere"]
