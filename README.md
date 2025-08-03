@@ -1,5 +1,9 @@
 # RunAnywhere SDKs
 
+<p align="center">
+  <img src="examples/logo.svg" alt="RunAnywhere Logo" width="200"/>
+</p>
+
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Android SDK CI](https://github.com/your-org/runanywhere-sdks/actions/workflows/android-sdk.yml/badge.svg)](https://github.com/your-org/runanywhere-sdks/actions/workflows/android-sdk.yml)
 [![iOS SDK CI](https://github.com/your-org/runanywhere-sdks/actions/workflows/ios-sdk.yml/badge.svg)](https://github.com/your-org/runanywhere-sdks/actions/workflows/ios-sdk.yml)
