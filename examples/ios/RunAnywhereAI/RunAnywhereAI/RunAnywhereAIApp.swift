@@ -38,6 +38,10 @@ struct RunAnywhereAIApp: App {
             config.privacyMode = .standard
             config.memoryThreshold = 2_000_000_000 // 2GB
 
+            // Register LLM.swift adapter before initializing SDK
+            let adapterRegistry = ServiceContainer.shared.adapterRegistry
+            adapterRegistry.register(LLMSwiftAdapter())
+
             // Initialize the SDK
             try await RunAnywhereSDK.shared.initialize(configuration: config)
             print("SDK initialized successfully")
