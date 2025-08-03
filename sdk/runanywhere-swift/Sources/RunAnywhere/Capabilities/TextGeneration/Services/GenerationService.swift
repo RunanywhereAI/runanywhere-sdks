@@ -110,16 +110,38 @@ public class GenerationService {
             options: options
         )
 
-        // Calculate metrics
+        // Parse thinking content if model supports it
+        let modelInfo = loadedModel.model
+        let (finalText, thinkingContent): (String, String?)
+
+        print("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
+        if modelInfo.supportsThinking {
+            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+            print("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
+            print("Raw generated text: \(generatedText)")
+
+            let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
+            finalText = parseResult.content
+            thinkingContent = parseResult.thinkingContent
+
+            print("Parsed content: \(finalText)")
+            print("Thinking content: \(thinkingContent ?? "None")")
+        } else {
+            finalText = generatedText
+            thinkingContent = nil
+        }
+
+        // Calculate metrics based on final text (without thinking)
         let latency = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
-        let estimatedTokens = generatedText.split(separator: " ").count
+        let estimatedTokens = finalText.split(separator: " ").count
         let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
         // Get memory usage from the service
         let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
 
         return GenerationResult(
-            text: generatedText,
+            text: finalText,
+            thinkingContent: thinkingContent,
             tokensUsed: estimatedTokens,
             modelUsed: loadedModel.model.id,
             latencyMs: latency,
@@ -188,8 +210,23 @@ public class GenerationService {
         // Get memory usage from the service
         let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
 
+        // Parse thinking content if model supports it
+        let modelInfo = loadedModel.model
+        let (finalText, thinkingContent): (String, String?)
+
+        if modelInfo.supportsThinking {
+            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+            let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
+            finalText = parseResult.content
+            thinkingContent = parseResult.thinkingContent
+        } else {
+            finalText = generatedText
+            thinkingContent = nil
+        }
+
         return GenerationResult(
-            text: generatedText,
+            text: finalText,
+            thinkingContent: thinkingContent,
             tokensUsed: estimatedTokens,
             modelUsed: loadedModel.model.id,
             latencyMs: latency,

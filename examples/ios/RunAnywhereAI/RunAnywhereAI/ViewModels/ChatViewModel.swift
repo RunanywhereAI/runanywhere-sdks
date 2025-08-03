@@ -28,6 +28,7 @@ class ChatViewModel: ObservableObject {
     @Published var error: Error?
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
+    @Published var useStreaming = true  // Toggle between streaming and non-streaming
 
     private let sdk = RunAnywhereSDK.shared
     private var generationTask: Task<Void, Never>?
@@ -83,27 +84,56 @@ class ChatViewModel: ObservableObject {
                     throw ChatError.noModelLoaded
                 }
 
-                // Use streaming generation for real-time updates
-                let stream = sdk.generateStream(prompt: prompt)
+                print("Starting generation with prompt: \(prompt), streaming: \(useStreaming)")
 
-                // Stream tokens as they arrive
-                for try await token in stream {
-                    // Update the assistant message with each new token
+                if useStreaming {
+                    // Use streaming generation for real-time updates
+                    var fullResponse = ""
+                    let stream = sdk.generateStream(prompt: prompt)
+
+                    // Stream tokens as they arrive
+                    for try await token in stream {
+                        fullResponse += token
+                        // Update the assistant message with each new token
+                        await MainActor.run {
+                            if messageIndex < self.messages.count {
+                                self.messages[messageIndex].content += token
+                            }
+                        }
+                    }
+
+                    print("Streaming completed with response: \(fullResponse)")
+
+                    // Note: Thinking content is not available in streaming mode
+                    // Could potentially parse it from the fullResponse if needed
+                } else {
+                    // Use non-streaming generation to get thinking content
+                    let result = try await sdk.generate(prompt: prompt)
+
+                    print("Generation completed with result: \(result.text)")
+
+                    // Update the assistant message with the complete response
                     await MainActor.run {
                         if messageIndex < self.messages.count {
-                            self.messages[messageIndex].content += token
+                            self.messages[messageIndex].content = result.text
+                            // Add thinking content if available
+                            if let thinkingContent = result.thinkingContent, !thinkingContent.isEmpty {
+                                self.messages[messageIndex].thinkingContent = thinkingContent
+                            }
                         }
                     }
                 }
             } catch {
+                print("Generation failed with error: \(error)")
                 await MainActor.run {
                     self.error = error
                     // Add error message to chat
                     if messageIndex < self.messages.count {
-                        let errorMessage = if error is ChatError {
-                            error.localizedDescription
+                        let errorMessage: String
+                        if error is ChatError {
+                            errorMessage = error.localizedDescription
                         } else {
-                            "❌ Generation failed: \(error.localizedDescription)"
+                            errorMessage = "❌ Generation failed: \(error.localizedDescription)"
                         }
                         self.messages[messageIndex].content = errorMessage
                     }

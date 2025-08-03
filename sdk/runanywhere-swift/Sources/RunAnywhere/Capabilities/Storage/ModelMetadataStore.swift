@@ -24,6 +24,9 @@ public class ModelMetadataStore {
         let tags: [String]
         let downloadedAt: Date
         let lastUsed: Date?
+        let supportsThinking: Bool
+        let thinkingOpenTag: String?
+        let thinkingCloseTag: String?
     }
 
     public init() {}
@@ -50,7 +53,10 @@ public class ModelMetadataStore {
             description: model.metadata?.description,
             tags: model.metadata?.tags ?? [],
             downloadedAt: Date(),
-            lastUsed: nil
+            lastUsed: nil,
+            supportsThinking: model.supportsThinking,
+            thinkingOpenTag: model.thinkingTagPattern?.openingTag,
+            thinkingCloseTag: model.thinkingTagPattern?.closingTag
         )
 
         var allMetadata = loadAllMetadata()
@@ -83,6 +89,16 @@ public class ModelMetadataStore {
                 actualFileSize = fileSize
             }
 
+            // Reconstruct thinking tag pattern if available
+            let thinkingTagPattern: ThinkingTagPattern? = {
+                if metadata.supportsThinking,
+                   let openTag = metadata.thinkingOpenTag,
+                   let closeTag = metadata.thinkingCloseTag {
+                    return ThinkingTagPattern(openingTag: openTag, closingTag: closeTag)
+                }
+                return metadata.supportsThinking ? ThinkingTagPattern.defaultPattern : nil
+            }()
+
             return ModelInfo(
                 id: metadata.id,
                 name: metadata.name,
@@ -99,7 +115,9 @@ public class ModelMetadataStore {
                     license: metadata.license,
                     tags: metadata.tags,
                     description: metadata.description
-                )
+                ),
+                supportsThinking: metadata.supportsThinking,
+                thinkingTagPattern: thinkingTagPattern
             )
         }
     }
@@ -114,7 +132,7 @@ public class ModelMetadataStore {
     /// Update last used date
     public func updateLastUsed(for modelId: String) {
         var allMetadata = loadAllMetadata()
-        if var metadata = allMetadata[modelId] {
+        if let metadata = allMetadata[modelId] {
             allMetadata[modelId] = StoredModelMetadata(
                 id: metadata.id,
                 name: metadata.name,
@@ -130,9 +148,41 @@ public class ModelMetadataStore {
                 description: metadata.description,
                 tags: metadata.tags,
                 downloadedAt: metadata.downloadedAt,
-                lastUsed: Date()
+                lastUsed: Date(),
+                supportsThinking: metadata.supportsThinking,
+                thinkingOpenTag: metadata.thinkingOpenTag,
+                thinkingCloseTag: metadata.thinkingCloseTag
             )
             saveAllMetadata(allMetadata)
+        }
+    }
+
+    /// Update thinking support for an existing model
+    public func updateThinkingSupport(for modelId: String, supportsThinking: Bool, thinkingTagPattern: ThinkingTagPattern?) {
+        var allMetadata = loadAllMetadata()
+        if let metadata = allMetadata[modelId] {
+            allMetadata[modelId] = StoredModelMetadata(
+                id: metadata.id,
+                name: metadata.name,
+                format: metadata.format,
+                framework: metadata.framework,
+                localPath: metadata.localPath,
+                estimatedMemory: metadata.estimatedMemory,
+                contextLength: metadata.contextLength,
+                downloadSize: metadata.downloadSize,
+                checksum: metadata.checksum,
+                author: metadata.author,
+                license: metadata.license,
+                description: metadata.description,
+                tags: metadata.tags,
+                downloadedAt: metadata.downloadedAt,
+                lastUsed: metadata.lastUsed,
+                supportsThinking: supportsThinking,
+                thinkingOpenTag: thinkingTagPattern?.openingTag,
+                thinkingCloseTag: thinkingTagPattern?.closingTag
+            )
+            saveAllMetadata(allMetadata)
+            logger.info("Updated thinking support for model: \(modelId)")
         }
     }
 

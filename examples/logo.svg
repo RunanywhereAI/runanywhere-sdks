@@ -1,0 +1,22 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- RunAnywhere Logo Concept 9: Cube Perspective -->
+  <!-- Cube faces -->
+  <!-- Top face -->
+  <path d="M25 25 L40 15 L55 25 L40 35 Z"
+        fill="#3B82F6" fill-opacity="0.8"/>
+  <!-- Left face -->
+  <path d="M25 25 L25 45 L40 55 L40 35 Z"
+        fill="#3B82F6" fill-opacity="0.6"/>
+  <!-- Right face -->
+  <path d="M40 35 L40 55 L55 45 L55 25 Z"
+        fill="#3B82F6" fill-opacity="1"/>
+
+  <!-- Connection lines -->
+  <path d="M40 55 L40 65 M25 45 L15 50 M55 45 L65 50"
+        stroke="#3B82F6" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Small nodes -->
+  <circle cx="40" cy="65" r="3" fill="#3B82F6"/>
+  <circle cx="15" cy="50" r="3" fill="#3B82F6"/>
+  <circle cx="65" cy="50" r="3" fill="#3B82F6"/>
+</svg>

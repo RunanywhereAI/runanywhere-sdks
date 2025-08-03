@@ -100,6 +100,12 @@ struct ChatView: View {
 
                     Divider()
 
+                    Toggle(isOn: $viewModel.useStreaming) {
+                        Label("Streaming Mode", systemImage: viewModel.useStreaming ? "waveform" : "text.alignleft")
+                    }
+
+                    Divider()
+
                     Button(action: viewModel.clearChat) {
                         Label("Clear Chat", systemImage: "trash")
                     }
@@ -159,6 +165,7 @@ struct ChatView: View {
 
 struct MessageBubble: View {
     let message: ChatMessage
+    @State private var showThinking = false
 
     var body: some View {
         HStack {
@@ -167,11 +174,45 @@ struct MessageBubble: View {
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 4) {
+                // Main content bubble
                 Text(message.content)
                     .padding(12)
                     .background(backgroundColor)
                     .foregroundColor(textColor)
                     .cornerRadius(16)
+
+                // Thinking section if available
+                if let thinkingContent = message.thinkingContent, !thinkingContent.isEmpty, message.role == .assistant {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Button(action: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                showThinking.toggle()
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: showThinking ? "chevron.down" : "chevron.right")
+                                    .font(.caption)
+                                Image(systemName: "brain")
+                                    .font(.caption)
+                                Text("Show thinking")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        if showThinking {
+                            Text(thinkingContent)
+                                .font(.caption)
+                                .padding(8)
+                                .background(Color(.tertiarySystemBackground))
+                                .foregroundColor(.secondary)
+                                .cornerRadius(8)
+                                .transition(.opacity.combined(with: .scale))
+                        }
+                    }
+                    .padding(.top, 2)
+                }
 
                 Text(message.timestamp, style: .time)
                     .font(.caption2)

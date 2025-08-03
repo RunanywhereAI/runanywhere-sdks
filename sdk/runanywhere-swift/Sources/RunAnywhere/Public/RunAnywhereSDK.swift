@@ -233,14 +233,60 @@ public class RunAnywhereSDK {
         name: String,
         url: URL,
         framework: LLMFramework,
-        estimatedSize: Int64? = nil
+        estimatedSize: Int64? = nil,
+        supportsThinking: Bool = false,
+        thinkingTagPattern: ThinkingTagPattern? = nil
     ) -> ModelInfo {
         return (serviceContainer.modelRegistry as! RegistryService).addModelFromURL(
             name: name,
             url: url,
             framework: framework,
-            estimatedSize: estimatedSize
+            estimatedSize: estimatedSize,
+            supportsThinking: supportsThinking,
+            thinkingTagPattern: thinkingTagPattern
         )
+    }
+
+    /// Update thinking support for an existing model
+    /// - Parameters:
+    ///   - modelId: The model to update
+    ///   - supportsThinking: Whether the model supports thinking
+    ///   - thinkingTagPattern: The thinking tag pattern to use
+    public func updateModelThinkingSupport(
+        modelId: String,
+        supportsThinking: Bool,
+        thinkingTagPattern: ThinkingTagPattern? = nil
+    ) {
+        let metadataStore = ModelMetadataStore()
+        metadataStore.updateThinkingSupport(
+            for: modelId,
+            supportsThinking: supportsThinking,
+            thinkingTagPattern: thinkingTagPattern
+        )
+
+        // Also update the model in the registry if it exists
+        if var existingModel = serviceContainer.modelRegistry.getModel(by: modelId) {
+            let updatedModel = ModelInfo(
+                id: existingModel.id,
+                name: existingModel.name,
+                format: existingModel.format,
+                downloadURL: existingModel.downloadURL,
+                localPath: existingModel.localPath,
+                estimatedMemory: existingModel.estimatedMemory,
+                contextLength: existingModel.contextLength,
+                downloadSize: existingModel.downloadSize,
+                checksum: existingModel.checksum,
+                compatibleFrameworks: existingModel.compatibleFrameworks,
+                preferredFramework: existingModel.preferredFramework,
+                hardwareRequirements: existingModel.hardwareRequirements,
+                tokenizerFormat: existingModel.tokenizerFormat,
+                metadata: existingModel.metadata,
+                alternativeDownloadURLs: existingModel.alternativeDownloadURLs,
+                supportsThinking: supportsThinking,
+                thinkingTagPattern: thinkingTagPattern
+            )
+            serviceContainer.modelRegistry.updateModel(updatedModel)
+        }
     }
 
 

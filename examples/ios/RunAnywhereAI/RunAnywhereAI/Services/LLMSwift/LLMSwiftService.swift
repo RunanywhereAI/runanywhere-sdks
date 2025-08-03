@@ -90,10 +90,17 @@ public class LLMSwiftService: LLMService {
                 }
             }
 
-            // Limit to max tokens if specified
+            // Note: We return the raw response including any thinking tags
+            // The SDK's GenerationService will handle parsing thinking content
+            // based on the model's configuration
+
+            // Limit to max tokens if specified (but preserve thinking tags)
             if options.maxTokens > 0 {
+                // For responses with thinking content, we count tokens excluding tags
                 let tokens = finalResponse.split(separator: " ")
                 if tokens.count > options.maxTokens {
+                    // This is a simple approximation - in practice, token counting
+                    // should be done by the tokenizer
                     finalResponse = tokens.prefix(options.maxTokens).joined(separator: " ")
                 }
             }
@@ -126,28 +133,46 @@ public class LLMSwiftService: LLMService {
         // Create streaming callback
         var tokenCount = 0
         let maxTokens = options.maxTokens > 0 ? options.maxTokens : Int.max
+        var accumulatedResponse = ""
 
         // Generate with streaming using respond method
         do {
             await llm.respond(to: fullPrompt) { response in
                 var fullResponse = ""
                 for await token in response {
-                    // Check token limit
-                    tokenCount += 1
-                    if tokenCount >= maxTokens {
-                        break
-                    }
+                    // Accumulate response to check for stop sequences
+                    accumulatedResponse += token
 
-                    // Check stop sequences
+                    // Note: We stream all tokens including thinking tags
+                    // The SDK's StreamingService will handle parsing and filtering
+                    // thinking content based on the model's configuration
+
+                    // Check stop sequences in accumulated response
                     if !options.stopSequences.isEmpty {
                         var shouldStop = false
                         for sequence in options.stopSequences {
-                            if token.contains(sequence) {
+                            if accumulatedResponse.contains(sequence) {
+                                // If we hit a stop sequence, emit only up to that point
+                                if let range = accumulatedResponse.range(of: sequence) {
+                                    let remainingText = String(accumulatedResponse[..<range.lowerBound])
+                                    if remainingText.count > fullResponse.count {
+                                        let newText = String(remainingText.suffix(remainingText.count - fullResponse.count))
+                                        if !newText.isEmpty {
+                                            onToken(newText)
+                                        }
+                                    }
+                                }
                                 shouldStop = true
                                 break
                             }
                         }
                         if shouldStop { break }
+                    }
+
+                    // Check token limit (approximate - actual tokenization may differ)
+                    tokenCount += 1
+                    if tokenCount >= maxTokens {
+                        break
                     }
 
                     // Yield token
