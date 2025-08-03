@@ -38,14 +38,22 @@ class ModelManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Use SDK's model unloading if available
-        // await sdk.unloadModel()
+        // Use SDK's model unloading
+        do {
+            try await sdk.unloadModel()
+        } catch {
+            self.error = error
+            print("Failed to unload model: \(error)")
+        }
     }
 
     func getAvailableModels() async -> [ModelInfo] {
-        // Since SDK properties are private, return empty array for now
-        // In a real implementation, this would use public SDK methods
-        return []
+        do {
+            return try await sdk.listAvailableModels()
+        } catch {
+            print("Failed to get available models: \(error)")
+            return []
+        }
     }
 
     func getCurrentModel() -> ModelInfo? {

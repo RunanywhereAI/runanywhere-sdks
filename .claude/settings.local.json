@@ -82,7 +82,14 @@
       "Bash(rm:*)",
       "Bash(./scripts/fix_pods_sandbox.sh:*)",
       "Bash(xcrun simctl uninstall:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(cp:*)",
+      "Bash(echo)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(sed:*)",
+      "WebFetch(domain:alamofire.github.io)"
     ],
     "deny": []
   }
