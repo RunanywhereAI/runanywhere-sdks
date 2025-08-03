@@ -90,7 +90,10 @@
       "Bash(done)",
       "Bash(sed:*)",
       "WebFetch(domain:alamofire.github.io)",
-      "Bash(xcrun simctl io:*)"
+      "Bash(xcrun simctl io:*)",
+      "Bash(./generate_app_icons_simple.sh:*)",
+      "Bash(./generate_centered_icons.sh:*)",
+      "Bash(./generate_transparent_icons.sh:*)"
     ],
     "deny": []
   }
