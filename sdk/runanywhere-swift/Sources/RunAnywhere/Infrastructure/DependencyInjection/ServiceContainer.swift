@@ -46,7 +46,7 @@ public class ServiceContainer {
 
     /// Streaming service
     private(set) lazy var streamingService: StreamingService = {
-        StreamingService(generationService: generationService)
+        StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
     /// Context manager

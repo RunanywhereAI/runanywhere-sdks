@@ -83,12 +83,17 @@ class ChatViewModel: ObservableObject {
                     throw ChatError.noModelLoaded
                 }
 
-                // Direct SDK usage - simple generate call for now
-                let response = try await sdk.generate(prompt: prompt)
+                // Use streaming generation for real-time updates
+                let stream = sdk.generateStream(prompt: prompt)
 
-                // Update the assistant message with the response
-                if messageIndex < self.messages.count {
-                    self.messages[messageIndex].content = response.text
+                // Stream tokens as they arrive
+                for try await token in stream {
+                    // Update the assistant message with each new token
+                    await MainActor.run {
+                        if messageIndex < self.messages.count {
+                            self.messages[messageIndex].content += token
+                        }
+                    }
                 }
             } catch {
                 await MainActor.run {

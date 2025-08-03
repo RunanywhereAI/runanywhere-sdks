@@ -27,6 +27,11 @@ public class GenerationService {
         self.currentLoadedModel = model
     }
 
+    /// Get the current loaded model
+    public func getCurrentModel() -> LoadedModel? {
+        return currentLoadedModel
+    }
+
     /// Generate text using the loaded model
     public func generate(
         prompt: String,
