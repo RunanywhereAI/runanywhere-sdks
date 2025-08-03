@@ -7,6 +7,18 @@
 #   ./build_and_run.sh device "YOUR_DEVICE_ID"
 #   ./build_and_run.sh device "Your Device Name" --add-models
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
+#
+# IMPORTANT: Swift Macro Support Fix
+# ----------------------------------
+# This project uses llm.swift which requires Swift Macros support. If you encounter
+# macro fingerprint validation errors or macro-related build issues, run this command:
+#
+#   defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+#
+# Additionally, ensure your project has "-enable-experimental-feature Macros" in
+# "Other Swift Flags" under Build Settings. This is required because llm.swift
+# uses Swift Macros for code generation, particularly for LLM model definitions
+# and prompt handling.
 
 set -e
 
