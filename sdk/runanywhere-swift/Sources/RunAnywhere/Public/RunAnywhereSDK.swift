@@ -55,6 +55,13 @@ public class RunAnywhereSDK {
         self.currentModel = loadedModel.model
         self.currentService = loadedModel.service
 
+        // Set the loaded model in the generation service
+        serviceContainer.generationService.setCurrentModel(loadedModel)
+
+        // Update last used date in metadata
+        let metadataStore = ModelMetadataStore()
+        metadataStore.updateLastUsed(for: modelIdentifier)
+
         return loadedModel.model
     }
 
@@ -68,6 +75,9 @@ public class RunAnywhereSDK {
 
         self.currentModel = nil
         self.currentService = nil
+
+        // Clear the model from generation service
+        serviceContainer.generationService.setCurrentModel(nil)
     }
 
     /// Generate text using the loaded model
@@ -127,12 +137,27 @@ public class RunAnywhereSDK {
             throw SDKError.notInitialized
         }
 
-        return await serviceContainer.modelRegistry.discoverModels()
+        // Always discover local models to ensure we have the latest
+        let discoveredModels = await serviceContainer.modelRegistry.discoverModels()
+
+        // Also check metadata store for any persisted models
+        let metadataStore = ModelMetadataStore()
+        let storedModels = metadataStore.loadStoredModels()
+
+        // Merge and deduplicate
+        var allModels = discoveredModels
+        for storedModel in storedModels {
+            if !allModels.contains(where: { $0.id == storedModel.id }) {
+                allModels.append(storedModel)
+            }
+        }
+
+        return allModels
     }
 
     /// Download a model
     /// - Parameter modelIdentifier: The model to download
-    public func downloadModel(_ modelIdentifier: String) async throws {
+    public func downloadModel(_ modelIdentifier: String) async throws -> DownloadTask {
         guard configuration != nil else {
             throw SDKError.notInitialized
         }
@@ -141,7 +166,7 @@ public class RunAnywhereSDK {
             throw SDKError.modelNotFound(modelIdentifier)
         }
 
-        try await serviceContainer.downloadService.downloadModel(model)
+        return try await serviceContainer.downloadService.downloadModel(model)
     }
 
     /// Delete a downloaded model
@@ -164,6 +189,60 @@ public class RunAnywhereSDK {
         let modelId = localPath.deletingLastPathComponent().lastPathComponent
         try serviceContainer.fileManager.deleteModel(modelId: modelId)
     }
+
+    /// Register a framework adapter
+    /// - Parameter adapter: The framework adapter to register
+    public func registerFrameworkAdapter(_ adapter: FrameworkAdapter) {
+        serviceContainer.adapterRegistry.register(adapter)
+    }
+
+    /// Get the list of registered framework adapters
+    /// - Returns: Dictionary of registered adapters by framework
+    public func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
+        return serviceContainer.adapterRegistry.getRegisteredAdapters()
+    }
+
+    /// Get available frameworks on this device (based on registered adapters)
+    /// - Returns: Array of frameworks that have registered adapters
+    public func getAvailableFrameworks() -> [LLMFramework] {
+        return serviceContainer.adapterRegistry.getAvailableFrameworks()
+    }
+
+    /// Get detailed framework availability information
+    /// - Returns: Array of framework availability details
+    public func getFrameworkAvailability() -> [FrameworkAvailability] {
+        return serviceContainer.adapterRegistry.getFrameworkAvailability()
+    }
+
+    /// Get models for a specific framework
+    /// - Parameter framework: The framework to filter models for
+    /// - Returns: Array of models compatible with the framework
+    public func getModelsForFramework(_ framework: LLMFramework) -> [ModelInfo] {
+        let criteria = ModelCriteria(framework: framework)
+        return serviceContainer.modelRegistry.filterModels(by: criteria)
+    }
+
+    /// Add a model from URL for download
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - url: Download URL for the model
+    ///   - framework: Target framework for the model
+    ///   - estimatedSize: Estimated memory usage (optional)
+    /// - Returns: The created model info
+    public func addModelFromURL(
+        name: String,
+        url: URL,
+        framework: LLMFramework,
+        estimatedSize: Int64? = nil
+    ) -> ModelInfo {
+        return (serviceContainer.modelRegistry as! RegistryService).addModelFromURL(
+            name: name,
+            url: url,
+            framework: framework,
+            estimatedSize: estimatedSize
+        )
+    }
+
 
     // MARK: - Private Methods
 

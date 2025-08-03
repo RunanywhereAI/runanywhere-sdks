@@ -33,14 +33,7 @@ class ModelListViewModel: ObservableObject {
         do {
             // Use SDK to list available models
             availableModels = try await sdk.listAvailableModels()
-
-            // If no models available, use sample models as fallback
-            if availableModels.isEmpty {
-                availableModels = createSampleModels()
-            }
         } catch {
-            // Fallback to sample models on error
-            availableModels = createSampleModels()
             print("Failed to load models from SDK: \(error)")
         }
 
@@ -56,6 +49,11 @@ class ModelListViewModel: ObservableObject {
             // Direct SDK usage
             try await sdk.loadModel(model.id)
             currentModel = model
+
+            // Post notification that model was loaded
+            await MainActor.run {
+                NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
+            }
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
         }
@@ -77,6 +75,8 @@ class ModelListViewModel: ObservableObject {
 
         do {
             try await sdk.downloadModel(modelId)
+            // Wait a moment for filesystem to settle
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             // Refresh models to update download status
             await loadModels()
             return true
@@ -101,44 +101,5 @@ class ModelListViewModel: ObservableObject {
             isLoading = false
             return false
         }
-    }
-
-    private func createSampleModels() -> [ModelInfo] {
-        return [
-            ModelInfo(
-                id: "foundation-phi-3-mini",
-                name: "Phi-3 Mini (Foundation Models)",
-                format: .gguf,
-                downloadURL: nil,
-                localPath: nil,
-                estimatedMemory: 2_000_000_000,
-                contextLength: 4096,
-                downloadSize: 0,
-                checksum: nil,
-                compatibleFrameworks: [.coreML],
-                preferredFramework: .coreML,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: nil,
-                alternativeDownloadURLs: []
-            ),
-            ModelInfo(
-                id: "mediapipe-gemma-2b",
-                name: "Gemma 2B (MediaPipe)",
-                format: .gguf,
-                downloadURL: nil,
-                localPath: nil,
-                estimatedMemory: 2_500_000_000,
-                contextLength: 2048,
-                downloadSize: 0,
-                checksum: nil,
-                compatibleFrameworks: [.llamaCpp],
-                preferredFramework: .llamaCpp,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: nil,
-                alternativeDownloadURLs: []
-            )
-        ]
     }
 }

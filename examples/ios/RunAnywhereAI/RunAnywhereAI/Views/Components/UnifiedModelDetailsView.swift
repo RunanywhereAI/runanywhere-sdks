@@ -52,6 +52,8 @@ struct UnifiedModelDetailsView: View {
             return "Minimum OS: \(version)"
         case .specificChip(let chip):
             return "Requires: \(chip)"
+        case .requiresAppleSilicon:
+            return "Requires Apple Silicon"
         }
     }
 

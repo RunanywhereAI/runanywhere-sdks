@@ -1,5 +1,6 @@
 import Foundation
 import Alamofire
+import Files
 
 /// Simplified download service using Alamofire
 public class AlamofireDownloadService: DownloadManager {
@@ -57,7 +58,13 @@ public class AlamofireDownloadService: DownloadManager {
                 do {
                     // Use SimplifiedFileManager for destination path
                     let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Use framework-specific folder if available
+                    let modelFolder: Folder
+                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+                    } else {
+                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    }
                     let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
                     // Configure destination
@@ -91,6 +98,16 @@ public class AlamofireDownloadService: DownloadManager {
                                         totalBytes: model.downloadSize ?? 0,
                                         state: .completed
                                     ))
+
+                                    // Update model with local path in registry
+                                    var updatedModel = model
+                                    updatedModel.localPath = url
+                                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                                    // Save metadata persistently
+                                    let metadataStore = ModelMetadataStore()
+                                    metadataStore.saveModelMetadata(updatedModel)
+
                                     self.logger.info("Download completed for model: \(model.id)")
                                     continuation.resume(returning: url)
                                 } else {
@@ -202,7 +219,13 @@ extension AlamofireDownloadService {
                 do {
                     // Use SimplifiedFileManager for destination path
                     let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Use framework-specific folder if available
+                    let modelFolder: Folder
+                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+                    } else {
+                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    }
                     let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
                     let destination: DownloadRequest.Destination = { _, _ in
@@ -242,6 +265,16 @@ extension AlamofireDownloadService {
                                         totalBytes: model.downloadSize ?? 0,
                                         state: .completed
                                     ))
+
+                                    // Update model with local path in registry
+                                    var updatedModel = model
+                                    updatedModel.localPath = url
+                                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                                    // Save metadata persistently
+                                    let metadataStore = ModelMetadataStore()
+                                    metadataStore.saveModelMetadata(updatedModel)
+
                                     continuation.resume(returning: url)
                                 } else {
                                     continuation.resume(throwing: DownloadError.invalidResponse)

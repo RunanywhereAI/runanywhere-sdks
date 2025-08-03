@@ -22,7 +22,20 @@ class ModelURLRegistry: ObservableObject {
             "gemma-2b": URL(string: "https://huggingface.co/google/gemma-2b/resolve/main/model.mlmodel")!
         ],
         .llamaCpp: [
-            "phi-3-mini": URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!
+            // Existing model
+            "phi-3-mini": URL(string: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf")!,
+
+            // Small models (< 2GB)
+            "phi-2-q4": URL(string: "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q4_K_M.gguf")!,
+
+            // Medium models (2-4GB)
+            "llama2-7b-chat-q4": URL(string: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf")!,
+
+            // Large models (4-8GB)
+            "mistral-7b-instruct-q5": URL(string: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.2-GGUF/resolve/main/mistral-7b-instruct-v0.2.Q5_K_M.gguf")!,
+
+            // Code models
+            "codellama-7b-q4": URL(string: "https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF/resolve/main/codellama-7b-instruct.Q4_K_M.gguf")!
         ]
     ]
 
@@ -104,14 +117,51 @@ class ModelURLRegistry: ObservableObject {
         // Return ModelInfo objects for models that have URLs
         let urls = getModelURLs(for: framework)
         return urls.compactMap { name, url in
-            ModelInfo(
+            // Determine format based on framework and URL
+            let format: ModelFormat = {
+                if framework == .coreML {
+                    return .mlmodel
+                } else if framework == .llamaCpp {
+                    return url.pathExtension == "gguf" ? .gguf : .ggml
+                }
+                return .gguf // Default
+            }()
+
+            // Estimate memory based on model name
+            let estimatedMemory: Int64 = {
+                switch name {
+                case "phi-2-q4":
+                    return 1_600_000_000 // 1.6GB
+                case "llama2-7b-chat-q4":
+                    return 3_800_000_000 // 3.8GB
+                case "mistral-7b-instruct-q5":
+                    return 5_200_000_000 // 5.2GB
+                case "codellama-7b-q4":
+                    return 3_900_000_000 // 3.9GB
+                default:
+                    return 1_000_000_000 // 1GB default
+                }
+            }()
+
+            // Extract quantization info from URL
+            let metadata: ModelInfoMetadata = {
+                if url.lastPathComponent.contains("Q4_K_M") {
+                    return ModelInfoMetadata(quantizationLevel: .q4_K_M)
+                } else if url.lastPathComponent.contains("Q5_K_M") {
+                    return ModelInfoMetadata(quantizationLevel: .q5_K_M)
+                }
+                return ModelInfoMetadata()
+            }()
+
+            return ModelInfo(
                 id: "\(framework.rawValue)-\(name)",
                 name: name,
-                format: .gguf, // Use consistent format for all
+                format: format,
                 downloadURL: url,
-                estimatedMemory: 1_000_000_000, // 1GB default
+                estimatedMemory: estimatedMemory,
                 compatibleFrameworks: [framework],
-                preferredFramework: framework
+                preferredFramework: framework,
+                metadata: metadata
             )
         }
     }

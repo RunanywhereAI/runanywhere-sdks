@@ -10,4 +10,13 @@ public protocol FrameworkAdapterRegistry {
 
     /// Register an adapter
     func register(_ adapter: FrameworkAdapter)
+
+    /// Get all registered adapters
+    func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter]
+
+    /// Get available frameworks (those with registered adapters)
+    func getAvailableFrameworks() -> [LLMFramework]
+
+    /// Get detailed framework availability information
+    func getFrameworkAvailability() -> [FrameworkAvailability]
 }

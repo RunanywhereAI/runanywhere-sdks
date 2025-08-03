@@ -20,17 +20,12 @@ class ModelDiscovery {
 
     func discoverLocalModels() async -> [ModelInfo] {
         var models: [ModelInfo] = []
+        let modelExtensions = ["mlmodel", "mlmodelc", "mlpackage", "tflite", "onnx", "gguf", "ggml", "mlx", "pte", "safetensors"]
 
         for directory in getDefaultModelDirectories() {
-            if let contents = try? FileManager.default.contentsOfDirectory(
-                at: directory,
-                includingPropertiesForKeys: [.isDirectoryKey, .fileSizeKey]
-            ) {
-                for url in contents {
-                    if let model = await detectModel(at: url) {
-                        models.append(model)
-                    }
-                }
+            // Search for model files recursively
+            await searchForModelsRecursively(in: directory, modelExtensions: modelExtensions) { model in
+                models.append(model)
             }
         }
 
@@ -40,6 +35,34 @@ class ModelDiscovery {
         }
 
         return models
+    }
+
+    private func searchForModelsRecursively(in directory: URL, modelExtensions: [String], onModelFound: (ModelInfo) async -> Void) async {
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            print("[ModelDiscovery] Directory does not exist: \(directory.path)")
+            return
+        }
+
+        guard let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            print("[ModelDiscovery] Failed to create enumerator for: \(directory.path)")
+            return
+        }
+
+        for case let fileURL as URL in enumerator {
+            // Check if it's a file with a model extension
+            let fileExtension = fileURL.pathExtension.lowercased()
+            if modelExtensions.contains(fileExtension) {
+                print("[ModelDiscovery] Found model file: \(fileURL.lastPathComponent)")
+                if let model = await detectModel(at: fileURL) {
+                    print("[ModelDiscovery] Successfully detected model: \(model.name)")
+                    await onModelFound(model)
+                }
+            }
+        }
     }
 
     func discoverOnlineModels() async -> [ModelInfo] {
@@ -126,7 +149,16 @@ class ModelDiscovery {
         var directories: [URL] = []
 
         if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            directories.append(documentsURL.appendingPathComponent("Models", isDirectory: true))
+            let modelsURL = documentsURL.appendingPathComponent("RunAnywhere", isDirectory: true).appendingPathComponent("Models", isDirectory: true)
+
+            // Add the base Models directory
+            directories.append(modelsURL)
+
+            // Add framework-specific subdirectories
+            for framework in LLMFramework.allCases {
+                let frameworkURL = modelsURL.appendingPathComponent(framework.rawValue, isDirectory: true)
+                directories.append(frameworkURL)
+            }
         }
 
         return directories
@@ -224,14 +256,32 @@ class ModelDiscovery {
     }
 
     private func generateModelId(from url: URL) -> String {
-        let path = url.path
-        let data = path.data(using: .utf8)!
-        let hash = data.base64EncodedString()
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "+", with: "-")
-            .prefix(8)
+        // For models in our storage structure, use the parent folder name as ID
+        // This ensures consistency with how models are stored
+        let pathComponents = url.pathComponents
 
-        return "\(url.lastPathComponent)-\(hash)"
+        // Check if this is a model in our framework structure
+        if let modelsIndex = pathComponents.firstIndex(of: "Models"),
+           modelsIndex + 2 < pathComponents.count {
+            // Path is like: .../Models/frameworkName/modelId/file.gguf
+            // or: .../Models/modelId/file.gguf
+            let nextComponent = pathComponents[modelsIndex + 1]
+
+            // Check if next component is a framework name
+            if LLMFramework.allCases.contains(where: { $0.rawValue == nextComponent }) {
+                // Framework structure: use the model folder name
+                if modelsIndex + 2 < pathComponents.count {
+                    return pathComponents[modelsIndex + 2]
+                }
+            } else {
+                // Direct model folder structure
+                return nextComponent
+            }
+        }
+
+        // Fallback to filename-based ID for other cases
+        let filename = url.deletingPathExtension().lastPathComponent
+        return filename
     }
 
     private func generateModelName(from url: URL, metadata: ModelMetadata) -> String {

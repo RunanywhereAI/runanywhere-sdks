@@ -38,6 +38,10 @@ struct RunAnywhereAIApp: App {
             config.privacyMode = .standard
             config.memoryThreshold = 2_000_000_000 // 2GB
 
+            // Register framework adapters before initializing SDK
+            RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
+            RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
+
             // Initialize the SDK
             try await RunAnywhereSDK.shared.initialize(configuration: config)
             print("SDK initialized successfully")

@@ -176,6 +176,14 @@ class RequirementChecker {
                 critical: true,
                 message: isSupported ? "" : "Requires OS version \(version) or later"
             )
+
+        case .requiresAppleSilicon:
+            let isAppleSiliconChip = isAppleSilicon()
+            return HardwareRequirementResult(
+                satisfied: isAppleSiliconChip,
+                critical: true,
+                message: isAppleSiliconChip ? "" : "Requires Apple Silicon processor"
+            )
         }
     }
 

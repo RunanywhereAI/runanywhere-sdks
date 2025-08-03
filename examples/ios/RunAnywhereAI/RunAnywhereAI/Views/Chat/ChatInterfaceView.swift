@@ -73,6 +73,16 @@ struct ChatInterfaceView: View {
             .sheet(isPresented: $showingConversationList) {
                 ConversationListView()
             }
+            .onAppear {
+                Task {
+                    await viewModel.checkModelStatus()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
+                Task {
+                    await viewModel.checkModelStatus()
+                }
+            }
         }
     }
 

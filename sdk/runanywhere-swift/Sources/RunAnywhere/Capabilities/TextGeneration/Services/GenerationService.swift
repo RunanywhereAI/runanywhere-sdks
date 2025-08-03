@@ -5,15 +5,31 @@ public class GenerationService {
     private let routingService: RoutingService
     private let contextManager: ContextManager
     private let performanceMonitor: PerformanceMonitor
+    private let modelLoadingService: ModelLoadingService
+
+    // Current loaded model
+    private var currentLoadedModel: LoadedModel?
 
     public init(
         routingService: RoutingService,
         contextManager: ContextManager,
-        performanceMonitor: PerformanceMonitor
+        performanceMonitor: PerformanceMonitor,
+        modelLoadingService: ModelLoadingService? = nil
     ) {
         self.routingService = routingService
         self.contextManager = contextManager
         self.performanceMonitor = performanceMonitor
+        self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+    }
+
+    /// Set the current loaded model for generation
+    public func setCurrentModel(_ model: LoadedModel?) {
+        self.currentLoadedModel = model
+    }
+
+    /// Get the current loaded model
+    public func getCurrentModel() -> LoadedModel? {
+        return currentLoadedModel
     }
 
     /// Generate text using the loaded model
@@ -78,17 +94,41 @@ public class GenerationService {
         options: GenerationOptions,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
-        // Placeholder implementation
+        let startTime = Date()
+
+        // Use the current loaded model
+        guard let loadedModel = currentLoadedModel else {
+            throw SDKError.modelNotFound("No model is currently loaded")
+        }
+
+        // Set context if needed
+        await loadedModel.service.setContext(context)
+
+        // Generate text using the actual loaded model's service
+        let generatedText = try await loadedModel.service.generate(
+            prompt: prompt,
+            options: options
+        )
+
+        // Calculate metrics
+        let latency = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
+        let estimatedTokens = generatedText.split(separator: " ").count
+        let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
+
+        // Get memory usage from the service
+        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
+
         return GenerationResult(
-            text: "Generated text on device",
-            tokensUsed: 10,
-            modelUsed: "placeholder-model",
-            latencyMs: 100.0,
+            text: generatedText,
+            tokensUsed: estimatedTokens,
+            modelUsed: loadedModel.model.id,
+            latencyMs: latency,
             executionTarget: .onDevice,
-            savedAmount: 0.001,
+            savedAmount: 0.001, // Calculate based on cloud pricing
             performanceMetrics: PerformanceMetrics(
-                inferenceTimeMs: 100.0,
-                tokensPerSecond: 10.0
+                inferenceTimeMs: latency,
+                tokensPerSecond: tokensPerSecond,
+                peakMemoryUsage: memoryUsage
             )
         )
     }
@@ -121,17 +161,44 @@ public class GenerationService {
         devicePortion: Double,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
-        // Placeholder implementation
+        // For hybrid approach, use on-device generation with partial processing
+        // In a real implementation, this would split processing between device and cloud
+        let startTime = Date()
+
+        // Use the current loaded model
+        guard let loadedModel = currentLoadedModel else {
+            throw SDKError.modelNotFound("No model is currently loaded")
+        }
+
+        // Set context if needed
+        await loadedModel.service.setContext(context)
+
+        // For now, use on-device generation entirely
+        // In a real implementation, this would coordinate between device and cloud
+        let generatedText = try await loadedModel.service.generate(
+            prompt: prompt,
+            options: options
+        )
+
+        // Calculate metrics
+        let latency = Date().timeIntervalSince(startTime) * 1000
+        let estimatedTokens = generatedText.split(separator: " ").count
+        let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
+
+        // Get memory usage from the service
+        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
+
         return GenerationResult(
-            text: "Generated text using hybrid approach",
-            tokensUsed: 10,
-            modelUsed: "hybrid-model",
-            latencyMs: 75.0,
+            text: generatedText,
+            tokensUsed: estimatedTokens,
+            modelUsed: loadedModel.model.id,
+            latencyMs: latency,
             executionTarget: .hybrid,
-            savedAmount: 0.0005,
+            savedAmount: 0.0005, // Hybrid saves less than full on-device
             performanceMetrics: PerformanceMetrics(
-                inferenceTimeMs: 75.0,
-                tokensPerSecond: 13.33
+                inferenceTimeMs: latency,
+                tokensPerSecond: tokensPerSecond,
+                peakMemoryUsage: memoryUsage
             )
         )
     }

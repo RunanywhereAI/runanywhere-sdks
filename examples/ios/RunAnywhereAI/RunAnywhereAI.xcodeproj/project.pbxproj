@@ -8,15 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		0C0A0EC1DA3A0C052961DD44 /* Pods_RunAnywhereAI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8F359D66AAFABB8AF3FABD91 /* Pods_RunAnywhereAI.framework */; };
+		540E20912E3EFE0C00F86C20 /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 540E20902E3EFE0C00F86C20 /* LLM */; };
 		541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22712E3BE21300EBF8FA /* RunAnywhereSDK */; };
-		547F709A2E35CC650061BAED /* MLX in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70992E35CC650061BAED /* MLX */; };
-		547F709C2E35CC650061BAED /* MLXFFT in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709B2E35CC650061BAED /* MLXFFT */; };
-		547F709E2E35CC650061BAED /* MLXFast in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709D2E35CC650061BAED /* MLXFast */; };
-		547F70A02E35CC650061BAED /* MLXLinalg in Frameworks */ = {isa = PBXBuildFile; productRef = 547F709F2E35CC650061BAED /* MLXLinalg */; };
-		547F70A22E35CC650061BAED /* MLXNN in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70A12E35CC650061BAED /* MLXNN */; };
-		547F70A42E35CC650061BAED /* MLXOptimizers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70A32E35CC650061BAED /* MLXOptimizers */; };
-		547F70A62E35CC650061BAED /* MLXRandom in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70A52E35CC650061BAED /* MLXRandom */; };
-		547F70A92E35CCD00061BAED /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70A82E35CCD00061BAED /* MLXLMCommon */; };
 		547F70AC2E35CE050061BAED /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70AB2E35CE050061BAED /* onnxruntime */; };
 		547F70AE2E35CE050061BAED /* onnxruntime_extensions in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70AD2E35CE050061BAED /* onnxruntime_extensions */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
@@ -94,22 +87,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				547F70AE2E35CE050061BAED /* onnxruntime_extensions in Frameworks */,
-				547F70A42E35CC650061BAED /* MLXOptimizers in Frameworks */,
-				547F709E2E35CC650061BAED /* MLXFast in Frameworks */,
 				54F5961B2E39C32A0057B6CE /* executorch in Frameworks */,
-				547F70A02E35CC650061BAED /* MLXLinalg in Frameworks */,
-				547F709A2E35CC650061BAED /* MLX in Frameworks */,
-				547F70A22E35CC650061BAED /* MLXNN in Frameworks */,
-				547F709C2E35CC650061BAED /* MLXFFT in Frameworks */,
 				54F596172E39C32A0057B6CE /* backend_mps in Frameworks */,
 				547F70B12E35CE270061BAED /* Transformers in Frameworks */,
+				540E20912E3EFE0C00F86C20 /* LLM in Frameworks */,
 				54F596192E39C32A0057B6CE /* backend_xnnpack in Frameworks */,
 				54F5961F2E39C32A0057B6CE /* kernels_optimized in Frameworks */,
 				547F70AC2E35CE050061BAED /* onnxruntime in Frameworks */,
 				54F596212E39C32A0057B6CE /* kernels_quantized in Frameworks */,
 				54F5961D2E39C32A0057B6CE /* kernels_custom in Frameworks */,
-				547F70A92E35CCD00061BAED /* MLXLMCommon in Frameworks */,
-				547F70A62E35CC650061BAED /* MLXRandom in Frameworks */,
 				54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
 				541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */,
@@ -203,14 +189,6 @@
 			);
 			name = RunAnywhereAI;
 			packageProductDependencies = (
-				547F70992E35CC650061BAED /* MLX */,
-				547F709B2E35CC650061BAED /* MLXFFT */,
-				547F709D2E35CC650061BAED /* MLXFast */,
-				547F709F2E35CC650061BAED /* MLXLinalg */,
-				547F70A12E35CC650061BAED /* MLXNN */,
-				547F70A32E35CC650061BAED /* MLXOptimizers */,
-				547F70A52E35CC650061BAED /* MLXRandom */,
-				547F70A82E35CCD00061BAED /* MLXLMCommon */,
 				547F70AB2E35CE050061BAED /* onnxruntime */,
 				547F70AD2E35CE050061BAED /* onnxruntime_extensions */,
 				547F70B02E35CE270061BAED /* Transformers */,
@@ -223,6 +201,7 @@
 				54F5961E2E39C32A0057B6CE /* kernels_optimized */,
 				54F596202E39C32A0057B6CE /* kernels_quantized */,
 				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
+				540E20902E3EFE0C00F86C20 /* LLM */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -305,13 +284,12 @@
 			mainGroup = 5480A1E72E2F250200337F2F;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */,
-				547F70A72E35CCD00061BAED /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 				547F70AA2E35CE050061BAED /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */,
 				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */,
+				540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -529,6 +507,8 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_SWIFT_FLAGS = "";
+				"OTHER_SWIFT_FLAGS[arch=*]" = "-enable-experimental-feature Macros";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -583,6 +563,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "";
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -805,20 +786,12 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */ = {
+		540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift";
+			repositoryURL = "https://github.com/eastriverlee/LLM.swift";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.25.6;
-			};
-		};
-		547F70A72E35CCD00061BAED /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.25.5;
+				branch = main;
+				kind = branch;
 			};
 		};
 		547F70AA2E35CE050061BAED /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
@@ -856,49 +829,14 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		540E20902E3EFE0C00F86C20 /* LLM */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */;
+			productName = LLM;
+		};
 		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = RunAnywhereSDK;
-		};
-		547F70992E35CC650061BAED /* MLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLX;
-		};
-		547F709B2E35CC650061BAED /* MLXFFT */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXFFT;
-		};
-		547F709D2E35CC650061BAED /* MLXFast */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXFast;
-		};
-		547F709F2E35CC650061BAED /* MLXLinalg */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXLinalg;
-		};
-		547F70A12E35CC650061BAED /* MLXNN */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXNN;
-		};
-		547F70A32E35CC650061BAED /* MLXOptimizers */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXOptimizers;
-		};
-		547F70A52E35CC650061BAED /* MLXRandom */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70982E35CC650061BAED /* XCRemoteSwiftPackageReference "mlx-swift" */;
-			productName = MLXRandom;
-		};
-		547F70A82E35CCD00061BAED /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 547F70A72E35CCD00061BAED /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
 		};
 		547F70AB2E35CE050061BAED /* onnxruntime */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -35,6 +35,13 @@ public class SimplifiedFileManager {
         return try modelsFolder.createSubfolderIfNeeded(withName: modelId)
     }
 
+    /// Get or create folder for a specific model with framework
+    public func getModelFolder(for modelId: String, framework: LLMFramework) throws -> Folder {
+        let modelsFolder = try baseFolder.subfolder(named: "Models")
+        let frameworkFolder = try modelsFolder.createSubfolderIfNeeded(withName: framework.rawValue)
+        return try frameworkFolder.createSubfolderIfNeeded(withName: modelId)
+    }
+
     /// Store model file
     public func storeModel(data: Data, modelId: String, format: ModelFormat) throws -> URL {
         let modelFolder = try getModelFolder(for: modelId)
@@ -42,6 +49,17 @@ public class SimplifiedFileManager {
 
         let file = try modelFolder.createFile(named: fileName, contents: data)
         logger.info("Stored model \(modelId) at: \(file.path)")
+
+        return URL(fileURLWithPath: file.path)
+    }
+
+    /// Store model file with framework
+    public func storeModel(data: Data, modelId: String, format: ModelFormat, framework: LLMFramework) throws -> URL {
+        let modelFolder = try getModelFolder(for: modelId, framework: framework)
+        let fileName = "\(modelId).\(format.rawValue)"
+
+        let file = try modelFolder.createFile(named: fileName, contents: data)
+        logger.info("Stored model \(modelId) in \(framework.rawValue) at: \(file.path)")
 
         return URL(fileURLWithPath: file.path)
     }
@@ -68,9 +86,40 @@ public class SimplifiedFileManager {
 
     /// Delete model
     public func deleteModel(modelId: String) throws {
-        let modelFolder = try getModelFolder(for: modelId)
-        try modelFolder.delete()
-        logger.info("Deleted model: \(modelId)")
+        // Try to find the model in framework-specific folders first
+        let modelsFolder = try baseFolder.subfolder(named: "Models")
+
+        // Check framework-specific folders
+        for frameworkFolder in modelsFolder.subfolders {
+            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+                if frameworkFolder.containsSubfolder(named: modelId) {
+                    let modelFolder = try frameworkFolder.subfolder(named: modelId)
+                    try modelFolder.delete()
+
+                    // Remove metadata
+                    let metadataStore = ModelMetadataStore()
+                    metadataStore.removeModelMetadata(modelId)
+
+                    logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
+                    return
+                }
+            }
+        }
+
+        // Check direct model folder (legacy)
+        if modelsFolder.containsSubfolder(named: modelId) {
+            let modelFolder = try modelsFolder.subfolder(named: modelId)
+            try modelFolder.delete()
+
+            // Remove metadata
+            let metadataStore = ModelMetadataStore()
+            metadataStore.removeModelMetadata(modelId)
+
+            logger.info("Deleted model: \(modelId)")
+            return
+        }
+
+        throw SDKError.modelNotFound(modelId)
     }
 
     // MARK: - Download Management
@@ -177,9 +226,14 @@ public class SimplifiedFileManager {
 
         var models: [(String, ModelFormat, Int64)] = []
 
+        // First check direct model folders (legacy structure)
         for modelFolder in modelsFolder.subfolders {
-            let modelId = modelFolder.name
+            // Skip framework folders
+            if LLMFramework.allCases.contains(where: { $0.rawValue == modelFolder.name }) {
+                continue
+            }
 
+            let modelId = modelFolder.name
             for file in modelFolder.files {
                 if let format = ModelFormat(rawValue: file.extension ?? "") {
                     var fileSize: Int64 = 0
@@ -188,6 +242,29 @@ public class SimplifiedFileManager {
                         fileSize = size.int64Value
                     }
                     models.append((modelId, format, fileSize))
+                }
+            }
+        }
+
+        // Then check framework-specific folders (new structure)
+        for frameworkFolder in modelsFolder.subfolders {
+            // Only process framework folders
+            guard LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) else {
+                continue
+            }
+
+            for modelFolder in frameworkFolder.subfolders {
+                let modelId = modelFolder.name
+
+                for file in modelFolder.files {
+                    if let format = ModelFormat(rawValue: file.extension ?? "") {
+                        var fileSize: Int64 = 0
+                        if let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+                           let size = attributes[.size] as? NSNumber {
+                            fileSize = size.int64Value
+                        }
+                        models.append((modelId, format, fileSize))
+                    }
                 }
             }
         }

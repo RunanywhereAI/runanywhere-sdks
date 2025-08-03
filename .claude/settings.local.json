@@ -89,7 +89,8 @@
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
       "Bash(sed:*)",
-      "WebFetch(domain:alamofire.github.io)"
+      "WebFetch(domain:alamofire.github.io)",
+      "Bash(xcrun simctl io:*)"
     ],
     "deny": []
   }
