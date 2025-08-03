@@ -1,5 +1,6 @@
 import Foundation
 import Alamofire
+import Files
 
 /// Simplified download service using Alamofire
 public class AlamofireDownloadService: DownloadManager {
@@ -57,7 +58,13 @@ public class AlamofireDownloadService: DownloadManager {
                 do {
                     // Use SimplifiedFileManager for destination path
                     let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Use framework-specific folder if available
+                    let modelFolder: Folder
+                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+                    } else {
+                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    }
                     let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
                     // Configure destination
@@ -202,7 +209,13 @@ extension AlamofireDownloadService {
                 do {
                     // Use SimplifiedFileManager for destination path
                     let fileManager = ServiceContainer.shared.fileManager
-                    let modelFolder = try fileManager.getModelFolder(for: model.id)
+                    // Use framework-specific folder if available
+                    let modelFolder: Folder
+                    if let framework = model.preferredFramework ?? model.compatibleFrameworks.first {
+                        modelFolder = try fileManager.getModelFolder(for: model.id, framework: framework)
+                    } else {
+                        modelFolder = try fileManager.getModelFolder(for: model.id)
+                    }
                     let destinationURL = URL(fileURLWithPath: modelFolder.path).appendingPathComponent("\(model.id).\(model.format.rawValue)")
 
                     let destination: DownloadRequest.Destination = { _, _ in

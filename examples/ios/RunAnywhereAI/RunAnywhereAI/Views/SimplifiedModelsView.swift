@@ -145,12 +145,20 @@ struct SimplifiedModelsView: View {
 
             Section("Models for \(expanded.displayName)") {
                 ForEach(filteredModels, id: \.id) { model in
-                    ModelRow(model: model, isSelected: selectedModel?.id == model.id)
-                        .onTapGesture {
+                    ModelRow(
+                        model: model,
+                        isSelected: selectedModel?.id == model.id,
+                        onDownloadCompleted: {
+                            Task {
+                                await viewModel.loadModels() // Refresh models list
+                            }
+                        },
+                        onSelectModel: {
                             Task {
                                 await selectModel(model)
                             }
                         }
+                    )
                 }
 
                 if filteredModels.isEmpty {
@@ -261,6 +269,9 @@ private struct FrameworkRow: View {
 private struct ModelRow: View {
     let model: ModelInfo
     let isSelected: Bool
+    let onDownloadCompleted: () -> Void
+    let onSelectModel: () -> Void
+
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
 
@@ -322,49 +333,92 @@ private struct ModelRow: View {
 
             Spacer()
 
-            // Download button or status indicator
-            if let downloadURL = model.downloadURL, model.localPath == nil {
-                if isDownloading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Button("Download") {
-                        Task {
-                            await downloadModel()
+            // Action buttons based on model state
+            HStack(spacing: 8) {
+                if let downloadURL = model.downloadURL, model.localPath == nil {
+                    // Model needs to be downloaded
+                    if isDownloading {
+                        VStack(spacing: 4) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            if downloadProgress > 0 {
+                                Text("\(Int(downloadProgress * 100))%")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } else {
+                        Button("Download") {
+                            Task {
+                                await downloadModel()
+                            }
+                        }
+                        .font(.caption)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                } else if model.localPath != nil {
+                    // Model is downloaded - show select and load options
+                    if isSelected {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Loaded")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        }
+                    } else {
+                        VStack(spacing: 4) {
+                            Button("Select") {
+                                onSelectModel()
+                            }
+                            .font(.caption2)
+                            .buttonStyle(.bordered)
+                            .controlSize(.mini)
+
+                            Button("Load") {
+                                onSelectModel() // This will select and load
+                            }
+                            .font(.caption2)
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.mini)
                         }
                     }
-                    .font(.caption)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
                 }
-            } else if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.blue)
             }
         }
         .padding(.vertical, 4)
     }
 
     private func downloadModel() async {
-        isDownloading = true
-        downloadProgress = 0.0
+        await MainActor.run {
+            isDownloading = true
+            downloadProgress = 0.0
+        }
 
-        // Simulate download progress
-        for i in 1...10 {
-            try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+        do {
+            try await RunAnywhereSDK.shared.downloadModel(model.id)
             await MainActor.run {
-                downloadProgress = Double(i) / 10.0
+                downloadProgress = 1.0
+            }
+
+            print("Model \(model.name) downloaded successfully!")
+
+            // Notify parent that download completed so it can refresh
+            await MainActor.run {
+                onDownloadCompleted()
+            }
+
+        } catch {
+            print("Download failed: \(error)")
+            await MainActor.run {
+                downloadProgress = 0.0
             }
         }
 
-        // Actually download using SDK
-        do {
-            try await RunAnywhereSDK.shared.downloadModel(model.id)
-        } catch {
-            print("Download failed: \(error)")
+        await MainActor.run {
+            isDownloading = false
         }
-
-        isDownloading = false
     }
 }
 

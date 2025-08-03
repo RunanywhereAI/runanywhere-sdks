@@ -126,7 +126,16 @@ class ModelDiscovery {
         var directories: [URL] = []
 
         if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            directories.append(documentsURL.appendingPathComponent("Models", isDirectory: true))
+            let modelsURL = documentsURL.appendingPathComponent("RunAnywhere", isDirectory: true).appendingPathComponent("Models", isDirectory: true)
+
+            // Add the base Models directory
+            directories.append(modelsURL)
+
+            // Add framework-specific subdirectories
+            for framework in LLMFramework.allCases {
+                let frameworkURL = modelsURL.appendingPathComponent(framework.rawValue, isDirectory: true)
+                directories.append(frameworkURL)
+            }
         }
 
         return directories

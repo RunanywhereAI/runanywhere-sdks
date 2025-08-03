@@ -4,8 +4,11 @@ import Foundation
 public class RegistryService: ModelRegistry {
     private var models: [String: ModelInfo] = [:]
     private var modelsByProvider: [String: [ModelInfo]] = [:]
+    private let modelDiscovery: ModelDiscovery
 
-    public init() {}
+    public init() {
+        self.modelDiscovery = ModelDiscovery()
+    }
 
     /// Initialize registry with configuration
     public func initialize(with configuration: Configuration) async {
@@ -19,7 +22,13 @@ public class RegistryService: ModelRegistry {
     }
 
     public func discoverModels() async -> [ModelInfo] {
-        // Return all registered models
+        // Discover local models from disk and register them
+        let localModels = await modelDiscovery.discoverLocalModels()
+        for model in localModels {
+            registerModel(model)
+        }
+
+        // Return all registered models (both pre-configured and discovered)
         return Array(models.values)
     }
 

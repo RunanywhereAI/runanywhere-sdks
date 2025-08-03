@@ -33,14 +33,7 @@ class ModelListViewModel: ObservableObject {
         do {
             // Use SDK to list available models
             availableModels = try await sdk.listAvailableModels()
-
-            // If no models available, use sample models as fallback
-            if availableModels.isEmpty {
-                availableModels = createSampleModels()
-            }
         } catch {
-            // Fallback to sample models on error
-            availableModels = createSampleModels()
             print("Failed to load models from SDK: \(error)")
         }
 
@@ -101,44 +94,5 @@ class ModelListViewModel: ObservableObject {
             isLoading = false
             return false
         }
-    }
-
-    private func createSampleModels() -> [ModelInfo] {
-        return [
-            ModelInfo(
-                id: "foundation-phi-3-mini",
-                name: "Phi-3 Mini (Foundation Models)",
-                format: .gguf,
-                downloadURL: nil,
-                localPath: nil,
-                estimatedMemory: 2_000_000_000,
-                contextLength: 4096,
-                downloadSize: 0,
-                checksum: nil,
-                compatibleFrameworks: [.coreML],
-                preferredFramework: .coreML,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: nil,
-                alternativeDownloadURLs: []
-            ),
-            ModelInfo(
-                id: "mediapipe-gemma-2b",
-                name: "Gemma 2B (MediaPipe)",
-                format: .gguf,
-                downloadURL: nil,
-                localPath: nil,
-                estimatedMemory: 2_500_000_000,
-                contextLength: 2048,
-                downloadSize: 0,
-                checksum: nil,
-                compatibleFrameworks: [.llamaCpp],
-                preferredFramework: .llamaCpp,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: nil,
-                alternativeDownloadURLs: []
-            )
-        ]
     }
 }

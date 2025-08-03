@@ -35,6 +35,13 @@ public class SimplifiedFileManager {
         return try modelsFolder.createSubfolderIfNeeded(withName: modelId)
     }
 
+    /// Get or create folder for a specific model with framework
+    public func getModelFolder(for modelId: String, framework: LLMFramework) throws -> Folder {
+        let modelsFolder = try baseFolder.subfolder(named: "Models")
+        let frameworkFolder = try modelsFolder.createSubfolderIfNeeded(withName: framework.rawValue)
+        return try frameworkFolder.createSubfolderIfNeeded(withName: modelId)
+    }
+
     /// Store model file
     public func storeModel(data: Data, modelId: String, format: ModelFormat) throws -> URL {
         let modelFolder = try getModelFolder(for: modelId)
@@ -42,6 +49,17 @@ public class SimplifiedFileManager {
 
         let file = try modelFolder.createFile(named: fileName, contents: data)
         logger.info("Stored model \(modelId) at: \(file.path)")
+
+        return URL(fileURLWithPath: file.path)
+    }
+
+    /// Store model file with framework
+    public func storeModel(data: Data, modelId: String, format: ModelFormat, framework: LLMFramework) throws -> URL {
+        let modelFolder = try getModelFolder(for: modelId, framework: framework)
+        let fileName = "\(modelId).\(format.rawValue)"
+
+        let file = try modelFolder.createFile(named: fileName, contents: data)
+        logger.info("Stored model \(modelId) in \(framework.rawValue) at: \(file.path)")
 
         return URL(fileURLWithPath: file.path)
     }

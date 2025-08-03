@@ -16,6 +16,7 @@ struct AddModelFromURLView: View {
     @State private var estimatedSize: String = ""
     @State private var isAdding = false
     @State private var errorMessage: String?
+    @State private var availableFrameworks: [LLMFramework] = []
 
     let onModelAdded: (ModelInfo) -> Void
 
@@ -35,7 +36,7 @@ struct AddModelFromURLView: View {
 
                 Section("Framework") {
                     Picker("Target Framework", selection: $selectedFramework) {
-                        ForEach(LLMFramework.allCases, id: \.self) { framework in
+                        ForEach(availableFrameworks, id: \.self) { framework in
                             Text(framework.displayName).tag(framework)
                         }
                     }
@@ -80,6 +81,20 @@ struct AddModelFromURLView: View {
                         dismiss()
                     }
                 }
+            }
+        }
+        .task {
+            await loadAvailableFrameworks()
+        }
+    }
+
+    private func loadAvailableFrameworks() async {
+        let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
+        await MainActor.run {
+            self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
+            // Set default selection to first available framework
+            if !frameworks.isEmpty && !frameworks.contains(selectedFramework) {
+                selectedFramework = frameworks.first!
             }
         }
     }

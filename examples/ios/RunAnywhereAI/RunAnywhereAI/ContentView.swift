@@ -24,13 +24,19 @@ struct ContentView: View {
                 }
                 .tag(1)
 
+            StorageView()
+                .tabItem {
+                    Label("Storage", systemImage: "externaldrive")
+                }
+                .tag(2)
+
             NavigationView {
                 SimplifiedSettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(2)
+            .tag(3)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
             selectedTab = 1

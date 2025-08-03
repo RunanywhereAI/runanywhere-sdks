@@ -1,6 +1,15 @@
 {
-  "originHash" : "d8712031d96e627c62a15addf09a38c49cf1e9d98ee63841c065d6fc51811511",
+  "originHash" : "f81426f30443f51d4260ae83bd578f34586afa86e5ec42a5c115621d11917d3c",
   "pins" : [
+    {
+      "identity" : "alamofire",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Alamofire/Alamofire.git",
+      "state" : {
+        "revision" : "513364f870f6bfc468f9d2ff0a95caccc10044c5",
+        "version" : "5.10.2"
+      }
+    },
     {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
@@ -11,12 +20,12 @@
       }
     },
     {
-      "identity" : "gzipswift",
+      "identity" : "files",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/1024jp/GzipSwift",
+      "location" : "https://github.com/JohnSundell/Files.git",
       "state" : {
-        "revision" : "731037f6cc2be2ec01562f6597c1d0aa3fe6fd05",
-        "version" : "6.0.1"
+        "revision" : "e85f2b4a8dfa0f242889f45236f3867d16e40480",
+        "version" : "4.3.0"
       }
     },
     {
@@ -29,21 +38,12 @@
       }
     },
     {
-      "identity" : "mlx-swift",
+      "identity" : "llm.swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift",
+      "location" : "https://github.com/eastriverlee/LLM.swift",
       "state" : {
-        "revision" : "96c0f69cf15f38abd6248bb71fca908171dab1d8",
-        "version" : "0.25.6"
-      }
-    },
-    {
-      "identity" : "mlx-swift-examples",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ml-explore/mlx-swift-examples",
-      "state" : {
-        "revision" : "42b0d21a607b97c3b99d1e20626b7d9b14827b81",
-        "version" : "2.25.5"
+        "branch" : "main",
+        "revision" : "7c9c8a86604c7a81eca5e6790053bc9704e30c0a"
       }
     },
     {
@@ -92,12 +92,12 @@
       }
     },
     {
-      "identity" : "swift-numerics",
+      "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics",
+      "location" : "https://github.com/apple/swift-syntax.git",
       "state" : {
-        "revision" : "e0ec0f5f3af6f3e4d5e7a19d2af26b481acb6ba8",
-        "version" : "1.0.3"
+        "revision" : "fd6373fad9cf3b3bc4e3c06d92f0cfd60007fa8e",
+        "version" : "602.0.0-prerelease-2025-06-26"
       }
     },
     {
