@@ -48,9 +48,12 @@ class ModelManager: ObservableObject {
     }
 
     func getAvailableModels() async -> [ModelInfo] {
-        // Since SDK properties are private, return empty array for now
-        // In a real implementation, this would use public SDK methods
-        return []
+        do {
+            return try await sdk.listAvailableModels()
+        } catch {
+            print("Failed to get available models: \(error)")
+            return []
+        }
     }
 
     func getCurrentModel() -> ModelInfo? {
