@@ -98,6 +98,16 @@ public class AlamofireDownloadService: DownloadManager {
                                         totalBytes: model.downloadSize ?? 0,
                                         state: .completed
                                     ))
+
+                                    // Update model with local path in registry
+                                    var updatedModel = model
+                                    updatedModel.localPath = url
+                                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                                    // Save metadata persistently
+                                    let metadataStore = ModelMetadataStore()
+                                    metadataStore.saveModelMetadata(updatedModel)
+
                                     self.logger.info("Download completed for model: \(model.id)")
                                     continuation.resume(returning: url)
                                 } else {
@@ -255,6 +265,16 @@ extension AlamofireDownloadService {
                                         totalBytes: model.downloadSize ?? 0,
                                         state: .completed
                                     ))
+
+                                    // Update model with local path in registry
+                                    var updatedModel = model
+                                    updatedModel.localPath = url
+                                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                                    // Save metadata persistently
+                                    let metadataStore = ModelMetadataStore()
+                                    metadataStore.saveModelMetadata(updatedModel)
+
                                     continuation.resume(returning: url)
                                 } else {
                                     continuation.resume(throwing: DownloadError.invalidResponse)

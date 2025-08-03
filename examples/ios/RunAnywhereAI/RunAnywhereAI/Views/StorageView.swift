@@ -190,21 +190,142 @@ private struct StoredModelRow: View {
             }
 
             if showingDetails {
-                VStack(alignment: .leading, spacing: 4) {
-                    if let filePath = model.filePath {
-                        Text("Path: \(filePath)")
+                VStack(alignment: .leading, spacing: 6) {
+                    // Model Format and Framework
+                    HStack {
+                        Text("Format:")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        Text(model.format.rawValue.uppercased())
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
 
-                    Text("Created: \(model.createdDate, style: .date)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    if let framework = model.framework {
+                        HStack {
+                            Text("Framework:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Text(framework.displayName)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
 
-                    if let lastUsed = model.lastUsed {
-                        Text("Last used: \(lastUsed, style: .relative)")
+                    // Context Length
+                    if let contextLength = model.contextLength {
+                        HStack {
+                            Text("Context Length:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Text("\(contextLength) tokens")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    // Metadata
+                    if let metadata = model.metadata {
+                        if let author = metadata.author {
+                            HStack {
+                                Text("Author:")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                Text(author)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let license = metadata.license {
+                            HStack {
+                                Text("License:")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                Text(license)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if let description = metadata.description {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Description:")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                Text(description)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+
+                        if !metadata.tags.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Tags:")
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                HStack(spacing: 4) {
+                                    ForEach(metadata.tags, id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Color.blue.opacity(0.2))
+                                            .cornerRadius(4)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // File Information
+                    if let filePath = model.filePath {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Path:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Text(filePath)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(2)
+                                .truncationMode(.middle)
+                        }
+                    }
+
+                    if let checksum = model.checksum {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Checksum:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Text(checksum)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+
+                    HStack {
+                        Text("Created:")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        Text(model.createdDate, style: .date)
                             .font(.caption2)
                             .foregroundColor(.secondary)
+                    }
+
+                    if let lastUsed = model.lastUsed {
+                        HStack {
+                            Text("Last used:")
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                            Text(lastUsed, style: .relative)
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
                 .padding(.top, 4)

@@ -70,6 +70,8 @@ class ModelListViewModel: ObservableObject {
 
         do {
             try await sdk.downloadModel(modelId)
+            // Wait a moment for filesystem to settle
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             // Refresh models to update download status
             await loadModels()
             return true

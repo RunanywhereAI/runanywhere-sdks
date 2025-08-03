@@ -37,22 +37,43 @@ class StorageViewModel: ObservableObject {
         storedModels = modelData.map { modelId, format, size in
             // Get file path from SDK
             let baseURL = fileManager.getBaseDirectoryURL()
-            let modelPath = baseURL.appendingPathComponent("Models").appendingPathComponent(modelId)
+            let modelsURL = baseURL.appendingPathComponent("Models")
 
             // Detect framework based on format
             let framework = detectFramework(for: format)
 
+            // Try to find the model in framework-specific folder first, then fallback to direct folder
+            var modelPath: URL
+            if let framework = framework {
+                let frameworkPath = modelsURL.appendingPathComponent(framework.rawValue).appendingPathComponent(modelId)
+                if FileManager.default.fileExists(atPath: frameworkPath.path) {
+                    modelPath = frameworkPath
+                } else {
+                    modelPath = modelsURL.appendingPathComponent(modelId)
+                }
+            } else {
+                modelPath = modelsURL.appendingPathComponent(modelId)
+            }
+
             // Get creation date
             let createdDate = getCreatedDate(for: modelPath)
 
+            // Try to get additional metadata from the metadata store
+            let metadataStore = ModelMetadataStore()
+            let storedModels = metadataStore.loadStoredModels()
+            let storedModel = storedModels.first { $0.id == modelId }
+
             return StoredModelInfo(
-                name: modelId,
+                name: storedModel?.name ?? modelId,
                 format: format,
                 size: size,
                 framework: framework,
                 filePath: modelPath.path,
                 createdDate: createdDate,
-                lastUsed: nil
+                lastUsed: nil,
+                metadata: storedModel?.metadata,
+                contextLength: storedModel?.contextLength,
+                checksum: storedModel?.checksum
             )
         }
 
@@ -128,4 +149,7 @@ struct StoredModelInfo {
     let filePath: String?
     let createdDate: Date
     let lastUsed: Date?
+    let metadata: ModelInfoMetadata?
+    let contextLength: Int?
+    let checksum: String?
 }

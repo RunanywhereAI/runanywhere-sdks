@@ -151,6 +151,8 @@ struct SimplifiedModelsView: View {
                         onDownloadCompleted: {
                             Task {
                                 await viewModel.loadModels() // Refresh models list
+                                // Also refresh available frameworks in case new adapters were registered
+                                await loadAvailableFrameworks()
                             }
                         },
                         onSelectModel: {
@@ -397,27 +399,45 @@ private struct ModelRow: View {
         }
 
         do {
-            try await RunAnywhereSDK.shared.downloadModel(model.id)
-            await MainActor.run {
-                downloadProgress = 1.0
+            let downloadTask = try await RunAnywhereSDK.shared.downloadModel(model.id)
+
+            // Track progress
+            Task {
+                for await progress in downloadTask.progress {
+                    await MainActor.run {
+                        switch progress.state {
+                        case .downloading:
+                            self.downloadProgress = Double(progress.bytesDownloaded) / Double(progress.totalBytes)
+                        case .completed:
+                            self.downloadProgress = 1.0
+                        case .failed:
+                            self.downloadProgress = 0.0
+                        default:
+                            break
+                        }
+                    }
+                }
             }
 
-            print("Model \(model.name) downloaded successfully!")
+            // Wait for download to complete
+            let url = try await downloadTask.result.value
+
+            print("Model \(model.name) downloaded successfully to: \(url)")
 
             // Notify parent that download completed so it can refresh
             await MainActor.run {
                 onDownloadCompleted()
+                // Reset download state
+                isDownloading = false
+                downloadProgress = 1.0
             }
 
         } catch {
             print("Download failed: \(error)")
             await MainActor.run {
                 downloadProgress = 0.0
+                isDownloading = false
             }
-        }
-
-        await MainActor.run {
-            isDownloading = false
         }
     }
 }

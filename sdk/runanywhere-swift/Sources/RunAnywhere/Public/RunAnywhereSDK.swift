@@ -55,6 +55,10 @@ public class RunAnywhereSDK {
         self.currentModel = loadedModel.model
         self.currentService = loadedModel.service
 
+        // Update last used date in metadata
+        let metadataStore = ModelMetadataStore()
+        metadataStore.updateLastUsed(for: modelIdentifier)
+
         return loadedModel.model
     }
 
@@ -132,7 +136,7 @@ public class RunAnywhereSDK {
 
     /// Download a model
     /// - Parameter modelIdentifier: The model to download
-    public func downloadModel(_ modelIdentifier: String) async throws {
+    public func downloadModel(_ modelIdentifier: String) async throws -> DownloadTask {
         guard configuration != nil else {
             throw SDKError.notInitialized
         }
@@ -141,7 +145,7 @@ public class RunAnywhereSDK {
             throw SDKError.modelNotFound(modelIdentifier)
         }
 
-        try await serviceContainer.downloadService.downloadModel(model)
+        return try await serviceContainer.downloadService.downloadModel(model)
     }
 
     /// Delete a downloaded model

@@ -198,7 +198,8 @@ public class ServiceContainer {
         // Logger is pre-configured through LoggingManager
 
         // Initialize core services
-        // Model registry is initialized on first use
+        // Initialize model registry with configuration
+        await (modelRegistry as? RegistryService)?.initialize(with: configuration)
 
         // Configure hardware preferences
         // Hardware manager is self-configuring

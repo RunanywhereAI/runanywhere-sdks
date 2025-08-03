@@ -5,15 +5,23 @@ public class RegistryService: ModelRegistry {
     private var models: [String: ModelInfo] = [:]
     private var modelsByProvider: [String: [ModelInfo]] = [:]
     private let modelDiscovery: ModelDiscovery
+    private let metadataStore: ModelMetadataStore
 
     public init() {
         self.modelDiscovery = ModelDiscovery()
+        self.metadataStore = ModelMetadataStore()
     }
 
     /// Initialize registry with configuration
     public func initialize(with configuration: Configuration) async {
         // Load pre-configured models
         await loadPreconfiguredModels()
+
+        // Discover local models that are already downloaded
+        let localModels = await modelDiscovery.discoverLocalModels()
+        for model in localModels {
+            registerModel(model)
+        }
 
         // Discover models from providers
         for provider in configuration.modelProviders where provider.enabled {
@@ -181,47 +189,23 @@ public class RegistryService: ModelRegistry {
     // MARK: - Private Methods
 
     private func loadPreconfiguredModels() async {
-        // Load some example models
-        let exampleModels = [
-            ModelInfo(
-                id: "llama2-7b-gguf",
-                name: "Llama 2 7B GGUF",
-                format: .gguf,
-                downloadURL: URL(string: "https://example.com/llama2-7b.gguf"),
-                estimatedMemory: 7_000_000_000,
-                contextLength: 4096,
-                downloadSize: 4_000_000_000,
-                compatibleFrameworks: [.llamaCpp],
-                preferredFramework: .llamaCpp,
-                metadata: ModelInfoMetadata(
-                    author: "Meta",
-                    license: "Llama 2 Community License",
-                    tags: ["llm", "7b", "gguf"],
-                    description: "Llama 2 7B model in GGUF format"
-                )
-            ),
-            ModelInfo(
-                id: "gpt2-coreml",
-                name: "GPT-2 CoreML",
-                format: .mlpackage,
-                downloadURL: URL(string: "https://example.com/gpt2.mlpackage"),
-                estimatedMemory: 500_000_000,
-                contextLength: 1024,
-                downloadSize: 250_000_000,
-                compatibleFrameworks: [.coreML],
-                preferredFramework: .coreML,
-                hardwareRequirements: [.requiresNeuralEngine],
-                metadata: ModelInfoMetadata(
-                    author: "OpenAI",
-                    license: "MIT",
-                    tags: ["gpt2", "coreml", "small"],
-                    description: "GPT-2 model optimized for CoreML"
-                )
-            )
-        ]
+        // Load models from persistent metadata store
+        // Only load models for frameworks that have registered adapters
+        let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
 
-        for model in exampleModels {
-            registerModel(model)
+        if !availableFrameworks.isEmpty {
+            // Load only models for registered frameworks
+            let storedModels = metadataStore.loadModelsForFrameworks(availableFrameworks)
+            for model in storedModels {
+                registerModel(model)
+            }
+        } else {
+            // No adapters registered yet, load all stored models
+            // They will be filtered when displayed based on available frameworks
+            let allStoredModels = metadataStore.loadStoredModels()
+            for model in allStoredModels {
+                registerModel(model)
+            }
         }
     }
 
