@@ -88,7 +88,8 @@
       "Bash(for:*)",
       "Bash(do echo \"=== $file ===\")",
       "Bash(done)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "WebFetch(domain:alamofire.github.io)"
     ],
     "deny": []
   }
