@@ -17,7 +17,7 @@ public class ServiceContainer {
     }()
 
     /// Framework adapter registry
-    private(set) lazy var adapterRegistry: FrameworkAdapterRegistry = {
+    internal lazy var adapterRegistry: FrameworkAdapterRegistry = {
         FrameworkAdapterRegistryImpl()
     }()
 

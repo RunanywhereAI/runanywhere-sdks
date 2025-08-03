@@ -120,7 +120,7 @@ class ModelURLRegistry: ObservableObject {
             // Determine format based on framework and URL
             let format: ModelFormat = {
                 if framework == .coreML {
-                    return .coreML
+                    return .mlmodel
                 } else if framework == .llamaCpp {
                     return url.pathExtension == "gguf" ? .gguf : .ggml
                 }
@@ -144,13 +144,13 @@ class ModelURLRegistry: ObservableObject {
             }()
 
             // Extract quantization info from URL
-            let metadata: [String: Any] = {
+            let metadata: ModelInfoMetadata = {
                 if url.lastPathComponent.contains("Q4_K_M") {
-                    return ["quantization": "Q4_K_M", "contextLength": 2048]
+                    return ModelInfoMetadata(quantizationLevel: .q4_K_M)
                 } else if url.lastPathComponent.contains("Q5_K_M") {
-                    return ["quantization": "Q5_K_M", "contextLength": 8192]
+                    return ModelInfoMetadata(quantizationLevel: .q5_K_M)
                 }
-                return ["contextLength": 2048]
+                return ModelInfoMetadata()
             }()
 
             return ModelInfo(

@@ -18,8 +18,8 @@ public class LLMSwiftAdapter: FrameworkAdapter {
         guard supportedFormats.contains(model.format) else { return false }
 
         // Check quantization compatibility
-        if let quantization = model.metadata?["quantization"] as? String {
-            return isQuantizationSupported(quantization)
+        if let metadata = model.metadata, let quantization = metadata.quantizationLevel {
+            return isQuantizationSupported(quantization.rawValue)
         }
 
         // Check memory requirements
@@ -59,10 +59,10 @@ public class LLMSwiftAdapter: FrameworkAdapter {
 
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         // Determine optimal configuration based on model size
-        let hasGPU = HardwareCapabilityManager.shared.hasGPU()
+        let hasGPU = HardwareCapabilityManager.shared.isAcceleratorAvailable(.gpu)
         let modelSize = model.estimatedMemory
 
-        let preferredAccelerator: HardwareAccelerator = {
+        let preferredAccelerator: HardwareAcceleration = {
             if hasGPU && modelSize < 4_000_000_000 { // 4GB
                 return .gpu
             } else {
@@ -71,9 +71,12 @@ public class LLMSwiftAdapter: FrameworkAdapter {
         }()
 
         return HardwareConfiguration(
-            preferredAccelerator: preferredAccelerator,
-            maxMemoryUsage: estimateMemoryUsage(for: model),
-            powerEfficiencyMode: .balanced
+            primaryAccelerator: preferredAccelerator,
+            fallbackAccelerator: .cpu,
+            memoryMode: .balanced,
+            threadCount: 4,
+            useQuantization: true,
+            quantizationBits: 4
         )
     }
 

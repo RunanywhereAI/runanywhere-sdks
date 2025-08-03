@@ -165,6 +165,24 @@ public class RunAnywhereSDK {
         try serviceContainer.fileManager.deleteModel(modelId: modelId)
     }
 
+    /// Register a framework adapter
+    /// - Parameter adapter: The framework adapter to register
+    public func registerFrameworkAdapter(_ adapter: FrameworkAdapter) {
+        serviceContainer.adapterRegistry.register(adapter)
+    }
+
+    /// Get the list of registered framework adapters
+    /// - Returns: Dictionary of registered adapters by framework
+    public func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
+        var adapters: [LLMFramework: FrameworkAdapter] = [:]
+        for framework in LLMFramework.allCases {
+            if let adapter = serviceContainer.adapterRegistry.getAdapter(for: framework) {
+                adapters[framework] = adapter
+            }
+        }
+        return adapters
+    }
+
     // MARK: - Private Methods
 
     private func setupServices() {
