@@ -2,8 +2,11 @@ import Foundation
 
 /// Result of a text generation request
 public struct GenerationResult {
-    /// Generated text
+    /// Generated text (with thinking content removed if extracted)
     public let text: String
+
+    /// Thinking/reasoning content extracted from the response
+    public let thinkingContent: String?
 
     /// Number of tokens used
     public let tokensUsed: Int
@@ -41,6 +44,7 @@ public struct GenerationResult {
     /// Initializer
     internal init(
         text: String,
+        thinkingContent: String? = nil,
         tokensUsed: Int,
         modelUsed: String,
         latencyMs: TimeInterval,
@@ -54,6 +58,7 @@ public struct GenerationResult {
         metadata: ResultMetadata? = nil
     ) {
         self.text = text
+        self.thinkingContent = thinkingContent
         self.tokensUsed = tokensUsed
         self.modelUsed = modelUsed
         self.latencyMs = latencyMs

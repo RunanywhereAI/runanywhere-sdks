@@ -154,7 +154,9 @@ public class RegistryService: ModelRegistry {
         name: String,
         url: URL,
         framework: LLMFramework,
-        estimatedSize: Int64? = nil
+        estimatedSize: Int64? = nil,
+        supportsThinking: Bool = false,
+        thinkingTagPattern: ThinkingTagPattern? = nil
     ) -> ModelInfo {
         let modelId = generateModelId(from: url)
 
@@ -179,7 +181,9 @@ public class RegistryService: ModelRegistry {
                 tags: ["user-added", framework.rawValue.lowercased()],
                 description: "User-added model"
             ),
-            alternativeDownloadURLs: []
+            alternativeDownloadURLs: [],
+            supportsThinking: supportsThinking,
+            thinkingTagPattern: thinkingTagPattern
         )
 
         registerModel(modelInfo)

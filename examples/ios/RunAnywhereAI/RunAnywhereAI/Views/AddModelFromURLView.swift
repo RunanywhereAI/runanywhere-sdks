@@ -14,6 +14,10 @@ struct AddModelFromURLView: View {
     @State private var modelURL: String = ""
     @State private var selectedFramework: LLMFramework = .llamaCpp
     @State private var estimatedSize: String = ""
+    @State private var supportsThinking = false
+    @State private var thinkingOpenTag = "<thinking>"
+    @State private var thinkingCloseTag = "</thinking>"
+    @State private var useCustomThinkingTags = false
     @State private var isAdding = false
     @State private var errorMessage: String?
     @State private var availableFrameworks: [LLMFramework] = []
@@ -41,6 +45,33 @@ struct AddModelFromURLView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                }
+
+                Section("Thinking Support") {
+                    Toggle("Model Supports Thinking", isOn: $supportsThinking)
+
+                    if supportsThinking {
+                        Toggle("Use Custom Tags", isOn: $useCustomThinkingTags)
+
+                        if useCustomThinkingTags {
+                            TextField("Opening Tag", text: $thinkingOpenTag)
+                                .textFieldStyle(.roundedBorder)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+
+                            TextField("Closing Tag", text: $thinkingCloseTag)
+                                .textFieldStyle(.roundedBorder)
+                                .autocapitalization(.none)
+                                .autocorrectionDisabled()
+                        } else {
+                            HStack {
+                                Text("Default tags:")
+                                Text("<thinking>...</thinking>")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 Section("Advanced (Optional)") {
@@ -116,11 +147,17 @@ struct AddModelFromURLView: View {
                 return size
             }()
 
+            // Create thinking tag pattern if custom tags are specified
+            let thinkingPattern: ThinkingTagPattern? = supportsThinking && useCustomThinkingTags ?
+                ThinkingTagPattern(openingTag: thinkingOpenTag, closingTag: thinkingCloseTag) : nil
+
             let modelInfo = RunAnywhereSDK.shared.addModelFromURL(
                 name: modelName,
                 url: url,
                 framework: selectedFramework,
-                estimatedSize: estimatedSizeBytes
+                estimatedSize: estimatedSizeBytes,
+                supportsThinking: supportsThinking,
+                thinkingTagPattern: thinkingPattern
             )
 
             await MainActor.run {

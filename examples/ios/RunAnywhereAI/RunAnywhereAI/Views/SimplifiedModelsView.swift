@@ -159,6 +159,12 @@ struct SimplifiedModelsView: View {
                             Task {
                                 await selectModel(model)
                             }
+                        },
+                        onModelUpdated: {
+                            Task {
+                                await viewModel.loadModels() // Refresh models list after thinking update
+                                await loadAvailableFrameworks()
+                            }
                         }
                     )
                 }
@@ -268,6 +274,7 @@ private struct ModelRow: View {
     let isSelected: Bool
     let onDownloadCompleted: () -> Void
     let onSelectModel: () -> Void
+    let onModelUpdated: () -> Void
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
@@ -297,6 +304,45 @@ private struct ModelRow: View {
                         .padding(.vertical, 2)
                         .background(Color.secondary.opacity(0.2))
                         .cornerRadius(4)
+
+                    // Show thinking indicator if model supports thinking
+                    if model.supportsThinking {
+                        HStack(spacing: 2) {
+                            Image(systemName: "brain")
+                                .font(.caption2)
+                            Text("THINKING")
+                                .font(.caption2)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.purple.opacity(0.2))
+                        .foregroundColor(.purple)
+                        .cornerRadius(4)
+                    } else if model.localPath != nil {
+                        // For downloaded models without thinking support, show option to enable it
+                        Button(action: {
+                            // Enable thinking support for this model
+                            RunAnywhereSDK.shared.updateModelThinkingSupport(
+                                modelId: model.id,
+                                supportsThinking: true,
+                                thinkingTagPattern: ThinkingTagPattern.defaultPattern
+                            )
+                            onModelUpdated()
+                        }) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "brain")
+                                    .font(.caption2)
+                                Text("ENABLE")
+                                    .font(.caption2)
+                            }
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.2))
+                            .foregroundColor(.orange)
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
                 }
 
                 // Show download status

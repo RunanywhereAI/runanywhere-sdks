@@ -71,7 +71,7 @@ struct ModelDownloadConfirmationView: View {
 
                         Spacer()
 
-                        Label(ByteCountFormatter.string(fromByteCount: model.estimatedMemory ?? 0, countStyle: .file), systemImage: "internaldrive")
+                        Label(ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .file), systemImage: "internaldrive")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -119,7 +119,7 @@ struct ModelDownloadConfirmationView: View {
                     Spacer()
 
                     // Download details
-                    if let info = downloadInfo {
+                    if downloadInfo != nil {
                         VStack(alignment: .leading, spacing: 8) {
                             if false { // Auth check placeholder
                                 Label("Requires authentication", systemImage: "lock.fill")

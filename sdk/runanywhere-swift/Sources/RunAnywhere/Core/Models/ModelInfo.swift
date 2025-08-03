@@ -1,5 +1,28 @@
 import Foundation
 
+/// Pattern for extracting thinking/reasoning content from model output
+public struct ThinkingTagPattern {
+    public let openingTag: String
+    public let closingTag: String
+
+    public init(openingTag: String, closingTag: String) {
+        self.openingTag = openingTag
+        self.closingTag = closingTag
+    }
+
+    /// Default pattern used by models like DeepSeek and Hermes
+    public static let defaultPattern = ThinkingTagPattern(
+        openingTag: "<think>",
+        closingTag: "</think>"
+    )
+
+    /// Alternative pattern with full "thinking" word
+    public static let thinkingPattern = ThinkingTagPattern(
+        openingTag: "<thinking>",
+        closingTag: "</thinking>"
+    )
+}
+
 /// Information about a model
 public struct ModelInfo {
     public let id: String
@@ -17,6 +40,8 @@ public struct ModelInfo {
     public let tokenizerFormat: TokenizerFormat?
     public let metadata: ModelInfoMetadata?
     public let alternativeDownloadURLs: [URL]?
+    public let supportsThinking: Bool  // Whether model supports thinking/reasoning tags
+    public let thinkingTagPattern: ThinkingTagPattern?  // Pattern for extracting thinking content
     public var additionalProperties: [String: Any] = [:]
 
     public init(
@@ -35,6 +60,8 @@ public struct ModelInfo {
         tokenizerFormat: TokenizerFormat? = nil,
         metadata: ModelInfoMetadata? = nil,
         alternativeDownloadURLs: [URL]? = nil,
+        supportsThinking: Bool = false,
+        thinkingTagPattern: ThinkingTagPattern? = nil,
         additionalProperties: [String: Any] = [:]
     ) {
         self.id = id
@@ -52,6 +79,8 @@ public struct ModelInfo {
         self.tokenizerFormat = tokenizerFormat
         self.metadata = metadata
         self.alternativeDownloadURLs = alternativeDownloadURLs
+        self.supportsThinking = supportsThinking
+        self.thinkingTagPattern = thinkingTagPattern
         self.additionalProperties = additionalProperties
     }
 }
