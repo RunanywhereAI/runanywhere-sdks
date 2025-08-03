@@ -76,6 +76,13 @@ public class ModelMetadataStore {
             let format = ModelFormat(rawValue: metadata.format) ?? .unknown
             let framework = LLMFramework(rawValue: metadata.framework)
 
+            // Get actual file size from disk
+            var actualFileSize = metadata.downloadSize
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: localURL.path),
+               let fileSize = attributes[.size] as? Int64 {
+                actualFileSize = fileSize
+            }
+
             return ModelInfo(
                 id: metadata.id,
                 name: metadata.name,
@@ -83,7 +90,7 @@ public class ModelMetadataStore {
                 localPath: localURL,
                 estimatedMemory: metadata.estimatedMemory,
                 contextLength: metadata.contextLength,
-                downloadSize: metadata.downloadSize,
+                downloadSize: actualFileSize,
                 checksum: metadata.checksum,
                 compatibleFrameworks: framework != nil ? [framework!] : [],
                 preferredFramework: framework,

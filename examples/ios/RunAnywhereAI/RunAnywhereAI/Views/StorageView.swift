@@ -290,8 +290,7 @@ private struct StoredModelRow: View {
                             Text(filePath)
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                     }
 

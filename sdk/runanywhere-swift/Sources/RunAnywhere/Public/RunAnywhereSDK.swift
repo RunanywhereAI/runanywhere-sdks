@@ -131,7 +131,22 @@ public class RunAnywhereSDK {
             throw SDKError.notInitialized
         }
 
-        return await serviceContainer.modelRegistry.discoverModels()
+        // Always discover local models to ensure we have the latest
+        let discoveredModels = await serviceContainer.modelRegistry.discoverModels()
+
+        // Also check metadata store for any persisted models
+        let metadataStore = ModelMetadataStore()
+        let storedModels = metadataStore.loadStoredModels()
+
+        // Merge and deduplicate
+        var allModels = discoveredModels
+        for storedModel in storedModels {
+            if !allModels.contains(where: { $0.id == storedModel.id }) {
+                allModels.append(storedModel)
+            }
+        }
+
+        return allModels
     }
 
     /// Download a model

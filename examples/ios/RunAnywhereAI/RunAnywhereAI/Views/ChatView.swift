@@ -122,6 +122,9 @@ struct ChatView: View {
         }
         .onAppear {
             loadCurrentConversation()
+            Task {
+                await viewModel.checkModelStatus()
+            }
         }
         .onChange(of: viewModel.messages) { _, _ in
             saveCurrentConversation()

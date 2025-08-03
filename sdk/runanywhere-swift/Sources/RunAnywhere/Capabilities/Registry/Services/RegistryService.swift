@@ -177,7 +177,7 @@ public class RegistryService: ModelRegistry {
             tokenizerFormat: nil,
             metadata: ModelInfoMetadata(
                 tags: ["user-added", framework.rawValue.lowercased()],
-                description: "User-added model from \(url.host ?? "external source")"
+                description: "User-added model"
             ),
             alternativeDownloadURLs: []
         )
@@ -268,6 +268,8 @@ public class RegistryService: ModelRegistry {
             return 3_000_000_000
         } else if filename.contains("1b") {
             return 1_000_000_000
+        } else if filename.contains("500m") {
+            return 500_000_000
         } else if filename.contains("small") {
             return 500_000_000
         } else if filename.contains("medium") {

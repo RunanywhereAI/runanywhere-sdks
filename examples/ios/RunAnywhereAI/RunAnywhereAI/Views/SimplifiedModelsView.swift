@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhereSDK
 
 struct SimplifiedModelsView: View {
-    @StateObject private var viewModel = ModelListViewModel()
+    @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
 
     @State private var selectedModel: ModelInfo?
@@ -191,13 +191,8 @@ struct SimplifiedModelsView: View {
     private func selectModel(_ model: ModelInfo) async {
         selectedModel = model
 
-        // Use SDK to load the model
-        do {
-            _ = try await RunAnywhereSDK.shared.loadModel(model.id)
-            // Model loaded successfully
-        } catch {
-            print("Failed to load model: \(error)")
-        }
+        // Update the view model state
+        await viewModel.selectModel(model)
     }
 }
 
@@ -370,21 +365,12 @@ private struct ModelRow: View {
                                 .foregroundColor(.green)
                         }
                     } else {
-                        VStack(spacing: 4) {
-                            Button("Select") {
-                                onSelectModel()
-                            }
-                            .font(.caption2)
-                            .buttonStyle(.bordered)
-                            .controlSize(.mini)
-
-                            Button("Load") {
-                                onSelectModel() // This will select and load
-                            }
-                            .font(.caption2)
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.mini)
+                        Button("Load") {
+                            onSelectModel()
                         }
+                        .font(.caption)
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
                     }
                 }
             }

@@ -49,6 +49,11 @@ class ModelListViewModel: ObservableObject {
             // Direct SDK usage
             try await sdk.loadModel(model.id)
             currentModel = model
+
+            // Post notification that model was loaded
+            await MainActor.run {
+                NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
+            }
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
         }

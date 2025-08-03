@@ -38,17 +38,26 @@ class ChatViewModel: ObservableObject {
 
     init() {
         addSystemMessage()
+
+        // Listen for model loaded notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(modelLoaded(_:)),
+            name: Notification.Name("ModelLoaded"),
+            object: nil
+        )
     }
 
     private func addSystemMessage() {
-        let content = if isModelLoaded, let modelName = loadedModelName {
-            "Model '\(modelName)' is loaded and ready to chat!"
+        let content: String
+        if isModelLoaded, let modelName = loadedModelName {
+            content = "Model '\(modelName)' is loaded and ready to chat!"
         } else {
-            "Welcome! Select and download a model from the Models tab to start chatting."
+            content = "Welcome! Select and download a model from the Models tab to start chatting."
         }
 
         let systemMessage = ChatMessage(role: .system, content: content)
-        messages.append(systemMessage)
+        messages.insert(systemMessage, at: 0)
     }
 
     func sendMessage() async {
@@ -136,7 +145,44 @@ class ChatViewModel: ObservableObject {
     }
 
     func checkModelStatus() async {
-        // This could be enhanced to check SDK's current model state
-        // For now, we'll rely on our internal state
+        // Check if a model is currently loaded in the SDK
+        // Since we can't directly access SDK's current model, we'll check via ModelListViewModel
+        let modelListViewModel = ModelListViewModel.shared
+
+        await MainActor.run {
+            if let currentModel = modelListViewModel.currentModel {
+                self.isModelLoaded = true
+                self.loadedModelName = currentModel.name
+            } else {
+                self.isModelLoaded = false
+                self.loadedModelName = nil
+            }
+
+            // Update system message
+            if self.messages.first?.role == .system {
+                self.messages.removeFirst()
+            }
+            self.addSystemMessage()
+        }
+    }
+
+    @objc private func modelLoaded(_ notification: Notification) {
+        if let model = notification.object as? ModelInfo {
+            Task {
+                await MainActor.run {
+                    self.isModelLoaded = true
+                    self.loadedModelName = model.name
+                    // Update system message to reflect loaded model
+                    if self.messages.first?.role == .system {
+                        self.messages.removeFirst()
+                    }
+                    self.addSystemMessage()
+                }
+            }
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
