@@ -4,14 +4,14 @@ import Foundation
 public class TokenizerService {
     private let adapterRegistry: AdapterRegistry
     private let tokenizerCache: TokenizerCache
-    private let formatDetector: FormatDetector
+    private let formatDetector: TokenizerFormatDetector
     private let configurationBuilder: ConfigurationBuilder
     private let logger = SDKLogger(category: "TokenizerService")
 
     internal init(
         adapterRegistry: AdapterRegistry = AdapterRegistry(),
         tokenizerCache: TokenizerCache = TokenizerCache(),
-        formatDetector: FormatDetector = FormatDetectorImpl(),
+        formatDetector: TokenizerFormatDetector = TokenizerFormatDetector(),
         configurationBuilder: ConfigurationBuilder = ConfigurationBuilder()
     ) {
         self.adapterRegistry = adapterRegistry
@@ -33,12 +33,10 @@ public class TokenizerService {
 
         // Detect tokenizer format
         guard let modelPath = model.localPath else {
-            throw TokenizerError.modelNotFound(model.id)
+            throw TokenizerError.loadingFailed("Model not found locally: \(model.id)")
         }
 
-        guard let format = formatDetector.detectFormat(at: modelPath) else {
-            throw TokenizerError.unsupportedFormat(model.format?.rawValue ?? "unknown")
-        }
+        let format = try formatDetector.detectFormat(for: model)
         logger.debug("Detected tokenizer format: \(format) for model: \(model.name)")
 
         // Get appropriate adapter

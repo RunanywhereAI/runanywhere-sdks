@@ -93,11 +93,12 @@ class MemoryService: MemoryManager {
     // MARK: - MemoryManager Protocol
 
     func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
+        let framework = service.modelInfo?.framework ?? model.model.preferredFramework ?? .coreML
         let memoryModel = MemoryLoadedModel(
-            id: model.id,
-            name: model.name,
+            id: model.model.id,
+            name: model.model.name,
             size: size,
-            framework: model.framework
+            framework: framework
         )
         registerModel(memoryModel, size: size, service: service)
     }
@@ -128,16 +129,21 @@ class MemoryService: MemoryManager {
 
     func getLoadedModels() -> [LoadedModel] {
         let memoryModels = allocationManager.getLoadedModels()
-        return memoryModels.map { memModel in
-            LoadedModel(
-                id: memModel.id,
-                name: memModel.name,
-                framework: memModel.framework,
-                format: .unknown, // This would need to be stored in MemoryLoadedModel
-                estimatedMemory: memModel.size,
-                isReady: true
-            )
-        }
+        return memoryModels
+            .filter { $0.service != nil }
+            .map { memModelInfo in
+                let service = memModelInfo.service!
+
+                // Create a ModelInfo from the MemoryLoadedModel
+                let modelInfo = ModelInfo(
+                    id: memModelInfo.model.id,
+                    name: memModelInfo.model.name,
+                    format: .gguf, // Default format - ideally this should be stored in MemoryLoadedModel
+                    compatibleFrameworks: [memModelInfo.model.framework]
+                )
+
+                return LoadedModel(model: modelInfo, service: service)
+            }
     }
 
     func isHealthy() -> Bool {
@@ -218,7 +224,7 @@ class MemoryService: MemoryManager {
         case .low, .medium:
             return config.memoryThreshold
         case .high:
-            return config.memoryThreshold * 1.5
+            return Int64(Double(config.memoryThreshold) * 1.5)
         case .warning:
             return config.memoryThreshold * 2
         case .critical:

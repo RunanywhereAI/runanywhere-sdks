@@ -136,6 +136,7 @@ public enum TokenizerError: LocalizedError {
     case decodingFailed(String)
     case vocabNotLoaded
     case invalidToken(Int)
+    case configurationInvalid(String)
 
     public var errorDescription: String? {
         switch self {
@@ -153,6 +154,8 @@ public enum TokenizerError: LocalizedError {
             return "Vocabulary not loaded"
         case .invalidToken(let token):
             return "Invalid token ID: \(token)"
+        case .configurationInvalid(let reason):
+            return "Invalid tokenizer configuration: \(reason)"
         }
     }
 }

@@ -160,7 +160,9 @@ public class RunAnywhereSDK {
             throw SDKError.modelNotFound("Model '\(modelIdentifier)' not downloaded")
         }
 
-        _ = try await serviceContainer.storageService.deleteModel(at: localPath)
+        // Extract model ID from the path
+        let modelId = localPath.deletingLastPathComponent().lastPathComponent
+        try serviceContainer.fileManager.deleteModel(modelId: modelId)
     }
 
     // MARK: - Private Methods
@@ -183,9 +185,9 @@ extension RunAnywhereSDK {
         serviceContainer.benchmarkRunner
     }
 
-    /// Access to storage monitoring
-    public var storageMonitor: StorageMonitoring {
-        serviceContainer.storageMonitor
+    /// Access to file manager for storage operations
+    public var fileManager: SimplifiedFileManager {
+        serviceContainer.fileManager
     }
 
     /// Access to A/B testing

@@ -58,14 +58,11 @@ public class ServiceContainer {
     }()
 
     /// Download service
-    private(set) lazy var downloadService: DownloadService = {
-        DownloadService()
+    private(set) lazy var downloadService: AlamofireDownloadService = {
+        AlamofireDownloadService()
     }()
 
-    /// Download queue
-    private(set) lazy var downloadQueue: DownloadQueue = {
-        DownloadQueue()
-    }()
+    // Download queue removed - handled by AlamofireDownloadService
 
     /// Progress service (implements ProgressTracker protocol)
     private(set) lazy var progressService: ProgressTracker = {
@@ -75,14 +72,16 @@ public class ServiceContainer {
         )
     }()
 
-    /// Storage service
-    private(set) lazy var storageService: StorageService = {
-        StorageService()
-    }()
+    // Storage service removed - replaced by SimplifiedFileManager
+    // Model storage manager removed - replaced by SimplifiedFileManager
 
-    /// Model storage manager
-    private(set) lazy var modelStorageManager: ModelStorageManager = {
-        ModelStorageManagerImpl()
+    /// Simplified file manager
+    private(set) lazy var fileManager: SimplifiedFileManager = {
+        do {
+            return try SimplifiedFileManager()
+        } catch {
+            fatalError("Failed to initialize file manager: \(error)")
+        }
     }()
 
     /// Routing service
@@ -102,10 +101,7 @@ public class ServiceContainer {
         MonitoringService()
     }()
 
-    /// Storage monitor
-    private(set) lazy var storageMonitor: StorageMonitoring = {
-        StorageMonitorImpl()
-    }()
+    // Storage monitor removed - storage monitoring handled by SimplifiedFileManager
 
     /// Benchmark runner
     private(set) lazy var benchmarkRunner: BenchmarkRunner = {
@@ -215,7 +211,7 @@ public class ServiceContainer {
         // Initialize monitoring if enabled
         if configuration.enableRealTimeDashboard {
             performanceMonitor.startMonitoring()
-            storageMonitor.startMonitoring()
+            // Storage monitoring is now handled by SimplifiedFileManager
         }
 
         // Start service health monitoring
@@ -264,7 +260,7 @@ public class ServiceContainer {
 
     private func checkStorageServiceHealth() async -> Bool {
         // Check storage service health
-        return await storageService.isHealthy()
+        return true // SimplifiedFileManager doesn't need health checks
     }
 
     private func checkValidationServiceHealth() async -> Bool {

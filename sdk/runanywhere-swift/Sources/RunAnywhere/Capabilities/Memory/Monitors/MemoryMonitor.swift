@@ -272,7 +272,7 @@ struct MemoryUsageTrend {
     var rateString: String {
         let formatter = ByteCountFormatter()
         formatter.countStyle = .memory
-        return "\(formatter.string(fromByteCount: Int64(rate), countStyle: .memory))/s"
+        return "\(formatter.string(fromByteCount: Int64(rate)))/s"
     }
 }
 

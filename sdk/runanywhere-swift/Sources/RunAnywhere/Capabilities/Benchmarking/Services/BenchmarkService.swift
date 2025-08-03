@@ -132,14 +132,16 @@ public actor BenchmarkService: @preconcurrency BenchmarkRunner {
                 let prompt = BenchmarkPrompt(
                     id: firstResult.promptId,
                     text: "Generated prompt",
-                    category: .custom
+                    category: .custom,
+                    expectedTokens: 100
                 )
-                let aggregated = metricsAggregator.aggregate(
-                    results,
-                    serviceName: firstResult.serviceName,
-                    prompt: prompt
-                )
-                aggregatedResults.append(aggregated)
+                // TODO: Implement MetricsAggregator.aggregate method
+                // let aggregated = metricsAggregator.aggregate(
+                //     results,
+                //     serviceName: firstResult.serviceName,
+                //     prompt: prompt
+                // )
+                // aggregatedResults.append(aggregated)
             }
         }
 

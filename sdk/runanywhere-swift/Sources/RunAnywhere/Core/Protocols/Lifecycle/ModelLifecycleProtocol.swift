@@ -60,6 +60,7 @@ public enum ModelLifecycleError: LocalizedError {
     case invalidTransition(from: ModelLifecycleState, to: ModelLifecycleState)
     case statePrerequisiteNotMet(String)
     case transitionFailed(Error)
+    case invalidState(String)
 
     public var errorDescription: String? {
         switch self {
@@ -69,6 +70,22 @@ public enum ModelLifecycleError: LocalizedError {
             return "State prerequisite not met: \(reason)"
         case .transitionFailed(let error):
             return "Transition failed: \(error.localizedDescription)"
+        case .invalidState(let reason):
+            return "Invalid state: \(reason)"
+        }
+    }
+}
+
+// MARK: - ModelLifecycleState Extensions
+
+extension ModelLifecycleState {
+    /// Whether the model is currently processing an operation
+    public var isProcessing: Bool {
+        switch self {
+        case .downloading, .extracting, .validating, .initializing, .loading, .executing:
+            return true
+        default:
+            return false
         }
     }
 }

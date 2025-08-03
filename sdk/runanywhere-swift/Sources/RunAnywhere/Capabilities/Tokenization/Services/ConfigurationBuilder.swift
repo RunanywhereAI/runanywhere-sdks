@@ -37,12 +37,7 @@ class ConfigurationBuilder {
             format: format,
             maxLength: maxLength,
             paddingStrategy: determinePaddingStrategy(for: format),
-            truncationStrategy: determineTruncationStrategy(for: format),
-            addSpecialTokens: shouldAddSpecialTokens(for: format),
-            lowercaseInput: shouldLowercaseInput(for: format),
-            stripAccents: shouldStripAccents(for: format),
-            customTokens: extractCustomTokens(for: model, format: format),
-            modelSpecificSettings: buildModelSpecificSettings(for: model, format: format)
+            truncationStrategy: determineTruncationStrategy(for: format)
         )
 
         logger.debug("Built configuration with vocab: \(vocabPath?.lastPathComponent ?? "none"), config: \(configPath?.lastPathComponent ?? "none")")
@@ -144,8 +139,8 @@ class ConfigurationBuilder {
 
     private func determineMaxLength(for model: ModelInfo, format: TokenizerFormat, configPath: URL?) -> Int {
         // 1. Use model's context length if available
-        if let contextLength = model.contextLength, contextLength > 0 {
-            return contextLength
+        if model.contextLength > 0 {
+            return model.contextLength
         }
 
         // 2. Try to read from config file
@@ -176,7 +171,7 @@ class ConfigurationBuilder {
     private func determinePaddingStrategy(for format: TokenizerFormat) -> TokenizerConfig.PaddingStrategy {
         switch format {
         case .wordPiece, .tflite:
-            return .right // Common for BERT-like models
+            return .maxLength // Common for BERT-like models
         case .bpe, .sentencePiece:
             return .none // Common for generative models
         default:
@@ -189,7 +184,7 @@ class ConfigurationBuilder {
         case .wordPiece, .tflite:
             return .longest // Keep as much content as possible
         case .bpe, .sentencePiece:
-            return .right // Truncate from the end
+            return .onlyFirst // Truncate from the end
         default:
             return Defaults.truncationStrategy
         }

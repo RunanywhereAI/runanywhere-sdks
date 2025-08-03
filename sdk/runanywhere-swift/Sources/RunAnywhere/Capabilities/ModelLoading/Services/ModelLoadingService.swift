@@ -60,13 +60,15 @@ public class ModelLoadingService {
         // Load model through adapter
         let service = try await adapter.loadModel(modelInfo)
 
-        // Register loaded model
-        try await memoryService.registerModel(
-            modelId: modelId,
-            memory: modelInfo.estimatedMemory
-        )
-
+        // Create loaded model
         let loaded = LoadedModel(model: modelInfo, service: service)
+
+        // Register loaded model
+        memoryService.registerLoadedModel(
+            loaded,
+            size: modelInfo.estimatedMemory,
+            service: service
+        )
         loadedModels[modelId] = loaded
 
         return loaded
@@ -79,10 +81,10 @@ public class ModelLoadingService {
         }
 
         // Unload through service
-        await loaded.service.unload()
+        await loaded.service.cleanup()
 
         // Unregister from memory service
-        await memoryService.unregisterModel(modelId: modelId)
+        memoryService.unregisterModel(modelId)
 
         // Remove from loaded models
         loadedModels.removeValue(forKey: modelId)

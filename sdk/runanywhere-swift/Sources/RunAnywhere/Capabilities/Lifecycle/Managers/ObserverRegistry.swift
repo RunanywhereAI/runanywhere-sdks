@@ -238,7 +238,7 @@ class ObserverRegistry {
             ObserverInfo(
                 index: index,
                 type: String(describing: type(of: observer)),
-                memoryAddress: String(format: "%p", Unmanaged.passUnretained(observer).toOpaque()),
+                memoryAddress: String(describing: ObjectIdentifier(observer)),
                 supportsProgress: observer is ModelLifecycleProgressObserver
             )
         }

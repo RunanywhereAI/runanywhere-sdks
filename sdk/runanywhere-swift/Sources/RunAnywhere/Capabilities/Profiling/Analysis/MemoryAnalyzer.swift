@@ -39,7 +39,7 @@ class MemoryAnalyzer {
     func analyzeAllocations(_ allocations: [AllocationInfo]) -> AllocationPattern {
         let totalAllocations = allocations.count
         let activeAllocations = allocations.filter { $0.isActive }.count
-        let totalSize = allocations.reduce(0) { $0 + $0.currentSize }
+        let totalSize = allocations.reduce(into: 0) { $0 += $1.currentSize }
         let largestAllocation = allocations.max(by: { $0.currentSize < $1.currentSize })
 
         let averageSize = totalAllocations > 0 ? totalSize / Int64(totalAllocations) : 0
