@@ -21,6 +21,7 @@ public class ServiceContainer {
         FrameworkAdapterRegistryImpl()
     }()
 
+
     // MARK: - Capability Services
 
     /// Model loading service
@@ -307,5 +308,73 @@ private class FrameworkAdapterRegistryImpl: FrameworkAdapterRegistry {
 
     func register(_ adapter: FrameworkAdapter) {
         adapters[adapter.framework] = adapter
+    }
+
+    func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
+        return adapters
+    }
+
+    func getAvailableFrameworks() -> [LLMFramework] {
+        return Array(adapters.keys)
+    }
+
+    func getFrameworkAvailability() -> [FrameworkAvailability] {
+        let registeredFrameworks = Set(adapters.keys)
+
+        return LLMFramework.allCases.map { framework in
+            let isAvailable = registeredFrameworks.contains(framework)
+            let capability = FrameworkCapabilities.getCapability(for: framework)
+
+            return FrameworkAvailability(
+                framework: framework,
+                isAvailable: isAvailable,
+                unavailabilityReason: isAvailable ? nil : "Framework adapter not registered",
+                requirements: getFrameworkRequirements(framework),
+                recommendedFor: getRecommendedUseCases(framework),
+                supportedFormats: capability?.supportedFormats.map { $0 } ?? []
+            )
+        }
+    }
+
+    // MARK: - Private Helper Methods
+
+    private func getFrameworkRequirements(_ framework: LLMFramework) -> [HardwareRequirement] {
+        switch framework {
+        case .coreML, .foundationModels:
+            return [.requiresNeuralEngine] // Optimal with Neural Engine
+        case .tensorFlowLite, .mediaPipe:
+            return [.requiresGPU] // Better with GPU
+        case .mlx:
+            return [.requiresGPU, .requiresAppleSilicon]
+        default:
+            return []
+        }
+    }
+
+    private func getRecommendedUseCases(_ framework: LLMFramework) -> [String] {
+        switch framework {
+        case .coreML:
+            return ["On-device inference", "Privacy-focused applications", "iOS/macOS apps"]
+        case .tensorFlowLite:
+            return ["Cross-platform deployment", "Mobile applications", "Edge computing"]
+        case .mlx:
+            return ["Apple Silicon optimization", "Research", "High-performance computing"]
+        case .onnx:
+            return ["Cross-platform models", "Framework interoperability", "Production deployment"]
+        case .llamaCpp:
+            return ["CPU-optimized inference", "Quantized models", "Resource-constrained environments"]
+        case .foundationModels:
+            return ["Apple ecosystem integration", "System-level features", "Privacy-first AI"]
+        case .mediaPipe:
+            return ["Real-time processing", "Computer vision", "Audio processing"]
+        case .swiftTransformers:
+            return ["Swift-native development", "Research", "Custom implementations"]
+        case .execuTorch:
+            return ["Mobile deployment", "Edge devices", "Real-time inference"]
+        case .picoLLM:
+            return ["Voice assistants", "Keyword spotting", "Ultra-low latency"]
+        case .mlc:
+            return ["Mobile LLM deployment", "Optimized inference", "Memory efficiency"]
+        }
     }
 }

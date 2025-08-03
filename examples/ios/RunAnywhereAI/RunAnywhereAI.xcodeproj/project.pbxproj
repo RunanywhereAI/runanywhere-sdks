@@ -60,22 +60,16 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5480A1F22E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
 		5480A2012E2F250400337F2F /* RunAnywhereAITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAITests;
 			sourceTree = "<group>";
 		};
 		5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
 			path = RunAnywhereAIUITests;
 			sourceTree = "<group>";
 		};
@@ -288,8 +282,8 @@
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */,
-				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */,
-				540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */,
+				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
+				540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -402,9 +396,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -779,14 +777,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */ = {
+		541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */ = {
+		540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/eastriverlee/LLM.swift";
 			requirement = {
@@ -831,7 +829,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		540E20902E3EFE0C00F86C20 /* LLM */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */;
+			package = 540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */;
 			productName = LLM;
 		};
 		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {

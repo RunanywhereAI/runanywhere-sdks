@@ -6,6 +6,7 @@ public enum HardwareRequirement {
     case minimumCompute(String)
     case requiresNeuralEngine
     case requiresGPU
+    case requiresAppleSilicon
     case minimumOSVersion(String)
     case specificChip(String)
 }

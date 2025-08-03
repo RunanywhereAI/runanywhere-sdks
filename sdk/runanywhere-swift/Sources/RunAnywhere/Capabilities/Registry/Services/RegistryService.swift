@@ -126,6 +126,49 @@ public class RegistryService: ModelRegistry {
         models.removeValue(forKey: id)
     }
 
+    /// Create and register a model from URL
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - url: Download URL for the model
+    ///   - framework: Target framework for the model
+    ///   - estimatedSize: Estimated memory usage (optional)
+    /// - Returns: The created model info
+    public func addModelFromURL(
+        name: String,
+        url: URL,
+        framework: LLMFramework,
+        estimatedSize: Int64? = nil
+    ) -> ModelInfo {
+        let modelId = generateModelId(from: url)
+
+        // Detect format from URL
+        let format = detectFormatFromURL(url)
+
+        let modelInfo = ModelInfo(
+            id: modelId,
+            name: name,
+            format: format,
+            downloadURL: url,
+            localPath: nil,
+            estimatedMemory: estimatedSize ?? estimateMemoryFromURL(url),
+            contextLength: 2048, // Default context length
+            downloadSize: nil, // Will be determined during download
+            checksum: nil,
+            compatibleFrameworks: [framework],
+            preferredFramework: framework,
+            hardwareRequirements: [],
+            tokenizerFormat: nil,
+            metadata: ModelInfoMetadata(
+                tags: ["user-added", framework.rawValue.lowercased()],
+                description: "User-added model from \(url.host ?? "external source")"
+            ),
+            alternativeDownloadURLs: []
+        )
+
+        registerModel(modelInfo)
+        return modelInfo
+    }
+
     // MARK: - Private Methods
 
     private func loadPreconfiguredModels() async {
@@ -176,5 +219,71 @@ public class RegistryService: ModelRegistry {
     private func discoverModelsFromProvider(_ provider: ModelProviderConfig) async {
         // Placeholder for provider-specific discovery
         // Would connect to HuggingFace, Kaggle, etc.
+    }
+
+    // MARK: - URL Helper Methods
+
+    private func generateModelId(from url: URL) -> String {
+        let nameWithoutExtension = url.deletingPathExtension().lastPathComponent
+        return "user-\(nameWithoutExtension)-\(abs(url.absoluteString.hashValue))"
+    }
+
+    private func detectFormatFromURL(_ url: URL) -> ModelFormat {
+        let pathExtension = url.pathExtension.lowercased()
+
+        switch pathExtension {
+        case "gguf":
+            return .gguf
+        case "ggml":
+            return .ggml
+        case "mlmodel":
+            return .mlmodel
+        case "mlpackage":
+            return .mlpackage
+        case "tflite":
+            return .tflite
+        case "onnx":
+            return .onnx
+        case "ort":
+            return .ort
+        case "safetensors":
+            return .safetensors
+        case "mlx":
+            return .mlx
+        case "pte":
+            return .pte
+        case "bin":
+            return .bin
+        case "weights":
+            return .weights
+        case "checkpoint":
+            return .checkpoint
+        default:
+            return .unknown
+        }
+    }
+
+    private func estimateMemoryFromURL(_ url: URL) -> Int64 {
+        let filename = url.lastPathComponent.lowercased()
+
+        // Try to extract size from filename patterns
+        if filename.contains("7b") {
+            return 7_000_000_000
+        } else if filename.contains("13b") {
+            return 13_000_000_000
+        } else if filename.contains("3b") {
+            return 3_000_000_000
+        } else if filename.contains("1b") {
+            return 1_000_000_000
+        } else if filename.contains("small") {
+            return 500_000_000
+        } else if filename.contains("medium") {
+            return 2_000_000_000
+        } else if filename.contains("large") {
+            return 5_000_000_000
+        }
+
+        // Default estimate
+        return 2_000_000_000
     }
 }

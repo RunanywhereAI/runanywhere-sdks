@@ -82,6 +82,14 @@ struct FrameworkCapabilities {
             requiresSpecificModels: false,
             minimumOS: "15.0",
             supportedArchitectures: ["arm64", "arm64e"]
+        ),
+        .mediaPipe: InternalFrameworkCapability(
+            supportedFormats: [.tflite, .gguf],
+            supportedQuantizations: [.f32, .f16, .q8_0],
+            maxModelSize: 5_000_000_000,
+            requiresSpecificModels: false,
+            minimumOS: "12.0",
+            supportedArchitectures: ["arm64", "arm64e"]
         )
     ]
 

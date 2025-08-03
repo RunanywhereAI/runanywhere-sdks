@@ -92,6 +92,8 @@ public struct DeviceCapabilities {
             default:
                 return compute <= "low"
             }
+        case .requiresAppleSilicon:
+            return processorType.isAppleSilicon
         }
     }
 }
@@ -130,4 +132,19 @@ public enum ProcessorType {
     case intel
     case arm
     case unknown
+
+    /// Whether this processor is Apple Silicon
+    var isAppleSilicon: Bool {
+        switch self {
+        case .a14Bionic, .a15Bionic, .a16Bionic, .a17Pro, .a18, .a18Pro,
+             .m1, .m1Pro, .m1Max, .m1Ultra,
+             .m2, .m2Pro, .m2Max, .m2Ultra,
+             .m3, .m3Pro, .m3Max,
+             .m4, .m4Pro, .m4Max,
+             .arm:
+            return true
+        case .intel, .unknown:
+            return false
+        }
+    }
 }

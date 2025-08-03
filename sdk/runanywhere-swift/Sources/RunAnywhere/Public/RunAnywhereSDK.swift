@@ -174,14 +174,50 @@ public class RunAnywhereSDK {
     /// Get the list of registered framework adapters
     /// - Returns: Dictionary of registered adapters by framework
     public func getRegisteredAdapters() -> [LLMFramework: FrameworkAdapter] {
-        var adapters: [LLMFramework: FrameworkAdapter] = [:]
-        for framework in LLMFramework.allCases {
-            if let adapter = serviceContainer.adapterRegistry.getAdapter(for: framework) {
-                adapters[framework] = adapter
-            }
-        }
-        return adapters
+        return serviceContainer.adapterRegistry.getRegisteredAdapters()
     }
+
+    /// Get available frameworks on this device (based on registered adapters)
+    /// - Returns: Array of frameworks that have registered adapters
+    public func getAvailableFrameworks() -> [LLMFramework] {
+        return serviceContainer.adapterRegistry.getAvailableFrameworks()
+    }
+
+    /// Get detailed framework availability information
+    /// - Returns: Array of framework availability details
+    public func getFrameworkAvailability() -> [FrameworkAvailability] {
+        return serviceContainer.adapterRegistry.getFrameworkAvailability()
+    }
+
+    /// Get models for a specific framework
+    /// - Parameter framework: The framework to filter models for
+    /// - Returns: Array of models compatible with the framework
+    public func getModelsForFramework(_ framework: LLMFramework) -> [ModelInfo] {
+        let criteria = ModelCriteria(framework: framework)
+        return serviceContainer.modelRegistry.filterModels(by: criteria)
+    }
+
+    /// Add a model from URL for download
+    /// - Parameters:
+    ///   - name: Display name for the model
+    ///   - url: Download URL for the model
+    ///   - framework: Target framework for the model
+    ///   - estimatedSize: Estimated memory usage (optional)
+    /// - Returns: The created model info
+    public func addModelFromURL(
+        name: String,
+        url: URL,
+        framework: LLMFramework,
+        estimatedSize: Int64? = nil
+    ) -> ModelInfo {
+        return (serviceContainer.modelRegistry as! RegistryService).addModelFromURL(
+            name: name,
+            url: url,
+            framework: framework,
+            estimatedSize: estimatedSize
+        )
+    }
+
 
     // MARK: - Private Methods
 
