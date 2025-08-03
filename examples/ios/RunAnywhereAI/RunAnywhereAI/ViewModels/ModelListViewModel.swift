@@ -30,11 +30,21 @@ class ModelListViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        // Stub implementation - normally would use SDK
-        // For now, create sample models since SDK properties are private
-        availableModels = createSampleModels()
-        currentModel = nil
+        do {
+            // Use SDK to list available models
+            availableModels = try await sdk.listAvailableModels()
 
+            // If no models available, use sample models as fallback
+            if availableModels.isEmpty {
+                availableModels = createSampleModels()
+            }
+        } catch {
+            // Fallback to sample models on error
+            availableModels = createSampleModels()
+            print("Failed to load models from SDK: \(error)")
+        }
+
+        currentModel = nil
         isLoading = false
     }
 
@@ -59,6 +69,38 @@ class ModelListViewModel: ObservableObject {
 
     func addImportedModel(_ model: ModelInfo) async {
         availableModels.append(model)
+    }
+
+    func downloadModel(_ modelId: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await sdk.downloadModel(modelId)
+            // Refresh models to update download status
+            await loadModels()
+            return true
+        } catch {
+            errorMessage = "Failed to download model: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
+    }
+
+    func deleteModel(_ modelId: String) async -> Bool {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try await sdk.deleteModel(modelId)
+            // Refresh models to update list
+            await loadModels()
+            return true
+        } catch {
+            errorMessage = "Failed to delete model: \(error.localizedDescription)"
+            isLoading = false
+            return false
+        }
     }
 
     private func createSampleModels() -> [ModelInfo] {

@@ -33,13 +33,21 @@ public class GPUDetector {
         #if canImport(Metal)
         guard let device = MTLCreateSystemDefaultDevice() else { return nil }
 
+        let recommendedWorkingSetSize: Int
+        if #available(iOS 16.0, macOS 13.0, tvOS 16.0, *) {
+            recommendedWorkingSetSize = Int(device.recommendedMaxWorkingSetSize)
+        } else {
+            // Fallback for older iOS versions
+            recommendedWorkingSetSize = Int(device.maxBufferLength)
+        }
+
         return GPUCapabilities(
             name: device.name,
             family: detectGPUFamily(device: device),
             maxBufferLength: Int(device.maxBufferLength),
             supportsComputeShaders: true,
             supportsMetalPerformanceShaders: true,
-            recommendedMaxWorkingSetSize: Int(device.recommendedMaxWorkingSetSize)
+            recommendedMaxWorkingSetSize: recommendedWorkingSetSize
         )
         #else
         return nil
@@ -109,7 +117,13 @@ public class GPUDetector {
     private func estimateDiscreteGPUMemory(device: MTLDevice) -> Int64 {
         // This is a rough estimate for discrete GPUs
         // In practice, you'd need platform-specific code to get actual VRAM
-        let recommendedMaxWorkingSetSize = device.recommendedMaxWorkingSetSize
+        let recommendedMaxWorkingSetSize: UInt64
+        if #available(iOS 16.0, macOS 13.0, tvOS 16.0, *) {
+            recommendedMaxWorkingSetSize = device.recommendedMaxWorkingSetSize
+        } else {
+            // Fallback for older versions - use max buffer size
+            recommendedMaxWorkingSetSize = UInt64(device.maxBufferLength)
+        }
 
         if recommendedMaxWorkingSetSize > 0 {
             return Int64(recommendedMaxWorkingSetSize)

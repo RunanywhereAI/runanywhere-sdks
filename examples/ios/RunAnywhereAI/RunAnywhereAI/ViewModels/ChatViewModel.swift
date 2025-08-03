@@ -54,7 +54,7 @@ class ChatViewModel: ObservableObject {
         generationTask = Task {
             do {
                 // Direct SDK usage - simple generate call for now
-                let response = try await sdk.generate(prompt)
+                let response = try await sdk.generate(prompt: prompt)
 
                 // Update the assistant message with the response
                 if messageIndex < self.messages.count {

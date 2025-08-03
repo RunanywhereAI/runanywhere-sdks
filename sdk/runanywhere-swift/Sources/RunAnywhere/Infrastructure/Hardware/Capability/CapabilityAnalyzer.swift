@@ -6,6 +6,9 @@
 //
 
 import Foundation
+#if os(iOS) || os(tvOS)
+import UIKit
+#endif
 
 /// Analyzes hardware capabilities and makes optimization recommendations
 public class CapabilityAnalyzer {

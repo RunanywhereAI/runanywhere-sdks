@@ -38,8 +38,13 @@ class ModelManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Use SDK's model unloading if available
-        // await sdk.unloadModel()
+        // Use SDK's model unloading
+        do {
+            try await sdk.unloadModel()
+        } catch {
+            self.error = error
+            print("Failed to unload model: \(error)")
+        }
     }
 
     func getAvailableModels() async -> [ModelInfo] {
