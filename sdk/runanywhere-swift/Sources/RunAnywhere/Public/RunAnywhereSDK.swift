@@ -55,6 +55,9 @@ public class RunAnywhereSDK {
         self.currentModel = loadedModel.model
         self.currentService = loadedModel.service
 
+        // Set the loaded model in the generation service
+        serviceContainer.generationService.setCurrentModel(loadedModel)
+
         // Update last used date in metadata
         let metadataStore = ModelMetadataStore()
         metadataStore.updateLastUsed(for: modelIdentifier)
@@ -72,6 +75,9 @@ public class RunAnywhereSDK {
 
         self.currentModel = nil
         self.currentService = nil
+
+        // Clear the model from generation service
+        serviceContainer.generationService.setCurrentModel(nil)
     }
 
     /// Generate text using the loaded model

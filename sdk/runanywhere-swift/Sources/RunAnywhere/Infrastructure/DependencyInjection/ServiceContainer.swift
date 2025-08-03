@@ -39,7 +39,8 @@ public class ServiceContainer {
         GenerationService(
             routingService: routingService,
             contextManager: contextManager,
-            performanceMonitor: performanceMonitor
+            performanceMonitor: performanceMonitor,
+            modelLoadingService: modelLoadingService
         )
     }()
 
