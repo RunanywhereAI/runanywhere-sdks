@@ -5,14 +5,12 @@ public class RegistryService: ModelRegistry {
     private var models: [String: ModelInfo] = [:]
     private var modelsByProvider: [String: [ModelInfo]] = [:]
     private let modelDiscovery: ModelDiscovery
-    private let metadataStore: ModelMetadataStore
     private let accessQueue = DispatchQueue(label: "com.runanywhere.registry", attributes: .concurrent)
     private let logger = SDKLogger(category: "RegistryService")
 
     public init() {
         logger.debug("Initializing RegistryService")
         self.modelDiscovery = ModelDiscovery()
-        self.metadataStore = ModelMetadataStore()
     }
 
     /// Initialize registry with configuration
@@ -37,6 +35,17 @@ public class RegistryService: ModelRegistry {
         }
 
         logger.info("Registry initialization complete")
+    }
+
+    private func getModelMetadataRepository() async -> ModelMetadataRepository? {
+        // Access through DataSyncService
+        guard let dataSyncService = await ServiceContainer.shared.dataSyncService else {
+            return nil
+        }
+
+        // Return the repository directly if we have access to it
+        // For now, we'll need to go through DataSyncService methods
+        return nil
     }
 
     public func discoverModels() async -> [ModelInfo] {
@@ -225,25 +234,32 @@ public class RegistryService: ModelRegistry {
     private func loadPreconfiguredModels() async {
         logger.debug("Loading pre-configured models")
 
-        // Load models from persistent metadata store
+        // Load models from repository
         // Only load models for frameworks that have registered adapters
         let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
         logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
 
-        if !availableFrameworks.isEmpty {
-            // Load only models for registered frameworks
-            let storedModels = metadataStore.loadModelsForFrameworks(availableFrameworks)
-            logger.info("Loading \(storedModels.count) models for available frameworks")
-            for model in storedModels {
-                registerModel(model)
-            }
-        } else {
-            // No adapters registered yet, load all stored models
-            // They will be filtered when displayed based on available frameworks
-            let allStoredModels = metadataStore.loadStoredModels()
-            logger.info("No framework adapters registered, loading all \(allStoredModels.count) stored models")
-            for model in allStoredModels {
-                registerModel(model)
+        // Load stored models from repository
+        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+            do {
+                // Load all stored models and filter later
+                var storedModels = try await dataSyncService.loadStoredModels()
+
+                if !availableFrameworks.isEmpty {
+                    // Filter for available frameworks
+                    storedModels = storedModels.filter { model in
+                        model.compatibleFrameworks.contains { availableFrameworks.contains($0) }
+                    }
+                    logger.info("Loading \(storedModels.count) models for available frameworks")
+                } else {
+                    logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
+                }
+
+                for model in storedModels {
+                    registerModel(model)
+                }
+            } catch {
+                logger.error("Failed to load stored models: \(error)")
             }
         }
     }

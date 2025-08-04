@@ -170,6 +170,45 @@ public class ServiceContainer {
         return service
     }
 
+    /// Database service
+    private var _database: DatabaseCore?
+
+    /// Get database (lazy initialization)
+    private var database: DatabaseCore? {
+        get async {
+            if _database == nil {
+                do {
+                    _database = try await SQLiteDatabase()
+                } catch {
+                    logger.error("Failed to initialize Database: \(error)")
+                }
+            }
+            return _database
+        }
+    }
+
+    /// API client for sync operations
+    private var apiClient: APIClient?
+
+    /// Data sync service
+    private var _dataSyncService: DataSyncService?
+
+    public var dataSyncService: DataSyncService? {
+        get async {
+            if _dataSyncService == nil {
+                if let db = await database {
+                    _dataSyncService = DataSyncService(
+                        database: db,
+                        apiClient: apiClient,
+                        enableAutoSync: true
+                    )
+                }
+            }
+            return _dataSyncService
+        }
+    }
+
+
     // MARK: - Public Service Access
 
     /// Get error recovery service
@@ -209,6 +248,14 @@ public class ServiceContainer {
 
         // Initialize configuration service
         _configurationService = ConfigurationService(configuration: configuration)
+
+        // Initialize API client if API key is provided
+        if !configuration.apiKey.isEmpty {
+            apiClient = APIClient(
+                baseURL: "https://api.runanywhere.ai",
+                apiKey: configuration.apiKey
+            )
+        }
 
         // Initialize core services
         // Initialize model registry with configuration

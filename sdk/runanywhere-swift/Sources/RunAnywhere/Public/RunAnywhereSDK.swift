@@ -59,8 +59,9 @@ public class RunAnywhereSDK {
         serviceContainer.generationService.setCurrentModel(loadedModel)
 
         // Update last used date in metadata
-        let metadataStore = ModelMetadataStore()
-        metadataStore.updateLastUsed(for: modelIdentifier)
+        if let dataSyncService = await serviceContainer.dataSyncService {
+            try? await dataSyncService.updateModelLastUsed(for: modelIdentifier)
+        }
 
         return loadedModel.model
     }
@@ -175,9 +176,13 @@ public class RunAnywhereSDK {
         // Always discover local models to ensure we have the latest
         let discoveredModels = await serviceContainer.modelRegistry.discoverModels()
 
-        // Also check metadata store for any persisted models
-        let metadataStore = ModelMetadataStore()
-        let storedModels = metadataStore.loadStoredModels()
+        // Also check repository for any persisted models
+        let storedModels: [ModelInfo]
+        if let dataSyncService = await serviceContainer.dataSyncService {
+            storedModels = (try? await dataSyncService.loadStoredModels()) ?? []
+        } else {
+            storedModels = []
+        }
 
         // Merge and deduplicate
         var allModels = discoveredModels
@@ -340,13 +345,15 @@ public class RunAnywhereSDK {
         modelId: String,
         supportsThinking: Bool,
         thinkingTagPattern: ThinkingTagPattern? = nil
-    ) {
-        let metadataStore = ModelMetadataStore()
-        metadataStore.updateThinkingSupport(
-            for: modelId,
-            supportsThinking: supportsThinking,
-            thinkingTagPattern: thinkingTagPattern
-        )
+    ) async {
+        // Update in repository
+        if let dataSyncService = await serviceContainer.dataSyncService {
+            try? await dataSyncService.updateThinkingSupport(
+                for: modelId,
+                supportsThinking: supportsThinking,
+                thinkingTagPattern: thinkingTagPattern
+            )
+        }
 
         // Also update the model in the registry if it exists
         if let existingModel = serviceContainer.modelRegistry.getModel(by: modelId) {

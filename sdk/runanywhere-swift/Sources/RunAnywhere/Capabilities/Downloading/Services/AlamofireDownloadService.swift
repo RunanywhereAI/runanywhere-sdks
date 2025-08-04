@@ -105,8 +105,11 @@ public class AlamofireDownloadService: DownloadManager {
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
                                     // Save metadata persistently
-                                    let metadataStore = ModelMetadataStore()
-                                    metadataStore.saveModelMetadata(updatedModel)
+                                    Task {
+                                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                                            try? await dataSyncService.saveModelMetadata(updatedModel)
+                                        }
+                                    }
 
                                     self.logger.info("Download completed for model: \(model.id)")
                                     continuation.resume(returning: url)
@@ -272,8 +275,11 @@ extension AlamofireDownloadService {
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
                                     // Save metadata persistently
-                                    let metadataStore = ModelMetadataStore()
-                                    metadataStore.saveModelMetadata(updatedModel)
+                                    Task {
+                                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                                            try? await dataSyncService.saveModelMetadata(updatedModel)
+                                        }
+                                    }
 
                                     continuation.resume(returning: url)
                                 } else {

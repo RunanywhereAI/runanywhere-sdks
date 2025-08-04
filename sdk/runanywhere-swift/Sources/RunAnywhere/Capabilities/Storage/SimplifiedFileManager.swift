@@ -27,6 +27,13 @@ public class SimplifiedFileManager {
         _ = try baseFolder.createSubfolderIfNeeded(withName: "Downloads")
     }
 
+    // MARK: - Public Access
+
+    /// Get the base RunAnywhere folder
+    public func getBaseFolder() -> Folder {
+        return baseFolder
+    }
+
     // MARK: - Model Storage
 
     /// Get or create folder for a specific model
@@ -97,8 +104,11 @@ public class SimplifiedFileManager {
                     try modelFolder.delete()
 
                     // Remove metadata
-                    let metadataStore = ModelMetadataStore()
-                    metadataStore.removeModelMetadata(modelId)
+                    Task {
+                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                            try? await dataSyncService.removeModelMetadata(modelId)
+                        }
+                    }
 
                     logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
                     return
