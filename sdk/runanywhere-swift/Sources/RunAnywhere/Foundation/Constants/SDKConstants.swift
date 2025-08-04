@@ -46,4 +46,34 @@ public enum SDKConstants {
 
     /// Temporary directory name
     public static let tempDirectoryName = "RunAnywhereTmp"
+
+    // MARK: - Configuration Defaults
+
+    /// Default configuration values
+    public enum ConfigurationDefaults {
+        // Generation settings
+        public static let temperature: Float = 0.7
+        public static let maxTokens: Int = 256
+        public static let topP: Float = 0.95
+        public static let topK: Int = 40
+
+        // SDK configuration
+        public static let cloudRoutingEnabled: Bool = true
+        public static let privacyModeEnabled: Bool = true
+        public static let routingPolicy: String = "automatic"
+        public static let allowUserOverride: Bool = true
+
+        // Configuration ID
+        public static let configurationId: String = "default"
+    }
+
+    // MARK: - Routing Policies
+
+    /// Available routing policy options
+    public enum RoutingPolicy {
+        public static let automatic = "automatic"
+        public static let onDeviceOnly = "on-device"
+        public static let cloudOnly = "cloud"
+        public static let costOptimized = "cost-optimized"
+    }
 }

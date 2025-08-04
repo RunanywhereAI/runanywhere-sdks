@@ -49,16 +49,14 @@ public actor DataSyncService {
 
     // MARK: - Configuration Management
 
-    /// Save configuration settings
-    public func saveConfiguration(_ settings: [String: String]) async throws {
-        let config = ConfigurationData(settings: settings)
+    /// Save configuration
+    public func saveConfiguration(_ config: ConfigurationData) async throws {
         try await configRepository.save(config)
     }
 
     /// Get current configuration
-    public func getConfiguration() async throws -> [String: String]? {
-        let configs = try await configRepository.fetchAll()
-        return configs.first?.settings
+    public func getConfiguration() async throws -> ConfigurationData? {
+        return try await configRepository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId)
     }
 
     // MARK: - Telemetry Management

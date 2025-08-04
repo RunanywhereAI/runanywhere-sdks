@@ -125,7 +125,7 @@ struct StorageView: View {
 // MARK: - Supporting Views
 
 private struct StoredModelRow: View {
-    let model: StoredModelInfo
+    let model: StoredModel
     let onDelete: () async -> Void
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false
@@ -282,16 +282,14 @@ private struct StoredModelRow: View {
                     Divider()
 
                     // File Information
-                    if let filePath = model.filePath {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Path:")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                            Text(filePath)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Path:")
+                            .font(.caption2)
+                            .fontWeight(.medium)
+                        Text(model.path.path)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let checksum = model.checksum {

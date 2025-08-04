@@ -322,12 +322,14 @@ private struct ModelRow: View {
                         // For downloaded models without thinking support, show option to enable it
                         Button(action: {
                             // Enable thinking support for this model
-                            RunAnywhereSDK.shared.updateModelThinkingSupport(
-                                modelId: model.id,
-                                supportsThinking: true,
-                                thinkingTagPattern: ThinkingTagPattern.defaultPattern
-                            )
-                            onModelUpdated()
+                            Task {
+                                await RunAnywhereSDK.shared.updateModelThinkingSupport(
+                                    modelId: model.id,
+                                    supportsThinking: true,
+                                    thinkingTagPattern: ThinkingTagPattern.defaultPattern
+                                )
+                                onModelUpdated()
+                            }
                         }) {
                             HStack(spacing: 2) {
                                 Image(systemName: "brain")

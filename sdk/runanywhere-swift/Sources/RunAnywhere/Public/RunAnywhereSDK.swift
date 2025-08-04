@@ -99,7 +99,7 @@ public class RunAnywhereSDK {
         }
 
         // Get effective settings from configuration
-        let effectiveSettings = await serviceContainer.configurationService.getGenerationSettings()
+        let effectiveSettings = await getGenerationSettings()
 
         // Create options with configuration defaults if not provided
         let effectiveOptions = options ?? GenerationOptions(
@@ -138,7 +138,7 @@ public class RunAnywhereSDK {
         return AsyncThrowingStream { continuation in
             Task {
                 // Get effective settings from configuration
-                let effectiveSettings = await serviceContainer.configurationService.getGenerationSettings()
+                let effectiveSettings = await getGenerationSettings()
 
                 // Create options with configuration defaults if not provided
                 let effectiveOptions = options ?? GenerationOptions(
@@ -291,49 +291,59 @@ public class RunAnywhereSDK {
 
     /// Set the temperature for text generation (0.0 - 2.0)
     public func setTemperature(_ value: Float) async {
-        await serviceContainer.configurationService.setTemperature(value)
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(temperature: value)
+        }
     }
 
     /// Set the maximum tokens for text generation
     public func setMaxTokens(_ value: Int) async {
-        await serviceContainer.configurationService.setMaxTokens(value)
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(maxTokens: value)
+        }
     }
 
     /// Set the top-p sampling parameter (0.0 - 1.0)
     public func setTopP(_ value: Float) async {
-        await serviceContainer.configurationService.setTopP(value)
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(topP: value)
+        }
     }
 
     /// Set the top-k sampling parameter
     public func setTopK(_ value: Int) async {
-        await serviceContainer.configurationService.setTopK(value)
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(topK: value)
+        }
     }
 
     /// Get current generation settings
     public func getGenerationSettings() async -> DefaultGenerationSettings {
-        return await serviceContainer.configurationService.getGenerationSettings()
+        let config = await serviceContainer.configurationService.getConfiguration()
+        return DefaultGenerationSettings(
+            temperature: config?.temperature ?? SDKConstants.ConfigurationDefaults.temperature,
+            maxTokens: config?.maxTokens ?? SDKConstants.ConfigurationDefaults.maxTokens,
+            topP: config?.topP ?? SDKConstants.ConfigurationDefaults.topP,
+            topK: config?.topK ?? SDKConstants.ConfigurationDefaults.topK,
+            allowUserOverride: config?.allowUserOverride ?? SDKConstants.ConfigurationDefaults.allowUserOverride
+        )
     }
 
     /// Reset all user overrides to SDK defaults
     public func resetGenerationSettings() async {
-        await serviceContainer.configurationService.clearUserOverrides()
-    }
-
-    /// Update generation settings from remote configuration
-    /// This would typically be called when receiving configuration from your server
-    public func updateRemoteConfiguration(_ config: [String: Any]) async {
-        await serviceContainer.configurationService.updateRemoteSettings(config)
+        await serviceContainer.configurationService.updateConfiguration { _ in
+            ConfigurationData() // Returns default configuration
+        }
     }
 
     /// Sync user preferences to remote server
-    /// This sends the current user settings to your backend
-    public func syncUserPreferences() async throws {
-        try await serviceContainer.configurationService.syncUserPreferences()
-    }
-
-    /// Register a callback for when settings change
-    public func onGenerationSettingsChanged(_ callback: @escaping (DefaultGenerationSettings) -> Void) async {
-        await serviceContainer.configurationService.onSettingsChanged(callback)
+    public func syncUserPreferences() async {
+        do {
+            try await serviceContainer.configurationService.syncToCloud()
+        } catch {
+            // Log error but don't throw to avoid breaking the UI
+            print("Failed to sync preferences: \(error)")
+        }
     }
 
     /// Update thinking support for an existing model
@@ -380,6 +390,60 @@ public class RunAnywhereSDK {
         }
     }
 
+    // MARK: - SDK Configuration Settings
+
+    /// Set whether cloud routing is enabled
+    public func setCloudRoutingEnabled(_ enabled: Bool) async {
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(cloudRoutingEnabled: enabled)
+        }
+    }
+
+    /// Get whether cloud routing is enabled
+    public func getCloudRoutingEnabled() async -> Bool {
+        let config = await serviceContainer.configurationService.getConfiguration()
+        return config?.cloudRoutingEnabled ?? SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+    }
+
+    /// Set whether privacy mode is enabled
+    public func setPrivacyModeEnabled(_ enabled: Bool) async {
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(privacyModeEnabled: enabled)
+        }
+    }
+
+    /// Get whether privacy mode is enabled
+    public func getPrivacyModeEnabled() async -> Bool {
+        let config = await serviceContainer.configurationService.getConfiguration()
+        return config?.privacyModeEnabled ?? SDKConstants.ConfigurationDefaults.privacyModeEnabled
+    }
+
+    /// Set the routing policy
+    public func setRoutingPolicy(_ policy: String) async {
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(routingPolicy: policy)
+        }
+    }
+
+    /// Get the routing policy
+    public func getRoutingPolicy() async -> String {
+        let config = await serviceContainer.configurationService.getConfiguration()
+        return config?.routingPolicy ?? SDKConstants.ConfigurationDefaults.routingPolicy
+    }
+
+    /// Set the API key
+    public func setApiKey(_ apiKey: String?) async {
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(apiKey: apiKey)
+        }
+    }
+
+    /// Get the API key
+    public func getApiKey() async -> String? {
+        let config = await serviceContainer.configurationService.getConfiguration()
+        return config?.apiKey
+    }
+
 
     // MARK: - Private Methods
 
@@ -388,7 +452,7 @@ public class RunAnywhereSDK {
     }
 }
 
-// MARK: - Internal Service Container Access
+// MARK: - Performance and Testing Access
 
 extension RunAnywhereSDK {
     /// Access to performance monitoring
@@ -401,13 +465,155 @@ extension RunAnywhereSDK {
         serviceContainer.benchmarkRunner
     }
 
-    /// Access to file manager for storage operations
-    public var fileManager: SimplifiedFileManager {
-        serviceContainer.fileManager
-    }
-
     /// Access to A/B testing
     public var abTesting: ABTestRunner {
         serviceContainer.abTestRunner
+    }
+}
+
+// MARK: - Storage Management
+
+extension RunAnywhereSDK {
+    /// Get storage information
+    /// - Returns: Storage information including app, device, and model storage details
+    public func getStorageInfo() async -> StorageInfo {
+        let totalSize = serviceContainer.fileManager.getTotalStorageSize()
+        let availableSpace = serviceContainer.fileManager.getAvailableSpace()
+        let modelStorageSize = serviceContainer.fileManager.getModelStorageSize()
+
+        // Get stored models for detailed info
+        let storedModels = await getStoredModels()
+
+        // Group models by framework
+        var modelsByFramework: [LLMFramework: [StoredModel]] = [:]
+        for model in storedModels {
+            if let framework = model.framework {
+                if modelsByFramework[framework] == nil {
+                    modelsByFramework[framework] = []
+                }
+                modelsByFramework[framework]?.append(model)
+            }
+        }
+
+        // Find largest model
+        let largestModel = storedModels.max { $0.size < $1.size }
+
+        return StorageInfo(
+            appStorage: AppStorageInfo(
+                documentsSize: totalSize,
+                cacheSize: 0, // Could be enhanced to track cache separately
+                appSupportSize: 0,
+                totalSize: totalSize
+            ),
+            deviceStorage: DeviceStorageInfo(
+                totalSpace: availableSpace + totalSize, // Approximate
+                freeSpace: availableSpace,
+                usedSpace: totalSize
+            ),
+            modelStorage: ModelStorageInfo(
+                totalSize: modelStorageSize,
+                modelCount: storedModels.count,
+                modelsByFramework: modelsByFramework,
+                largestModel: largestModel
+            ),
+            cacheSize: 0, // Could be enhanced to track cache separately
+            storedModels: storedModels,
+            lastUpdated: Date()
+        )
+    }
+
+    /// Get all stored models with their metadata
+    /// - Returns: Array of stored model information
+    public func getStoredModels() async -> [StoredModel] {
+        // Get basic model info from file system
+        let modelData = serviceContainer.fileManager.getAllStoredModels()
+
+        // Get metadata from repository if available
+        let repositoryModels: [ModelInfo]
+        do {
+            repositoryModels = try await listAvailableModels()
+        } catch {
+            repositoryModels = []
+        }
+
+        // Map to StoredModel
+        return modelData.compactMap { modelId, format, size in
+            // Find matching model info from repository
+            let modelInfo = repositoryModels.first { $0.id == modelId }
+
+            // Try to construct the model path
+            let baseURL = serviceContainer.fileManager.getBaseDirectoryURL()
+            let modelsURL = baseURL.appendingPathComponent("Models")
+
+            // Detect framework
+            let framework = modelInfo?.compatibleFrameworks.first ?? detectFramework(for: format)
+
+            // Determine path based on framework
+            var modelPath: URL
+            if let framework = framework {
+                modelPath = modelsURL
+                    .appendingPathComponent(framework.rawValue)
+                    .appendingPathComponent(modelId)
+                    .appendingPathComponent("\(modelId).\(format.rawValue)")
+            } else {
+                modelPath = modelsURL
+                    .appendingPathComponent(modelId)
+                    .appendingPathComponent("\(modelId).\(format.rawValue)")
+            }
+
+            return StoredModel(
+                name: modelInfo?.name ?? modelId,
+                path: modelPath,
+                size: size,
+                format: format,
+                framework: framework,
+                createdDate: Date(), // Could be enhanced to get actual creation date
+                lastUsed: nil, // Could be enhanced with usage tracking
+                metadata: modelInfo?.metadata,
+                contextLength: modelInfo?.contextLength,
+                checksum: modelInfo?.checksum
+            )
+        }
+    }
+
+    /// Clear all cache files
+    public func clearCache() async throws {
+        try serviceContainer.fileManager.clearCache()
+    }
+
+    /// Clean temporary files
+    public func cleanTempFiles() async throws {
+        try serviceContainer.fileManager.cleanTempFiles()
+    }
+
+    /// Delete a specific model
+    /// - Parameter modelId: The model ID to delete
+    public func deleteStoredModel(_ modelId: String) async throws {
+        try serviceContainer.fileManager.deleteModel(modelId: modelId)
+    }
+
+    /// Get the base storage directory URL
+    /// - Returns: URL to the base RunAnywhere directory
+    public func getBaseDirectoryURL() -> URL {
+        return serviceContainer.fileManager.getBaseDirectoryURL()
+    }
+
+    // MARK: - Private Helpers
+
+    private func detectFramework(for format: ModelFormat) -> LLMFramework? {
+        switch format {
+        case .gguf, .ggml:
+            return .llamaCpp
+        case .mlmodel, .mlpackage:
+            return .coreML
+        case .onnx:
+            return .onnx
+        case .tflite:
+            return .tensorFlowLite
+        case .mlx:
+            return .mlx
+        default:
+            return nil
+        }
     }
 }

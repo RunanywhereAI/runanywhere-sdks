@@ -121,9 +121,12 @@ public class SimplifiedFileManager {
             let modelFolder = try modelsFolder.subfolder(named: modelId)
             try modelFolder.delete()
 
-            // Remove metadata
-            let metadataStore = ModelMetadataStore()
-            metadataStore.removeModelMetadata(modelId)
+            // Remove metadata using DataSyncService
+            Task {
+                if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                    try? await dataSyncService.removeModelMetadata(modelId)
+                }
+            }
 
             logger.info("Deleted model: \(modelId)")
             return

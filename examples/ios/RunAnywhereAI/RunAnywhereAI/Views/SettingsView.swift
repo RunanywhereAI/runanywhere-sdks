@@ -9,13 +9,19 @@ import SwiftUI
 import RunAnywhereSDK
 
 struct SettingsView: View {
-    @State private var temperature: Double = 0.7
-    @State private var maxTokens: Double = 150
-    @State private var topP: Double = 0.95
-    @State private var topK: Double = 40
+    @State private var temperature: Double = Double(SDKConstants.ConfigurationDefaults.temperature)
+    @State private var maxTokens: Double = Double(SDKConstants.ConfigurationDefaults.maxTokens)
+    @State private var topP: Double = Double(SDKConstants.ConfigurationDefaults.topP)
+    @State private var topK: Double = Double(SDKConstants.ConfigurationDefaults.topK)
     @AppStorage("showAdvancedSettings") private var showAdvancedSettings = false
     @State private var showingFrameworkConfig = false
     @State private var selectedFramework: LLMFramework?
+
+    // SDK Configuration settings
+    @State private var cloudRoutingEnabled: Bool = SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+    @State private var privacyModeEnabled: Bool = SDKConstants.ConfigurationDefaults.privacyModeEnabled
+    @State private var routingPolicy: String = SDKConstants.ConfigurationDefaults.routingPolicy
+    @State private var apiKey: String = ""
 
     // Access to SDK
     private let sdk = RunAnywhereSDK.shared
@@ -23,25 +29,30 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("SDK Configuration") {
-                HStack {
-                    Text("Enable Cloud Routing")
-                    Spacer()
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                }
+                Toggle("Enable Cloud Routing", isOn: $cloudRoutingEnabled)
+                    .onChange(of: cloudRoutingEnabled) { newValue in
+                        Task {
+                            await sdk.setCloudRoutingEnabled(newValue)
+                        }
+                    }
 
-                HStack {
-                    Text("Privacy Mode")
-                    Spacer()
-                    Text("Automatic")
-                        .foregroundColor(.secondary)
-                }
+                Toggle("Privacy Mode", isOn: $privacyModeEnabled)
+                    .onChange(of: privacyModeEnabled) { newValue in
+                        Task {
+                            await sdk.setPrivacyModeEnabled(newValue)
+                        }
+                    }
 
-                HStack {
-                    Text("Routing Policy")
-                    Spacer()
-                    Text("Automatic")
-                        .foregroundColor(.secondary)
+                Picker("Routing Policy", selection: $routingPolicy) {
+                    Text("Automatic").tag(SDKConstants.RoutingPolicy.automatic)
+                    Text("On-Device Only").tag(SDKConstants.RoutingPolicy.onDeviceOnly)
+                    Text("Cloud Only").tag(SDKConstants.RoutingPolicy.cloudOnly)
+                    Text("Cost Optimized").tag(SDKConstants.RoutingPolicy.costOptimized)
+                }
+                .onChange(of: routingPolicy) { newValue in
+                    Task {
+                        await sdk.setRoutingPolicy(newValue)
+                    }
                 }
             }
 
@@ -117,8 +128,28 @@ struct SettingsView: View {
                 HStack {
                     Text("API Key")
                     Spacer()
-                    Text("Not Set")
-                        .foregroundColor(.red)
+                    if apiKey.isEmpty {
+                        Text("Not Set")
+                            .foregroundColor(.red)
+                    } else {
+                        Text("••••••••")
+                            .foregroundColor(.green)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // In a real app, you'd show a secure input dialog
+                    // For now, we'll just toggle between set/not set
+                    Task {
+                        if apiKey.isEmpty {
+                            let testKey = "test_api_key_123"
+                            apiKey = testKey
+                            await sdk.setApiKey(testKey)
+                        } else {
+                            apiKey = ""
+                            await sdk.setApiKey(nil)
+                        }
+                    }
                 }
 
                 NavigationLink(destination: Text("Documentation")) {
@@ -173,25 +204,47 @@ struct SettingsView: View {
     }
 
     private func resetToDefaults() {
-        temperature = 0.7
-        maxTokens = 150
-        topP = 0.95
-        topK = 40
+        temperature = Double(SDKConstants.ConfigurationDefaults.temperature)
+        maxTokens = Double(SDKConstants.ConfigurationDefaults.maxTokens)
+        topP = Double(SDKConstants.ConfigurationDefaults.topP)
+        topK = Double(SDKConstants.ConfigurationDefaults.topK)
         showAdvancedSettings = false
+        cloudRoutingEnabled = SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+        privacyModeEnabled = SDKConstants.ConfigurationDefaults.privacyModeEnabled
+        routingPolicy = SDKConstants.ConfigurationDefaults.routingPolicy
 
-        // Clear SDK overrides
+        // Clear SDK overrides and reset to defaults
         Task {
             await sdk.resetGenerationSettings()
+            await sdk.setCloudRoutingEnabled(SDKConstants.ConfigurationDefaults.cloudRoutingEnabled)
+            await sdk.setPrivacyModeEnabled(SDKConstants.ConfigurationDefaults.privacyModeEnabled)
+            await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
+
+            // Sync to database and cloud
+            await sdk.syncUserPreferences()
         }
     }
 
     private func loadCurrentSettings() async {
+        // Load generation settings
         let settings = await sdk.getGenerationSettings()
+
+        // Load SDK configuration settings
+        let cloudRouting = await sdk.getCloudRoutingEnabled()
+        let privacyMode = await sdk.getPrivacyModeEnabled()
+        let policy = await sdk.getRoutingPolicy()
+        let key = await sdk.getApiKey()
+
         await MainActor.run {
             temperature = Double(settings.temperature)
             maxTokens = Double(settings.maxTokens)
             topP = Double(settings.topP)
             topK = Double(settings.topK)
+
+            cloudRoutingEnabled = cloudRouting
+            privacyModeEnabled = privacyMode
+            routingPolicy = policy
+            apiKey = key ?? ""
         }
     }
 

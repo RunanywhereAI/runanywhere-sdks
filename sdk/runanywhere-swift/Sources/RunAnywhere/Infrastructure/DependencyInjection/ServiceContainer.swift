@@ -246,8 +246,18 @@ public class ServiceContainer {
     public func bootstrap(with configuration: Configuration) async throws {
         // Logger is pre-configured through LoggingManager
 
-        // Initialize configuration service
-        _configurationService = ConfigurationService(configuration: configuration)
+        // Initialize configuration service with repository
+        if let db = await database {
+            let configRepository = ConfigurationRepository(
+                database: db,
+                apiClient: apiClient
+            )
+            _configurationService = ConfigurationService(
+                configRepository: configRepository
+            )
+        } else {
+            fatalError("Database must be available for ConfigurationService")
+        }
 
         // Initialize API client if API key is provided
         if !configuration.apiKey.isEmpty {
