@@ -4,6 +4,7 @@ import Foundation
 public class ModelMetadataStore {
     private let userDefaults = UserDefaults.standard
     private let metadataKey = "com.runanywhere.modelMetadata"
+    private let accessQueue = DispatchQueue(label: "com.runanywhere.modelmetadata", attributes: .concurrent)
 
     private let logger = SDKLogger(category: "ModelMetadataStore")
 
@@ -38,6 +39,8 @@ public class ModelMetadataStore {
             return
         }
 
+        logger.debug("Saving metadata for model: \(model.id)")
+
         let metadata = StoredModelMetadata(
             id: model.id,
             name: model.name,
@@ -59,16 +62,20 @@ public class ModelMetadataStore {
             thinkingCloseTag: model.thinkingTagPattern?.closingTag
         )
 
-        var allMetadata = loadAllMetadata()
-        allMetadata[model.id] = metadata
-        saveAllMetadata(allMetadata)
+        accessQueue.async(flags: .barrier) {
+            var allMetadata = self.loadAllMetadata()
+            allMetadata[model.id] = metadata
+            self.saveAllMetadata(allMetadata)
+        }
 
         logger.info("Saved metadata for model: \(model.id)")
     }
 
     /// Load all stored model metadata
     public func loadStoredModels() -> [ModelInfo] {
+        logger.debug("Loading stored models")
         let allMetadata = loadAllMetadata()
+        logger.info("Found \(allMetadata.count) stored model metadata entries")
 
         return allMetadata.compactMap { (id, metadata) in
             // Check if the file still exists
@@ -131,7 +138,8 @@ public class ModelMetadataStore {
 
     /// Update last used date
     public func updateLastUsed(for modelId: String) {
-        var allMetadata = loadAllMetadata()
+        accessQueue.async(flags: .barrier) {
+            var allMetadata = self.loadAllMetadata()
         if let metadata = allMetadata[modelId] {
             allMetadata[modelId] = StoredModelMetadata(
                 id: metadata.id,
@@ -153,7 +161,8 @@ public class ModelMetadataStore {
                 thinkingOpenTag: metadata.thinkingOpenTag,
                 thinkingCloseTag: metadata.thinkingCloseTag
             )
-            saveAllMetadata(allMetadata)
+            self.saveAllMetadata(allMetadata)
+            }
         }
     }
 
@@ -188,20 +197,30 @@ public class ModelMetadataStore {
 
     /// Remove model metadata
     public func removeModelMetadata(_ modelId: String) {
-        var allMetadata = loadAllMetadata()
-        allMetadata.removeValue(forKey: modelId)
-        saveAllMetadata(allMetadata)
-        logger.info("Removed metadata for model: \(modelId)")
+        accessQueue.async(flags: .barrier) {
+            var allMetadata = self.loadAllMetadata()
+            allMetadata.removeValue(forKey: modelId)
+            self.saveAllMetadata(allMetadata)
+            self.logger.info("Removed metadata for model: \(modelId)")
+        }
     }
 
     // MARK: - Private Methods
 
     private func loadAllMetadata() -> [String: StoredModelMetadata] {
-        guard let data = userDefaults.data(forKey: metadataKey),
-              let metadata = try? JSONDecoder().decode([String: StoredModelMetadata].self, from: data) else {
+        guard let data = userDefaults.data(forKey: metadataKey) else {
             return [:]
         }
-        return metadata
+
+        do {
+            let metadata = try JSONDecoder().decode([String: StoredModelMetadata].self, from: data)
+            return metadata
+        } catch {
+            logger.error("Failed to decode stored model metadata: \(error)")
+            // Clear corrupted data
+            userDefaults.removeObject(forKey: metadataKey)
+            return [:]
+        }
     }
 
     private func saveAllMetadata(_ metadata: [String: StoredModelMetadata]) {

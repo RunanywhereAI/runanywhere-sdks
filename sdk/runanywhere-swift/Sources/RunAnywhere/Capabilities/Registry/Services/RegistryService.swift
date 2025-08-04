@@ -6,27 +6,37 @@ public class RegistryService: ModelRegistry {
     private var modelsByProvider: [String: [ModelInfo]] = [:]
     private let modelDiscovery: ModelDiscovery
     private let metadataStore: ModelMetadataStore
+    private let accessQueue = DispatchQueue(label: "com.runanywhere.registry", attributes: .concurrent)
+    private let logger = SDKLogger(category: "RegistryService")
 
     public init() {
+        logger.debug("Initializing RegistryService")
         self.modelDiscovery = ModelDiscovery()
         self.metadataStore = ModelMetadataStore()
     }
 
     /// Initialize registry with configuration
     public func initialize(with configuration: Configuration) async {
+        logger.info("Initializing registry with configuration")
+
         // Load pre-configured models
         await loadPreconfiguredModels()
 
         // Discover local models that are already downloaded
+        logger.debug("Discovering local models")
         let localModels = await modelDiscovery.discoverLocalModels()
+        logger.info("Found \(localModels.count) local models")
         for model in localModels {
             registerModel(model)
         }
 
         // Discover models from providers
         for provider in configuration.modelProviders where provider.enabled {
+            logger.debug("Discovering models from provider")
             await discoverModelsFromProvider(provider)
         }
+
+        logger.info("Registry initialization complete")
     }
 
     public func discoverModels() async -> [ModelInfo] {
@@ -37,19 +47,34 @@ public class RegistryService: ModelRegistry {
         }
 
         // Return all registered models (both pre-configured and discovered)
-        return Array(models.values)
+        return accessQueue.sync {
+            Array(models.values)
+        }
     }
 
     public func registerModel(_ model: ModelInfo) {
-        models[model.id] = model
+        // Validate model before registering
+        guard !model.id.isEmpty else {
+            logger.error("Attempted to register model with empty ID")
+            return
+        }
+
+        logger.debug("Registering model: \(model.id) - \(model.name)")
+        accessQueue.async(flags: .barrier) {
+            self.models[model.id] = model
+            self.logger.info("Successfully registered model: \(model.id)")
+        }
     }
 
     public func getModel(by id: String) -> ModelInfo? {
-        return models[id]
+        return accessQueue.sync {
+            models[id]
+        }
     }
 
     public func filterModels(by criteria: ModelCriteria) -> [ModelInfo] {
-        return models.values.filter { model in
+        return accessQueue.sync {
+            models.values.filter { model in
             // Framework filter
             if let framework = criteria.framework,
                !model.compatibleFrameworks.contains(framework) {
@@ -132,15 +157,20 @@ public class RegistryService: ModelRegistry {
             }
 
             return true
+            }
         }
     }
 
     public func updateModel(_ model: ModelInfo) {
-        models[model.id] = model
+        accessQueue.async(flags: .barrier) {
+            self.models[model.id] = model
+        }
     }
 
     public func removeModel(_ id: String) {
-        models.removeValue(forKey: id)
+        accessQueue.async(flags: .barrier) {
+            self.models.removeValue(forKey: id)
+        }
     }
 
     /// Create and register a model from URL
@@ -193,13 +223,17 @@ public class RegistryService: ModelRegistry {
     // MARK: - Private Methods
 
     private func loadPreconfiguredModels() async {
+        logger.debug("Loading pre-configured models")
+
         // Load models from persistent metadata store
         // Only load models for frameworks that have registered adapters
         let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
+        logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
 
         if !availableFrameworks.isEmpty {
             // Load only models for registered frameworks
             let storedModels = metadataStore.loadModelsForFrameworks(availableFrameworks)
+            logger.info("Loading \(storedModels.count) models for available frameworks")
             for model in storedModels {
                 registerModel(model)
             }
@@ -207,6 +241,7 @@ public class RegistryService: ModelRegistry {
             // No adapters registered yet, load all stored models
             // They will be filtered when displayed based on available frameworks
             let allStoredModels = metadataStore.loadStoredModels()
+            logger.info("No framework adapters registered, loading all \(allStoredModels.count) stored models")
             for model in allStoredModels {
                 registerModel(model)
             }
