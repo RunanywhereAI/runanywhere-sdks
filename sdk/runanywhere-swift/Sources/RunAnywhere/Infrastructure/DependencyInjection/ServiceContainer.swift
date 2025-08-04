@@ -255,6 +255,12 @@ public class ServiceContainer {
             _configurationService = ConfigurationService(
                 configRepository: configRepository
             )
+
+            // Ensure configuration is loaded immediately
+            if let configService = _configurationService {
+                await configService.ensureConfigurationLoaded()
+                logger.info("Configuration loaded during SDK initialization")
+            }
         } else {
             fatalError("Database must be available for ConfigurationService")
         }
@@ -327,7 +333,7 @@ public class ServiceContainer {
 
     private func checkDownloadServiceHealth() async -> Bool {
         // Check if download service can handle requests
-        return await downloadService.isHealthy()
+        return downloadService.isHealthy()
     }
 
     private func checkStorageServiceHealth() async -> Bool {

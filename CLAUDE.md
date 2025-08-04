@@ -98,7 +98,7 @@ cd examples/android/RunAnywhereAI/
 cd examples/ios/RunAnywhereAI/
 IMPORTANT!! - Always use build and run to run the project with correct device or sim
 # Build and run on simulator (handles dependencies automatically)
-./scripts/build_and_run.sh simulator "iPhone 16 Pro"
+./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 
 # Build and run on connected device
 ./scripts/build_and_run.sh device

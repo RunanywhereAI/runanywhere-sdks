@@ -10,17 +10,20 @@ public actor ConfigurationService {
 
     public init(configRepository: ConfigurationRepository) {
         self.configRepository = configRepository
-
-        Task {
-            await loadConfiguration()
-            logger.info("ConfigurationService initialized")
-        }
+        logger.info("ConfigurationService created")
     }
 
     // MARK: - Public Methods
 
     public func getConfiguration() -> ConfigurationData? {
         return currentConfig
+    }
+
+    /// Ensure configuration is loaded from database
+    public func ensureConfigurationLoaded() async {
+        if currentConfig == nil {
+            await loadConfiguration()
+        }
     }
 
     public func updateConfiguration(_ updates: (ConfigurationData) -> ConfigurationData) async {
@@ -45,13 +48,13 @@ public actor ConfigurationService {
             // Try to load existing configuration
             if let config = try await configRepository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId) {
                 self.currentConfig = config
-                logger.info("Loaded configuration from database")
+                logger.info("Loaded configuration from database - maxTokens: \(config.maxTokens), temperature: \(config.temperature)")
             } else {
                 // Create default configuration
                 let defaultConfig = ConfigurationData()
                 try await configRepository.save(defaultConfig)
                 self.currentConfig = defaultConfig
-                logger.info("Created default configuration")
+                logger.info("Created default configuration - maxTokens: \(defaultConfig.maxTokens)")
             }
         } catch {
             logger.error("Failed to load configuration: \(error)")
@@ -64,7 +67,7 @@ public actor ConfigurationService {
         do {
             try await configRepository.save(config)
             self.currentConfig = config
-            logger.debug("Configuration saved")
+            logger.info("Configuration saved - maxTokens: \(config.maxTokens), temperature: \(config.temperature)")
         } catch {
             logger.error("Failed to save configuration: \(error)")
         }

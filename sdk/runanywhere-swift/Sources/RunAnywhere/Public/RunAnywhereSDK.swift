@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// The main entry point for the RunAnywhere SDK
 public class RunAnywhereSDK {
@@ -15,10 +16,14 @@ public class RunAnywhereSDK {
     private var currentModel: ModelInfo?
     private var currentService: LLMService?
 
+    /// Logger for debugging
+    private let logger = SDKLogger(category: "RunAnywhereSDK")
+
     /// Private initializer to enforce singleton pattern
     private init() {
         self.serviceContainer = ServiceContainer()
         setupServices()
+        logger.info("🏗️ RunAnywhereSDK singleton created")
     }
 
     // MARK: - Public API
@@ -26,18 +31,27 @@ public class RunAnywhereSDK {
     /// Initialize the SDK with the provided configuration
     /// - Parameter config: The configuration to use
     public func initialize(configuration: Configuration) async throws {
+        logger.info("🚀 Starting SDK initialization with configuration")
+
         self.configuration = configuration
 
         // Validate configuration
         try await serviceContainer.configurationValidator.validate(configuration)
+        logger.info("✅ Configuration validated")
 
         // Bootstrap all services with configuration
         try await serviceContainer.bootstrap(with: configuration)
+        logger.info("✅ Services bootstrapped")
 
         // Start monitoring services if enabled
         if configuration.enableRealTimeDashboard {
-            await serviceContainer.performanceMonitor.startMonitoring()
+            serviceContainer.performanceMonitor.startMonitoring()
+            logger.info("📊 Performance monitoring started")
         }
+
+        // Log successful initialization
+        logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
+        print("✅ RunAnywhereSDK initialized successfully - configuration loaded")
     }
 
     /// Load a model by identifier
@@ -291,49 +305,72 @@ public class RunAnywhereSDK {
 
     /// Set the temperature for text generation (0.0 - 2.0)
     public func setTemperature(_ value: Float) async {
+        logger.info("🌡️ Setting temperature")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(temperature: value)
         }
+        logger.info("✅ Temperature updated")
     }
 
     /// Set the maximum tokens for text generation
     public func setMaxTokens(_ value: Int) async {
+        logger.info("🔢 Setting maxTokens")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(maxTokens: value)
         }
+        logger.info("✅ MaxTokens updated")
     }
 
     /// Set the top-p sampling parameter (0.0 - 1.0)
     public func setTopP(_ value: Float) async {
+        logger.info("📊 Setting topP")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(topP: value)
         }
+        logger.info("✅ TopP updated")
     }
 
     /// Set the top-k sampling parameter
     public func setTopK(_ value: Int) async {
+        logger.info("📊 Setting topK")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(topK: value)
         }
+        logger.info("✅ TopK updated")
     }
 
     /// Get current generation settings
     public func getGenerationSettings() async -> DefaultGenerationSettings {
+        logger.info("📖 Getting generation settings")
+
+        // Ensure configuration is loaded from database
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
+
         let config = await serviceContainer.configurationService.getConfiguration()
+
+        let temperature = config?.temperature ?? SDKConstants.ConfigurationDefaults.temperature
+        let maxTokens = config?.maxTokens ?? SDKConstants.ConfigurationDefaults.maxTokens
+        let topP = config?.topP ?? SDKConstants.ConfigurationDefaults.topP
+        let topK = config?.topK ?? SDKConstants.ConfigurationDefaults.topK
+
+        logger.info("📊 Returning generation settings")
+
         return DefaultGenerationSettings(
-            temperature: config?.temperature ?? SDKConstants.ConfigurationDefaults.temperature,
-            maxTokens: config?.maxTokens ?? SDKConstants.ConfigurationDefaults.maxTokens,
-            topP: config?.topP ?? SDKConstants.ConfigurationDefaults.topP,
-            topK: config?.topK ?? SDKConstants.ConfigurationDefaults.topK,
+            temperature: temperature,
+            maxTokens: maxTokens,
+            topP: topP,
+            topK: topK,
             allowUserOverride: config?.allowUserOverride ?? SDKConstants.ConfigurationDefaults.allowUserOverride
         )
     }
 
     /// Reset all user overrides to SDK defaults
     public func resetGenerationSettings() async {
+        logger.info("🔄 Resetting generation settings to defaults")
         await serviceContainer.configurationService.updateConfiguration { _ in
             ConfigurationData() // Returns default configuration
         }
+        logger.info("✅ Generation settings reset to defaults")
     }
 
     /// Sync user preferences to remote server
@@ -394,53 +431,76 @@ public class RunAnywhereSDK {
 
     /// Set whether cloud routing is enabled
     public func setCloudRoutingEnabled(_ enabled: Bool) async {
+        logger.info("☁️ Setting cloud routing enabled")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(cloudRoutingEnabled: enabled)
         }
+        logger.info("✅ Cloud routing setting updated")
     }
 
     /// Get whether cloud routing is enabled
     public func getCloudRoutingEnabled() async -> Bool {
+        logger.info("📖 Getting cloud routing enabled setting")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        return config?.cloudRoutingEnabled ?? SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+        let value = config?.cloudRoutingEnabled ?? SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+        logger.info("☁️ Cloud routing enabled retrieved")
+        return value
     }
 
     /// Set whether privacy mode is enabled
     public func setPrivacyModeEnabled(_ enabled: Bool) async {
+        logger.info("🔒 Setting privacy mode enabled")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(privacyModeEnabled: enabled)
         }
+        logger.info("✅ Privacy mode setting updated")
     }
 
     /// Get whether privacy mode is enabled
     public func getPrivacyModeEnabled() async -> Bool {
+        logger.info("📖 Getting privacy mode enabled setting")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        return config?.privacyModeEnabled ?? SDKConstants.ConfigurationDefaults.privacyModeEnabled
+        let value = config?.privacyModeEnabled ?? SDKConstants.ConfigurationDefaults.privacyModeEnabled
+        logger.info("🔒 Privacy mode enabled retrieved")
+        return value
     }
 
     /// Set the routing policy
     public func setRoutingPolicy(_ policy: String) async {
+        logger.info("🛣️ Setting routing policy")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(routingPolicy: policy)
         }
+        logger.info("✅ Routing policy updated")
     }
 
     /// Get the routing policy
     public func getRoutingPolicy() async -> String {
+        logger.info("📖 Getting routing policy")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        return config?.routingPolicy ?? SDKConstants.ConfigurationDefaults.routingPolicy
+        let value = config?.routingPolicy ?? SDKConstants.ConfigurationDefaults.routingPolicy
+        logger.info("🛣️ Routing policy retrieved")
+        return value
     }
 
     /// Set the API key
     public func setApiKey(_ apiKey: String?) async {
+        logger.info("🔑 Setting API key")
         await serviceContainer.configurationService.updateConfiguration { config in
             config.with(apiKey: apiKey)
         }
+        logger.info("✅ API key updated")
     }
 
     /// Get the API key
     public func getApiKey() async -> String? {
+        logger.info("📖 Getting API key")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
+        logger.info("🔑 API key retrieved")
         return config?.apiKey
     }
 

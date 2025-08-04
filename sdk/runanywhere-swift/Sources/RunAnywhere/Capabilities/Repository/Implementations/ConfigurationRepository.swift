@@ -49,13 +49,23 @@ public actor ConfigurationRepository: Repository {
             SELECT data FROM \(tableName) ORDER BY updated_at DESC
         """, parameters: [])
 
+        logger.info("Found \(results.count) configurations in database")
+
         return results.compactMap { row in
             guard let json = row["data"] as? String,
                   let data = json.data(using: .utf8) else {
+                logger.warning("Failed to parse configuration data")
                 return nil
             }
 
-            return try? JSONDecoder().decode(ConfigurationData.self, from: data)
+            do {
+                let config = try JSONDecoder().decode(ConfigurationData.self, from: data)
+                logger.info("Fetched config - id: \(config.id), maxTokens: \(config.maxTokens)")
+                return config
+            } catch {
+                logger.error("Failed to decode configuration: \(error)")
+                return nil
+            }
         }
     }
 
