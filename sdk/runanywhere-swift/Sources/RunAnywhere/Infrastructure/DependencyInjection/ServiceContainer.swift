@@ -161,6 +161,15 @@ public class ServiceContainer {
         SDKLogger()
     }()
 
+    /// Configuration service
+    private var _configurationService: ConfigurationService?
+    public var configurationService: ConfigurationService {
+        guard let service = _configurationService else {
+            fatalError("ConfigurationService must be initialized via bootstrap")
+        }
+        return service
+    }
+
     // MARK: - Public Service Access
 
     /// Get error recovery service
@@ -197,6 +206,9 @@ public class ServiceContainer {
     /// Bootstrap all services with configuration
     public func bootstrap(with configuration: Configuration) async throws {
         // Logger is pre-configured through LoggingManager
+
+        // Initialize configuration service
+        _configurationService = ConfigurationService(configuration: configuration)
 
         // Initialize core services
         // Initialize model registry with configuration

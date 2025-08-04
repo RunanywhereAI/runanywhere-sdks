@@ -9,29 +9,77 @@ import SwiftUI
 import RunAnywhereSDK
 
 struct SettingsView: View {
-    @AppStorage("temperature") private var temperature: Double = 0.7
-    @AppStorage("maxTokens") private var maxTokens: Double = 150
-    @AppStorage("topP") private var topP: Double = 0.95
-    @AppStorage("topK") private var topK: Double = 40
+    @State private var temperature: Double = 0.7
+    @State private var maxTokens: Double = 150
+    @State private var topP: Double = 0.95
+    @State private var topK: Double = 40
     @AppStorage("showAdvancedSettings") private var showAdvancedSettings = false
     @State private var showingFrameworkConfig = false
     @State private var selectedFramework: LLMFramework?
 
+    // Access to SDK
+    private let sdk = RunAnywhereSDK.shared
+
     var body: some View {
         Form {
+            Section("SDK Configuration") {
+                HStack {
+                    Text("Enable Cloud Routing")
+                    Spacer()
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                }
+
+                HStack {
+                    Text("Privacy Mode")
+                    Spacer()
+                    Text("Automatic")
+                        .foregroundColor(.secondary)
+                }
+
+                HStack {
+                    Text("Routing Policy")
+                    Spacer()
+                    Text("Automatic")
+                        .foregroundColor(.secondary)
+                }
+            }
+
             Section("Generation Settings") {
                 VStack(alignment: .leading) {
                     Text("Temperature: \(temperature, specifier: "%.2f")")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Slider(value: $temperature, in: 0...2, step: 0.1)
+                    Slider(value: $temperature, in: 0...2, step: 0.1) { _ in
+                        // Update SDK configuration
+                        Task {
+                            await sdk.setTemperature(Float(temperature))
+                        }
+                    }
                 }
 
                 VStack(alignment: .leading) {
-                    Text("Max Tokens: \(Int(maxTokens))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Slider(value: $maxTokens, in: 10...500, step: 10)
+                    HStack {
+                        Text("Max Tokens: \(Int(maxTokens))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button(action: { maxTokens = max(10, maxTokens - 10) }) {
+                            Image(systemName: "minus")
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
+
+                        Button(action: { maxTokens = min(500, maxTokens + 10) }) {
+                            Image(systemName: "plus")
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
+                    }
+                    Slider(value: $maxTokens, in: 10...500, step: 10) { _ in
+                        // Update SDK configuration
+                        Task {
+                            await sdk.setMaxTokens(Int(maxTokens))
+                        }
+                    }
                 }
 
                 Toggle("Show Advanced Settings", isOn: $showAdvancedSettings)
@@ -43,78 +91,59 @@ struct SettingsView: View {
                         Text("Top P: \(topP, specifier: "%.2f")")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Slider(value: $topP, in: 0...1, step: 0.05)
+                        Slider(value: $topP, in: 0...1, step: 0.05) { _ in
+                            // Update SDK configuration
+                            Task {
+                                await sdk.setTopP(Float(topP))
+                            }
+                        }
                     }
 
                     VStack(alignment: .leading) {
                         Text("Top K: \(Int(topK))")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Slider(value: $topK, in: 1...100, step: 1)
-                    }
-                }
-            }
-
-            Section("Framework Configuration") {
-                ForEach(availableFrameworks, id: \.self) { framework in
-                    Button(action: {
-                        selectedFramework = framework
-                        showingFrameworkConfig = true
-                    }) {
-                        HStack {
-                            Text(framework.displayName)
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.secondary)
-                                .font(.caption)
+                        Slider(value: $topK, in: 1...100, step: 1) { _ in
+                            // Update SDK configuration
+                            Task {
+                                await sdk.setTopK(Int(topK))
+                            }
                         }
                     }
                 }
             }
 
             Section("API Configuration") {
-                NavigationLink(destination: APICredentialsView()) {
-                    Label("API Credentials", systemImage: "key.fill")
-                        .badge(getCredentialsStatus())
+                HStack {
+                    Text("API Key")
+                    Spacer()
+                    Text("Not Set")
+                        .foregroundColor(.red)
                 }
 
-                NavigationLink(destination: ModelURLSettingsView()) {
-                    Label("Model URLs", systemImage: "link")
+                NavigationLink(destination: Text("Documentation")) {
+                    Label("Documentation", systemImage: "doc.text")
                 }
 
-                Text("Configure API credentials and custom download URLs for models.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-
-            Section("Maintenance") {
-                Button(action: {}) {
-                    Label("Clean Misplaced Files", systemImage: "trash")
+                NavigationLink(destination: Text("GitHub")) {
+                    Label("GitHub", systemImage: "link")
                 }
-
-                Text("Remove files that were downloaded to incorrect locations.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
 
             Section("About") {
                 HStack {
-                    Text("Version")
+                    Label("RunAnywhere SDK", systemImage: "cube")
                     Spacer()
-                    Text("1.0.0")
+                    Text("Version 1.0.0")
                         .foregroundColor(.secondary)
                 }
 
-                HStack {
-                    Text("Device Memory")
-                    Spacer()
-                    Text(deviceMemoryString)
-                        .foregroundColor(.secondary)
+                NavigationLink(destination: Text("Documentation")) {
+                    Label("Documentation", systemImage: "doc.text")
                 }
 
-                if let url = URL(string: "https://github.com/RunanywhereAI/sdks") {
-                    Link("GitHub Repository", destination: url)
+                NavigationLink(destination: Text("GitHub")) {
+                    Label("GitHub", systemImage: "link")
                 }
             }
 
@@ -133,6 +162,9 @@ struct SettingsView: View {
                     .padding()
             }
         }
+        .task {
+            await loadCurrentSettings()
+        }
     }
 
     private var deviceMemoryString: String {
@@ -146,12 +178,21 @@ struct SettingsView: View {
         topP = 0.95
         topK = 40
         showAdvancedSettings = false
+
+        // Clear SDK overrides
+        Task {
+            await sdk.resetGenerationSettings()
+        }
     }
 
-    private func getCredentialsStatus() -> Text? {
-        return Text("Not Connected")
-            .font(.caption)
-            .foregroundColor(.red)
+    private func loadCurrentSettings() async {
+        let settings = await sdk.getGenerationSettings()
+        await MainActor.run {
+            temperature = Double(settings.temperature)
+            maxTokens = Double(settings.maxTokens)
+            topP = Double(settings.topP)
+            topK = Double(settings.topK)
+        }
     }
 
     private var availableFrameworks: [LLMFramework] {

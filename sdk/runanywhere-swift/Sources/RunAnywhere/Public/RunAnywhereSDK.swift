@@ -97,9 +97,19 @@ public class RunAnywhereSDK {
             throw SDKError.modelNotFound("No model loaded")
         }
 
+        // Get effective settings from configuration
+        let effectiveSettings = await serviceContainer.configurationService.getGenerationSettings()
+
+        // Create options with configuration defaults if not provided
+        let effectiveOptions = options ?? GenerationOptions(
+            maxTokens: effectiveSettings.maxTokens,
+            temperature: effectiveSettings.temperature,
+            topP: effectiveSettings.topP
+        )
+
         return try await serviceContainer.generationService.generate(
             prompt: prompt,
-            options: options ?? GenerationOptions()
+            options: effectiveOptions
         )
     }
 
@@ -124,10 +134,35 @@ public class RunAnywhereSDK {
             }
         }
 
-        return serviceContainer.streamingService.generateStream(
-            prompt: prompt,
-            options: options ?? GenerationOptions()
-        )
+        return AsyncThrowingStream { continuation in
+            Task {
+                // Get effective settings from configuration
+                let effectiveSettings = await serviceContainer.configurationService.getGenerationSettings()
+
+                // Create options with configuration defaults if not provided
+                let effectiveOptions = options ?? GenerationOptions(
+                    maxTokens: effectiveSettings.maxTokens,
+                    temperature: effectiveSettings.temperature,
+                    topP: effectiveSettings.topP
+                )
+
+                // Get the actual stream
+                let stream = serviceContainer.streamingService.generateStream(
+                    prompt: prompt,
+                    options: effectiveOptions
+                )
+
+                // Forward all values from the inner stream
+                do {
+                    for try await chunk in stream {
+                        continuation.yield(chunk)
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     /// List available models
@@ -247,6 +282,55 @@ public class RunAnywhereSDK {
         )
     }
 
+    // MARK: - Configuration Management
+
+    /// Set the temperature for text generation (0.0 - 2.0)
+    public func setTemperature(_ value: Float) async {
+        await serviceContainer.configurationService.setTemperature(value)
+    }
+
+    /// Set the maximum tokens for text generation
+    public func setMaxTokens(_ value: Int) async {
+        await serviceContainer.configurationService.setMaxTokens(value)
+    }
+
+    /// Set the top-p sampling parameter (0.0 - 1.0)
+    public func setTopP(_ value: Float) async {
+        await serviceContainer.configurationService.setTopP(value)
+    }
+
+    /// Set the top-k sampling parameter
+    public func setTopK(_ value: Int) async {
+        await serviceContainer.configurationService.setTopK(value)
+    }
+
+    /// Get current generation settings
+    public func getGenerationSettings() async -> DefaultGenerationSettings {
+        return await serviceContainer.configurationService.getGenerationSettings()
+    }
+
+    /// Reset all user overrides to SDK defaults
+    public func resetGenerationSettings() async {
+        await serviceContainer.configurationService.clearUserOverrides()
+    }
+
+    /// Update generation settings from remote configuration
+    /// This would typically be called when receiving configuration from your server
+    public func updateRemoteConfiguration(_ config: [String: Any]) async {
+        await serviceContainer.configurationService.updateRemoteSettings(config)
+    }
+
+    /// Sync user preferences to remote server
+    /// This sends the current user settings to your backend
+    public func syncUserPreferences() async throws {
+        try await serviceContainer.configurationService.syncUserPreferences()
+    }
+
+    /// Register a callback for when settings change
+    public func onGenerationSettingsChanged(_ callback: @escaping (DefaultGenerationSettings) -> Void) async {
+        await serviceContainer.configurationService.onSettingsChanged(callback)
+    }
+
     /// Update thinking support for an existing model
     /// - Parameters:
     ///   - modelId: The model to update
@@ -265,7 +349,7 @@ public class RunAnywhereSDK {
         )
 
         // Also update the model in the registry if it exists
-        if var existingModel = serviceContainer.modelRegistry.getModel(by: modelId) {
+        if let existingModel = serviceContainer.modelRegistry.getModel(by: modelId) {
             let updatedModel = ModelInfo(
                 id: existingModel.id,
                 name: existingModel.name,
