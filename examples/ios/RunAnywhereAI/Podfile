@@ -3,10 +3,10 @@ platform :ios, '16.0'
 target 'RunAnywhereAI' do
   use_frameworks!
 
-  # TensorFlow Lite (LiteRT) - Only available via CocoaPods
-  pod 'TensorFlowLiteSwift', '~> 2.17.0'
-  pod 'TensorFlowLiteSwift/Metal', '~> 2.17.0'    # GPU acceleration
-  pod 'TensorFlowLiteSwift/CoreML', '~> 2.17.0'   # Neural Engine support
+  # TensorFlow Lite (LiteRT) - REMOVED due to App Store Connect submission issues
+  # pod 'TensorFlowLiteSwift', '~> 2.17.0'
+  # pod 'TensorFlowLiteSwift/Metal', '~> 2.17.0'    # GPU acceleration
+  # pod 'TensorFlowLiteSwift/CoreML', '~> 2.17.0'   # Neural Engine support
 
   # ZIP handling - REMOVED: Already available via Swift Package Manager
   # pod 'ZIPFoundation', '~> 0.9.19'

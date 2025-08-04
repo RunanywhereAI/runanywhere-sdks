@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		3EA690BC78A1B05690A63F2A /* Pods_RunAnywhereAI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D112F9BABE6B910AB8A4560 /* Pods_RunAnywhereAI.framework */; };
+		4164DA19E81552D72944EF11 /* libPods-RunAnywhereAIUITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 74CF1B895C9DC891D9493AA9 /* libPods-RunAnywhereAIUITests.a */; };
+		52F6A75D378A56D01236AD8F /* libPods-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CAEFBBC0F28516F1FC50FA8B /* libPods-RunAnywhereAITests.a */; };
 		540E20912E3EFE0C00F86C20 /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 540E20902E3EFE0C00F86C20 /* LLM */; };
 		541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22712E3BE21300EBF8FA /* RunAnywhereSDK */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
@@ -19,8 +20,7 @@
 		54F5961D2E39C32A0057B6CE /* kernels_custom in Frameworks */ = {isa = PBXBuildFile; productRef = 54F5961C2E39C32A0057B6CE /* kernels_custom */; };
 		54F5961F2E39C32A0057B6CE /* kernels_optimized in Frameworks */ = {isa = PBXBuildFile; productRef = 54F5961E2E39C32A0057B6CE /* kernels_optimized */; };
 		54F596212E39C32A0057B6CE /* kernels_quantized in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596202E39C32A0057B6CE /* kernels_quantized */; };
-		5C52A29773F79F5DDCB3B4BF /* libPods-RunAnywhereAIUITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = D4B1EF2B564408CB07AF424F /* libPods-RunAnywhereAIUITests.a */; };
-		864DE74C8BBE0BD57BC4499E /* libPods-RunAnywhereAITests.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C53903306D82206A366F6466 /* libPods-RunAnywhereAITests.a */; };
+		E50881BCD52C6CA64DB4ADE9 /* Pods_RunAnywhereAI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 2D9BB8226C30942BBDF8A7FF /* Pods_RunAnywhereAI.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -41,33 +41,39 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		10CEC16C6FE4D37168FCE5CB /* Pods-RunAnywhereAIUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.release.xcconfig"; sourceTree = "<group>"; };
-		48039BB784F94EB42638A6C8 /* Pods-RunAnywhereAITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.debug.xcconfig"; sourceTree = "<group>"; };
-		4D112F9BABE6B910AB8A4560 /* Pods_RunAnywhereAI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunAnywhereAI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		2D9BB8226C30942BBDF8A7FF /* Pods_RunAnywhereAI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunAnywhereAI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		5429576054886FAE9686B768 /* Pods-RunAnywhereAITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.release.xcconfig"; sourceTree = "<group>"; };
 		5480A1F02E2F250200337F2F /* RunAnywhereAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RunAnywhereAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A1FE2E2F250400337F2F /* RunAnywhereAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A2082E2F250400337F2F /* RunAnywhereAIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		93F59EE0AC4C0BC02E528D7F /* Pods-RunAnywhereAIUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.debug.xcconfig"; sourceTree = "<group>"; };
-		C53903306D82206A366F6466 /* libPods-RunAnywhereAITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		CC1B6C884FF6B7195D6D2262 /* Pods-RunAnywhereAITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.release.xcconfig"; sourceTree = "<group>"; };
-		CF97E8539C12E261A9FF3A1D /* Pods-RunAnywhereAI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.debug.xcconfig"; sourceTree = "<group>"; };
-		D4B1EF2B564408CB07AF424F /* libPods-RunAnywhereAIUITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAIUITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		DAD7ACED49FECECF1399B33F /* Pods-RunAnywhereAI.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.release.xcconfig"; sourceTree = "<group>"; };
+		667294704302857A84703D2C /* Pods-RunAnywhereAI.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.release.xcconfig"; sourceTree = "<group>"; };
+		731975339BC1767D341CDDE4 /* Pods-RunAnywhereAIUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.debug.xcconfig"; sourceTree = "<group>"; };
+		74CF1B895C9DC891D9493AA9 /* libPods-RunAnywhereAIUITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAIUITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		CAEFBBC0F28516F1FC50FA8B /* libPods-RunAnywhereAITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		EE6132AF07BEB3EC759DADC6 /* Pods-RunAnywhereAITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.debug.xcconfig"; sourceTree = "<group>"; };
+		F4EDF55B631A6B2C64D1E6D3 /* Pods-RunAnywhereAIUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.release.xcconfig"; sourceTree = "<group>"; };
+		FDB48EA4E24AB03BD189796F /* Pods-RunAnywhereAI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5480A1F22E2F250200337F2F /* RunAnywhereAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = RunAnywhereAI;
 			sourceTree = "<group>";
 		};
 		5480A2012E2F250400337F2F /* RunAnywhereAITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = RunAnywhereAITests;
 			sourceTree = "<group>";
 		};
 		5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = RunAnywhereAIUITests;
 			sourceTree = "<group>";
 		};
@@ -89,7 +95,7 @@
 				54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
 				541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */,
-				3EA690BC78A1B05690A63F2A /* Pods_RunAnywhereAI.framework in Frameworks */,
+				E50881BCD52C6CA64DB4ADE9 /* Pods_RunAnywhereAI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -97,7 +103,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				864DE74C8BBE0BD57BC4499E /* libPods-RunAnywhereAITests.a in Frameworks */,
+				52F6A75D378A56D01236AD8F /* libPods-RunAnywhereAITests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -105,13 +111,23 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5C52A29773F79F5DDCB3B4BF /* libPods-RunAnywhereAIUITests.a in Frameworks */,
+				4164DA19E81552D72944EF11 /* libPods-RunAnywhereAIUITests.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		1BBD1A6F3657920C11346FB0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				2D9BB8226C30942BBDF8A7FF /* Pods_RunAnywhereAI.framework */,
+				CAEFBBC0F28516F1FC50FA8B /* libPods-RunAnywhereAITests.a */,
+				74CF1B895C9DC891D9493AA9 /* libPods-RunAnywhereAIUITests.a */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		5480A1E72E2F250200337F2F = {
 			isa = PBXGroup;
 			children = (
@@ -120,7 +136,7 @@
 				5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */,
 				5480A1F12E2F250200337F2F /* Products */,
 				F6EFD36220C47AA4E19CBE98 /* Pods */,
-				FB9432E52744E6D5818212F9 /* Frameworks */,
+				1BBD1A6F3657920C11346FB0 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -137,24 +153,14 @@
 		F6EFD36220C47AA4E19CBE98 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				CF97E8539C12E261A9FF3A1D /* Pods-RunAnywhereAI.debug.xcconfig */,
-				DAD7ACED49FECECF1399B33F /* Pods-RunAnywhereAI.release.xcconfig */,
-				48039BB784F94EB42638A6C8 /* Pods-RunAnywhereAITests.debug.xcconfig */,
-				CC1B6C884FF6B7195D6D2262 /* Pods-RunAnywhereAITests.release.xcconfig */,
-				93F59EE0AC4C0BC02E528D7F /* Pods-RunAnywhereAIUITests.debug.xcconfig */,
-				10CEC16C6FE4D37168FCE5CB /* Pods-RunAnywhereAIUITests.release.xcconfig */,
+				FDB48EA4E24AB03BD189796F /* Pods-RunAnywhereAI.debug.xcconfig */,
+				667294704302857A84703D2C /* Pods-RunAnywhereAI.release.xcconfig */,
+				EE6132AF07BEB3EC759DADC6 /* Pods-RunAnywhereAITests.debug.xcconfig */,
+				5429576054886FAE9686B768 /* Pods-RunAnywhereAITests.release.xcconfig */,
+				731975339BC1767D341CDDE4 /* Pods-RunAnywhereAIUITests.debug.xcconfig */,
+				F4EDF55B631A6B2C64D1E6D3 /* Pods-RunAnywhereAIUITests.release.xcconfig */,
 			);
 			path = Pods;
-			sourceTree = "<group>";
-		};
-		FB9432E52744E6D5818212F9 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				4D112F9BABE6B910AB8A4560 /* Pods_RunAnywhereAI.framework */,
-				C53903306D82206A366F6466 /* libPods-RunAnywhereAITests.a */,
-				D4B1EF2B564408CB07AF424F /* libPods-RunAnywhereAIUITests.a */,
-			);
-			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -164,11 +170,10 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2122E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAI" */;
 			buildPhases = (
-				138B5E24DF6A58E6759A53F6 /* [CP] Check Pods Manifest.lock */,
+				91511E543CC30EB9E5BC34C9 /* [CP] Check Pods Manifest.lock */,
 				5480A1EC2E2F250200337F2F /* Sources */,
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
-				5603CCC547178B7DD0B8D522 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -199,7 +204,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2152E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAITests" */;
 			buildPhases = (
-				A5E61E20BBDDD9BF2AB649FA /* [CP] Check Pods Manifest.lock */,
+				07AF4D3E35A9EE810D2465CF /* [CP] Check Pods Manifest.lock */,
 				5480A1FA2E2F250400337F2F /* Sources */,
 				5480A1FB2E2F250400337F2F /* Frameworks */,
 				5480A1FC2E2F250400337F2F /* Resources */,
@@ -221,7 +226,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2182E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAIUITests" */;
 			buildPhases = (
-				FBEF6E1A5C8E6D5D6E231B26 /* [CP] Check Pods Manifest.lock */,
+				432DD0D53DB880B6239021B5 /* [CP] Check Pods Manifest.lock */,
 				5480A2042E2F250400337F2F /* Sources */,
 				5480A2052E2F250400337F2F /* Frameworks */,
 				5480A2062E2F250400337F2F /* Resources */,
@@ -275,8 +280,8 @@
 				547F70AF2E35CE270061BAED /* XCRemoteSwiftPackageReference "swift-transformers" */,
 				547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */,
-				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
-				540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */,
+				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */,
+				540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -315,50 +320,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		138B5E24DF6A58E6759A53F6 /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-RunAnywhereAI-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		5603CCC547178B7DD0B8D522 /* [CP] Copy Pods Resources */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-input-files.xcfilelist",
-			);
-			inputPaths = (
-			);
-			name = "[CP] Copy Pods Resources";
-			outputFileListPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources-${CONFIGURATION}-output-files.xcfilelist",
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI-resources.sh\"\n";
-			showEnvVarsInLog = 0;
-		};
-		A5E61E20BBDDD9BF2AB649FA /* [CP] Check Pods Manifest.lock */ = {
+		07AF4D3E35A9EE810D2465CF /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -380,7 +342,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		FBEF6E1A5C8E6D5D6E231B26 /* [CP] Check Pods Manifest.lock */ = {
+		432DD0D53DB880B6239021B5 /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -396,6 +358,28 @@
 			);
 			outputPaths = (
 				"$(DERIVED_FILE_DIR)/Pods-RunAnywhereAIUITests-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		91511E543CC30EB9E5BC34C9 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-RunAnywhereAI-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -561,13 +545,13 @@
 		};
 		5480A2132E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CF97E8539C12E261A9FF3A1D /* Pods-RunAnywhereAI.debug.xcconfig */;
+			baseConfigurationReference = FDB48EA4E24AB03BD189796F /* Pods-RunAnywhereAI.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = AFAL2647U9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -601,14 +585,14 @@
 		};
 		5480A2142E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = DAD7ACED49FECECF1399B33F /* Pods-RunAnywhereAI.release.xcconfig */;
+			baseConfigurationReference = 667294704302857A84703D2C /* Pods-RunAnywhereAI.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = RunAnywhereAI/RunAnywhereAI.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = AFAL2647U9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -642,11 +626,11 @@
 		};
 		5480A2162E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 48039BB784F94EB42638A6C8 /* Pods-RunAnywhereAITests.debug.xcconfig */;
+			baseConfigurationReference = EE6132AF07BEB3EC759DADC6 /* Pods-RunAnywhereAITests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -666,11 +650,11 @@
 		};
 		5480A2172E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = CC1B6C884FF6B7195D6D2262 /* Pods-RunAnywhereAITests.release.xcconfig */;
+			baseConfigurationReference = 5429576054886FAE9686B768 /* Pods-RunAnywhereAITests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -689,10 +673,10 @@
 		};
 		5480A2192E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 93F59EE0AC4C0BC02E528D7F /* Pods-RunAnywhereAIUITests.debug.xcconfig */;
+			baseConfigurationReference = 731975339BC1767D341CDDE4 /* Pods-RunAnywhereAIUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
@@ -712,10 +696,10 @@
 		};
 		5480A21A2E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 10CEC16C6FE4D37168FCE5CB /* Pods-RunAnywhereAIUITests.release.xcconfig */;
+			baseConfigurationReference = F4EDF55B631A6B2C64D1E6D3 /* Pods-RunAnywhereAIUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MACOSX_DEPLOYMENT_TARGET = 15.5;
@@ -774,14 +758,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
+		541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "runanywhere-swift" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift";
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */ = {
+		540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/eastriverlee/LLM.swift";
 			requirement = {
@@ -818,7 +802,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		540E20902E3EFE0C00F86C20 /* LLM */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM" */;
+			package = 540E208F2E3EFE0C00F86C20 /* XCRemoteSwiftPackageReference "LLM.swift" */;
 			productName = LLM;
 		};
 		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {

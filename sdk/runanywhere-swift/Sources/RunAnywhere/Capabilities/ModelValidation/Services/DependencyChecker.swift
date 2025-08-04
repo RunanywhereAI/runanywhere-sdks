@@ -84,7 +84,7 @@ public class DependencyChecker {
             return true
         #endif
         case .tensorFlowLite:
-            return Bundle.main.path(forResource: "TensorFlowLiteC", ofType: "framework") != nil
+            return false // TensorFlow Lite support temporarily disabled
         default:
             return true // Placeholder for other frameworks
         }
