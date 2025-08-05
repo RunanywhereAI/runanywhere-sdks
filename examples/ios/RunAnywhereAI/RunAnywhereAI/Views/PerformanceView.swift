@@ -45,17 +45,17 @@ struct PerformanceView: View {
                     Text("Performance Metrics")
                         .font(.headline)
 
-                    MetricRow(label: "CPU Usage", value: "\(Int(metrics.cpuUsage * 100))%")
-                    MetricRow(label: "Memory Usage", value: formatBytes(metrics.memoryUsage))
-                    MetricRow(label: "Available Memory", value: formatBytes(metrics.availableMemory))
-                    MetricRow(label: "Thermal State", value: "\(metrics.thermalState)")
+                    PerformanceMetricRow(label: "CPU Usage", value: "\(Int(metrics.cpuUsage * 100))%")
+                    PerformanceMetricRow(label: "Memory Usage", value: formatBytes(metrics.memoryUsage))
+                    PerformanceMetricRow(label: "Available Memory", value: formatBytes(metrics.availableMemory))
+                    PerformanceMetricRow(label: "Thermal State", value: "\(metrics.thermalState)")
 
                     if metrics.timeToFirstToken > 0 {
-                        MetricRow(label: "Time to First Token", value: String(format: "%.2f ms", metrics.timeToFirstToken * 1000))
+                        PerformanceMetricRow(label: "Time to First Token", value: String(format: "%.2f ms", metrics.timeToFirstToken * 1000))
                     }
 
                     if metrics.currentTokensPerSecond > 0 {
-                        MetricRow(label: "Tokens/sec", value: String(format: "%.1f", metrics.currentTokensPerSecond))
+                        PerformanceMetricRow(label: "Tokens/sec", value: String(format: "%.1f", metrics.currentTokensPerSecond))
                     }
                 }
                 .padding()
@@ -91,7 +91,7 @@ struct PerformanceView: View {
     }
 }
 
-struct MetricRow: View {
+struct PerformanceMetricRow: View {
     let label: String
     let value: String
 

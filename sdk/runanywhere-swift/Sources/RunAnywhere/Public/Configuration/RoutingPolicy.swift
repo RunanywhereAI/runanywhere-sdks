@@ -8,6 +8,9 @@ public enum RoutingPolicy: String, Codable {
     /// Always use on-device execution when possible
     case preferDevice
 
+    /// ONLY use on-device execution - never use cloud
+    case deviceOnly
+
     /// Always use cloud execution
     case preferCloud
 

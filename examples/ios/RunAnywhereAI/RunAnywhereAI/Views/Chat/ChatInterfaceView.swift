@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import RunAnywhereSDK
 
 struct ChatInterfaceView: View {
     @StateObject private var viewModel = ChatViewModel()
     @StateObject private var conversationStore = ConversationStore.shared
     @State private var showingConversationList = false
+    @State private var showAnalyticsInline = true  // Default to true for better visibility
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -21,8 +23,15 @@ struct ChatInterfaceView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(viewModel.messages) { message in
-                                MessageBubbleView(message: message)
-                                    .id(message.id)
+                                VStack(spacing: 8) {
+                                    MessageBubbleView(message: message)
+                                        .id(message.id)
+
+                                    // Show analytics for assistant messages when toggle is enabled
+                                    if message.role == .assistant && showAnalyticsInline {
+                                        SessionAnalyticsView(sessionId: viewModel.currentSessionId)
+                                    }
+                                }
                             }
 
                             if viewModel.isGenerating {
@@ -74,9 +83,7 @@ struct ChatInterfaceView: View {
                 ConversationListView()
             }
             .onAppear {
-                Task {
-                    await viewModel.checkModelStatus()
-                }
+                setupInitialState()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
                 Task {
@@ -88,6 +95,34 @@ struct ChatInterfaceView: View {
 
     private var inputArea: some View {
         VStack(spacing: 0) {
+            Divider()
+
+            // Analytics toggle - make it extremely visible
+            VStack(spacing: 8) {
+                Text("📊 ANALYTICS TOGGLE")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.blue)
+
+                HStack {
+                    Toggle("Show Analytics", isOn: $showAnalyticsInline)
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                        .onChange(of: showAnalyticsInline) { newValue in
+                            updateAnalyticsConfig(newValue)
+                        }
+                    Spacer()
+                    Text(showAnalyticsInline ? "✅ ON" : "❌ OFF")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(showAnalyticsInline ? .green : .red)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .background(Color.blue.opacity(0.1))
+            .border(Color.blue, width: 2)
+
             Divider()
 
             HStack(spacing: 12) {
@@ -116,6 +151,23 @@ struct ChatInterfaceView: View {
 
         Task {
             await viewModel.sendMessage()
+        }
+    }
+
+    private func setupInitialState() {
+        Task {
+            await viewModel.checkModelStatus()
+            // Also check analytics configuration and sync with UI
+            let analyticsEnabled = await RunAnywhereSDK.shared.getAnalyticsEnabled()
+            await MainActor.run {
+                showAnalyticsInline = analyticsEnabled  // Sync with SDK configuration
+            }
+        }
+    }
+
+    private func updateAnalyticsConfig(_ enabled: Bool) {
+        Task {
+            await RunAnywhereSDK.shared.setAnalyticsEnabled(enabled)
         }
     }
 }

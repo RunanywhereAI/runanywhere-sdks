@@ -28,10 +28,13 @@ class ChatViewModel: ObservableObject {
     @Published var error: Error?
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
-    @Published var useStreaming = true  // Toggle between streaming and non-streaming
+    @Published var useStreaming = false  // Use non-streaming for more reliable generation
 
     private let sdk = RunAnywhereSDK.shared
     private var generationTask: Task<Void, Never>?
+    private var conversationContext: Context?
+    @Published var currentSessionId: UUID?
+    @Published var showAnalytics = false
 
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating && isModelLoaded
@@ -47,6 +50,9 @@ class ChatViewModel: ObservableObject {
             name: Notification.Name("ModelLoaded"),
             object: nil
         )
+
+        // Delay analytics initialization to avoid crash during SDK startup
+        // Analytics will be initialized when the view appears or when first used
     }
 
     private func addSystemMessage() {
@@ -79,17 +85,65 @@ class ChatViewModel: ObservableObject {
 
         generationTask = Task {
             do {
-                // Ensure model is loaded before generating
+                // Check if we need to reload the model in SDK
+                // This handles cases where the app was restarted but UI state shows model as loaded
+                if isModelLoaded, let _ = loadedModelName {
+                    // Try to ensure the model is actually loaded in the SDK
+                    // Get the model from ModelListViewModel
+                    if let model = ModelListViewModel.shared.currentModel {
+                        do {
+                            // This will reload the model if it's not already loaded
+                            _ = try await sdk.loadModel(model.id)
+                            print("Ensured model '\(model.name)' is loaded in SDK")
+                        } catch {
+                            print("Failed to ensure model is loaded: \(error)")
+                            // If loading fails, update our state
+                            await MainActor.run {
+                                self.isModelLoaded = false
+                                self.loadedModelName = nil
+                            }
+                            throw ChatError.noModelLoaded
+                        }
+                    }
+                }
+
+                // Final check - ensure model is loaded before generating
                 if !isModelLoaded {
                     throw ChatError.noModelLoaded
                 }
 
                 print("Starting generation with prompt: \(prompt), streaming: \(useStreaming)")
 
+                // Build conversation context with previous messages
+                var contextMessages: String = ""
+                for message in self.messages where message.role != .system {
+                    if message.role == .user {
+                        contextMessages += "User: \(message.content)\n"
+                    } else if message.role == .assistant {
+                        contextMessages += "Assistant: \(message.content)\n"
+                    }
+                }
+
+                // Create a full prompt with context
+                let fullPrompt = contextMessages.isEmpty ? prompt : contextMessages + "User: \(prompt)\nAssistant:"
+
+                let options = GenerationOptions(
+                    maxTokens: 500,
+                    temperature: 0.7,
+                    context: self.conversationContext
+                )
+
+                // Ensure analytics are initialized before generation
+                await self.initializeAnalytics()
+
+                // Get the current session ID - will be set after generation starts
+                let sessionId = await sdk.getCurrentSessionId()
+                print("📊 [ChatViewModel] Current session ID before generation: \(sessionId?.uuidString ?? "nil")")
+
                 if useStreaming {
                     // Use streaming generation for real-time updates
                     var fullResponse = ""
-                    let stream = sdk.generateStream(prompt: prompt)
+                    let stream = sdk.generateStream(prompt: fullPrompt, options: options)
 
                     // Stream tokens as they arrive
                     for try await token in stream {
@@ -104,11 +158,21 @@ class ChatViewModel: ObservableObject {
 
                     print("Streaming completed with response: \(fullResponse)")
 
+                    // Get the session ID after generation (should be created now)
+                    currentSessionId = await sdk.getCurrentSessionId()
+                    print("📊 [ChatViewModel] Session ID after streaming generation: \(currentSessionId?.uuidString ?? "nil")")
+
+                    // Log analytics info
+                    await logAnalyticsForCurrentGeneration()
+
+                    // Update context with the assistant's response
+                    self.updateContextWithResponse(fullResponse)
+
                     // Note: Thinking content is not available in streaming mode
                     // Could potentially parse it from the fullResponse if needed
                 } else {
                     // Use non-streaming generation to get thinking content
-                    let result = try await sdk.generate(prompt: prompt)
+                    let result = try await sdk.generate(prompt: fullPrompt, options: options)
 
                     print("Generation completed with result: \(result.text)")
 
@@ -122,6 +186,16 @@ class ChatViewModel: ObservableObject {
                             }
                         }
                     }
+
+                    // Get the session ID after generation (should be created now)
+                    currentSessionId = await sdk.getCurrentSessionId()
+                    print("📊 [ChatViewModel] Session ID after non-streaming generation: \(currentSessionId?.uuidString ?? "nil")")
+
+                    // Log analytics info
+                    await logAnalyticsForCurrentGeneration()
+
+                    // Update context with the assistant's response
+                    self.updateContextWithResponse(result.text)
                 }
             } catch {
                 print("Generation failed with error: \(error)")
@@ -153,6 +227,9 @@ class ChatViewModel: ObservableObject {
         currentInput = ""
         isGenerating = false
         error = nil
+        conversationContext = nil  // Clear context when clearing chat
+        currentSessionId = nil  // Start a new analytics session
+        // Keep allAnalytics to view history
     }
 
     func stopGeneration() {
@@ -188,9 +265,31 @@ class ChatViewModel: ObservableObject {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
+
+                // Ensure the model is actually loaded in the SDK
+                Task {
+                    do {
+                        _ = try await sdk.loadModel(currentModel.id)
+                        print("Verified model '\(currentModel.name)' is loaded in SDK")
+
+                        // Now that SDK is initialized and model is loaded, initialize analytics
+                        await self.initializeAnalytics()
+                    } catch {
+                        print("Failed to verify model is loaded: \(error)")
+                        await MainActor.run {
+                            self.isModelLoaded = false
+                            self.loadedModelName = nil
+                        }
+                    }
+                }
             } else {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
+
+                // Still try to initialize analytics even without a model
+                Task {
+                    await self.initializeAnalytics()
+                }
             }
 
             // Update system message
@@ -219,5 +318,78 @@ class ChatViewModel: ObservableObject {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    // MARK: - Context Management
+
+    private func buildContext() -> Context {
+        // For now, we'll just track context locally and let the SDK handle message creation
+        // The SDK's ContextManager will append messages properly
+        if conversationContext == nil {
+            conversationContext = Context(
+                messages: [],
+                systemPrompt: nil,
+                maxTokens: 2048
+            )
+        }
+
+        return conversationContext!
+    }
+
+    private func updateContextWithResponse(_ response: String) {
+        // Context will be rebuilt on next generation with all messages
+        // This ensures the assistant's response is included in the next context
+    }
+
+    // MARK: - Analytics
+
+    private func initializeAnalytics() async {
+        do {
+            // Enable analytics for real-time data capture - force enable with fallback
+            print("📊 Initializing analytics safely after SDK startup...")
+
+            // Always ensure analytics are enabled with hardcoded fallback
+            await sdk.setAnalyticsEnabled(true)
+            await sdk.setEnableLiveMetrics(true)
+
+            // Log current analytics configuration
+            let analyticsEnabled = await sdk.getAnalyticsEnabled()
+            let liveMetricsEnabled = await sdk.getEnableLiveMetrics()
+            print("📊 Analytics Configuration - Enabled: \(analyticsEnabled), Live Metrics: \(liveMetricsEnabled)")
+
+        } catch {
+            print("⚠️ Failed to initialize analytics: \(error)")
+            // Continue without analytics rather than crashing
+        }
+    }
+
+    func logAnalyticsForCurrentGeneration() async {
+        guard let sessionId = currentSessionId else { return }
+
+        // Get the current session
+        if let session = await sdk.getAnalyticsSession(sessionId) {
+            print("📊 Current Session Analytics:")
+            print("   Session ID: \(String(session.id.uuidString.prefix(8)))")
+            print("   Model: \(session.modelId)")
+            print("   Type: \(session.sessionType)")
+            print("   Generations: \(session.generationCount)")
+            print("   Total Tokens: \(session.totalInputTokens + session.totalOutputTokens)")
+            print("   Avg Speed: \(String(format: "%.2f", session.averageTokensPerSecond)) tokens/sec")
+            print("   Duration: \(String(format: "%.2f", session.totalDuration))s")
+        }
+
+        // Get the latest generation
+        let generations = await sdk.getGenerationsForSession(sessionId)
+        if let latestGen = generations.last, let performance = latestGen.performance {
+            print("📊 Latest Generation:")
+            print("   Time to First Token: \(String(format: "%.2f", performance.timeToFirstToken))s")
+            print("   Total Time: \(String(format: "%.2f", performance.totalGenerationTime))s")
+            print("   Tokens/sec: \(String(format: "%.2f", performance.tokensPerSecond))")
+            print("   Execution: \(performance.executionTarget)")
+        }
+    }
+
+    func getAllAnalytics() async -> [GenerationSession] {
+        return await sdk.getAllAnalyticsSessions()
     }
 }

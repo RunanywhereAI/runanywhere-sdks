@@ -348,7 +348,7 @@ private struct ModelRow: View {
                 }
 
                 // Show download status
-                if let downloadURL = model.downloadURL {
+                if let _ = model.downloadURL {
                     if model.localPath == nil {
                         HStack(spacing: 4) {
                             if isDownloading {

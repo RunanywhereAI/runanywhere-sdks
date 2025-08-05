@@ -23,6 +23,10 @@ struct SettingsView: View {
     @State private var routingPolicy: String = SDKConstants.ConfigurationDefaults.routingPolicy
     @State private var apiKey: String = ""
 
+    // Analytics settings
+    @State private var analyticsEnabled: Bool = SDKConstants.ConfigurationDefaults.analyticsEnabled
+    @State private var enableLiveMetrics: Bool = SDKConstants.ConfigurationDefaults.enableLiveMetrics
+
     // Access to SDK
     private let sdk = RunAnywhereSDK.shared
 
@@ -53,6 +57,29 @@ struct SettingsView: View {
                     Task {
                         await sdk.setRoutingPolicy(newValue)
                     }
+                }
+            }
+
+            Section("Analytics Configuration") {
+                Toggle("Enable Analytics", isOn: $analyticsEnabled)
+                    .onChange(of: analyticsEnabled) { newValue in
+                        Task {
+                            await sdk.setAnalyticsEnabled(newValue)
+                        }
+                    }
+
+                Toggle("Live Metrics", isOn: $enableLiveMetrics)
+                    .onChange(of: enableLiveMetrics) { newValue in
+                        Task {
+                            await sdk.setEnableLiveMetrics(newValue)
+                        }
+                    }
+                    .disabled(!analyticsEnabled)
+
+                if analyticsEnabled {
+                    Text("Analytics help track performance and usage metrics for better experience.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
 
@@ -212,6 +239,8 @@ struct SettingsView: View {
         cloudRoutingEnabled = SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
         privacyModeEnabled = SDKConstants.ConfigurationDefaults.privacyModeEnabled
         routingPolicy = SDKConstants.ConfigurationDefaults.routingPolicy
+        analyticsEnabled = SDKConstants.ConfigurationDefaults.analyticsEnabled
+        enableLiveMetrics = SDKConstants.ConfigurationDefaults.enableLiveMetrics
 
         // Clear SDK overrides and reset to defaults
         Task {
@@ -219,6 +248,8 @@ struct SettingsView: View {
             await sdk.setCloudRoutingEnabled(SDKConstants.ConfigurationDefaults.cloudRoutingEnabled)
             await sdk.setPrivacyModeEnabled(SDKConstants.ConfigurationDefaults.privacyModeEnabled)
             await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
+            await sdk.setAnalyticsEnabled(SDKConstants.ConfigurationDefaults.analyticsEnabled)
+            await sdk.setEnableLiveMetrics(SDKConstants.ConfigurationDefaults.enableLiveMetrics)
 
             // Sync to database and cloud
             await sdk.syncUserPreferences()
@@ -235,6 +266,10 @@ struct SettingsView: View {
         let policy = await sdk.getRoutingPolicy()
         let key = await sdk.getApiKey()
 
+        // Load analytics settings
+        let analytics = await sdk.getAnalyticsEnabled()
+        let liveMetrics = await sdk.getEnableLiveMetrics()
+
         await MainActor.run {
             temperature = Double(settings.temperature)
             maxTokens = Double(settings.maxTokens)
@@ -245,6 +280,8 @@ struct SettingsView: View {
             privacyModeEnabled = privacyMode
             routingPolicy = policy
             apiKey = key ?? ""
+            analyticsEnabled = analytics
+            enableLiveMetrics = liveMetrics
         }
     }
 

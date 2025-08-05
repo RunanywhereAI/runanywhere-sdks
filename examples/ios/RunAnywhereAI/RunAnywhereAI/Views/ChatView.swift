@@ -14,6 +14,8 @@ struct ChatView: View {
     @FocusState private var isInputFocused: Bool
     @State private var showingConversationList = false
     @State private var showingExportView = false
+    @State private var showingAnalytics = false
+    @State private var showAnalyticsInline = true  // Default to true for better visibility
 
     init() {
         _viewModel = StateObject(wrappedValue: ChatViewModel())
@@ -26,8 +28,15 @@ struct ChatView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(viewModel.messages) { message in
-                            MessageBubble(message: message)
-                                .id(message.id)
+                            VStack(spacing: 8) {
+                                MessageBubble(message: message)
+                                    .id(message.id)
+
+                                // Show analytics for assistant messages when toggle is enabled
+                                if message.role == .assistant && showAnalyticsInline {
+                                    SessionAnalyticsView(sessionId: viewModel.currentSessionId)
+                                }
+                            }
                         }
 
                         if viewModel.isGenerating {
@@ -44,6 +53,17 @@ struct ChatView: View {
                     }
                 }
             }
+
+            Divider()
+
+            // Analytics toggle
+            HStack {
+                Toggle("Show Analytics", isOn: $showAnalyticsInline)
+                    .font(.caption)
+                Spacer()
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
 
             Divider()
 
@@ -106,6 +126,14 @@ struct ChatView: View {
 
                     Divider()
 
+                    Button(action: {
+                        showingAnalytics = true
+                    }) {
+                        Label("View Analytics", systemImage: "chart.bar.xaxis")
+                    }
+
+                    Divider()
+
                     Button(action: viewModel.clearChat) {
                         Label("Clear Chat", systemImage: "trash")
                     }
@@ -125,6 +153,9 @@ struct ChatView: View {
                     conversations: []
                 )
             }
+        }
+        .sheet(isPresented: $showingAnalytics) {
+            AnalyticsHistoryView()
         }
         .onAppear {
             loadCurrentConversation()
