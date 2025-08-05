@@ -514,17 +514,6 @@ public class RunAnywhereSDK {
         return value
     }
 
-    /// Set whether privacy mode is enabled (convenience method for boolean compatibility)
-    public func setPrivacyModeEnabled(_ enabled: Bool) async {
-        let mode: PrivacyMode = enabled ? .strict : .standard
-        await setPrivacyMode(mode)
-    }
-
-    /// Get whether privacy mode is enabled (convenience method for boolean compatibility)
-    public func getPrivacyModeEnabled() async -> Bool {
-        let mode = await getPrivacyMode()
-        return mode == .strict
-    }
 
     /// Set the routing policy
     public func setRoutingPolicy(_ policy: RoutingPolicy) async {
@@ -547,21 +536,6 @@ public class RunAnywhereSDK {
         return value
     }
 
-    /// Set the routing policy (convenience method for string compatibility)
-    public func setRoutingPolicy(_ policy: String) async {
-        if let routingPolicy = RoutingPolicy(rawValue: policy) {
-            await setRoutingPolicy(routingPolicy)
-        } else {
-            logger.info("⚠️ Invalid routing policy string: \(policy), using default")
-            await setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
-        }
-    }
-
-    /// Get the routing policy as string (convenience method for string compatibility)
-    public func getRoutingPolicyString() async -> String {
-        let policy = await getRoutingPolicy()
-        return policy.rawValue
-    }
 
     /// Set the API key
     public func setApiKey(_ apiKey: String?) async {

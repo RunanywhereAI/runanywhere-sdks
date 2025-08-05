@@ -43,7 +43,7 @@ struct SettingsView: View {
                 Toggle("Privacy Mode", isOn: $privacyModeEnabled)
                     .onChange(of: privacyModeEnabled) { newValue in
                         Task {
-                            await sdk.setPrivacyModeEnabled(newValue)
+                            await sdk.setPrivacyMode(newValue ? .strict : .standard)
                         }
                     }
 
@@ -56,7 +56,9 @@ struct SettingsView: View {
                 }
                 .onChange(of: routingPolicy) { newValue in
                     Task {
-                        await sdk.setRoutingPolicy(newValue)
+                        if let policy = RoutingPolicy(rawValue: newValue) {
+                            await sdk.setRoutingPolicy(policy)
+                        }
                     }
                 }
             }
@@ -247,8 +249,8 @@ struct SettingsView: View {
         Task {
             await sdk.resetGenerationSettings()
             await sdk.setCloudRoutingEnabled(SDKConstants.ConfigurationDefaults.cloudRoutingEnabled)
-            await sdk.setPrivacyModeEnabled(SDKConstants.ConfigurationDefaults.privacyModeEnabled)
-            await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy.rawValue)
+            await sdk.setPrivacyMode(SDKConstants.ConfigurationDefaults.privacyModeEnabled ? .strict : .standard)
+            await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
             await sdk.setAnalyticsEnabled(SDKConstants.ConfigurationDefaults.analyticsEnabled)
             await sdk.setEnableLiveMetrics(SDKConstants.ConfigurationDefaults.enableLiveMetrics)
 
@@ -263,7 +265,7 @@ struct SettingsView: View {
 
         // Load SDK configuration settings
         let cloudRouting = await sdk.getCloudRoutingEnabled()
-        let privacyMode = await sdk.getPrivacyModeEnabled()
+        let privacyMode = await sdk.getPrivacyMode()
         let policy = await sdk.getRoutingPolicy()
         let key = await sdk.getApiKey()
 
@@ -278,7 +280,7 @@ struct SettingsView: View {
             topK = Double(settings.topK ?? 50)
 
             cloudRoutingEnabled = cloudRouting
-            privacyModeEnabled = privacyMode
+            privacyModeEnabled = privacyMode == .strict
             routingPolicy = policy.rawValue
             apiKey = key ?? ""
             analyticsEnabled = analytics
