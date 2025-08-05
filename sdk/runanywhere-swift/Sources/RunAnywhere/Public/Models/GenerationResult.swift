@@ -41,6 +41,9 @@ public struct GenerationResult {
     /// Additional metadata
     public let metadata: ResultMetadata?
 
+    /// Structured output validation result (if structured output was requested)
+    public var structuredOutputValidation: StructuredOutputValidation?
+
     /// Initializer
     internal init(
         text: String,
@@ -55,7 +58,8 @@ public struct GenerationResult {
         memoryUsed: Int64 = 0,
         tokenizerFormat: TokenizerFormat? = nil,
         performanceMetrics: PerformanceMetrics,
-        metadata: ResultMetadata? = nil
+        metadata: ResultMetadata? = nil,
+        structuredOutputValidation: StructuredOutputValidation? = nil
     ) {
         self.text = text
         self.thinkingContent = thinkingContent
@@ -70,6 +74,7 @@ public struct GenerationResult {
         self.tokenizerFormat = tokenizerFormat
         self.performanceMetrics = performanceMetrics
         self.metadata = metadata
+        self.structuredOutputValidation = structuredOutputValidation
     }
 }
 

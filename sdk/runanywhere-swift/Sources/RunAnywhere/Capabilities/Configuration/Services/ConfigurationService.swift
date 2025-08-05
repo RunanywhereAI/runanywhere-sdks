@@ -1,7 +1,7 @@
 import Foundation
 
 /// Simple service for managing SDK configuration using repository pattern
-public actor ConfigurationService {
+public actor ConfigurationService: ConfigurationServiceProtocol {
     private let logger = SDKLogger(category: "ConfigurationService")
     private let configRepository: ConfigurationRepository
     private var currentConfig: ConfigurationData?

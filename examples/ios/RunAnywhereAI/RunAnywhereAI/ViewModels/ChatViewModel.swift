@@ -31,17 +31,27 @@ class ChatViewModel: ObservableObject {
     @Published var useStreaming = false  // Use non-streaming for more reliable generation
 
     private let sdk = RunAnywhereSDK.shared
+    private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
     private var conversationContext: Context?
     @Published var currentSessionId: UUID?
     @Published var showAnalytics = false
+    private var currentConversation: Conversation?
 
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating && isModelLoaded
     }
 
     init() {
-        addSystemMessage()
+        // Load existing conversation or create new one
+        if let conversation = conversationStore.currentConversation {
+            currentConversation = conversation
+            messages = conversation.messages
+        } else {
+            let conversation = conversationStore.createConversation()
+            currentConversation = conversation
+            addSystemMessage()
+        }
 
         // Listen for model loaded notifications
         NotificationCenter.default.addObserver(
@@ -65,6 +75,12 @@ class ChatViewModel: ObservableObject {
 
         let systemMessage = ChatMessage(role: .system, content: content)
         messages.insert(systemMessage, at: 0)
+
+        // Save to conversation store
+        if var conversation = currentConversation {
+            conversation.messages = messages
+            conversationStore.updateConversation(conversation)
+        }
     }
 
     func sendMessage() async {
@@ -72,6 +88,11 @@ class ChatViewModel: ObservableObject {
 
         let userMessage = ChatMessage(role: .user, content: currentInput)
         messages.append(userMessage)
+
+        // Save user message to conversation
+        if let conversation = currentConversation {
+            conversationStore.addMessage(userMessage, to: conversation)
+        }
 
         let prompt = currentInput
         currentInput = ""
@@ -216,6 +237,17 @@ class ChatViewModel: ObservableObject {
 
             await MainActor.run {
                 self.isGenerating = false
+
+                // Save final assistant message to conversation
+                if messageIndex < self.messages.count,
+                   let conversation = self.currentConversation {
+                    let assistantMessage = self.messages[messageIndex]
+                    // Update conversation with final message
+                    var updatedConversation = conversation
+                    updatedConversation.messages = self.messages
+                    updatedConversation.modelName = self.loadedModelName
+                    self.conversationStore.updateConversation(updatedConversation)
+                }
             }
         }
     }
@@ -223,10 +255,14 @@ class ChatViewModel: ObservableObject {
     func clearChat() {
         generationTask?.cancel()
         messages.removeAll()
-        addSystemMessage()
         currentInput = ""
         isGenerating = false
         error = nil
+
+        // Create new conversation
+        let conversation = conversationStore.createConversation()
+        currentConversation = conversation
+        addSystemMessage()
         conversationContext = nil  // Clear context when clearing chat
         currentSessionId = nil  // Start a new analytics session
         // Keep allAnalytics to view history
@@ -244,7 +280,9 @@ class ChatViewModel: ObservableObject {
                 self.isModelLoaded = true
                 self.loadedModelName = modelInfo.name
                 // Update system message to reflect loaded model
-                self.messages.removeAll()
+                if self.messages.first?.role == .system {
+                    self.messages.removeFirst()
+                }
                 self.addSystemMessage()
             }
         } catch {
@@ -314,6 +352,20 @@ class ChatViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    func loadConversation(_ conversation: Conversation) {
+        currentConversation = conversation
+        messages = conversation.messages
+
+        // Update model info if available
+        if let modelName = conversation.modelName {
+            loadedModelName = modelName
+        }
+    }
+
+    func createNewConversation() {
+        clearChat()
     }
 
     deinit {

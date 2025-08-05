@@ -37,6 +37,12 @@ struct ContentView: View {
                 Label("Settings", systemImage: "gear")
             }
             .tag(3)
+
+            QuizView()
+                .tabItem {
+                    Label("Quiz", systemImage: "questionmark.circle")
+                }
+                .tag(4)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
             selectedTab = 1

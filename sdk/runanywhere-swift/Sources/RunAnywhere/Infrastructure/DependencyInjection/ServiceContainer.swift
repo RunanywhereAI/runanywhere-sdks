@@ -161,9 +161,9 @@ public class ServiceContainer {
         SDKLogger()
     }()
 
-    /// Configuration service
-    private var _configurationService: ConfigurationService?
-    public var configurationService: ConfigurationService {
+    /// Configuration service (either ConfigurationService or InMemoryConfigurationService)
+    private var _configurationService: ConfigurationServiceProtocol?
+    public var configurationService: ConfigurationServiceProtocol {
         guard let service = _configurationService else {
             fatalError("ConfigurationService must be initialized via bootstrap")
         }
@@ -173,17 +173,22 @@ public class ServiceContainer {
     /// Database service
     private var _database: DatabaseCore?
 
-    /// Get database (lazy initialization)
+    /// Get database (lazy initialization) - TEMPORARILY DISABLED DUE TO CORRUPTED JSON
     private var database: DatabaseCore? {
         get async {
-            if _database == nil {
-                do {
-                    _database = try await SQLiteDatabase()
-                } catch {
-                    logger.error("Failed to initialize Database: \(error)")
-                }
-            }
-            return _database
+            // COMMENTED OUT: Database temporarily disabled to avoid JSON corruption issues
+            // if _database == nil {
+            //     do {
+            //         _database = try await SQLiteDatabase()
+            //     } catch {
+            //         logger.error("Failed to initialize Database: \(error)")
+            //     }
+            // }
+            // return _database
+
+            // Return nil to force in-memory configuration
+            logger.warning("Database disabled - using in-memory configuration only")
+            return nil
         }
     }
 
@@ -294,7 +299,10 @@ public class ServiceContainer {
                 logger.info("Configuration loaded during SDK initialization")
             }
         } else {
-            fatalError("Database must be available for ConfigurationService")
+            // DATABASE DISABLED: Create in-memory configuration service
+            logger.warning("Database unavailable - creating in-memory configuration service")
+            _configurationService = InMemoryConfigurationService()
+            logger.info("In-memory configuration service created")
         }
 
         // Initialize API client if API key is provided

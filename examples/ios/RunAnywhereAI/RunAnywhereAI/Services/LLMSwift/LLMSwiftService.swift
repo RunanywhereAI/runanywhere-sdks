@@ -2,6 +2,24 @@ import Foundation
 import RunAnywhereSDK
 import LLM
 
+// Define LLMError for handling LLM.swift specific errors
+enum LLMError: LocalizedError {
+    case modelLoadFailed
+    case initializationFailed
+    case generationFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .modelLoadFailed:
+            return "Failed to load the LLM model"
+        case .initializationFailed:
+            return "Failed to initialize LLM service"
+        case .generationFailed(let reason):
+            return "Generation failed: \(reason)"
+        }
+    }
+}
+
 public class LLMSwiftService: LLMService {
     private var llm: LLM?
     private var modelPath: String?
@@ -17,25 +35,108 @@ public class LLMSwiftService: LLMService {
     }
 
     public func initialize(modelPath: String) async throws {
+        print("🚀 [LLMSwiftService] Initializing with model path: \(modelPath)")
         self.modelPath = modelPath
+
+        // Check if model file exists
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: modelPath) else {
+            print("❌ [LLMSwiftService] Model file does not exist at path: \(modelPath)")
+            throw LLMServiceError.modelNotLoaded
+        }
+
+        let fileSize = (try? fileManager.attributesOfItem(atPath: modelPath)[.size] as? Int64) ?? 0
+        print("📊 [LLMSwiftService] Model file size: \(fileSize) bytes")
 
         // Configure LLM with hardware settings
         let maxTokens = 2048 // Default context length
         let template = determineTemplate(from: modelPath)
+        print("📝 [LLMSwiftService] Using template: \(template), maxTokens: \(maxTokens)")
 
         // Initialize LLM instance
         do {
-            self.llm = LLM(
-                from: URL(fileURLWithPath: modelPath),
-                template: template,
-                maxTokenCount: Int32(maxTokens)
-            )
+            print("🚀 [LLMSwiftService] Creating LLM instance with timeout protection")
+
+            // Create LLM instance with timeout protection to prevent initialization hangs
+            // Run the blocking LLM initializer on a background queue to prevent main thread blocking
+            self.llm = try await withThrowingTaskGroup(of: LLM?.self) { group in
+                // Main initialization task on background queue
+                group.addTask {
+                    // Move to background queue to prevent blocking
+                    return try await Task.detached(priority: .userInitiated) {
+                        let llmInstance = LLM(
+                            from: URL(fileURLWithPath: modelPath),
+                            template: template,
+                            maxTokenCount: Int32(maxTokens)
+                        )
+                        return llmInstance
+                    }.value
+                }
+
+                // Timeout task for initialization
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds for model loading
+                    throw LLMError.initializationFailed
+                }
+
+                // Return the first completed task
+                guard let result = try await group.next() else {
+                    throw LLMError.initializationFailed
+                }
+
+                // Cancel remaining tasks
+                group.cancelAll()
+
+                // Ensure we got a valid LLM instance
+                guard let validLLM = result else {
+                    throw LLMError.modelLoadFailed
+                }
+
+                return validLLM
+            }
+
+            print("✅ [LLMSwiftService] LLM instance created successfully")
+
+            // Validate model readiness with a simple test prompt
+            print("🧪 [LLMSwiftService] Validating model readiness with test prompt")
+            guard let llm = self.llm else {
+                throw FrameworkError(
+                    framework: .llamaCpp,
+                    underlying: LLMError.modelLoadFailed,
+                    context: "Failed to initialize LLM.swift with model at \(modelPath)"
+                )
+            }
+
+            // Quick validation test with timeout
+            do {
+                let _ = try await withThrowingTaskGroup(of: String.self) { group in
+                    group.addTask {
+                        await llm.getCompletion(from: "Test")
+                    }
+
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds for validation
+                        throw LLMError.generationFailed("Model validation timed out")
+                    }
+
+                    guard let result = try await group.next() else {
+                        throw LLMError.generationFailed("Model validation failed")
+                    }
+
+                    group.cancelAll()
+                    return result
+                }
+                print("✅ [LLMSwiftService] Model validation successful - model is ready")
+            } catch {
+                print("⚠️ [LLMSwiftService] Model validation failed, but continuing: \(error)")
+                // Continue anyway - some models might not work with simple test prompts
+            }
 
             // Note: Will configure generation parameters during inference
             // LLM.swift Configuration API requires apiKey parameter
 
             // Create model info
-            guard let llm = self.llm else {
+            guard self.llm != nil else {
                 throw FrameworkError(
                     framework: .llamaCpp,
                     underlying: LLMError.modelLoadFailed,
@@ -65,19 +166,50 @@ public class LLMSwiftService: LLMService {
     }
 
     public func generate(prompt: String, options: GenerationOptions) async throws -> String {
+        print("🔧 [LLMSwiftService] Starting generation for prompt: \(prompt.prefix(50))...")
+
         guard let llm = llm else {
+            print("❌ [LLMSwiftService] LLM not initialized")
             throw LLMServiceError.notInitialized
         }
 
+        print("✅ [LLMSwiftService] LLM is initialized, applying options")
         // Apply generation options
         await applyGenerationOptions(options, to: llm)
 
+        print("🔧 [LLMSwiftService] Building prompt with context")
         // Include context if available
         let fullPrompt = buildPromptWithContext(prompt)
+        print("📝 [LLMSwiftService] Full prompt length: \(fullPrompt.count) characters")
 
-        // Generate response
+        // Generate response with timeout protection
         do {
-            let response = await llm.getCompletion(from: fullPrompt)
+            print("🚀 [LLMSwiftService] Calling llm.getCompletion() with 30-second timeout")
+
+            // Use timeout to prevent infinite hangs - THIS IS THE KEY FIX
+            let response = try await withThrowingTaskGroup(of: String.self) { group in
+                // Main generation task
+                group.addTask {
+                    await llm.getCompletion(from: fullPrompt)
+                }
+
+                // Timeout task
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
+                    throw LLMError.generationFailed("Generation timed out after 30 seconds")
+                }
+
+                // Return the first completed task (either response or timeout)
+                guard let result = try await group.next() else {
+                    throw LLMError.generationFailed("No result from generation task")
+                }
+
+                // Cancel remaining tasks
+                group.cancelAll()
+                return result
+            }
+
+            print("✅ [LLMSwiftService] Got response from LLM: \(response.prefix(100))...")
 
             // Apply stop sequences if specified
             var finalResponse = response
@@ -107,6 +239,7 @@ public class LLMSwiftService: LLMService {
 
             return finalResponse
         } catch {
+            print("❌ [LLMSwiftService] Generation failed: \(error)")
             throw FrameworkError(
                 framework: .llamaCpp,
                 underlying: error,
@@ -120,7 +253,10 @@ public class LLMSwiftService: LLMService {
         options: GenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
+        print("🔧 [LLMSwiftService] Starting stream generation for prompt: \(prompt.prefix(50))...")
+
         guard let llm = llm else {
+            print("❌ [LLMSwiftService] LLM not initialized for streaming")
             throw LLMServiceError.notInitialized
         }
 
@@ -129,63 +265,85 @@ public class LLMSwiftService: LLMService {
 
         // Include context
         let fullPrompt = buildPromptWithContext(prompt)
+        print("📝 [LLMSwiftService] Full streaming prompt length: \(fullPrompt.count) characters")
 
         // Create streaming callback
         var tokenCount = 0
         let maxTokens = options.maxTokens > 0 ? options.maxTokens : Int.max
         var accumulatedResponse = ""
 
-        // Generate with streaming using respond method
+        // Generate with streaming using respond method with timeout protection
         do {
-            await llm.respond(to: fullPrompt) { response in
-                var fullResponse = ""
-                for await token in response {
-                    // Accumulate response to check for stop sequences
-                    accumulatedResponse += token
+            print("🚀 [LLMSwiftService] Starting streaming with 60-second timeout")
 
-                    // Note: We stream all tokens including thinking tags
-                    // The SDK's StreamingService will handle parsing and filtering
-                    // thinking content based on the model's configuration
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                // Main streaming task
+                group.addTask {
+                    await llm.respond(to: fullPrompt) { response in
+                        var fullResponse = ""
+                        for await token in response {
+                            // Accumulate response to check for stop sequences
+                            accumulatedResponse += token
 
-                    // Check stop sequences in accumulated response
-                    if !options.stopSequences.isEmpty {
-                        var shouldStop = false
-                        for sequence in options.stopSequences {
-                            if accumulatedResponse.contains(sequence) {
-                                // If we hit a stop sequence, emit only up to that point
-                                if let range = accumulatedResponse.range(of: sequence) {
-                                    let remainingText = String(accumulatedResponse[..<range.lowerBound])
-                                    if remainingText.count > fullResponse.count {
-                                        let newText = String(remainingText.suffix(remainingText.count - fullResponse.count))
-                                        if !newText.isEmpty {
-                                            onToken(newText)
+                            // Note: We stream all tokens including thinking tags
+                            // The SDK's StreamingService will handle parsing and filtering
+                            // thinking content based on the model's configuration
+
+                            // Check stop sequences in accumulated response
+                            if !options.stopSequences.isEmpty {
+                                var shouldStop = false
+                                for sequence in options.stopSequences {
+                                    if accumulatedResponse.contains(sequence) {
+                                        // If we hit a stop sequence, emit only up to that point
+                                        if let range = accumulatedResponse.range(of: sequence) {
+                                            let remainingText = String(accumulatedResponse[..<range.lowerBound])
+                                            if remainingText.count > fullResponse.count {
+                                                let newText = String(remainingText.suffix(remainingText.count - fullResponse.count))
+                                                if !newText.isEmpty {
+                                                    onToken(newText)
+                                                }
+                                            }
                                         }
+                                        shouldStop = true
+                                        break
                                     }
                                 }
-                                shouldStop = true
+                                if shouldStop { break }
+                            }
+
+                            // Check token limit (approximate - actual tokenization may differ)
+                            tokenCount += 1
+                            if tokenCount >= maxTokens {
                                 break
                             }
+
+                            // Yield token
+                            onToken(token)
+                            fullResponse += token
                         }
-                        if shouldStop { break }
+                        return fullResponse
                     }
-
-                    // Check token limit (approximate - actual tokenization may differ)
-                    tokenCount += 1
-                    if tokenCount >= maxTokens {
-                        break
-                    }
-
-                    // Yield token
-                    onToken(token)
-                    fullResponse += token
                 }
-                return fullResponse
+
+                // Timeout task for streaming
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds for streaming
+                    throw LLMError.generationFailed("Streaming generation timed out after 60 seconds")
+                }
+
+                // Wait for either completion or timeout
+                let _ = try await group.next()
+                group.cancelAll()
             }
+
+            print("✅ [LLMSwiftService] Streaming generation completed successfully")
+
         } catch {
+            print("❌ [LLMSwiftService] Streaming generation failed: \(error)")
             throw FrameworkError(
                 framework: .llamaCpp,
                 underlying: error,
-                context: "Streaming generation failed"
+                context: "Streaming generation failed for prompt: \(prompt)"
             )
         }
     }
