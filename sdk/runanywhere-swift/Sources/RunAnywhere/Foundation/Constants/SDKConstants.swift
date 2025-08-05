@@ -52,20 +52,20 @@ public enum SDKConstants {
     /// Default configuration values
     public enum ConfigurationDefaults {
         // Generation settings
-        public static let temperature: Float = 0.7
+        public static let temperature: Double = 0.7
         public static let maxTokens: Int = 256
-        public static let topP: Float = 0.95
+        public static let topP: Double = 0.95
         public static let topK: Int = 40
 
         // SDK configuration - FORCE LOCAL ONLY
         public static let cloudRoutingEnabled: Bool = false  // Disable cloud routing completely
         public static let privacyModeEnabled: Bool = true
-        public static let routingPolicy: String = "on-device"  // Force on-device only
+        public static let routingPolicy = RoutingPolicy.deviceOnly  // Force on-device only
         public static let allowUserOverride: Bool = false  // Don't allow override to cloud
 
         // Analytics configuration - hardcoded to be fully enabled
         public static let analyticsEnabled: Bool = true
-        public static let analyticsLevel: String = "full"  // Changed to "full" for complete analytics
+        public static let analyticsLevel = AnalyticsLevel.verbose  // Changed to verbose for complete analytics
         public static let enableLiveMetrics: Bool = true   // Enable live metrics for better real-time tracking
 
         // Configuration ID
@@ -73,12 +73,5 @@ public enum SDKConstants {
     }
 
     // MARK: - Routing Policies
-
-    /// Available routing policy options
-    public enum RoutingPolicy {
-        public static let automatic = "automatic"
-        public static let onDeviceOnly = "on-device"
-        public static let cloudOnly = "cloud"
-        public static let costOptimized = "cost-optimized"
-    }
+    // Note: RoutingPolicy enum has been moved to Public/Configuration/RoutingPolicy.swift
 }

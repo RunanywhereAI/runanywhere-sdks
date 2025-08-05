@@ -234,10 +234,15 @@ public class ServiceContainer {
                         telemetryService: telemetryRepo,
                         performanceMonitor: performanceMonitor
                     )
+                } else {
+                    // Database is disabled, create no-op analytics service
+                    logger.warning("Creating no-op GenerationAnalytics service (database disabled)")
+                    _generationAnalytics = NoOpGenerationAnalyticsService()
                 }
             }
 
             guard let analytics = _generationAnalytics else {
+                logger.error("GenerationAnalytics service not available")
                 fatalError("Failed to initialize GenerationAnalytics service")
             }
 

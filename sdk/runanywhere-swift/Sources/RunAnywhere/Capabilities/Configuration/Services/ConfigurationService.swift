@@ -48,13 +48,13 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
             // Try to load existing configuration
             if let config = try await configRepository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId) {
                 self.currentConfig = config
-                logger.info("Loaded configuration from database - maxTokens: \(config.maxTokens), temperature: \(config.temperature)")
+                logger.info("Loaded configuration from database - maxTokens: \(config.generation.defaults.maxTokens), temperature: \(config.generation.defaults.temperature)")
             } else {
                 // Create default configuration
                 let defaultConfig = ConfigurationData()
                 try await configRepository.save(defaultConfig)
                 self.currentConfig = defaultConfig
-                logger.info("Created default configuration - maxTokens: \(defaultConfig.maxTokens)")
+                logger.info("Created default configuration - maxTokens: \(defaultConfig.generation.defaults.maxTokens)")
             }
         } catch {
             logger.error("Failed to load configuration: \(error)")
@@ -67,7 +67,7 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
         do {
             try await configRepository.save(config)
             self.currentConfig = config
-            logger.info("Configuration saved - maxTokens: \(config.maxTokens), temperature: \(config.temperature)")
+            logger.info("Configuration saved - maxTokens: \(config.generation.defaults.maxTokens), temperature: \(config.generation.defaults.temperature)")
         } catch {
             logger.error("Failed to save configuration: \(error)")
         }

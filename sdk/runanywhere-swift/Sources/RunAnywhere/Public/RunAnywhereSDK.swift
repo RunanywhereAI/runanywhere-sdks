@@ -342,7 +342,9 @@ public class RunAnywhereSDK {
     public func setTemperature(_ value: Float) async {
         logger.info("🌡️ Setting temperature")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(temperature: value)
+            var updated = config
+            updated.generation.defaults.temperature = Double(value)
+            return updated.markUpdated()
         }
         logger.info("✅ Temperature updated")
     }
@@ -351,7 +353,9 @@ public class RunAnywhereSDK {
     public func setMaxTokens(_ value: Int) async {
         logger.info("🔢 Setting maxTokens")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(maxTokens: value)
+            var updated = config
+            updated.generation.defaults.maxTokens = value
+            return updated.markUpdated()
         }
         logger.info("✅ MaxTokens updated")
     }
@@ -360,7 +364,9 @@ public class RunAnywhereSDK {
     public func setTopP(_ value: Float) async {
         logger.info("📊 Setting topP")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(topP: value)
+            var updated = config
+            updated.generation.defaults.topP = Double(value)
+            return updated.markUpdated()
         }
         logger.info("✅ TopP updated")
     }
@@ -369,7 +375,9 @@ public class RunAnywhereSDK {
     public func setTopK(_ value: Int) async {
         logger.info("📊 Setting topK")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(topK: value)
+            var updated = config
+            updated.generation.defaults.topK = value
+            return updated.markUpdated()
         }
         logger.info("✅ TopK updated")
     }
@@ -383,10 +391,11 @@ public class RunAnywhereSDK {
 
         let config = await serviceContainer.configurationService.getConfiguration()
 
-        let temperature = config?.temperature ?? SDKConstants.ConfigurationDefaults.temperature
-        let maxTokens = config?.maxTokens ?? SDKConstants.ConfigurationDefaults.maxTokens
-        let topP = config?.topP ?? SDKConstants.ConfigurationDefaults.topP
-        let topK = config?.topK ?? SDKConstants.ConfigurationDefaults.topK
+        let defaults = config?.generation.defaults ?? DefaultGenerationSettings()
+        let temperature = Float(defaults.temperature)
+        let maxTokens = defaults.maxTokens
+        let topP = Float(defaults.topP)
+        let topK = defaults.topK ?? SDKConstants.ConfigurationDefaults.topK
 
         logger.info("📊 Returning generation settings")
 
