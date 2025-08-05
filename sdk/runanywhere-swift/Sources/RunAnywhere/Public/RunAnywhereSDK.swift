@@ -127,8 +127,8 @@ public class RunAnywhereSDK {
         // Create options with configuration defaults if not provided
         let effectiveOptions = options ?? GenerationOptions(
             maxTokens: effectiveSettings.maxTokens,
-            temperature: effectiveSettings.temperature,
-            topP: effectiveSettings.topP
+            temperature: Float(effectiveSettings.temperature),
+            topP: Float(effectiveSettings.topP)
         )
 
         // Check if analytics is enabled
@@ -181,8 +181,8 @@ public class RunAnywhereSDK {
                 // Create options with configuration defaults if not provided
                 let effectiveOptions = options ?? GenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
-                    temperature: effectiveSettings.temperature,
-                    topP: effectiveSettings.topP
+                    temperature: Float(effectiveSettings.temperature),
+                    topP: Float(effectiveSettings.topP)
                 )
 
                 // Check if analytics is enabled
@@ -392,9 +392,9 @@ public class RunAnywhereSDK {
         let config = await serviceContainer.configurationService.getConfiguration()
 
         let defaults = config?.generation.defaults ?? DefaultGenerationSettings()
-        let temperature = Float(defaults.temperature)
+        let temperature = defaults.temperature
         let maxTokens = defaults.maxTokens
-        let topP = Float(defaults.topP)
+        let topP = defaults.topP
         let topK = defaults.topK ?? SDKConstants.ConfigurationDefaults.topK
 
         logger.info("📊 Returning generation settings")
@@ -403,8 +403,7 @@ public class RunAnywhereSDK {
             temperature: temperature,
             maxTokens: maxTokens,
             topP: topP,
-            topK: topK,
-            allowUserOverride: config?.allowUserOverride ?? SDKConstants.ConfigurationDefaults.allowUserOverride
+            topK: topK
         )
     }
 
@@ -477,7 +476,9 @@ public class RunAnywhereSDK {
     public func setCloudRoutingEnabled(_ enabled: Bool) async {
         logger.info("☁️ Setting cloud routing enabled")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(cloudRoutingEnabled: enabled)
+            var updated = config
+            updated.routing.cloudEnabled = enabled
+            return updated.markUpdated()
         }
         logger.info("✅ Cloud routing setting updated")
     }
@@ -487,54 +488,88 @@ public class RunAnywhereSDK {
         logger.info("📖 Getting cloud routing enabled setting")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.cloudRoutingEnabled ?? SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
+        let value = config?.routing.cloudEnabled ?? SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
         logger.info("☁️ Cloud routing enabled retrieved")
         return value
     }
 
-    /// Set whether privacy mode is enabled
-    public func setPrivacyModeEnabled(_ enabled: Bool) async {
-        logger.info("🔒 Setting privacy mode enabled")
+    /// Set privacy mode
+    public func setPrivacyMode(_ mode: PrivacyMode) async {
+        logger.info("🔒 Setting privacy mode")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(privacyModeEnabled: enabled)
+            var updated = config
+            updated.routing.privacyMode = mode
+            return updated.markUpdated()
         }
         logger.info("✅ Privacy mode setting updated")
     }
 
-    /// Get whether privacy mode is enabled
-    public func getPrivacyModeEnabled() async -> Bool {
-        logger.info("📖 Getting privacy mode enabled setting")
+    /// Get privacy mode
+    public func getPrivacyMode() async -> PrivacyMode {
+        logger.info("📖 Getting privacy mode setting")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.privacyModeEnabled ?? SDKConstants.ConfigurationDefaults.privacyModeEnabled
-        logger.info("🔒 Privacy mode enabled retrieved")
+        let value = config?.routing.privacyMode ?? (SDKConstants.ConfigurationDefaults.privacyModeEnabled ? .strict : .standard)
+        logger.info("🔒 Privacy mode retrieved")
         return value
     }
 
+    /// Set whether privacy mode is enabled (convenience method for boolean compatibility)
+    public func setPrivacyModeEnabled(_ enabled: Bool) async {
+        let mode: PrivacyMode = enabled ? .strict : .standard
+        await setPrivacyMode(mode)
+    }
+
+    /// Get whether privacy mode is enabled (convenience method for boolean compatibility)
+    public func getPrivacyModeEnabled() async -> Bool {
+        let mode = await getPrivacyMode()
+        return mode == .strict
+    }
+
     /// Set the routing policy
-    public func setRoutingPolicy(_ policy: String) async {
+    public func setRoutingPolicy(_ policy: RoutingPolicy) async {
         logger.info("🛣️ Setting routing policy")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(routingPolicy: policy)
+            var updated = config
+            updated.routing.policy = policy
+            return updated.markUpdated()
         }
         logger.info("✅ Routing policy updated")
     }
 
     /// Get the routing policy
-    public func getRoutingPolicy() async -> String {
+    public func getRoutingPolicy() async -> RoutingPolicy {
         logger.info("📖 Getting routing policy")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.routingPolicy ?? SDKConstants.ConfigurationDefaults.routingPolicy
+        let value = config?.routing.policy ?? SDKConstants.ConfigurationDefaults.routingPolicy
         logger.info("🛣️ Routing policy retrieved")
         return value
+    }
+
+    /// Set the routing policy (convenience method for string compatibility)
+    public func setRoutingPolicy(_ policy: String) async {
+        if let routingPolicy = RoutingPolicy(rawValue: policy) {
+            await setRoutingPolicy(routingPolicy)
+        } else {
+            logger.info("⚠️ Invalid routing policy string: \(policy), using default")
+            await setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
+        }
+    }
+
+    /// Get the routing policy as string (convenience method for string compatibility)
+    public func getRoutingPolicyString() async -> String {
+        let policy = await getRoutingPolicy()
+        return policy.rawValue
     }
 
     /// Set the API key
     public func setApiKey(_ apiKey: String?) async {
         logger.info("🔑 Setting API key")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(apiKey: apiKey)
+            var updated = config
+            updated.apiKey = apiKey
+            return updated.markUpdated()
         }
         logger.info("✅ API key updated")
     }
@@ -552,7 +587,9 @@ public class RunAnywhereSDK {
     public func setAnalyticsEnabled(_ enabled: Bool) async {
         logger.info("📊 Setting analytics enabled")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(analyticsEnabled: enabled)
+            var updated = config
+            updated.analytics.enabled = enabled
+            return updated.markUpdated()
         }
         logger.info("✅ Analytics enabled setting updated")
     }
@@ -562,7 +599,7 @@ public class RunAnywhereSDK {
         logger.info("📖 Getting analytics enabled setting")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.analyticsEnabled ?? SDKConstants.ConfigurationDefaults.analyticsEnabled
+        let value = config?.analytics.enabled ?? SDKConstants.ConfigurationDefaults.analyticsEnabled
         logger.info("📊 Analytics enabled retrieved: \(value)")
         return value
     }
@@ -592,7 +629,9 @@ public class RunAnywhereSDK {
     public func setEnableLiveMetrics(_ enabled: Bool) async {
         logger.info("📊 Setting enable live metrics")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(enableLiveMetrics: enabled)
+            var updated = config
+            updated.analytics.liveMetricsEnabled = enabled
+            return updated.markUpdated()
         }
         logger.info("✅ Enable live metrics setting updated")
     }
@@ -602,7 +641,7 @@ public class RunAnywhereSDK {
         logger.info("📖 Getting enable live metrics setting")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.enableLiveMetrics ?? SDKConstants.ConfigurationDefaults.enableLiveMetrics
+        let value = config?.analytics.liveMetricsEnabled ?? SDKConstants.ConfigurationDefaults.enableLiveMetrics
         logger.info("📊 Enable live metrics retrieved: \(value)")
         return value
     }

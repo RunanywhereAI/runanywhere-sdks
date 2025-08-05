@@ -5,7 +5,7 @@ public actor GenerationAnalyticsServiceImpl: GenerationAnalyticsService {
     // MARK: - Properties
 
     private let repository: GenerationAnalyticsRepository
-    private let telemetryService: TelemetryRepository
+    private let telemetryService: any TelemetryRepository
     private let performanceMonitor: PerformanceMonitor
     private let logger = SDKLogger(category: "GenerationAnalytics")
 
@@ -17,7 +17,7 @@ public actor GenerationAnalyticsServiceImpl: GenerationAnalyticsService {
 
     public init(
         repository: GenerationAnalyticsRepository,
-        telemetryService: TelemetryRepository,
+        telemetryService: any TelemetryRepository,
         performanceMonitor: PerformanceMonitor
     ) {
         self.repository = repository

@@ -128,14 +128,14 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public func fetchByKey(_ key: String) async throws -> ConfigurationData? {
         // For now, just return the default configuration if key matches
         if key == "default" {
-            return try await fetch("default")
+            return try await fetch(id: "default")
         }
         return nil
     }
 
     public func updatePartial(_ id: String, updates: (ConfigurationData) -> ConfigurationData) async throws {
-        guard let existing = try await fetch(id) else {
-            throw RepositoryError.entityNotFound(id: id)
+        guard let existing = try await fetch(id: id) else {
+            throw RepositoryError.entityNotFound(id)
         }
 
         let updated = updates(existing)

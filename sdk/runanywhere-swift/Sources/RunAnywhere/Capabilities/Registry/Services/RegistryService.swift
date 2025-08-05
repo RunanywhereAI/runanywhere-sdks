@@ -37,7 +37,7 @@ public class RegistryService: ModelRegistry {
         logger.info("Registry initialization complete")
     }
 
-    private func getModelMetadataRepository() async -> ModelMetadataRepository? {
+    private func getModelMetadataRepository() async -> (any ModelMetadataRepository)? {
         // Access through DataSyncService
         guard let dataSyncService = await ServiceContainer.shared.dataSyncService else {
             return nil

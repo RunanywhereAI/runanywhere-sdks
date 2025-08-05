@@ -99,7 +99,8 @@
       "Bash(xcrun simctl terminate:*)",
       "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)",
       "Bash(timeout 60 xcodebuild -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -configuration Debug build -destination 'platform=iOS Simulator,name=iPhone 16 Pro')",
-      "Bash(xcrun simctl log:*)"
+      "Bash(xcrun simctl log:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

@@ -289,4 +289,75 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
 
         return try JSONDecoder().decode(ModelMetadataData.self, from: data)
     }
+
+    public func fetchByFramework(_ framework: LLMFramework) async throws -> [ModelMetadataData] {
+        let results = try await database.query("""
+            SELECT data FROM \(tableName) ORDER BY updated_at DESC
+        """, parameters: [])
+
+        return results.compactMap { row in
+            guard let json = row["data"] as? String,
+                  let data = json.data(using: .utf8),
+                  let metadata = try? JSONDecoder().decode(ModelMetadataData.self, from: data) else {
+                return nil
+            }
+
+            // Filter by framework
+            return metadata.framework == framework.rawValue ? metadata : nil
+        }
+    }
+
+    public func fetchDownloaded() async throws -> [ModelMetadataData] {
+        let results = try await database.query("""
+            SELECT data FROM \(tableName) ORDER BY updated_at DESC
+        """, parameters: [])
+
+        return results.compactMap { row in
+            guard let json = row["data"] as? String,
+                  let data = json.data(using: .utf8),
+                  let metadata = try? JSONDecoder().decode(ModelMetadataData.self, from: data) else {
+                return nil
+            }
+
+            // Check if the model file exists at the local path
+            let fileExists = FileManager.default.fileExists(atPath: metadata.localPath)
+            return fileExists ? metadata : nil
+        }
+    }
+
+    public func updateDownloadStatus(_ modelId: String, isDownloaded: Bool) async throws {
+        guard var metadata = try await fetch(id: modelId) else {
+            logger.warning("Model metadata not found: \(modelId)")
+            return
+        }
+
+        // If marking as not downloaded, we might want to clear the local path
+        // For now, we'll just update the metadata timestamp to reflect the change
+        let updatedMetadata = ModelMetadataData(
+            id: metadata.id,
+            name: metadata.name,
+            format: metadata.format,
+            framework: metadata.framework,
+            localPath: isDownloaded ? metadata.localPath : "", // Clear path if not downloaded
+            estimatedMemory: metadata.estimatedMemory,
+            contextLength: metadata.contextLength,
+            downloadSize: metadata.downloadSize,
+            checksum: metadata.checksum,
+            author: metadata.author,
+            license: metadata.license,
+            description: metadata.description,
+            tags: metadata.tags,
+            downloadedAt: isDownloaded ? (metadata.downloadedAt == Date(timeIntervalSince1970: 0) ? Date() : metadata.downloadedAt) : Date(timeIntervalSince1970: 0), // Set to epoch if not downloaded, current date if newly downloaded
+            lastUsed: metadata.lastUsed,
+            usageCount: metadata.usageCount,
+            supportsThinking: metadata.supportsThinking,
+            thinkingOpenTag: metadata.thinkingOpenTag,
+            thinkingCloseTag: metadata.thinkingCloseTag,
+            updatedAt: Date(),
+            syncPending: true
+        )
+
+        try await save(updatedMetadata)
+        logger.info("Updated download status for model \(modelId): \(isDownloaded)")
+    }
 }

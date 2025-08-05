@@ -88,7 +88,7 @@ internal struct ConfigurationMigration {
     internal static func migrateFromLegacy(_ legacy: LegacyConfigurationData) -> ConfigurationData {
         // Create routing configuration
         let routingPolicy = RoutingPolicy(rawValue: legacy.routingPolicy) ?? .deviceOnly
-        let privacyMode: PrivacyMode = legacy.privacyModeEnabled ? .enhanced : .standard
+        let privacyMode: PrivacyMode = legacy.privacyModeEnabled ? .strict : .standard
         let routing = RoutingConfiguration(
             policy: routingPolicy,
             cloudEnabled: legacy.cloudRoutingEnabled,

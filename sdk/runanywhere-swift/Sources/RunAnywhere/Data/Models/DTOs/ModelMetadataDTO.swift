@@ -14,24 +14,30 @@ public struct ModelMetadataDTO: Codable {
     public let requirements: ModelRequirementsDTO
 
     public init(from entity: ModelMetadataData) {
-        self.modelId = entity.modelId
+        self.modelId = entity.id  // Map from id to modelId
         self.name = entity.name
-        self.version = entity.version
-        self.framework = entity.framework
-        self.format = entity.format
-        self.sizeInBytes = entity.sizeInBytes
-        self.downloadURLs = entity.downloadURLs
+        self.version = "1.0.0"  // Default version as it doesn't exist in ModelMetadataData
+
+        // Convert String to enum with fallback
+        self.framework = LLMFramework(rawValue: entity.framework) ?? .foundationModels
+        self.format = ModelFormat(rawValue: entity.format) ?? .gguf
+
+        self.sizeInBytes = entity.downloadSize ?? entity.estimatedMemory  // Use downloadSize or fallback to estimatedMemory
+        self.downloadURLs = []  // Not available in ModelMetadataData, use empty array
         self.checksum = entity.checksum
+
         self.metadata = ModelMetadataInfo(
             description: entity.description,
             author: entity.author,
             license: entity.license,
             tags: entity.tags
         )
+
+        // Create requirements with estimated values since exact fields don't exist
         self.requirements = ModelRequirementsDTO(
-            minMemory: entity.minMemory,
-            recommendedMemory: entity.recommendedMemory,
-            supportedPlatforms: entity.supportedPlatforms
+            minMemory: entity.estimatedMemory,
+            recommendedMemory: entity.estimatedMemory + (entity.estimatedMemory / 4),  // Add 25% buffer
+            supportedPlatforms: ["iOS", "macOS"]  // Default supported platforms
         )
     }
 }

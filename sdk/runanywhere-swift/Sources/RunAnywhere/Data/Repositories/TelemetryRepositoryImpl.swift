@@ -139,4 +139,85 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
 
         try await save(event)
     }
+
+    // MARK: - TelemetryRepository Protocol Methods
+
+    public func fetchByDateRange(from: Date, to: Date) async throws -> [TelemetryData] {
+        let results = try await database.query("""
+            SELECT data FROM \(tableName) ORDER BY updated_at DESC
+        """, parameters: [])
+
+        return results.compactMap { row in
+            guard let json = row["data"] as? String,
+                  let data = json.data(using: .utf8),
+                  let telemetryData = try? JSONDecoder().decode(TelemetryData.self, from: data) else {
+                return nil
+            }
+
+            // Filter by date range
+            return (telemetryData.timestamp >= from && telemetryData.timestamp <= to) ? telemetryData : nil
+        }
+    }
+
+    public func fetchUnsent() async throws -> [TelemetryData] {
+        let results = try await database.query("""
+            SELECT data FROM \(tableName) WHERE sync_pending = 1 ORDER BY timestamp DESC
+        """, parameters: [])
+
+        return results.compactMap { row in
+            guard let json = row["data"] as? String,
+                  let data = json.data(using: .utf8) else {
+                return nil
+            }
+
+            return try? JSONDecoder().decode(TelemetryData.self, from: data)
+        }
+    }
+
+    public func markAsSent(_ ids: [String]) async throws {
+        try await database.transaction { db in
+            for id in ids {
+                try await db.execute("""
+                    UPDATE \(self.tableName) SET sync_pending = 0 WHERE id = ?
+                """, parameters: [id])
+            }
+        }
+
+        logger.info("Marked \(ids.count) telemetry events as sent")
+    }
+
+    public func cleanup(olderThan date: Date) async throws {
+        // Get all records to check timestamps
+        let results = try await database.query("""
+            SELECT id, data FROM \(tableName)
+        """, parameters: [])
+
+        var idsToDelete: [String] = []
+
+        for row in results {
+            guard let json = row["data"] as? String,
+                  let data = json.data(using: .utf8),
+                  let telemetryData = try? JSONDecoder().decode(TelemetryData.self, from: data),
+                  let id = row["id"] as? String else {
+                continue
+            }
+
+            if telemetryData.timestamp < date {
+                idsToDelete.append(id)
+            }
+        }
+
+        // Delete old records
+        if !idsToDelete.isEmpty {
+            try await database.transaction { db in
+                for id in idsToDelete {
+                    try await db.execute("""
+                        DELETE FROM \(self.tableName) WHERE id = ?
+                    """, parameters: [id])
+                }
+            }
+        }
+
+        logger.info("Cleaned up \(idsToDelete.count) telemetry events older than \(date)")
+    }
 }

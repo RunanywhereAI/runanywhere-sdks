@@ -20,7 +20,7 @@ struct SettingsView: View {
     // SDK Configuration settings
     @State private var cloudRoutingEnabled: Bool = SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
     @State private var privacyModeEnabled: Bool = SDKConstants.ConfigurationDefaults.privacyModeEnabled
-    @State private var routingPolicy: String = SDKConstants.ConfigurationDefaults.routingPolicy
+    @State private var routingPolicy: String = SDKConstants.ConfigurationDefaults.routingPolicy.rawValue
     @State private var apiKey: String = ""
 
     // Analytics settings
@@ -32,7 +32,7 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("SDK Configuration") {
+            Section(header: Text("SDK Configuration")) {
                 Toggle("Enable Cloud Routing", isOn: $cloudRoutingEnabled)
                     .onChange(of: cloudRoutingEnabled) { newValue in
                         Task {
@@ -48,10 +48,11 @@ struct SettingsView: View {
                     }
 
                 Picker("Routing Policy", selection: $routingPolicy) {
-                    Text("Automatic").tag(SDKConstants.RoutingPolicy.automatic)
-                    Text("On-Device Only").tag(SDKConstants.RoutingPolicy.onDeviceOnly)
-                    Text("Cloud Only").tag(SDKConstants.RoutingPolicy.cloudOnly)
-                    Text("Cost Optimized").tag(SDKConstants.RoutingPolicy.costOptimized)
+                    Text("Automatic").tag(RoutingPolicy.automatic.rawValue)
+                    Text("Prefer Device").tag(RoutingPolicy.preferDevice.rawValue)
+                    Text("Device Only").tag(RoutingPolicy.deviceOnly.rawValue)
+                    Text("Prefer Cloud").tag(RoutingPolicy.preferCloud.rawValue)
+                    Text("Custom").tag(RoutingPolicy.custom.rawValue)
                 }
                 .onChange(of: routingPolicy) { newValue in
                     Task {
@@ -60,7 +61,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Analytics Configuration") {
+            Section(header: Text("Analytics Configuration")) {
                 Toggle("Enable Analytics", isOn: $analyticsEnabled)
                     .onChange(of: analyticsEnabled) { newValue in
                         Task {
@@ -83,7 +84,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Generation Settings") {
+            Section(header: Text("Generation Settings")) {
                 VStack(alignment: .leading) {
                     Text("Temperature: \(temperature, specifier: "%.2f")")
                         .font(.caption)
@@ -124,7 +125,7 @@ struct SettingsView: View {
             }
 
             if showAdvancedSettings {
-                Section("Advanced Settings") {
+                Section(header: Text("Advanced Settings")) {
                     VStack(alignment: .leading) {
                         Text("Top P: \(topP, specifier: "%.2f")")
                             .font(.caption)
@@ -151,7 +152,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("API Configuration") {
+            Section(header: Text("API Configuration")) {
                 HStack {
                     Text("API Key")
                     Spacer()
@@ -188,7 +189,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("About") {
+            Section(header: Text("About")) {
                 HStack {
                     Label("RunAnywhere SDK", systemImage: "cube")
                     Spacer()
@@ -238,7 +239,7 @@ struct SettingsView: View {
         showAdvancedSettings = false
         cloudRoutingEnabled = SDKConstants.ConfigurationDefaults.cloudRoutingEnabled
         privacyModeEnabled = SDKConstants.ConfigurationDefaults.privacyModeEnabled
-        routingPolicy = SDKConstants.ConfigurationDefaults.routingPolicy
+        routingPolicy = SDKConstants.ConfigurationDefaults.routingPolicy.rawValue
         analyticsEnabled = SDKConstants.ConfigurationDefaults.analyticsEnabled
         enableLiveMetrics = SDKConstants.ConfigurationDefaults.enableLiveMetrics
 
@@ -247,7 +248,7 @@ struct SettingsView: View {
             await sdk.resetGenerationSettings()
             await sdk.setCloudRoutingEnabled(SDKConstants.ConfigurationDefaults.cloudRoutingEnabled)
             await sdk.setPrivacyModeEnabled(SDKConstants.ConfigurationDefaults.privacyModeEnabled)
-            await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy)
+            await sdk.setRoutingPolicy(SDKConstants.ConfigurationDefaults.routingPolicy.rawValue)
             await sdk.setAnalyticsEnabled(SDKConstants.ConfigurationDefaults.analyticsEnabled)
             await sdk.setEnableLiveMetrics(SDKConstants.ConfigurationDefaults.enableLiveMetrics)
 
@@ -274,11 +275,11 @@ struct SettingsView: View {
             temperature = Double(settings.temperature)
             maxTokens = Double(settings.maxTokens)
             topP = Double(settings.topP)
-            topK = Double(settings.topK)
+            topK = Double(settings.topK ?? 50)
 
             cloudRoutingEnabled = cloudRouting
             privacyModeEnabled = privacyMode
-            routingPolicy = policy
+            routingPolicy = policy.rawValue
             apiKey = key ?? ""
             analyticsEnabled = analytics
             enableLiveMetrics = liveMetrics

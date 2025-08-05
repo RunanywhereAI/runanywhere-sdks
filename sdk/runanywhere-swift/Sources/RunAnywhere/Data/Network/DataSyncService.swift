@@ -5,9 +5,9 @@ public actor DataSyncService {
     private let logger = SDKLogger(category: "DataSyncService")
 
     // Repositories
-    private let configRepository: ConfigurationRepository
-    public let telemetryRepository: TelemetryRepository
-    private let modelMetadataRepository: ModelMetadataRepository
+    private let configRepository: any ConfigurationRepository
+    public let telemetryRepository: any TelemetryRepository
+    private let modelMetadataRepository: any ModelMetadataRepository
 
     // Sync timer
     private var syncTimer: Task<Void, Never>?
@@ -66,7 +66,9 @@ public actor DataSyncService {
         _ type: String,
         properties: [String: String] = [:]
     ) async throws {
-        try await telemetryRepository.trackEvent(type, properties: properties)
+        // Convert string to TelemetryEventType enum, default to .custom if not found
+        let eventType = TelemetryEventType(rawValue: type) ?? .custom
+        try await telemetryRepository.trackEvent(eventType, properties: properties)
     }
 
     /// Get telemetry events

@@ -152,7 +152,7 @@ if [ "$BUILD_SDK" = true ]; then
     SDK_PATH="../../../sdk/runanywhere-swift"
     if [ -d "$SDK_PATH" ]; then
         pushd "$SDK_PATH" > /dev/null
-        if swift build 2>&1 | tee /tmp/sdk_build.log; then
+        if swift build -Xswiftc -suppress-warnings 2>&1 | tee /tmp/sdk_build.log; then
             print_status "SDK built successfully!"
         else
             # Check if it's just warnings
