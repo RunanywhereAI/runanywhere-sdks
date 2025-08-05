@@ -1,7 +1,7 @@
 import Foundation
 
 /// Repository for managing telemetry data
-public actor TelemetryRepository: Repository {
+public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public typealias Entity = TelemetryData
 
     private let database: DatabaseCore
@@ -131,9 +131,9 @@ public actor TelemetryRepository: Repository {
     }
 
     /// Track an event
-    public func trackEvent(_ type: String, properties: [String: String]) async throws {
+    public func trackEvent(_ type: TelemetryEventType, properties: [String: String]) async throws {
         let event = TelemetryData(
-            eventType: type,
+            eventType: type.rawValue,
             properties: properties
         )
 

@@ -19,17 +19,17 @@ public actor DataSyncService {
         apiClient: APIClient?,
         enableAutoSync: Bool = true
     ) {
-        self.configRepository = ConfigurationRepository(
+        self.configRepository = ConfigurationRepositoryImpl(
             database: database,
             apiClient: apiClient
         )
 
-        self.telemetryRepository = TelemetryRepository(
+        self.telemetryRepository = TelemetryRepositoryImpl(
             database: database,
             apiClient: apiClient
         )
 
-        self.modelMetadataRepository = ModelMetadataRepository(
+        self.modelMetadataRepository = ModelMetadataRepositoryImpl(
             database: database,
             apiClient: apiClient
         )

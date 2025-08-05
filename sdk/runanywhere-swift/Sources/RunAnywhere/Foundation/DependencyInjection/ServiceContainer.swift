@@ -290,7 +290,7 @@ public class ServiceContainer {
 
         // Initialize configuration service with repository
         if let db = await database {
-            let configRepository = ConfigurationRepository(
+            let configRepository = ConfigurationRepositoryImpl(
                 database: db,
                 apiClient: apiClient
             )

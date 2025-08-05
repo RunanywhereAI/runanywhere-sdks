@@ -7,4 +7,7 @@ public protocol TelemetryRepository: Repository where Entity == TelemetryData {
     func fetchUnsent() async throws -> [TelemetryData]
     func markAsSent(_ ids: [String]) async throws
     func cleanup(olderThan date: Date) async throws
+
+    // Additional methods
+    func trackEvent(_ type: TelemetryEventType, properties: [String: String]) async throws
 }

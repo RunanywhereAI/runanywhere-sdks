@@ -280,26 +280,6 @@ private class WeakObserver {
     }
 }
 
-/// Extended observer protocol for progress updates
-protocol ModelLifecycleProgressObserver: ModelLifecycleObserver {
-    func modelDidUpdateProgress(_ progress: ModelLifecycleProgress)
-}
-
-/// Progress information for lifecycle operations
-struct ModelLifecycleProgress {
-    let currentState: ModelLifecycleState
-    let percentage: Double
-    let estimatedTimeRemaining: TimeInterval?
-    let message: String?
-
-    init(currentState: ModelLifecycleState, percentage: Double, estimatedTimeRemaining: TimeInterval? = nil, message: String? = nil) {
-        self.currentState = currentState
-        self.percentage = max(0.0, min(100.0, percentage))
-        self.estimatedTimeRemaining = estimatedTimeRemaining
-        self.message = message
-    }
-}
-
 // MARK: - Data Structures
 
 struct ObserverRegistryStatistics {

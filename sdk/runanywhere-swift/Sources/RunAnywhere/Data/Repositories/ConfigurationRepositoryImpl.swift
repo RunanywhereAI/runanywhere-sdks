@@ -1,7 +1,7 @@
 import Foundation
 
 /// Repository for managing SDK configuration data
-public actor ConfigurationRepository: Repository {
+public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public typealias Entity = ConfigurationData
 
     private let database: DatabaseCore
@@ -60,7 +60,7 @@ public actor ConfigurationRepository: Repository {
 
             do {
                 let config = try JSONDecoder().decode(ConfigurationData.self, from: data)
-                logger.info("Fetched config - id: \(config.id), maxTokens: \(config.maxTokens)")
+                logger.info("Fetched config - id: \(config.id)")
                 return config
             } catch {
                 logger.error("Failed to decode configuration: \(error)")
@@ -121,5 +121,24 @@ public actor ConfigurationRepository: Repository {
         // Example sync implementation:
         // let response = try await apiClient.post(.syncConfiguration, pending)
         // try await markSynced(response.syncedIds)
+    }
+
+    // MARK: - ConfigurationRepository Protocol Methods
+
+    public func fetchByKey(_ key: String) async throws -> ConfigurationData? {
+        // For now, just return the default configuration if key matches
+        if key == "default" {
+            return try await fetch("default")
+        }
+        return nil
+    }
+
+    public func updatePartial(_ id: String, updates: (ConfigurationData) -> ConfigurationData) async throws {
+        guard let existing = try await fetch(id) else {
+            throw RepositoryError.entityNotFound(id: id)
+        }
+
+        let updated = updates(existing)
+        try await save(updated.markUpdated())
     }
 }

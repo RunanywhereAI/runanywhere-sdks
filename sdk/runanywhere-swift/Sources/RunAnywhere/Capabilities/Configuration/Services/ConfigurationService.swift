@@ -3,12 +3,12 @@ import Foundation
 /// Simple service for managing SDK configuration using repository pattern
 public actor ConfigurationService: ConfigurationServiceProtocol {
     private let logger = SDKLogger(category: "ConfigurationService")
-    private let configRepository: ConfigurationRepository
+    private let configRepository: any ConfigurationRepository
     private var currentConfig: ConfigurationData?
 
     // MARK: - Initialization
 
-    public init(configRepository: ConfigurationRepository) {
+    public init(configRepository: any ConfigurationRepository) {
         self.configRepository = configRepository
         logger.info("ConfigurationService created")
     }

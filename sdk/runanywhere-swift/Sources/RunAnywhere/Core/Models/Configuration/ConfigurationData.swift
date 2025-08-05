@@ -83,9 +83,9 @@ internal struct LegacyConfigurationData: Codable {
 }
 
 /// Migration helper for converting legacy data
-public struct ConfigurationMigration {
+internal struct ConfigurationMigration {
     /// Migrates from legacy configuration format to new format
-    public static func migrateFromLegacy(_ legacy: LegacyConfigurationData) -> ConfigurationData {
+    internal static func migrateFromLegacy(_ legacy: LegacyConfigurationData) -> ConfigurationData {
         // Create routing configuration
         let routingPolicy = RoutingPolicy(rawValue: legacy.routingPolicy) ?? .deviceOnly
         let privacyMode: PrivacyMode = legacy.privacyModeEnabled ? .enhanced : .standard

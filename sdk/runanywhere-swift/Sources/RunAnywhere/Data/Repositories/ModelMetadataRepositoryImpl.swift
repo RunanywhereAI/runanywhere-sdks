@@ -1,7 +1,7 @@
 import Foundation
 
 /// Repository for managing model metadata
-public actor ModelMetadataRepository: Repository {
+public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
     public typealias Entity = ModelMetadataData
 
     private let database: DatabaseCore
@@ -271,5 +271,22 @@ public actor ModelMetadataRepository: Repository {
         return allModels.filter { model in
             model.compatibleFrameworks.contains { frameworks.contains($0) }
         }
+    }
+
+    // MARK: - ModelMetadataRepository Protocol Methods
+
+    public func fetchByModelId(_ modelId: String) async throws -> ModelMetadataData? {
+        let results = try await database.query(
+            "SELECT * FROM \(tableName) WHERE model_id = ?",
+            parameters: [modelId]
+        )
+
+        guard let row = results.first,
+              let json = row["data"] as? String,
+              let data = json.data(using: .utf8) else {
+            return nil
+        }
+
+        return try JSONDecoder().decode(ModelMetadataData.self, from: data)
     }
 }

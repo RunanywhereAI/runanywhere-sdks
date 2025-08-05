@@ -1,7 +1,7 @@
 import Foundation
 
 /// Model formats supported
-public enum ModelFormat: String, CaseIterable {
+public enum ModelFormat: String, CaseIterable, Codable {
     case mlmodel = "mlmodel"
     case mlpackage = "mlpackage"
     case tflite = "tflite"

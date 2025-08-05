@@ -37,7 +37,7 @@ public actor InMemoryConfigurationService: ConfigurationServiceProtocol {
 
         let updated = updates(config)
         currentConfig = updated
-        logger.info("Configuration updated in memory - maxTokens: \(updated.maxTokens), temperature: \(updated.temperature)")
+        logger.info("Configuration updated in memory - id: \(updated.id)")
     }
 
     public func syncToCloud() async throws {
