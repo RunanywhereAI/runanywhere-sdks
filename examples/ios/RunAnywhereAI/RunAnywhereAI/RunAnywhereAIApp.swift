@@ -51,11 +51,6 @@ struct RunAnywhereAIApp: App {
     }
 
     private func initializeBundledModels() async {
-        // Install bundled models from app bundle
-        let success = await BundledModelsService.shared.installBundledModels()
-
-        if !success {
-            print("Failed to initialize bundled models")
-        }
+        // Bundled models functionality removed - models are downloaded on demand
     }
 }

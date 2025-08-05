@@ -2,7 +2,7 @@
 //  DeviceInfoService.swift
 //  RunAnywhereAI
 //
-//  Device information service using SDK capabilities
+//  Service for retrieving device information and capabilities
 //
 
 import Foundation

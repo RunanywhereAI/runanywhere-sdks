@@ -2,7 +2,7 @@
 //  ModelURLRegistry.swift
 //  RunAnywhereAI
 //
-//  Minimal stub for model URL management
+//  Service for managing model download URLs
 //
 
 import Foundation

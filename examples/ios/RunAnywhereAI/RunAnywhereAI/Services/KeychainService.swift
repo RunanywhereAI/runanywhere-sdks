@@ -10,6 +10,10 @@ import Foundation
 // MARK: - Keychain Service
 
 class KeychainService {
+    static let shared = KeychainService()
+
+    private init() {}
+
     func save(key: String, data: Data) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

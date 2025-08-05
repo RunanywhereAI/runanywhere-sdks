@@ -2,7 +2,7 @@
 //  ModelManager.swift
 //  RunAnywhereAI
 //
-//  Minimal stub implementation - uses SDK for actual functionality
+//  Service for managing model loading and lifecycle
 //
 
 import Foundation

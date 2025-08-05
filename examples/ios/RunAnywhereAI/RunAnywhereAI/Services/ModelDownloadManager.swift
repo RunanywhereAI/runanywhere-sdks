@@ -2,7 +2,7 @@
 //  ModelDownloadManager.swift
 //  RunAnywhereAI
 //
-//  Minimal stub for model download management
+//  Service for managing model downloads
 //
 
 import Foundation

@@ -396,23 +396,17 @@ class ChatViewModel: ObservableObject {
     // MARK: - Analytics
 
     private func initializeAnalytics() async {
-        do {
-            // Enable analytics for real-time data capture - force enable with fallback
-            print("📊 Initializing analytics safely after SDK startup...")
+        // Enable analytics for real-time data capture - force enable with fallback
+        print("📊 Initializing analytics safely after SDK startup...")
 
-            // Always ensure analytics are enabled with hardcoded fallback
-            await sdk.setAnalyticsEnabled(true)
-            await sdk.setEnableLiveMetrics(true)
+        // Always ensure analytics are enabled with hardcoded fallback
+        await sdk.setAnalyticsEnabled(true)
+        await sdk.setEnableLiveMetrics(true)
 
-            // Log current analytics configuration
-            let analyticsEnabled = await sdk.getAnalyticsEnabled()
-            let liveMetricsEnabled = await sdk.getEnableLiveMetrics()
-            print("📊 Analytics Configuration - Enabled: \(analyticsEnabled), Live Metrics: \(liveMetricsEnabled)")
-
-        } catch {
-            print("⚠️ Failed to initialize analytics: \(error)")
-            // Continue without analytics rather than crashing
-        }
+        // Log current analytics configuration
+        let analyticsEnabled = await sdk.getAnalyticsEnabled()
+        let liveMetricsEnabled = await sdk.getEnableLiveMetrics()
+        print("📊 Analytics Configuration - Enabled: \(analyticsEnabled), Live Metrics: \(liveMetricsEnabled)")
     }
 
     func logAnalyticsForCurrentGeneration() async {
