@@ -567,21 +567,23 @@ public class RunAnywhereSDK {
         return value
     }
 
-    /// Set the analytics level ("basic", "detailed", "full")
-    public func setAnalyticsLevel(_ level: String) async {
+    /// Set the analytics level
+    public func setAnalyticsLevel(_ level: AnalyticsLevel) async {
         logger.info("📊 Setting analytics level")
         await serviceContainer.configurationService.updateConfiguration { config in
-            config.with(analyticsLevel: level)
+            var updated = config
+            updated.analytics.level = level
+            return updated.markUpdated()
         }
         logger.info("✅ Analytics level updated")
     }
 
     /// Get the analytics level
-    public func getAnalyticsLevel() async -> String {
+    public func getAnalyticsLevel() async -> AnalyticsLevel {
         logger.info("📖 Getting analytics level")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
-        let value = config?.analyticsLevel ?? SDKConstants.ConfigurationDefaults.analyticsLevel
+        let value = config?.analytics.level ?? SDKConstants.ConfigurationDefaults.analyticsLevel
         logger.info("📊 Analytics level retrieved: \(value)")
         return value
     }
