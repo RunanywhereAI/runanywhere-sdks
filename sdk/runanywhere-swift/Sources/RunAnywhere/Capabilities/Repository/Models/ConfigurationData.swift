@@ -19,6 +19,11 @@ public struct ConfigurationData: RepositoryEntity, Codable {
     // API configuration
     public let apiKey: String?
 
+    // Analytics configuration
+    public let analyticsEnabled: Bool
+    public let analyticsLevel: String // "basic", "detailed", "full"
+    public let enableLiveMetrics: Bool
+
     // Metadata
     public let updatedAt: Date
     public let syncPending: Bool
@@ -34,6 +39,9 @@ public struct ConfigurationData: RepositoryEntity, Codable {
         routingPolicy: String = SDKConstants.ConfigurationDefaults.routingPolicy,
         allowUserOverride: Bool = SDKConstants.ConfigurationDefaults.allowUserOverride,
         apiKey: String? = nil,
+        analyticsEnabled: Bool = SDKConstants.ConfigurationDefaults.analyticsEnabled,
+        analyticsLevel: String = SDKConstants.ConfigurationDefaults.analyticsLevel,
+        enableLiveMetrics: Bool = SDKConstants.ConfigurationDefaults.enableLiveMetrics,
         updatedAt: Date = Date(),
         syncPending: Bool = true
     ) {
@@ -47,6 +55,9 @@ public struct ConfigurationData: RepositoryEntity, Codable {
         self.routingPolicy = routingPolicy
         self.allowUserOverride = allowUserOverride
         self.apiKey = apiKey
+        self.analyticsEnabled = analyticsEnabled
+        self.analyticsLevel = analyticsLevel
+        self.enableLiveMetrics = enableLiveMetrics
         self.updatedAt = updatedAt
         self.syncPending = syncPending
     }
@@ -62,6 +73,9 @@ public struct ConfigurationData: RepositoryEntity, Codable {
         routingPolicy: String? = nil,
         allowUserOverride: Bool? = nil,
         apiKey: String? = nil,
+        analyticsEnabled: Bool? = nil,
+        analyticsLevel: String? = nil,
+        enableLiveMetrics: Bool? = nil,
         syncPending: Bool? = nil
     ) -> ConfigurationData {
         return ConfigurationData(
@@ -75,6 +89,9 @@ public struct ConfigurationData: RepositoryEntity, Codable {
             routingPolicy: routingPolicy ?? self.routingPolicy,
             allowUserOverride: allowUserOverride ?? self.allowUserOverride,
             apiKey: apiKey ?? self.apiKey,
+            analyticsEnabled: analyticsEnabled ?? self.analyticsEnabled,
+            analyticsLevel: analyticsLevel ?? self.analyticsLevel,
+            enableLiveMetrics: enableLiveMetrics ?? self.enableLiveMetrics,
             updatedAt: Date(),
             syncPending: syncPending ?? true
         )

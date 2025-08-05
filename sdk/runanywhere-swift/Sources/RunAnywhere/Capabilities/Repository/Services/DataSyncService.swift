@@ -6,7 +6,7 @@ public actor DataSyncService {
 
     // Repositories
     private let configRepository: ConfigurationRepository
-    private let telemetryRepository: TelemetryRepository
+    public let telemetryRepository: TelemetryRepository
     private let modelMetadataRepository: ModelMetadataRepository
 
     // Sync timer

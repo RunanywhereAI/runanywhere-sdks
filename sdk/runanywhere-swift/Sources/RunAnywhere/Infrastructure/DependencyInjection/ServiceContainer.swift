@@ -213,6 +213,38 @@ public class ServiceContainer {
         }
     }
 
+    /// Generation analytics service
+    private var _generationAnalytics: GenerationAnalyticsService?
+
+    public var generationAnalytics: GenerationAnalyticsService {
+        get async {
+            if _generationAnalytics == nil {
+                if let db = await database,
+                   let syncService = await dataSyncService {
+                    let repository = GenerationAnalyticsRepositoryImpl(
+                        database: db,
+                        syncService: syncService
+                    )
+
+                    // Get telemetry repository from data sync service
+                    let telemetryRepo = syncService.telemetryRepository
+
+                    _generationAnalytics = GenerationAnalyticsServiceImpl(
+                        repository: repository,
+                        telemetryService: telemetryRepo,
+                        performanceMonitor: performanceMonitor
+                    )
+                }
+            }
+
+            guard let analytics = _generationAnalytics else {
+                fatalError("Failed to initialize GenerationAnalytics service")
+            }
+
+            return analytics
+        }
+    }
+
 
     // MARK: - Public Service Access
 

@@ -57,11 +57,16 @@ public enum SDKConstants {
         public static let topP: Float = 0.95
         public static let topK: Int = 40
 
-        // SDK configuration
-        public static let cloudRoutingEnabled: Bool = true
+        // SDK configuration - FORCE LOCAL ONLY
+        public static let cloudRoutingEnabled: Bool = false  // Disable cloud routing completely
         public static let privacyModeEnabled: Bool = true
-        public static let routingPolicy: String = "automatic"
-        public static let allowUserOverride: Bool = true
+        public static let routingPolicy: String = "on-device"  // Force on-device only
+        public static let allowUserOverride: Bool = false  // Don't allow override to cloud
+
+        // Analytics configuration - hardcoded to be fully enabled
+        public static let analyticsEnabled: Bool = true
+        public static let analyticsLevel: String = "full"  // Changed to "full" for complete analytics
+        public static let enableLiveMetrics: Bool = true   // Enable live metrics for better real-time tracking
 
         // Configuration ID
         public static let configurationId: String = "default"

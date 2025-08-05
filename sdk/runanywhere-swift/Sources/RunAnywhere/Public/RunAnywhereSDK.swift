@@ -21,7 +21,7 @@ public class RunAnywhereSDK {
 
     /// Private initializer to enforce singleton pattern
     private init() {
-        self.serviceContainer = ServiceContainer()
+        self.serviceContainer = ServiceContainer.shared  // Use the shared instance!
         setupServices()
         logger.info("🏗️ RunAnywhereSDK singleton created")
     }
@@ -131,11 +131,21 @@ public class RunAnywhereSDK {
             topP: effectiveSettings.topP
         )
 
-        print("🚀 [RunAnywhereSDK] Calling GenerationService.generate()")
+        // Check if analytics is enabled
+        let isAnalyticsEnabled = await getAnalyticsEnabled()
+
+        if isAnalyticsEnabled {
+            return try await serviceContainer.generationService.generateWithAnalytics(
+                prompt: prompt,
+                options: effectiveOptions
+            )
+        } else {
+            print("🚀 [RunAnywhereSDK] Calling GenerationService.generate()")
         let result = try await serviceContainer.generationService.generate(
-            prompt: prompt,
-            options: effectiveOptions
-        )
+                prompt: prompt,
+                options: effectiveOptions
+            )
+        }
 
         print("✅ [RunAnywhereSDK] Generation completed successfully")
         return result
@@ -174,11 +184,22 @@ public class RunAnywhereSDK {
                     topP: effectiveSettings.topP
                 )
 
+                // Check if analytics is enabled
+                let isAnalyticsEnabled = await getAnalyticsEnabled()
+
                 // Get the actual stream
-                let stream = serviceContainer.streamingService.generateStream(
-                    prompt: prompt,
-                    options: effectiveOptions
-                )
+                let stream: AsyncThrowingStream<String, Error>
+                if isAnalyticsEnabled {
+                    stream = serviceContainer.streamingService.generateStreamWithAnalytics(
+                        prompt: prompt,
+                        options: effectiveOptions
+                    )
+                } else {
+                    stream = serviceContainer.streamingService.generateStream(
+                        prompt: prompt,
+                        options: effectiveOptions
+                    )
+                }
 
                 // Forward all values from the inner stream
                 do {
@@ -517,6 +538,125 @@ public class RunAnywhereSDK {
         return config?.apiKey
     }
 
+    /// Set whether analytics is enabled
+    public func setAnalyticsEnabled(_ enabled: Bool) async {
+        logger.info("📊 Setting analytics enabled")
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(analyticsEnabled: enabled)
+        }
+        logger.info("✅ Analytics enabled setting updated")
+    }
+
+    /// Get whether analytics is enabled
+    public func getAnalyticsEnabled() async -> Bool {
+        logger.info("📖 Getting analytics enabled setting")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
+        let config = await serviceContainer.configurationService.getConfiguration()
+        let value = config?.analyticsEnabled ?? SDKConstants.ConfigurationDefaults.analyticsEnabled
+        logger.info("📊 Analytics enabled retrieved: \(value)")
+        return value
+    }
+
+    /// Set the analytics level ("basic", "detailed", "full")
+    public func setAnalyticsLevel(_ level: String) async {
+        logger.info("📊 Setting analytics level")
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(analyticsLevel: level)
+        }
+        logger.info("✅ Analytics level updated")
+    }
+
+    /// Get the analytics level
+    public func getAnalyticsLevel() async -> String {
+        logger.info("📖 Getting analytics level")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
+        let config = await serviceContainer.configurationService.getConfiguration()
+        let value = config?.analyticsLevel ?? SDKConstants.ConfigurationDefaults.analyticsLevel
+        logger.info("📊 Analytics level retrieved: \(value)")
+        return value
+    }
+
+    /// Set whether live metrics are enabled
+    public func setEnableLiveMetrics(_ enabled: Bool) async {
+        logger.info("📊 Setting enable live metrics")
+        await serviceContainer.configurationService.updateConfiguration { config in
+            config.with(enableLiveMetrics: enabled)
+        }
+        logger.info("✅ Enable live metrics setting updated")
+    }
+
+    /// Get whether live metrics are enabled
+    public func getEnableLiveMetrics() async -> Bool {
+        logger.info("📖 Getting enable live metrics setting")
+        await serviceContainer.configurationService.ensureConfigurationLoaded()
+        let config = await serviceContainer.configurationService.getConfiguration()
+        let value = config?.enableLiveMetrics ?? SDKConstants.ConfigurationDefaults.enableLiveMetrics
+        logger.info("📊 Enable live metrics retrieved: \(value)")
+        return value
+    }
+
+    // MARK: - Analytics Query APIs
+
+    /// Get analytics for a specific session
+    public func getAnalyticsSession(_ sessionId: UUID) async -> GenerationSession? {
+        logger.info("📊 Getting analytics session: \(sessionId)")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getSession(sessionId)
+    }
+
+    /// Get all generations for a session
+    public func getGenerationsForSession(_ sessionId: UUID) async -> [Generation] {
+        logger.info("📊 Getting generations for session: \(sessionId)")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getGenerations(for: sessionId)
+    }
+
+    /// Get all analytics sessions
+    public func getAllAnalyticsSessions() async -> [GenerationSession] {
+        logger.info("📊 Getting all analytics sessions")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getAllSessions()
+    }
+
+    /// Get session summary with aggregated metrics
+    public func getSessionSummary(_ sessionId: UUID) async -> SessionSummary? {
+        logger.info("📊 Getting session summary: \(sessionId)")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getSessionSummary(sessionId)
+    }
+
+    /// Get average metrics for a model
+    public func getAverageMetrics(for modelId: String, limit: Int = 100) async -> AverageMetrics? {
+        logger.info("📊 Getting average metrics for model: \(modelId)")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getAverageMetrics(for: modelId, limit: limit)
+    }
+
+    /// Observe live metrics for a generation
+    public func observeLiveMetrics(for generationId: UUID) -> AsyncStream<LiveGenerationMetrics> {
+        logger.info("📊 Observing live metrics for generation: \(generationId)")
+        let analytics = Task {
+            await serviceContainer.generationAnalytics
+        }
+
+        return AsyncStream { continuation in
+            Task {
+                let analyticsService = await analytics.value
+                for await metrics in await analyticsService.observeLiveMetrics(for: generationId) {
+                    continuation.yield(metrics)
+                }
+                continuation.finish()
+            }
+        }
+    }
+
+    /// Get current active session ID (if any)
+    public func getCurrentSessionId() async -> UUID? {
+        logger.info("📊 Getting current session ID")
+        let analytics = await serviceContainer.generationAnalytics
+        return await analytics.getCurrentSessionId()
+    }
+
 
     // MARK: - Private Methods
 
@@ -541,6 +681,13 @@ extension RunAnywhereSDK {
     /// Access to A/B testing
     public var abTesting: ABTestRunner {
         serviceContainer.abTestRunner
+    }
+
+    /// Access to generation analytics service for advanced use cases
+    public var generationAnalytics: GenerationAnalyticsService {
+        get async {
+            await serviceContainer.generationAnalytics
+        }
     }
 }
 
