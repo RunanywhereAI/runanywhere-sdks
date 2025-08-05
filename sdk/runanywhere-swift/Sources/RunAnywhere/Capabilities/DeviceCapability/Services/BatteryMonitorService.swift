@@ -39,39 +39,3 @@ public actor BatteryMonitorService {
         #endif
     }
 }
-
-/// Battery information
-public struct BatteryInfo: Codable {
-    public let level: Float // 0.0 to 1.0
-    public let state: BatteryState
-    public let isLowPowerModeEnabled: Bool
-
-    public var isLowBattery: Bool {
-        level < 0.2 // Less than 20%
-    }
-}
-
-/// Battery state enumeration
-public enum BatteryState: String, Codable {
-    case unknown = "unknown"
-    case unplugged = "unplugged"
-    case charging = "charging"
-    case full = "full"
-
-    #if os(iOS)
-    init(from uiDeviceState: UIDevice.BatteryState) {
-        switch uiDeviceState {
-        case .unknown:
-            self = .unknown
-        case .unplugged:
-            self = .unplugged
-        case .charging:
-            self = .charging
-        case .full:
-            self = .full
-        @unknown default:
-            self = .unknown
-        }
-    }
-    #endif
-}
