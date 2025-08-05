@@ -96,7 +96,7 @@
       "Bash(./generate_transparent_icons.sh:*)",
       "Bash(xcrun simctl get_app_container:*)",
       "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)",
-      "Bash(xcrun simctl terminate:*)"
+      "Bash(xcrun simctl terminate:*)",
       "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)",
       "Bash(timeout 60 xcodebuild -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -configuration Debug build -destination 'platform=iOS Simulator,name=iPhone 16 Pro')"
     ],

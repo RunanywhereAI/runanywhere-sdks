@@ -34,15 +34,15 @@ public actor PerformanceTracker {
         self.metricsTask = Task { [weak self] in
             await self?.startMetricsTimer()
         }
-    }https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
     }
 
-    deinit {
+    // MARK: - Public Methods
+
+    /// Clean up resources when tracking is complete
+    public func cleanup() {
         metricsTask?.cancel()
         continuation.finish()
-    }https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf',
-
-    // MARK: - Public Methods
+    }
 
     /// Record the first token generated
     public func recordFirstToken() {

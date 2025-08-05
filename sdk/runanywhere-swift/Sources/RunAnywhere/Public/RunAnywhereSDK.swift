@@ -134,14 +134,15 @@ public class RunAnywhereSDK {
         // Check if analytics is enabled
         let isAnalyticsEnabled = await getAnalyticsEnabled()
 
+        let result: GenerationResult
         if isAnalyticsEnabled {
-            return try await serviceContainer.generationService.generateWithAnalytics(
+            result = try await serviceContainer.generationService.generateWithAnalytics(
                 prompt: prompt,
                 options: effectiveOptions
             )
         } else {
             print("🚀 [RunAnywhereSDK] Calling GenerationService.generate()")
-        let result = try await serviceContainer.generationService.generate(
+            result = try await serviceContainer.generationService.generate(
                 prompt: prompt,
                 options: effectiveOptions
             )
