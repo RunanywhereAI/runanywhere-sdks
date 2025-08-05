@@ -4,10 +4,16 @@ import Foundation
 public class StreamingService {
     private let generationService: GenerationService
     private let modelLoadingService: ModelLoadingService
+    private let structuredOutputHandler: StructuredOutputHandler
 
-    public init(generationService: GenerationService, modelLoadingService: ModelLoadingService? = nil) {
+    public init(
+        generationService: GenerationService,
+        modelLoadingService: ModelLoadingService? = nil,
+        structuredOutputHandler: StructuredOutputHandler? = nil
+    ) {
         self.generationService = generationService
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+        self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }
 
     /// Generate streaming text using the loaded model
@@ -23,8 +29,19 @@ public class StreamingService {
                         throw SDKError.modelNotFound("No model is currently loaded")
                     }
 
+                    // Prepare prompt with structured output if needed
+                    let effectivePrompt: String
+                    if let structuredConfig = options.structuredOutput {
+                        effectivePrompt = self.structuredOutputHandler.preparePrompt(
+                            originalPrompt: prompt,
+                            config: structuredConfig
+                        )
+                    } else {
+                        effectivePrompt = prompt
+                    }
+
                     // Create context for the prompt
-                    let context = Context(messages: [Message(role: .user, content: prompt)])
+                    let context = Context(messages: [Message(role: .user, content: effectivePrompt)])
                     await loadedModel.service.setContext(context)
 
                     // Check if model supports thinking and get pattern
@@ -38,7 +55,7 @@ public class StreamingService {
 
                     // Use the actual streaming method from the LLM service
                     try await loadedModel.service.streamGenerate(
-                        prompt: prompt,
+                        prompt: effectivePrompt,
                         options: options,
                         onToken: { token in
                             if shouldParseThinking {
@@ -87,8 +104,19 @@ public class StreamingService {
                         throw SDKError.modelNotFound("No model is currently loaded")
                     }
 
+                    // Prepare prompt with structured output if needed
+                    let effectivePrompt: String
+                    if let structuredConfig = options.structuredOutput {
+                        effectivePrompt = self.structuredOutputHandler.preparePrompt(
+                            originalPrompt: prompt,
+                            config: structuredConfig
+                        )
+                    } else {
+                        effectivePrompt = prompt
+                    }
+
                     // Create context for the prompt
-                    let context = Context(messages: [Message(role: .user, content: prompt)])
+                    let context = Context(messages: [Message(role: .user, content: effectivePrompt)])
                     await loadedModel.service.setContext(context)
 
                     // Check if model supports thinking and get pattern
@@ -104,7 +132,7 @@ public class StreamingService {
 
                     // Use the actual streaming method from the LLM service
                     try await loadedModel.service.streamGenerate(
-                        prompt: prompt,
+                        prompt: effectivePrompt,
                         options: options,
                         onToken: { token in
                             if shouldParseThinking {

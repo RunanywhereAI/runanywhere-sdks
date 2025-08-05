@@ -35,6 +35,9 @@ public struct GenerationOptions {
     /// Preferred execution target
     public let preferredExecutionTarget: ExecutionTarget?
 
+    /// Structured output configuration (optional)
+    public let structuredOutput: StructuredOutputConfig?
+
     /// Initialize generation options
     /// - Parameters:
     ///   - maxTokens: Maximum tokens to generate (default: 100)
@@ -48,6 +51,7 @@ public struct GenerationOptions {
     ///   - tokenBudget: Token budget constraints
     ///   - frameworkOptions: Framework-specific options
     ///   - preferredExecutionTarget: Preferred execution target
+    ///   - structuredOutput: Structured output configuration (optional)
     public init(
         maxTokens: Int = 100,
         temperature: Float = 0.7,
@@ -59,7 +63,8 @@ public struct GenerationOptions {
         streamingEnabled: Bool = false,
         tokenBudget: TokenBudget? = nil,
         frameworkOptions: FrameworkOptions? = nil,
-        preferredExecutionTarget: ExecutionTarget? = nil
+        preferredExecutionTarget: ExecutionTarget? = nil,
+        structuredOutput: StructuredOutputConfig? = nil
     ) {
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -72,5 +77,6 @@ public struct GenerationOptions {
         self.tokenBudget = tokenBudget
         self.frameworkOptions = frameworkOptions
         self.preferredExecutionTarget = preferredExecutionTarget
+        self.structuredOutput = structuredOutput
     }
 }

@@ -95,7 +95,8 @@
       "Bash(./generate_centered_icons.sh:*)",
       "Bash(./generate_transparent_icons.sh:*)",
       "Bash(xcrun simctl get_app_container:*)",
-      "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)"
+      "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)",
+      "Bash(xcrun simctl terminate:*)"
     ],
     "deny": []
   }

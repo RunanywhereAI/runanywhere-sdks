@@ -6,6 +6,7 @@ public class GenerationService {
     private let contextManager: ContextManager
     private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
+    private let structuredOutputHandler: StructuredOutputHandler
 
     // Current loaded model
     private var currentLoadedModel: LoadedModel?
@@ -14,12 +15,14 @@ public class GenerationService {
         routingService: RoutingService,
         contextManager: ContextManager,
         performanceMonitor: PerformanceMonitor,
-        modelLoadingService: ModelLoadingService? = nil
+        modelLoadingService: ModelLoadingService? = nil,
+        structuredOutputHandler: StructuredOutputHandler? = nil
     ) {
         self.routingService = routingService
         self.contextManager = contextManager
         self.performanceMonitor = performanceMonitor
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+        self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }
 
     /// Set the current loaded model for generation
@@ -40,15 +43,26 @@ public class GenerationService {
         // Start performance tracking
         let startTime = Date()
 
+        // Prepare prompt with structured output if needed
+        let effectivePrompt: String
+        if let structuredConfig = options.structuredOutput {
+            effectivePrompt = structuredOutputHandler.preparePrompt(
+                originalPrompt: prompt,
+                config: structuredConfig
+            )
+        } else {
+            effectivePrompt = prompt
+        }
+
         // Prepare context
         let context = try await contextManager.prepareContext(
-            prompt: prompt,
+            prompt: effectivePrompt,
             options: options
         )
 
         // Get routing decision
         let routingDecision = try await routingService.determineRouting(
-            prompt: prompt,
+            prompt: effectivePrompt,
             context: context,
             options: options
         )
@@ -59,7 +73,7 @@ public class GenerationService {
         switch routingDecision {
         case .onDevice(let framework, let reason):
             result = try await generateOnDevice(
-                prompt: prompt,
+                prompt: effectivePrompt,
                 context: context,
                 options: options,
                 framework: framework
@@ -67,7 +81,7 @@ public class GenerationService {
 
         case .cloud(let provider, let reason):
             result = try await generateInCloud(
-                prompt: prompt,
+                prompt: effectivePrompt,
                 context: context,
                 options: options,
                 provider: provider
@@ -75,7 +89,7 @@ public class GenerationService {
 
         case .hybrid(let devicePortion, let framework, let reason):
             result = try await generateHybrid(
-                prompt: prompt,
+                prompt: effectivePrompt,
                 context: context,
                 options: options,
                 devicePortion: devicePortion,
@@ -83,7 +97,19 @@ public class GenerationService {
             )
         }
 
-        // Performance tracking is handled by the monitoring service
+        // Validate structured output if configured
+        if let structuredConfig = options.structuredOutput {
+            let validation = structuredOutputHandler.validateStructuredOutput(
+                text: result.text,
+                config: structuredConfig
+            )
+
+            // Add validation info to result metadata
+            var updatedResult = result
+            updatedResult.structuredOutputValidation = validation
+
+            return updatedResult
+        }
 
         return result
     }
@@ -94,21 +120,48 @@ public class GenerationService {
         options: GenerationOptions,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
+        print("🚀 [GenerationService] Starting on-device generation")
         let startTime = Date()
 
         // Use the current loaded model
         guard let loadedModel = currentLoadedModel else {
+            print("❌ [GenerationService] No model is currently loaded")
             throw SDKError.modelNotFound("No model is currently loaded")
         }
+
+        print("✅ [GenerationService] Using loaded model: \(loadedModel.model.name)")
+        print("🚀 [GenerationService] Setting context on service")
 
         // Set context if needed
         await loadedModel.service.setContext(context)
 
-        // Generate text using the actual loaded model's service
-        let generatedText = try await loadedModel.service.generate(
-            prompt: prompt,
-            options: options
-        )
+        print("🚀 [GenerationService] Calling service.generate() with graceful error handling")
+
+        // Generate text using the actual loaded model's service with enhanced error handling
+        let generatedText: String
+        do {
+            generatedText = try await loadedModel.service.generate(
+                prompt: prompt,
+                options: options
+            )
+            print("✅ [GenerationService] Got response from service: \(generatedText.prefix(100))...")
+        } catch {
+            print("❌ [GenerationService] Generation failed with error: \(error)")
+
+            // Enhanced error handling - if it's a timeout or framework error, provide helpful fallback
+            if let frameworkError = error as? FrameworkError {
+                print("🔄 [GenerationService] Framework error detected: \(frameworkError)")
+
+                // For timeout errors, check the error message for timeout indicators
+                let errorMessage = frameworkError.underlying.localizedDescription.lowercased()
+                if errorMessage.contains("timeout") || errorMessage.contains("timed out") {
+                    throw SDKError.generationTimeout("Text generation timed out. The model may be too large for this device or the prompt too complex. Try using a smaller model or simpler prompt.")
+                }
+            }
+
+            // Re-throw the original error with additional context
+            throw SDKError.generationFailed("On-device generation failed: \(error.localizedDescription)")
+        }
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model

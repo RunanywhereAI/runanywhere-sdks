@@ -32,7 +32,10 @@ public class LLMSwiftAdapter: FrameworkAdapter {
     }
 
     public func loadModel(_ model: ModelInfo) async throws -> LLMService {
+        print("🚀 [LLMSwiftAdapter] Loading model: \(model.name) (ID: \(model.id))")
+
         guard let localPath = model.localPath else {
+            print("❌ [LLMSwiftAdapter] Model has no local path - not downloaded")
             throw FrameworkError(
                 framework: framework,
                 underlying: LLMServiceError.modelNotLoaded,
@@ -40,8 +43,13 @@ public class LLMSwiftAdapter: FrameworkAdapter {
             )
         }
 
+        print("📝 [LLMSwiftAdapter] Model local path: \(localPath.path)")
+        print("🚀 [LLMSwiftAdapter] Creating LLMSwiftService")
+
         let service = LLMSwiftService(hardwareConfig: hardwareConfig)
+        print("🚀 [LLMSwiftAdapter] Initializing service with model path")
         try await service.initialize(modelPath: localPath.path)
+        print("✅ [LLMSwiftAdapter] Service initialized successfully")
         return service
     }
 

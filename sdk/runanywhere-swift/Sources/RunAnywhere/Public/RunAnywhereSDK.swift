@@ -104,15 +104,24 @@ public class RunAnywhereSDK {
         prompt: String,
         options: GenerationOptions? = nil
     ) async throws -> GenerationResult {
+        print("🚀 [RunAnywhereSDK] Starting generation for prompt: \(prompt.prefix(50))...")
+
         guard configuration != nil else {
+            print("❌ [RunAnywhereSDK] SDK not initialized")
             throw SDKError.notInitialized
         }
 
-        guard currentModel != nil else {
+        print("✅ [RunAnywhereSDK] SDK is initialized")
+
+        guard let model = currentModel else {
+            print("❌ [RunAnywhereSDK] No model loaded")
             throw SDKError.modelNotFound("No model loaded")
         }
 
+        print("✅ [RunAnywhereSDK] Current model: \(model.name)")
+
         // Get effective settings from configuration
+        print("🚀 [RunAnywhereSDK] Getting effective settings")
         let effectiveSettings = await getGenerationSettings()
 
         // Create options with configuration defaults if not provided
@@ -122,10 +131,14 @@ public class RunAnywhereSDK {
             topP: effectiveSettings.topP
         )
 
-        return try await serviceContainer.generationService.generate(
+        print("🚀 [RunAnywhereSDK] Calling GenerationService.generate()")
+        let result = try await serviceContainer.generationService.generate(
             prompt: prompt,
             options: effectiveOptions
         )
+
+        print("✅ [RunAnywhereSDK] Generation completed successfully")
+        return result
     }
 
     /// Generate text as a stream
