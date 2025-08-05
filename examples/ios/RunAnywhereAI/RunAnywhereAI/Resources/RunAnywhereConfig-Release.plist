@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>environment</key>
+    <string>production</string>
+
+    <key>logging</key>
+    <dict>
+        <key>enableConsoleLogging</key>
+        <false/>
+        <key>enableFileLogging</key>
+        <true/>
+        <key>enableRemoteLogging</key>
+        <true/>
+        <key>minimumLogLevel</key>
+        <string>warning</string>
+        <key>enableSensitiveDataLogging</key>
+        <false/>
+        <key>maxLogFileSizeMB</key>
+        <integer>10</integer>
+        <key>logRetentionDays</key>
+        <integer>90</integer>
+    </dict>
+
+    <key>api</key>
+    <dict>
+        <key>baseURL</key>
+        <string>https://api.runanywhere.ai</string>
+        <key>timeoutSeconds</key>
+        <real>15</real>
+        <key>enableRequestLogging</key>
+        <false/>
+    </dict>
+
+    <key>enablePerformanceMonitoring</key>
+    <false/>
+
+    <key>enableCrashReporting</key>
+    <true/>
+</dict>
+</plist>

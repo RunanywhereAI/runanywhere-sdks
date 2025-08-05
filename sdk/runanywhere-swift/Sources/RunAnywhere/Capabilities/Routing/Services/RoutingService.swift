@@ -4,6 +4,7 @@ import Foundation
 public class RoutingService {
     private let costCalculator: CostCalculator
     private let resourceChecker: ResourceChecker
+    private let logger = SDKLogger(category: "RoutingService")
 
     public init(
         costCalculator: CostCalculator,
@@ -21,7 +22,7 @@ public class RoutingService {
         options: GenerationOptions
     ) async throws -> RoutingDecision {
         // FORCE ON-DEVICE ONLY - ignore all other logic
-        print("🔒 FORCED LOCAL-ONLY ROUTING: Always using on-device execution")
+        logger.info("🔒 FORCED LOCAL-ONLY ROUTING: Always using on-device execution")
 
         return .onDevice(
             framework: selectBestFramework(for: options),

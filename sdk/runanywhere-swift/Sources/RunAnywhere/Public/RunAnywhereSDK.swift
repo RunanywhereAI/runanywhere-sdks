@@ -51,7 +51,7 @@ public class RunAnywhereSDK {
 
         // Log successful initialization
         logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
-        print("✅ RunAnywhereSDK initialized successfully - configuration loaded")
+        logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
     }
 
     /// Load a model by identifier
@@ -104,24 +104,24 @@ public class RunAnywhereSDK {
         prompt: String,
         options: GenerationOptions? = nil
     ) async throws -> GenerationResult {
-        print("🚀 [RunAnywhereSDK] Starting generation for prompt: \(prompt.prefix(50))...")
+        logger.info("🚀 Starting generation for prompt: \(prompt.prefix(50))...")
 
         guard configuration != nil else {
-            print("❌ [RunAnywhereSDK] SDK not initialized")
+            logger.error("❌ SDK not initialized")
             throw SDKError.notInitialized
         }
 
-        print("✅ [RunAnywhereSDK] SDK is initialized")
+        logger.debug("✅ SDK is initialized")
 
         guard let model = currentModel else {
-            print("❌ [RunAnywhereSDK] No model loaded")
+            logger.error("❌ No model loaded")
             throw SDKError.modelNotFound("No model loaded")
         }
 
-        print("✅ [RunAnywhereSDK] Current model: \(model.name)")
+        logger.debug("✅ Current model: \(model.name)")
 
         // Get effective settings from configuration
-        print("🚀 [RunAnywhereSDK] Getting effective settings")
+        logger.debug("🚀 Getting effective settings")
         let effectiveSettings = await getGenerationSettings()
 
         // Create options with configuration defaults if not provided
@@ -141,14 +141,14 @@ public class RunAnywhereSDK {
                 options: effectiveOptions
             )
         } else {
-            print("🚀 [RunAnywhereSDK] Calling GenerationService.generate()")
+            logger.debug("🚀 Calling GenerationService.generate()")
             result = try await serviceContainer.generationService.generate(
                 prompt: prompt,
                 options: effectiveOptions
             )
         }
 
-        print("✅ [RunAnywhereSDK] Generation completed successfully")
+        logger.info("✅ Generation completed successfully")
         return result
     }
 
@@ -422,7 +422,7 @@ public class RunAnywhereSDK {
             try await serviceContainer.configurationService.syncToCloud()
         } catch {
             // Log error but don't throw to avoid breaking the UI
-            print("Failed to sync preferences: \(error)")
+            logger.error("Failed to sync preferences: \(error)")
         }
     }
 

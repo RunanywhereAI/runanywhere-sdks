@@ -7,6 +7,7 @@ public class GenerationService {
     private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
     private let structuredOutputHandler: StructuredOutputHandler
+    private let logger = SDKLogger(category: "GenerationService")
 
     // Current loaded model
     private var currentLoadedModel: LoadedModel?
@@ -41,7 +42,7 @@ public class GenerationService {
         options: GenerationOptions
     ) async throws -> GenerationResult {
         // Start performance tracking
-        let startTime = Date()
+        _ = Date() // Will be used for performance metrics in future
 
         // Prepare prompt with structured output if needed
         let effectivePrompt: String
@@ -71,7 +72,7 @@ public class GenerationService {
         let result: GenerationResult
 
         switch routingDecision {
-        case .onDevice(let framework, let reason):
+        case .onDevice(let framework, _):
             result = try await generateOnDevice(
                 prompt: effectivePrompt,
                 context: context,
@@ -79,7 +80,7 @@ public class GenerationService {
                 framework: framework
             )
 
-        case .cloud(let provider, let reason):
+        case .cloud(let provider, _):
             result = try await generateInCloud(
                 prompt: effectivePrompt,
                 context: context,
@@ -87,7 +88,7 @@ public class GenerationService {
                 provider: provider
             )
 
-        case .hybrid(let devicePortion, let framework, let reason):
+        case .hybrid(let devicePortion, let framework, _):
             result = try await generateHybrid(
                 prompt: effectivePrompt,
                 context: context,
@@ -120,22 +121,22 @@ public class GenerationService {
         options: GenerationOptions,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
-        print("🚀 [GenerationService] Starting on-device generation")
+        logger.info("🚀 Starting on-device generation")
         let startTime = Date()
 
         // Use the current loaded model
         guard let loadedModel = currentLoadedModel else {
-            print("❌ [GenerationService] No model is currently loaded")
+            logger.error("❌ No model is currently loaded")
             throw SDKError.modelNotFound("No model is currently loaded")
         }
 
-        print("✅ [GenerationService] Using loaded model: \(loadedModel.model.name)")
-        print("🚀 [GenerationService] Setting context on service")
+        logger.info("✅ Using loaded model: \(loadedModel.model.name)")
+        logger.debug("🚀 Setting context on service")
 
         // Set context if needed
         await loadedModel.service.setContext(context)
 
-        print("🚀 [GenerationService] Calling service.generate() with graceful error handling")
+        logger.debug("🚀 Calling service.generate() with graceful error handling")
 
         // Generate text using the actual loaded model's service with enhanced error handling
         let generatedText: String
@@ -144,13 +145,13 @@ public class GenerationService {
                 prompt: prompt,
                 options: options
             )
-            print("✅ [GenerationService] Got response from service: \(generatedText.prefix(100))...")
+            logger.info("✅ Got response from service: \(generatedText.prefix(100))...")
         } catch {
-            print("❌ [GenerationService] Generation failed with error: \(error)")
+            logger.error("❌ Generation failed with error: \(error)")
 
             // Enhanced error handling - if it's a timeout or framework error, provide helpful fallback
             if let frameworkError = error as? FrameworkError {
-                print("🔄 [GenerationService] Framework error detected: \(frameworkError)")
+                logger.warning("🔄 Framework error detected: \(frameworkError)")
 
                 // For timeout errors, check the error message for timeout indicators
                 let errorMessage = frameworkError.underlying.localizedDescription.lowercased()
@@ -167,18 +168,18 @@ public class GenerationService {
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
 
-        print("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
+        logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
         if modelInfo.supportsThinking {
             let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
-            print("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
-            print("Raw generated text: \(generatedText)")
+            logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
+            logger.debug("Raw generated text: \(generatedText)")
 
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent
 
-            print("Parsed content: \(finalText)")
-            print("Thinking content: \(thinkingContent ?? "None")")
+            logger.debug("Parsed content: \(finalText)")
+            logger.debug("Thinking content: \(thinkingContent ?? "None")")
         } else {
             finalText = generatedText
             thinkingContent = nil

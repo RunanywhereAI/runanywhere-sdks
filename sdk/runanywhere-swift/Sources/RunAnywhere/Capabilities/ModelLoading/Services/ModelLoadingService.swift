@@ -6,6 +6,7 @@ public class ModelLoadingService {
     private let adapterRegistry: FrameworkAdapterRegistry
     private let validationService: ValidationService
     private let memoryService: MemoryManager // Using MemoryManager protocol for now
+    private let logger = SDKLogger(category: "ModelLoadingService")
 
     private var loadedModels: [String: LoadedModel] = [:]
 
@@ -23,21 +24,21 @@ public class ModelLoadingService {
 
     /// Load a model by identifier
     public func loadModel(_ modelId: String) async throws -> LoadedModel {
-        print("🚀 [ModelLoadingService] Loading model: \(modelId)")
+        logger.info("🚀 Loading model: \(modelId)")
 
         // Check if already loaded
         if let loaded = loadedModels[modelId] {
-            print("✅ [ModelLoadingService] Model already loaded: \(modelId)")
+            logger.info("✅ Model already loaded: \(modelId)")
             return loaded
         }
 
         // Get model info from registry
         guard let modelInfo = registry.getModel(by: modelId) else {
-            print("❌ [ModelLoadingService] Model not found in registry: \(modelId)")
+            logger.error("❌ Model not found in registry: \(modelId)")
             throw SDKError.modelNotFound(modelId)
         }
 
-        print("✅ [ModelLoadingService] Found model in registry: \(modelInfo.name)")
+        logger.info("✅ Found model in registry: \(modelInfo.name)")
 
         // Validate model file exists
         guard let localPath = modelInfo.localPath else {
@@ -57,24 +58,24 @@ public class ModelLoadingService {
         }
 
         // Find appropriate adapter
-        print("🚀 [ModelLoadingService] Finding adapter for model")
+        logger.info("🚀 Finding adapter for model")
         let registeredAdapters = adapterRegistry.getRegisteredAdapters()
-        print("📊 [ModelLoadingService] Registered adapters: \(registeredAdapters.keys.map { $0.rawValue })")
+        logger.debug("📊 Registered adapters: \(registeredAdapters.keys.map { $0.rawValue })")
 
         guard let adapter = adapterRegistry.findBestAdapter(for: modelInfo) else {
-            print("❌ [ModelLoadingService] No adapter found for model with preferred framework: \(modelInfo.preferredFramework?.rawValue ?? "none")")
-            print("❌ [ModelLoadingService] Compatible frameworks: \(modelInfo.compatibleFrameworks.map { $0.rawValue })")
+            logger.error("❌ No adapter found for model with preferred framework: \(modelInfo.preferredFramework?.rawValue ?? "none")")
+            logger.error("❌ Compatible frameworks: \(modelInfo.compatibleFrameworks.map { $0.rawValue })")
             throw SDKError.frameworkNotAvailable(
                 modelInfo.preferredFramework ?? .coreML
             )
         }
 
-        print("✅ [ModelLoadingService] Found adapter for framework: \(adapter.framework.rawValue)")
+        logger.info("✅ Found adapter for framework: \(adapter.framework.rawValue)")
 
         // Load model through adapter
-        print("🚀 [ModelLoadingService] Loading model through adapter")
+        logger.info("🚀 Loading model through adapter")
         let service = try await adapter.loadModel(modelInfo)
-        print("✅ [ModelLoadingService] Model loaded through adapter")
+        logger.info("✅ Model loaded through adapter")
 
         // Create loaded model
         let loaded = LoadedModel(model: modelInfo, service: service)
