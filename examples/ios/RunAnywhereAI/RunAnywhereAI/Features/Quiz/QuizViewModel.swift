@@ -234,30 +234,30 @@ class QuizViewModel: ObservableObject {
     // MARK: - Quiz Generation
 
     func generateQuiz() async {
-        NSLog("🔄 QUIZ DEBUG: generateQuiz() method called")
+        // NSLog("🔄 QUIZ DEBUG: generateQuiz() method called")
 
         guard isInputValid else {
-            NSLog("❌ QUIZ DEBUG: Input validation failed")
+            // NSLog("❌ QUIZ DEBUG: Input validation failed")
             return
         }
 
-        NSLog("🔄 QUIZ DEBUG: Input validation passed")
+        // NSLog("🔄 QUIZ DEBUG: Input validation passed")
         viewState = .generating
         error = nil
 
-        NSLog("🔄 QUIZ DEBUG: Set view state to generating")
+        // NSLog("🔄 QUIZ DEBUG: Set view state to generating")
 
         do {
-            NSLog("🔄 QUIZ DEBUG: Starting quiz generation process...")
+            // NSLog("🔄 QUIZ DEBUG: Starting quiz generation process...")
 
             // First, ensure we have a model loaded - THIS IS THE KEY FIX
-            NSLog("🔄 QUIZ DEBUG: Checking and loading models...")
+            // NSLog("🔄 QUIZ DEBUG: Checking and loading models...")
             let availableModels = try await sdk.listAvailableModels()
-            NSLog("📊 QUIZ DEBUG: Found %d available models", availableModels.count)
+            // NSLog("📊 QUIZ DEBUG: Found %d available models", availableModels.count)
 
             var modelToLoad: ModelInfo?
             for model in availableModels {
-                NSLog("📊 QUIZ DEBUG: Model: %@ - Local path: %@", model.name, model.localPath?.path ?? "none")
+                // NSLog("📊 QUIZ DEBUG: Model: %@ - Local path: %@", model.name, model.localPath?.path ?? "none")
                 if model.localPath != nil {
                     modelToLoad = model
                     break
@@ -268,35 +268,35 @@ class QuizViewModel: ObservableObject {
                 throw QuizGenerationError.sdkGenerationFailed("No local model available for generation")
             }
 
-            NSLog("🔄 QUIZ DEBUG: Loading model: %@", model.name)
+            // NSLog("🔄 QUIZ DEBUG: Loading model: %@", model.name)
             try await sdk.loadModel(model.id)
-            NSLog("✅ QUIZ DEBUG: Model loaded successfully: %@", model.name)
+            // NSLog("✅ QUIZ DEBUG: Model loaded successfully: %@", model.name)
 
             // Test 1: Check if we can even create simple options
-            NSLog("🔄 QUIZ DEBUG: Creating GenerationOptions...")
+            // NSLog("🔄 QUIZ DEBUG: Creating GenerationOptions...")
 
             let simpleOptions = GenerationOptions(
                 maxTokens: 50,
                 temperature: 0.5,
                 preferredExecutionTarget: .onDevice
             )
-            NSLog("✅ QUIZ DEBUG: GenerationOptions created successfully")
+            // NSLog("✅ QUIZ DEBUG: GenerationOptions created successfully")
 
             let simplePrompt = "Say hello."
-            NSLog("🔄 QUIZ DEBUG: About to test SDK with simple prompt: '%@'", simplePrompt)
+            // NSLog("🔄 QUIZ DEBUG: About to test SDK with simple prompt: '%@'", simplePrompt)
 
             // Use timeout since we know SDK hangs
-            NSLog("🔄 QUIZ DEBUG: Calling sdk.generate with 5 second timeout...")
+            // NSLog("🔄 QUIZ DEBUG: Calling sdk.generate with 5 second timeout...")
 
             // SKIP THE SIMPLE TEST FOR NOW - Model loading has its own timeout
             // let simpleResult = try await withTimeout(seconds: 5) { [self] in
             //     try await self.sdk.generate(prompt: simplePrompt, options: simpleOptions)
             // }
 
-            NSLog("✅ QUIZ DEBUG: Model loaded successfully, skipping simple test")
+            // NSLog("✅ QUIZ DEBUG: Model loaded successfully, skipping simple test")
 
             // If we get here, the SDK works! The issue was elsewhere
-            NSLog("🎉 QUIZ DEBUG: SDK is working! Problem was not with basic generation")
+            // NSLog("🎉 QUIZ DEBUG: SDK is working! Problem was not with basic generation")
 
             // Generate quiz using structured output
             let prompt = """
@@ -339,35 +339,35 @@ class QuizViewModel: ObservableObject {
 
             // For debugging, let's temporarily skip structured output and go straight to fallback
             os_log("🔄 Using regular generation for debugging...", log: .default, type: .info)
-            NSLog("🔄 QUIZ DEBUG: Using regular generation for debugging...")
-            NSLog("🔄 QUIZ DEBUG: About to call sdk.generate with prompt length: %d", prompt.count)
-            NSLog("🔄 QUIZ DEBUG: Generation options - maxTokens: %d, temperature: %.2f, preferredTarget: %@", options.maxTokens, options.temperature, String(describing: options.preferredExecutionTarget))
+            // NSLog("🔄 QUIZ DEBUG: Using regular generation for debugging...")
+            // NSLog("🔄 QUIZ DEBUG: About to call sdk.generate with prompt length: %d", prompt.count)
+            // NSLog("🔄 QUIZ DEBUG: Generation options - maxTokens: %d, temperature: %.2f, preferredTarget: %@", options.maxTokens, options.temperature, String(describing: options.preferredExecutionTarget))
 
             // Add detailed step-by-step logging
-            NSLog("🔄 QUIZ DEBUG: Step 1 - Entering SDK generate call")
+            // NSLog("🔄 QUIZ DEBUG: Step 1 - Entering SDK generate call")
 
             let result: GenerationResult
             do {
                 // Add timeout to prevent hanging - reduced to 10 seconds since model is already loaded
                 result = try await withTimeout(seconds: 10) { [self] in
-                    NSLog("🔄 QUIZ DEBUG: Step 2 - Inside timeout wrapper, calling SDK")
+                    // NSLog("🔄 QUIZ DEBUG: Step 2 - Inside timeout wrapper, calling SDK")
                     let sdkResult = try await self.sdk.generate(prompt: prompt, options: options)
-                    NSLog("🔄 QUIZ DEBUG: Step 3 - SDK call completed successfully")
+                    // NSLog("🔄 QUIZ DEBUG: Step 3 - SDK call completed successfully")
                     return sdkResult
                 }
-                NSLog("🔄 QUIZ DEBUG: Step 4 - Timeout wrapper completed")
+                // NSLog("🔄 QUIZ DEBUG: Step 4 - Timeout wrapper completed")
             } catch let timeoutError as TimeoutError {
-                NSLog("⏰ QUIZ DEBUG: SDK call timed out after %d seconds", timeoutError.seconds)
+                // NSLog("⏰ QUIZ DEBUG: SDK call timed out after %d seconds", timeoutError.seconds)
                 throw timeoutError
             } catch {
-                NSLog("❌ QUIZ DEBUG: SDK call failed with error: %@", error.localizedDescription)
+                // NSLog("❌ QUIZ DEBUG: SDK call failed with error: %@", error.localizedDescription)
                 throw error
             }
 
-            NSLog("🔄 QUIZ DEBUG: Step 5 - Processing result")
+            // NSLog("🔄 QUIZ DEBUG: Step 5 - Processing result")
             os_log("📝 Generated text: %{public}@", log: .default, type: .info, result.text)
-            NSLog("📝 QUIZ DEBUG: Generated text: %@", result.text)
-            NSLog("📝 QUIZ DEBUG: Model used: %@, Execution target: %@", result.modelUsed, String(describing: result.executionTarget))
+            // NSLog("📝 QUIZ DEBUG: Generated text: %@", result.text)
+            // NSLog("📝 QUIZ DEBUG: Model used: %@, Execution target: %@", result.modelUsed, String(describing: result.executionTarget))
             generatedQuiz = try parseQuizFromText(result.text)
 
             // Validate we have questions
@@ -387,9 +387,9 @@ class QuizViewModel: ObservableObject {
             viewState = .quiz(session)
 
         } catch {
-            NSLog("🚨 QUIZ DEBUG: Exception caught in generateQuiz()")
-            NSLog("🚨 QUIZ DEBUG: Error: %@", error.localizedDescription)
-            NSLog("🚨 QUIZ DEBUG: Error type: %@", String(describing: type(of: error)))
+            // NSLog("🚨 QUIZ DEBUG: Exception caught in generateQuiz()")
+            // NSLog("🚨 QUIZ DEBUG: Error: %@", error.localizedDescription)
+            // NSLog("🚨 QUIZ DEBUG: Error type: %@", String(describing: type(of: error)))
             os_log("🚨 Quiz generation completely failed: %{public}@", log: .default, type: .error, error.localizedDescription)
 
             let errorMessage: String
@@ -531,7 +531,7 @@ class QuizViewModel: ObservableObject {
 
     private func parseQuizFromText(_ text: String) throws -> QuizGeneration {
         os_log("🔍 Parsing quiz from text: %{public}@...", log: .default, type: .info, String(text.prefix(300)))
-        NSLog("🔍 QUIZ DEBUG: Parsing quiz from text: %@...", String(text.prefix(300)))
+        // NSLog("🔍 QUIZ DEBUG: Parsing quiz from text: %@...", String(text.prefix(300)))
 
         // Try to extract JSON from the text
         let cleanedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -540,7 +540,7 @@ class QuizViewModel: ObservableObject {
         guard let startIndex = cleanedText.firstIndex(of: "{"),
               let endIndex = cleanedText.lastIndex(of: "}") else {
             os_log("⚠️ No JSON boundaries found in generated text", log: .default, type: .info)
-            NSLog("⚠️ QUIZ DEBUG: No JSON boundaries found in generated text")
+            // NSLog("⚠️ QUIZ DEBUG: No JSON boundaries found in generated text")
             throw QuizGenerationError.invalidJSONFormat
         }
 
@@ -549,19 +549,19 @@ class QuizViewModel: ObservableObject {
 
         guard let jsonData = jsonString.data(using: .utf8) else {
             os_log("⚠️ Failed to convert JSON string to data", log: .default, type: .info)
-            NSLog("⚠️ QUIZ DEBUG: Failed to convert JSON string to data")
+            // NSLog("⚠️ QUIZ DEBUG: Failed to convert JSON string to data")
             throw QuizGenerationError.invalidJSONFormat
         }
 
         do {
             let decoded = try JSONDecoder().decode(QuizGeneration.self, from: jsonData)
             os_log("✅ Successfully decoded quiz with %{public}d questions", log: .default, type: .info, decoded.questions.count)
-            NSLog("✅ QUIZ DEBUG: Successfully decoded quiz with %d questions", decoded.questions.count)
+            // NSLog("✅ QUIZ DEBUG: Successfully decoded quiz with %d questions", decoded.questions.count)
             return decoded
         } catch {
             // If JSON parsing fails, throw an error instead of using fallback
             os_log("❌ JSON parsing failed: %{public}@", log: .default, type: .error, error.localizedDescription)
-            NSLog("❌ QUIZ DEBUG: JSON parsing failed: %@", error.localizedDescription)
+            // NSLog("❌ QUIZ DEBUG: JSON parsing failed: %@", error.localizedDescription)
             throw QuizGenerationError.parsingFailed(error.localizedDescription)
         }
     }
