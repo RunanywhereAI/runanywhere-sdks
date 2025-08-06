@@ -8,6 +8,40 @@ public class RunAnywhereSDK {
 
     /// Current configuration
     private var configuration: Configuration?
+    private var _isInitialized = false
+
+    /// Task that tracks SDK initialization - allows other code to await completion
+    private var initializationTask: Task<Void, Error>?
+
+    /// Check if SDK is fully initialized
+    public var isInitialized: Bool {
+        return _isInitialized
+    }
+
+    /// Wait for SDK to be initialized - safe to call from any thread
+    public func waitForInitialization() async throws {
+        if let initTask = initializationTask {
+            try await initTask.value
+        } else if !_isInitialized {
+            throw SDKError.notInitialized
+        }
+    }
+
+    /// Private helper to ensure SDK is initialized before proceeding
+    private func ensureInitialized() async throws {
+        if _isInitialized {
+            return // Fast path - already initialized
+        }
+
+        if let initTask = initializationTask {
+            // Initialization in progress, wait for it
+            try await initTask.value
+            return
+        }
+
+        // Not initialized and no initialization in progress
+        throw SDKError.notInitialized
+    }
 
     /// Service container for dependency injection
     private let serviceContainer: ServiceContainer
@@ -31,27 +65,55 @@ public class RunAnywhereSDK {
     /// Initialize the SDK with the provided configuration
     /// - Parameter config: The configuration to use
     public func initialize(configuration: Configuration) async throws {
-        logger.info("🚀 Starting SDK initialization with configuration")
-
-        self.configuration = configuration
-
-        // Validate configuration
-        try await serviceContainer.configurationValidator.validate(configuration)
-        logger.info("✅ Configuration validated")
-
-        // Bootstrap all services with configuration
-        try await serviceContainer.bootstrap(with: configuration)
-        logger.info("✅ Services bootstrapped")
-
-        // Start monitoring services if enabled
-        if configuration.enableRealTimeDashboard {
-            serviceContainer.performanceMonitor.startMonitoring()
-            logger.info("📊 Performance monitoring started")
+        // If already initialized or initializing, return/wait
+        if _isInitialized {
+            logger.info("✅ SDK already initialized")
+            return
         }
 
-        // Log successful initialization
-        logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
-        logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
+        if let existingTask = initializationTask {
+            logger.info("⏳ SDK initialization in progress, waiting...")
+            try await existingTask.value
+            return
+        }
+
+        logger.info("🚀 Starting SDK initialization with configuration")
+
+        // Create initialization task
+        let initTask = Task<Void, Error> { @MainActor in
+            do {
+                self.configuration = configuration
+
+                // Validate configuration
+                try await serviceContainer.configurationValidator.validate(configuration)
+                logger.info("✅ Configuration validated")
+
+                // Bootstrap all services with configuration
+                try await serviceContainer.bootstrap(with: configuration)
+                logger.info("✅ Services bootstrapped")
+
+                // Start monitoring services if enabled
+                if configuration.enableRealTimeDashboard {
+                    serviceContainer.performanceMonitor.startMonitoring()
+                    logger.info("📊 Performance monitoring started")
+                }
+
+                // Mark as initialized
+                _isInitialized = true
+
+                // Log successful initialization
+                logger.info("✅ RunAnywhereSDK initialized successfully - configuration loaded")
+            } catch {
+                logger.error("❌ SDK initialization failed: \(error)")
+                _isInitialized = false
+                self.configuration = nil
+                self.initializationTask = nil // Clear failed task
+                throw error
+            }
+        }
+
+        self.initializationTask = initTask
+        try await initTask.value
     }
 
     /// Load a model by identifier
@@ -59,7 +121,7 @@ public class RunAnywhereSDK {
     /// - Returns: Information about the loaded model
     @discardableResult
     public func loadModel(_ modelIdentifier: String) async throws -> ModelInfo {
-        guard configuration != nil else {
+        guard _isInitialized else {
             throw SDKError.notInitialized
         }
 
@@ -106,7 +168,7 @@ public class RunAnywhereSDK {
     ) async throws -> GenerationResult {
         logger.info("🚀 Starting generation for prompt: \(prompt.prefix(50))...")
 
-        guard configuration != nil else {
+        guard _isInitialized else {
             logger.error("❌ SDK not initialized")
             throw SDKError.notInitialized
         }
@@ -161,7 +223,7 @@ public class RunAnywhereSDK {
         prompt: String,
         options: GenerationOptions? = nil
     ) -> AsyncThrowingStream<String, Error> {
-        guard configuration != nil else {
+        guard _isInitialized else {
             return AsyncThrowingStream { continuation in
                 continuation.finish(throwing: SDKError.notInitialized)
             }
@@ -218,7 +280,7 @@ public class RunAnywhereSDK {
     /// List available models
     /// - Returns: Array of available models
     public func listAvailableModels() async throws -> [ModelInfo] {
-        guard configuration != nil else {
+        guard _isInitialized else {
             throw SDKError.notInitialized
         }
 
@@ -247,7 +309,7 @@ public class RunAnywhereSDK {
     /// Download a model
     /// - Parameter modelIdentifier: The model to download
     public func downloadModel(_ modelIdentifier: String) async throws -> DownloadTask {
-        guard configuration != nil else {
+        guard _isInitialized else {
             throw SDKError.notInitialized
         }
 
@@ -261,7 +323,7 @@ public class RunAnywhereSDK {
     /// Delete a downloaded model
     /// - Parameter modelIdentifier: The model to delete
     public func deleteModel(_ modelIdentifier: String) async throws {
-        guard configuration != nil else {
+        guard _isInitialized else {
             throw SDKError.notInitialized
         }
 
@@ -560,6 +622,14 @@ public class RunAnywhereSDK {
     /// Set whether analytics is enabled
     public func setAnalyticsEnabled(_ enabled: Bool) async {
         logger.info("📊 Setting analytics enabled")
+
+        do {
+            try await ensureInitialized()
+        } catch {
+            logger.warning("⚠️ SDK not initialized, cannot set analytics setting")
+            return
+        }
+
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.enabled = enabled
@@ -571,6 +641,14 @@ public class RunAnywhereSDK {
     /// Get whether analytics is enabled
     public func getAnalyticsEnabled() async -> Bool {
         logger.info("📖 Getting analytics enabled setting")
+
+        do {
+            try await ensureInitialized()
+        } catch {
+            logger.warning("⚠️ SDK not initialized, returning default analytics setting")
+            return SDKConstants.ConfigurationDefaults.analyticsEnabled
+        }
+
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
         let value = config?.analytics.enabled ?? SDKConstants.ConfigurationDefaults.analyticsEnabled
@@ -581,6 +659,14 @@ public class RunAnywhereSDK {
     /// Set the analytics level
     public func setAnalyticsLevel(_ level: AnalyticsLevel) async {
         logger.info("📊 Setting analytics level")
+
+        do {
+            try await ensureInitialized()
+        } catch {
+            logger.warning("⚠️ SDK not initialized, cannot set analytics level")
+            return
+        }
+
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.level = level
@@ -592,6 +678,14 @@ public class RunAnywhereSDK {
     /// Get the analytics level
     public func getAnalyticsLevel() async -> AnalyticsLevel {
         logger.info("📖 Getting analytics level")
+
+        do {
+            try await ensureInitialized()
+        } catch {
+            logger.warning("⚠️ SDK not initialized, returning default analytics level")
+            return SDKConstants.ConfigurationDefaults.analyticsLevel
+        }
+
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
         let value = config?.analytics.level ?? SDKConstants.ConfigurationDefaults.analyticsLevel
@@ -602,6 +696,14 @@ public class RunAnywhereSDK {
     /// Set whether live metrics are enabled
     public func setEnableLiveMetrics(_ enabled: Bool) async {
         logger.info("📊 Setting enable live metrics")
+
+        do {
+            try await ensureInitialized()
+        } catch {
+            logger.warning("⚠️ SDK not initialized, cannot set live metrics")
+            return
+        }
+
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.liveMetricsEnabled = enabled

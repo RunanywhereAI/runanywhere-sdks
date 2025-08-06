@@ -7,6 +7,12 @@
 
 import Foundation
 import DeviceKit
+#if os(iOS) || os(tvOS)
+import UIKit
+#endif
+#if os(watchOS)
+import WatchKit
+#endif
 
 /// Bridges DeviceKit functionality to RunAnywhere SDK
 @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)
@@ -21,7 +27,6 @@ public final class DeviceKitAdapter {
 
     public init() {
         self.device = Device.current
-        logger.debug("[DeviceKit] Initialized: \(device.description)")
     }
 
     // MARK: - Processor Information
@@ -113,7 +118,7 @@ public final class DeviceKitAdapter {
         switch device {
         case .iPhone15Pro, .iPhone15ProMax, .iPhone16Pro, .iPhone16ProMax:
             return .highPerformance
-        case .iPadPro12Inch5thGen, .iPadPro11Inch3rdGen, .iPadPro12Inch6thGen, .iPadPro11Inch4thGen:
+        case _ where device.description.contains("iPad Pro"):
             return .highPerformance
         case _ where device.isPad:
             return .balanced
@@ -129,9 +134,17 @@ public final class DeviceKitAdapter {
     /// Get battery information
     public func getBatteryInfo() -> BatteryInfo? {
         #if os(iOS) || os(watchOS)
-        guard device.isBatteryMonitoringEnabled else {
-            device.isBatteryMonitoringEnabled = true
+        #if os(iOS)
+        let wasBatteryMonitoringEnabled = UIDevice.current.isBatteryMonitoringEnabled
+        if !wasBatteryMonitoringEnabled {
+            UIDevice.current.isBatteryMonitoringEnabled = true
         }
+        #elseif os(watchOS)
+        let wasBatteryMonitoringEnabled = WKInterfaceDevice.current().isBatteryMonitoringEnabled
+        if !wasBatteryMonitoringEnabled {
+            WKInterfaceDevice.current().isBatteryMonitoringEnabled = true
+        }
+        #endif
 
         let level = device.batteryLevel.map { Float($0) / 100.0 }
         let state = mapBatteryState(device.batteryState)
@@ -148,8 +161,11 @@ public final class DeviceKitAdapter {
 
     /// Enable battery monitoring
     public func enableBatteryMonitoring() {
-        #if os(iOS) || os(watchOS)
-        device.isBatteryMonitoringEnabled = true
+        #if os(iOS)
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        logger.debug("[DeviceKit] Battery monitoring enabled")
+        #elseif os(watchOS)
+        WKInterfaceDevice.current().isBatteryMonitoringEnabled = true
         logger.debug("[DeviceKit] Battery monitoring enabled")
         #endif
     }
@@ -181,15 +197,15 @@ public final class DeviceKitAdapter {
             return (.a15Bionic, .standard)
 
         // iPad M4
-        case .iPadPro13Inch2024, .iPadPro11Inch2024:
+        case .iPadPro13M4, .iPadPro11M4:
             return (.m4, .standard)
 
         // iPad M2
-        case .iPadPro12Inch6thGen, .iPadPro11Inch4thGen, .iPadAir6:
+        case .iPadPro12Inch6, .iPadPro11Inch4, .iPadAir11M2, .iPadAir13M2:
             return (.m2, .standard)
 
         // iPad M1
-        case .iPadPro12Inch5thGen, .iPadPro11Inch3rdGen, .iPadAir5:
+        case .iPadPro12Inch5, .iPadPro11Inch3, .iPadAir5:
             return (.m1, .standard)
 
         // Older iPads with A-series
@@ -405,12 +421,10 @@ public final class DeviceKitAdapter {
         switch state {
         case .full:
             return .full
-        case .charging, .unplugged:
-            if state == .charging {
-                return .charging
-            } else {
-                return .unplugged
-            }
+        case .charging(_):
+            return .charging
+        case .unplugged:
+            return .unplugged
         }
     }
     #endif
