@@ -34,7 +34,7 @@ struct ModelCapabilities: Codable {
     let supportsStreaming: Bool
     let supportedLanguages: [String]?
 
-    init(maxTokens: Int = 4096, supportsStreaming: Bool = true, supportedLanguages: [String]? = nil) {
+    init(maxTokens: Int = SDKConstants.ModelDefaults.defaultContextLength, supportsStreaming: Bool = true, supportedLanguages: [String]? = nil) {
         self.maxTokens = maxTokens
         self.supportsStreaming = supportsStreaming
         self.supportedLanguages = supportedLanguages
@@ -46,7 +46,7 @@ struct ModelRequirements: Codable {
     let minComputeUnits: Int?
     let requiresNeuralEngine: Bool
 
-    init(minMemoryMB: Int = 512, minComputeUnits: Int? = nil, requiresNeuralEngine: Bool = false) {
+    init(minMemoryMB: Int = SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB / 2, minComputeUnits: Int? = nil, requiresNeuralEngine: Bool = false) {
         self.minMemoryMB = minMemoryMB
         self.minComputeUnits = minComputeUnits
         self.requiresNeuralEngine = requiresNeuralEngine

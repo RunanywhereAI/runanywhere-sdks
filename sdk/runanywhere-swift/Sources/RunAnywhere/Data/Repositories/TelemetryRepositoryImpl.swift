@@ -8,7 +8,7 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
     private let logger = SDKLogger(category: "TelemetryRepository")
-    private let batchSize = 50
+    private let batchSize = SDKConstants.TelemetryDefaults.batchSize
 
     // MARK: - Initialization
 
@@ -184,7 +184,7 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
         let eventName = entity.eventType.components(separatedBy: ".").last ?? entity.eventType
 
         // Get SDK version
-        let sdkVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let sdkVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? SDKConstants.DatabaseDefaults.sdkVersion
 
         return TelemetryRecord(
             id: entity.id,

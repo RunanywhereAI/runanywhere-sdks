@@ -638,6 +638,12 @@ Since the app is not in production:
 4. Updated ServiceContainer to create repositories with DatabaseManager
 5. Fixed DataSyncService to accept repositories via constructor
 6. Removed all legacy database code and adapters
+7. Created ModelUsageStatsRecord for missing table in schema
+8. Consolidated all hardcoded values into SDKConstants.swift:
+   - Added DatabaseDefaults, TelemetryDefaults, ModelDefaults, PrivacyDefaults
+   - Added AnalyticsDefaults, StorageDefaults, RoutingDefaults
+   - Added ExecutionTargets, SessionTypes, PlatformDefaults
+   - Updated all files to use these constants instead of hardcoded values
 
 ### Next Steps - Phase 1D:
 1. **Implement Database Observations** for real-time updates

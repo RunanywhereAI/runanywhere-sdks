@@ -10,7 +10,7 @@ public struct ConfigurationDTO: Codable {
     public init(
         id: String,
         data: ConfigurationData,
-        version: String = "1.0",
+        version: String = SDKConstants.DatabaseDefaults.modelVersion,
         lastModified: Date = Date()
     ) {
         self.id = id

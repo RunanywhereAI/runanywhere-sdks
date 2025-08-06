@@ -16,7 +16,7 @@ public struct ModelMetadataDTO: Codable {
     public init(from entity: ModelMetadataData) {
         self.modelId = entity.id  // Map from id to modelId
         self.name = entity.name
-        self.version = "1.0.0"  // Default version as it doesn't exist in ModelMetadataData
+        self.version = SDKConstants.DatabaseDefaults.sdkVersion  // Default version as it doesn't exist in ModelMetadataData
 
         // Convert String to enum with fallback
         self.framework = LLMFramework(rawValue: entity.framework) ?? .foundationModels
@@ -36,8 +36,8 @@ public struct ModelMetadataDTO: Codable {
         // Create requirements with estimated values since exact fields don't exist
         self.requirements = ModelRequirementsDTO(
             minMemory: entity.estimatedMemory,
-            recommendedMemory: entity.estimatedMemory + (entity.estimatedMemory / 4),  // Add 25% buffer
-            supportedPlatforms: ["iOS", "macOS"]  // Default supported platforms
+            recommendedMemory: Int64(Double(entity.estimatedMemory) * (1 + SDKConstants.ModelDefaults.recommendedMemoryBufferPercentage)),
+            supportedPlatforms: SDKConstants.PlatformDefaults.defaultSupportedPlatforms
         )
     }
 }

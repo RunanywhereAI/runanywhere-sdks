@@ -23,7 +23,7 @@ struct TelemetryRecord: Codable {
         userId: String? = nil,
         sessionId: String? = nil,
         deviceInfo: Data? = nil,
-        sdkVersion: String = "1.0.0",
+        sdkVersion: String = SDKConstants.DatabaseDefaults.sdkVersion,
         timestamp: Date = Date(),
         createdAt: Date = Date(),
         syncPending: Bool = true

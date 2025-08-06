@@ -10,11 +10,11 @@ struct Migration001_InitialSchema {
         try db.create(table: "configuration") { t in
             t.primaryKey("id", .text)
             t.column("api_key", .text)
-            t.column("base_url", .text).notNull().defaults(to: "https://api.runanywhere.ai")
-            t.column("model_cache_size", .integer).notNull().defaults(to: 5)
-            t.column("max_memory_usage_mb", .integer).notNull().defaults(to: 1024)
-            t.column("privacy_mode", .text).notNull().defaults(to: "standard")
-            t.column("telemetry_consent", .text).notNull().defaults(to: "anonymous")
+            t.column("base_url", .text).notNull().defaults(to: SDKConstants.DatabaseDefaults.apiBaseURL)
+            t.column("model_cache_size", .integer).notNull().defaults(to: SDKConstants.ModelDefaults.defaultModelCacheSize)
+            t.column("max_memory_usage_mb", .integer).notNull().defaults(to: SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB)
+            t.column("privacy_mode", .text).notNull().defaults(to: SDKConstants.PrivacyDefaults.defaultPrivacyMode)
+            t.column("telemetry_consent", .text).notNull().defaults(to: SDKConstants.TelemetryDefaults.consentAnonymous)
             t.column("created_at", .datetime).notNull()
             t.column("updated_at", .datetime).notNull()
             t.column("sync_pending", .boolean).notNull().defaults(to: true)
@@ -26,7 +26,7 @@ struct Migration001_InitialSchema {
             t.primaryKey("id", .text)
             t.belongsTo("configuration", onDelete: .cascade).notNull()
             t.column("policy_type", .text).notNull() // costOptimized, latencyOptimized, privacyFirst, balanced
-            t.column("on_device_threshold", .double).notNull().defaults(to: 0.8)
+            t.column("on_device_threshold", .double).notNull().defaults(to: SDKConstants.RoutingDefaults.defaultOnDeviceThreshold)
             t.column("max_cloud_cost_per_request", .double)
             t.column("prefer_on_device", .boolean).notNull().defaults(to: true)
             t.column("created_at", .datetime).notNull()
@@ -37,7 +37,7 @@ struct Migration001_InitialSchema {
         try db.create(table: "analytics_config") { t in
             t.primaryKey("id", .text)
             t.belongsTo("configuration", onDelete: .cascade).notNull()
-            t.column("analytics_level", .text).notNull().defaults(to: "basic") // basic, detailed, debug
+            t.column("analytics_level", .text).notNull().defaults(to: SDKConstants.AnalyticsDefaults.defaultLevel) // basic, detailed, debug
             t.column("metrics_enabled", .boolean).notNull().defaults(to: true)
             t.column("error_reporting_enabled", .boolean).notNull().defaults(to: true)
             t.column("performance_tracking_enabled", .boolean).notNull().defaults(to: true)
@@ -49,10 +49,10 @@ struct Migration001_InitialSchema {
         try db.create(table: "storage_config") { t in
             t.primaryKey("id", .text)
             t.belongsTo("configuration", onDelete: .cascade).notNull()
-            t.column("max_cache_size_mb", .integer).notNull().defaults(to: 2048)
+            t.column("max_cache_size_mb", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultMaxCacheSizeMB)
             t.column("auto_cleanup_enabled", .boolean).notNull().defaults(to: true)
-            t.column("cleanup_threshold_percentage", .integer).notNull().defaults(to: 90)
-            t.column("model_retention_days", .integer).notNull().defaults(to: 30)
+            t.column("cleanup_threshold_percentage", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultCleanupThresholdPercentage)
+            t.column("model_retention_days", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultModelRetentionDays)
             t.column("created_at", .datetime).notNull()
         }
 
@@ -167,7 +167,7 @@ struct Migration001_InitialSchema {
             t.column("sync_pending", .boolean).notNull().defaults(to: true)
 
             // Check constraints
-            t.check(sql: "execution_target IN ('onDevice', 'cloud')")
+            t.check(sql: "execution_target IN ('\(SDKConstants.ExecutionTargets.onDevice)', '\(SDKConstants.ExecutionTargets.cloud)')")
         }
 
         // MARK: - Telemetry Table

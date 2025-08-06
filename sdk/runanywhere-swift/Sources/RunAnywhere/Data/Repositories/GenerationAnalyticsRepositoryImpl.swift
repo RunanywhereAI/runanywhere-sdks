@@ -283,7 +283,7 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
             timeToFirstTokenMs: timeToFirstTokenMs,
             cost: 0.0, // Calculate based on model pricing
             costSaved: 0.0,
-            executionTarget: "device", // Default, could be stored in performance
+            executionTarget: SDKConstants.ModelDefaults.defaultExecutionTarget,
             errorType: nil,
             errorMessage: nil,
             metadata: performanceData,

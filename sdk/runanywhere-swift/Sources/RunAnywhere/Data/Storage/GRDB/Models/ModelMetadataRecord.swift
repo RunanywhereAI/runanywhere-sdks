@@ -39,7 +39,7 @@ struct ModelMetadataRecord: Codable {
         framework: String,
         sizeBytes: Int64,
         quantization: String? = nil,
-        version: String = "1.0",
+        version: String = SDKConstants.DatabaseDefaults.modelVersion,
         sha256Hash: String? = nil,
         capabilities: Data = Data(),
         requirements: Data? = nil,
@@ -117,4 +117,9 @@ extension ModelMetadataRecord {
         case updatedAt = "updated_at"
         case syncPending = "sync_pending"
     }
+}
+
+// MARK: - Associations
+extension ModelMetadataRecord {
+    static let usageStats = hasMany(ModelUsageStatsRecord.self)
 }

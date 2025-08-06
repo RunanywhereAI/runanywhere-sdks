@@ -21,7 +21,7 @@ public final class DatabaseManager {
             for: .documentDirectory,
             in: .userDomainMask
         ).first!
-        return documentsPath.appendingPathComponent("runanywhere.db")
+        return documentsPath.appendingPathComponent(SDKConstants.DatabaseDefaults.databaseFileName)
     }
 
     // MARK: - Initialization

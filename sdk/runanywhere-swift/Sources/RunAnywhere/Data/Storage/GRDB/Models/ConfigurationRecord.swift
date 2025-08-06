@@ -17,11 +17,11 @@ struct ConfigurationRecord: Codable {
     init(
         id: String = UUID().uuidString,
         apiKey: String? = nil,
-        baseURL: String = "https://api.runanywhere.ai",
-        modelCacheSize: Int = 5,
-        maxMemoryUsageMB: Int = 1024,
-        privacyMode: String = "standard",
-        telemetryConsent: String = "anonymous",
+        baseURL: String = SDKConstants.DatabaseDefaults.apiBaseURL,
+        modelCacheSize: Int = SDKConstants.ModelDefaults.defaultModelCacheSize,
+        maxMemoryUsageMB: Int = SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB,
+        privacyMode: String = SDKConstants.PrivacyDefaults.defaultPrivacyMode,
+        telemetryConsent: String = SDKConstants.TelemetryDefaults.consentAnonymous,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         syncPending: Bool = true

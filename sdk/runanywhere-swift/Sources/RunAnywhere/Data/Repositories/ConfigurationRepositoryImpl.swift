@@ -124,13 +124,13 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
         // Map the composed configuration to flat record structure
         let privacyMode = entity.routing.privacyMode.rawValue
         let telemetryConsent = entity.analytics.enabled ?
-            (entity.analytics.level == .detailed ? "detailed" : "anonymous") :
-            "none"
+            (entity.analytics.level == .detailed ? SDKConstants.TelemetryDefaults.consentDetailed : SDKConstants.TelemetryDefaults.consentAnonymous) :
+            SDKConstants.TelemetryDefaults.consentNone
 
         return ConfigurationRecord(
             id: entity.id,
             apiKey: entity.apiKey,
-            baseURL: "https://api.runanywhere.ai", // Default for now
+            baseURL: SDKConstants.DatabaseDefaults.apiBaseURL,
             modelCacheSize: entity.storage.modelCacheSize,
             maxMemoryUsageMB: entity.storage.maxMemoryUsageMB,
             privacyMode: privacyMode,
@@ -144,8 +144,8 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     private func mapToEntity(_ record: ConfigurationRecord) throws -> ConfigurationData {
         // Map flat record structure back to composed configuration
         let privacyMode = PrivacyMode(rawValue: record.privacyMode) ?? .standard
-        let analyticsEnabled = record.telemetryConsent != "none"
-        let analyticsLevel: AnalyticsLevel = record.telemetryConsent == "detailed" ? .detailed : .basic
+        let analyticsEnabled = record.telemetryConsent != SDKConstants.TelemetryDefaults.consentNone
+        let analyticsLevel: AnalyticsLevel = record.telemetryConsent == SDKConstants.TelemetryDefaults.consentDetailed ? .detailed : .basic
 
         // Create routing configuration
         let routing = RoutingConfiguration(

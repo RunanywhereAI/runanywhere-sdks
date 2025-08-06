@@ -339,7 +339,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             framework: entity.framework,
             sizeBytes: entity.estimatedMemory,
             quantization: nil, // Could be extracted from name or stored separately
-            version: "1.0", // Default version
+            version: SDKConstants.DatabaseDefaults.modelVersion,
             sha256Hash: entity.checksum,
             capabilities: capabilitiesData,
             requirements: nil, // Could be added later
@@ -358,7 +358,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
 
     private func mapToEntity(_ record: ModelMetadataRecord) throws -> ModelMetadataData {
         // Parse capabilities JSON
-        var contextLength = 4096 // Default
+        var contextLength = SDKConstants.ModelDefaults.defaultContextLength
         var supportsThinking = false
         var thinkingOpenTag: String?
         var thinkingCloseTag: String?
@@ -368,7 +368,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
         var tags: [String] = []
 
         if let capabilities = try? JSONSerialization.jsonObject(with: record.capabilities) as? [String: Any] {
-            contextLength = capabilities["contextLength"] as? Int ?? 4096
+            contextLength = capabilities["contextLength"] as? Int ?? SDKConstants.ModelDefaults.defaultContextLength
             supportsThinking = capabilities["supportsThinking"] as? Bool ?? false
             thinkingOpenTag = capabilities["thinkingOpenTag"] as? String
             thinkingCloseTag = capabilities["thinkingCloseTag"] as? String
