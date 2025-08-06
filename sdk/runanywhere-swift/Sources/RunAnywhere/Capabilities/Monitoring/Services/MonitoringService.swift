@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Pulse
 
 /// Real-time performance monitoring service
 public class MonitoringService: PerformanceMonitor {
@@ -29,6 +30,7 @@ public class MonitoringService: PerformanceMonitor {
     private let historyManager = HistoryManager()
     private let alertManager = AlertManager()
     private let reportGenerator = ReportGenerator()
+    private let pulsePerformanceLogger = PulsePerformanceLogger.shared
 
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 0.1 // 100ms updates
@@ -38,6 +40,7 @@ public class MonitoringService: PerformanceMonitor {
 
     public init() {
         setupSystemMonitoring()
+        setupPulseIntegration()
     }
 
     deinit {
@@ -188,6 +191,24 @@ public class MonitoringService: PerformanceMonitor {
         )
     }
 
+    private func setupPulseIntegration() {
+        // Set up metrics collector callback to log to Pulse
+        metricsCollector.onMetricsCollected = { [weak self] metrics in
+            self?.pulsePerformanceLogger.logSystemMetrics(metrics)
+        }
+
+        // Set up alert manager callback to log alerts to Pulse
+        alertManager.addAlertCallback { [weak self] alert in
+            self?.pulsePerformanceLogger.logPerformanceAlert(
+                type: alert.type.rawValue,
+                message: alert.message,
+                threshold: alert.threshold,
+                currentValue: alert.currentValue,
+                recommendation: alert.recommendation
+            )
+        }
+    }
+
     private func updateMetrics() {
         // Get current generation info if any
         let activeGeneration = generationTracker.currentGeneration
@@ -235,6 +256,21 @@ public class MonitoringService: PerformanceMonitor {
             - Token count: \(summary.tokenCount)
             - Memory used: \(ByteCountFormatter.string(fromByteCount: summary.memoryUsed, countStyle: .memory))
             """)
+
+        // Log to Pulse with structured data
+        let performance = GenerationPerformance(
+            modelId: summary.modelName,
+            executionTarget: .onDevice,
+            timeToFirstToken: summary.timeToFirstToken,
+            tokensPerSecond: summary.tokensPerSecond,
+            totalDuration: summary.totalTime,
+            memoryUsed: summary.memoryUsed,
+            cpuUsage: Double(summary.cpuUsage ?? 0),
+            gpuUsage: nil,
+            totalCost: 0.0, // On-device execution has no cost
+            savedCost: 0.0
+        )
+        pulsePerformanceLogger.logGenerationPerformance(performance)
     }
 }
 

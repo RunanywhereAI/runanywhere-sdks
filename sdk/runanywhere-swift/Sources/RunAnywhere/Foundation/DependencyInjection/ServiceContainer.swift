@@ -1,4 +1,5 @@
 import Foundation
+import Pulse
 
 /// Service container for dependency injection
 public class ServiceContainer {
@@ -288,6 +289,9 @@ public class ServiceContainer {
 
     /// Bootstrap all services with configuration
     public func bootstrap(with configuration: Configuration) async throws {
+        // Configure Pulse logging framework
+        PulseConfiguration.configure(with: configuration)
+
         // Logger is pre-configured through LoggingManager
 
         // Initialize configuration service with repository

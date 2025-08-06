@@ -1,8 +1,8 @@
-# Pulse Framework Integration Plan for RunAnywhere Swift SDK
+# Pulse Framework Integration Plan for RunAnywhere Swift SDK (Simplified)
 
 ## Executive Summary
 
-This document outlines the implementation plan for integrating the Pulse framework into the RunAnywhere Swift SDK to replace existing logging and monitoring implementations. The integration will enhance debugging capabilities, provide automatic network monitoring, and improve developer experience while maintaining backward compatibility.
+This document outlines a simplified implementation plan for integrating the Pulse framework into the RunAnywhere Swift SDK. The focus is on enhancing network request logging and performance monitoring for model downloads and API calls, without adding unnecessary UI components or complexity.
 
 ## Current State Analysis
 
@@ -23,9 +23,34 @@ This document outlines the implementation plan for integrating the Pulse framewo
    - No automatic network request logging currently exists
    - Manual logging in `Data/Network/Services/APIClient.swift`
 
+## Key Benefits (What We're Actually Using)
+
+1. **Model Download Debugging**: Automatic logging of download progress, failures, and network issues
+2. **Performance Analysis**: Structured logging of generation performance metrics
+3. **Network Transparency**: All network requests (downloads, API calls) are automatically logged
+4. **Production Debugging**: Export detailed logs with full context when issues occur
+5. **Minimal Overhead**: Pulse uses compression and efficient storage (90% less space)
+
+## Implementation Approach (Simplified)
+
+### Core Components Only
+
+1. **PulseSDKLogger**: Drop-in replacement for SDKLogger with enhanced metadata support
+2. **PulseConfiguration**: Minimal setup with sensible defaults
+3. **Network Logging**: Automatic capture via URLSessionProxyDelegate
+4. **Performance Logging**: Structured metrics for generation analytics
+
+### What We're NOT Including
+
+- ❌ Debug UI/Views (PulseDebugMenu)
+- ❌ Complex configuration options
+- ❌ Remote logging features
+- ❌ Export UI components
+- ❌ Debug-only features
+
 ## Implementation Phases
 
-### Phase 1: Core Pulse Integration (Week 1)
+### Phase 1: Core Integration (Completed)
 
 #### 1.1 Add Pulse Dependency
 
@@ -39,46 +64,41 @@ targets: [
     .target(
         name: "RunAnywhere",
         dependencies: [
-            "Pulse",
-            "PulseUI",
+            "Pulse",  // Core logging only, no PulseUI
             // ... existing dependencies
         ]
     )
 ]
 ```
 
-#### 1.2 Create Pulse Configuration Service
+#### 1.2 Minimal Pulse Configuration
 
-**New File: `Foundation/Logging/Services/PulseConfiguration.swift`**
+**File: `Foundation/Logging/Services/Pulse/PulseConfiguration.swift`**
 ```swift
 import Foundation
 import Pulse
 
 final class PulseConfiguration {
-    static func configure(with config: SDKConfiguration) {
-        // Configure LoggerStore
+    static func configure(with config: Configuration) {
+        // Basic configuration with sensible defaults
         LoggerStore.shared.configuration = LoggerStore.Configuration(
-            sizeLimit: config.loggingConfiguration.maxStorageSize ?? 50_000_000, // 50MB default
+            sizeLimit: 50_000_000, // 50MB
             maximumSessionAge: TimeInterval(7 * 24 * 60 * 60), // 7 days
             sweepInterval: TimeInterval(60 * 60) // 1 hour
         )
 
-        // Configure NetworkLogger
+        // Enable network logging for model downloads
         NetworkLogger.Configuration.shared = NetworkLogger.Configuration(
-            isEnabled: config.analyticsConfiguration.isEnabled,
+            isEnabled: true,
             isFiltered: true,
-            allowedHosts: Set(config.loggingConfiguration.allowedHosts ?? []),
-            blockedHosts: Set(config.loggingConfiguration.blockedHosts ?? []),
+            allowedHosts: Set([
+                "huggingface.co",
+                "*.huggingface.co",
+                "github.com",
+                "*.github.com"
+            ]),
             sensitiveDataRedaction: .automatic
         )
-
-        // Configure RemoteLogger for development
-        #if DEBUG
-        RemoteLogger.shared.enable(
-            serverIP: config.loggingConfiguration.remoteLoggerHost,
-            port: config.loggingConfiguration.remoteLoggerPort ?? 8080
-        )
-        #endif
     }
 }
 ```
@@ -346,82 +366,6 @@ extension MonitoringService {
 }
 ```
 
-### Phase 4: UI Integration (Week 2-3)
-
-#### 4.1 Create Debug Console Integration
-
-**New File: `Public/Debug/PulseDebugMenu.swift`**
-```swift
-#if DEBUG
-import SwiftUI
-import PulseUI
-
-public struct PulseDebugMenu: View {
-    @State private var isPresented = false
-
-    public var body: some View {
-        Button("Open Debug Console") {
-            isPresented = true
-        }
-        .sheet(isPresented: $isPresented) {
-            NavigationView {
-                ConsoleView()
-            }
-        }
-    }
-}
-
-// UIKit support
-public class PulseDebugViewController: UIViewController {
-    public static func present(from viewController: UIViewController) {
-        let consoleVC = UIHostingController(rootView:
-            NavigationView { ConsoleView() }
-        )
-        viewController.present(consoleVC, animated: true)
-    }
-}
-#endif
-```
-
-#### 4.2 Add Debug Configuration
-
-**Modified File: `Public/Configuration/SDKConfiguration.swift`**
-```swift
-public struct SDKConfiguration {
-    // ... existing properties
-
-    /// Debug configuration for development builds
-    public struct DebugConfiguration {
-        /// Enable Pulse debug console
-        public let enableDebugConsole: Bool
-
-        /// Enable remote logging to Pulse Pro
-        public let enableRemoteLogging: Bool
-
-        /// Remote logger host (for Pulse Pro)
-        public let remoteLoggerHost: String?
-
-        /// Remote logger port
-        public let remoteLoggerPort: Int?
-
-        public init(
-            enableDebugConsole: Bool = true,
-            enableRemoteLogging: Bool = false,
-            remoteLoggerHost: String? = nil,
-            remoteLoggerPort: Int? = 8080
-        ) {
-            self.enableDebugConsole = enableDebugConsole
-            self.enableRemoteLogging = enableRemoteLogging
-            self.remoteLoggerHost = remoteLoggerHost
-            self.remoteLoggerPort = remoteLoggerPort
-        }
-    }
-
-    #if DEBUG
-    public let debugConfiguration: DebugConfiguration
-    #endif
-}
-```
 
 ### Phase 5: ServiceContainer Updates (Week 3)
 
@@ -519,50 +463,48 @@ struct FeatureFlags {
 }
 ```
 
-## Success Criteria
+## Implementation Summary
 
-1. **Functionality**
-   - All existing logging functionality maintained
-   - Network requests automatically logged
-   - Performance metrics captured accurately
-   - Debug console accessible in development
+### What We've Done
 
-2. **Performance**
-   - No regression in app launch time
-   - Memory usage within 5% of current
-   - Logging overhead < 1% CPU usage
+1. **Core Logging**: PulseSDKLogger as a drop-in replacement for SDKLogger
+2. **Network Monitoring**: Automatic logging for URLSession requests
+3. **Performance Tracking**: Structured logging for generation metrics
+4. **Download Tracking**: Enhanced logging for model downloads with progress
 
-3. **Developer Experience**
-   - Real-time log streaming working
-   - Network inspector functional
-   - Export functionality operational
-   - Documentation updated
+### Key Benefits Achieved
 
-## Risk Mitigation
+- ✅ Automatic network request logging (downloads, API calls)
+- ✅ Structured performance metrics with compression
+- ✅ Enhanced error context for debugging
+- ✅ Minimal code changes (typealias for compatibility)
+- ✅ Production-ready logging with 7-day retention
 
-1. **Dependency Management**
-   - Pin to specific Pulse version
-   - Regular updates and testing
-   - Fallback to basic logging if needed
+### What We Intentionally Skipped
 
-2. **Platform Compatibility**
-   - Pulse requires iOS 15+ for UI
-   - Core logging works on iOS 13+
-   - Graceful degradation for older versions
+- ❌ UI components (no debug console views)
+- ❌ Complex configuration options
+- ❌ Remote logging features
+- ❌ Export UI (logs can still be accessed programmatically)
 
-3. **Privacy Compliance**
-   - All logs stored locally by default
-   - Sensitive data redaction configured
-   - Remote logging only in debug builds
+## Migration Notes
 
-## Timeline Summary
+The implementation uses a compatibility bridge:
+```swift
+// Temporary bridge for zero code changes
+internal typealias SDKLogger = PulseSDKLogger
+```
 
-- **Week 1**: Core Pulse integration and network monitoring setup
-- **Week 2**: Performance monitoring and UI integration
-- **Week 3**: ServiceContainer updates and legacy cleanup
+This means all existing `SDKLogger` usage automatically uses Pulse without any code modifications.
 
-Total Duration: 3 weeks
+## Future Considerations
+
+If needed in the future, we can:
+- Add programmatic log export functionality
+- Enable remote logging for specific debug builds
+- Add more sophisticated filtering rules
+- Integrate with crash reporting tools
 
 ## Conclusion
 
-This implementation plan provides a comprehensive approach to integrating Pulse into the RunAnywhere Swift SDK. The phased approach ensures minimal disruption while delivering significant improvements in debugging capabilities, network monitoring, and developer experience. The plan maintains backward compatibility while setting up the SDK for future enhancements.
+This simplified Pulse integration provides powerful network and performance logging capabilities without adding unnecessary complexity. The focus remains on the core benefits: better debugging for model downloads, performance tracking, and production issue diagnosis.
