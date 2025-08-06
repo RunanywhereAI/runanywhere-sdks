@@ -12,6 +12,7 @@ struct ChatInterfaceView: View {
     @StateObject private var viewModel = ChatViewModel()
     @StateObject private var conversationStore = ConversationStore.shared
     @State private var showingConversationList = false
+    @State private var showingModelSelection = false
     @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
@@ -59,7 +60,7 @@ struct ChatInterfaceView: View {
                 // Input area
                 inputArea
             }
-            .navigationTitle("Chat")
+            .navigationTitle(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -67,15 +68,36 @@ struct ChatInterfaceView: View {
                         Image(systemName: "list.bullet")
                     }
                 }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { viewModel.clearChat() }) {
-                        Image(systemName: "trash")
+                    HStack(spacing: 8) {
+                        Button(action: { showingModelSelection = true }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "cube")
+                                if viewModel.isModelLoaded {
+                                    Text("Switch")
+                                        .font(.caption)
+                                } else {
+                                    Text("Select")
+                                        .font(.caption)
+                                }
+                            }
+                        }
+
+                        Button(action: { viewModel.clearChat() }) {
+                            Image(systemName: "trash")
+                        }
+                        .disabled(viewModel.messages.isEmpty)
                     }
-                    .disabled(viewModel.messages.isEmpty)
                 }
             }
             .sheet(isPresented: $showingConversationList) {
                 ConversationListView()
+            }
+            .sheet(isPresented: $showingModelSelection) {
+                ModelSelectionSheet { model in
+                    await handleModelSelected(model)
+                }
             }
             .onAppear {
                 setupInitialState()
@@ -92,6 +114,27 @@ struct ChatInterfaceView: View {
         VStack(spacing: 0) {
             Divider()
 
+            // Show model selection prompt if no model is loaded
+            if !viewModel.isModelLoaded {
+                VStack(spacing: 8) {
+                    Text("Welcome! Select and download a model to start chatting.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Button("Select Model") {
+                        showingModelSelection = true
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(Color.blue.opacity(0.1))
+
+                Divider()
+            }
 
             HStack(spacing: 12) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
@@ -101,6 +144,7 @@ struct ChatInterfaceView: View {
                     .onSubmit {
                         sendMessage()
                     }
+                    .disabled(!viewModel.isModelLoaded)
 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
@@ -126,6 +170,12 @@ struct ChatInterfaceView: View {
         Task {
             await viewModel.checkModelStatus()
         }
+    }
+
+    private func handleModelSelected(_ model: ModelInfo) async {
+        // The model loading is already handled in the ModelSelectionSheet
+        // Just update our view model to reflect the change
+        await viewModel.checkModelStatus()
     }
 
 }

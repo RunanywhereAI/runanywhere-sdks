@@ -1,7 +1,9 @@
 import SwiftUI
+import RunAnywhereSDK
 
 struct QuizView: View {
     @StateObject private var viewModel = QuizViewModel()
+    @State private var showingModelSelection = false
 
     var body: some View {
         NavigationView {
@@ -22,6 +24,22 @@ struct QuizView: View {
             }
             .navigationTitle("Quiz Generator")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showingModelSelection = true }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "cube")
+                            Text("Model")
+                                .font(.caption)
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showingModelSelection) {
+                ModelSelectionSheet { model in
+                    await handleModelSelected(model)
+                }
+            }
             .alert("Error", isPresented: .constant(viewModel.error != nil)) {
                 Button("OK") {
                     viewModel.error = nil
@@ -30,6 +48,11 @@ struct QuizView: View {
                 Text(viewModel.error ?? "")
             }
         }
+    }
+
+    private func handleModelSelected(_ model: ModelInfo) async {
+        // Model is already loaded in the SDK by the sheet
+        // Could update quiz viewModel if needed
     }
 }
 

@@ -1,39 +1,55 @@
 //
-//  SimplifiedModelsView.swift
+//  ModelSelectionSheet.swift
 //  RunAnywhereAI
 //
-//  A simplified models view that demonstrates SDK usage
+//  Reusable model selection sheet that can be used across the app
 //
 
 import SwiftUI
 import RunAnywhereSDK
 
-struct SimplifiedModelsView: View {
+struct ModelSelectionSheet: View {
     @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
+    @Environment(\.dismiss) var dismiss
 
     @State private var selectedModel: ModelInfo?
     @State private var expandedFramework: LLMFramework?
     @State private var availableFrameworks: [LLMFramework] = []
     @State private var showingAddModelSheet = false
+    @State private var isLoadingModel = false
+    @State private var loadingProgress: String = ""
+
+    let onModelSelected: (ModelInfo) async -> Void
+
+    init(onModelSelected: @escaping (ModelInfo) async -> Void) {
+        self.onModelSelected = onModelSelected
+    }
 
     var body: some View {
         NavigationView {
-            mainContentView
-        }
-    }
+            ZStack {
+                mainContentView
 
-    private var mainContentView: some View {
-        List {
-            deviceStatusSection
-            frameworksSection
-            modelsSection
-        }
-        .navigationTitle("Models")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Add Model") {
-                    showingAddModelSheet = true
+                if isLoadingModel {
+                    loadingOverlay
+                }
+            }
+            .navigationTitle("Select Model")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isLoadingModel)
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add Model") {
+                        showingAddModelSheet = true
+                    }
+                    .disabled(isLoadingModel)
                 }
             }
         }
@@ -49,13 +65,43 @@ struct SimplifiedModelsView: View {
         }
     }
 
+    private var mainContentView: some View {
+        List {
+            deviceStatusSection
+            frameworksSection
+            modelsSection
+        }
+    }
+
+    private var loadingOverlay: some View {
+        Color.black.opacity(0.4)
+            .ignoresSafeArea()
+            .overlay {
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.2)
+
+                    Text("Loading Model")
+                        .font(.headline)
+
+                    Text(loadingProgress)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(30)
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+                .shadow(radius: 10)
+            }
+    }
+
     private func loadInitialData() async {
         await viewModel.loadModels()
         await loadAvailableFrameworks()
     }
 
     private func loadAvailableFrameworks() async {
-        // Get available frameworks from SDK
         let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
@@ -145,24 +191,24 @@ struct SimplifiedModelsView: View {
 
             Section("Models for \(expanded.displayName)") {
                 ForEach(filteredModels, id: \.id) { model in
-                    ModelRow(
+                    SelectableModelRow(
                         model: model,
                         isSelected: selectedModel?.id == model.id,
+                        isLoading: isLoadingModel,
                         onDownloadCompleted: {
                             Task {
-                                await viewModel.loadModels() // Refresh models list
-                                // Also refresh available frameworks in case new adapters were registered
+                                await viewModel.loadModels()
                                 await loadAvailableFrameworks()
                             }
                         },
                         onSelectModel: {
                             Task {
-                                await selectModel(model)
+                                await selectAndLoadModel(model)
                             }
                         },
                         onModelUpdated: {
                             Task {
-                                await viewModel.loadModels() // Refresh models list after thinking update
+                                await viewModel.loadModels()
                                 await loadAvailableFrameworks()
                             }
                         }
@@ -194,19 +240,60 @@ struct SimplifiedModelsView: View {
         }
     }
 
-    private func selectModel(_ model: ModelInfo) async {
-        selectedModel = model
+    private func selectAndLoadModel(_ model: ModelInfo) async {
+        guard model.localPath != nil else {
+            return // Model not downloaded yet
+        }
 
-        // Update the view model state
-        await viewModel.selectModel(model)
+        await MainActor.run {
+            isLoadingModel = true
+            loadingProgress = "Initializing \(model.name)..."
+            selectedModel = model
+        }
+
+        do {
+            await MainActor.run {
+                loadingProgress = "Loading model into memory..."
+            }
+
+            // This is where we actually wait for the model to load
+            try await RunAnywhereSDK.shared.loadModel(model.id)
+
+            await MainActor.run {
+                loadingProgress = "Model loaded successfully!"
+            }
+
+            // Wait a moment to show success message
+            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+
+            // Call the callback with the loaded model
+            await onModelSelected(model)
+
+            // Update the shared view model
+            await viewModel.selectModel(model)
+
+            await MainActor.run {
+                dismiss()
+            }
+
+        } catch {
+            await MainActor.run {
+                isLoadingModel = false
+                loadingProgress = ""
+                selectedModel = nil
+                // Could show error alert here
+            }
+            print("Failed to load model: \(error)")
+        }
     }
 }
 
 // MARK: - Supporting Views
 
-private struct ModelRow: View {
+private struct SelectableModelRow: View {
     let model: ModelInfo
     let isSelected: Bool
+    let isLoading: Bool
     let onDownloadCompleted: () -> Void
     let onSelectModel: () -> Void
     let onModelUpdated: () -> Void
@@ -254,9 +341,7 @@ private struct ModelRow: View {
                         .foregroundColor(.purple)
                         .cornerRadius(4)
                     } else if model.localPath != nil {
-                        // For downloaded models without thinking support, show option to enable it
                         Button(action: {
-                            // Enable thinking support for this model
                             Task {
                                 await RunAnywhereSDK.shared.updateModelThinkingSupport(
                                     modelId: model.id,
@@ -336,29 +421,22 @@ private struct ModelRow: View {
                         .font(.caption)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
+                        .disabled(isLoading)
                     }
                 } else if model.localPath != nil {
-                    // Model is downloaded - show select and load options
-                    if isSelected {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Loaded")
-                                .font(.caption2)
-                                .foregroundColor(.green)
-                        }
-                    } else {
-                        Button("Load") {
-                            onSelectModel()
-                        }
-                        .font(.caption)
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                    // Model is downloaded - show select button
+                    Button("Select") {
+                        onSelectModel()
                     }
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isLoading || isSelected)
                 }
             }
         }
         .padding(.vertical, 4)
+        .opacity(isLoading && !isSelected ? 0.6 : 1.0)
     }
 
     private func downloadModel() async {
@@ -390,13 +468,10 @@ private struct ModelRow: View {
 
             // Wait for download to complete
             let url = try await downloadTask.result.value
-
             print("Model \(model.name) downloaded successfully to: \(url)")
 
-            // Notify parent that download completed so it can refresh
             await MainActor.run {
                 onDownloadCompleted()
-                // Reset download state
                 isDownloading = false
                 downloadProgress = 1.0
             }
@@ -409,8 +484,4 @@ private struct ModelRow: View {
             }
         }
     }
-}
-
-#Preview {
-    SimplifiedModelsView()
 }

@@ -18,17 +18,11 @@ struct ContentView: View {
             }
             .tag(0)
 
-            SimplifiedModelsView()
-                .tabItem {
-                    Label("Models", systemImage: "cube")
-                }
-                .tag(1)
-
             StorageView()
                 .tabItem {
                     Label("Storage", systemImage: "externaldrive")
                 }
-                .tag(2)
+                .tag(1)
 
             NavigationView {
                 SimplifiedSettingsView()
@@ -36,16 +30,13 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(3)
+            .tag(2)
 
             QuizView()
                 .tabItem {
                     Label("Quiz", systemImage: "questionmark.circle")
                 }
-                .tag(4)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("SwitchToModelsTab"))) { _ in
-            selectedTab = 1
+                .tag(3)
         }
     }
 }
