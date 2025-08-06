@@ -102,7 +102,9 @@
       "Bash(xcrun simctl log:*)",
       "Bash(timeout:*)",
       "WebFetch(domain:kean-docs.github.io)",
-      "WebFetch(domain:aptabase.com)"
+      "WebFetch(domain:aptabase.com)",
+      "Bash(/dev/null)",
+      "Bash(nm:*)"
     ],
     "deny": []
   }
