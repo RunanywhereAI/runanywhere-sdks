@@ -78,31 +78,54 @@ This plan outlines the integration of GRDB.swift to replace the current disabled
 └─────────────────────────┘
 ```
 
-### 2. GRDB Implementation Layers
+### 2. Corrected Architecture - Repository Pattern
 
 ```
 ┌────────────────────────────────────────┐
 │          Public API Layer              │
-│    (Existing Repository Protocols)     │
+│    (Repository Protocols)              │
+│  ConfigurationRepository, etc.         │
 └────────────────────────────────────────┘
                     │
 ┌────────────────────────────────────────┐
-│        GRDB Repository Layer           │
-│   (New implementations using GRDB)     │
+│     Repository Implementations         │
+│  ConfigurationRepositoryImpl, etc.     │
+│  (Handles BOTH local DB + remote API)  │
 └────────────────────────────────────────┘
                     │
-┌────────────────────────────────────────┐
-│         GRDB Record Layer              │
-│    (Type-safe record definitions)      │
-└────────────────────────────────────────┘
-                    │
-┌────────────────────────────────────────┐
-│      GRDB Database Manager             │
-│   (Connection, migration, lifecycle)   │
-└────────────────────────────────────────┘
+            ┌───────┴───────┐
+            │               │
+┌───────────▼──────┐ ┌─────▼──────────┐
+│  Local Storage   │ │  Remote API    │
+│  (GRDB inside)   │ │  (APIClient)   │
+├──────────────────┤ ├────────────────┤
+│ • DatabaseManager│ │ • Sync logic   │
+│ • GRDB Records   │ │ • DTOs         │
+│ • Migrations     │ │ • Endpoints    │
+└──────────────────┘ └────────────────┘
 ```
 
+**Key Architecture Principles:**
+1. **Repository hides implementation** - No "GRDB" in public names
+2. **Single source of truth** - Repository manages both local cache and remote sync
+3. **Implementation agnostic** - Could switch from GRDB to Core Data without changing public API
+4. **Existing structure preserved** - Update internals, not the architecture
+
 ---
+
+## Implementation Approach
+
+### What We're Actually Doing:
+1. **Replacing the database engine** - SQLite → GRDB (internal change only)
+2. **Keeping the same architecture** - Repository pattern remains unchanged
+3. **Updating existing files** - Not creating parallel implementations
+4. **Hiding implementation details** - GRDB is an internal detail, not exposed
+
+### What We're NOT Doing:
+- ❌ Creating new "GRDB" repositories
+- ❌ Changing the repository protocols
+- ❌ Exposing GRDB in public APIs
+- ❌ Breaking the repository pattern
 
 ## Implementation Plan
 
@@ -163,29 +186,97 @@ GRDBModels/
 - Enum converters for type-safe status fields
 - Custom UUID handling
 
-### Phase 1C: Repository Migration (Days 5-7)
+### Phase 1C: Repository Migration (Days 5-7) 🚧 NEEDS FIXES
 
-#### 1.6 Create GRDB Repository Implementations
+#### Issues Found:
+1. **ConfigurationRepositoryImpl.swift is partially migrated** - Has mixed old and new code
+2. **ServiceContainer still references old DatabaseCore** - Uses GRDBDatabaseAdapter as bridge
+3. **Repository constructor signatures are inconsistent** - Some expect DatabaseCore, others DatabaseManager
+4. **Missing mapping functions** - Need mapToRecord() and mapToEntity() implementations
+
+#### 1.6 Update Existing Repository Implementations
 ```
-GRDBRepositories/
-├── GRDBConfigurationRepository.swift
-├── GRDBModelMetadataRepository.swift
-├── GRDBGenerationAnalyticsRepository.swift
-├── GRDBTelemetryRepository.swift
-└── GRDBRepositoryBase.swift
+Updated Files (not new):
+├── Data/Repositories/ConfigurationRepositoryImpl.swift
+├── Data/Repositories/ModelMetadataRepositoryImpl.swift
+├── Data/Repositories/GenerationAnalyticsRepositoryImpl.swift
+└── Data/Repositories/TelemetryRepositoryImpl.swift
 ```
 
-**Implementation Strategy:**
-- Maintain existing repository protocols
-- Create GRDB-based implementations
-- Add feature flag for gradual rollout
-- Implement batch operations for performance
+**Fixed Implementation Strategy:**
+1. **Fix ConfigurationRepositoryImpl.swift** first:
+   - Remove mixed old database code (lines 50-100 have old JSON blob pattern)
+   - Implement proper mapToRecord() and mapToEntity() functions
+   - Use DatabaseManager instead of DatabaseCore
+   - Keep apiClient for remote sync
 
-#### 1.7 Query Optimization
-- Add indexes for frequently queried fields
-- Implement query builders for complex filters
-- Add pagination support for large datasets
-- Create database views for common aggregations
+2. **Update remaining repositories** following same pattern:
+   - Replace `database: DatabaseCore` with `databaseManager: DatabaseManager`
+   - Replace JSON blob storage with GRDB record operations
+   - Implement record mapping functions for each repository
+   - Keep all sync() logic with APIClient unchanged
+
+3. **Fix ServiceContainer initialization**:
+   - Update repository constructors to use DatabaseManager directly
+   - Remove GRDBDatabaseAdapter bridge after all repositories updated
+   - Fix async initialization issues
+
+#### 1.7 Repository Implementation Details
+
+**Each repository needs:**
+```swift
+// 1. Updated constructor
+public init(databaseManager: DatabaseManager, apiClient: APIClient?)
+
+// 2. Mapping functions
+private func mapToRecord(_ entity: EntityType) -> RecordType
+private func mapToEntity(_ record: RecordType) throws -> EntityType
+
+// 3. GRDB operations replacing JSON blobs
+try databaseManager.write { db in
+    try record.save(db)
+}
+
+// 4. Proper associations for related data
+let records = try ModelMetadataRecord
+    .including(all: ModelMetadataRecord.usageStats)
+    .fetchAll(db)
+```
+
+#### 1.8 Query Optimization
+- Indexes already added in Migration002_AddIndexes.swift ✅
+- Implement filtered queries using GRDB's query interface
+- Add pagination using `.limit()` and `.offset()`
+- Use GRDB's request builders for complex queries
+
+### Phase 1C Implementation Order:
+
+1. **ConfigurationRepositoryImpl.swift** (FIRST - it's already partially done)
+   - Remove lines 50-100 (old JSON blob code)
+   - Add proper mapToRecord() and mapToEntity() functions
+   - Fix fetch, fetchAll, delete methods to use GRDB
+   - Keep sync() method with APIClient
+
+2. **ModelMetadataRepositoryImpl.swift**
+   - Change constructor to use DatabaseManager
+   - Implement record mapping for ModelMetadataRecord
+   - Handle JSON blobs for capabilities and requirements
+   - Include associations for usage stats
+
+3. **GenerationAnalyticsRepositoryImpl.swift**
+   - Map to GenerationSessionRecord and GenerationRecord
+   - Handle parent-child relationship between sessions and generations
+   - Implement aggregation queries for analytics
+
+4. **TelemetryRepositoryImpl.swift**
+   - Simple mapping to TelemetryRecord
+   - Implement batch insert for performance
+   - Add cleanup for old telemetry data
+
+5. **ServiceContainer Updates**
+   - Update all repository initializations
+   - Remove DatabaseCore and GRDBDatabaseAdapter references
+   - Simplify async initialization
 
 ### Phase 1D: Advanced Features (Days 8-9)
 
@@ -509,27 +600,96 @@ Since the app is not in production:
 - Updated `ServiceContainer` to use new GRDB database directly
 - No migration from old database needed - starting fresh
 
-### Phase 1B: Core Data Models 🚧 IN PROGRESS
+### Phase 1B: Core Data Models ✅ COMPLETED
 
-Next steps:
-- Create GRDB Record types for all tables
-- Implement type converters for JSON columns
-- Define associations between records
-- Add computed properties for derived values
+#### Created GRDB Record Types:
+1. **ConfigurationRecord.swift** - Main configuration with proper types
+2. **ModelMetadataRecord.swift** - Model metadata with JSON blob support
+3. **GenerationSessionRecord.swift** - Generation sessions with associations
+4. **GenerationRecord.swift** - Individual generations with associations
+5. **TelemetryRecord.swift** - Telemetry events
+6. **JSONHelpers.swift** - Helper utilities for JSON encoding/decoding
+
+#### Key Features Implemented:
+- All records conform to TableRecord, FetchableRecord, and PersistableRecord
+- Type-safe column definitions using ColumnExpression
+- Associations defined between related tables
+- JSON blob support for flexible data (capabilities, requirements, etc.)
+- Default values matching schema definition
+
+### Phase 1C: Repository Migration ✅ COMPLETED
+
+#### Completion Status:
+- ✅ ConfigurationRepositoryImpl.swift - Fixed and using GRDB
+- ✅ ModelMetadataRepositoryImpl.swift - Migrated to GRDB
+- ✅ GenerationAnalyticsRepositoryImpl.swift - Migrated to GRDB
+- ✅ TelemetryRepositoryImpl.swift - Migrated to GRDB
+- ✅ ServiceContainer - Updated to use DatabaseManager directly
+- ✅ GRDBDatabaseAdapter - Removed (no longer needed)
+- ✅ DatabaseCore protocol - Removed (no longer needed)
+- ✅ SQLiteDatabase.swift - Removed (old implementation)
+- ✅ InMemoryConfigurationService - Removed (no fallback needed)
+- ✅ NoOpGenerationAnalyticsService - Removed (no fallback needed)
+
+#### What Was Done:
+1. Fixed ConfigurationRepositoryImpl with proper mapping functions
+2. Updated all repositories to use DatabaseManager instead of DatabaseCore
+3. Implemented mapToRecord() and mapToEntity() functions for each repository
+4. Updated ServiceContainer to create repositories with DatabaseManager
+5. Fixed DataSyncService to accept repositories via constructor
+6. Removed all legacy database code and adapters
+
+### Next Steps - Phase 1D:
+1. **Implement Database Observations** for real-time updates
+2. **Add Backup and Recovery** functionality
+3. **Remove JSON serialization** from entity models
+4. **Add more advanced queries** and aggregations
+5. **Performance optimization** with better indexes
+
+### Key Achievements:
+- ✅ All repositories now use GRDB directly
+- ✅ Proper relational schema replacing JSON blobs
+- ✅ Type-safe database operations
+- ✅ Clean separation between entities and records
+- ✅ No more database adapter layer
+- ✅ Simplified dependency injection
+2. **Replace** DatabaseCore/SQLite calls with DatabaseManager/GRDB
+3. **Keep** the same repository protocols and public API
+4. **Maintain** both local DB and remote API sync in same repository
+5. **Hide** GRDB implementation details - no "GRDB" in names
+
+#### Current Repository Structure (Correct Pattern):
+```swift
+// Existing ConfigurationRepositoryImpl
+public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
+    private let database: DatabaseCore  // ← Change to: DatabaseManager
+    private let apiClient: APIClient?   // ← Keep as is
+
+    // Repository handles BOTH:
+    // 1. Local caching (database)
+    // 2. Remote sync (apiClient)
+}
+```
+
+#### Migration Steps:
+1. Replace `DatabaseCore` with `DatabaseManager` in repositories
+2. Replace JSON blob storage with GRDB record operations
+3. Keep all sync() logic with APIClient unchanged
+4. ServiceContainer remains unchanged (same interface)
 
 ---
 
 ## Cleanup Checklist
 
 ### After Phase 1 Completion:
-- [ ] Delete `SQLiteDatabase.swift`
-- [ ] Delete old repository implementations (4 files)
-- [ ] Delete `InMemoryConfigurationService.swift`
-- [ ] Delete `NoOpGenerationAnalyticsService.swift`
-- [ ] Remove JSON serialization from entity models
-- [ ] Update `DataSyncService` to use GRDB repositories
-- [ ] Clean up `ServiceContainer` fallback logic
-- [ ] Remove `DatabaseCore` protocol and adapter (final step)
-- [ ] Update all imports and dependencies
+- [x] Delete `SQLiteDatabase.swift` ✅
+- [x] Delete old repository implementations (4 files) - Actually updated them instead ✅
+- [x] Delete `InMemoryConfigurationService.swift` ✅
+- [x] Delete `NoOpGenerationAnalyticsService.swift` ✅
+- [ ] Remove JSON serialization from entity models (Phase 1D task)
+- [x] Update `DataSyncService` to use GRDB repositories ✅
+- [x] Clean up `ServiceContainer` fallback logic ✅
+- [x] Remove `DatabaseCore` protocol and adapter ✅
+- [ ] Update all imports and dependencies (ongoing)
 - [ ] Run tests to ensure nothing breaks
 - [ ] Update documentation to reflect new architecture

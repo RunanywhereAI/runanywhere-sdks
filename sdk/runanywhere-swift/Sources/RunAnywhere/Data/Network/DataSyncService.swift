@@ -15,24 +15,14 @@ public actor DataSyncService {
     // MARK: - Initialization
 
     public init(
-        database: DatabaseCore,
-        apiClient: APIClient?,
+        configurationRepository: any ConfigurationRepository,
+        modelMetadataRepository: any ModelMetadataRepository,
+        telemetryRepository: any TelemetryRepository,
         enableAutoSync: Bool = true
     ) {
-        self.configRepository = ConfigurationRepositoryImpl(
-            database: database,
-            apiClient: apiClient
-        )
-
-        self.telemetryRepository = TelemetryRepositoryImpl(
-            database: database,
-            apiClient: apiClient
-        )
-
-        self.modelMetadataRepository = ModelMetadataRepositoryImpl(
-            database: database,
-            apiClient: apiClient
-        )
+        self.configRepository = configurationRepository
+        self.telemetryRepository = telemetryRepository
+        self.modelMetadataRepository = modelMetadataRepository
 
         if enableAutoSync {
             Task {

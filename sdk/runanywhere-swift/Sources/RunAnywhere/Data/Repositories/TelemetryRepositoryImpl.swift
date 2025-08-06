@@ -1,32 +1,30 @@
 import Foundation
+import GRDB
 
 /// Repository for managing telemetry data
 public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public typealias Entity = TelemetryData
 
-    private let database: DatabaseCore
+    private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
     private let logger = SDKLogger(category: "TelemetryRepository")
-    private let tableName = "telemetry"
     private let batchSize = 50
 
     // MARK: - Initialization
 
-    public init(database: DatabaseCore, apiClient: APIClient?) {
-        self.database = database
+    public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
+        self.databaseManager = databaseManager
         self.apiClient = apiClient
     }
 
     // MARK: - Repository Implementation
 
     public func save(_ entity: TelemetryData) async throws {
-        let data = try JSONEncoder().encode(entity)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = try mapToRecord(entity)
 
-        try await database.execute("""
-            INSERT OR REPLACE INTO \(tableName) (id, data, updated_at, sync_pending)
-            VALUES (?, ?, ?, ?)
-        """, parameters: [entity.id, json, entity.updatedAt, entity.syncPending ? 1 : 0])
+        try databaseManager.write { db in
+            try record.save(db)
+        }
 
         // Check if we should auto-sync
         let pendingCount = try await getPendingCount()
@@ -38,61 +36,47 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     }
 
     public func fetch(id: String) async throws -> TelemetryData? {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) WHERE id = ?
-        """, parameters: [id])
-
-        guard let row = results.first,
-              let json = row["data"] as? String,
-              let data = json.data(using: .utf8) else {
-            return nil
+        let record = try databaseManager.read { db in
+            try TelemetryRecord.fetchOne(db, key: id)
         }
 
-        return try JSONDecoder().decode(TelemetryData.self, from: data)
+        return record.map(mapToEntity)
     }
 
     public func fetchAll() async throws -> [TelemetryData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) ORDER BY updated_at DESC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8) else {
-                return nil
-            }
-
-            return try? JSONDecoder().decode(TelemetryData.self, from: data)
+        let records = try databaseManager.read { db in
+            try TelemetryRecord
+                .order(TelemetryRecord.Columns.timestamp.desc)
+                .fetchAll(db)
         }
+
+        return records.map(mapToEntity)
     }
 
     public func delete(id: String) async throws {
-        try await database.execute("""
-            DELETE FROM \(tableName) WHERE id = ?
-        """, parameters: [id])
-    }
-
-    public func fetchPendingSync() async throws -> [TelemetryData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) WHERE sync_pending = 1 LIMIT ?
-        """, parameters: [batchSize])
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8) else {
-                return nil
-            }
-
-            return try? JSONDecoder().decode(TelemetryData.self, from: data)
+        try databaseManager.write { db in
+            _ = try TelemetryRecord.deleteOne(db, key: id)
         }
     }
 
+    public func fetchPendingSync() async throws -> [TelemetryData] {
+        let records = try databaseManager.read { db in
+            try TelemetryRecord
+                .filter(TelemetryRecord.Columns.syncPending == true)
+                .limit(batchSize)
+                .fetchAll(db)
+        }
+
+        return records.map(mapToEntity)
+    }
+
     public func markSynced(_ ids: [String]) async throws {
-        try await database.transaction { db in
+        try databaseManager.write { db in
             for id in ids {
-                try await db.execute("""
-                    UPDATE \(self.tableName) SET sync_pending = 0 WHERE id = ?
-                """, parameters: [id])
+                if var record = try TelemetryRecord.fetchOne(db, key: id) {
+                    record.syncPending = false
+                    try record.update(db)
+                }
             }
         }
     }
@@ -118,16 +102,13 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     // MARK: - Helper Methods
 
     private func getPendingCount() async throws -> Int {
-        let results = try await database.query("""
-            SELECT COUNT(*) as count FROM \(tableName) WHERE sync_pending = 1
-        """, parameters: [])
-
-        guard let row = results.first,
-              let count = row["count"] as? Int64 else {
-            return 0
+        let count = try databaseManager.read { db in
+            try TelemetryRecord
+                .filter(TelemetryRecord.Columns.syncPending == true)
+                .fetchCount(db)
         }
 
-        return Int(count)
+        return count
     }
 
     /// Track an event
@@ -143,43 +124,35 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     // MARK: - TelemetryRepository Protocol Methods
 
     public func fetchByDateRange(from: Date, to: Date) async throws -> [TelemetryData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) ORDER BY updated_at DESC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8),
-                  let telemetryData = try? JSONDecoder().decode(TelemetryData.self, from: data) else {
-                return nil
-            }
-
-            // Filter by date range
-            return (telemetryData.timestamp >= from && telemetryData.timestamp <= to) ? telemetryData : nil
+        let records = try databaseManager.read { db in
+            try TelemetryRecord
+                .filter(TelemetryRecord.Columns.timestamp >= from)
+                .filter(TelemetryRecord.Columns.timestamp <= to)
+                .order(TelemetryRecord.Columns.timestamp.desc)
+                .fetchAll(db)
         }
+
+        return records.map(mapToEntity)
     }
 
     public func fetchUnsent() async throws -> [TelemetryData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) WHERE sync_pending = 1 ORDER BY timestamp DESC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8) else {
-                return nil
-            }
-
-            return try? JSONDecoder().decode(TelemetryData.self, from: data)
+        let records = try databaseManager.read { db in
+            try TelemetryRecord
+                .filter(TelemetryRecord.Columns.syncPending == true)
+                .order(TelemetryRecord.Columns.timestamp.desc)
+                .fetchAll(db)
         }
+
+        return records.map(mapToEntity)
     }
 
     public func markAsSent(_ ids: [String]) async throws {
-        try await database.transaction { db in
+        try databaseManager.write { db in
             for id in ids {
-                try await db.execute("""
-                    UPDATE \(self.tableName) SET sync_pending = 0 WHERE id = ?
-                """, parameters: [id])
+                if var record = try TelemetryRecord.fetchOne(db, key: id) {
+                    record.syncPending = false
+                    try record.update(db)
+                }
             }
         }
 
@@ -187,37 +160,72 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     }
 
     public func cleanup(olderThan date: Date) async throws {
-        // Get all records to check timestamps
-        let results = try await database.query("""
-            SELECT id, data FROM \(tableName)
-        """, parameters: [])
-
-        var idsToDelete: [String] = []
-
-        for row in results {
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8),
-                  let telemetryData = try? JSONDecoder().decode(TelemetryData.self, from: data),
-                  let id = row["id"] as? String else {
-                continue
-            }
-
-            if telemetryData.timestamp < date {
-                idsToDelete.append(id)
-            }
+        let deletedCount = try databaseManager.write { db in
+            try TelemetryRecord
+                .filter(TelemetryRecord.Columns.timestamp < date)
+                .deleteAll(db)
         }
 
-        // Delete old records
-        if !idsToDelete.isEmpty {
-            try await database.transaction { db in
-                for id in idsToDelete {
-                    try await db.execute("""
-                        DELETE FROM \(self.tableName) WHERE id = ?
-                    """, parameters: [id])
+        logger.info("Cleaned up \(deletedCount) telemetry events older than \(date)")
+    }
+
+    // MARK: - Mapping Functions
+
+    private func mapToRecord(_ entity: TelemetryData) throws -> TelemetryRecord {
+        // Convert properties to JSON
+        let propertiesData: Data?
+        if !entity.properties.isEmpty {
+            propertiesData = try JSONSerialization.data(withJSONObject: entity.properties)
+        } else {
+            propertiesData = nil
+        }
+
+        // Extract event name from eventType (e.g., "model.loaded" -> "loaded")
+        let eventName = entity.eventType.components(separatedBy: ".").last ?? entity.eventType
+
+        // Get SDK version
+        let sdkVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+
+        return TelemetryRecord(
+            id: entity.id,
+            eventType: entity.eventType,
+            eventName: eventName,
+            properties: propertiesData,
+            userId: nil, // Could be added to TelemetryData if needed
+            sessionId: nil, // Could be linked to generation sessions
+            deviceInfo: nil, // Could be populated with device details
+            sdkVersion: sdkVersion,
+            timestamp: entity.timestamp,
+            createdAt: entity.timestamp,
+            syncPending: entity.syncPending
+        )
+    }
+
+    private func mapToEntity(_ record: TelemetryRecord) -> TelemetryData {
+        // Parse properties JSON
+        var properties: [String: String] = [:]
+        if let propertiesData = record.properties,
+           let json = try? JSONSerialization.jsonObject(with: propertiesData) as? [String: Any] {
+            // Convert all values to strings for TelemetryData compatibility
+            properties = json.compactMapValues { value in
+                switch value {
+                case let string as String:
+                    return string
+                case let number as NSNumber:
+                    return number.stringValue
+                default:
+                    return String(describing: value)
                 }
             }
         }
 
-        logger.info("Cleaned up \(idsToDelete.count) telemetry events older than \(date)")
+        return TelemetryData(
+            id: record.id,
+            eventType: record.eventType,
+            properties: properties,
+            timestamp: record.timestamp,
+            updatedAt: record.createdAt,
+            syncPending: record.syncPending
+        )
     }
 }

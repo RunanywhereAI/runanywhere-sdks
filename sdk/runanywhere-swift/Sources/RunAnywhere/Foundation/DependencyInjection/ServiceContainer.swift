@@ -171,31 +171,16 @@ public class ServiceContainer {
     }
 
     /// Database manager
-    private var _databaseManager: DatabaseManager?
-    private var _databaseAdapter: GRDBDatabaseAdapter?
-
-    /// Get database (lazy initialization)
-    private var database: DatabaseCore? {
-        get async {
-            if _databaseAdapter == nil {
-                if _databaseManager == nil {
-                    _databaseManager = DatabaseManager.shared
-                    do {
-                        try _databaseManager?.setup()
-                        logger.info("Database initialized successfully")
-                    } catch {
-                        logger.error("Failed to initialize database: \(error)")
-                        return nil
-                    }
-                }
-
-                if let manager = _databaseManager {
-                    _databaseAdapter = GRDBDatabaseAdapter(databaseManager: manager)
-                }
-            }
-            return _databaseAdapter
+    private lazy var databaseManager: DatabaseManager = {
+        let manager = DatabaseManager.shared
+        do {
+            try manager.setup()
+            logger.info("Database initialized successfully")
+        } catch {
+            logger.error("Failed to initialize database: \(error)")
         }
-    }
+        return manager
+    }()
 
     /// API client for sync operations
     private var apiClient: APIClient?
@@ -206,13 +191,26 @@ public class ServiceContainer {
     public var dataSyncService: DataSyncService? {
         get async {
             if _dataSyncService == nil {
-                if let db = await database {
-                    _dataSyncService = DataSyncService(
-                        database: db,
-                        apiClient: apiClient,
-                        enableAutoSync: true
-                    )
-                }
+                // Create repositories for data sync
+                let configRepo = ConfigurationRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                let modelRepo = ModelMetadataRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                let telemetryRepo = TelemetryRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+
+                _dataSyncService = DataSyncService(
+                    configurationRepository: configRepo,
+                    modelMetadataRepository: modelRepo,
+                    telemetryRepository: telemetryRepo,
+                    enableAutoSync: true
+                )
             }
             return _dataSyncService
         }
@@ -224,10 +222,9 @@ public class ServiceContainer {
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
             if _generationAnalytics == nil {
-                if let db = await database,
-                   let syncService = await dataSyncService {
+                if let syncService = await dataSyncService {
                     let repository = GenerationAnalyticsRepositoryImpl(
-                        database: db,
+                        databaseManager: databaseManager,
                         syncService: syncService
                     )
 
@@ -294,25 +291,18 @@ public class ServiceContainer {
         // Logger is pre-configured through LoggingManager
 
         // Initialize configuration service with repository
-        if let db = await database {
-            let configRepository = ConfigurationRepositoryImpl(
-                database: db,
-                apiClient: apiClient
-            )
-            _configurationService = ConfigurationService(
-                configRepository: configRepository
-            )
+        let configRepository = ConfigurationRepositoryImpl(
+            databaseManager: databaseManager,
+            apiClient: apiClient
+        )
+        _configurationService = ConfigurationService(
+            configRepository: configRepository
+        )
 
-            // Ensure configuration is loaded immediately
-            if let configService = _configurationService {
-                await configService.ensureConfigurationLoaded()
-                logger.info("Configuration loaded during SDK initialization")
-            }
-        } else {
-            // Create in-memory configuration service as fallback
-            logger.warning("Database unavailable - creating in-memory configuration service")
-            _configurationService = InMemoryConfigurationService()
-            logger.info("In-memory configuration service created")
+        // Ensure configuration is loaded immediately
+        if let configService = _configurationService {
+            await configService.ensureConfigurationLoaded()
+            logger.info("Configuration loaded during SDK initialization")
         }
 
         // Initialize API client if API key is provided
