@@ -1,7 +1,10 @@
 import Foundation
 
 /// Message in a conversation
-public struct Message: Codable {
+public struct Message: Codable, Identifiable {
+    /// Unique identifier for the message
+    public let id: UUID
+
     /// Role of the message sender
     public let role: Role
 
@@ -17,7 +20,8 @@ public struct Message: Codable {
         case system
     }
 
-    public init(role: Role, content: String, timestamp: Date = Date()) {
+    public init(id: UUID = UUID(), role: Role, content: String, timestamp: Date = Date()) {
+        self.id = id
         self.role = role
         self.content = content
         self.timestamp = timestamp

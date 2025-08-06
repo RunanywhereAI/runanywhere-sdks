@@ -23,7 +23,7 @@ enum ChatError: LocalizedError {
 
 @MainActor
 class ChatViewModel: ObservableObject {
-    @Published var messages: [ChatMessage] = []
+    @Published var messages: [Message] = []
     @Published var isGenerating = false
     @Published var currentInput = ""
     @Published var error: Error?
@@ -74,7 +74,7 @@ class ChatViewModel: ObservableObject {
             content = "Welcome! Select and download a model from the Models tab to start chatting."
         }
 
-        let systemMessage = ChatMessage(role: .system, content: content)
+        let systemMessage = Message(role: .system, content: content)
         messages.insert(systemMessage, at: 0)
 
         // Save to conversation store
@@ -94,7 +94,7 @@ class ChatViewModel: ObservableObject {
         }
         logger.info("✅ canSend is true, proceeding")
 
-        let userMessage = ChatMessage(role: .user, content: currentInput)
+        let userMessage = Message(role: .user, content: currentInput)
         messages.append(userMessage)
 
         // Save user message to conversation
@@ -108,9 +108,12 @@ class ChatViewModel: ObservableObject {
         error = nil
 
         // Create assistant message that we'll update with streaming tokens
-        let assistantMessage = ChatMessage(role: .assistant, content: "")
+        let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
+
+        // Build the context before starting generation
+        buildContext()
 
         generationTask = Task {
             logger.info("🚀 Starting sendMessage task")
@@ -171,7 +174,14 @@ class ChatViewModel: ObservableObject {
                         // Update the assistant message with each new token
                         await MainActor.run {
                             if messageIndex < self.messages.count {
-                                self.messages[messageIndex].content += token
+                                // Create a new message with updated content since Message is immutable
+                                let currentMessage = self.messages[messageIndex]
+                                let updatedMessage = Message(
+                                    role: currentMessage.role,
+                                    content: currentMessage.content + token,
+                                    timestamp: currentMessage.timestamp
+                                )
+                                self.messages[messageIndex] = updatedMessage
                             }
                         }
                     }
@@ -193,11 +203,14 @@ class ChatViewModel: ObservableObject {
                     // Update the assistant message with the complete response
                     await MainActor.run {
                         if messageIndex < self.messages.count {
-                            self.messages[messageIndex].content = result.text
-                            // Add thinking content if available
-                            if let thinkingContent = result.thinkingContent, !thinkingContent.isEmpty {
-                                self.messages[messageIndex].thinkingContent = thinkingContent
-                            }
+                            let currentMessage = self.messages[messageIndex]
+                            let updatedMessage = Message(
+                                role: currentMessage.role,
+                                content: result.text,
+                                timestamp: currentMessage.timestamp
+                            )
+                            self.messages[messageIndex] = updatedMessage
+                            // Note: SDK Message doesn't have thinkingContent field - this would need to be handled differently
                         }
                     }
 
@@ -220,7 +233,13 @@ class ChatViewModel: ObservableObject {
                         } else {
                             errorMessage = "❌ Generation failed: \(error.localizedDescription)"
                         }
-                        self.messages[messageIndex].content = errorMessage
+                        let currentMessage = self.messages[messageIndex]
+                        let updatedMessage = Message(
+                            role: currentMessage.role,
+                            content: errorMessage,
+                            timestamp: currentMessage.timestamp
+                        )
+                        self.messages[messageIndex] = updatedMessage
                     }
                 }
             }
@@ -356,23 +375,21 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Context Management
 
-    private func buildContext() -> Context {
-        // For now, we'll just track context locally and let the SDK handle message creation
-        // The SDK's ContextManager will append messages properly
-        if conversationContext == nil {
-            conversationContext = Context(
-                messages: [],
-                systemPrompt: nil,
-                maxTokens: 2048
-            )
-        }
-
-        return conversationContext!
+    private func buildContext() {
+        logger.info("Building context from \(self.messages.count) messages.")
+        // Now we can use the messages directly since they're already SDK Message objects
+        conversationContext = Context(
+            messages: self.messages,
+            systemPrompt: nil, // System prompt can be handled via messages with .system role
+            maxTokens: 2048
+        )
     }
 
     private func updateContextWithResponse(_ response: String) {
-        // Context will be rebuilt on next generation with all messages
-        // This ensures the assistant's response is included in the next context
+        // The context is rebuilt from the `messages` array before each call,
+        // so this method is no longer strictly necessary for context state management.
+        // It could be used for other purposes, like logging or analytics on the response.
+        logger.info("Context will be rebuilt on the next turn including this response.")
     }
 
     // MARK: - Analytics

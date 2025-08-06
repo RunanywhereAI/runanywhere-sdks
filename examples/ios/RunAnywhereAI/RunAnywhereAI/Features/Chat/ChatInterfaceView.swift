@@ -23,46 +23,7 @@ struct ChatInterfaceView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Chat messages
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(viewModel.messages) { message in
-                                VStack(spacing: 8) {
-                                    MessageBubbleView(message: message)
-                                        .id(message.id)
-
-                                }
-                            }
-
-                            if viewModel.isGenerating {
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("Generating...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .id("typing")
-                            }
-                        }
-                        .padding()
-                    }
-                    .background(Color(.systemGroupedBackground))
-                    .onTapGesture {
-                        isTextFieldFocused = false
-                    }
-                    .onChange(of: viewModel.messages.count) { _, _ in
-                        withAnimation {
-                            if let lastMessage = viewModel.messages.last {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-
-                // Input area
+                chatMessagesView
                 inputArea
             }
             .navigationTitle(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
@@ -75,25 +36,7 @@ struct ChatInterfaceView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 8) {
-                        Button(action: { showingModelSelection = true }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "cube")
-                                if viewModel.isModelLoaded {
-                                    Text("Switch")
-                                        .font(.caption)
-                                } else {
-                                    Text("Select")
-                                        .font(.caption)
-                                }
-                            }
-                        }
-
-                        Button(action: { viewModel.clearChat() }) {
-                            Image(systemName: "trash")
-                        }
-                        .disabled(viewModel.messages.isEmpty)
-                    }
+                    toolbarButtons
                 }
             }
             .sheet(isPresented: $showingConversationList) {
@@ -117,6 +60,65 @@ struct ChatInterfaceView: View {
             } message: {
                 Text(debugMessage)
             }
+        }
+    }
+
+    private var chatMessagesView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 12) {
+                    ForEach(viewModel.messages) { message in
+                        MessageBubbleView(message: message)
+                            .id(message.id)
+                    }
+
+                    if viewModel.isGenerating {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Generating...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding()
+                        .id("typing")
+                    }
+                }
+                .padding()
+            }
+            .background(Color(.systemGroupedBackground))
+            .onTapGesture {
+                isTextFieldFocused = false
+            }
+            .onChange(of: viewModel.messages.count) { _, _ in
+                withAnimation {
+                    if let lastMessage = viewModel.messages.last {
+                        proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    private var toolbarButtons: some View {
+        HStack(spacing: 8) {
+            Button(action: { showingModelSelection = true }) {
+                HStack(spacing: 4) {
+                    Image(systemName: "cube")
+                    if viewModel.isModelLoaded {
+                        Text("Switch")
+                            .font(.caption)
+                    } else {
+                        Text("Select")
+                            .font(.caption)
+                    }
+                }
+            }
+
+            Button(action: { viewModel.clearChat() }) {
+                Image(systemName: "trash")
+            }
+            .disabled(viewModel.messages.isEmpty)
         }
     }
 
@@ -213,7 +215,7 @@ struct ChatInterfaceView: View {
 
 // Simple message bubble view
 struct MessageBubbleView: View {
-    let message: ChatMessage
+    let message: Message
 
     var body: some View {
         HStack {
