@@ -173,14 +173,7 @@ public class ServiceContainer {
 
     /// Database manager
     private lazy var databaseManager: DatabaseManager = {
-        let manager = DatabaseManager.shared
-        do {
-            try manager.setup()
-            logger.info("Database initialized successfully")
-        } catch {
-            logger.error("Failed to initialize database: \(error)")
-        }
-        return manager
+        DatabaseManager.shared
     }()
 
     /// API client for sync operations
@@ -229,8 +222,11 @@ public class ServiceContainer {
                         syncService: syncService
                     )
 
-                    // Get telemetry repository from data sync service
-                    let telemetryRepo = syncService.telemetryRepository
+                    // Get telemetry repository - create a new instance
+                    let telemetryRepo = TelemetryRepositoryImpl(
+                        databaseManager: databaseManager,
+                        apiClient: apiClient
+                    )
 
                     _generationAnalytics = GenerationAnalyticsServiceImpl(
                         repository: repository,
@@ -289,6 +285,27 @@ public class ServiceContainer {
 
     /// Bootstrap all services with configuration
     public func bootstrap(with configuration: Configuration) async throws {
+        // Initialize database first
+        do {
+            try databaseManager.setup()
+            logger.info("Database initialized successfully during bootstrap")
+        } catch {
+            logger.error("Failed to initialize database during bootstrap: \(error)")
+
+            // In development, reset database on schema errors
+            #if DEBUG
+            logger.warning("Attempting to reset database due to error: \(error)")
+            do {
+                try databaseManager.reset()
+                logger.info("Database reset successful after error")
+            } catch let resetError {
+                logger.error("Failed to reset database: \(resetError)")
+                throw SDKError.databaseInitializationFailed(resetError)
+            }
+            #else
+            throw SDKError.databaseInitializationFailed(error)
+            #endif
+        }
 
         // Logger is pre-configured through LoggingManager
 

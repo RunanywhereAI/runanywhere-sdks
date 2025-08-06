@@ -74,7 +74,7 @@ class ModelListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await sdk.downloadModel(modelId)
+            _ = try await sdk.downloadModel(modelId)
             // Wait a moment for filesystem to settle
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             // Refresh models to update download status

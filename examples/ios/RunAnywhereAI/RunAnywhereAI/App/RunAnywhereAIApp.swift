@@ -20,6 +20,9 @@ struct RunAnywhereAIApp: App {
                 if isSDKInitialized {
                     ContentView()
                         .environmentObject(modelManager)
+                        .onAppear {
+                            print("🎉 RunAnywhereAI: App is ready to use!")
+                        }
                 } else if let error = initializationError {
                     InitializationErrorView(error: error) {
                         // Retry initialization
@@ -32,6 +35,7 @@ struct RunAnywhereAIApp: App {
                 }
             }
             .task {
+                print("🏁 RunAnywhereAI: App launched, initializing SDK...")
                 await initializeSDK()
                 await initializeBundledModels()
             }
@@ -47,12 +51,12 @@ struct RunAnywhereAIApp: App {
             var config = Configuration(
                 apiKey: "demo-api-key", // For demo purposes
                 enableRealTimeDashboard: false,
-                telemetryConsent: .denied
+                telemetryConsent: .granted
             )
 
             // Configure additional settings
-            config.routingPolicy = .preferDevice
-            config.privacyMode = .standard
+            config.routingPolicy = RoutingPolicy.preferDevice
+            config.privacyMode = PrivacyMode.standard
             config.memoryThreshold = 2_000_000_000 // 2GB
 
             // Register framework adapters before initializing SDK
@@ -60,15 +64,26 @@ struct RunAnywhereAIApp: App {
             RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
 
             // Initialize the SDK
+            let startTime = Date()
+            print("🚀 RunAnywhereSDK: Starting initialization...")
+            print("📋 Configuration: API Key: \(config.apiKey.prefix(8))..., Routing: \(config.routingPolicy), Privacy: \(config.privacyMode)")
+
             try await RunAnywhereSDK.shared.initialize(configuration: config)
-            print("SDK initialized successfully")
+
+            let initTime = Date().timeIntervalSince(startTime)
+            print("✅ RunAnywhereSDK: Successfully initialized!")
+            print("⏱️  Initialization time: \(String(format: "%.2f", initTime)) seconds")
+            print("📊 SDK Status: Ready for on-device AI inference")
+            print("🔧 Registered frameworks: LLMSwift, FoundationModels")
 
             // Mark as initialized
             await MainActor.run {
                 isSDKInitialized = true
             }
         } catch {
-            print("Failed to initialize SDK: \(error)")
+            print("❌ RunAnywhereSDK: Initialization failed!")
+            print("🔍 Error: \(error)")
+            print("💡 Tip: Check your API key and network connection")
             await MainActor.run {
                 initializationError = error
             }

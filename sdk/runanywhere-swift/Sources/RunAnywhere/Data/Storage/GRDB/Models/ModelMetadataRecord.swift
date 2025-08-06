@@ -32,6 +32,29 @@ struct ModelMetadataRecord: Codable {
     var updatedAt: Date
     var syncPending: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case format
+        case framework
+        case sizeBytes = "size_bytes"
+        case quantization
+        case version
+        case sha256Hash = "sha256_hash"
+        case capabilities
+        case requirements
+        case downloadURL = "download_url"
+        case localPath = "local_path"
+        case isDownloaded = "is_downloaded"
+        case downloadDate = "download_date"
+        case lastUsedAt = "last_used_at"
+        case useCount = "use_count"
+        case totalTokensGenerated = "total_tokens_generated"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case syncPending = "sync_pending"
+    }
+
     init(
         id: String = UUID().uuidString,
         name: String,

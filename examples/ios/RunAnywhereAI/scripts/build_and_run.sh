@@ -1,12 +1,14 @@
 #!/bin/bash
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models] [--build-sdk]
+# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]
 # Examples:
 #   ./build_and_run.sh simulator "iPhone 16 Pro"
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
 #   ./build_and_run.sh device "YOUR_DEVICE_ID"
 #   ./build_and_run.sh device "Your Device Name" --add-models
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --clean
+#   ./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
 #
 # IMPORTANT: Swift Macro Support Fix
 # ----------------------------------
@@ -46,16 +48,20 @@ TARGET_TYPE="${1:-device}"
 DEVICE_NAME="${2:-}"
 ADD_MODELS=false
 BUILD_SDK=false
+CLEAN_BUILD=false
+CLEAN_DATA=false
 
 # Check for help flag
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models] [--build-sdk]"
+    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]"
     echo ""
     echo "Arguments:"
     echo "  simulator|device    Target type (default: device)"
     echo "  device-name-or-id   Device name or ID (optional for simulator)"
     echo "  --add-models        Add model files to Xcode project (optional)"
     echo "  --build-sdk         Build the RunAnywhere SDK before building the app (optional)"
+    echo "  --clean             Clean all build artifacts before building (optional)"
+    echo "  --clean-data        Clean app data including database (optional)"
     echo ""
     echo "Examples:"
     echo "  $0 simulator \"iPhone 16 Pro\""
@@ -63,6 +69,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0 device"
     echo "  $0 device \"My iPhone\" --add-models"
     echo "  $0 simulator \"iPhone 16 Pro\" --build-sdk"
+    echo "  $0 simulator \"iPhone 16 Pro\" --clean"
+    echo "  $0 simulator \"iPhone 16 Pro\" --clean-data"
     exit 0
 fi
 
@@ -72,6 +80,11 @@ for arg in "${@:3}"; do
         ADD_MODELS=true
     elif [ "$arg" = "--build-sdk" ]; then
         BUILD_SDK=true
+    elif [ "$arg" = "--clean" ]; then
+        CLEAN_BUILD=true
+    elif [ "$arg" = "--clean-data" ]; then
+        CLEAN_DATA=true
+        CLEAN_BUILD=true  # Clean data implies clean build
     fi
 done
 
@@ -143,8 +156,79 @@ get_destination() {
     fi
 }
 
+# Function to clean build artifacts
+clean_build_artifacts() {
+    print_status "Cleaning build artifacts..."
+
+    # Clean DerivedData
+    print_status "Removing DerivedData..."
+    rm -rf ~/Library/Developer/Xcode/DerivedData/RunAnywhereAI-*
+
+    # Clean local build directory
+    if [ -d "build" ]; then
+        print_status "Removing local build directory..."
+        rm -rf build/
+    fi
+
+    # Clean using xcodebuild
+    print_status "Running xcodebuild clean..."
+    xcodebuild clean -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+
+    # Clean Swift Package Manager cache
+    print_status "Cleaning Swift Package Manager cache..."
+    rm -rf .build/
+    rm -rf ~/Library/Caches/org.swift.swiftpm/
+
+    # Clean Pods and reinstall
+    print_status "Cleaning and reinstalling CocoaPods..."
+    if [ -d "Pods" ]; then
+        rm -rf Pods/
+    fi
+    if [ -f "Podfile.lock" ]; then
+        rm -f Podfile.lock
+    fi
+
+    print_status "Running pod install..."
+    pod install
+}
+
+# Function to clean app data
+clean_app_data() {
+    print_status "Cleaning app data including database..."
+
+    # Remove app data from simulators
+    BUNDLE_ID="com.runanywhere.RunAnywhereAI"
+    LEGACY_BUNDLE_ID="com.runanywhere.ai.RunAnywhereAI"  # Also clean legacy bundle ID
+
+    print_status "Removing simulator app data..."
+    # Clean both bundle IDs
+    rm -rf ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application/*/${BUNDLE_ID}/Documents/* 2>/dev/null || true
+    rm -rf ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application/*/${LEGACY_BUNDLE_ID}/Documents/* 2>/dev/null || true
+
+    # Clean app container if it exists
+    find ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Application -name ".com.apple.mobile_container_manager.metadata.plist" -exec grep -l "${BUNDLE_ID}\|${LEGACY_BUNDLE_ID}" {} \; | while read plist; do
+        APP_DIR=$(dirname "$plist")
+        if [ -d "$APP_DIR/Documents" ]; then
+            print_status "Cleaning app data in: $APP_DIR"
+            rm -rf "$APP_DIR/Documents"/*
+        fi
+    done
+
+    print_status "App data cleaned successfully!"
+}
+
 # Main execution
 print_status "Starting build process for $TARGET_TYPE..."
+
+# Clean if requested
+if [ "$CLEAN_BUILD" = true ]; then
+    clean_build_artifacts
+fi
+
+# Clean data if requested
+if [ "$CLEAN_DATA" = true ]; then
+    clean_app_data
+fi
 
 # Build SDK if requested
 if [ "$BUILD_SDK" = true ]; then

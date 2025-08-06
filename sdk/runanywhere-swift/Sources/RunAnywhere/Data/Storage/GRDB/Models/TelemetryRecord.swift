@@ -15,6 +15,20 @@ struct TelemetryRecord: Codable {
     var createdAt: Date
     var syncPending: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case eventType = "event_type"
+        case eventName = "event_name"
+        case properties
+        case userId = "user_id"
+        case sessionId = "session_id"
+        case deviceInfo = "device_info"
+        case sdkVersion = "sdk_version"
+        case timestamp
+        case createdAt = "created_at"
+        case syncPending = "sync_pending"
+    }
+
     init(
         id: String = UUID().uuidString,
         eventType: String,

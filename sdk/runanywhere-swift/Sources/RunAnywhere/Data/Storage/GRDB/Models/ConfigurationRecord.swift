@@ -14,6 +14,19 @@ struct ConfigurationRecord: Codable {
     var updatedAt: Date
     var syncPending: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case apiKey = "api_key"
+        case baseURL = "base_url"
+        case modelCacheSize = "model_cache_size"
+        case maxMemoryUsageMB = "max_memory_usage_mb"
+        case privacyMode = "privacy_mode"
+        case telemetryConsent = "telemetry_consent"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case syncPending = "sync_pending"
+    }
+
     init(
         id: String = UUID().uuidString,
         apiKey: String? = nil,

@@ -13,6 +13,18 @@ struct ModelUsageStatsRecord: Codable {
     var errorCount: Int
     var createdAt: Date
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case modelMetadataId = "model_metadataId"  // GRDB's belongsTo creates camelCase
+        case date
+        case generationCount = "generation_count"
+        case totalTokens = "total_tokens"
+        case totalCost = "total_cost"
+        case averageLatencyMs = "average_latency_ms"
+        case errorCount = "error_count"
+        case createdAt = "created_at"
+    }
+
     init(
         id: String = UUID().uuidString,
         modelMetadataId: String,

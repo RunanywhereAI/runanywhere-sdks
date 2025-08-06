@@ -108,7 +108,7 @@ struct Migration001_InitialSchema {
             t.column("created_at", .datetime).notNull()
 
             // Unique constraint on model_id + date
-            t.uniqueKey(["model_metadata_id", "date"])
+            t.uniqueKey(["model_metadataId", "date"])
         }
 
         // MARK: - Generation Sessions Table

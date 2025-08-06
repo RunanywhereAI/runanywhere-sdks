@@ -12,6 +12,7 @@ public enum SDKError: LocalizedError {
     case downloadFailed(Error)
     case validationFailed(ValidationError)
     case routingFailed(String)
+    case databaseInitializationFailed(Error)
 
     public var errorDescription: String? {
         switch self {
@@ -35,6 +36,8 @@ public enum SDKError: LocalizedError {
             return "Validation failed: \(error.localizedDescription)"
         case .routingFailed(let reason):
             return "Routing failed: \(reason)"
+        case .databaseInitializationFailed(let error):
+            return "Database initialization failed: \(error.localizedDescription)"
         }
     }
 }
