@@ -41,7 +41,7 @@ struct ModelCapabilities: Codable {
     }
 }
 
-struct ModelRequirements: Codable {
+struct ModelRequirementsJSON: Codable {
     let minMemoryMB: Int
     let minComputeUnits: Int?
     let requiresNeuralEngine: Bool
@@ -53,7 +53,7 @@ struct ModelRequirements: Codable {
     }
 }
 
-struct DeviceInfo: Codable {
+struct DeviceInfoJSON: Codable {
     let model: String
     let osVersion: String
     let appVersion: String

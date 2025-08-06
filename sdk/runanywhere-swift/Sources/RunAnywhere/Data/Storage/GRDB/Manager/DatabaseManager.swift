@@ -44,9 +44,13 @@ public final class DatabaseManager {
             // Enable foreign key constraints
             config.foreignKeysEnabled = true
 
+            // Set busy timeout to 5 seconds
+            config.busyMode = .timeout(5.0)
+
             // Enable WAL mode for better concurrency
             config.prepareDatabase { db in
-                try db.usePassphrase(self.configuration.passphrase)
+                // SQLCipher passphrase would go here if available
+                // try db.usePassphrase(self.configuration.passphrase)
                 try db.execute(sql: "PRAGMA journal_mode = WAL")
 
                 // Performance optimizations
@@ -55,7 +59,7 @@ public final class DatabaseManager {
                 try db.execute(sql: "PRAGMA mmap_size = 30000000000")
 
                 // Set busy timeout to 5 seconds
-                db.configuration.busyMode = .timeout(.seconds(5))
+                // Note: busyMode is set on Configuration, not Database
             }
 
             // Development settings
@@ -150,9 +154,12 @@ public final class DatabaseManager {
             throw DatabaseError.notInitialized
         }
 
-        return try dbQueue.inTransaction(.immediate) { db in
-            return try block(db)
+        var result: T!
+        try dbQueue.inTransaction { db in
+            result = try block(db)
+            return .commit
         }
+        return result
     }
 
     // MARK: - Observation
@@ -167,9 +174,13 @@ public final class DatabaseManager {
         }
 
         do {
-            return try observation.start(in: dbQueue) { error in
-                self.logger.error("Observation error: \(error)")
-            }
+            return observation.start(
+                in: dbQueue,
+                onError: { error in
+                    self.logger.error("Observation error: \(error)")
+                },
+                onChange: { _ in }
+            )
         } catch {
             logger.error("Failed to start observation: \(error)")
             return nil
@@ -219,10 +230,7 @@ public final class DatabaseManager {
             throw DatabaseError.notInitialized
         }
 
-        try dbQueue.backup(to: destinationURL.path) { progress in
-            let percentage = Int(progress.completedPageCount * 100 / progress.totalPageCount)
-            self.logger.debug("Backup progress: \(percentage)%")
-        }
+        try dbQueue.backup(to: DatabaseQueue(path: destinationURL.path))
 
         logger.info("Database backed up to: \(destinationURL.path)")
     }

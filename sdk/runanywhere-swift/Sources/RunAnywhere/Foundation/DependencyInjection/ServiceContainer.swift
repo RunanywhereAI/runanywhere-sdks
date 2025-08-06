@@ -161,7 +161,7 @@ public class ServiceContainer {
         SDKLogger()
     }()
 
-    /// Configuration service (either ConfigurationService or InMemoryConfigurationService)
+    /// Configuration service
     private var _configurationService: ConfigurationServiceProtocol?
     public var configurationService: ConfigurationServiceProtocol {
         guard let service = _configurationService else {
@@ -237,9 +237,9 @@ public class ServiceContainer {
                         performanceMonitor: performanceMonitor
                     )
                 } else {
-                    // Database not available, create no-op analytics service
-                    logger.warning("Creating no-op GenerationAnalytics service (database not available)")
-                    _generationAnalytics = NoOpGenerationAnalyticsService()
+                    // Database is required for analytics
+                    logger.error("Database not available for GenerationAnalytics service")
+                    fatalError("Database is required for GenerationAnalytics service")
                 }
             }
 

@@ -131,8 +131,8 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
             id: entity.id,
             apiKey: entity.apiKey,
             baseURL: SDKConstants.DatabaseDefaults.apiBaseURL,
-            modelCacheSize: entity.storage.modelCacheSize,
-            maxMemoryUsageMB: entity.storage.maxMemoryUsageMB,
+            modelCacheSize: SDKConstants.ModelDefaults.defaultModelCacheSize,
+            maxMemoryUsageMB: SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB,
             privacyMode: privacyMode,
             telemetryConsent: telemetryConsent,
             createdAt: entity.createdAt,
@@ -149,7 +149,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
         // Create routing configuration
         let routing = RoutingConfiguration(
-            policy: .balanced, // Default for now, could be stored separately
+            policy: .automatic, // Default for now, could be stored separately
             cloudEnabled: true,
             privacyMode: privacyMode
         )
@@ -164,10 +164,9 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
         // Create generation configuration with defaults
         let generation = GenerationConfiguration()
 
-        // Create storage configuration
+        // Create storage configuration with defaults
         let storage = StorageConfiguration(
-            modelCacheSize: record.modelCacheSize,
-            maxMemoryUsageMB: record.maxMemoryUsageMB
+            maxCacheSize: Int64(record.maxMemoryUsageMB) * 1024 * 1024
         )
 
         return ConfigurationData(

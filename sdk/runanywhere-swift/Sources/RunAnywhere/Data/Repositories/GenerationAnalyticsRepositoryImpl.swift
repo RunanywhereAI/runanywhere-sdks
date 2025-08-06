@@ -79,7 +79,7 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     // MARK: - Generation Operations
 
     public func saveGeneration(_ generation: Generation) async throws {
-        let record = mapGenerationToRecord(generation)
+        let record = try mapGenerationToRecord(generation)
 
         try databaseManager.write { db in
             try record.save(db)
@@ -89,7 +89,7 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     }
 
     public func updateGeneration(_ generation: Generation) async throws {
-        let record = mapGenerationToRecord(generation)
+        let record = try mapGenerationToRecord(generation)
 
         try databaseManager.write { db in
             try record.update(db)
@@ -267,7 +267,7 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
         // Extract metrics from performance
         let promptTokens = generation.performance?.inputTokens ?? 0
         let completionTokens = generation.performance?.outputTokens ?? 0
-        let latencyMs = (generation.performance?.totalDuration ?? 0) * 1000
+        let latencyMs = (generation.performance?.totalGenerationTime ?? 0) * 1000
         let tokensPerSecond = generation.performance?.tokensPerSecond ?? 0
         let timeToFirstTokenMs = (generation.performance?.timeToFirstToken ?? 0) * 1000
 
@@ -284,9 +284,9 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
             cost: 0.0, // Calculate based on model pricing
             costSaved: 0.0,
             executionTarget: SDKConstants.ModelDefaults.defaultExecutionTarget,
-            errorType: nil,
+            requestData: performanceData,
+            errorCode: nil,
             errorMessage: nil,
-            metadata: performanceData,
             createdAt: generation.timestamp,
             syncPending: true
         )
@@ -295,8 +295,8 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     private func mapRecordToGeneration(_ record: GenerationRecord) throws -> Generation {
         // Deserialize performance data
         var performance: GenerationPerformance?
-        if let metadata = record.metadata {
-            performance = try JSONDecoder().decode(GenerationPerformance.self, from: metadata)
+        if let requestData = record.requestData {
+            performance = try JSONDecoder().decode(GenerationPerformance.self, from: requestData)
         }
 
         return Generation(
