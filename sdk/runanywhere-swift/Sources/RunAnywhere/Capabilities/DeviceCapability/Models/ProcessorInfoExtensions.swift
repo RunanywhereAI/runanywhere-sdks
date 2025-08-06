@@ -23,6 +23,7 @@ public enum ProcessorFeature {
     case sse               // Intel SSE instructions
     case vectorUnit        // Generic vector processing unit
     case dedicatedCache    // Dedicated cache for ML operations
+    case neuralEngine      // Apple Neural Engine
     case unknown(String)   // Other features
 }
 

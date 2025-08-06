@@ -52,23 +52,48 @@ public struct DeviceInfo {
         let architecture = "unknown"
         #endif
 
+        // Use DeviceKitAdapter if available
+        let deviceModel = getDetailedDeviceModel()
+        let neuralEngineInfo = getDetailedNeuralEngineInfo()
+
         return DeviceInfo(
-            model: getDeviceModel(),
+            model: deviceModel,
             osVersion: processInfo.operatingSystemVersionString,
             architecture: architecture,
             totalMemory: Int64(processInfo.physicalMemory),
             availableMemory: getAvailableMemory(),
-            hasNeuralEngine: hasAppleNeuralEngine(),
+            hasNeuralEngine: neuralEngineInfo.hasNeuralEngine,
             gpuFamily: getGPUFamily()
         )
     }
 
-    private static func getDeviceModel() -> String {
+    private static func getDetailedDeviceModel() -> String {
+        // Try to use DeviceKitAdapter for detailed model name
+        let adapter = DeviceKitAdapter()
+        let deviceInfo = adapter.getDeviceInfo()
+
+        // Return detailed name if available, otherwise fall back to generic
+        if !deviceInfo.name.isEmpty && deviceInfo.name != "Simulator" {
+            return deviceInfo.name
+        }
+
+        // Fallback to generic model
         #if os(iOS) || os(tvOS)
         return UIDevice.current.model
         #else
         return "Mac"
         #endif
+    }
+
+    private static func getDetailedNeuralEngineInfo() -> (hasNeuralEngine: Bool, cores: Int) {
+        // Use DeviceKitAdapter for accurate Neural Engine detection
+        let adapter = DeviceKitAdapter()
+        let processorInfo = adapter.getProcessorInfo()
+
+        return (
+            hasNeuralEngine: processorInfo.hasNeuralEngine,
+            cores: processorInfo.neuralEngineCores
+        )
     }
 
     private static func getAvailableMemory() -> Int64 {
@@ -90,17 +115,6 @@ public struct DeviceInfo {
         return Int64(ProcessInfo.processInfo.physicalMemory) - used
     }
 
-    private static func hasAppleNeuralEngine() -> Bool {
-        #if os(iOS) || os(tvOS)
-        // Check for A12 Bionic or later (iPhone XS and newer)
-        let device = UIDevice.current.model
-        // This is simplified - in production would check actual chip
-        return true
-        #else
-        // Check for M1 or later on Mac
-        return ProcessInfo.processInfo.processorCount > 4
-        #endif
-    }
 
     private static func getGPUFamily() -> String? {
         #if os(iOS) || os(tvOS)

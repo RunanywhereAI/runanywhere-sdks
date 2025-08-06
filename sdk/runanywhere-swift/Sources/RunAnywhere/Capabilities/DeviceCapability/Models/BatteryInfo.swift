@@ -2,8 +2,8 @@ import Foundation
 
 /// Battery information for device power status
 public struct BatteryInfo: Codable {
-    /// Battery level from 0.0 to 1.0
-    public let level: Float
+    /// Battery level from 0.0 to 1.0 (nil if unknown)
+    public let level: Float?
     /// Current battery state
     public let state: BatteryState
     /// Whether the device is in low power mode
@@ -11,16 +11,18 @@ public struct BatteryInfo: Codable {
 
     /// Check if battery is low (less than 20%)
     public var isLowBattery: Bool {
-        level < 0.2
+        guard let level = level else { return false }
+        return level < 0.2
     }
 
     /// Check if battery is critical (less than 10%)
     public var isCriticalBattery: Bool {
-        level < 0.1
+        guard let level = level else { return false }
+        return level < 0.1
     }
 
     public init(
-        level: Float,
+        level: Float?,
         state: BatteryState,
         isLowPowerModeEnabled: Bool = false
     ) {

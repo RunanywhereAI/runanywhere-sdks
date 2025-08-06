@@ -6,6 +6,7 @@ This plan outlines the integration of DeviceKit into the RunAnywhere Swift SDK t
 
 ### Current Problems
 - Hardcoded processor detection that fails for new devices (M3, M4, A18)
+
 - Generic device names ("iPhone", "iPad") instead of specific models
 - Simplified Neural Engine detection missing nuanced capabilities
 - No thermal state monitoring or battery optimization
@@ -22,21 +23,22 @@ This plan outlines the integration of DeviceKit into the RunAnywhere Swift SDK t
 
 ## Current State Analysis
 
-### 1. ProcessorDetector.swift Issues
+### 1. ProcessorDetector.swift Issues (DeviceCapability/Services/ProcessorDetector.swift)
 
 ```swift
-// Current hardcoded detection
-private func detectAppleSiliconChipName() -> String {
+// Current hardcoded detection - lines 105-117
+private func detectAppleSiliconName(coreCount: Int) -> String {
+    // Simple heuristic based on core count
+    // In production, would use IOKit to get actual chip info
     if coreCount >= 10 {
         return "Apple M2 Pro/Max"  // WRONG for M3, M4!
     } else if coreCount >= 8 {
-        if frequency > 3.4 {
-            return "Apple M2"      // WRONG for M3, M4!
-        } else {
-            return "Apple M1 Pro/Max"
-        }
+        return "Apple M1 Pro/M2"   // WRONG for M3, M4!
+    } else if coreCount >= 4 {
+        return "Apple M1/A14+"
+    } else {
+        return "Apple A-series"
     }
-    // More hardcoded logic...
 }
 ```
 
@@ -44,34 +46,62 @@ private func detectAppleSiliconChipName() -> String {
 - Relies on core count heuristics that break with new chips
 - No differentiation between Pro/Max/Ultra variants
 - Missing A18, M3, M4 support
-- Frequency-based detection is unreliable
+- Returns generic strings instead of specific chip names
+- No actual chip identification, just guesswork
 
-### 2. HardwareDetectionService.swift Limitations
+### 2. Current Device Detection Architecture
 
-```swift
-// Current simplified detection
-private func detectNeuralEngineSupport() -> Bool {
-    #if os(iOS) || os(tvOS)
-    if #available(iOS 11.0, tvOS 11.0, *) {
-        return true  // TOO SIMPLISTIC!
-    }
-    #endif
-    return false
-}
-```
+The codebase has the following device detection structure:
+
+**DeviceCapability Module** (`/Capabilities/DeviceCapability/`):
+- **Models/**
+  - `DeviceInfo.swift` - Basic device info with hardcoded detection
+  - `DeviceCapabilities.swift` - Device capabilities with ProcessorType enum
+  - `ProcessorInfo.swift` - Processor details with core counts
+  - `BatteryInfo.swift` - Battery state information
+- **Services/**
+  - `ProcessorDetector.swift` - Hardcoded processor detection
+  - `HardwareDetectionService.swift` - Main hardware detection facade
+  - `BatteryMonitorService.swift` - Battery monitoring
+  - `ThermalMonitorService.swift` - Thermal state monitoring
+  - `CapabilityAnalyzer.swift` - Capability analysis
+  - `RequirementMatcher.swift` - Requirement matching
 
 **Problems:**
-- Assumes all iOS 11+ devices have Neural Engine (false for A10 and older)
-- No differentiation between Neural Engine generations
-- Missing capability levels (16-core vs 32-core ANE)
+- ProcessorType enum has hardcoded list that needs manual updates
+- DeviceInfo returns generic "iPhone", "iPad", "Mac" instead of specific models
+- No actual chip detection - just heuristics based on core counts
+- Neural Engine detection is oversimplified (just returns true for iOS/tvOS)
 
-### 3. DeviceInfo.swift Generic Names
+### 3. DeviceInfo.swift Generic Names (DeviceCapability/Models/DeviceInfo.swift)
 
 ```swift
+// Current implementation - lines 66-72
+private static func getDeviceModel() -> String {
+    #if os(iOS) || os(tvOS)
+    return UIDevice.current.model  // Returns "iPhone", "iPad", etc.
+    #else
+    return "Mac"
+    #endif
+}
+
 // Current output
-deviceName: "iPhone"      // Should be "iPhone 15 Pro"
-deviceModel: "iPhone15,2"  // Raw identifier, not user-friendly
+model: "iPhone"      // Should be "iPhone 15 Pro"
+osVersion: "17.2.0"  // No device-specific identification
 ```
+
+### 4. Existing Models to Update
+
+**ProcessorInfo.swift** (needs enhancement):
+- Add chip name field
+- Add Neural Engine core count
+- Add performance metrics (TOPS)
+- Add generation/variant info
+
+**DeviceCapabilities.swift** (needs ProcessorType updates):
+- ProcessorType enum is hardcoded with specific chips
+- Needs to be replaced with dynamic detection
+- Missing newer chips (M3 Ultra, M4 variants, A18)
 
 ---
 
@@ -81,18 +111,43 @@ deviceModel: "iPhone15,2"  // Raw identifier, not user-friendly
 
 ```
 RunAnywhere SDK
-    ├── DeviceCapability/
+    ├── Capabilities/DeviceCapability/
     │   ├── Services/
-    │   │   ├── DeviceKitAdapter.swift (NEW)
-    │   │   ├── HardwareDetectionService.swift (MODIFIED)
-    │   │   └── ProcessorDetector.swift (REPLACED)
-    │   └── Models/
-    │       ├── DeviceSpecifications.swift (NEW)
-    │       └── ProcessorInfo.swift (ENHANCED)
+    │   │   ├── DeviceKitAdapter.swift (NEW - main adapter)
+    │   │   ├── HardwareDetectionService.swift (MODIFIED - use adapter)
+    │   │   ├── ProcessorDetector.swift (REPLACED - use DeviceKit)
+    │   │   ├── BatteryMonitorService.swift (KEEP - already good)
+    │   │   ├── ThermalMonitorService.swift (KEEP - already good)
+    │   │   ├── CapabilityAnalyzer.swift (MODIFIED - use DeviceKit)
+    │   │   └── RequirementMatcher.swift (KEEP - logic is good)
+    │   ├── Models/
+    │   │   ├── DeviceSpecifications.swift (NEW - processor specs DB)
+    │   │   ├── ProcessorInfo.swift (ENHANCED - add more fields)
+    │   │   ├── DeviceInfo.swift (MODIFIED - use DeviceKit names)
+    │   │   ├── DeviceCapabilities.swift (MODIFIED - remove hardcoded ProcessorType)
+    │   │   └── BatteryInfo.swift (KEEP - already good)
+    │   └── Data/
+    │       └── ProcessorDatabase.swift (NEW - specs database)
     └── Package.swift (MODIFIED - add DeviceKit dependency)
 ```
 
-### 2. DeviceKitAdapter Design
+### 2. Legacy Code to Remove
+
+The following hardcoded logic needs to be replaced:
+
+1. **ProcessorDetector.swift**:
+   - `detectAppleSiliconName()` - Replace with DeviceKit CPU detection
+   - Hardcoded core count heuristics
+
+2. **DeviceInfo.swift**:
+   - `getDeviceModel()` - Replace UIDevice.current.model with DeviceKit
+   - `hasAppleNeuralEngine()` - Replace with actual chip detection
+
+3. **DeviceCapabilities.swift**:
+   - `ProcessorType` enum - Replace with dynamic detection
+   - Hardcoded chip list that needs manual updates
+
+### 3. DeviceKitAdapter Design
 
 ```swift
 import DeviceKit
@@ -140,7 +195,7 @@ class DeviceKitAdapter {
 }
 ```
 
-### 3. Device Specifications Database
+### 4. Device Specifications Database
 
 ```swift
 /// Detailed hardware specifications for ML workloads
@@ -177,7 +232,7 @@ struct DeviceSpecifications {
 
 ## Implementation Plan
 
-### Phase 1: Foundation (Week 1)
+### Phase 1: Foundation (Day 1-2)
 
 #### 1.1 Add DeviceKit Dependency
 
@@ -521,7 +576,7 @@ enum DeviceSpecifications {
 }
 ```
 
-### Phase 2: Enhanced Detection (Week 2)
+### Phase 2: Core Integration (Day 3-4)
 
 #### 2.1 Update HardwareDetectionService
 
@@ -677,7 +732,7 @@ public enum PerformanceTier: String, Codable {
 }
 ```
 
-### Phase 3: Advanced Features (Week 3)
+### Phase 3: Model Updates and Testing (Day 5)
 
 #### 3.1 Model Selection Enhancement
 
@@ -798,7 +853,7 @@ class PerformanceOptimizer {
 }
 ```
 
-### Phase 4: Framework Integration (Week 4)
+### Phase 4: Cleanup and Documentation (Day 6)
 
 #### 4.1 Framework Selection
 
@@ -871,7 +926,7 @@ extension ServiceContainer {
 }
 ```
 
-### Phase 5: Validation & Documentation (Week 5)
+### Phase 5: Final Testing and Validation (Day 7)
 
 #### 5.1 Performance Validation
 
@@ -1004,37 +1059,77 @@ extension ProcessorInfo {
 
 ---
 
-## Timeline
+## Implementation Timeline (1 Week Sprint)
 
-### Week 1: Foundation
-- Day 1-2: Add DeviceKit dependency, create adapter
-- Day 3-4: Implement device specifications database
-- Day 5: Initial testing and validation
+### Phase 1: Foundation (Day 1-2)
+✅ DeviceKit already added to Package.swift
+- [ ] Create DeviceKitAdapter.swift in DeviceCapability/Services/
+- [ ] Create DeviceSpecifications.swift in DeviceCapability/Data/
+- [ ] Create ProcessorDatabase.swift with chip specifications
+- [ ] Initial DeviceKit integration testing
 
-### Week 2: Core Integration
-- Day 1-2: Update HardwareDetectionService
-- Day 3-4: Enhance ProcessorInfo and models
-- Day 5: Integration testing
+### Phase 2: Core Integration (Day 3-4)
+- [ ] Update ProcessorInfo.swift with new fields (chipName, neuralEngineCores, estimatedTops)
+- [ ] Update DeviceInfo.swift to use DeviceKit for model names
+- [ ] Replace ProcessorDetector implementation with DeviceKit
+- [ ] Update HardwareDetectionService to use DeviceKitAdapter
 
-### Week 3: Advanced Features
-- Day 1-2: Model selection enhancement
-- Day 3-4: Performance optimization
-- Day 5: Battery and thermal testing
+### Phase 3: Model Updates and Testing (Day 5)
+- [ ] Update DeviceCapabilities.swift - remove hardcoded ProcessorType enum
+- [ ] Update CapabilityAnalyzer to use DeviceKit data
+- [ ] Test on simulator and physical devices
+- [ ] Verify all device detection works correctly
 
-### Week 4: Framework Integration
-- Day 1-2: Framework selection logic
-- Day 3-4: ServiceContainer updates
-- Day 5: End-to-end testing
+### Phase 4: Cleanup and Documentation (Day 6)
+- [ ] Remove legacy hardcoded detection logic
+- [ ] Update API documentation
+- [ ] Update ARCHITECTURE_V2.md with DeviceKit integration
+- [ ] Create migration guide for existing code
 
-### Week 5: Validation & Release
-- Day 1-2: Performance validation
-- Day 3: Documentation updates
-- Day 4-5: Release preparation and deployment
+### Phase 5: Final Testing and Validation (Day 7)
+- [ ] Performance benchmarking
+- [ ] Memory impact analysis
+- [ ] Full integration testing
+- [ ] Release preparation
 
 ---
 
+## Key Implementation Notes
+
+### Current Status
+- ✅ DeviceKit dependency already added to Package.swift (line 26)
+- 🔧 Need to create DeviceKitAdapter to bridge DeviceKit with our models
+- 🔧 ProcessorDetector needs complete replacement
+- 🔧 DeviceInfo needs update to return specific device names
+- 🔧 DeviceCapabilities ProcessorType enum needs replacement with dynamic detection
+
+### Priority Order
+1. **DeviceKitAdapter** - Core adapter implementation
+2. **DeviceSpecifications** - Processor specs database
+3. **Model Updates** - ProcessorInfo, DeviceInfo, DeviceCapabilities
+4. **Service Integration** - Update existing services to use adapter
+5. **Legacy Removal** - Clean up hardcoded detection logic
+
+### Files to Modify
+- `DeviceCapability/Services/ProcessorDetector.swift` - Replace implementation
+- `DeviceCapability/Services/HardwareDetectionService.swift` - Use adapter
+- `DeviceCapability/Services/CapabilityAnalyzer.swift` - Use DeviceKit data
+- `DeviceCapability/Models/DeviceInfo.swift` - Use DeviceKit names
+- `DeviceCapability/Models/ProcessorInfo.swift` - Add new fields
+- `DeviceCapability/Models/DeviceCapabilities.swift` - Remove hardcoded enum
+
+### Files to Create
+- `DeviceCapability/Services/DeviceKitAdapter.swift` - Main adapter
+- `DeviceCapability/Data/DeviceSpecifications.swift` - Specs database
+- `DeviceCapability/Data/ProcessorDatabase.swift` - Processor info DB
+
 ## Conclusion
 
-This DeviceKit integration will transform the RunAnywhere SDK's device detection from a maintenance burden to a robust, future-proof system. With accurate hardware identification, real-time monitoring, and device-specific optimization, the SDK can make intelligent decisions about model selection and execution targets, ultimately providing users with the best possible on-device AI experience.
+This DeviceKit integration will transform the RunAnywhere SDK's device detection from a maintenance burden to a robust, future-proof system. The integration is already partially prepared (DeviceKit dependency added), and the implementation focuses on creating an adapter layer that preserves the existing API while providing accurate device detection.
 
-The implementation is designed to be incremental, testable, and backward compatible, ensuring a smooth transition while immediately delivering value through improved device support and optimization capabilities.
+Key benefits:
+- Automatic support for all current and future Apple devices
+- Accurate processor identification (no more "M2" detected as "M1 Pro/M2")
+- Specific device names ("iPhone 15 Pro" instead of "iPhone")
+- Real Neural Engine detection instead of assumptions
+- Zero maintenance for new device releases

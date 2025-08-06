@@ -2,7 +2,7 @@
 //  ProcessorDetector.swift
 //  RunAnywhere SDK
 //
-//  Detects processor capabilities and information
+//  Detects processor capabilities and information using DeviceKit
 //
 
 import Foundation
@@ -13,121 +13,54 @@ public class ProcessorDetector {
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "ProcessorDetector")
+    private let deviceKitAdapter = DeviceKitAdapter()
 
     // MARK: - Public Methods
 
     /// Detect processor information
     public func detectProcessorInfo() -> ProcessorInfo {
-        let coreCount = ProcessInfo.processInfo.processorCount
-
-        #if arch(arm64)
-        return detectARMProcessor(coreCount: coreCount)
-        #elseif arch(x86_64)
-        return detectIntelProcessor(coreCount: coreCount)
-        #else
-        return ProcessorInfo(
-            name: "Unknown",
-            architecture: "Unknown",
-            coreCount: coreCount,
-            performanceCoreCount: coreCount,
-            efficiencyCoreCount: 0,
-            frequencyHz: nil,
-            hasARM64E: false
-        )
-        #endif
+        // Use DeviceKit adapter for accurate detection
+        return deviceKitAdapter.getProcessorInfo()
     }
 
     /// Get processor efficiency rating
     public func getProcessorEfficiency() -> ProcessorEfficiency {
         let info = detectProcessorInfo()
 
-        // Simple heuristic based on core count and architecture
-        #if arch(arm64)
-        // ARM processors are generally more efficient
-        if info.coreCount >= 8 {
+        // Use performance tier from ProcessorInfo for accurate assessment
+        switch info.performanceTier {
+        case .flagship:
             return .high
-        } else if info.coreCount >= 4 {
+        case .high:
+            return .high
+        case .medium:
             return .medium
-        } else {
+        case .entry:
             return .low
         }
-        #elseif arch(x86_64)
-        // Intel processors
-        if info.coreCount >= 8 {
-            return .medium
-        } else if info.coreCount >= 4 {
-            return .medium
-        } else {
-            return .low
-        }
-        #else
-        return .unknown
-        #endif
     }
 
     /// Get supported processor features
     public func getSupportedFeatures() -> [ProcessorFeature] {
+        let info = detectProcessorInfo()
         var features: [ProcessorFeature] = []
 
-        #if arch(arm64)
-        features.append(.neon)
-        features.append(.vectorUnit)
-        #elseif arch(x86_64)
-        // These would require runtime CPU feature detection
-        // For now, assume modern Intel processors support these
-        if ProcessInfo.processInfo.processorCount >= 4 {
+        // ARM features
+        if info.isAppleSilicon {
+            features.append(.neon)
+            features.append(.vectorUnit)
+            if info.hasNeuralEngine {
+                features.append(.neuralEngine)
+            }
+        }
+
+        // Intel features
+        if info.isIntel {
             features.append(.sse)
             features.append(.avx)
             features.append(.avx2)
         }
-        #endif
 
         return features
     }
-
-    // MARK: - Private Methods
-
-    #if arch(arm64)
-    private func detectARMProcessor(coreCount: Int) -> ProcessorInfo {
-        // Detect Apple Silicon variants
-        _ = detectAppleSiliconName(coreCount: coreCount)
-
-        return ProcessorInfo(
-            coreCount: coreCount,
-            performanceCores: max(2, coreCount / 2),
-            efficiencyCores: max(2, coreCount / 2),
-            architecture: "ARM64",
-            hasARM64E: true,
-            clockFrequency: 3.2
-        )
-    }
-
-    private func detectAppleSiliconName(coreCount: Int) -> String {
-        // Simple heuristic based on core count
-        // In production, would use IOKit to get actual chip info
-        if coreCount >= 10 {
-            return "Apple M2 Pro/Max"
-        } else if coreCount >= 8 {
-            return "Apple M1 Pro/M2"
-        } else if coreCount >= 4 {
-            return "Apple M1/A14+"
-        } else {
-            return "Apple A-series"
-        }
-    }
-    #endif
-
-    #if arch(x86_64)
-    private func detectIntelProcessor(coreCount: Int) -> ProcessorInfo {
-        return ProcessorInfo(
-            name: "Intel x86_64",
-            architecture: "x86_64",
-            coreCount: coreCount,
-            performanceCoreCount: coreCount,
-            efficiencyCoreCount: 0,
-            frequencyHz: nil,
-            hasARM64E: false
-        )
-    }
-    #endif
 }
