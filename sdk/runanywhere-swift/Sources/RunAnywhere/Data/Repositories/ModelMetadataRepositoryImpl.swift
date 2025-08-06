@@ -121,9 +121,10 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
         try await save(metadata)
 
         // Trigger sync for important model metadata
-        Task {
-            try? await sync()
-        }
+        // Disabled: No backend currently available
+        // Task {
+        //     try? await sync()
+        // }
     }
 
     /// Update last used date
@@ -203,15 +204,12 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
     /// Load stored models as ModelInfo array
     public func loadStoredModels() async throws -> [ModelInfo] {
         let allMetadata = try await fetchAll()
+        let fileManager = ServiceContainer.shared.fileManager
 
         return allMetadata.compactMap { metadata in
-            // Check if file exists
-            let localURL = URL(fileURLWithPath: metadata.localPath)
-            guard FileManager.default.fileExists(atPath: localURL.path) else {
-                logger.warning("Model file missing for \(metadata.id), removing metadata")
-                Task {
-                    try? await delete(id: metadata.id)
-                }
+            // Use the file manager to find the model file
+            guard let modelURL = fileManager.findModelFile(modelId: metadata.id, expectedPath: metadata.localPath) else {
+                logger.error("Model file not found for \(metadata.id)")
                 return nil
             }
 
@@ -232,7 +230,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
                 id: metadata.id,
                 name: metadata.name,
                 format: format,
-                localPath: localURL,
+                localPath: modelURL,
                 estimatedMemory: metadata.estimatedMemory,
                 contextLength: metadata.contextLength,
                 downloadSize: metadata.downloadSize,

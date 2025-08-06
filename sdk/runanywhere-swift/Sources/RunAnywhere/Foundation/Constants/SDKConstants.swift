@@ -110,7 +110,7 @@ public enum SDKConstants {
         public static let defaultContextLength = 4096
 
         /// Default execution target
-        public static let defaultExecutionTarget = "device"
+        public static let defaultExecutionTarget = ExecutionTargets.onDevice
 
         /// Default model cache size
         public static let defaultModelCacheSize = 5

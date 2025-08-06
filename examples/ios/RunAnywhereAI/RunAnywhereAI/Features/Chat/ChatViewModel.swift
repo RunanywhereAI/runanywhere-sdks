@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import RunAnywhereSDK
+import os.log
 
 enum ChatError: LocalizedError {
     case noModelLoaded
@@ -28,13 +29,15 @@ class ChatViewModel: ObservableObject {
     @Published var error: Error?
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
-    @Published var useStreaming = false  // Use non-streaming for more reliable generation
+    @Published var useStreaming = true  // Enable streaming for real-time token display
 
     private let sdk = RunAnywhereSDK.shared
     private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
     private var conversationContext: Context?
     private var currentConversation: Conversation?
+
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatViewModel")
 
     var canSend: Bool {
         !currentInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isGenerating && isModelLoaded
@@ -82,7 +85,14 @@ class ChatViewModel: ObservableObject {
     }
 
     func sendMessage() async {
-        guard canSend else { return }
+        logger.info("🎯 sendMessage() called")
+        logger.info("📝 canSend: \(self.canSend), isModelLoaded: \(self.isModelLoaded), loadedModelName: \(self.loadedModelName ?? "nil")")
+
+        guard canSend else {
+            logger.error("❌ canSend is false, returning")
+            return
+        }
+        logger.info("✅ canSend is true, proceeding")
 
         let userMessage = ChatMessage(role: .user, content: currentInput)
         messages.append(userMessage)
@@ -103,19 +113,24 @@ class ChatViewModel: ObservableObject {
         let messageIndex = messages.count - 1
 
         generationTask = Task {
+            logger.info("🚀 Starting sendMessage task")
             do {
+                logger.info("📋 Entering do block")
+                logger.info("📝 Checking model status - isModelLoaded: \(self.isModelLoaded), loadedModelName: \(self.loadedModelName ?? "nil")")
+
                 // Check if we need to reload the model in SDK
                 // This handles cases where the app was restarted but UI state shows model as loaded
                 if isModelLoaded, let _ = loadedModelName {
+                    logger.info("📝 Model appears loaded, checking SDK state")
                     // Try to ensure the model is actually loaded in the SDK
                     // Get the model from ModelListViewModel
                     if let model = ModelListViewModel.shared.currentModel {
                         do {
                             // This will reload the model if it's not already loaded
                             _ = try await sdk.loadModel(model.id)
-                            print("Ensured model '\(model.name)' is loaded in SDK")
+                            logger.info("✅ Ensured model '\(model.name)' is loaded in SDK")
                         } catch {
-                            print("Failed to ensure model is loaded: \(error)")
+                            logger.error("Failed to ensure model is loaded: \(error)")
                             // If loading fails, update our state
                             await MainActor.run {
                                 self.isModelLoaded = false
@@ -128,23 +143,14 @@ class ChatViewModel: ObservableObject {
 
                 // Final check - ensure model is loaded before generating
                 if !isModelLoaded {
+                    logger.error("❌ Model not loaded, throwing error")
                     throw ChatError.noModelLoaded
                 }
 
-                print("Starting generation with prompt: \(prompt), streaming: \(useStreaming)")
+                logger.info("🎯 Starting generation with prompt: \(String(prompt.prefix(50)))..., streaming: \(self.useStreaming)")
 
-                // Build conversation context with previous messages
-                var contextMessages: String = ""
-                for message in self.messages where message.role != .system {
-                    if message.role == .user {
-                        contextMessages += "User: \(message.content)\n"
-                    } else if message.role == .assistant {
-                        contextMessages += "Assistant: \(message.content)\n"
-                    }
-                }
-
-                // Create a full prompt with context
-                let fullPrompt = contextMessages.isEmpty ? prompt : contextMessages + "User: \(prompt)\nAssistant:"
+                // Just send the raw prompt - let the SDK handle context formatting
+                let fullPrompt = prompt
 
                 let options = GenerationOptions(
                     maxTokens: 500,
@@ -152,6 +158,7 @@ class ChatViewModel: ObservableObject {
                     context: self.conversationContext
                 )
 
+                logger.info("📝 Generation options created, useStreaming: \(self.useStreaming)")
 
                 if useStreaming {
                     // Use streaming generation for real-time updates
@@ -169,7 +176,7 @@ class ChatViewModel: ObservableObject {
                         }
                     }
 
-                    print("Streaming completed with response: \(fullResponse)")
+                    logger.info("Streaming completed with response: \(fullResponse)")
 
 
                     // Update context with the assistant's response
@@ -181,7 +188,7 @@ class ChatViewModel: ObservableObject {
                     // Use non-streaming generation to get thinking content
                     let result = try await sdk.generate(prompt: fullPrompt, options: options)
 
-                    print("Generation completed with result: \(result.text)")
+                    logger.info("Generation completed with result: \(result.text)")
 
                     // Update the assistant message with the complete response
                     await MainActor.run {
@@ -199,7 +206,10 @@ class ChatViewModel: ObservableObject {
                     self.updateContextWithResponse(result.text)
                 }
             } catch {
-                print("Generation failed with error: \(error)")
+                logger.error("❌ Generation failed with error: \(error)")
+                logger.error("❌ Error type: \(type(of: error))")
+                logger.error("❌ Error details: \(String(describing: error))")
+
                 await MainActor.run {
                     self.error = error
                     // Add error message to chat
@@ -221,7 +231,6 @@ class ChatViewModel: ObservableObject {
                 // Save final assistant message to conversation
                 if messageIndex < self.messages.count,
                    let conversation = self.currentConversation {
-                    let assistantMessage = self.messages[messageIndex]
                     // Update conversation with final message
                     var updatedConversation = conversation
                     updatedConversation.messages = self.messages
@@ -287,10 +296,10 @@ class ChatViewModel: ObservableObject {
                 Task {
                     do {
                         _ = try await sdk.loadModel(currentModel.id)
-                        print("Verified model '\(currentModel.name)' is loaded in SDK")
+                        logger.info("Verified model '\(currentModel.name)' is loaded in SDK")
 
                     } catch {
-                        print("Failed to verify model is loaded: \(error)")
+                        logger.error("Failed to verify model is loaded: \(error)")
                         await MainActor.run {
                             self.isModelLoaded = false
                             self.loadedModelName = nil

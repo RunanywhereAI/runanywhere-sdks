@@ -2,6 +2,7 @@ import Foundation
 
 /// Extension to add analytics support to StreamingService
 extension StreamingService {
+    private static let logger = SDKLogger(category: "StreamingService+Analytics")
 
     /// Generate streaming text with analytics tracking
     public func generateStreamWithAnalytics(
@@ -69,10 +70,13 @@ extension StreamingService {
                     let startTime = Date()
 
                     // Use the actual streaming method from the LLM service
+                    Self.logger.debug("About to call streamGenerate on service")
+                    Self.logger.debug("Service type: \(type(of: loadedModel.service))")
                     try await loadedModel.service.streamGenerate(
                         prompt: prompt,
                         options: options,
                         onToken: { token in
+                            Self.logger.debug("Received token: '\(token)'")
                             // Track token for analytics
                             Task {
                                 if !hasRecordedFirstToken {
@@ -102,6 +106,8 @@ extension StreamingService {
                             }
                         }
                     )
+
+                    Self.logger.debug("streamGenerate completed")
 
                     // Complete tracking
                     let endTime = Date()

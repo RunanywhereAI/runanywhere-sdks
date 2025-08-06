@@ -203,7 +203,7 @@ public class ServiceContainer {
                     configurationRepository: configRepo,
                     modelMetadataRepository: modelRepo,
                     telemetryRepository: telemetryRepo,
-                    enableAutoSync: true
+                    enableAutoSync: false // Disabled: No backend currently available
                 )
             }
             return _dataSyncService

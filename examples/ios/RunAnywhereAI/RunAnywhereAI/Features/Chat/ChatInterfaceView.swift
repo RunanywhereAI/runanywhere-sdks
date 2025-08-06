@@ -7,13 +7,18 @@
 
 import SwiftUI
 import RunAnywhereSDK
+import os.log
 
 struct ChatInterfaceView: View {
     @StateObject private var viewModel = ChatViewModel()
     @StateObject private var conversationStore = ConversationStore.shared
     @State private var showingConversationList = false
     @State private var showingModelSelection = false
+    @State private var showDebugAlert = false
+    @State private var debugMessage = ""
     @FocusState private var isTextFieldFocused: Bool
+
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatInterfaceView")
 
     var body: some View {
         NavigationView {
@@ -107,6 +112,11 @@ struct ChatInterfaceView: View {
                     await viewModel.checkModelStatus()
                 }
             }
+            .alert("Debug Info", isPresented: $showDebugAlert) {
+                Button("OK") { }
+            } message: {
+                Text(debugMessage)
+            }
         }
     }
 
@@ -159,10 +169,31 @@ struct ChatInterfaceView: View {
     }
 
     private func sendMessage() {
-        guard viewModel.canSend else { return }
+        logger.info("🎯 sendMessage() called")
+        logger.info("📝 viewModel.canSend: \(viewModel.canSend)")
+        logger.info("📝 viewModel.isModelLoaded: \(viewModel.isModelLoaded)")
+        logger.info("📝 viewModel.currentInput: '\(viewModel.currentInput)'")
+        logger.info("📝 viewModel.isGenerating: \(viewModel.isGenerating)")
 
+        guard viewModel.canSend else {
+            logger.error("❌ canSend is false, returning")
+            return
+        }
+
+        logger.info("✅ Launching task to send message")
         Task {
             await viewModel.sendMessage()
+
+            // Check for errors after a short delay
+            Task {
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                if let error = viewModel.error {
+                    await MainActor.run {
+                        debugMessage = "Error occurred: \(error.localizedDescription)"
+                        showDebugAlert = true
+                    }
+                }
+            }
         }
     }
 

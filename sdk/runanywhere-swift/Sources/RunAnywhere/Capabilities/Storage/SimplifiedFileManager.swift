@@ -308,6 +308,51 @@ public class SimplifiedFileManager {
         return URL(fileURLWithPath: file.path)
     }
 
+    /// Find model file by searching all possible locations
+    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? {
+        // If expected path exists and is valid, return it
+        if let expectedPath = expectedPath,
+           FileManager.default.fileExists(atPath: expectedPath) {
+            return URL(fileURLWithPath: expectedPath)
+        }
+
+        guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return nil }
+
+        // Search in framework-specific folders first
+        for frameworkFolder in modelsFolder.subfolders {
+            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+                if frameworkFolder.containsSubfolder(named: modelId) {
+                    if let modelFolder = try? frameworkFolder.subfolder(named: modelId) {
+                        // Look for any model file in the folder
+                        for file in modelFolder.files {
+                            if ModelFormat(from: file.extension ?? "") != nil,
+                               file.nameExcludingExtension == modelId || file.name.contains(modelId) {
+                                logger.info("Found model \(modelId) at: \(file.path)")
+                                return URL(fileURLWithPath: file.path)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Search in direct model folders (legacy)
+        if modelsFolder.containsSubfolder(named: modelId) {
+            if let modelFolder = try? modelsFolder.subfolder(named: modelId) {
+                for file in modelFolder.files {
+                    if let format = ModelFormat(from: file.extension ?? ""),
+                       file.nameExcludingExtension == modelId || file.name.contains(modelId) {
+                        logger.info("Found model \(modelId) at: \(file.path)")
+                        return URL(fileURLWithPath: file.path)
+                    }
+                }
+            }
+        }
+
+        logger.warning("Model file not found for: \(modelId)")
+        return nil
+    }
+
     /// Get base directory URL
     public func getBaseDirectoryURL() -> URL {
         return URL(fileURLWithPath: baseFolder.path)
