@@ -170,25 +170,30 @@ public class ServiceContainer {
         return service
     }
 
-    /// Database service
-    private var _database: DatabaseCore?
+    /// Database manager
+    private var _databaseManager: DatabaseManager?
+    private var _databaseAdapter: GRDBDatabaseAdapter?
 
-    /// Get database (lazy initialization) - TEMPORARILY DISABLED DUE TO CORRUPTED JSON
+    /// Get database (lazy initialization)
     private var database: DatabaseCore? {
         get async {
-            // COMMENTED OUT: Database temporarily disabled to avoid JSON corruption issues
-            // if _database == nil {
-            //     do {
-            //         _database = try await SQLiteDatabase()
-            //     } catch {
-            //         logger.error("Failed to initialize Database: \(error)")
-            //     }
-            // }
-            // return _database
+            if _databaseAdapter == nil {
+                if _databaseManager == nil {
+                    _databaseManager = DatabaseManager.shared
+                    do {
+                        try _databaseManager?.setup()
+                        logger.info("Database initialized successfully")
+                    } catch {
+                        logger.error("Failed to initialize database: \(error)")
+                        return nil
+                    }
+                }
 
-            // Return nil to force in-memory configuration
-            logger.warning("Database disabled - using in-memory configuration only")
-            return nil
+                if let manager = _databaseManager {
+                    _databaseAdapter = GRDBDatabaseAdapter(databaseManager: manager)
+                }
+            }
+            return _databaseAdapter
         }
     }
 
@@ -235,8 +240,8 @@ public class ServiceContainer {
                         performanceMonitor: performanceMonitor
                     )
                 } else {
-                    // Database is disabled, create no-op analytics service
-                    logger.warning("Creating no-op GenerationAnalytics service (database disabled)")
+                    // Database not available, create no-op analytics service
+                    logger.warning("Creating no-op GenerationAnalytics service (database not available)")
                     _generationAnalytics = NoOpGenerationAnalyticsService()
                 }
             }
@@ -304,7 +309,7 @@ public class ServiceContainer {
                 logger.info("Configuration loaded during SDK initialization")
             }
         } else {
-            // DATABASE DISABLED: Create in-memory configuration service
+            // Create in-memory configuration service as fallback
             logger.warning("Database unavailable - creating in-memory configuration service")
             _configurationService = InMemoryConfigurationService()
             logger.info("In-memory configuration service created")

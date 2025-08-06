@@ -100,7 +100,9 @@
       "Bash(./examples/ios/RunAnywhereAI/scripts/build_and_run.sh:*)",
       "Bash(timeout 60 xcodebuild -workspace RunAnywhereAI.xcworkspace -scheme RunAnywhereAI -configuration Debug build -destination 'platform=iOS Simulator,name=iPhone 16 Pro')",
       "Bash(xcrun simctl log:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "WebFetch(domain:kean-docs.github.io)",
+      "WebFetch(domain:aptabase.com)"
     ],
     "deny": []
   }
