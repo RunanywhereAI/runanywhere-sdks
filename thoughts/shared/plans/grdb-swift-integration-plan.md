@@ -209,7 +209,32 @@ GRDBObservations/
 - Export/import functionality
 - Data validation and repair
 
-### Phase 1E: Integration and Testing (Days 10-14)
+### Phase 1E: Legacy Cleanup (Days 10-11)
+
+#### 1.13 Remove Legacy SQLite Code
+```
+Files to Delete:
+├── Data/Storage/Database/
+│   ├── Protocols/DatabaseCore.swift     (Keep - used as bridge)
+│   └── Services/SQLiteDatabase.swift    (DELETE)
+├── Data/Repositories/
+│   ├── ConfigurationRepositoryImpl.swift    (DELETE after GRDB version)
+│   ├── GenerationAnalyticsRepositoryImpl.swift (DELETE after GRDB version)
+│   ├── ModelMetadataRepositoryImpl.swift    (DELETE after GRDB version)
+│   └── TelemetryRepositoryImpl.swift        (DELETE after GRDB version)
+```
+
+#### 1.14 Remove JSON Blob Storage Pattern
+- Remove all JSON encoding/decoding from repositories
+- Remove `RepositoryEntity` protocol's JSON requirements
+- Simplify data models to use proper types instead of JSON strings
+
+#### 1.15 Clean Up ServiceContainer
+- Remove fallback to InMemoryConfigurationService
+- Remove NoOpGenerationAnalyticsService
+- Ensure all services use GRDB database
+
+### Phase 1F: Integration and Testing (Days 12-14)
 
 #### 1.10 ServiceContainer Integration
 ```swift
@@ -387,6 +412,53 @@ This plan provides a comprehensive roadmap for successfully integrating GRDB.swi
 
 ---
 
+## Legacy Code Cleanup Plan
+
+### Files to Remove After GRDB Migration
+
+#### 1. Database Layer (1 file)
+- ✅ `Data/Storage/Database/Services/SQLiteDatabase.swift` - Old SQLite implementation
+- 🔄 `Data/Storage/Database/Protocols/DatabaseCore.swift` - Keep temporarily as bridge
+
+#### 2. Repository Implementations (4 files)
+- ✅ `Data/Repositories/ConfigurationRepositoryImpl.swift` - Replace with GRDB version
+- ✅ `Data/Repositories/GenerationAnalyticsRepositoryImpl.swift` - Replace with GRDB version
+- ✅ `Data/Repositories/ModelMetadataRepositoryImpl.swift` - Replace with GRDB version
+- ✅ `Data/Repositories/TelemetryRepositoryImpl.swift` - Replace with GRDB version
+
+#### 3. Repository Support Files (Keep for now)
+- 🔄 `Data/Protocols/ConfigurationRepository.swift` - Keep, used by services
+- 🔄 `Data/Protocols/GenerationAnalyticsRepository.swift` - Keep, used by services
+- 🔄 `Data/Protocols/ModelMetadataRepository.swift` - Keep, used by services
+- 🔄 `Data/Protocols/TelemetryRepository.swift` - Keep, used by services
+- 🔄 `Data/Protocols/Repository.swift` - Keep, base protocol
+- 🔄 `Data/Models/Entities/RepositoryError.swift` - Keep, error handling
+
+#### 4. Fallback Services (2 files)
+- ✅ `Capabilities/Configuration/Services/InMemoryConfigurationService.swift` - Remove
+- ✅ `Capabilities/GenerationAnalytics/Services/NoOpGenerationAnalyticsService.swift` - Remove
+
+#### 5. Data Models to Simplify
+- 🔄 Remove JSON serialization from all `Data/Models/Entities/*`
+- 🔄 Remove `RepositoryEntity` protocol's JSON requirements
+- 🔄 Simplify DTOs to match new normalized schema
+
+#### 6. Service Updates
+- 🔄 `Data/Network/DataSyncService.swift` - Update to use GRDB repositories
+- 🔄 `Foundation/DependencyInjection/ServiceContainer.swift` - Remove fallback logic
+
+### Total Files to Delete: 7
+### Total Files to Modify: ~15
+
+### Cleanup Timeline
+1. **Phase 1C**: Create GRDB repositories alongside old ones
+2. **Phase 1D**: Switch ServiceContainer to use GRDB repositories
+3. **Phase 1E**: Delete old repository implementations
+4. **Phase 1F**: Remove fallback services and clean up data models
+5. **Final**: Remove DatabaseCore protocol and adapter once all code uses GRDB directly
+
+---
+
 ## Implementation Progress
 
 ### Phase 1A: GRDB Foundation ✅ COMPLETED
@@ -444,3 +516,20 @@ Next steps:
 - Implement type converters for JSON columns
 - Define associations between records
 - Add computed properties for derived values
+
+---
+
+## Cleanup Checklist
+
+### After Phase 1 Completion:
+- [ ] Delete `SQLiteDatabase.swift`
+- [ ] Delete old repository implementations (4 files)
+- [ ] Delete `InMemoryConfigurationService.swift`
+- [ ] Delete `NoOpGenerationAnalyticsService.swift`
+- [ ] Remove JSON serialization from entity models
+- [ ] Update `DataSyncService` to use GRDB repositories
+- [ ] Clean up `ServiceContainer` fallback logic
+- [ ] Remove `DatabaseCore` protocol and adapter (final step)
+- [ ] Update all imports and dependencies
+- [ ] Run tests to ensure nothing breaks
+- [ ] Update documentation to reflect new architecture

@@ -202,65 +202,12 @@ if coreCount >= 10 {
 - Battery usage tracking
 - Network request inspection
 
-### 3.2 Memory Leak Detection
-
-**Tasks:**
-1. Add LifetimeTracker dependency
-   ```swift
-   .package(url: "https://github.com/krzysztofzablocki/LifetimeTracker.git", from: "1.8.0")
-   ```
-
-2. Integrate with key components
-   - Track model lifecycle
-   - Monitor service lifetimes
-   - Add to view controllers
-   - Configure production safety
-
-3. Setup leak detection
-   - Configure visual overlay
-   - Add CI integration
-   - Create leak reports
-   - Document known issues
-
-**Success Criteria:**
-- Automatic leak detection
-- Visual debugging overlay
-- CI/CD integration
-- Zero memory leaks
-
 ---
 
-## Phase 4: Testing & Analytics (Week 4)
-*Enhance testing infrastructure and add privacy-first analytics*
+## Phase 4: Analytics (Week 4)
+*Add privacy-first analytics*
 
-### 4.1 Testing Framework Enhancement
-
-**Tasks:**
-1. Add testing dependencies
-   ```swift
-   .package(url: "https://github.com/Quick/Quick.git", from: "6.0.0"),
-   .package(url: "https://github.com/Quick/Nimble.git", from: "11.0.0")
-   ```
-
-2. Setup BDD test structure
-   - Create test templates
-   - Define custom matchers
-   - Add async test helpers
-   - Configure test targets
-
-3. Migrate existing tests
-   - Convert XCTest to Quick
-   - Add comprehensive specs
-   - Improve test coverage
-   - Add integration tests
-
-**Success Criteria:**
-- BDD-style test organization
-- Improved test readability
-- Better async testing
-- >80% code coverage
-
-### 4.2 Privacy-First Analytics
+### 4.1 Privacy-First Analytics
 
 **Tasks:**
 1. Add Aptabase dependency
@@ -409,15 +356,12 @@ if coreCount >= 10 {
 
 ### Phase 3 Completion
 - [ ] Monitoring implemented
-- [ ] Memory leaks detected
 - [ ] Performance tracked
 - [ ] Debug tools integrated
 
 ### Phase 4 Completion
-- [ ] Test coverage >80%
 - [ ] Analytics implemented
 - [ ] Privacy maintained
-- [ ] BDD tests adopted
 
 ### Phase 5 Completion
 - [ ] All packages integrated
@@ -432,7 +376,7 @@ if coreCount >= 10 {
 - **Week 1**: Critical fixes (Database, Device Detection)
 - **Week 2**: Core infrastructure (DI, Networking)
 - **Week 3**: Monitoring & Debugging
-- **Week 4**: Testing & Analytics
+- **Week 4**: Analytics
 - **Week 5**: Specialized features & Cleanup
 
 Total Duration: 5 weeks

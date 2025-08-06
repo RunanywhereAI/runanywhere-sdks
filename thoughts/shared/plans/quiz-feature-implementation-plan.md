@@ -327,7 +327,6 @@ func calculateQuestionCount(for text: String) -> Int {
 1. **Technical**
    - Quiz generation < 5 seconds
    - Smooth 60fps swipe animations
-   - No memory leaks
 
 2. **User Experience**
    - 90% completion rate
