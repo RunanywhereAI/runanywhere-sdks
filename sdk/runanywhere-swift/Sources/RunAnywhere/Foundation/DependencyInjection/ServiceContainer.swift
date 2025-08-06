@@ -1,4 +1,5 @@
 import Foundation
+import Pulse
 
 /// Service container for dependency injection
 public class ServiceContainer {
@@ -161,7 +162,7 @@ public class ServiceContainer {
         SDKLogger()
     }()
 
-    /// Configuration service (either ConfigurationService or InMemoryConfigurationService)
+    /// Configuration service
     private var _configurationService: ConfigurationServiceProtocol?
     public var configurationService: ConfigurationServiceProtocol {
         guard let service = _configurationService else {
@@ -170,27 +171,17 @@ public class ServiceContainer {
         return service
     }
 
-    /// Database service
-    private var _database: DatabaseCore?
-
-    /// Get database (lazy initialization) - TEMPORARILY DISABLED DUE TO CORRUPTED JSON
-    private var database: DatabaseCore? {
-        get async {
-            // COMMENTED OUT: Database temporarily disabled to avoid JSON corruption issues
-            // if _database == nil {
-            //     do {
-            //         _database = try await SQLiteDatabase()
-            //     } catch {
-            //         logger.error("Failed to initialize Database: \(error)")
-            //     }
-            // }
-            // return _database
-
-            // Return nil to force in-memory configuration
-            logger.warning("Database disabled - using in-memory configuration only")
-            return nil
+    /// Database manager
+    private lazy var databaseManager: DatabaseManager = {
+        let manager = DatabaseManager.shared
+        do {
+            try manager.setup()
+            logger.info("Database initialized successfully")
+        } catch {
+            logger.error("Failed to initialize database: \(error)")
         }
-    }
+        return manager
+    }()
 
     /// API client for sync operations
     private var apiClient: APIClient?
@@ -201,13 +192,26 @@ public class ServiceContainer {
     public var dataSyncService: DataSyncService? {
         get async {
             if _dataSyncService == nil {
-                if let db = await database {
-                    _dataSyncService = DataSyncService(
-                        database: db,
-                        apiClient: apiClient,
-                        enableAutoSync: true
-                    )
-                }
+                // Create repositories for data sync
+                let configRepo = ConfigurationRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                let modelRepo = ModelMetadataRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                let telemetryRepo = TelemetryRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+
+                _dataSyncService = DataSyncService(
+                    configurationRepository: configRepo,
+                    modelMetadataRepository: modelRepo,
+                    telemetryRepository: telemetryRepo,
+                    enableAutoSync: true
+                )
             }
             return _dataSyncService
         }
@@ -219,10 +223,9 @@ public class ServiceContainer {
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
             if _generationAnalytics == nil {
-                if let db = await database,
-                   let syncService = await dataSyncService {
+                if let syncService = await dataSyncService {
                     let repository = GenerationAnalyticsRepositoryImpl(
-                        database: db,
+                        databaseManager: databaseManager,
                         syncService: syncService
                     )
 
@@ -235,9 +238,9 @@ public class ServiceContainer {
                         performanceMonitor: performanceMonitor
                     )
                 } else {
-                    // Database is disabled, create no-op analytics service
-                    logger.warning("Creating no-op GenerationAnalytics service (database disabled)")
-                    _generationAnalytics = NoOpGenerationAnalyticsService()
+                    // Database is required for analytics
+                    logger.error("Database not available for GenerationAnalytics service")
+                    fatalError("Database is required for GenerationAnalytics service")
                 }
             }
 
@@ -286,28 +289,22 @@ public class ServiceContainer {
 
     /// Bootstrap all services with configuration
     public func bootstrap(with configuration: Configuration) async throws {
+
         // Logger is pre-configured through LoggingManager
 
         // Initialize configuration service with repository
-        if let db = await database {
-            let configRepository = ConfigurationRepositoryImpl(
-                database: db,
-                apiClient: apiClient
-            )
-            _configurationService = ConfigurationService(
-                configRepository: configRepository
-            )
+        let configRepository = ConfigurationRepositoryImpl(
+            databaseManager: databaseManager,
+            apiClient: apiClient
+        )
+        _configurationService = ConfigurationService(
+            configRepository: configRepository
+        )
 
-            // Ensure configuration is loaded immediately
-            if let configService = _configurationService {
-                await configService.ensureConfigurationLoaded()
-                logger.info("Configuration loaded during SDK initialization")
-            }
-        } else {
-            // DATABASE DISABLED: Create in-memory configuration service
-            logger.warning("Database unavailable - creating in-memory configuration service")
-            _configurationService = InMemoryConfigurationService()
-            logger.info("In-memory configuration service created")
+        // Ensure configuration is loaded immediately
+        if let configService = _configurationService {
+            await configService.ensureConfigurationLoaded()
+            logger.info("Configuration loaded during SDK initialization")
         }
 
         // Initialize API client if API key is provided

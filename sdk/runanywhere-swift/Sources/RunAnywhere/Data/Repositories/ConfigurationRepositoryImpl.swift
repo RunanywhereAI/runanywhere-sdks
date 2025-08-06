@@ -1,103 +1,79 @@
 import Foundation
+import GRDB
 
 /// Repository for managing SDK configuration data
 public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public typealias Entity = ConfigurationData
 
-    private let database: DatabaseCore
+    private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
     private let logger = SDKLogger(category: "ConfigurationRepository")
-    private let tableName = "configuration"
 
     // MARK: - Initialization
 
-    public init(database: DatabaseCore, apiClient: APIClient?) {
-        self.database = database
+    public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
+        self.databaseManager = databaseManager
         self.apiClient = apiClient
     }
 
     // MARK: - Repository Implementation
 
     public func save(_ entity: ConfigurationData) async throws {
-        let data = try JSONEncoder().encode(entity)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = mapToRecord(entity)
 
-        try await database.execute("""
-            INSERT OR REPLACE INTO \(tableName) (id, data, updated_at, sync_pending)
-            VALUES (?, ?, ?, ?)
-        """, parameters: [entity.id, json, entity.updatedAt, entity.syncPending ? 1 : 0])
+        try databaseManager.write { db in
+            try record.save(db)
+        }
 
         logger.info("Configuration saved: \(entity.id)")
     }
 
     public func fetch(id: String) async throws -> ConfigurationData? {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) WHERE id = ?
-        """, parameters: [id])
-
-        guard let row = results.first,
-              let json = row["data"] as? String,
-              let data = json.data(using: .utf8) else {
-            return nil
+        let record = try databaseManager.read { db in
+            try ConfigurationRecord.fetchOne(db, key: id)
         }
 
-        return try JSONDecoder().decode(ConfigurationData.self, from: data)
+        return try record.map { try mapToEntity($0) }
     }
 
     public func fetchAll() async throws -> [ConfigurationData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) ORDER BY updated_at DESC
-        """, parameters: [])
-
-        logger.info("Found \(results.count) configurations in database")
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8) else {
-                logger.warning("Failed to parse configuration data")
-                return nil
-            }
-
-            do {
-                let config = try JSONDecoder().decode(ConfigurationData.self, from: data)
-                logger.info("Fetched config - id: \(config.id)")
-                return config
-            } catch {
-                logger.error("Failed to decode configuration: \(error)")
-                return nil
-            }
+        let records = try databaseManager.read { db in
+            try ConfigurationRecord
+                .order(ConfigurationRecord.Columns.updatedAt.desc)
+                .fetchAll(db)
         }
+
+        logger.info("Found \(records.count) configurations in database")
+
+        return try records.map { try mapToEntity($0) }
     }
 
     public func delete(id: String) async throws {
-        try await database.execute("""
-            DELETE FROM \(tableName) WHERE id = ?
-        """, parameters: [id])
+        try databaseManager.write { db in
+            _ = try ConfigurationRecord.deleteOne(db, key: id)
+        }
 
         logger.info("Configuration deleted: \(id)")
     }
 
     public func fetchPendingSync() async throws -> [ConfigurationData] {
-        let results = try await database.query("""
-            SELECT data FROM \(tableName) WHERE sync_pending = 1
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let json = row["data"] as? String,
-                  let data = json.data(using: .utf8) else {
-                return nil
-            }
-
-            return try? JSONDecoder().decode(ConfigurationData.self, from: data)
+        let records = try databaseManager.read { db in
+            try ConfigurationRecord
+                .filter(ConfigurationRecord.Columns.syncPending == true)
+                .fetchAll(db)
         }
+
+        return try records.map { try mapToEntity($0) }
     }
 
     public func markSynced(_ ids: [String]) async throws {
-        try await database.transaction { db in
+        try databaseManager.write { db in
             for id in ids {
-                try await db.execute("""
-                    UPDATE \(self.tableName) SET sync_pending = 0 WHERE id = ?
-                """, parameters: [id])
+                if var record = try ConfigurationRecord.fetchOne(db, key: id) {
+                    record.syncPending = false
+                    record.updatedAt = Date()
+                    try record.update(db)
+                }
             }
         }
 
@@ -140,5 +116,70 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
         let updated = updates(existing)
         try await save(updated.markUpdated())
+    }
+
+    // MARK: - Mapping Functions
+
+    private func mapToRecord(_ entity: ConfigurationData) -> ConfigurationRecord {
+        // Map the composed configuration to flat record structure
+        let privacyMode = entity.routing.privacyMode.rawValue
+        let telemetryConsent = entity.analytics.enabled ?
+            (entity.analytics.level == .detailed ? SDKConstants.TelemetryDefaults.consentDetailed : SDKConstants.TelemetryDefaults.consentAnonymous) :
+            SDKConstants.TelemetryDefaults.consentNone
+
+        return ConfigurationRecord(
+            id: entity.id,
+            apiKey: entity.apiKey,
+            baseURL: SDKConstants.DatabaseDefaults.apiBaseURL,
+            modelCacheSize: SDKConstants.ModelDefaults.defaultModelCacheSize,
+            maxMemoryUsageMB: SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB,
+            privacyMode: privacyMode,
+            telemetryConsent: telemetryConsent,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            syncPending: entity.syncPending
+        )
+    }
+
+    private func mapToEntity(_ record: ConfigurationRecord) throws -> ConfigurationData {
+        // Map flat record structure back to composed configuration
+        let privacyMode = PrivacyMode(rawValue: record.privacyMode) ?? .standard
+        let analyticsEnabled = record.telemetryConsent != SDKConstants.TelemetryDefaults.consentNone
+        let analyticsLevel: AnalyticsLevel = record.telemetryConsent == SDKConstants.TelemetryDefaults.consentDetailed ? .detailed : .basic
+
+        // Create routing configuration
+        let routing = RoutingConfiguration(
+            policy: .automatic, // Default for now, could be stored separately
+            cloudEnabled: true,
+            privacyMode: privacyMode
+        )
+
+        // Create analytics configuration
+        let analytics = AnalyticsConfiguration(
+            enabled: analyticsEnabled,
+            level: analyticsLevel,
+            liveMetricsEnabled: true
+        )
+
+        // Create generation configuration with defaults
+        let generation = GenerationConfiguration()
+
+        // Create storage configuration with defaults
+        let storage = StorageConfiguration(
+            maxCacheSize: Int64(record.maxMemoryUsageMB) * 1024 * 1024
+        )
+
+        return ConfigurationData(
+            id: record.id,
+            routing: routing,
+            analytics: analytics,
+            generation: generation,
+            storage: storage,
+            apiKey: record.apiKey,
+            allowUserOverride: true,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            syncPending: record.syncPending
+        )
     }
 }

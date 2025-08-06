@@ -1,121 +1,77 @@
 import Foundation
+import GRDB
 
 /// Implementation of generation analytics repository for persistence
 public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     // MARK: - Properties
 
-    private let database: DatabaseCore
+    private let databaseManager: DatabaseManager
     private let syncService: DataSyncService?
     private let logger = SDKLogger(category: "GenerationAnalyticsRepository")
 
-    // Table names
-    private let sessionsTable = "generation_sessions"
-    private let generationsTable = "generations"
-
     // MARK: - Initialization
 
-    public init(database: DatabaseCore, syncService: DataSyncService?) {
-        self.database = database
+    public init(databaseManager: DatabaseManager, syncService: DataSyncService?) {
+        self.databaseManager = databaseManager
         self.syncService = syncService
-
-        Task {
-            await createTablesIfNeeded()
-        }
     }
 
     // MARK: - Session Operations
 
     public func saveSession(_ session: GenerationSession) async throws {
-        let data = try JSONEncoder().encode(session)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = mapSessionToRecord(session)
 
-        try await database.execute("""
-            INSERT OR REPLACE INTO \(sessionsTable)
-            (id, model_id, session_type, data, created_at, updated_at, sync_pending)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, parameters: [
-            session.id.uuidString,
-            session.modelId,
-            session.sessionType.rawValue,
-            json,
-            session.startTime,
-            Date(),
-            1
-        ])
+        try databaseManager.write { db in
+            try record.save(db)
+        }
 
         logger.debug("Saved session: \(session.id)")
     }
 
     public func updateSession(_ session: GenerationSession) async throws {
-        let data = try JSONEncoder().encode(session)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = mapSessionToRecord(session)
 
-        try await database.execute("""
-            UPDATE \(sessionsTable)
-            SET data = ?, updated_at = ?, sync_pending = 1
-            WHERE id = ?
-        """, parameters: [
-            json,
-            Date(),
-            session.id.uuidString
-        ])
+        try databaseManager.write { db in
+            try record.update(db)
+        }
 
         logger.debug("Updated session: \(session.id)")
     }
 
     public func getSession(_ id: UUID) async throws -> GenerationSession? {
-        let results = try await database.query("""
-            SELECT data FROM \(sessionsTable) WHERE id = ?
-        """, parameters: [id.uuidString])
-
-        guard let row = results.first,
-              let jsonString = row["data"] as? String,
-              let data = jsonString.data(using: .utf8) else {
-            return nil
+        let record = try databaseManager.read { db in
+            try GenerationSessionRecord.fetchOne(db, key: id.uuidString)
         }
 
-        return try JSONDecoder().decode(GenerationSession.self, from: data)
+        return record.map(mapRecordToSession)
     }
 
     public func getAllSessions() async throws -> [GenerationSession] {
-        let results = try await database.query("""
-            SELECT data FROM \(sessionsTable) ORDER BY created_at DESC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(GenerationSession.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationSessionRecord
+                .order(GenerationSessionRecord.Columns.createdAt.desc)
+                .fetchAll(db)
         }
+
+        return records.map(mapRecordToSession)
     }
 
     public func getActiveSessions() async throws -> [GenerationSession] {
-        let results = try await database.query("""
-            SELECT data FROM \(sessionsTable)
-            WHERE json_extract(data, '$.endTime') IS NULL
-            ORDER BY created_at DESC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(GenerationSession.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationSessionRecord
+                .filter(GenerationSessionRecord.Columns.endedAt == nil)
+                .order(GenerationSessionRecord.Columns.createdAt.desc)
+                .fetchAll(db)
         }
+
+        return records.map(mapRecordToSession)
     }
 
     public func deleteSession(_ id: UUID) async throws {
-        try await database.execute("""
-            DELETE FROM \(sessionsTable) WHERE id = ?
-        """, parameters: [id.uuidString])
-
-        // Also delete associated generations
-        try await database.execute("""
-            DELETE FROM \(generationsTable) WHERE session_id = ?
-        """, parameters: [id.uuidString])
+        try databaseManager.write { db in
+            // Delete session (generations will be cascade deleted due to foreign key)
+            _ = try GenerationSessionRecord.deleteOne(db, key: id.uuidString)
+        }
 
         logger.debug("Deleted session and generations: \(id)")
     }
@@ -123,77 +79,48 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     // MARK: - Generation Operations
 
     public func saveGeneration(_ generation: Generation) async throws {
-        let data = try JSONEncoder().encode(generation)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = try mapGenerationToRecord(generation)
 
-        try await database.execute("""
-            INSERT OR REPLACE INTO \(generationsTable)
-            (id, session_id, sequence_number, data, created_at, updated_at, sync_pending)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, parameters: [
-            generation.id.uuidString,
-            generation.sessionId.uuidString,
-            generation.sequenceNumber,
-            json,
-            generation.timestamp,
-            Date(),
-            1
-        ])
+        try databaseManager.write { db in
+            try record.save(db)
+        }
 
         logger.debug("Saved generation: \(generation.id)")
     }
 
     public func updateGeneration(_ generation: Generation) async throws {
-        let data = try JSONEncoder().encode(generation)
-        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let record = try mapGenerationToRecord(generation)
 
-        try await database.execute("""
-            UPDATE \(generationsTable)
-            SET data = ?, updated_at = ?, sync_pending = 1
-            WHERE id = ?
-        """, parameters: [
-            json,
-            Date(),
-            generation.id.uuidString
-        ])
+        try databaseManager.write { db in
+            try record.update(db)
+        }
 
         logger.debug("Updated generation: \(generation.id)")
     }
 
     public func getGeneration(_ id: UUID) async throws -> Generation? {
-        let results = try await database.query("""
-            SELECT data FROM \(generationsTable) WHERE id = ?
-        """, parameters: [id.uuidString])
-
-        guard let row = results.first,
-              let jsonString = row["data"] as? String,
-              let data = jsonString.data(using: .utf8) else {
-            return nil
+        let record = try databaseManager.read { db in
+            try GenerationRecord.fetchOne(db, key: id.uuidString)
         }
 
-        return try JSONDecoder().decode(Generation.self, from: data)
+        return try record.map { try mapRecordToGeneration($0) }
     }
 
     public func getGenerations(sessionId: UUID) async throws -> [Generation] {
-        let results = try await database.query("""
-            SELECT data FROM \(generationsTable)
-            WHERE session_id = ?
-            ORDER BY sequence_number ASC
-        """, parameters: [sessionId.uuidString])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(Generation.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationRecord
+                .filter(GenerationRecord.Columns.generationSessionsId == sessionId.uuidString)
+                .order(GenerationRecord.Columns.sequenceNumber.asc)
+                .fetchAll(db)
         }
+
+        return try records.map { try mapRecordToGeneration($0) }
     }
 
     public func deleteGeneration(_ id: UUID) async throws {
-        try await database.execute("""
-            DELETE FROM \(generationsTable) WHERE id = ?
-        """, parameters: [id.uuidString])
+        try databaseManager.write { db in
+            _ = try GenerationRecord.deleteOne(db, key: id.uuidString)
+        }
 
         logger.debug("Deleted generation: \(id)")
     }
@@ -201,141 +128,183 @@ public actor GenerationAnalyticsRepositoryImpl: GenerationAnalyticsRepository {
     // MARK: - Analytics Queries
 
     public func getSessionsByModel(_ modelId: String, limit: Int) async throws -> [GenerationSession] {
-        let results = try await database.query("""
-            SELECT data FROM \(sessionsTable)
-            WHERE model_id = ?
-            ORDER BY created_at DESC
-            LIMIT ?
-        """, parameters: [modelId, limit])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(GenerationSession.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationSessionRecord
+                .filter(GenerationSessionRecord.Columns.modelMetadataId == modelId)
+                .order(GenerationSessionRecord.Columns.createdAt.desc)
+                .limit(limit)
+                .fetchAll(db)
         }
+
+        return records.map(mapRecordToSession)
     }
 
     public func getRecentGenerations(limit: Int) async throws -> [Generation] {
-        let results = try await database.query("""
-            SELECT data FROM \(generationsTable)
-            ORDER BY created_at DESC
-            LIMIT ?
-        """, parameters: [limit])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(Generation.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationRecord
+                .order(GenerationRecord.Columns.createdAt.desc)
+                .limit(limit)
+                .fetchAll(db)
         }
+
+        return try records.map { try mapRecordToGeneration($0) }
     }
 
     // MARK: - Sync Operations
 
     public func getPendingSyncSessions() async throws -> [GenerationSession] {
-        let results = try await database.query("""
-            SELECT data FROM \(sessionsTable)
-            WHERE sync_pending = 1
-            ORDER BY created_at ASC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(GenerationSession.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationSessionRecord
+                .filter(GenerationSessionRecord.Columns.syncPending == true)
+                .order(GenerationSessionRecord.Columns.createdAt.asc)
+                .fetchAll(db)
         }
+
+        return records.map(mapRecordToSession)
     }
 
     public func getPendingSyncGenerations() async throws -> [Generation] {
-        let results = try await database.query("""
-            SELECT data FROM \(generationsTable)
-            WHERE sync_pending = 1
-            ORDER BY created_at ASC
-        """, parameters: [])
-
-        return results.compactMap { row in
-            guard let jsonString = row["data"] as? String,
-                  let data = jsonString.data(using: .utf8) else {
-                return nil
-            }
-            return try? JSONDecoder().decode(Generation.self, from: data)
+        let records = try databaseManager.read { db in
+            try GenerationRecord
+                .filter(GenerationRecord.Columns.syncPending == true)
+                .order(GenerationRecord.Columns.createdAt.asc)
+                .fetchAll(db)
         }
+
+        return try records.map { try mapRecordToGeneration($0) }
     }
 
     public func markSessionsSynced(_ ids: [UUID]) async throws {
-        for id in ids {
-            try await database.execute("""
-                UPDATE \(sessionsTable)
-                SET sync_pending = 0
-                WHERE id = ?
-            """, parameters: [id.uuidString])
+        try databaseManager.write { db in
+            for id in ids {
+                if var record = try GenerationSessionRecord.fetchOne(db, key: id.uuidString) {
+                    record.syncPending = false
+                    record.updatedAt = Date()
+                    try record.update(db)
+                }
+            }
         }
 
         logger.debug("Marked \(ids.count) sessions as synced")
     }
 
     public func markGenerationsSynced(_ ids: [UUID]) async throws {
-        for id in ids {
-            try await database.execute("""
-                UPDATE \(generationsTable)
-                SET sync_pending = 0
-                WHERE id = ?
-            """, parameters: [id.uuidString])
+        try databaseManager.write { db in
+            for id in ids {
+                if var record = try GenerationRecord.fetchOne(db, key: id.uuidString) {
+                    record.syncPending = false
+                    try record.update(db)
+                }
+            }
         }
 
         logger.debug("Marked \(ids.count) generations as synced")
     }
 
-    // MARK: - Private Methods
+    // MARK: - Mapping Functions
 
-    private func createTablesIfNeeded() async {
-        do {
-            // Create sessions table
-            try await database.execute("""
-                CREATE TABLE IF NOT EXISTS \(sessionsTable) (
-                    id TEXT PRIMARY KEY,
-                    model_id TEXT NOT NULL,
-                    session_type TEXT NOT NULL,
-                    data TEXT NOT NULL,
-                    created_at REAL NOT NULL,
-                    updated_at REAL NOT NULL,
-                    sync_pending INTEGER DEFAULT 1
-                )
-            """, parameters: [])
+    private func mapSessionToRecord(_ session: GenerationSession) -> GenerationSessionRecord {
+        // Create context data JSON
+        let contextData: [String: Any] = [
+            "generationCount": session.generationCount,
+            "totalInputTokens": session.totalInputTokens,
+            "totalOutputTokens": session.totalOutputTokens,
+            "averageTimeToFirstToken": session.averageTimeToFirstToken,
+            "averageTokensPerSecond": session.averageTokensPerSecond,
+            "totalDuration": session.totalDuration
+        ]
 
-            // Create generations table
-            try await database.execute("""
-                CREATE TABLE IF NOT EXISTS \(generationsTable) (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    sequence_number INTEGER NOT NULL,
-                    data TEXT NOT NULL,
-                    created_at REAL NOT NULL,
-                    updated_at REAL NOT NULL,
-                    sync_pending INTEGER DEFAULT 1,
-                    FOREIGN KEY (session_id) REFERENCES \(sessionsTable)(id)
-                )
-            """, parameters: [])
+        let contextDataJSON = try? JSONSerialization.data(withJSONObject: contextData)
 
-            // Create indexes
-            try await database.execute("""
-                CREATE INDEX IF NOT EXISTS idx_sessions_model_id
-                ON \(sessionsTable)(model_id)
-            """, parameters: [])
+        return GenerationSessionRecord(
+            id: session.id.uuidString,
+            modelMetadataId: session.modelId,
+            sessionType: session.sessionType.rawValue,
+            totalTokens: session.totalInputTokens + session.totalOutputTokens,
+            totalCost: 0.0, // Calculate based on model pricing
+            messageCount: session.generationCount,
+            contextData: contextDataJSON,
+            startedAt: session.startTime,
+            endedAt: session.endTime,
+            createdAt: session.startTime,
+            updatedAt: Date(),
+            syncPending: true
+        )
+    }
 
-            try await database.execute("""
-                CREATE INDEX IF NOT EXISTS idx_generations_session_id
-                ON \(generationsTable)(session_id)
-            """, parameters: [])
+    private func mapRecordToSession(_ record: GenerationSessionRecord) -> GenerationSession {
+        var session = GenerationSession(
+            id: UUID(uuidString: record.id) ?? UUID(),
+            modelId: record.modelMetadataId,
+            sessionType: SessionType(rawValue: record.sessionType) ?? .singleGeneration,
+            startTime: record.startedAt,
+            endTime: record.endedAt
+        )
 
-            logger.info("Analytics tables created/verified")
-        } catch {
-            logger.error("Failed to create tables: \(error)")
+        // Parse context data if available
+        if let contextData = record.contextData,
+           let json = try? JSONSerialization.jsonObject(with: contextData) as? [String: Any] {
+            session.generationCount = json["generationCount"] as? Int ?? 0
+            session.totalInputTokens = json["totalInputTokens"] as? Int ?? 0
+            session.totalOutputTokens = json["totalOutputTokens"] as? Int ?? 0
+            session.averageTimeToFirstToken = json["averageTimeToFirstToken"] as? TimeInterval ?? 0
+            session.averageTokensPerSecond = json["averageTokensPerSecond"] as? Double ?? 0
+            session.totalDuration = json["totalDuration"] as? TimeInterval ?? 0
         }
+
+        return session
+    }
+
+    private func mapGenerationToRecord(_ generation: Generation) throws -> GenerationRecord {
+        // Serialize performance data
+        let performanceData: Data?
+        if let performance = generation.performance {
+            performanceData = try JSONEncoder().encode(performance)
+        } else {
+            performanceData = nil
+        }
+
+        // Extract metrics from performance
+        let promptTokens = generation.performance?.inputTokens ?? 0
+        let completionTokens = generation.performance?.outputTokens ?? 0
+        let latencyMs = (generation.performance?.totalGenerationTime ?? 0) * 1000
+        let tokensPerSecond = generation.performance?.tokensPerSecond ?? 0
+        let timeToFirstTokenMs = (generation.performance?.timeToFirstToken ?? 0) * 1000
+
+        return GenerationRecord(
+            id: generation.id.uuidString,
+            generationSessionsId: generation.sessionId.uuidString,
+            sequenceNumber: generation.sequenceNumber,
+            promptTokens: promptTokens,
+            completionTokens: completionTokens,
+            totalTokens: promptTokens + completionTokens,
+            latencyMs: latencyMs,
+            tokensPerSecond: tokensPerSecond,
+            timeToFirstTokenMs: timeToFirstTokenMs,
+            cost: 0.0, // Calculate based on model pricing
+            costSaved: 0.0,
+            executionTarget: SDKConstants.ModelDefaults.defaultExecutionTarget,
+            requestData: performanceData,
+            errorCode: nil,
+            errorMessage: nil,
+            createdAt: generation.timestamp,
+            syncPending: true
+        )
+    }
+
+    private func mapRecordToGeneration(_ record: GenerationRecord) throws -> Generation {
+        // Deserialize performance data
+        var performance: GenerationPerformance?
+        if let requestData = record.requestData {
+            performance = try JSONDecoder().decode(GenerationPerformance.self, from: requestData)
+        }
+
+        return Generation(
+            id: UUID(uuidString: record.id) ?? UUID(),
+            sessionId: UUID(uuidString: record.generationSessionsId) ?? UUID(),
+            sequenceNumber: record.sequenceNumber,
+            timestamp: record.createdAt,
+            performance: performance
+        )
     }
 }

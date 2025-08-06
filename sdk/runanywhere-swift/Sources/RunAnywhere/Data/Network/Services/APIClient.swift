@@ -1,4 +1,5 @@
 import Foundation
+import Pulse
 
 /// Simple API client for cloud sync operations
 public actor APIClient {
@@ -17,10 +18,16 @@ public actor APIClient {
         config.timeoutIntervalForRequest = 30.0
         config.httpAdditionalHeaders = [
             "Authorization": "Bearer \(apiKey)",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "X-SDK-Client": "RunAnywhereSDK"
         ]
 
-        self.session = URLSession(configuration: config)
+        // Configure URLSession with Pulse proxy for automatic network logging
+        self.session = URLSession(
+            configuration: config,
+            delegate: URLSessionProxyDelegate(),
+            delegateQueue: nil
+        )
     }
 
     // MARK: - Public Methods
@@ -44,7 +51,12 @@ public actor APIClient {
         }
 
         guard httpResponse.statusCode == 200 else {
-            logger.error("API error: \(httpResponse.statusCode)")
+            logger.error("API error: \(httpResponse.statusCode)", metadata: [
+                "url": url.absoluteString,
+                "method": "POST",
+                "statusCode": httpResponse.statusCode,
+                "endpoint": endpoint.path
+            ])
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
@@ -68,7 +80,12 @@ public actor APIClient {
         }
 
         guard httpResponse.statusCode == 200 else {
-            logger.error("API error: \(httpResponse.statusCode)")
+            logger.error("API error: \(httpResponse.statusCode)", metadata: [
+                "url": url.absoluteString,
+                "method": "GET",
+                "statusCode": httpResponse.statusCode,
+                "endpoint": endpoint.path
+            ])
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
