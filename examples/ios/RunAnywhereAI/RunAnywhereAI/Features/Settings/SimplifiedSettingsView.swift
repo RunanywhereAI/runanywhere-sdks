@@ -17,10 +17,6 @@ struct SimplifiedSettingsView: View {
     @State private var showApiKeyEntry = false
     @State private var apiKey = ""
 
-    // Analytics settings
-    @State private var analyticsEnabled = true
-    @State private var enableLiveMetrics = true
-
     var body: some View {
         Form {
             Section("SDK Configuration") {

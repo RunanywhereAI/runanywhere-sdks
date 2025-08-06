@@ -620,7 +620,7 @@ public class RunAnywhereSDK {
     }
 
     /// Set whether analytics is enabled
-    public func setAnalyticsEnabled(_ enabled: Bool) async {
+    internal func setAnalyticsEnabled(_ enabled: Bool) async {
         logger.info("📊 Setting analytics enabled")
 
         do {
@@ -639,7 +639,7 @@ public class RunAnywhereSDK {
     }
 
     /// Get whether analytics is enabled
-    public func getAnalyticsEnabled() async -> Bool {
+    internal func getAnalyticsEnabled() async -> Bool {
         logger.info("📖 Getting analytics enabled setting")
 
         do {
@@ -657,7 +657,7 @@ public class RunAnywhereSDK {
     }
 
     /// Set the analytics level
-    public func setAnalyticsLevel(_ level: AnalyticsLevel) async {
+    internal func setAnalyticsLevel(_ level: AnalyticsLevel) async {
         logger.info("📊 Setting analytics level")
 
         do {
@@ -676,7 +676,7 @@ public class RunAnywhereSDK {
     }
 
     /// Get the analytics level
-    public func getAnalyticsLevel() async -> AnalyticsLevel {
+    internal func getAnalyticsLevel() async -> AnalyticsLevel {
         logger.info("📖 Getting analytics level")
 
         do {
@@ -694,7 +694,7 @@ public class RunAnywhereSDK {
     }
 
     /// Set whether live metrics are enabled
-    public func setEnableLiveMetrics(_ enabled: Bool) async {
+    internal func setEnableLiveMetrics(_ enabled: Bool) async {
         logger.info("📊 Setting enable live metrics")
 
         do {
@@ -713,7 +713,7 @@ public class RunAnywhereSDK {
     }
 
     /// Get whether live metrics are enabled
-    public func getEnableLiveMetrics() async -> Bool {
+    internal func getEnableLiveMetrics() async -> Bool {
         logger.info("📖 Getting enable live metrics setting")
         await serviceContainer.configurationService.ensureConfigurationLoaded()
         let config = await serviceContainer.configurationService.getConfiguration()
@@ -722,45 +722,45 @@ public class RunAnywhereSDK {
         return value
     }
 
-    // MARK: - Analytics Query APIs
+    // MARK: - Analytics Query APIs (Internal)
 
     /// Get analytics for a specific session
-    public func getAnalyticsSession(_ sessionId: UUID) async -> GenerationSession? {
+    internal func getAnalyticsSession(_ sessionId: UUID) async -> GenerationSession? {
         logger.info("📊 Getting analytics session: \(sessionId)")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getSession(sessionId)
     }
 
     /// Get all generations for a session
-    public func getGenerationsForSession(_ sessionId: UUID) async -> [Generation] {
+    internal func getGenerationsForSession(_ sessionId: UUID) async -> [Generation] {
         logger.info("📊 Getting generations for session: \(sessionId)")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getGenerations(for: sessionId)
     }
 
     /// Get all analytics sessions
-    public func getAllAnalyticsSessions() async -> [GenerationSession] {
+    internal func getAllAnalyticsSessions() async -> [GenerationSession] {
         logger.info("📊 Getting all analytics sessions")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getAllSessions()
     }
 
     /// Get session summary with aggregated metrics
-    public func getSessionSummary(_ sessionId: UUID) async -> SessionSummary? {
+    internal func getSessionSummary(_ sessionId: UUID) async -> SessionSummary? {
         logger.info("📊 Getting session summary: \(sessionId)")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getSessionSummary(sessionId)
     }
 
     /// Get average metrics for a model
-    public func getAverageMetrics(for modelId: String, limit: Int = 100) async -> AverageMetrics? {
+    internal func getAverageMetrics(for modelId: String, limit: Int = 100) async -> AverageMetrics? {
         logger.info("📊 Getting average metrics for model: \(modelId)")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getAverageMetrics(for: modelId, limit: limit)
     }
 
     /// Observe live metrics for a generation
-    public func observeLiveMetrics(for generationId: UUID) -> AsyncStream<LiveGenerationMetrics> {
+    internal func observeLiveMetrics(for generationId: UUID) -> AsyncStream<LiveGenerationMetrics> {
         logger.info("📊 Observing live metrics for generation: \(generationId)")
         let analytics = Task {
             await serviceContainer.generationAnalytics
@@ -778,7 +778,7 @@ public class RunAnywhereSDK {
     }
 
     /// Get current active session ID (if any)
-    public func getCurrentSessionId() async -> UUID? {
+    internal func getCurrentSessionId() async -> UUID? {
         logger.info("📊 Getting current session ID")
         let analytics = await serviceContainer.generationAnalytics
         return await analytics.getCurrentSessionId()
@@ -811,7 +811,7 @@ extension RunAnywhereSDK {
     }
 
     /// Access to generation analytics service for advanced use cases
-    public var generationAnalytics: GenerationAnalyticsService {
+    internal var generationAnalytics: GenerationAnalyticsService {
         get async {
             await serviceContainer.generationAnalytics
         }

@@ -34,8 +34,6 @@ class ChatViewModel: ObservableObject {
     private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
     private var conversationContext: Context?
-    @Published var currentSessionId: UUID?
-    @Published var showAnalytics = false
     private var currentConversation: Conversation?
 
     var canSend: Bool {
@@ -154,12 +152,6 @@ class ChatViewModel: ObservableObject {
                     context: self.conversationContext
                 )
 
-                // Ensure analytics are initialized before generation
-                await self.initializeAnalytics()
-
-                // Get the current session ID - will be set after generation starts
-                let sessionId = await sdk.getCurrentSessionId()
-                print("📊 [ChatViewModel] Current session ID before generation: \(sessionId?.uuidString ?? "nil")")
 
                 if useStreaming {
                     // Use streaming generation for real-time updates
@@ -179,12 +171,6 @@ class ChatViewModel: ObservableObject {
 
                     print("Streaming completed with response: \(fullResponse)")
 
-                    // Get the session ID after generation (should be created now)
-                    currentSessionId = await sdk.getCurrentSessionId()
-                    print("📊 [ChatViewModel] Session ID after streaming generation: \(currentSessionId?.uuidString ?? "nil")")
-
-                    // Log analytics info
-                    await logAnalyticsForCurrentGeneration()
 
                     // Update context with the assistant's response
                     self.updateContextWithResponse(fullResponse)
@@ -208,12 +194,6 @@ class ChatViewModel: ObservableObject {
                         }
                     }
 
-                    // Get the session ID after generation (should be created now)
-                    currentSessionId = await sdk.getCurrentSessionId()
-                    print("📊 [ChatViewModel] Session ID after non-streaming generation: \(currentSessionId?.uuidString ?? "nil")")
-
-                    // Log analytics info
-                    await logAnalyticsForCurrentGeneration()
 
                     // Update context with the assistant's response
                     self.updateContextWithResponse(result.text)
@@ -264,7 +244,6 @@ class ChatViewModel: ObservableObject {
         currentConversation = conversation
         addSystemMessage()
         conversationContext = nil  // Clear context when clearing chat
-        currentSessionId = nil  // Start a new analytics session
         // Keep allAnalytics to view history
     }
 
@@ -310,8 +289,6 @@ class ChatViewModel: ObservableObject {
                         _ = try await sdk.loadModel(currentModel.id)
                         print("Verified model '\(currentModel.name)' is loaded in SDK")
 
-                        // Now that SDK is initialized and model is loaded, initialize analytics
-                        await self.initializeAnalytics()
                     } catch {
                         print("Failed to verify model is loaded: \(error)")
                         await MainActor.run {
@@ -324,10 +301,6 @@ class ChatViewModel: ObservableObject {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
 
-                // Still try to initialize analytics even without a model
-                Task {
-                    await self.initializeAnalytics()
-                }
             }
 
             // Update system message
@@ -395,47 +368,6 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Analytics
 
-    private func initializeAnalytics() async {
-        // Enable analytics for real-time data capture - force enable with fallback
-        print("📊 Initializing analytics safely after SDK startup...")
 
-        // Always ensure analytics are enabled with hardcoded fallback
-        await sdk.setAnalyticsEnabled(true)
-        await sdk.setEnableLiveMetrics(true)
 
-        // Log current analytics configuration
-        let analyticsEnabled = await sdk.getAnalyticsEnabled()
-        let liveMetricsEnabled = await sdk.getEnableLiveMetrics()
-        print("📊 Analytics Configuration - Enabled: \(analyticsEnabled), Live Metrics: \(liveMetricsEnabled)")
-    }
-
-    func logAnalyticsForCurrentGeneration() async {
-        guard let sessionId = currentSessionId else { return }
-
-        // Get the current session
-        if let session = await sdk.getAnalyticsSession(sessionId) {
-            print("📊 Current Session Analytics:")
-            print("   Session ID: \(String(session.id.uuidString.prefix(8)))")
-            print("   Model: \(session.modelId)")
-            print("   Type: \(session.sessionType)")
-            print("   Generations: \(session.generationCount)")
-            print("   Total Tokens: \(session.totalInputTokens + session.totalOutputTokens)")
-            print("   Avg Speed: \(String(format: "%.2f", session.averageTokensPerSecond)) tokens/sec")
-            print("   Duration: \(String(format: "%.2f", session.totalDuration))s")
-        }
-
-        // Get the latest generation
-        let generations = await sdk.getGenerationsForSession(sessionId)
-        if let latestGen = generations.last, let performance = latestGen.performance {
-            print("📊 Latest Generation:")
-            print("   Time to First Token: \(String(format: "%.2f", performance.timeToFirstToken))s")
-            print("   Total Time: \(String(format: "%.2f", performance.totalGenerationTime))s")
-            print("   Tokens/sec: \(String(format: "%.2f", performance.tokensPerSecond))")
-            print("   Execution: \(performance.executionTarget)")
-        }
-    }
-
-    func getAllAnalytics() async -> [GenerationSession] {
-        return await sdk.getAllAnalyticsSessions()
-    }
 }
