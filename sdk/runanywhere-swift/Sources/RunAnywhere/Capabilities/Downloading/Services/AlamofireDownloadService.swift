@@ -81,8 +81,7 @@ public class AlamofireDownloadService: DownloadManager {
                         "destination": destinationURL.path
                     ])
 
-                    // Configure Pulse network logging for downloads
-                    NetworkLogger.shared.logTaskCreated(downloadURL)
+                    // Network logging is handled automatically by Alamofire + Pulse integration
 
                     // Create download request
                     let downloadRequest = self.session.download(downloadURL, to: destination)

@@ -40,7 +40,7 @@ public struct PerformanceAlert: Identifiable {
 }
 
 /// Alert types
-public enum AlertType {
+public enum AlertType: String {
     case highMemoryUsage
     case highCPUUsage
     case thermalThrottle

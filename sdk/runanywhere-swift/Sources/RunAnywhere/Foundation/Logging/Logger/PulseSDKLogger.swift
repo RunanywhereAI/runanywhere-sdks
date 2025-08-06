@@ -77,7 +77,7 @@ internal final class PulseSDKLogger {
 
             // Add underlying error if available
             if let nsError = error as NSError? {
-                pulseMetadata["errorCode"] = .int(nsError.code)
+                pulseMetadata["errorCode"] = .string(String(nsError.code))
                 pulseMetadata["errorDomain"] = .string(nsError.domain)
 
                 if !nsError.userInfo.isEmpty {
@@ -130,8 +130,8 @@ internal final class PulseSDKLogger {
         enrichedMetadata["generationOptions"] = [
             "maxTokens": options.maxTokens,
             "temperature": options.temperature,
-            "systemPrompt": options.systemPrompt ?? "",
-            "tokenBudget": options.tokenBudget?.available ?? 0
+            // systemPrompt not available in GenerationOptions
+            "tokenBudget": options.tokenBudget?.maxTokens ?? 0
         ]
         enrichedMetadata["event"] = "generation_start"
 
@@ -144,15 +144,11 @@ internal final class PulseSDKLogger {
         enrichedMetadata["generationResult"] = [
             "executionTarget": result.executionTarget.rawValue,
             "tokensUsed": result.tokensUsed,
-            "costBreakdown": [
-                "totalCost": result.costBreakdown.totalCost,
-                "savedCost": result.costBreakdown.savedCost
-            ],
-            "performanceMetrics": [
-                "timeToFirstToken": result.performanceMetrics.timeToFirstToken,
-                "tokensPerSecond": result.performanceMetrics.tokensPerSecond,
-                "totalDuration": result.performanceMetrics.totalDuration
-            ]
+            "savedAmount": result.savedAmount,
+            "modelUsed": result.modelUsed,
+            "latencyMs": result.latencyMs,
+            "memoryUsed": result.memoryUsed,
+            "framework": result.framework?.rawValue ?? "none"
         ]
         enrichedMetadata["event"] = "generation_complete"
 
@@ -166,11 +162,11 @@ internal final class PulseSDKLogger {
         case let string as String:
             return .string(string)
         case let int as Int:
-            return .int(int)
+            return .string(String(int))
         case let double as Double:
-            return .double(double)
+            return .string(String(double))
         case let bool as Bool:
-            return .int(bool ? 1 : 0)
+            return .string(String(bool))
         case let url as URL:
             return .string(url.absoluteString)
         case let data as Data:
@@ -189,8 +185,3 @@ internal final class PulseSDKLogger {
         }
     }
 }
-
-// MARK: - SDKLogger Compatibility Bridge
-
-/// Temporary bridge to maintain compatibility with existing SDKLogger usage
-internal typealias SDKLogger = PulseSDKLogger

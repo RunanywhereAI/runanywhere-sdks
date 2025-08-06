@@ -192,20 +192,9 @@ public class MonitoringService: PerformanceMonitor {
     }
 
     private func setupPulseIntegration() {
-        // Set up metrics collector callback to log to Pulse
-        metricsCollector.onMetricsCollected = { [weak self] metrics in
-            self?.pulsePerformanceLogger.logSystemMetrics(metrics)
-        }
-
         // Set up alert manager callback to log alerts to Pulse
         alertManager.addAlertCallback { [weak self] alert in
-            self?.pulsePerformanceLogger.logPerformanceAlert(
-                type: alert.type.rawValue,
-                message: alert.message,
-                threshold: alert.threshold,
-                currentValue: alert.currentValue,
-                recommendation: alert.recommendation
-            )
+            self?.pulsePerformanceLogger.logPerformanceAlert(alert)
         }
     }
 
@@ -259,16 +248,15 @@ public class MonitoringService: PerformanceMonitor {
 
         // Log to Pulse with structured data
         let performance = GenerationPerformance(
+            timeToFirstToken: summary.timeToFirstToken,
+            totalGenerationTime: summary.totalTime,
+            inputTokens: 0, // Not available in summary
+            outputTokens: summary.tokenCount,
+            tokensPerSecond: summary.tokensPerSecond,
             modelId: summary.modelName,
             executionTarget: .onDevice,
-            timeToFirstToken: summary.timeToFirstToken,
-            tokensPerSecond: summary.tokensPerSecond,
-            totalDuration: summary.totalTime,
-            memoryUsed: summary.memoryUsed,
-            cpuUsage: Double(summary.cpuUsage ?? 0),
-            gpuUsage: nil,
-            totalCost: 0.0, // On-device execution has no cost
-            savedCost: 0.0
+            routingFramework: summary.framework.rawValue,
+            routingReason: "On-device execution"
         )
         pulsePerformanceLogger.logGenerationPerformance(performance)
     }

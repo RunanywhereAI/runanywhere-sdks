@@ -34,15 +34,14 @@ internal final class PulsePerformanceLogger {
             "executionTarget": .string(performance.executionTarget.rawValue),
             "metrics": .stringConvertible([
                 "timeToFirstToken": String(performance.timeToFirstToken),
-                "tokensPerSecond": String(performance.tokensPerSecond),
-                "totalDuration": String(performance.totalDuration),
-                "memoryUsed": String(performance.memoryUsed),
-                "cpuUsage": String(performance.cpuUsage),
-                "gpuUsage": String(performance.gpuUsage ?? 0)
+                "totalGenerationTime": String(performance.totalGenerationTime),
+                "inputTokens": String(performance.inputTokens),
+                "outputTokens": String(performance.outputTokens),
+                "tokensPerSecond": String(performance.tokensPerSecond)
             ]),
-            "cost": .stringConvertible([
-                "totalCost": String(performance.totalCost),
-                "savedCost": String(performance.savedCost)
+            "routing": .stringConvertible([
+                "framework": performance.routingFramework ?? "none",
+                "reason": performance.routingReason
             ]),
             "type": .string("performance_metrics")
         ]
@@ -56,16 +55,16 @@ internal final class PulsePerformanceLogger {
     }
 
     /// Log system metrics
-    func logSystemMetrics(_ metrics: SystemMetrics) {
+    func logSystemMetrics(_ metrics: LiveMetrics) {
         let metadata: [String: LoggerStore.MetadataValue] = [
             "memory": .stringConvertible([
-                "used": String(metrics.memoryUsed),
-                "available": String(metrics.memoryAvailable),
-                "pressure": metrics.memoryPressure.rawValue
+                "used": String(metrics.memoryUsage),
+                "available": String(metrics.availableMemory)
             ]),
-            "cpu": .double(metrics.cpuUsage),
-            "thermal": .string(metrics.thermalState.rawValue),
-            "battery": .double(metrics.batteryLevel),
+            "cpu": .string(String(metrics.cpuUsage)),
+            "thermal": .string(String(describing: metrics.thermalState)),
+            "currentTokensPerSecond": .string(String(metrics.currentTokensPerSecond)),
+            "timeToFirstToken": .string(String(metrics.timeToFirstToken)),
             "type": .string("system_metrics")
         ]
 
@@ -80,16 +79,15 @@ internal final class PulsePerformanceLogger {
     /// Log generation session performance
     func logSessionPerformance(_ session: GenerationSession) {
         let metadata: [String: LoggerStore.MetadataValue] = [
-            "sessionId": .string(session.id),
-            "generationCount": .int(session.generations.count),
-            "totalTokens": .int(session.totalTokensUsed),
-            "totalCost": .double(session.totalCost),
-            "savedCost": .double(session.totalSavedCost),
-            "duration": .double(session.duration),
-            "modelBreakdown": .stringConvertible(
-                Dictionary(grouping: session.generations, by: { $0.modelId })
-                    .mapValues { $0.count }
-            ),
+            "sessionId": .string(session.id.uuidString),
+            "modelId": .string(session.modelId),
+            "sessionType": .string(String(describing: session.sessionType)),
+            "generationCount": .string(String(session.generationCount)),
+            "totalInputTokens": .string(String(session.totalInputTokens)),
+            "totalOutputTokens": .string(String(session.totalOutputTokens)),
+            "averageTimeToFirstToken": .string(String(session.averageTimeToFirstToken)),
+            "averageTokensPerSecond": .string(String(session.averageTokensPerSecond)),
+            "totalDuration": .string(String(session.totalDuration)),
             "type": .string("session_performance")
         ]
 
@@ -104,12 +102,13 @@ internal final class PulsePerformanceLogger {
     /// Log live generation metrics
     func logLiveMetrics(_ metrics: LiveGenerationMetrics) {
         let metadata: [String: LoggerStore.MetadataValue] = [
-            "generationId": .string(metrics.generationId),
-            "tokensGenerated": .int(metrics.tokensGenerated),
-            "timeElapsed": .double(metrics.timeElapsed),
-            "tokensPerSecond": .double(metrics.tokensPerSecond),
-            "memoryUsage": .int(Int(metrics.memoryUsage)),
-            "state": .string(metrics.state.rawValue),
+            "generationId": .string(metrics.generationId.uuidString),
+            "sessionId": .string(metrics.sessionId.uuidString),
+            "tokensGenerated": .string(String(metrics.tokensGenerated)),
+            "elapsedTime": .string(String(metrics.elapsedTime)),
+            "currentTokensPerSecond": .string(String(metrics.currentTokensPerSecond)),
+            "hasFirstToken": .string(String(metrics.hasFirstToken)),
+            "timeToFirstToken": .string(metrics.timeToFirstToken.map { String($0) } ?? "nil"),
             "type": .string("live_metrics")
         ]
 
@@ -121,7 +120,25 @@ internal final class PulsePerformanceLogger {
         )
     }
 
-    /// Log performance alert
+    /// Log performance alert with minimal information
+    func logPerformanceAlert(_ alert: PerformanceAlert) {
+        let metadata: [String: LoggerStore.MetadataValue] = [
+            "alertId": .string(alert.id.uuidString),
+            "alertType": .string(alert.type.rawValue),
+            "severity": .string(String(describing: alert.severity)),
+            "timestamp": .string(ISO8601DateFormatter().string(from: alert.timestamp)),
+            "type": .string("performance_alert")
+        ]
+
+        logger.storeMessage(
+            label: "Performance",
+            level: .warning,
+            message: alert.message,
+            metadata: metadata
+        )
+    }
+
+    /// Log performance alert with detailed metrics
     func logPerformanceAlert(
         type: String,
         message: String,
@@ -131,9 +148,9 @@ internal final class PulsePerformanceLogger {
     ) {
         var metadata: [String: LoggerStore.MetadataValue] = [
             "alertType": .string(type),
-            "threshold": .double(threshold),
-            "currentValue": .double(currentValue),
-            "exceedance": .double(currentValue - threshold),
+            "threshold": .string(String(threshold)),
+            "currentValue": .string(String(currentValue)),
+            "exceedance": .string(String(currentValue - threshold)),
             "type": .string("performance_alert")
         ]
 
@@ -166,9 +183,9 @@ internal final class PulsePerformanceLogger {
             if let stringValue = value as? String {
                 metadata[key] = .string(stringValue)
             } else if let intValue = value as? Int {
-                metadata[key] = .int(intValue)
+                metadata[key] = .string(String(intValue))
             } else if let doubleValue = value as? Double {
-                metadata[key] = .double(doubleValue)
+                metadata[key] = .string(String(doubleValue))
             } else if let dictValue = value as? [String: String] {
                 metadata[key] = .stringConvertible(dictValue)
             } else {
