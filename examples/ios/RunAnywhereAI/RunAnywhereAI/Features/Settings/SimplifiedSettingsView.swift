@@ -11,7 +11,7 @@ import RunAnywhereSDK
 struct SimplifiedSettingsView: View {
     @State private var routingPolicy = RoutingPolicy.automatic
     @State private var defaultTemperature = 0.7
-    @State private var defaultMaxTokens = 256
+    @State private var defaultMaxTokens = 10000
     @State private var showApiKeyEntry = false
     @State private var apiKey = ""
 
@@ -42,8 +42,8 @@ struct SimplifiedSettingsView: View {
 
                 Stepper("Max Tokens: \(defaultMaxTokens)",
                        value: $defaultMaxTokens,
-                       in: 50...4096,
-                       step: 50)
+                       in: 500...20000,
+                       step: 500)
                     .onChange(of: defaultMaxTokens) { _ in
                         updateSDKConfiguration()
                     }
@@ -118,20 +118,23 @@ struct SimplifiedSettingsView: View {
         .navigationTitle("Settings")
         .onAppear {
             loadCurrentConfiguration()
+            syncWithSDKSettings()
         }
     }
 
     private func updateSDKConfiguration() {
-        // Use SDK's actual Configuration constructor signature
-        let config = Configuration(
-            apiKey: apiKey.isEmpty ? "demo-key" : apiKey,
-            enableRealTimeDashboard: routingPolicy != .deviceOnly,
-            telemetryConsent: routingPolicy == .deviceOnly ? .denied : .granted
-        )
+        Task {
+            // Update SDK generation settings
+            await RunAnywhereSDK.shared.setTemperature(Float(defaultTemperature))
+            await RunAnywhereSDK.shared.setMaxTokens(defaultMaxTokens)
 
-        // Note: In a real app, you would update the SDK configuration
-        // RunAnywhereSDK.shared.updateConfiguration(config)
-        print("Configuration updated: \(config)")
+            // Save to UserDefaults for persistence
+            UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
+            UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
+            UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
+
+            print("SDK Configuration updated - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
+        }
     }
 
     private func loadCurrentConfiguration() {
@@ -152,7 +155,20 @@ struct SimplifiedSettingsView: View {
         if defaultTemperature == 0 { defaultTemperature = 0.7 }
 
         defaultMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-        if defaultMaxTokens == 0 { defaultMaxTokens = 256 }
+        if defaultMaxTokens == 0 { defaultMaxTokens = 10000 }
+    }
+
+    private func syncWithSDKSettings() {
+        Task {
+            // Get current settings from SDK to ensure UI shows actual values
+            let currentSettings = await RunAnywhereSDK.shared.getGenerationSettings()
+
+            await MainActor.run {
+                // Update UI with current SDK values
+                self.defaultTemperature = currentSettings.temperature
+                self.defaultMaxTokens = currentSettings.maxTokens
+            }
+        }
     }
 
     private func saveApiKey() {
