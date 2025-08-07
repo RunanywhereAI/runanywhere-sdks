@@ -10,6 +10,35 @@ import SwiftUI
 import RunAnywhereSDK
 import os.log
 
+// Local Message type for the app
+public struct Message: Identifiable, Codable {
+    public let id: UUID
+    public let role: Role
+    public let content: String
+    public let thinkingContent: String?
+    public let timestamp: Date
+
+    public enum Role: String, Codable {
+        case system
+        case user
+        case assistant
+    }
+
+    public init(
+        id: UUID = UUID(),
+        role: Role,
+        content: String,
+        thinkingContent: String? = nil,
+        timestamp: Date = Date()
+    ) {
+        self.id = id
+        self.role = role
+        self.content = content
+        self.thinkingContent = thinkingContent
+        self.timestamp = timestamp
+    }
+}
+
 enum ChatError: LocalizedError {
     case noModelLoaded
 
@@ -34,7 +63,6 @@ class ChatViewModel: ObservableObject {
     private let sdk = RunAnywhereSDK.shared
     private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
-    private var conversationContext: Context?
     private var currentConversation: Conversation?
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatViewModel")
@@ -94,7 +122,12 @@ class ChatViewModel: ObservableObject {
         }
         logger.info("✅ canSend is true, proceeding")
 
-        let userMessage = Message(role: .user, content: currentInput)
+                let prompt = currentInput
+        currentInput = ""
+        isGenerating = true
+        error = nil
+
+        let userMessage = Message(role: .user, content: prompt)
         messages.append(userMessage)
 
         // Save user message to conversation
@@ -102,18 +135,10 @@ class ChatViewModel: ObservableObject {
             conversationStore.addMessage(userMessage, to: conversation)
         }
 
-        let prompt = currentInput
-        currentInput = ""
-        isGenerating = true
-        error = nil
-
         // Create assistant message that we'll update with streaming tokens
         let assistantMessage = Message(role: .assistant, content: "")
         messages.append(assistantMessage)
         let messageIndex = messages.count - 1
-
-        // Build the context before starting generation
-        buildContext()
 
         generationTask = Task {
             logger.info("🚀 Starting sendMessage task")
@@ -152,13 +177,14 @@ class ChatViewModel: ObservableObject {
 
                 logger.info("🎯 Starting generation with prompt: \(String(prompt.prefix(50)))..., streaming: \(self.useStreaming)")
 
-                // Just send the raw prompt - let the SDK handle context formatting
+                // Send only the new user message - LLM.swift manages history internally
                 let fullPrompt = prompt
+                logger.info("📝 Sending new message only: \(fullPrompt)")
 
                 let options = GenerationOptions(
                     maxTokens: 500,
-                    temperature: 0.7,
-                    context: self.conversationContext
+                    temperature: 0.7
+                    // No context passed - it's all in the prompt now
                 )
 
                 logger.info("📝 Generation options created, useStreaming: \(self.useStreaming)")
@@ -166,6 +192,7 @@ class ChatViewModel: ObservableObject {
                 if useStreaming {
                     // Use streaming generation for real-time updates
                     var fullResponse = ""
+                    logger.info("📤 Sending prompt to SDK.generateStream")
                     let stream = sdk.generateStream(prompt: fullPrompt, options: options)
 
                     // Stream tokens as they arrive
@@ -189,11 +216,27 @@ class ChatViewModel: ObservableObject {
                     logger.info("Streaming completed with response: \(fullResponse)")
 
 
-                    // Update context with the assistant's response
-                    self.updateContextWithResponse(fullResponse)
+                    // No need to update context - it's managed in messages array
 
-                    // Note: Thinking content is not available in streaming mode
-                    // Could potentially parse it from the fullResponse if needed
+                    // Parse thinking content from the full response
+                    if let thinkingRange = fullResponse.range(of: "<think>"),
+                       let thinkingEndRange = fullResponse.range(of: "</think>") {
+                        let thinkingContent = String(fullResponse[thinkingRange.upperBound..<thinkingEndRange.lowerBound])
+                        let responseContent = String(fullResponse[thinkingEndRange.upperBound...])
+
+                        await MainActor.run {
+                            if messageIndex < self.messages.count {
+                                let updatedMessage = Message(
+                                    id: self.messages[messageIndex].id,
+                                    role: self.messages[messageIndex].role,
+                                    content: responseContent.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    thinkingContent: thinkingContent.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    timestamp: self.messages[messageIndex].timestamp
+                                )
+                                self.messages[messageIndex] = updatedMessage
+                            }
+                        }
+                    }
                 } else {
                     // Use non-streaming generation to get thinking content
                     let result = try await sdk.generate(prompt: fullPrompt, options: options)
@@ -207,16 +250,15 @@ class ChatViewModel: ObservableObject {
                             let updatedMessage = Message(
                                 role: currentMessage.role,
                                 content: result.text,
+                                thinkingContent: result.thinkingContent,
                                 timestamp: currentMessage.timestamp
                             )
                             self.messages[messageIndex] = updatedMessage
-                            // Note: SDK Message doesn't have thinkingContent field - this would need to be handled differently
                         }
                     }
 
 
-                    // Update context with the assistant's response
-                    self.updateContextWithResponse(result.text)
+                    // No need to update context - it's managed in messages array
                 }
             } catch {
                 logger.error("❌ Generation failed with error: \(error)")
@@ -271,7 +313,7 @@ class ChatViewModel: ObservableObject {
         let conversation = conversationStore.createConversation()
         currentConversation = conversation
         addSystemMessage()
-        conversationContext = nil  // Clear context when clearing chat
+        // No context to clear - it's managed through messages
         // Keep allAnalytics to view history
     }
 
@@ -375,21 +417,40 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Context Management
 
-    private func buildContext() {
-        logger.info("Building context from \(self.messages.count) messages.")
-        // Now we can use the messages directly since they're already SDK Message objects
-        conversationContext = Context(
-            messages: self.messages,
-            systemPrompt: nil, // System prompt can be handled via messages with .system role
-            maxTokens: 2048
-        )
-    }
+    private func buildFullPrompt() -> String {
+        // Since LLM.swift handles its own template formatting, we should pass raw messages
+        // Let's try a simple conversation format first
+        var promptParts: [String] = []
 
-    private func updateContextWithResponse(_ response: String) {
-        // The context is rebuilt from the `messages` array before each call,
-        // so this method is no longer strictly necessary for context state management.
-        // It could be used for other purposes, like logging or analytics on the response.
-        logger.info("Context will be rebuilt on the next turn including this response.")
+        logger.info("Building simple prompt from \(self.messages.count) messages")
+
+        // Build conversation in a simple format
+        var hasMessages = false
+        for (index, message) in messages.enumerated() {
+            switch message.role {
+            case .user:
+                if hasMessages {
+                    promptParts.append("")  // Add blank line between exchanges
+                }
+                promptParts.append("User: \(message.content)")
+                hasMessages = true
+            case .assistant:
+                // Only add assistant messages that have content
+                if !message.content.isEmpty {
+                    promptParts.append("Assistant: \(message.content)")
+                }
+            case .system:
+                // Skip system messages in the prompt
+                continue
+            }
+        }
+
+        // Don't add "Assistant:" at the end - let the model complete naturally
+
+        let fullPrompt = promptParts.joined(separator: "\n")
+        logger.info("📝 Built simple prompt with \(promptParts.count) parts")
+        logger.info("📝 Final prompt:\n\(fullPrompt)")
+        return fullPrompt
     }
 
     // MARK: - Analytics

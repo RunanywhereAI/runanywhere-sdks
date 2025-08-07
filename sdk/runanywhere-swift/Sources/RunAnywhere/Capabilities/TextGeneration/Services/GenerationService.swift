@@ -3,7 +3,6 @@ import Foundation
 /// Main service for text generation
 public class GenerationService {
     private let routingService: RoutingService
-    private let contextManager: ContextManager
     private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
     private let structuredOutputHandler: StructuredOutputHandler
@@ -14,13 +13,11 @@ public class GenerationService {
 
     public init(
         routingService: RoutingService,
-        contextManager: ContextManager,
         performanceMonitor: PerformanceMonitor,
         modelLoadingService: ModelLoadingService? = nil,
         structuredOutputHandler: StructuredOutputHandler? = nil
     ) {
         self.routingService = routingService
-        self.contextManager = contextManager
         self.performanceMonitor = performanceMonitor
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
         self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
@@ -55,16 +52,10 @@ public class GenerationService {
             effectivePrompt = prompt
         }
 
-        // Prepare context
-        let context = try await contextManager.prepareContext(
-            prompt: effectivePrompt,
-            options: options
-        )
-
         // Get routing decision
         let routingDecision = try await routingService.determineRouting(
             prompt: effectivePrompt,
-            context: context,
+            context: nil,
             options: options
         )
 
@@ -75,7 +66,6 @@ public class GenerationService {
         case .onDevice(let framework, _):
             result = try await generateOnDevice(
                 prompt: effectivePrompt,
-                context: context,
                 options: options,
                 framework: framework
             )
@@ -83,7 +73,6 @@ public class GenerationService {
         case .cloud(let provider, _):
             result = try await generateInCloud(
                 prompt: effectivePrompt,
-                context: context,
                 options: options,
                 provider: provider
             )
@@ -91,7 +80,6 @@ public class GenerationService {
         case .hybrid(let devicePortion, let framework, _):
             result = try await generateHybrid(
                 prompt: effectivePrompt,
-                context: context,
                 options: options,
                 devicePortion: devicePortion,
                 framework: framework
@@ -117,7 +105,6 @@ public class GenerationService {
 
     private func generateOnDevice(
         prompt: String,
-        context: Context,
         options: GenerationOptions,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
@@ -131,10 +118,7 @@ public class GenerationService {
         }
 
         logger.info("✅ Using loaded model: \(loadedModel.model.name)")
-        logger.debug("🚀 Setting context on service")
 
-        // Set context if needed
-        await loadedModel.service.setContext(context)
 
         logger.debug("🚀 Calling service.generate() with graceful error handling")
 
@@ -211,7 +195,6 @@ public class GenerationService {
 
     private func generateInCloud(
         prompt: String,
-        context: Context,
         options: GenerationOptions,
         provider: String?
     ) async throws -> GenerationResult {
@@ -232,7 +215,6 @@ public class GenerationService {
 
     private func generateHybrid(
         prompt: String,
-        context: Context,
         options: GenerationOptions,
         devicePortion: Double,
         framework: LLMFramework?
@@ -246,8 +228,6 @@ public class GenerationService {
             throw SDKError.modelNotFound("No model is currently loaded")
         }
 
-        // Set context if needed
-        await loadedModel.service.setContext(context)
 
         // For now, use on-device generation entirely
         // In a real implementation, this would coordinate between device and cloud

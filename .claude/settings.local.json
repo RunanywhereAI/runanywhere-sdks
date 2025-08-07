@@ -104,7 +104,8 @@
       "WebFetch(domain:kean-docs.github.io)",
       "WebFetch(domain:aptabase.com)",
       "Bash(/dev/null)",
-      "Bash(nm:*)"
+      "Bash(nm:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": []
   }

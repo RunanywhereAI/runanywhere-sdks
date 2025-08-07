@@ -39,7 +39,6 @@ public class ServiceContainer {
     private(set) lazy var generationService: GenerationService = {
         GenerationService(
             routingService: routingService,
-            contextManager: contextManager,
             performanceMonitor: performanceMonitor,
             modelLoadingService: modelLoadingService
         )
@@ -50,12 +49,7 @@ public class ServiceContainer {
         StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
-    /// Context manager
-    private(set) lazy var contextManager: ContextManager = {
-        ContextManager()
-    }()
-
-    /// Validation service
+/// Validation service
     private(set) lazy var validationService: ValidationService = {
         ValidationService()
     }()

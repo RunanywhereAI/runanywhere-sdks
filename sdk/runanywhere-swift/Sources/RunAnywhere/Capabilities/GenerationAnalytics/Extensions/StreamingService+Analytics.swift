@@ -51,9 +51,6 @@ extension StreamingService {
                         return
                     }
 
-                    // Create context for the prompt
-                    let context = Context(messages: [Message(role: .user, content: prompt)])
-                    await loadedModel.service.setContext(context)
 
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
