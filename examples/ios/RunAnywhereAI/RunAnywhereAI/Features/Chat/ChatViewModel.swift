@@ -502,6 +502,8 @@ class ChatViewModel: ObservableObject {
                                 let currentMessage = self.messages[messageIndex]
                                 let modelInfo = ModelListViewModel.shared.currentModel != nil ? MessageModelInfo(from: ModelListViewModel.shared.currentModel!) : nil
 
+                                self.logger.info("📊 Attaching analytics to message \(messageIndex): tokens/sec = \(analytics.averageTokensPerSecond), time = \(analytics.totalGenerationTime)")
+
                                 let updatedMessage = Message(
                                     id: currentMessage.id,
                                     role: currentMessage.role,
@@ -566,6 +568,8 @@ class ChatViewModel: ObservableObject {
                                 let currentMessage = self.messages[messageIndex]
                                 let modelInfo = ModelListViewModel.shared.currentModel != nil ? MessageModelInfo(from: ModelListViewModel.shared.currentModel!) : nil
 
+                                self.logger.info("📊 Attaching analytics to message \(messageIndex): tokens/sec = \(analytics.averageTokensPerSecond), time = \(analytics.totalGenerationTime)")
+
                                 let updatedMessage = Message(
                                     id: currentMessage.id,
                                     role: currentMessage.role,
@@ -614,13 +618,18 @@ class ChatViewModel: ObservableObject {
             await MainActor.run {
                 self.isGenerating = false
 
-                // Save final assistant message to conversation
+                // Save final assistant message to conversation with analytics
                 if messageIndex < self.messages.count,
                    let conversation = self.currentConversation {
-                    // Update conversation with final message
+                    // Update conversation with final message including analytics
                     var updatedConversation = conversation
                     updatedConversation.messages = self.messages
                     updatedConversation.modelName = self.loadedModelName
+
+                    // Log analytics status
+                    let analyticsCount = self.messages.compactMap { $0.analytics }.count
+                    self.logger.info("💾 Saving conversation with \(self.messages.count) messages, \(analyticsCount) have analytics")
+
                     self.conversationStore.updateConversation(updatedConversation)
                 }
             }
@@ -746,6 +755,10 @@ class ChatViewModel: ObservableObject {
             }
         } else {
             messages = conversation.messages
+
+            // Log analytics status
+            let analyticsCount = messages.compactMap { $0.analytics }.count
+            logger.info("📂 Loaded conversation with \(self.messages.count) messages, \(analyticsCount) have analytics")
         }
 
         // Update model info if available

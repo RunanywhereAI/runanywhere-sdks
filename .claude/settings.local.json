@@ -108,7 +108,8 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(xcrun devicectl device install app:*)",
       "Bash(xcrun devicectl device process launch:*)",
-      "Bash(xcrun xctrace:*)"
+      "Bash(xcrun xctrace:*)",
+      "Bash(log stream:*)"
     ],
     "deny": []
   }
