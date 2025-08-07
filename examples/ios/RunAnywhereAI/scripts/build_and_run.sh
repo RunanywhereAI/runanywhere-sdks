@@ -28,6 +28,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Function to print colored output
@@ -41,6 +42,51 @@ print_error() {
 
 print_warning() {
     echo -e "${YELLOW}[!]${NC} $1"
+}
+
+print_debug() {
+    if [ "${DEBUG:-0}" = "1" ]; then
+        echo -e "${BLUE}[DEBUG]${NC} $1"
+    fi
+}
+
+# Function to check required tools
+check_requirements() {
+    local missing_tools=()
+
+    # Check for xcodebuild
+    if ! command -v xcodebuild &> /dev/null; then
+        missing_tools+=("xcodebuild (Xcode)")
+    fi
+
+    # Check for xcrun
+    if ! command -v xcrun &> /dev/null; then
+        missing_tools+=("xcrun (Xcode Command Line Tools)")
+    fi
+
+    # Check for pod
+    if ! command -v pod &> /dev/null; then
+        print_warning "CocoaPods not found. Some dependencies may not work."
+        print_warning "Install with: sudo gem install cocoapods"
+    fi
+
+    # Check if any required tools are missing
+    if [ ${#missing_tools[@]} -gt 0 ]; then
+        print_error "Missing required tools:"
+        for tool in "${missing_tools[@]}"; do
+            print_error "  - $tool"
+        done
+        print_error "Please install Xcode from the App Store and run: xcode-select --install"
+        exit 1
+    fi
+
+    # Check Xcode selection
+    if ! xcode-select -p &> /dev/null; then
+        print_error "Xcode path not set. Run: sudo xcode-select --switch /Applications/Xcode.app"
+        exit 1
+    fi
+
+    print_status "All required tools are installed"
 }
 
 # Parse arguments
@@ -217,8 +263,25 @@ clean_app_data() {
     print_status "App data cleaned successfully!"
 }
 
+# Function to get DerivedData path
+get_derived_data_path() {
+    # First try to get from xcodebuild
+    local derived_data=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
+
+    if [ -n "$derived_data" ] && [ -d "$derived_data" ]; then
+        echo "$derived_data"
+        return
+    fi
+
+    # Fallback to default location
+    echo "$HOME/Library/Developer/Xcode/DerivedData"
+}
+
 # Main execution
 print_status "Starting build process for $TARGET_TYPE..."
+
+# Check requirements first
+check_requirements
 
 # Clean if requested
 if [ "$CLEAN_BUILD" = true ]; then
@@ -292,15 +355,45 @@ if [ "$TARGET_TYPE" = "simulator" ]; then
     # For simulator
     print_status "Installing on simulator..."
 
-    # Get the app path - use correct path for simulator builds
-    if [[ "$DESTINATION" == *"id="* ]]; then
-        # For simulator builds, use Debug-iphonesimulator path
-        APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphonesimulator/*" -not -path "*/Index.noindex/*" | head -1)
-    else
-        # Fallback to old method
-        APP_PATH=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -showBuildSettings | grep "BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
-        APP_PATH="$APP_PATH/$SCHEME.app"
+    # Get the app path - use xcodebuild to get the exact build location
+    print_debug "Getting build directory from xcodebuild..."
+    BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+
+    if [ -n "$BUILD_DIR" ]; then
+        APP_PATH="$BUILD_DIR/$SCHEME.app"
+        print_debug "Expected app path: $APP_PATH"
     fi
+
+    # Verify the app exists, if not try multiple strategies
+    if [ ! -d "$APP_PATH" ]; then
+        print_warning "App not found at expected path, searching for built app..."
+
+        # Strategy 1: Search in DerivedData with multiple patterns
+        DERIVED_DATA=$(get_derived_data_path)
+        print_debug "Searching in DerivedData: $DERIVED_DATA"
+
+        # Try to find the app with various search patterns
+        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug-iphonesimulator/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+
+        # Strategy 2: If still not found, try without the Debug requirement
+        if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*-iphonesimulator/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+        fi
+
+        # Strategy 3: Last resort - any .app file for our scheme
+        if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -not -path "*/Index.noindex/*" 2>/dev/null | grep -i simulator | head -1)
+        fi
+
+        if [ ! -d "$APP_PATH" ]; then
+            print_error "Could not find built app!"
+            print_error "Searched in: $DERIVED_DATA"
+            print_error "You may need to clean and rebuild. Try: $0 $TARGET_TYPE \"$DEVICE_NAME\" --clean"
+            exit 1
+        fi
+    fi
+
+    print_status "Found app at: $APP_PATH"
 
     # Extract simulator ID from destination if it's an ID-based destination
     if [[ "$DESTINATION" == *"id="* ]]; then
@@ -348,13 +441,45 @@ else
 
     print_status "Using device: $DEVICE_NAME_FOR_INSTALL (Xcode: $XCODE_DEVICE_ID, devicectl: $DEVICECTL_ID)"
 
-    # Get the built app path
-    APP_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "RunAnywhereAI.app" -path "*/Debug-iphoneos/*" -not -path "*/Index.noindex/*" | head -1)
+    # Get the built app path - use xcodebuild to get the exact build location
+    print_debug "Getting build directory from xcodebuild..."
+    BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
 
-    if [ -z "$APP_PATH" ]; then
-        print_error "Could not find built app!"
-        exit 1
+    if [ -n "$BUILD_DIR" ]; then
+        APP_PATH="$BUILD_DIR/$SCHEME.app"
+        print_debug "Expected app path: $APP_PATH"
     fi
+
+    # Verify the app exists, if not try multiple strategies
+    if [ ! -d "$APP_PATH" ]; then
+        print_warning "App not found at expected path, searching for built app..."
+
+        # Strategy 1: Search in DerivedData with multiple patterns
+        DERIVED_DATA=$(get_derived_data_path)
+        print_debug "Searching in DerivedData: $DERIVED_DATA"
+
+        # Try to find the app with various search patterns
+        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug-iphoneos/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+
+        # Strategy 2: If still not found, try without the Debug requirement
+        if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*-iphoneos/*" -not -path "*/Index.noindex/*" 2>/dev/null | head -1)
+        fi
+
+        # Strategy 3: Last resort - any .app file for our scheme
+        if [ ! -d "$APP_PATH" ]; then
+            APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -not -path "*/Index.noindex/*" 2>/dev/null | grep -v simulator | head -1)
+        fi
+
+        if [ ! -d "$APP_PATH" ]; then
+            print_error "Could not find built app!"
+            print_error "Searched in: $DERIVED_DATA"
+            print_error "You may need to clean and rebuild. Try: $0 $TARGET_TYPE \"$DEVICE_NAME\" --clean"
+            exit 1
+        fi
+    fi
+
+    print_status "Found app at: $APP_PATH"
 
     print_status "Installing app on device..."
     if xcrun devicectl device install app --device "$DEVICECTL_ID" "$APP_PATH"; then

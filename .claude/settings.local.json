@@ -105,7 +105,8 @@
       "WebFetch(domain:aptabase.com)",
       "Bash(/dev/null)",
       "Bash(nm:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xcrun simctl boot:*)"
     ],
     "deny": []
   }
