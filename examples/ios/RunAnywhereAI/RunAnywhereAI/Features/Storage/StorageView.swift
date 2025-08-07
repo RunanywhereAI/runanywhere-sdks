@@ -82,7 +82,13 @@ struct StorageView: View {
             } else {
                 ForEach(viewModel.storedModels, id: \.name) { model in
                     StoredModelRow(model: model) {
-                        await viewModel.deleteModel(model.name)
+                        // Extract modelId from filename
+                        // Filename format: [modelId].[format]
+                        let filename = model.path.lastPathComponent
+                        if let dotIndex = filename.lastIndex(of: ".") {
+                            let modelId = String(filename[..<dotIndex])
+                            await viewModel.deleteModel(modelId)
+                        }
                     }
                 }
             }
