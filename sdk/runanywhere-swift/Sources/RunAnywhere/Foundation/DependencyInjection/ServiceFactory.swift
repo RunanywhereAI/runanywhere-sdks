@@ -24,9 +24,6 @@ public class ServiceFactory {
         case is RegistryService.Type:
             return createRegistryService() as? T
 
-        case is ContextManager.Type:
-            return createContextManager() as? T
-
         default:
             return nil
         }
@@ -46,7 +43,6 @@ public class ServiceFactory {
     private func createGenerationService() -> GenerationService {
         GenerationService(
             routingService: container.routingService,
-            contextManager: container.contextManager,
             performanceMonitor: container.performanceMonitor
         )
     }
@@ -57,10 +53,6 @@ public class ServiceFactory {
 
     private func createRegistryService() -> RegistryService {
         RegistryService()
-    }
-
-    private func createContextManager() -> ContextManager {
-        ContextManager()
     }
 
     /// Create a service with custom configuration

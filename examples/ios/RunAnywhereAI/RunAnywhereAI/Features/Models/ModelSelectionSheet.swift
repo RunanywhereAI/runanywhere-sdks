@@ -187,43 +187,97 @@ struct ModelSelectionSheet: View {
     @ViewBuilder
     private var modelsSection: some View {
         if let expanded = expandedFramework {
-            let filteredModels = viewModel.availableModels.filter { $0.compatibleFrameworks.contains(expanded) }
-
-            Section("Models for \(expanded.displayName)") {
-                ForEach(filteredModels, id: \.id) { model in
-                    SelectableModelRow(
-                        model: model,
-                        isSelected: selectedModel?.id == model.id,
-                        isLoading: isLoadingModel,
-                        onDownloadCompleted: {
-                            Task {
-                                await viewModel.loadModels()
-                                await loadAvailableFrameworks()
+            if expanded == .foundationModels {
+                // Special handling for Foundation Models
+                Section("Models for \(expanded.displayName)") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Requirements notice
+                        HStack(spacing: 8) {
+                            Image(systemName: "info.circle.fill")
+                                .foregroundColor(.blue)
+                                .font(.subheadline)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Requirements")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text("• iOS 18.0 beta or later")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text("• Apple Intelligence enabled")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
                             }
-                        },
-                        onSelectModel: {
-                            Task {
-                                await selectAndLoadModel(model)
-                            }
-                        },
-                        onModelUpdated: {
-                            Task {
-                                await viewModel.loadModels()
-                                await loadAvailableFrameworks()
-                            }
+                            Spacer()
                         }
-                    )
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color.blue.opacity(0.1))
+                        .cornerRadius(8)
+
+                        // Availability notice
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "exclamationmark.circle.fill")
+                                    .foregroundColor(.orange)
+                                Text("Model Availability")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+
+                            Text("Foundation Models are integrated into iOS. No specific model selection is available at this time.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            Text("Ensure Apple Intelligence is enabled in Settings to use Foundation Models.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .padding(.top, 2)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
+            } else {
+                // Regular handling for other frameworks
+                let filteredModels = viewModel.availableModels.filter { $0.compatibleFrameworks.contains(expanded) }
 
-                if filteredModels.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("No models available for this framework")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                Section("Models for \(expanded.displayName)") {
+                    ForEach(filteredModels, id: \.id) { model in
+                        SelectableModelRow(
+                            model: model,
+                            isSelected: selectedModel?.id == model.id,
+                            isLoading: isLoadingModel,
+                            onDownloadCompleted: {
+                                Task {
+                                    await viewModel.loadModels()
+                                    await loadAvailableFrameworks()
+                                }
+                            },
+                            onSelectModel: {
+                                Task {
+                                    await selectAndLoadModel(model)
+                                }
+                            },
+                            onModelUpdated: {
+                                Task {
+                                    await viewModel.loadModels()
+                                    await loadAvailableFrameworks()
+                                }
+                            }
+                        )
+                    }
 
-                        Text("Tap 'Add Model' to add a model from URL")
-                            .foregroundColor(.blue)
-                            .font(.caption2)
+                    if filteredModels.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("No models available for this framework")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+
+                            Text("Tap 'Add Model' to add a model from URL")
+                                .foregroundColor(.blue)
+                                .font(.caption2)
+                        }
                     }
                 }
             }
@@ -286,6 +340,7 @@ struct ModelSelectionSheet: View {
             print("Failed to load model: \(error)")
         }
     }
+
 }
 
 // MARK: - Supporting Views

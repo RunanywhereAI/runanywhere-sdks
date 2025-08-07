@@ -133,11 +133,5 @@ class FoundationModelsService: LLMService {
         return _modelInfo?.memoryUsage ?? 0
     }
 
-    func setContext(_ context: Context) async {
-        // Context handling not implemented in demo
-    }
-
-    func clearContext() async {
-        // Context handling not implemented in demo
-    }
+    // Removed setContext and clearContext - no longer part of protocol
 }

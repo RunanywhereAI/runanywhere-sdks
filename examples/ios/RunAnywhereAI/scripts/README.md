@@ -50,16 +50,57 @@ Verifies that all model download URLs in `ModelURLRegistry.swift` are accessible
 
 ### build_and_run.sh
 
-Builds and runs the iOS app on simulator or device.
+A unified build script that handles building, installing, and running the RunAnywhereAI app on iOS devices and simulators.
 
 **Usage:**
 ```bash
-# Run on simulator
-./build_and_run.sh simulator "iPhone 16 Pro"
-
-# Run on connected device
-./build_and_run.sh device
+./build_and_run.sh [simulator|device] [device-name-or-id] [options]
 ```
+
+**Options:**
+- `--add-models` - Add model files to Xcode project
+- `--build-sdk` - Build the RunAnywhere SDK before building the app
+- `--clean` - Clean all build artifacts before building
+- `--clean-data` - Clean app data including database (implies --clean)
+
+**Examples:**
+```bash
+# Basic usage
+./build_and_run.sh simulator "iPhone 16 Pro"
+./build_and_run.sh device
+
+# Clean build (removes DerivedData, build artifacts, reinstalls pods)
+./build_and_run.sh simulator "iPhone 16 Pro" --clean
+
+# Clean data and build (resets database and app data)
+./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
+
+# Build SDK first
+./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
+
+# Add models to project
+./build_and_run.sh simulator "iPhone 16 Pro" --add-models
+
+# Combine options
+./build_and_run.sh simulator "iPhone 16 Pro" --clean-data --build-sdk
+```
+
+**Troubleshooting Database Issues:**
+
+If you encounter database schema errors like:
+- `SQLite error 1: no such table`
+- `SQLite error 1: no such column`
+
+Run the script with `--clean-data` to reset the database:
+```bash
+./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
+```
+
+This will:
+1. Clean all build artifacts
+2. Remove the app's database and documents
+3. Reinstall CocoaPods dependencies
+4. Build and run with a fresh database
 
 ### fix_pods_sandbox.sh
 

@@ -16,6 +16,21 @@ struct GenerationSessionRecord: Codable {
     var updatedAt: Date
     var syncPending: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case modelMetadataId = "model_metadataId"  // GRDB's belongsTo creates camelCase
+        case sessionType = "session_type"
+        case totalTokens = "total_tokens"
+        case totalCost = "total_cost"
+        case messageCount = "message_count"
+        case contextData = "context_data"
+        case startedAt = "started_at"
+        case endedAt = "ended_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case syncPending = "sync_pending"
+    }
+
     init(
         id: String = UUID().uuidString,
         modelMetadataId: String,

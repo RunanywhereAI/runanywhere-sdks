@@ -27,14 +27,14 @@ struct Migration002_AddIndexes {
         // Index for date-based queries
         try db.create(index: "idx_model_usage_stats_date",
                       on: "model_usage_stats",
-                      columns: ["date", "model_metadata_id"])
+                      columns: ["date", "model_metadataId"])
 
         // MARK: - Generation Sessions Indexes
 
         // Index for model-based queries
         try db.create(index: "idx_generation_sessions_model",
                       on: "generation_sessions",
-                      columns: ["model_metadata_id", "created_at"])
+                      columns: ["model_metadataId", "created_at"])
 
         // Index for active sessions
         try db.create(index: "idx_generation_sessions_active",
@@ -47,7 +47,7 @@ struct Migration002_AddIndexes {
         // Index for session-based queries
         try db.create(index: "idx_generations_session",
                       on: "generations",
-                      columns: ["generation_sessions_id", "sequence_number"])
+                      columns: ["generation_sessionsId", "sequence_number"])
 
         // Index for performance analysis
         try db.create(index: "idx_generations_performance",

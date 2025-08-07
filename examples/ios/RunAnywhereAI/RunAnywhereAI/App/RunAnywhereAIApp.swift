@@ -20,6 +20,9 @@ struct RunAnywhereAIApp: App {
                 if isSDKInitialized {
                     ContentView()
                         .environmentObject(modelManager)
+                        .onAppear {
+                            print("🎉 RunAnywhereAI: App is ready to use!")
+                        }
                 } else if let error = initializationError {
                     InitializationErrorView(error: error) {
                         // Retry initialization
@@ -32,6 +35,7 @@ struct RunAnywhereAIApp: App {
                 }
             }
             .task {
+                print("🏁 RunAnywhereAI: App launched, initializing SDK...")
                 await initializeSDK()
                 await initializeBundledModels()
             }
@@ -47,12 +51,12 @@ struct RunAnywhereAIApp: App {
             var config = Configuration(
                 apiKey: "demo-api-key", // For demo purposes
                 enableRealTimeDashboard: false,
-                telemetryConsent: .denied
+                telemetryConsent: .granted
             )
 
             // Configure additional settings
-            config.routingPolicy = .preferDevice
-            config.privacyMode = .standard
+            config.routingPolicy = RoutingPolicy.preferDevice
+            config.privacyMode = PrivacyMode.standard
             config.memoryThreshold = 2_000_000_000 // 2GB
 
             // Register framework adapters before initializing SDK
@@ -60,15 +64,29 @@ struct RunAnywhereAIApp: App {
             RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
 
             // Initialize the SDK
+            let startTime = Date()
+            print("🚀 RunAnywhereSDK: Starting initialization...")
+            print("📋 Configuration: API Key: \(config.apiKey.prefix(8))..., Routing: \(config.routingPolicy), Privacy: \(config.privacyMode)")
+
             try await RunAnywhereSDK.shared.initialize(configuration: config)
-            print("SDK initialized successfully")
+
+            let initTime = Date().timeIntervalSince(startTime)
+            print("✅ RunAnywhereSDK: Successfully initialized!")
+            print("⏱️  Initialization time: \(String(format: "%.2f", initTime)) seconds")
+            print("📊 SDK Status: Ready for on-device AI inference")
+            print("🔧 Registered frameworks: LLMSwift, FoundationModels")
 
             // Mark as initialized
             await MainActor.run {
                 isSDKInitialized = true
             }
+
+            // Auto-load first available model
+            await autoLoadFirstModel()
         } catch {
-            print("Failed to initialize SDK: \(error)")
+            print("❌ RunAnywhereSDK: Initialization failed!")
+            print("🔍 Error: \(error)")
+            print("💡 Tip: Check your API key and network connection")
             await MainActor.run {
                 initializationError = error
             }
@@ -85,6 +103,45 @@ struct RunAnywhereAIApp: App {
 
     private func initializeBundledModels() async {
         // Bundled models functionality removed - models are downloaded on demand
+    }
+
+    private func autoLoadFirstModel() async {
+        print("🤖 Auto-loading first available model...")
+
+        do {
+            // Get available models from SDK
+            let availableModels = try await RunAnywhereSDK.shared.listAvailableModels()
+
+            // Filter for Llama CPP compatible models first, then any model
+            let llamaCppModels = availableModels.filter { $0.compatibleFrameworks.contains(.llamaCpp) && $0.localPath != nil }
+            let anyDownloadedModels = availableModels.filter { $0.localPath != nil }
+
+            // Prefer Llama CPP models, fallback to any downloaded model
+            let modelToLoad = llamaCppModels.first ?? anyDownloadedModels.first
+
+            if let model = modelToLoad {
+                print("✅ Found model to auto-load: \(model.name) (Framework: \(model.compatibleFrameworks.first?.displayName ?? "Unknown"))")
+
+                // Load the model
+                try await RunAnywhereSDK.shared.loadModel(model.id)
+
+                print("🎉 Successfully auto-loaded model: \(model.name)")
+
+                // Update ModelListViewModel to reflect the loaded model
+                await ModelListViewModel.shared.setCurrentModel(model)
+
+                // Notify the app that a model was loaded
+                NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
+
+            } else {
+                print("ℹ️ No downloaded models available for auto-loading")
+                print("💡 User will need to download and select a model manually")
+            }
+
+        } catch {
+            print("⚠️ Failed to auto-load model: \(error)")
+            print("💡 User will need to select a model manually")
+        }
     }
 }
 

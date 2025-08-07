@@ -64,7 +64,7 @@ struct FrameworkRow: View {
     private var frameworkDescription: String {
         switch framework {
         case .foundationModels:
-            return "Apple's on-device language models"
+            return "Apple's pre-installed system models"
         case .mediaPipe:
             return "Google's cross-platform ML framework"
         default:

@@ -2,6 +2,8 @@ import Foundation
 import SwiftUI
 import RunAnywhereSDK
 
+// Note: MessageAnalytics and ConversationAnalytics are defined in ChatViewModel.swift
+
 // MARK: - Conversation Store
 
 @MainActor
@@ -149,8 +151,7 @@ class ConversationStore: ObservableObject {
             // Sort by update date, newest first
             conversations = loadedConversations.sorted { $0.updatedAt > $1.updatedAt }
 
-            // Set current conversation to the most recent
-            currentConversation = conversations.first
+            // Don't automatically set current conversation - let ChatViewModel create a new one
         } catch {
             print("Error loading conversations: \(error)")
         }
@@ -196,6 +197,10 @@ struct Conversation: Identifiable, Codable {
     var modelName: String?
     var frameworkName: String?
 
+    // NEW: Conversation-level analytics
+    var analytics: ConversationAnalytics?
+    var performanceSummary: PerformanceSummary?
+
     var summary: String {
         guard !messages.isEmpty else { return "No messages" }
 
@@ -214,6 +219,34 @@ struct Conversation: Identifiable, Codable {
             .replacingOccurrences(of: "\n", with: " ")
 
         return String(preview.prefix(100))
+    }
+}
+
+// Performance summary for quick access
+struct PerformanceSummary: Codable {
+    let averageResponseTime: TimeInterval
+    let totalTokens: Int
+    let mainModel: String?
+    let completionRate: Double
+    let averageTokensPerSecond: Double
+
+    init(from messages: [Message]) {
+        let analyticsMessages = messages.compactMap { $0.analytics }
+
+        if !analyticsMessages.isEmpty {
+            averageResponseTime = analyticsMessages.compactMap { $0.totalGenerationTime }.reduce(0, +) / Double(analyticsMessages.count)
+            totalTokens = analyticsMessages.reduce(0) { $0 + $1.inputTokens + $1.outputTokens }
+            mainModel = analyticsMessages.first?.modelName
+            let completed = analyticsMessages.filter { $0.completionStatus == .complete }.count
+            completionRate = Double(completed) / Double(analyticsMessages.count)
+            averageTokensPerSecond = analyticsMessages.compactMap { $0.averageTokensPerSecond }.reduce(0, +) / Double(analyticsMessages.count)
+        } else {
+            averageResponseTime = 0
+            totalTokens = 0
+            mainModel = nil
+            completionRate = 0
+            averageTokensPerSecond = 0
+        }
     }
 }
 
@@ -236,7 +269,8 @@ struct ConversationListView: View {
                 ForEach(filteredConversations) { conversation in
                     ConversationRow(conversation: conversation)
                         .onTapGesture {
-                            store.currentConversation = conversation
+                            store.loadConversation(conversation.id)
+                            NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: conversation)
                             dismiss()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -261,7 +295,9 @@ struct ConversationListView: View {
 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        _ = store.createConversation()
+                        let newConversation = store.createConversation()
+                        // Notify ChatViewModel about the new conversation
+                        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: newConversation)
                         dismiss()
                     }) {
                         Image(systemName: "plus")

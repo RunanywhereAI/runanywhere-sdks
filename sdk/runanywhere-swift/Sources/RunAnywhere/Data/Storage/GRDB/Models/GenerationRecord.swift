@@ -38,6 +38,29 @@ struct GenerationRecord: Codable {
     var createdAt: Date
     var syncPending: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case generationSessionsId = "generation_sessionsId"  // GRDB's belongsTo creates camelCase
+        case sequenceNumber = "sequence_number"
+        case promptTokens = "prompt_tokens"
+        case completionTokens = "completion_tokens"
+        case totalTokens = "total_tokens"
+        case latencyMs = "latency_ms"
+        case tokensPerSecond = "tokens_per_second"
+        case timeToFirstTokenMs = "time_to_first_token_ms"
+        case cost
+        case costSaved = "cost_saved"
+        case executionTarget = "execution_target"
+        case routingReason = "routing_reason"
+        case frameworkUsed = "framework_used"
+        case requestData = "request_data"
+        case responseData = "response_data"
+        case errorCode = "error_code"
+        case errorMessage = "error_message"
+        case createdAt = "created_at"
+        case syncPending = "sync_pending"
+    }
+
     init(
         id: String = UUID().uuidString,
         generationSessionsId: String,

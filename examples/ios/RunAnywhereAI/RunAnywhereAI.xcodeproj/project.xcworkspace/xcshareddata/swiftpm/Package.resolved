@@ -1,5 +1,5 @@
 {
-  "originHash" : "50cc60621f8849144ab3bb0a548248f912072a8f4b90104e576977063c8a376f",
+  "originHash" : "4f96fffb024156e02d1e769989fec0090698f2a9269db44728521e4b0b6b90c7",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -22,7 +22,7 @@
     {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch.git",
+      "location" : "https://github.com/pytorch/ecutorch.git",
       "state" : {
         "branch" : "swiftpm-0.7.0",
         "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
@@ -53,15 +53,6 @@
       "state" : {
         "revision" : "fc1233dea1142897d474bda2f1f9a6c3fe7acab6",
         "version" : "1.2.1"
-      }
-    },
-    {
-      "identity" : "llm.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/eastriverlee/LLM.swift",
-      "state" : {
-        "branch" : "main",
-        "revision" : "7c9c8a86604c7a81eca5e6790053bc9704e30c0a"
       }
     },
     {

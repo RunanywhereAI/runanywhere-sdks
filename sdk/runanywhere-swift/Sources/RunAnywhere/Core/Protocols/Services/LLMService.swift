@@ -36,13 +36,6 @@ public protocol LLMService: AnyObject {
 
     /// Get model information
     var modelInfo: LoadedModelInfo? { get }
-
-    /// Set generation context
-    /// - Parameter context: The context to use
-    func setContext(_ context: Context) async
-
-    /// Clear generation context
-    func clearContext() async
 }
 
 /// Information about a loaded model

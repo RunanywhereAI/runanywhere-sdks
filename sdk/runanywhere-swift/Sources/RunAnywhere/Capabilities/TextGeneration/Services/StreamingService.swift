@@ -40,9 +40,6 @@ public class StreamingService {
                         effectivePrompt = prompt
                     }
 
-                    // Create context for the prompt
-                    let context = Context(messages: [Message(role: .user, content: effectivePrompt)])
-                    await loadedModel.service.setContext(context)
 
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
@@ -115,9 +112,6 @@ public class StreamingService {
                         effectivePrompt = prompt
                     }
 
-                    // Create context for the prompt
-                    let context = Context(messages: [Message(role: .user, content: effectivePrompt)])
-                    await loadedModel.service.setContext(context)
 
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model

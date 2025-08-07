@@ -8,19 +8,54 @@ struct QuizView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                switch viewModel.viewState {
-                case .input:
-                    QuizInputView(viewModel: viewModel)
+                // Main content
+                ZStack {
+                    switch viewModel.viewState {
+                    case .input:
+                        QuizInputView(viewModel: viewModel)
 
-                case .generating:
-                    QuizGeneratingView()
+                    case .generating:
+                        QuizGeneratingView()
 
-                case .quiz:
-                    QuizSwipeView(viewModel: viewModel)
+                    case .quiz:
+                        QuizSwipeView(viewModel: viewModel)
 
-                case .results(let results):
-                    QuizResultsView(results: results, viewModel: viewModel)
+                    case .results(let results):
+                        QuizResultsView(results: results, viewModel: viewModel)
+                    }
                 }
+                .blur(radius: 3)
+                .disabled(true)
+
+                // Coming Soon overlay
+                VStack(spacing: 20) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "clock.badge.checkmark")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                            .symbolRenderingMode(.hierarchical)
+
+                        Text("Coming Soon")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+
+                        Text("This feature is under development")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 48)
+                    .padding(.vertical, 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.regularMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 0.5)
+                            )
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.2))
             }
             .navigationTitle("Quiz Generator")
             .navigationBarTitleDisplayMode(.large)
@@ -33,6 +68,8 @@ struct QuizView: View {
                                 .font(.caption)
                         }
                     }
+                    .disabled(true)
+                    .opacity(0.5)
                 }
             }
             .sheet(isPresented: $showingModelSelection) {
