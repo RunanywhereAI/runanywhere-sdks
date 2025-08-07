@@ -69,6 +69,10 @@ class ModelListViewModel: ObservableObject {
         availableModels.append(model)
     }
 
+    func setCurrentModel(_ model: ModelInfo) async {
+        currentModel = model
+    }
+
     func downloadModel(_ modelId: String) async -> Bool {
         isLoading = true
         errorMessage = nil

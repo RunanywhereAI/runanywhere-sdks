@@ -66,25 +66,56 @@ struct ChatInterfaceView: View {
     private var chatMessagesView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) {
-                    ForEach(viewModel.messages) { message in
-                        MessageBubbleView(message: message)
-                            .id(message.id)
-                    }
+                if viewModel.messages.isEmpty && !viewModel.isGenerating {
+                    // Empty state view
+                    VStack(spacing: 16) {
+                        Spacer()
 
-                    if viewModel.isGenerating {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Generating...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        Image(systemName: "message.circle")
+                            .font(.system(size: 60))
+                            .foregroundColor(.secondary.opacity(0.6))
+
+                        VStack(spacing: 8) {
+                            Text("Start a conversation")
+                                .font(.title2)
+                                .fontWeight(.medium)
+                                .foregroundColor(.primary)
+
+                            if viewModel.isModelLoaded {
+                                Text("Type a message below to get started")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("Select a model first, then start chatting")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                        .padding()
-                        .id("typing")
+
+                        Spacer()
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    LazyVStack(spacing: 12) {
+                        ForEach(viewModel.messages) { message in
+                            MessageBubbleView(message: message)
+                                .id(message.id)
+                        }
+
+                        if viewModel.isGenerating {
+                            HStack {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Generating...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding()
+                            .id("typing")
+                        }
+                    }
+                    .padding()
                 }
-                .padding()
             }
             .background(Color(.systemGroupedBackground))
             .onTapGesture {

@@ -149,8 +149,7 @@ class ConversationStore: ObservableObject {
             // Sort by update date, newest first
             conversations = loadedConversations.sorted { $0.updatedAt > $1.updatedAt }
 
-            // Set current conversation to the most recent
-            currentConversation = conversations.first
+            // Don't automatically set current conversation - let ChatViewModel create a new one
         } catch {
             print("Error loading conversations: \(error)")
         }
@@ -236,7 +235,8 @@ struct ConversationListView: View {
                 ForEach(filteredConversations) { conversation in
                     ConversationRow(conversation: conversation)
                         .onTapGesture {
-                            store.currentConversation = conversation
+                            store.loadConversation(conversation.id)
+                            NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: conversation)
                             dismiss()
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {

@@ -72,13 +72,13 @@ class ChatViewModel: ObservableObject {
     }
 
     init() {
-        // Load existing conversation or create new one
-        if let conversation = conversationStore.currentConversation {
-            currentConversation = conversation
-            messages = conversation.messages
-        } else {
-            let conversation = conversationStore.createConversation()
-            currentConversation = conversation
+        // Always start with a new conversation for a fresh chat experience
+        let conversation = conversationStore.createConversation()
+        currentConversation = conversation
+        messages = [] // Start with empty messages array
+
+        // Add system message only if model is already loaded
+        if isModelLoaded {
             addSystemMessage()
         }
 
@@ -90,18 +90,25 @@ class ChatViewModel: ObservableObject {
             object: nil
         )
 
+        // Listen for conversation selection notifications
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(conversationSelected(_:)),
+            name: Notification.Name("ConversationSelected"),
+            object: nil
+        )
+
         // Delay analytics initialization to avoid crash during SDK startup
         // Analytics will be initialized when the view appears or when first used
     }
 
     private func addSystemMessage() {
-        let content: String
-        if isModelLoaded, let modelName = loadedModelName {
-            content = "Model '\(modelName)' is loaded and ready to chat!"
-        } else {
-            content = "Welcome! Select and download a model from the Models tab to start chatting."
+        // Only add system message if model is loaded
+        guard isModelLoaded, let modelName = loadedModelName else {
+            return
         }
 
+        let content = "Model '\(modelName)' is loaded and ready to chat!"
         let systemMessage = Message(role: .system, content: content)
         messages.insert(systemMessage, at: 0)
 
@@ -312,9 +319,11 @@ class ChatViewModel: ObservableObject {
         // Create new conversation
         let conversation = conversationStore.createConversation()
         currentConversation = conversation
-        addSystemMessage()
-        // No context to clear - it's managed through messages
-        // Keep allAnalytics to view history
+
+        // Only add system message if model is loaded
+        if isModelLoaded {
+            addSystemMessage()
+        }
     }
 
     func stopGeneration() {
@@ -382,8 +391,8 @@ class ChatViewModel: ObservableObject {
     }
 
     @objc private func modelLoaded(_ notification: Notification) {
-        if let model = notification.object as? ModelInfo {
-            Task {
+        Task {
+            if let model = notification.object as? ModelInfo {
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
@@ -393,7 +402,16 @@ class ChatViewModel: ObservableObject {
                     }
                     self.addSystemMessage()
                 }
+            } else {
+                // If no model object is passed, check the current model state
+                await self.checkModelStatus()
             }
+        }
+    }
+
+    @objc private func conversationSelected(_ notification: Notification) {
+        if let conversation = notification.object as? Conversation {
+            loadConversation(conversation)
         }
     }
 
