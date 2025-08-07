@@ -138,6 +138,7 @@ lint/reports/
 *.rar
 hs_err_pid*
 
+
 EXTERNAL/
 # thoughts/
 local/

@@ -105,7 +105,10 @@
       "WebFetch(domain:aptabase.com)",
       "Bash(/dev/null)",
       "Bash(nm:*)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(xcrun devicectl device install app:*)",
+      "Bash(xcrun devicectl device process launch:*)",
+      "Bash(xcrun xctrace:*)"
     ],
     "deny": []
   }

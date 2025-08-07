@@ -9,8 +9,6 @@ import SwiftUI
 import RunAnywhereSDK
 
 struct SimplifiedSettingsView: View {
-    @State private var enableCloudRouting = false
-    @State private var privacyMode = true
     @State private var routingPolicy = RoutingPolicy.automatic
     @State private var defaultTemperature = 0.7
     @State private var defaultMaxTokens = 256
@@ -20,18 +18,9 @@ struct SimplifiedSettingsView: View {
     var body: some View {
         Form {
             Section("SDK Configuration") {
-                Toggle("Enable Cloud Routing", isOn: $enableCloudRouting)
-                    .onChange(of: enableCloudRouting) { _ in
-                        updateSDKConfiguration()
-                    }
-
-                Toggle("Privacy Mode", isOn: $privacyMode)
-                    .onChange(of: privacyMode) { _ in
-                        updateSDKConfiguration()
-                    }
-
                 Picker("Routing Policy", selection: $routingPolicy) {
                     Text("Automatic").tag(RoutingPolicy.automatic)
+                    Text("Device Only").tag(RoutingPolicy.deviceOnly)
                     Text("Prefer Device").tag(RoutingPolicy.preferDevice)
                     Text("Prefer Cloud").tag(RoutingPolicy.preferCloud)
                 }
@@ -114,17 +103,13 @@ struct SimplifiedSettingsView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Label("RunAnywhere SDK", systemImage: "cube")
                         .font(.headline)
-                    Text("Version 1.0.0")
+                    Text("Version 0.1")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
 
                 Link(destination: URL(string: "https://docs.runanywhere.ai")!) {
                     Label("Documentation", systemImage: "book")
-                }
-
-                Link(destination: URL(string: "https://github.com/runanywhere/sdk")!) {
-                    Label("GitHub", systemImage: "link")
                 }
             } header: {
                 Text("About")
@@ -140,8 +125,8 @@ struct SimplifiedSettingsView: View {
         // Use SDK's actual Configuration constructor signature
         let config = Configuration(
             apiKey: apiKey.isEmpty ? "demo-key" : apiKey,
-            enableRealTimeDashboard: enableCloudRouting,
-            telemetryConsent: privacyMode ? .denied : .granted
+            enableRealTimeDashboard: routingPolicy != .deviceOnly,
+            telemetryConsent: routingPolicy == .deviceOnly ? .denied : .granted
         )
 
         // Note: In a real app, you would update the SDK configuration
@@ -157,8 +142,6 @@ struct SimplifiedSettingsView: View {
         }
 
         // Load other settings from UserDefaults
-        enableCloudRouting = UserDefaults.standard.bool(forKey: "enableCloudRouting")
-        privacyMode = UserDefaults.standard.bool(forKey: "privacyMode")
         if let policyRaw = UserDefaults.standard.string(forKey: "routingPolicy"),
            let policy = RoutingPolicy(rawValue: policyRaw) {
             routingPolicy = policy
