@@ -7,10 +7,12 @@ public enum SDKError: LocalizedError {
     case modelNotFound(String)
     case loadingFailed(String)
     case generationFailed(String)
+    case generationTimeout(String)
     case frameworkNotAvailable(LLMFramework)
     case downloadFailed(Error)
     case validationFailed(ValidationError)
     case routingFailed(String)
+    case databaseInitializationFailed(Error)
 
     public var errorDescription: String? {
         switch self {
@@ -24,6 +26,8 @@ public enum SDKError: LocalizedError {
             return "Failed to load model: \(reason)"
         case .generationFailed(let reason):
             return "Generation failed: \(reason)"
+        case .generationTimeout(let reason):
+            return "Generation timed out: \(reason)"
         case .frameworkNotAvailable(let framework):
             return "Framework \(framework.rawValue) not available"
         case .downloadFailed(let error):
@@ -32,6 +36,8 @@ public enum SDKError: LocalizedError {
             return "Validation failed: \(error.localizedDescription)"
         case .routingFailed(let reason):
             return "Routing failed: \(reason)"
+        case .databaseInitializationFailed(let error):
+            return "Database initialization failed: \(error.localizedDescription)"
         }
     }
 }

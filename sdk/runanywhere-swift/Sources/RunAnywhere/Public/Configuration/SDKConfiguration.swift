@@ -38,6 +38,9 @@ public struct Configuration {
     /// Download configuration
     public var downloadConfiguration: DownloadConfig
 
+    /// Default generation settings
+    public var defaultGenerationSettings: DefaultGenerationSettings
+
     /// Initialize configuration with API key
     /// - Parameters:
     ///   - apiKey: Your RunAnywhere API key
@@ -45,13 +48,14 @@ public struct Configuration {
     ///   - telemetryConsent: Telemetry consent preference (default: .granted)
     public init(
         apiKey: String,
+        baseURL: URL = URL(string: "https://api.runanywhere.ai") ?? URL(fileURLWithPath: "/"),
         enableRealTimeDashboard: Bool = true,
         telemetryConsent: TelemetryConsent = .granted
     ) {
         self.apiKey = apiKey
         self.baseURL = URL(string: "https://api.runanywhere.ai") ?? URL(fileURLWithPath: "/")
         self.enableRealTimeDashboard = enableRealTimeDashboard
-        self.routingPolicy = .automatic
+        self.routingPolicy = .deviceOnly  // FORCE DEVICE-ONLY ROUTING - NEVER USE CLOUD
         self.telemetryConsent = telemetryConsent
         self.privacyMode = .standard
         self.debugMode = false
@@ -60,5 +64,6 @@ public struct Configuration {
         self.modelProviders = []
         self.memoryThreshold = 500_000_000 // 500MB default
         self.downloadConfiguration = DownloadConfig()
+        self.defaultGenerationSettings = DefaultGenerationSettings()
     }
 }

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Pulse
 
 /// Real-time performance monitoring service
 public class MonitoringService: PerformanceMonitor {
@@ -29,6 +30,7 @@ public class MonitoringService: PerformanceMonitor {
     private let historyManager = HistoryManager()
     private let alertManager = AlertManager()
     private let reportGenerator = ReportGenerator()
+    private let pulsePerformanceLogger = PulsePerformanceLogger.shared
 
     private var monitoringTimer: Timer?
     private let updateInterval: TimeInterval = 0.1 // 100ms updates
@@ -38,6 +40,7 @@ public class MonitoringService: PerformanceMonitor {
 
     public init() {
         setupSystemMonitoring()
+        setupPulseIntegration()
     }
 
     deinit {
@@ -188,6 +191,13 @@ public class MonitoringService: PerformanceMonitor {
         )
     }
 
+    private func setupPulseIntegration() {
+        // Set up alert manager callback to log alerts to Pulse
+        alertManager.addAlertCallback { [weak self] alert in
+            self?.pulsePerformanceLogger.logPerformanceAlert(alert)
+        }
+    }
+
     private func updateMetrics() {
         // Get current generation info if any
         let activeGeneration = generationTracker.currentGeneration
@@ -235,6 +245,20 @@ public class MonitoringService: PerformanceMonitor {
             - Token count: \(summary.tokenCount)
             - Memory used: \(ByteCountFormatter.string(fromByteCount: summary.memoryUsed, countStyle: .memory))
             """)
+
+        // Log to Pulse with structured data
+        let performance = GenerationPerformance(
+            timeToFirstToken: summary.timeToFirstToken,
+            totalGenerationTime: summary.totalTime,
+            inputTokens: 0, // Not available in summary
+            outputTokens: summary.tokenCount,
+            tokensPerSecond: summary.tokensPerSecond,
+            modelId: summary.modelName,
+            executionTarget: .onDevice,
+            routingFramework: summary.framework.rawValue,
+            routingReason: "On-device execution"
+        )
+        pulsePerformanceLogger.logGenerationPerformance(performance)
     }
 }
 

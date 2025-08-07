@@ -5,6 +5,7 @@ class ModelDiscovery {
     private let formatDetector: FormatDetector
     private let metadataExtractor: MetadataExtractor
     private var registeredProviders: [ModelProvider] = []
+    private let logger = SDKLogger(category: "ModelDiscovery")
 
     init(
         formatDetector: FormatDetector = ServiceContainer.shared.formatDetector,
@@ -39,7 +40,7 @@ class ModelDiscovery {
 
     private func searchForModelsRecursively(in directory: URL, modelExtensions: [String], onModelFound: (ModelInfo) async -> Void) async {
         guard FileManager.default.fileExists(atPath: directory.path) else {
-            print("[ModelDiscovery] Directory does not exist: \(directory.path)")
+            logger.debug("Directory does not exist: \(directory.path)")
             return
         }
 
@@ -48,7 +49,7 @@ class ModelDiscovery {
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) else {
-            print("[ModelDiscovery] Failed to create enumerator for: \(directory.path)")
+            logger.warning("Failed to create enumerator for: \(directory.path)")
             return
         }
 
@@ -56,9 +57,9 @@ class ModelDiscovery {
             // Check if it's a file with a model extension
             let fileExtension = fileURL.pathExtension.lowercased()
             if modelExtensions.contains(fileExtension) {
-                print("[ModelDiscovery] Found model file: \(fileURL.lastPathComponent)")
+                logger.debug("Found model file: \(fileURL.lastPathComponent)")
                 if let model = await detectModel(at: fileURL) {
-                    print("[ModelDiscovery] Successfully detected model: \(model.name)")
+                    logger.info("Successfully detected model: \(model.name)")
                     await onModelFound(model)
                 }
             }
@@ -71,11 +72,11 @@ class ModelDiscovery {
         // Query each registered provider
         await withTaskGroup(of: [ModelInfo].self) { group in
             for provider in registeredProviders {
-                group.addTask {
+                group.addTask { [weak self] in
                     do {
                         return try await provider.listAvailableModels(limit: 100)
                     } catch {
-                        print("[ModelDiscovery] Failed to query provider \(provider.name): \(error)")
+                        self?.logger.error("Failed to query provider \(provider.name): \(error)")
                         return []
                     }
                 }

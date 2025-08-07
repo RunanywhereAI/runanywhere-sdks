@@ -1,6 +1,7 @@
 import Foundation
 import Alamofire
 import Files
+import Pulse
 
 /// Simplified download service using Alamofire
 public class AlamofireDownloadService: DownloadManager {
@@ -72,6 +73,16 @@ public class AlamofireDownloadService: DownloadManager {
                         return (destinationURL, [.removePreviousFile, .createIntermediateDirectories])
                     }
 
+                    // Log download start
+                    self.logger.info("Starting download", metadata: [
+                        "modelId": model.id,
+                        "url": downloadURL.absoluteString,
+                        "expectedSize": model.downloadSize ?? 0,
+                        "destination": destinationURL.path
+                    ])
+
+                    // Network logging is handled automatically by Alamofire + Pulse integration
+
                     // Create download request
                     let downloadRequest = self.session.download(downloadURL, to: destination)
                         .downloadProgress { progress in
@@ -80,6 +91,19 @@ public class AlamofireDownloadService: DownloadManager {
                                 totalBytes: progress.totalUnitCount,
                                 state: .downloading
                             )
+
+                            // Log progress at 10% intervals
+                            let progressPercent = progress.fractionCompleted * 100
+                            if progressPercent.truncatingRemainder(dividingBy: 10) < 0.1 {
+                                self.logger.debug("Download progress", metadata: [
+                                    "modelId": model.id,
+                                    "progress": progressPercent,
+                                    "bytesDownloaded": progress.completedUnitCount,
+                                    "totalBytes": progress.totalUnitCount,
+                                    "speed": self.calculateDownloadSpeed(progress: progress)
+                                ])
+                            }
+
                             progressContinuation.yield(downloadProgress)
                         }
                         .validate()
@@ -105,10 +129,18 @@ public class AlamofireDownloadService: DownloadManager {
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
                                     // Save metadata persistently
-                                    let metadataStore = ModelMetadataStore()
-                                    metadataStore.saveModelMetadata(updatedModel)
+                                    Task {
+                                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                                            try? await dataSyncService.saveModelMetadata(updatedModel)
+                                        }
+                                    }
 
-                                    self.logger.info("Download completed for model: \(model.id)")
+                                    self.logger.info("Download completed", metadata: [
+                                        "modelId": model.id,
+                                        "localPath": url.path,
+                                        "fileSize": (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0,
+                                        "duration": response.metrics?.taskInterval.duration ?? 0
+                                    ])
                                     continuation.resume(returning: url)
                                 } else {
                                     continuation.resume(throwing: DownloadError.invalidResponse)
@@ -116,6 +148,15 @@ public class AlamofireDownloadService: DownloadManager {
 
                             case .failure(let error):
                                 let downloadError = self.mapAlamofireError(error)
+
+                                self.logger.error("Download failed", metadata: [
+                                    "modelId": model.id,
+                                    "url": downloadURL.absoluteString,
+                                    "error": error.localizedDescription,
+                                    "errorType": String(describing: type(of: error)),
+                                    "statusCode": response.response?.statusCode ?? 0
+                                ])
+
                                 progressContinuation.yield(DownloadProgress(
                                     bytesDownloaded: 0,
                                     totalBytes: model.downloadSize ?? 0,
@@ -154,6 +195,22 @@ public class AlamofireDownloadService: DownloadManager {
     }
 
     // MARK: - Helper Methods
+
+    private func calculateDownloadSpeed(progress: Progress) -> String {
+        // Simple speed calculation - could be enhanced with time-based tracking
+        guard progress.totalUnitCount > 0 else { return "0 B/s" }
+
+        // This is a simplified calculation - in production, you'd track time elapsed
+        let bytesPerSecond = Double(progress.completedUnitCount) / max(1, progress.estimatedTimeRemaining ?? 1)
+
+        if bytesPerSecond < 1024 {
+            return String(format: "%.0f B/s", bytesPerSecond)
+        } else if bytesPerSecond < 1024 * 1024 {
+            return String(format: "%.1f KB/s", bytesPerSecond / 1024)
+        } else {
+            return String(format: "%.1f MB/s", bytesPerSecond / (1024 * 1024))
+        }
+    }
 
     private func mapAlamofireError(_ error: AFError) -> Error {
         switch error {
@@ -272,8 +329,11 @@ extension AlamofireDownloadService {
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
                                     // Save metadata persistently
-                                    let metadataStore = ModelMetadataStore()
-                                    metadataStore.saveModelMetadata(updatedModel)
+                                    Task {
+                                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                                            try? await dataSyncService.saveModelMetadata(updatedModel)
+                                        }
+                                    }
 
                                     continuation.resume(returning: url)
                                 } else {

@@ -37,7 +37,7 @@ final class RunAnywhereSDKTests: XCTestCase {
     func testSDKNotInitializedError() async {
         // Test that SDK throws error when not initialized
         do {
-            _ = try await RunAnywhereSDK.shared.generate("test prompt")
+            _ = try await RunAnywhereSDK.shared.generate(prompt: "test prompt")
             XCTFail("Should throw notInitialized error")
         } catch let error as SDKError {
             if case .notInitialized = error {

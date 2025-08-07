@@ -1,0 +1,397 @@
+import Foundation
+import RunAnywhereSDK
+import LLM
+import os.log
+
+// Define LLMError for handling LLM.swift specific errors
+enum LLMError: LocalizedError {
+    case modelLoadFailed
+    case initializationFailed
+    case generationFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .modelLoadFailed:
+            return "Failed to load the LLM model"
+        case .initializationFailed:
+            return "Failed to initialize LLM service"
+        case .generationFailed(let reason):
+            return "Generation failed: \(reason)"
+        }
+    }
+}
+
+public class LLMSwiftService: LLMService {
+    private var llm: LLM?
+    private var modelPath: String?
+    private var _modelInfo: LoadedModelInfo?
+    // Removed context property - no longer using Context type
+    private let hardwareConfig: HardwareConfiguration?
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "LLMSwiftService")
+
+    public var isReady: Bool { llm != nil }
+    public var modelInfo: LoadedModelInfo? { _modelInfo }
+
+    init(hardwareConfig: HardwareConfiguration? = nil) {
+        self.hardwareConfig = hardwareConfig
+    }
+
+    public func initialize(modelPath: String) async throws {
+        logger.info("🚀 Initializing with model path: \(modelPath)")
+        self.modelPath = modelPath
+
+        // Check if model file exists
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: modelPath) else {
+            logger.error("❌ Model file does not exist at path: \(modelPath)")
+            throw LLMServiceError.modelNotLoaded
+        }
+
+        let fileSize = (try? fileManager.attributesOfItem(atPath: modelPath)[.size] as? Int64) ?? 0
+        logger.info("📊 Model file size: \(fileSize) bytes")
+
+        // Configure LLM with hardware settings
+        let maxTokens = 2048 // Default context length
+        let template = determineTemplate(from: modelPath)
+        logger.info("📝 Using template: \(String(describing: template)), maxTokens: \(maxTokens)")
+
+        // Initialize LLM instance
+        do {
+            logger.info("🚀 Creating LLM instance...")
+
+            // Create LLM instance with proper configuration
+            self.llm = LLM(
+                from: URL(fileURLWithPath: modelPath),
+                template: template,
+                historyLimit: 6,  // Limit conversation history to prevent context overflow
+                maxTokenCount: Int32(maxTokens)
+            )
+
+            guard let llm = self.llm else {
+                throw LLMError.modelLoadFailed
+            }
+
+            logger.info("✅ LLM instance created")
+
+            // Validate model readiness with a simple test prompt
+            logger.info("🧪 Validating model readiness with test prompt")
+            guard let llm = self.llm else {
+                throw FrameworkError(
+                    framework: .llamaCpp,
+                    underlying: LLMError.modelLoadFailed,
+                    context: "Failed to initialize LLM.swift with model at \(modelPath)"
+                )
+            }
+
+            // Skip the test prompt to avoid blocking during initialization
+            logger.info("✅ Skipping test prompt to avoid blocking")
+
+            // Note: Will configure generation parameters during inference
+            // LLM.swift Configuration API requires apiKey parameter
+
+            // Create model info
+            guard self.llm != nil else {
+                throw FrameworkError(
+                    framework: .llamaCpp,
+                    underlying: LLMError.modelLoadFailed,
+                    context: "Failed to initialize LLM.swift with model at \(modelPath)"
+                )
+            }
+
+            _modelInfo = LoadedModelInfo(
+                id: UUID().uuidString,
+                name: URL(fileURLWithPath: modelPath).lastPathComponent,
+                framework: .llamaCpp,
+                format: determineFormat(from: modelPath),
+                memoryUsage: try await getModelMemoryUsage(),
+                contextLength: Int(maxTokens),
+                configuration: hardwareConfig ?? HardwareConfiguration(
+                    primaryAccelerator: .cpu,
+                    memoryMode: .balanced
+                )
+            )
+        } catch {
+            throw FrameworkError(
+                framework: .llamaCpp,
+                underlying: error,
+                context: "Failed to initialize LLM.swift with model at \(modelPath)"
+            )
+        }
+    }
+
+    public func generate(prompt: String, options: GenerationOptions) async throws -> String {
+        logger.info("🔧 Starting generation for prompt: \(prompt.prefix(50))...")
+
+        guard let llm = llm else {
+            logger.error("❌ LLM not initialized")
+            throw LLMServiceError.notInitialized
+        }
+
+        logger.info("✅ LLM is initialized, applying options")
+        logger.info("🔍 LLM instance: \(String(describing: llm))")
+        logger.info("🔍 Model path: \(self.modelPath ?? "nil")")
+
+        // Let LLM.swift manage its own conversation history
+        // This maintains context across multiple turns
+
+        // Apply generation options
+        await applyGenerationOptions(options, to: llm)
+
+        logger.info("🔧 Building prompt with context")
+        // Include context if available
+        let fullPrompt = buildPromptWithContext(prompt)
+        logger.info("📝 Full prompt length: \(fullPrompt.count) characters")
+
+        // Generate response with timeout protection
+        do {
+            logger.info("🚀 Calling llm.getCompletion() with 60-second timeout")
+            logger.info("📝 Full prompt being sent to LLM:")
+            logger.info("---START PROMPT---")
+            logger.info("\(fullPrompt)")
+            logger.info("---END PROMPT---")
+
+            // Use the simpler getCompletion method which is more reliable
+            logger.info("🔄 Using getCompletion method for generation...")
+
+            let response = try await withThrowingTaskGroup(of: String.self) { group in
+                group.addTask {
+                    // Call getCompletion which handles the generation internally
+                    let result = await llm.getCompletion(from: fullPrompt)
+                    self.logger.info("✅ Got response from getCompletion: \(result.prefix(100))...")
+                    return result
+                }
+
+                group.addTask {
+                    // Timeout task
+                    try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
+                    self.logger.error("❌ Generation timed out after 60 seconds")
+                    throw LLMError.generationFailed("Generation timed out after 60 seconds")
+                }
+
+                // Return the first completed task (either result or timeout)
+                guard let result = try await group.next() else {
+                    throw LLMError.generationFailed("No result from generation")
+                }
+
+                // Cancel the other task
+                group.cancelAll()
+                return result
+            }
+
+            logger.info("✅ Got response from LLM: \(response.prefix(100))...")
+
+            // Apply stop sequences if specified
+            var finalResponse = response
+            if !options.stopSequences.isEmpty {
+                for sequence in options.stopSequences {
+                    if let range = finalResponse.range(of: sequence) {
+                        finalResponse = String(finalResponse[..<range.lowerBound])
+                        break
+                    }
+                }
+            }
+
+            // Note: We return the raw response including any thinking tags
+            // The SDK's GenerationService will handle parsing thinking content
+            // based on the model's configuration
+
+            // Limit to max tokens if specified (but preserve thinking tags)
+            if options.maxTokens > 0 {
+                // For responses with thinking content, we count tokens excluding tags
+                let tokens = finalResponse.split(separator: " ")
+                if tokens.count > options.maxTokens {
+                    // This is a simple approximation - in practice, token counting
+                    // should be done by the tokenizer
+                    finalResponse = tokens.prefix(options.maxTokens).joined(separator: " ")
+                }
+            }
+
+            return finalResponse
+        } catch {
+            logger.error("❌ Generation failed: \(error)")
+            throw FrameworkError(
+                framework: .llamaCpp,
+                underlying: error,
+                context: "Generation failed for prompt: \(prompt)"
+            )
+        }
+    }
+
+    public func streamGenerate(
+        prompt: String,
+        options: GenerationOptions,
+        onToken: @escaping (String) -> Void
+    ) async throws {
+        logger.info("🔧 streamGenerate called!")
+        logger.info("🔧 Starting stream generation for prompt: \(prompt.prefix(50))...")
+
+        guard let llm = llm else {
+            logger.error("❌ LLM not initialized for streaming")
+            throw LLMServiceError.notInitialized
+        }
+
+        // Apply generation options
+        await applyGenerationOptions(options, to: llm)
+
+        // Include context
+        let fullPrompt = buildPromptWithContext(prompt)
+        logger.info("📝 Full streaming prompt length: \(fullPrompt.count) characters")
+
+        // Let LLM.swift manage its own conversation history for streaming
+        // This maintains context across multiple turns
+
+        // Create streaming callback
+        let maxTokens = options.maxTokens > 0 ? options.maxTokens : Int.max
+        var accumulatedResponse = ""
+
+        // Generate with streaming using respond method - simpler approach
+        do {
+            logger.info("🚀 Starting streaming generation")
+            logger.info("📝 Full streaming prompt:")
+            logger.info("---START STREAMING PROMPT---")
+            logger.info("\(fullPrompt)")
+            logger.info("---END STREAMING PROMPT---")
+
+            var tokenCount = 0
+
+            // Log the actual prompt being sent to LLM.swift
+            logger.info("📤 Calling llm.respond with prompt: '\(fullPrompt)'")
+            logger.info("📊 Current LLM history count: \(llm.history.count)")
+            if !llm.history.isEmpty {
+                for (index, chat) in llm.history.enumerated() {
+                    let roleStr = chat.role == .user ? "user" : "bot"
+                    let contentPreview = String(chat.content.prefix(100))
+                    logger.info("📜 History[\(index)]: \(roleStr) - \(contentPreview)...")
+                }
+            }
+
+            await llm.respond(to: fullPrompt) { [weak self] response in
+                var fullResponse = ""
+                self?.logger.info("🎯 Received response stream")
+
+                for await token in response {
+                    tokenCount += 1
+                    self?.logger.info("📤 Token #\(tokenCount): '\(token)'")
+
+                    // Accumulate response to check for stop sequences
+                    accumulatedResponse += token
+
+                    // Note: We stream all tokens including thinking tags
+                    // The SDK's StreamingService will handle parsing and filtering
+                    // thinking content based on the model's configuration
+
+                    // Check stop sequences in accumulated response
+                    if !options.stopSequences.isEmpty {
+                        var shouldStop = false
+                        for sequence in options.stopSequences {
+                            if accumulatedResponse.contains(sequence) {
+                                // If we hit a stop sequence, emit only up to that point
+                                if let range = accumulatedResponse.range(of: sequence) {
+                                    let remainingText = String(accumulatedResponse[..<range.lowerBound])
+                                    if remainingText.count > fullResponse.count {
+                                        let newText = String(remainingText.suffix(remainingText.count - fullResponse.count))
+                                        if !newText.isEmpty {
+                                            onToken(newText)
+                                        }
+                                    }
+                                }
+                                shouldStop = true
+                                break
+                            }
+                        }
+                        if shouldStop { break }
+                    }
+
+                    // Check token limit (approximate - actual tokenization may differ)
+                    tokenCount += 1
+                    if tokenCount >= maxTokens {
+                        break
+                    }
+
+                    // Yield token
+                    onToken(token)
+                    fullResponse += token
+                }
+                return fullResponse
+            }
+
+            logger.info("✅ Streaming generation completed successfully")
+            logger.info("📊 Total tokens streamed: \(tokenCount)")
+            logger.info("📊 Total response length: \(accumulatedResponse.count)")
+
+        }
+    }
+
+    public func cleanup() async {
+        llm = nil
+        modelPath = nil
+        _modelInfo = nil
+    }
+
+    public func getModelMemoryUsage() async throws -> Int64 {
+        // Estimate based on model file size and context
+        guard let modelPath = modelPath else {
+            throw LLMServiceError.notInitialized
+        }
+
+        let fileManager = FileManager.default
+        let attributes = try fileManager.attributesOfItem(atPath: modelPath)
+        let fileSize = attributes[.size] as? Int64 ?? 0
+
+        // Add context memory (approximately 10MB per 1000 context tokens)
+        let contextMemory = Int64(2048 * 10 * 1024) // 20MB for 2048 context
+
+        return fileSize + contextMemory
+    }
+
+
+
+    // MARK: - Private Helpers
+
+    private func determineTemplate(from path: String) -> Template {
+        let filename = URL(fileURLWithPath: path).lastPathComponent.lowercased()
+
+        logger.info("🔍 Determining template for filename: \(filename)")
+
+        if filename.contains("qwen") {
+            // Qwen models typically use ChatML format
+            logger.info("✅ Using ChatML template for Qwen model")
+            return .chatML()
+        } else if filename.contains("chatml") || filename.contains("openai") {
+            return .chatML()
+        } else if filename.contains("alpaca") {
+            return .alpaca()
+        } else if filename.contains("llama") {
+            return .llama()
+        } else if filename.contains("mistral") {
+            return .mistral
+        } else if filename.contains("gemma") {
+            return .gemma
+        }
+
+        // Default to ChatML
+        logger.info("⚠️ Using default ChatML template")
+        return .chatML()
+    }
+
+    private func determineFormat(from path: String) -> ModelFormat {
+        let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
+        return ext == "gguf" ? .gguf : .ggml
+    }
+
+    private func applyGenerationOptions(_ options: GenerationOptions, to llm: LLM) async {
+        // LLM.swift Configuration requires apiKey, so we'll use generation parameters directly
+        // The parameters will be applied during the respond() call
+        // This is a placeholder for compatibility
+    }
+
+    private func buildPromptWithContext(_ prompt: String) -> String {
+        // LLM.swift manages conversation history internally
+        // We should only pass the new user message
+        logger.info("📝 Passing new user message to LLM.swift")
+        logger.info("📝 Message length: \(prompt.count) characters")
+
+        // Return only the new message - LLM.swift will handle the rest
+        return prompt
+    }
+}

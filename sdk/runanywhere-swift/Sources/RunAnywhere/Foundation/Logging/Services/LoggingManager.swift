@@ -20,6 +20,9 @@ public class LoggingManager {
     /// Current logging configuration
     public private(set) var configuration = LoggingConfiguration()
 
+    /// Environment configuration
+    private let envConfig = EnvironmentConfiguration.current
+
     /// Remote logger for telemetry
     private let remoteLogger = RemoteLogger()
 
@@ -32,6 +35,8 @@ public class LoggingManager {
     // MARK: - Initialization
 
     private init() {
+        // Apply environment-based configuration
+        applyEnvironmentConfiguration()
         setupBatcher()
     }
 
@@ -54,7 +59,10 @@ public class LoggingManager {
 
     /// Log a message with the specified level and metadata
     internal func log(level: LogLevel, category: String, message: String, metadata: [String: Any]? = nil) {
-        // Check if we should log this level
+        // Check against environment minimum log level first
+        guard level >= envConfig.logging.minimumLogLevel else { return }
+
+        // Then check against SDK configuration
         guard level >= configuration.minLogLevel else { return }
 
         // Create log entry
@@ -67,13 +75,18 @@ public class LoggingManager {
             deviceInfo: configuration.includeDeviceMetadata ? DeviceInfo.current : nil
         )
 
-        // Local logging
-        if configuration.enableLocalLogging {
+        // Local logging - respect environment configuration
+        if configuration.enableLocalLogging && envConfig.logging.enableConsoleLogging {
             logLocally(entry)
         }
 
-        // Remote logging
-        if configuration.enableRemoteLogging {
+        // File logging - if enabled in environment
+        if envConfig.logging.enableFileLogging {
+            // TODO: Implement file logging
+        }
+
+        // Remote logging - respect both SDK and environment configuration
+        if configuration.enableRemoteLogging && envConfig.logging.enableRemoteLogging {
             logBatcher?.add(entry)
         }
     }
@@ -119,7 +132,40 @@ public class LoggingManager {
         } else {
             // Fallback for older OS versions
             let consoleMessage = LogFormatter.formatForConsole(entry)
-            print(consoleMessage)
+            // Only print to console if environment allows it
+            if envConfig.logging.enableConsoleLogging {
+                print(consoleMessage)
+            }
+        }
+    }
+
+    private func applyEnvironmentConfiguration() {
+        // Update SDK configuration based on environment
+        var config = configuration
+
+        // Set minimum log level from environment
+        config.minLogLevel = envConfig.logging.minimumLogLevel
+
+        // Enable/disable remote logging based on environment
+        config.enableRemoteLogging = envConfig.logging.enableRemoteLogging
+
+        // Enable local logging based on environment console logging
+        config.enableLocalLogging = envConfig.logging.enableConsoleLogging || envConfig.logging.enableFileLogging
+
+        // Update configuration
+        self.configuration = config
+
+        // Log current environment for debugging
+        if envConfig.environment.isDebug {
+            let entry = LogEntry(
+                timestamp: Date(),
+                level: .info,
+                category: "LoggingManager",
+                message: "🚀 Running in \(envConfig.environment.rawValue) environment - Console: \(envConfig.logging.enableConsoleLogging), Remote: \(envConfig.logging.enableRemoteLogging), MinLevel: \(envConfig.logging.minimumLogLevel)",
+                metadata: nil,
+                deviceInfo: nil
+            )
+            logLocally(entry)
         }
     }
 }

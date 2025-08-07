@@ -4,6 +4,7 @@ import Foundation
 public class RoutingService {
     private let costCalculator: CostCalculator
     private let resourceChecker: ResourceChecker
+    private let logger = SDKLogger(category: "RoutingService")
 
     public init(
         costCalculator: CostCalculator,
@@ -14,63 +15,19 @@ public class RoutingService {
     }
 
     /// Determine the optimal routing for a generation request
+    /// FORCE LOCAL ONLY - Always route to on-device execution
     public func determineRouting(
         prompt: String,
-        context: Context,
+        context: Any?,
         options: GenerationOptions
     ) async throws -> RoutingDecision {
-        // Check user preference first
-        if let userTarget = options.preferredExecutionTarget {
-            return try await handleUserPreference(userTarget, prompt: prompt, context: context, options: options)
-        }
+        // FORCE ON-DEVICE ONLY - ignore all other logic
+        logger.info("🔒 FORCED LOCAL-ONLY ROUTING: Always using on-device execution")
 
-        // Check policy constraints
-        if let policyDecision = try await checkPolicyConstraints(prompt: prompt, context: context, options: options) {
-            return policyDecision
-        }
-
-        // Check resource availability
-        let deviceResourcesAvailable = await resourceChecker.checkDeviceResources()
-        if !deviceResourcesAvailable {
-            return .cloud(
-                provider: nil,
-                reason: .insufficientResources("device memory or processing power")
-            )
-        }
-
-        // Analyze complexity
-        let complexity = analyzeComplexity(prompt: prompt, options: options)
-
-        // Calculate costs for different options
-        let onDeviceCost = await costCalculator.calculateOnDeviceCost(
-            tokenCount: estimateTokenCount(prompt),
-            options: options
+        return .onDevice(
+            framework: selectBestFramework(for: options),
+            reason: .privacySensitive  // Use privacy as the reason for forcing local
         )
-
-        let cloudCost = await costCalculator.calculateCloudCost(
-            tokenCount: estimateTokenCount(prompt),
-            options: options
-        )
-
-        // Make decision based on cost and complexity
-        if complexity == .low && onDeviceCost < cloudCost {
-            return .onDevice(
-                framework: selectBestFramework(for: options),
-                reason: .costOptimization(savedAmount: cloudCost - onDeviceCost)
-            )
-        } else if complexity == .high {
-            return .cloud(
-                provider: nil,
-                reason: .highComplexity
-            )
-        } else {
-            // Use hybrid approach for medium complexity
-            return .hybrid(
-                devicePortion: 0.5,
-                framework: selectBestFramework(for: options),
-                reason: .latencyOptimization(expectedMs: 500)
-            )
-        }
     }
 
     // MARK: - Private Methods
@@ -78,7 +35,7 @@ public class RoutingService {
     private func handleUserPreference(
         _ target: ExecutionTarget,
         prompt: String,
-        context: Context,
+        context: Any?,
         options: GenerationOptions
     ) async throws -> RoutingDecision {
         switch target {
@@ -114,7 +71,7 @@ public class RoutingService {
 
     private func checkPolicyConstraints(
         prompt: String,
-        context: Context,
+        context: Any?,
         options: GenerationOptions
     ) async throws -> RoutingDecision? {
         // Check for privacy-sensitive content

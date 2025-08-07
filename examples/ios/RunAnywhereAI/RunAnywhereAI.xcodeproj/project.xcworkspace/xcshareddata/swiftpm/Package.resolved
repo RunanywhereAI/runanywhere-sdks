@@ -1,5 +1,5 @@
 {
-  "originHash" : "f81426f30443f51d4260ae83bd578f34586afa86e5ec42a5c115621d11917d3c",
+  "originHash" : "4f96fffb024156e02d1e769989fec0090698f2a9269db44728521e4b0b6b90c7",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -11,9 +11,18 @@
       }
     },
     {
+      "identity" : "devicekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/devicekit/DeviceKit.git",
+      "state" : {
+        "revision" : "513b9d7e7a1bd46504a1009bbab943b75ce2f195",
+        "version" : "5.6.0"
+      }
+    },
+    {
       "identity" : "executorch",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch.git",
+      "location" : "https://github.com/pytorch/ecutorch.git",
       "state" : {
         "branch" : "swiftpm-0.7.0",
         "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
@@ -29,6 +38,15 @@
       }
     },
     {
+      "identity" : "grdb.swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/groue/GRDB.swift",
+      "state" : {
+        "revision" : "8ba1bc9a96afc731a000fd4136dd13a5a46297bd",
+        "version" : "7.6.1"
+      }
+    },
+    {
       "identity" : "jinja",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/johnmai-dev/Jinja",
@@ -38,21 +56,12 @@
       }
     },
     {
-      "identity" : "llm.swift",
+      "identity" : "pulse",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/eastriverlee/LLM.swift",
+      "location" : "https://github.com/kean/Pulse",
       "state" : {
-        "branch" : "main",
-        "revision" : "7c9c8a86604c7a81eca5e6790053bc9704e30c0a"
-      }
-    },
-    {
-      "identity" : "onnxruntime-swift-package-manager",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/microsoft/onnxruntime-swift-package-manager",
-      "state" : {
-        "revision" : "12ce7374c86944e1f68f3a866d10105d8357f074",
-        "version" : "1.20.0"
+        "revision" : "3ac5ee35ab233e900aa484919803d51791d1e351",
+        "version" : "4.2.7"
       }
     },
     {

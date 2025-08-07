@@ -27,6 +27,13 @@ public class SimplifiedFileManager {
         _ = try baseFolder.createSubfolderIfNeeded(withName: "Downloads")
     }
 
+    // MARK: - Public Access
+
+    /// Get the base RunAnywhere folder
+    public func getBaseFolder() -> Folder {
+        return baseFolder
+    }
+
     // MARK: - Model Storage
 
     /// Get or create folder for a specific model
@@ -97,8 +104,11 @@ public class SimplifiedFileManager {
                     try modelFolder.delete()
 
                     // Remove metadata
-                    let metadataStore = ModelMetadataStore()
-                    metadataStore.removeModelMetadata(modelId)
+                    Task {
+                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                            try? await dataSyncService.removeModelMetadata(modelId)
+                        }
+                    }
 
                     logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
                     return
@@ -111,9 +121,12 @@ public class SimplifiedFileManager {
             let modelFolder = try modelsFolder.subfolder(named: modelId)
             try modelFolder.delete()
 
-            // Remove metadata
-            let metadataStore = ModelMetadataStore()
-            metadataStore.removeModelMetadata(modelId)
+            // Remove metadata using DataSyncService
+            Task {
+                if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+                    try? await dataSyncService.removeModelMetadata(modelId)
+                }
+            }
 
             logger.info("Deleted model: \(modelId)")
             return
@@ -293,6 +306,51 @@ public class SimplifiedFileManager {
         let fileName = "\(modelId).\(format.rawValue)"
         let file = try modelFolder.file(named: fileName)
         return URL(fileURLWithPath: file.path)
+    }
+
+    /// Find model file by searching all possible locations
+    public func findModelFile(modelId: String, expectedPath: String? = nil) -> URL? {
+        // If expected path exists and is valid, return it
+        if let expectedPath = expectedPath,
+           FileManager.default.fileExists(atPath: expectedPath) {
+            return URL(fileURLWithPath: expectedPath)
+        }
+
+        guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return nil }
+
+        // Search in framework-specific folders first
+        for frameworkFolder in modelsFolder.subfolders {
+            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+                if frameworkFolder.containsSubfolder(named: modelId) {
+                    if let modelFolder = try? frameworkFolder.subfolder(named: modelId) {
+                        // Look for any model file in the folder
+                        for file in modelFolder.files {
+                            if ModelFormat(from: file.extension ?? "") != nil,
+                               file.nameExcludingExtension == modelId || file.name.contains(modelId) {
+                                logger.info("Found model \(modelId) at: \(file.path)")
+                                return URL(fileURLWithPath: file.path)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Search in direct model folders (legacy)
+        if modelsFolder.containsSubfolder(named: modelId) {
+            if let modelFolder = try? modelsFolder.subfolder(named: modelId) {
+                for file in modelFolder.files {
+                    if let format = ModelFormat(from: file.extension ?? ""),
+                       file.nameExcludingExtension == modelId || file.name.contains(modelId) {
+                        logger.info("Found model \(modelId) at: \(file.path)")
+                        return URL(fileURLWithPath: file.path)
+                    }
+                }
+            }
+        }
+
+        logger.warning("Model file not found for: \(modelId)")
+        return nil
     }
 
     /// Get base directory URL

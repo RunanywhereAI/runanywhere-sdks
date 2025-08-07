@@ -44,29 +44,6 @@ public protocol HardwareDetector {
 // The types are available in the same module scope
 
 // Using ProcessInfo.ThermalState from Foundation
-
-/// Battery information
-public struct BatteryInfo {
-    public let level: Float  // 0.0 to 1.0
-    public let state: BatteryState
-    public let isLowPowerModeEnabled: Bool
-
-    public enum BatteryState {
-        case unknown
-        case unplugged
-        case charging
-        case full
-    }
-
-    public init(
-        level: Float,
-        state: BatteryState,
-        isLowPowerModeEnabled: Bool = false
-    ) {
-        self.level = level
-        self.state = state
-        self.isLowPowerModeEnabled = isLowPowerModeEnabled
-    }
-}
+// BatteryInfo is defined in DeviceCapability/Services/BatteryMonitorService.swift
 
 // ResourceAvailability is defined in Types.swift
