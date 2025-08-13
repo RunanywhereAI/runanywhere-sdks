@@ -52,7 +52,7 @@ public class LLMSwiftService: LLMService {
 
         // Configure LLM with hardware settings
         let maxTokens = 2048 // Default context length
-        let template = determineTemplate(from: modelPath)
+        let template = determineTemplate(from: modelPath, systemPrompt: nil)
         logger.info("📝 Using template: \(String(describing: template)), maxTokens: \(maxTokens)")
 
         // Initialize LLM instance
@@ -136,6 +136,13 @@ public class LLMSwiftService: LLMService {
 
         // Apply generation options
         await applyGenerationOptions(options, to: llm)
+
+        // Handle system prompt if provided
+        if let systemPrompt = options.systemPrompt, let modelPath = self.modelPath {
+            logger.info("🔧 Applying system prompt: \(systemPrompt.prefix(100))...")
+            let newTemplate = determineTemplate(from: modelPath, systemPrompt: systemPrompt)
+            llm.template = newTemplate
+        }
 
         logger.info("🔧 Building prompt with context")
         // Include context if available
@@ -233,6 +240,13 @@ public class LLMSwiftService: LLMService {
         // Apply generation options
         await applyGenerationOptions(options, to: llm)
 
+        // Handle system prompt if provided
+        if let systemPrompt = options.systemPrompt, let modelPath = self.modelPath {
+            logger.info("🔧 Applying system prompt for streaming: \(systemPrompt.prefix(100))...")
+            let newTemplate = determineTemplate(from: modelPath, systemPrompt: systemPrompt)
+            llm.template = newTemplate
+        }
+
         // Include context
         let fullPrompt = buildPromptWithContext(prompt)
         logger.info("📝 Full streaming prompt length: \(fullPrompt.count) characters")
@@ -271,7 +285,6 @@ public class LLMSwiftService: LLMService {
 
                 for await token in response {
                     tokenCount += 1
-                    self?.logger.info("📤 Token #\(tokenCount): '\(token)'")
 
                     // Accumulate response to check for stop sequences
                     accumulatedResponse += token
@@ -317,7 +330,7 @@ public class LLMSwiftService: LLMService {
 
             logger.info("✅ Streaming generation completed successfully")
             logger.info("📊 Total tokens streamed: \(tokenCount)")
-            logger.info("📊 Total response length: \(accumulatedResponse.count)")
+            logger.info("📊 Full response: \(accumulatedResponse)")
 
         }
     }
@@ -348,30 +361,41 @@ public class LLMSwiftService: LLMService {
 
     // MARK: - Private Helpers
 
-    private func determineTemplate(from path: String) -> Template {
+    private func determineTemplate(from path: String, systemPrompt: String? = nil) -> Template {
         let filename = URL(fileURLWithPath: path).lastPathComponent.lowercased()
 
         logger.info("🔍 Determining template for filename: \(filename)")
+        if let systemPrompt = systemPrompt {
+            logger.info("📝 Using system prompt: \(systemPrompt.prefix(100))...")
+        }
 
         if filename.contains("qwen") {
             // Qwen models typically use ChatML format
             logger.info("✅ Using ChatML template for Qwen model")
-            return .chatML()
+            return .chatML(systemPrompt)
         } else if filename.contains("chatml") || filename.contains("openai") {
-            return .chatML()
+            return .chatML(systemPrompt)
         } else if filename.contains("alpaca") {
-            return .alpaca()
+            return .alpaca(systemPrompt)
         } else if filename.contains("llama") {
-            return .llama()
+            return .llama(systemPrompt)
         } else if filename.contains("mistral") {
+            // Mistral doesn't support system prompts in the same way
+            if systemPrompt != nil {
+                logger.warning("⚠️ Mistral template doesn't support system prompts, ignoring")
+            }
             return .mistral
         } else if filename.contains("gemma") {
+            // Gemma doesn't support system prompts in the same way
+            if systemPrompt != nil {
+                logger.warning("⚠️ Gemma template doesn't support system prompts, ignoring")
+            }
             return .gemma
         }
 
         // Default to ChatML
         logger.info("⚠️ Using default ChatML template")
-        return .chatML()
+        return .chatML(systemPrompt)
     }
 
     private func determineFormat(from path: String) -> ModelFormat {
