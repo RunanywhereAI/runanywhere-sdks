@@ -104,6 +104,50 @@ class ModelListViewModel: ObservableObject {
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
+        ),
+
+        // MARK: - Voice Models (WhisperKit)
+
+        // Whisper Tiny
+        ModelInfo(
+            id: "whisper-tiny",
+            name: "Whisper Tiny",
+            format: .mlmodel,
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-tiny.en/melspectrogram_normalizer.mlmodelc.zip"),
+            estimatedMemory: 39_000_000, // 39MB
+            contextLength: 0, // Not applicable for voice models
+            downloadSize: 39_000_000, // ~39MB
+            compatibleFrameworks: [.whisperKit],
+            preferredFramework: .whisperKit,
+            supportsThinking: false
+        ),
+
+        // Whisper Base
+        ModelInfo(
+            id: "whisper-base",
+            name: "Whisper Base",
+            format: .mlmodel,
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-base/melspectrogram_normalizer.mlmodelc.zip"),
+            estimatedMemory: 74_000_000, // 74MB
+            contextLength: 0, // Not applicable for voice models
+            downloadSize: 74_000_000, // ~74MB
+            compatibleFrameworks: [.whisperKit],
+            preferredFramework: .whisperKit,
+            supportsThinking: false
+        ),
+
+        // Whisper Small
+        ModelInfo(
+            id: "whisper-small",
+            name: "Whisper Small",
+            format: .mlmodel,
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-small/melspectrogram_normalizer.mlmodelc.zip"),
+            estimatedMemory: 244_000_000, // 244MB
+            contextLength: 0, // Not applicable for voice models
+            downloadSize: 244_000_000, // ~244MB
+            compatibleFrameworks: [.whisperKit],
+            preferredFramework: .whisperKit,
+            supportsThinking: false
         )
     ]
 
