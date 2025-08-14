@@ -505,6 +505,10 @@ private class FrameworkAdapterRegistryImpl: FrameworkAdapterRegistry {
             return ["Voice assistants", "Keyword spotting", "Ultra-low latency"]
         case .mlc:
             return ["Mobile LLM deployment", "Optimized inference", "Memory efficiency"]
+        case .whisperKit:
+            return ["Speech-to-text", "Voice transcription", "On-device speech recognition"]
+        case .openAIWhisper:
+            return ["Cloud-based transcription", "High accuracy speech-to-text", "Multi-language support"]
         }
     }
 }

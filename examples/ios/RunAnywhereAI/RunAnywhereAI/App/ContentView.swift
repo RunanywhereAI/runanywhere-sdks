@@ -37,6 +37,12 @@ struct ContentView: View {
                     Label("Quiz", systemImage: "questionmark.circle")
                 }
                 .tag(3)
+
+            VoiceAssistantView()
+                .tabItem {
+                    Label("Voice", systemImage: "mic")
+                }
+                .tag(4)
         }
     }
 }

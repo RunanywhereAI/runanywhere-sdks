@@ -23,7 +23,8 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.6.1"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        .package(url: "https://github.com/kean/Pulse", from: "4.0.0")
+        .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit", from: "0.9.4")
     ],
     targets: [
         .target(

@@ -31,7 +31,7 @@ internal class VoiceAdapterRegistryImpl: VoiceAdapterRegistry {
     }
 
     func findBestAdapter(for model: ModelInfo) -> VoiceFrameworkAdapter? {
-        return queue.sync {
+        return queue.sync { () -> VoiceFrameworkAdapter? in
             // Try to find adapter based on compatible frameworks
             for framework in model.compatibleFrameworks {
                 if let adapter = adapters[framework], adapter.canHandle(model: model) {
@@ -39,13 +39,10 @@ internal class VoiceAdapterRegistryImpl: VoiceAdapterRegistry {
                 }
             }
 
-            // Try to find adapter based on architecture
-            if model.architecture == .whisper {
-                // Find any adapter that supports whisper models
-                for adapter in adapters.values {
-                    if adapter.canHandle(model: model) {
-                        return adapter
-                    }
+            // Try to find any adapter that can handle this model
+            for adapter in adapters.values {
+                if adapter.canHandle(model: model) {
+                    return adapter
                 }
             }
 

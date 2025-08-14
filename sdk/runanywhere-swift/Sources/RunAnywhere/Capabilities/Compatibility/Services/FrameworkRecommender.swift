@@ -154,6 +154,10 @@ class FrameworkRecommender {
             return 0.50 // Small models only
         case .mediaPipe:
             return 0.60 // Optimized for specific model types
+        case .whisperKit:
+            return 0.85 // Optimized for speech recognition on Apple devices
+        case .openAIWhisper:
+            return 0.70 // Cloud-based, excellent accuracy
         }
     }
 
@@ -182,6 +186,10 @@ class FrameworkRecommender {
             return 0.55 // Less optimized
         case .mediaPipe:
             return 0.70 // Efficient for specific models
+        case .whisperKit:
+            return 0.80 // Efficient on-device speech models
+        case .openAIWhisper:
+            return 0.50 // Cloud-based, no local memory usage
         }
     }
 
@@ -209,6 +217,10 @@ class FrameworkRecommender {
             return 0.80 // Simple for small models
         case .mediaPipe:
             return 0.75 // Good integration with Google tools
+        case .whisperKit:
+            return 0.80 // Simple API for speech recognition
+        case .openAIWhisper:
+            return 0.85 // Very simple API, cloud-based
         }
     }
 
@@ -236,6 +248,10 @@ class FrameworkRecommender {
             return 0.70 // Simple and stable
         case .mediaPipe:
             return 0.85 // Google-maintained, stable
+        case .whisperKit:
+            return 0.75 // Active community project
+        case .openAIWhisper:
+            return 0.90 // OpenAI-maintained, very stable
         }
     }
 

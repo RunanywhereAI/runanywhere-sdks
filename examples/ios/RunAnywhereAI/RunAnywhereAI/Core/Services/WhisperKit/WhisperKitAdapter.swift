@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 
 /// WhisperKit adapter for voice transcription
 public class WhisperKitAdapter: VoiceFrameworkAdapter {
@@ -8,13 +8,12 @@ public class WhisperKitAdapter: VoiceFrameworkAdapter {
 
     public let framework: LLMFramework = .whisperKit
 
-    public let supportedFormats: [ModelFormat] = [.coreML, .mlmodel]
+    public let supportedFormats: [ModelFormat] = [.mlmodel, .mlpackage]
 
     // MARK: - VoiceFrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
-        return model.compatibleFrameworks.contains(.whisperKit) ||
-               model.architecture == .whisper
+        return model.compatibleFrameworks.contains(.whisperKit)
     }
 
     public func createService() -> VoiceService {
