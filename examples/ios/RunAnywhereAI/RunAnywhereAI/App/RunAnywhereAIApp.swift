@@ -63,6 +63,9 @@ struct RunAnywhereAIApp: App {
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
             RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
 
+            // Register voice framework adapter
+            RunAnywhereSDK.shared.registerVoiceFrameworkAdapter(WhisperKitAdapter())
+
             // Initialize the SDK
             let startTime = Date()
             print("🚀 RunAnywhereSDK: Starting initialization...")

@@ -50,6 +50,9 @@ public class RunAnywhereSDK {
     internal var currentModel: ModelInfo?
     internal var currentService: LLMService?
 
+    /// Voice framework adapters storage
+    internal var voiceAdapters: [LLMFramework: VoiceFrameworkAdapter] = [:]
+
     /// Logger for debugging
     internal let logger = SDKLogger(category: "RunAnywhereSDK")
 

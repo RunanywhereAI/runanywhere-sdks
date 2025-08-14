@@ -9,7 +9,7 @@
 ### While implementing
 - You should update the plan as you work - check `thoughts/shared/plans/{descriptive_name}.md` if you're running an already created plan via `thoughts/shared/plans/{descriptive_name}.md`
 - After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
-
+- Always make sure that you're using structured outputs, never use strings directly so that we can keep things consistent and scalable and not make mistakes.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
