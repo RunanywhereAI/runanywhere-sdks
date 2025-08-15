@@ -126,6 +126,18 @@ public class RunAnywhereSDK {
     }
 }
 
+// MARK: - Download Strategy Registration
+
+extension RunAnywhereSDK {
+    /// Register a custom download strategy for handling special model downloads
+    /// - Parameter strategy: The download strategy to register
+    /// - Note: Custom strategies have priority over default download behavior
+    public func registerDownloadStrategy(_ strategy: DownloadStrategy) {
+        serviceContainer.downloadService.registerStrategy(strategy)
+        logger.info("✅ Registered custom download strategy")
+    }
+}
+
 // MARK: - Performance and Testing Access
 
 extension RunAnywhereSDK {

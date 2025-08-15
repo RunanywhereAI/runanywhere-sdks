@@ -12,6 +12,11 @@ public class AlamofireDownloadService: DownloadManager {
     private var activeDownloadRequests: [String: DownloadRequest] = [:]
     private let logger = SDKLogger(category: "AlamofireDownloadService")
 
+    // MARK: - Custom Download Strategies
+
+    /// Storage for custom download strategies provided by host app
+    private var customStrategies: [DownloadStrategy] = []
+
     // MARK: - Initialization
 
     public init(configuration: DownloadConfiguration = DownloadConfiguration()) {
@@ -38,6 +43,14 @@ public class AlamofireDownloadService: DownloadManager {
     // MARK: - DownloadManager Protocol
 
     public func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
+        // Check if any custom strategy can handle this model
+        for strategy in customStrategies {
+            if strategy.canHandle(model: model) {
+                return try await downloadModelWithCustomStrategy(model, strategy: strategy)
+            }
+        }
+
+        // No custom strategy found, use default download
         guard let downloadURL = model.downloadURL else {
             throw DownloadError.invalidURL
         }
@@ -192,6 +205,92 @@ public class AlamofireDownloadService: DownloadManager {
         // Note: We can't return the actual DownloadTask objects as they're created asynchronously
         // This would need refactoring to maintain a proper task registry
         return []
+    }
+
+    // MARK: - Custom Strategy Support
+
+    /// Register a custom download strategy from host app
+    public func registerStrategy(_ strategy: DownloadStrategy) {
+        customStrategies.insert(strategy, at: 0) // Custom strategies have priority
+        logger.info("Registered custom download strategy")
+    }
+
+    /// Helper to download using a custom strategy
+    private func downloadModelWithCustomStrategy(_ model: ModelInfo, strategy: DownloadStrategy) async throws -> DownloadTask {
+        logger.info("Using custom strategy for model: \(model.id)")
+
+        let taskId = UUID().uuidString
+        let (progressStream, progressContinuation) = AsyncStream<DownloadProgress>.makeStream()
+
+        // Create download task
+        let task = DownloadTask(
+            id: taskId,
+            modelId: model.id,
+            progress: progressStream,
+            result: Task {
+                defer {
+                    progressContinuation.finish()
+                }
+
+                do {
+                    let destinationFolder = try getDestinationFolder(for: model.id, framework: model.preferredFramework)
+
+                    let resultURL = try await strategy.download(
+                        model: model,
+                        to: destinationFolder,
+                        progressHandler: { progress in
+                            progressContinuation.yield(DownloadProgress(
+                                bytesDownloaded: Int64(progress * Double(model.downloadSize ?? 100)),
+                                totalBytes: Int64(model.downloadSize ?? 100),
+                                state: .downloading
+                            ))
+                        }
+                    )
+
+                    // Update progress to completed
+                    progressContinuation.yield(DownloadProgress(
+                        bytesDownloaded: Int64(model.downloadSize ?? 100),
+                        totalBytes: Int64(model.downloadSize ?? 100),
+                        state: .completed
+                    ))
+
+                    // Update model with local path in registry
+                    var updatedModel = model
+                    updatedModel.localPath = resultURL
+                    ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                    self.logger.info("Custom strategy download completed", metadata: [
+                        "modelId": model.id,
+                        "localPath": resultURL.path
+                    ])
+
+                    return resultURL
+                } catch {
+                    progressContinuation.yield(DownloadProgress(
+                        bytesDownloaded: 0,
+                        totalBytes: Int64(model.downloadSize ?? 0),
+                        state: .failed(error)
+                    ))
+                    throw error
+                }
+            }
+        )
+
+        return task
+    }
+
+    /// Helper to get destination folder for a model
+    private func getDestinationFolder(for modelId: String, framework: LLMFramework? = nil) throws -> URL {
+        let fileManager = ServiceContainer.shared.fileManager
+        let modelFolder: Folder
+
+        if let framework = framework {
+            modelFolder = try fileManager.getModelFolder(for: modelId, framework: framework)
+        } else {
+            modelFolder = try fileManager.getModelFolder(for: modelId)
+        }
+
+        return URL(fileURLWithPath: modelFolder.path)
     }
 
     // MARK: - Helper Methods

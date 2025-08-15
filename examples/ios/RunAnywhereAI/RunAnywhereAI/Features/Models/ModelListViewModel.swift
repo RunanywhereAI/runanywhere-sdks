@@ -107,13 +107,14 @@ class ModelListViewModel: ObservableObject {
         ),
 
         // MARK: - Voice Models (WhisperKit)
+        // Note: URLs provide the base path for the custom download strategy to extract model info
 
         // Whisper Tiny
         ModelInfo(
             id: "whisper-tiny",
             name: "Whisper Tiny",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-tiny.en/melspectrogram_normalizer.mlmodelc.zip"),
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-tiny.en/"), // Base URL for strategy
             estimatedMemory: 39_000_000, // 39MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 39_000_000, // ~39MB
@@ -127,7 +128,7 @@ class ModelListViewModel: ObservableObject {
             id: "whisper-base",
             name: "Whisper Base",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-base/melspectrogram_normalizer.mlmodelc.zip"),
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-base/"), // Base URL for strategy
             estimatedMemory: 74_000_000, // 74MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 74_000_000, // ~74MB
@@ -141,7 +142,7 @@ class ModelListViewModel: ObservableObject {
             id: "whisper-small",
             name: "Whisper Small",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/whisperkit-coreml/openai_whisper-small/melspectrogram_normalizer.mlmodelc.zip"),
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-small/"), // Base URL for strategy
             estimatedMemory: 244_000_000, // 244MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 244_000_000, // ~244MB
@@ -253,7 +254,15 @@ class ModelListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
+            // Get the model info
+            guard let model = availableModels.first(where: { $0.id == modelId }) else {
+                throw SDKError.modelNotFound(modelId)
+            }
+
+            // Use the SDK's downloadModel with strategy support
+            // The SDK will automatically use the registered WhisperKit strategy for whisper models
             _ = try await sdk.downloadModel(modelId)
+
             // Wait a moment for filesystem to settle
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             // Refresh models to update download status

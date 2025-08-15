@@ -66,6 +66,10 @@ struct RunAnywhereAIApp: App {
             // Register voice framework adapter
             RunAnywhereSDK.shared.registerVoiceFrameworkAdapter(WhisperKitAdapter())
 
+            // Register WhisperKit download strategy
+            RunAnywhereSDK.shared.registerDownloadStrategy(WhisperKitDownloadStrategy())
+            print("📥 Registered WhisperKit download strategy")
+
             // Initialize the SDK
             let startTime = Date()
             print("🚀 RunAnywhereSDK: Starting initialization...")
