@@ -165,25 +165,17 @@ class ModelListViewModel: ObservableObject {
         // First, register predefined models with SDK if they have download URLs
         await registerPredefinedModels()
 
-        // Start with predefined models
-        var allModels = predefinedModels
-
+        // Use SDK models as the source of truth
         do {
-            // Add any existing SDK models
+            // Get all models from SDK (includes registered predefined models)
             let sdkModels = try await sdk.listAvailableModels()
-
-            // Avoid duplicates by checking if model already exists in predefined list
-            for sdkModel in sdkModels {
-                if !allModels.contains(where: { $0.id == sdkModel.id }) {
-                    allModels.append(sdkModel)
-                }
-            }
+            availableModels = sdkModels
         } catch {
             print("Failed to load models from SDK: \(error)")
-            // Still proceed with predefined models even if SDK fails
+            // Fall back to predefined models if SDK fails
+            availableModels = predefinedModels
         }
 
-        availableModels = allModels
         currentModel = nil
         isLoading = false
     }

@@ -13,6 +13,7 @@ public enum SDKError: LocalizedError {
     case validationFailed(ValidationError)
     case routingFailed(String)
     case databaseInitializationFailed(Error)
+    case unsupportedModality(String)
 
     public var errorDescription: String? {
         switch self {
@@ -38,6 +39,8 @@ public enum SDKError: LocalizedError {
             return "Routing failed: \(reason)"
         case .databaseInitializationFailed(let error):
             return "Database initialization failed: \(error.localizedDescription)"
+        case .unsupportedModality(let modality):
+            return "Unsupported modality: \(modality)"
         }
     }
 }

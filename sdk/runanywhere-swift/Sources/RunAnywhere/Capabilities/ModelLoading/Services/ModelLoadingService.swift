@@ -3,7 +3,7 @@ import Foundation
 /// Service responsible for loading models
 public class ModelLoadingService {
     private let registry: ModelRegistry
-    private let adapterRegistry: FrameworkAdapterRegistry
+    private let adapterRegistry: AdapterRegistry
     private let validationService: ValidationService
     private let memoryService: MemoryManager // Using MemoryManager protocol for now
     private let logger = SDKLogger(category: "ModelLoadingService")
@@ -12,7 +12,7 @@ public class ModelLoadingService {
 
     public init(
         registry: ModelRegistry,
-        adapterRegistry: FrameworkAdapterRegistry,
+        adapterRegistry: AdapterRegistry,
         validationService: ValidationService,
         memoryService: MemoryManager
     ) {
@@ -59,8 +59,6 @@ public class ModelLoadingService {
 
         // Find appropriate adapter
         logger.info("🚀 Finding adapter for model")
-        let registeredAdapters = adapterRegistry.getRegisteredAdapters()
-        logger.debug("📊 Registered adapters: \(registeredAdapters.keys.map { $0.rawValue })")
 
         guard let adapter = adapterRegistry.findBestAdapter(for: modelInfo) else {
             logger.error("❌ No adapter found for model with preferred framework: \(modelInfo.preferredFramework?.rawValue ?? "none")")
@@ -72,19 +70,27 @@ public class ModelLoadingService {
 
         logger.info("✅ Found adapter for framework: \(adapter.framework.rawValue)")
 
+        // Determine modality based on model (for now, default to textToText for LLMs)
+        let modality: FrameworkModality = modelInfo.preferredFramework == .whisperKit ? .voiceToText : .textToText
+
         // Load model through adapter
         logger.info("🚀 Loading model through adapter")
-        let service = try await adapter.loadModel(modelInfo)
+        let service = try await adapter.loadModel(modelInfo, for: modality)
         logger.info("✅ Model loaded through adapter")
 
+        // Cast to LLMService
+        guard let llmService = service as? LLMService else {
+            throw SDKError.loadingFailed("Adapter returned incompatible service type")
+        }
+
         // Create loaded model
-        let loaded = LoadedModel(model: modelInfo, service: service)
+        let loaded = LoadedModel(model: modelInfo, service: llmService)
 
         // Register loaded model
         memoryService.registerLoadedModel(
             loaded,
             size: modelInfo.estimatedMemory,
-            service: service
+            service: llmService
         )
         loadedModels[modelId] = loaded
 

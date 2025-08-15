@@ -3,12 +3,12 @@ import RunAnywhereSDK
 
 /// Sample adapter for Apple Foundation Models framework
 /// This is a demonstration adapter showing the interface
-public class FoundationModelsAdapter: FrameworkAdapter {
-    public var framework: LLMFramework { .foundationModels }
+public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
+    public let framework: LLMFramework = .foundationModels
 
-    public var supportedFormats: [ModelFormat] {
-        [.mlmodel, .mlpackage]
-    }
+    public let supportedModalities: Set<FrameworkModality> = [.textToText]
+
+    public let supportedFormats: [ModelFormat] = [.mlmodel, .mlpackage]
 
     private var hardwareConfig: HardwareConfiguration?
 
@@ -26,11 +26,15 @@ public class FoundationModelsAdapter: FrameworkAdapter {
         }
     }
 
-    public func createService() -> LLMService {
+    public func createService(for modality: FrameworkModality) -> Any? {
+        guard modality == .textToText else { return nil }
         return FoundationModelsService(hardwareConfig: hardwareConfig)
     }
 
-    public func loadModel(_ model: ModelInfo) async throws -> LLMService {
+    public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
+        guard modality == .textToText else {
+            throw SDKError.unsupportedModality(modality.rawValue)
+        }
         guard let localPath = model.localPath else {
             throw FrameworkError(
                 framework: framework,

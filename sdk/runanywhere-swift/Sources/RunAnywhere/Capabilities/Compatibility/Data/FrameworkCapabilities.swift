@@ -90,6 +90,14 @@ struct FrameworkCapabilities {
             requiresSpecificModels: false,
             minimumOS: "12.0",
             supportedArchitectures: ["arm64", "arm64e"]
+        ),
+        .whisperKit: InternalFrameworkCapability(
+            supportedFormats: [.mlmodel],
+            supportedQuantizations: [.f16, .f32],
+            maxModelSize: 1_500_000_000,
+            requiresSpecificModels: true,
+            minimumOS: "14.0",
+            supportedArchitectures: ["arm64", "arm64e"]
         )
     ]
 

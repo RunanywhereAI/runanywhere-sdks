@@ -2,12 +2,12 @@ import Foundation
 import RunAnywhereSDK
 import LLM
 
-public class LLMSwiftAdapter: FrameworkAdapter {
-    public var framework: LLMFramework { .llamaCpp }
+public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
+    public let framework: LLMFramework = .llamaCpp
 
-    public var supportedFormats: [ModelFormat] {
-        [.gguf, .ggml]
-    }
+    public let supportedModalities: Set<FrameworkModality> = [.textToText]
+
+    public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
 
     private var hardwareConfig: HardwareConfiguration?
 
@@ -27,11 +27,15 @@ public class LLMSwiftAdapter: FrameworkAdapter {
         return model.estimatedMemory < Int64(Double(availableMemory) * 0.7)
     }
 
-    public func createService() -> LLMService {
+    public func createService(for modality: FrameworkModality) -> Any? {
+        guard modality == .textToText else { return nil }
         return LLMSwiftService(hardwareConfig: hardwareConfig)
     }
 
-    public func loadModel(_ model: ModelInfo) async throws -> LLMService {
+    public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
+        guard modality == .textToText else {
+            throw SDKError.unsupportedModality(modality.rawValue)
+        }
         print("🚀 [LLMSwiftAdapter] Loading model: \(model.name) (ID: \(model.id))")
 
         guard let localPath = model.localPath else {

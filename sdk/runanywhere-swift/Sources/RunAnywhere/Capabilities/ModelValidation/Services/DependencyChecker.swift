@@ -6,11 +6,11 @@ public class DependencyChecker {
     // MARK: - Properties
 
     private let logger = SDKLogger(category: "DependencyChecker")
-    private let frameworkRegistry: FrameworkAdapterRegistry
+    private let frameworkRegistry: AdapterRegistry
 
     // MARK: - Initialization
 
-    public init(frameworkRegistry: FrameworkAdapterRegistry) {
+    public init(frameworkRegistry: AdapterRegistry) {
         self.frameworkRegistry = frameworkRegistry
     }
 
