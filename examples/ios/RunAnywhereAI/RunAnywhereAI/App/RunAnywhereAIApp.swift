@@ -63,8 +63,8 @@ struct RunAnywhereAIApp: App {
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
             RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
 
-            // Register voice framework adapter
-            RunAnywhereSDK.shared.registerVoiceFrameworkAdapter(WhisperKitAdapter())
+            // Register voice framework adapter (now uses unified adapter)
+            RunAnywhereSDK.shared.registerFrameworkAdapter(WhisperKitAdapter())
 
             // Register WhisperKit download strategy
             RunAnywhereSDK.shared.registerDownloadStrategy(WhisperKitDownloadStrategy())

@@ -8,7 +8,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
 
     public let framework: LLMFramework = .whisperKit
 
-    public let supportedModalities: Set<FrameworkModality> = [.voiceToText]
+    public let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToVoice]
 
     public let supportedFormats: [ModelFormat] = [.mlmodel, .mlpackage]
 
@@ -19,22 +19,30 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
-        guard modality == .voiceToText else { return nil }
-        return WhisperKitService()
+        switch modality {
+        case .voiceToText:
+            return WhisperKitService()
+        case .textToVoice:
+            return SystemTTSServiceWrapper()
+        default:
+            return nil
+        }
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
-        guard modality == .voiceToText else {
+        switch modality {
+        case .voiceToText:
+            let service = WhisperKitService()
+            // Initialize with model path if available
+            let modelPath = model.localPath?.path
+            try await service.initialize(modelPath: modelPath)
+            return service
+        case .textToVoice:
+            // TTS doesn't need model loading, just return the service
+            return SystemTTSServiceWrapper()
+        default:
             throw SDKError.unsupportedModality(modality.rawValue)
         }
-
-        let service = WhisperKitService()
-
-        // Initialize with model path if available
-        let modelPath = model.localPath?.path
-        try await service.initialize(modelPath: modelPath)
-
-        return service
     }
 
     public func configure(with hardware: HardwareConfiguration) async {

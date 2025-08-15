@@ -3,18 +3,6 @@ import Foundation
 // MARK: - Voice Extensions
 public extension RunAnywhereSDK {
 
-    /// Register a voice framework adapter (now uses unified adapter)
-    /// - Parameter adapter: The unified framework adapter that supports voice
-    func registerVoiceFrameworkAdapter(_ adapter: UnifiedFrameworkAdapter) {
-        // Verify it supports voice modality
-        guard adapter.supportedModalities.contains(.voiceToText) ||
-              adapter.supportedModalities.contains(.textToVoice) else {
-            logger.warning("Adapter \(adapter.framework) doesn't support voice modalities")
-            return
-        }
-        serviceContainer.adapterRegistry.register(adapter)
-    }
-
     /// Transcribe audio to text
     /// - Parameters:
     ///   - audio: Audio data to transcribe
@@ -28,19 +16,16 @@ public extension RunAnywhereSDK {
     ) async throws -> TranscriptionResult {
         try await ensureInitialized()
 
-        // Find appropriate voice adapter
-        guard let adapter = findVoiceAdapter(for: modelId) else {
+        // Find appropriate voice service
+        guard let voiceService = findVoiceService(for: modelId) else {
             // No adapter available, return placeholder
             return TranscriptionResult(
-                text: "No voice adapter registered. Please register WhisperKitAdapter.",
+                text: "No voice adapter registered. Please register a UnifiedFrameworkAdapter with voice support.",
                 language: options.language.rawValue,
                 confidence: 0.0,
                 duration: 0.0
             )
         }
-
-        // Create voice service
-        let voiceService = adapter.createService()
 
         // Initialize the service
         try await voiceService.initialize(modelPath: modelId)
@@ -54,8 +39,8 @@ public extension RunAnywhereSDK {
         return result
     }
 
-    /// Find appropriate voice adapter for model
-    private func findVoiceAdapter(for modelId: String) -> VoiceFrameworkAdapter? {
+    /// Find appropriate voice service for model
+    private func findVoiceService(for modelId: String) -> VoiceService? {
         // Try to find a model info for this modelId
         if let model = try? serviceContainer.modelRegistry.getModel(by: modelId) {
             // Find adapter that can handle this model
@@ -63,8 +48,7 @@ public extension RunAnywhereSDK {
                unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
                 // Create a voice service from the unified adapter
                 if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                    // Return a wrapper that creates this service
-                    return VoiceServiceAdapterWrapper(service: voiceService, framework: unifiedAdapter.framework)
+                    return voiceService
                 }
             }
         }
@@ -74,7 +58,7 @@ public extension RunAnywhereSDK {
         if let firstVoiceFramework = voiceFrameworks.first,
            let adapter = serviceContainer.adapterRegistry.getAdapter(for: firstVoiceFramework) {
             if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                return VoiceServiceAdapterWrapper(service: voiceService, framework: adapter.framework)
+                return voiceService
             }
         }
 
@@ -124,35 +108,5 @@ public struct VoiceResponse {
     public init(inputText: String, outputText: String) {
         self.inputText = inputText
         self.outputText = outputText
-    }
-}
-
-// MARK: - Internal Helper
-
-/// Helper wrapper to adapt a VoiceService to VoiceFrameworkAdapter
-internal class VoiceServiceAdapterWrapper: VoiceFrameworkAdapter {
-    private let service: VoiceService
-    let framework: LLMFramework
-
-    var supportedFormats: [ModelFormat] {
-        return [.mlmodel, .mlpackage]
-    }
-
-    init(service: VoiceService, framework: LLMFramework) {
-        self.service = service
-        self.framework = framework
-    }
-
-    func canHandle(model: ModelInfo) -> Bool {
-        return model.compatibleFrameworks.contains(framework)
-    }
-
-    func createService() -> VoiceService {
-        return service
-    }
-
-    func loadModel(_ model: ModelInfo) async throws -> VoiceService {
-        try await service.initialize(modelPath: model.localPath?.path)
-        return service
     }
 }
