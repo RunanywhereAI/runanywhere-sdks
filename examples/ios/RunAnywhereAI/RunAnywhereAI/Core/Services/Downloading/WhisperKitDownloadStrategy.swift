@@ -4,7 +4,6 @@ import os
 
 /// Custom download strategy for WhisperKit models that require multiple files
 class WhisperKitDownloadStrategy: DownloadStrategy {
-
     // WhisperKit models need these 5 files
     private let requiredFiles = [
         "AudioEncoder.mlmodelc",
@@ -19,8 +18,8 @@ class WhisperKitDownloadStrategy: DownloadStrategy {
 
     func canHandle(model: ModelInfo) -> Bool {
         // Handle models marked as WhisperKit
-        return model.preferredFramework == .whisperKit ||
-               model.compatibleFrameworks.contains(.whisperKit)
+        model.preferredFramework == .whisperKit ||
+        model.compatibleFrameworks.contains(.whisperKit)
     }
 
     func download(
