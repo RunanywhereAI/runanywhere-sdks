@@ -67,7 +67,7 @@ extension RunAnywhereSDK {
         }
 
         // Map to StoredModel
-        return modelData.compactMap { modelId, format, size in
+        return modelData.compactMap { modelId, format, size, detectedFramework in
             // Find matching model info from repository
             let modelInfo = repositoryModels.first { $0.id == modelId }
 
@@ -75,24 +75,64 @@ extension RunAnywhereSDK {
             let baseURL = serviceContainer.fileManager.getBaseDirectoryURL()
             let modelsURL = baseURL.appendingPathComponent("Models")
 
-            // Detect framework
-            let framework = modelInfo?.compatibleFrameworks.first ?? detectFramework(for: format)
+            // Use detected framework from file system, or fall back to model info or format detection
+            let framework = detectedFramework ?? modelInfo?.compatibleFrameworks.first ?? detectFramework(for: format)
 
-            // Determine path based on framework
+            // Determine path based on framework and format
             var modelPath: URL
             if let framework = framework {
-                modelPath = modelsURL
-                    .appendingPathComponent(framework.rawValue)
-                    .appendingPathComponent(modelId)
-                    .appendingPathComponent("\(modelId).\(format.rawValue)")
+                let frameworkPath = modelsURL.appendingPathComponent(framework.rawValue)
+                let modelFolderPath = frameworkPath.appendingPathComponent(modelId)
+
+                // Check if this is a directory-based model (no single file)
+                // Directory-based models (like compiled Core ML) don't have a single file
+                let isDirectoryModel = !FileManager.default.fileExists(atPath: modelFolderPath.appendingPathComponent("\(modelId).\(format.rawValue)").path)
+
+                if isDirectoryModel {
+                    modelPath = modelFolderPath
+                } else {
+                    modelPath = modelFolderPath.appendingPathComponent("\(modelId).\(format.rawValue)")
+                }
             } else {
                 modelPath = modelsURL
                     .appendingPathComponent(modelId)
                     .appendingPathComponent("\(modelId).\(format.rawValue)")
             }
 
+            // Extract a better display name for models
+            let displayName: String
+            if let modelName = modelInfo?.name {
+                displayName = modelName
+            } else {
+                // Generic name extraction from modelId
+                // Remove common prefixes
+                var cleanId = modelId
+                    .replacingOccurrences(of: "user-", with: "")
+                    .replacingOccurrences(of: "openai_", with: "")
+                    .replacingOccurrences(of: "_", with: " ")
+
+                // Remove hash suffix if it looks like a hash (long number at the end)
+                // Pattern: name-<large number>
+                if let lastDashIndex = cleanId.lastIndex(of: "-") {
+                    let suffix = String(cleanId[cleanId.index(after: lastDashIndex)...])
+                    // Check if suffix is a large number (likely a hash)
+                    if suffix.count > 10 && Int(suffix) != nil {
+                        cleanId = String(cleanId[..<lastDashIndex])
+                    }
+                }
+
+                // Clean up and capitalize
+                displayName = cleanId
+                    .replacingOccurrences(of: "-", with: " ")
+                    .replacingOccurrences(of: ".", with: " ")
+                    .split(separator: " ")
+                    .map { $0.capitalized }
+                    .joined(separator: " ")
+            }
+
             return StoredModel(
-                name: modelInfo?.name ?? modelId,
+                id: modelId,  // Use the actual folder name as ID for deletion
+                name: displayName,
                 path: modelPath,
                 size: size,
                 format: format,
@@ -135,6 +175,8 @@ extension RunAnywhereSDK {
         case .gguf, .ggml:
             return .llamaCpp
         case .mlmodel, .mlpackage:
+            // Note: WhisperKit models will be properly detected through model metadata
+            // This is a fallback for Core ML models without metadata
             return .coreML
         case .onnx:
             return .onnx

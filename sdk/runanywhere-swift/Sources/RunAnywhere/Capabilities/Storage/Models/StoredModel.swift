@@ -2,6 +2,7 @@ import Foundation
 
 /// Stored model information
 public struct StoredModel {
+    public let id: String  // Model ID used for operations like deletion
     public let name: String
     public let path: URL
     public let size: Int64
@@ -14,6 +15,7 @@ public struct StoredModel {
     public let checksum: String?
 
     public init(
+        id: String,
         name: String,
         path: URL,
         size: Int64,
@@ -25,6 +27,7 @@ public struct StoredModel {
         contextLength: Int? = nil,
         checksum: String? = nil
     ) {
+        self.id = id
         self.name = name
         self.path = path
         self.size = size

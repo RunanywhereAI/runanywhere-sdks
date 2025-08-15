@@ -93,7 +93,6 @@ public class SimplifiedFileManager {
 
     /// Delete model
     public func deleteModel(modelId: String) throws {
-        // Try to find the model in framework-specific folders first
         let modelsFolder = try baseFolder.subfolder(named: "Models")
 
         // Check framework-specific folders
@@ -121,7 +120,7 @@ public class SimplifiedFileManager {
             let modelFolder = try modelsFolder.subfolder(named: modelId)
             try modelFolder.delete()
 
-            // Remove metadata using DataSyncService
+            // Remove metadata
             Task {
                 if let dataSyncService = await ServiceContainer.shared.dataSyncService {
                     try? await dataSyncService.removeModelMetadata(modelId)
@@ -234,10 +233,10 @@ public class SimplifiedFileManager {
     }
 
     /// Get all stored models
-    public func getAllStoredModels() -> [(modelId: String, format: ModelFormat, size: Int64)] {
+    public func getAllStoredModels() -> [(modelId: String, format: ModelFormat, size: Int64, framework: LLMFramework?)] {
         guard let modelsFolder = try? baseFolder.subfolder(named: "Models") else { return [] }
 
-        var models: [(String, ModelFormat, Int64)] = []
+        var models: [(String, ModelFormat, Int64, LLMFramework?)] = []
 
         // First check direct model folders (legacy structure)
         for modelFolder in modelsFolder.subfolders {
@@ -247,42 +246,70 @@ public class SimplifiedFileManager {
             }
 
             let modelId = modelFolder.name
-            for file in modelFolder.files {
-                if let format = ModelFormat(rawValue: file.extension ?? "") {
-                    var fileSize: Int64 = 0
-                    if let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
-                       let size = attributes[.size] as? NSNumber {
-                        fileSize = size.int64Value
-                    }
-                    models.append((modelId, format, fileSize))
-                }
+            // Try to find model files
+            if let modelInfo = detectModelInFolder(modelFolder) {
+                models.append((modelId, modelInfo.format, modelInfo.size, nil))
             }
         }
 
-        // Then check framework-specific folders (new structure)
+        // Then check framework-specific folders
         for frameworkFolder in modelsFolder.subfolders {
             // Only process framework folders
-            guard LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) else {
+            guard let frameworkType = LLMFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) else {
                 continue
             }
 
             for modelFolder in frameworkFolder.subfolders {
                 let modelId = modelFolder.name
 
-                for file in modelFolder.files {
-                    if let format = ModelFormat(rawValue: file.extension ?? "") {
-                        var fileSize: Int64 = 0
-                        if let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
-                           let size = attributes[.size] as? NSNumber {
-                            fileSize = size.int64Value
-                        }
-                        models.append((modelId, format, fileSize))
-                    }
+                // Generic handling for all model types
+                if let modelInfo = detectModelInFolder(modelFolder) {
+                    models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
                 }
             }
         }
 
         return models
+    }
+
+    /// Detect model format and size in a folder
+    private func detectModelInFolder(_ folder: Folder) -> (format: ModelFormat, size: Int64)? {
+        // Check for single model files
+        for file in folder.files {
+            if let format = ModelFormat(rawValue: file.extension ?? "") {
+                var fileSize: Int64 = 0
+                if let attributes = try? FileManager.default.attributesOfItem(atPath: file.path),
+                   let size = attributes[.size] as? NSNumber {
+                    fileSize = size.int64Value
+                }
+                return (format, fileSize)
+            }
+        }
+
+        // If no single model file, assume it's a directory-based model
+        // Just calculate total size and return default format
+        let totalSize = calculateDirectorySize(at: URL(fileURLWithPath: folder.path))
+        if totalSize > 0 {
+            // Default to mlmodel for directory-based models
+            return (.mlmodel, totalSize)
+        }
+
+        return nil
+    }
+
+    /// Calculate the total size of a directory including all subdirectories and files
+    private func calculateDirectorySize(at url: URL) -> Int64 {
+        var totalSize: Int64 = 0
+
+        if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: []) {
+            for case let fileURL as URL in enumerator {
+                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                    totalSize += Int64(fileSize)
+                }
+            }
+        }
+
+        return totalSize
     }
 
     /// Get available space
@@ -340,7 +367,7 @@ public class SimplifiedFileManager {
         if modelsFolder.containsSubfolder(named: modelId) {
             if let modelFolder = try? modelsFolder.subfolder(named: modelId) {
                 for file in modelFolder.files {
-                    if let format = ModelFormat(from: file.extension ?? ""),
+                    if ModelFormat(from: file.extension ?? "") != nil,
                        file.nameExcludingExtension == modelId || file.name.contains(modelId) {
                         logger.info("Found model \(modelId) at: \(file.path)")
                         return URL(fileURLWithPath: file.path)
