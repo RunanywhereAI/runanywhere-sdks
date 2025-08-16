@@ -6,6 +6,9 @@ import os
 public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitAdapter")
 
+    // Singleton instance to ensure caching works across the app
+    public static let shared = WhisperKitAdapter()
+
     // MARK: - Properties
 
     public let framework: LLMFramework = .whisperKit
@@ -13,6 +16,14 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     public let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToVoice]
 
     public let supportedFormats: [ModelFormat] = [.mlmodel, .mlpackage]
+
+    // Cache service instances to avoid re-initialization
+    private var cachedWhisperKitService: WhisperKitService?
+    private var cachedTTSService: SystemTTSServiceWrapper?
+
+    // Track last usage for smart cleanup
+    private var lastWhisperKitUsage: Date?
+    private let cacheTimeout: TimeInterval = 300 // 5 minutes
 
     // MARK: - UnifiedFrameworkAdapter Implementation
 
@@ -26,11 +37,30 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         logger.info("createService for modality: \(modality.rawValue, privacy: .public)")
         switch modality {
         case .voiceToText:
-            logger.info("Creating WhisperKitService for voice-to-text")
-            return WhisperKitService()
+            // Check if cached service should be cleaned up
+            cleanupStaleCache()
+
+            // Return cached instance if available
+            if let cached = cachedWhisperKitService {
+                logger.info("Returning cached WhisperKitService for voice-to-text")
+                lastWhisperKitUsage = Date()
+                return cached
+            }
+            logger.info("Creating new WhisperKitService for voice-to-text")
+            let service = WhisperKitService()
+            cachedWhisperKitService = service
+            lastWhisperKitUsage = Date()
+            return service
         case .textToVoice:
-            logger.info("Creating SystemTTSServiceWrapper for text-to-voice")
-            return SystemTTSServiceWrapper()
+            // Return cached instance if available
+            if let cached = cachedTTSService {
+                logger.info("Returning cached SystemTTSServiceWrapper for text-to-voice")
+                return cached
+            }
+            logger.info("Creating new SystemTTSServiceWrapper for text-to-voice")
+            let service = SystemTTSServiceWrapper()
+            cachedTTSService = service
+            return service
         default:
             logger.warning("Unsupported modality: \(modality.rawValue, privacy: .public)")
             return nil
@@ -41,18 +71,39 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         logger.info("loadModel(\(model.name, privacy: .public)) for modality: \(modality.rawValue, privacy: .public)")
         switch modality {
         case .voiceToText:
-            logger.info("Creating and initializing WhisperKitService...")
-            let service = WhisperKitService()
+            // Check if cached service should be cleaned up
+            cleanupStaleCache()
+
+            // Use cached service if available
+            let service: WhisperKitService
+            if let cached = cachedWhisperKitService {
+                logger.info("Using cached WhisperKitService for initialization")
+                service = cached
+            } else {
+                logger.info("Creating new WhisperKitService for initialization")
+                service = WhisperKitService()
+                cachedWhisperKitService = service
+            }
+
             // Initialize with model path if available
             let modelPath = model.localPath?.path
             logger.debug("Model path: \(modelPath ?? "nil", privacy: .public)")
             try await service.initialize(modelPath: modelPath)
             logger.info("WhisperKitService initialized")
+            lastWhisperKitUsage = Date()
             return service
         case .textToVoice:
+            // Use cached service if available
+            if let cached = cachedTTSService {
+                logger.info("Returning cached SystemTTSServiceWrapper (no model loading needed)")
+                return cached
+            }
+
             // TTS doesn't need model loading, just return the service
             logger.info("Creating SystemTTSServiceWrapper (no model loading needed)")
-            return SystemTTSServiceWrapper()
+            let service = SystemTTSServiceWrapper()
+            cachedTTSService = service
+            return service
         default:
             logger.error("Unsupported modality: \(modality.rawValue, privacy: .public)")
             throw SDKError.unsupportedModality(modality.rawValue)
@@ -78,5 +129,32 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
         logger.info("Supported formats: \(self.supportedFormats.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
         // No initialization needed for basic adapter
+    }
+
+    // MARK: - Cache Management
+
+    /// Clean up stale cached services after timeout
+    private func cleanupStaleCache() {
+        if let lastUsage = lastWhisperKitUsage {
+            let timeSinceLastUsage = Date().timeIntervalSince(lastUsage)
+            if timeSinceLastUsage > cacheTimeout {
+                logger.info("Cleaning up stale WhisperKit cache (unused for \(Int(timeSinceLastUsage))s)")
+                Task {
+                    await cachedWhisperKitService?.cleanup()
+                    cachedWhisperKitService = nil
+                    lastWhisperKitUsage = nil
+                }
+            }
+        }
+    }
+
+    /// Force cleanup of cached services (can be called on memory warning)
+    public func forceCleanup() async {
+        logger.info("Force cleanup of cached services")
+        await cachedWhisperKitService?.cleanup()
+        cachedWhisperKitService = nil
+        lastWhisperKitUsage = nil
+        // TTS doesn't need cleanup
+        cachedTTSService = nil
     }
 }

@@ -33,8 +33,8 @@ public extension RunAnywhereSDK {
         // Transcribe audio
         let result = try await voiceService.transcribe(audio: audio, options: options)
 
-        // Cleanup
-        await voiceService.cleanup()
+        // Don't cleanup - keep service cached for reuse
+        // await voiceService.cleanup()
 
         return result
     }

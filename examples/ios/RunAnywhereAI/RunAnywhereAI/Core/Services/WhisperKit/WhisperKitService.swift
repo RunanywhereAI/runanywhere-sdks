@@ -20,6 +20,12 @@ public class WhisperKitService: VoiceService {
         logger.info("Starting initialization...")
         logger.debug("Model path requested: \(modelPath ?? "default", privacy: .public)")
 
+        // Skip initialization if already initialized with the same model
+        if isInitialized && whisperKit != nil && currentModelPath == (modelPath ?? "whisper-base") {
+            logger.info("✅ WhisperKit already initialized with model: \(self.currentModelPath ?? "unknown", privacy: .public)")
+            return
+        }
+
         do {
             // Try to initialize WhisperKit with default model (it will use cached models)
             // WhisperKit will automatically look for downloaded models in the default location

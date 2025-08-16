@@ -7,6 +7,7 @@
 
 import SwiftUI
 import RunAnywhereSDK
+import UIKit
 import os
 
 @main
@@ -41,6 +42,12 @@ struct RunAnywhereAIApp: App {
                 await initializeSDK()
                 await initializeBundledModels()
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+                logger.warning("⚠️ Memory warning received, cleaning up cached services")
+                Task {
+                    await WhisperKitAdapter.shared.forceCleanup()
+                }
+            }
         }
     }
 
@@ -65,9 +72,9 @@ struct RunAnywhereAIApp: App {
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
             RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
 
-            // Register voice framework adapter (now uses unified adapter)
+            // Register voice framework adapter (now uses unified adapter with singleton)
             logger.info("🎤 Registering WhisperKitAdapter...")
-            RunAnywhereSDK.shared.registerFrameworkAdapter(WhisperKitAdapter())
+            RunAnywhereSDK.shared.registerFrameworkAdapter(WhisperKitAdapter.shared)
             logger.info("✅ WhisperKitAdapter registered")
 
             // Register WhisperKit download strategy
