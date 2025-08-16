@@ -5,16 +5,26 @@ import Combine
 import os
 
 @MainActor
-class VoiceAssistantViewModel: ObservableObject {
+class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
     private let sdk = RunAnywhereSDK.shared
-    let audioCapture = AudioCapture()  // Made accessible for VoiceAssistantView
     private let ttsService = SystemTTSService()
-    private var whisperKitService: WhisperKitService?
+    private let audioCapture = AudioCapture()
 
+    // MARK: - Published Properties
+    @Published var currentTranscript: String = ""
+    @Published var assistantResponse: String = ""
+    @Published var isProcessing: Bool = false
+    @Published var errorMessage: String?
     @Published var isInitialized = false
     @Published var currentStatus = "Initializing..."
-    @Published var isWhisperReady = false
+
+    // MARK: - Real-time Voice Session
+    private var voiceSession: VoiceSessionManager?
+    @Published var sessionState: VoiceSessionManager.SessionState = .disconnected
+    @Published var isListening: Bool = false
+
+    // MARK: - Initialization
 
     func initialize() async {
         logger.info("Initializing VoiceAssistantViewModel...")
@@ -25,228 +35,173 @@ class VoiceAssistantViewModel: ObservableObject {
         logger.info("Microphone permission: \(hasPermission)")
         guard hasPermission else {
             currentStatus = "Microphone permission denied"
+            errorMessage = "Please enable microphone access in Settings"
             logger.error("Microphone permission denied")
             return
         }
-
-        // Pre-initialize WhisperKit for faster first transcription
-        currentStatus = "Loading speech recognition model..."
-        await preloadWhisperKit()
 
         logger.info("Voice assistant initialized")
         currentStatus = "Ready to listen"
         isInitialized = true
     }
 
-    private func preloadWhisperKit() async {
-        logger.info("Pre-loading WhisperKit model...")
+    // MARK: - Real-time Conversation Methods
+
+    /// Start real-time conversation
+    func startConversation() async {
         do {
-            // Create and initialize WhisperKit service
-            whisperKitService = WhisperKitService()
-            try await whisperKitService?.initialize(modelPath: "whisper-base")
-            isWhisperReady = true
-            logger.info("✅ WhisperKit pre-loaded and ready")
+            // Create voice session with configuration
+            let config = VoiceSessionConfig(
+                recognitionModel: "whisper-base",
+                ttsModel: "system",
+                enableVAD: true,
+                enableStreaming: true,
+                maxSessionDuration: 300,
+                silenceTimeout: 2.0,
+                language: "en",
+                useLLM: true,
+                llmModel: nil  // Use default model
+            )
+
+            // Create voice session with audio capture providers
+            voiceSession = sdk.createVoiceSession(
+                config: config,
+                audioCaptureProvider: { [weak self] in
+                    self?.audioCapture.startContinuousCapture() ?? AsyncStream { _ in }
+                },
+                stopAudioCapture: { [weak self] in
+                    self?.audioCapture.stopContinuousCapture()
+                }
+            )
+            voiceSession?.delegate = self
+
+            // Connect and start listening
+            try await voiceSession?.connect()
+            try await voiceSession?.startListening()
+
+            isListening = true
+            errorMessage = nil
+            currentStatus = "Listening..."
         } catch {
-            logger.error("Failed to pre-load WhisperKit: \(error)")
-            // Continue anyway - it will be initialized on first use
+            errorMessage = "Failed to start conversation: \(error.localizedDescription)"
+            isListening = false
+            logger.error("Failed to start conversation: \(error)")
         }
     }
 
+    /// Stop conversation
+    func stopConversation() async {
+        isListening = false
+        await voiceSession?.disconnect()
+        voiceSession = nil
+        currentStatus = "Ready to listen"
+    }
+
+    /// Interrupt AI response
+    func interruptResponse() async {
+        await voiceSession?.interrupt()
+    }
+
+    // MARK: - VoiceSessionDelegate Implementation
+
+    func voiceSession(_ session: VoiceSessionManager, didChangeState state: VoiceSessionManager.SessionState) {
+        DispatchQueue.main.async {
+            self.sessionState = state
+
+            switch state {
+            case .listening:
+                self.isProcessing = false
+                self.isListening = true
+                self.currentStatus = "Listening..."
+            case .processing:
+                self.isProcessing = true
+                self.currentStatus = "Thinking..."
+            case .speaking:
+                self.isProcessing = true
+                self.currentStatus = "Speaking..."
+            case .connected:
+                self.currentStatus = "Ready"
+            case .connecting:
+                self.currentStatus = "Connecting..."
+            case .disconnected:
+                self.currentStatus = "Disconnected"
+                self.isListening = false
+            case .error(let errorMessage):
+                self.errorMessage = errorMessage
+                self.isProcessing = false
+                self.isListening = false
+                self.currentStatus = "Error"
+            }
+        }
+    }
+
+    func voiceSession(_ session: VoiceSessionManager, didReceiveTranscript text: String, isFinal: Bool) {
+        DispatchQueue.main.async {
+            self.currentTranscript = text
+
+            // Clear response when new transcript starts
+            if !isFinal && self.assistantResponse.isEmpty == false {
+                self.assistantResponse = ""
+            }
+
+            self.logger.info("Transcript (\(isFinal ? "final" : "partial")): '\(text)'")
+        }
+    }
+
+    func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
+        DispatchQueue.main.async {
+            self.assistantResponse = text
+            self.logger.info("AI Response: '\(text.prefix(100))...'")
+        }
+    }
+
+    func voiceSession(_ session: VoiceSessionManager, didEncounterError error: Error) {
+        DispatchQueue.main.async {
+            self.errorMessage = error.localizedDescription
+            self.isProcessing = false
+            self.logger.error("Voice session error: \(error)")
+        }
+    }
+
+    func voiceSession(_ session: VoiceSessionManager, didReceiveAudio data: Data) {
+        // Audio playback handled by TTS service
+        // Can add custom audio handling here if needed
+        Task {
+            // Play audio through TTS service if needed
+            // For now, TTS is handled internally
+        }
+    }
+
+    // MARK: - Legacy Methods (for backward compatibility)
+
     func startRecording() async throws {
-        logger.info("Starting recording...")
-        currentStatus = "Listening..."
-        try await audioCapture.startRecording()
-        logger.info("Recording started")
+        // Convert to new real-time approach
+        await startConversation()
     }
 
     func stopRecordingAndProcess() async throws -> VoicePipelineResult {
-        logger.info("Stopping recording and processing...")
-        currentStatus = "Processing..."
+        // This method is kept for backward compatibility
+        // In real-time mode, processing happens continuously
+        await stopConversation()
 
-        // Stop recording and get audio data
-        logger.info("Getting audio data...")
-        let audioData = try await audioCapture.stopRecording()
-        logger.debug("Audio data size: \(audioData.count) bytes")
-
-        // Process through voice pipeline with proper timeouts
-        logger.info("Processing voice query with SDK orchestrator...")
-        currentStatus = "Transcribing..."
-        let result = try await sdk.processVoiceQuery(
-            audio: audioData,
-            voiceModelId: "whisper-base",
-            llmModelId: nil,
-            ttsEnabled: false  // TTS will be handled separately for now
+        // Return a mock result since real-time doesn't have a single result
+        return VoicePipelineResult(
+            transcription: VoiceTranscriptionResult(
+                text: currentTranscript,
+                language: "en",
+                confidence: 0.95,
+                duration: 0
+            ),
+            llmResponse: assistantResponse,
+            audioOutput: nil,
+            processingTime: 0,
+            stageTiming: [:]
         )
-        logger.info("Voice query processed")
-        logger.info("Input: '\(result.transcription.text, privacy: .public)'")
-        logger.info("Output: '\(result.llmResponse, privacy: .public)'")
-
-        currentStatus = "Ready to listen"
-        return result
     }
 
     func speakResponse(_ text: String) async {
         logger.info("Speaking response: '\(text, privacy: .public)'")
         await ttsService.speak(text: text)
         logger.info("Response spoken")
-    }
-
-    func transcribeOnly(_ audioData: Data) async throws -> String {
-        logger.info("Transcribing audio data...")
-        logger.debug("Audio data size: \(audioData.count) bytes")
-
-        let result = try await sdk.transcribe(
-            audio: audioData,
-            modelId: "whisper-base"
-        )
-
-        logger.info("Transcription complete: '\(result.text, privacy: .public)'")
-        return result.text
-    }
-
-    func processVoiceWithStreaming(_ audioData: Data) async throws -> VoicePipelineResult {
-        logger.info("Processing voice with streaming events...")
-
-        var lastResult: VoicePipelineResult?
-        var accumulatedResponse = ""
-        var ttsBuffer = ""  // Buffer for sentence-level TTS
-
-        // Configure pipeline with streaming enabled for better UX
-        let config = VoicePipelineConfig(
-            sttModelId: "whisper-base",
-            llmModelId: nil,  // Use current model
-            ttsEnabled: true,  // Enable TTS for streaming synthesis
-            streamingEnabled: true,  // Enable streaming for LLM generation
-            timeouts: VoicePipelineConfig.PipelineTimeouts(
-                transcription: 30.0,
-                llmGeneration: 60.0,
-                textToSpeech: 30.0
-            ),
-            generationOptions: GenerationOptions(
-                maxTokens: 200,  // Increased for better responses
-                temperature: 0.7,
-                systemPrompt: "You are a helpful, friendly voice assistant. Respond naturally and conversationally, keeping responses brief and to the point."
-            )
-        )
-
-        // Process with streaming events
-        for try await event in sdk.processVoiceStream(audio: audioData, config: config) {
-            switch event {
-            case .transcriptionCompleted(let result):
-                logger.info("Transcription completed: '\(result.text, privacy: .public)'")
-                await MainActor.run {
-                    self.currentStatus = "You said: \(result.text)"
-                }
-
-            case .llmGenerationStarted:
-                logger.info("LLM generation started")
-                await MainActor.run {
-                    self.currentStatus = "Generating response..."
-                }
-
-            case .llmGenerationProgress(let text, let tokens):
-                // Update UI with streaming text
-                let previousLength = accumulatedResponse.count
-                accumulatedResponse = text
-
-                // Get the new tokens added
-                let newContent = String(text.dropFirst(previousLength))
-                ttsBuffer += newContent
-
-                logger.debug("LLM streaming: \(tokens) tokens, new content: '\(newContent)'")
-
-                // Check if we have a complete sentence to speak
-                if ttsBuffer.contains(where: { ".!?".contains($0) }) {
-                    // Find the last complete sentence
-                    if let lastSentenceEnd = ttsBuffer.lastIndex(where: { ".!?".contains($0) }) {
-                        let sentenceEndIndex = ttsBuffer.index(after: lastSentenceEnd)
-                        let sentence = String(ttsBuffer[..<sentenceEndIndex])
-
-                        // Speak the sentence asynchronously
-                        if !sentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Task {
-                                logger.info("Speaking sentence: '\(sentence)'")
-                                await self.ttsService.speak(text: sentence)
-                            }
-                        }
-
-                        // Remove spoken sentence from buffer
-                        ttsBuffer = String(ttsBuffer[sentenceEndIndex...])
-                    }
-                }
-
-                await MainActor.run {
-                    // Show partial response for better UX
-                    let preview = text.prefix(100)
-                    self.currentStatus = "Generating: \(preview)..."
-                }
-
-            case .llmGenerationCompleted(let text):
-                logger.info("LLM generation completed: '\(text.prefix(100), privacy: .public)'...")
-
-                // Speak any remaining text in the buffer
-                if !ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Task {
-                        logger.info("Speaking remaining text: '\(ttsBuffer)'")
-                        await self.ttsService.speak(text: ttsBuffer)
-                    }
-                    ttsBuffer = ""
-                }
-
-                await MainActor.run {
-                    self.currentStatus = "Speaking response..."
-                }
-
-            case .ttsStarted:
-                logger.info("TTS synthesis started")
-
-            case .ttsProgress(let audioChunk, let progress):
-                logger.debug("TTS progress: \(Int(progress * 100))%")
-                // In a real implementation, we could play audio chunks here
-                // For now, the system TTS will handle playback
-
-            case .ttsCompleted(let audio):
-                logger.info("TTS completed, audio size: \(audio.count) bytes")
-
-            case .completed(let result):
-                lastResult = result
-                logger.info("Pipeline completed successfully")
-                await MainActor.run {
-                    self.currentStatus = "Response complete"
-                }
-
-                // TTS is handled during streaming, so we don't need to speak again
-                // The response has already been spoken sentence by sentence during generation
-
-            case .error(let stage, let error):
-                logger.error("Pipeline error at \(stage.rawValue): \(error)")
-                await MainActor.run {
-                    self.currentStatus = "Error: \(error.localizedDescription)"
-                }
-                throw error
-
-            case .started(let sessionId):
-                logger.info("Pipeline started with session: \(sessionId)")
-
-            case .transcriptionStarted:
-                logger.info("Transcription started")
-                await MainActor.run {
-                    self.currentStatus = "Listening..."
-                }
-
-            case .transcriptionProgress(let text, let confidence):
-                logger.debug("Transcription progress: '\(text)' (confidence: \(confidence))")
-
-            @unknown default:
-                logger.debug("Unhandled pipeline event")
-            }
-        }
-
-        guard let result = lastResult else {
-            throw NSError(domain: "VoiceAssistant", code: -1,
-                         userInfo: [NSLocalizedDescriptionKey: "Voice pipeline failed to complete"])
-        }
-
-        return result
     }
 }

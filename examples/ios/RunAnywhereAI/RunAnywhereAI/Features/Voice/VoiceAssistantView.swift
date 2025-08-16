@@ -4,11 +4,6 @@ import AVFoundation
 
 struct VoiceAssistantView: View {
     @StateObject private var viewModel = VoiceAssistantViewModel()
-    @State private var isListening = false
-    @State private var transcribedText = ""
-    @State private var responseText = ""
-    @State private var errorMessage: String?
-    @State private var isProcessing = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -19,92 +14,110 @@ struct VoiceAssistantView: View {
 
             // Status indicator
             HStack {
-                if viewModel.currentStatus.contains("Loading") {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                        .frame(width: 12, height: 12)
-                } else {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 12, height: 12)
-                }
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 12, height: 12)
                 Text(statusText)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal)
 
-            // Transcribed text display
-            VStack(alignment: .leading, spacing: 8) {
-                Text("You said:")
+            // Transcript display
+            VStack(alignment: .leading, spacing: 10) {
+                Text("You:")
                     .font(.headline)
                     .foregroundColor(.secondary)
-
-                ScrollView {
-                    Text(transcribedText.isEmpty ? "Tap the microphone to speak..." : transcribedText)
-                        .font(.body)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(10)
-                }
-                .frame(maxHeight: 150)
+                Text(viewModel.currentTranscript.isEmpty ? "Tap mic to speak..." : viewModel.currentTranscript)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(Color(.secondarySystemBackground))
+                    .cornerRadius(10)
+                    .frame(minHeight: 80)
             }
             .padding(.horizontal)
 
-            // Response text display
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Assistant response:")
+            // AI Response
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Assistant:")
                     .font(.headline)
                     .foregroundColor(.secondary)
-
                 ScrollView {
-                    Text(responseText.isEmpty ? "Waiting for your input..." : responseText)
+                    Text(viewModel.assistantResponse.isEmpty ? "Waiting..." : viewModel.assistantResponse)
                         .font(.body)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding()
-                        .background(Color(.secondarySystemBackground))
+                        .background(Color.blue.opacity(0.1))
                         .cornerRadius(10)
                 }
-                .frame(maxHeight: 150)
+                .frame(maxHeight: 200)
             }
             .padding(.horizontal)
 
-            // Error message
-            if let error = errorMessage {
+            Spacer()
+
+            // Control buttons
+            HStack(spacing: 30) {
+                // Mic button - tap to start/stop
+                Button(action: {
+                    Task {
+                        if viewModel.isListening {
+                            await viewModel.stopConversation()
+                        } else {
+                            await viewModel.startConversation()
+                        }
+                    }
+                }) {
+                    ZStack {
+                        Circle()
+                            .fill(viewModel.isListening ? Color.red : Color.blue)
+                            .frame(width: 80, height: 80)
+
+                        if viewModel.isProcessing && !viewModel.isListening {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                        } else {
+                            Image(systemName: viewModel.isListening ? "mic.fill" : "mic")
+                                .font(.system(size: 35))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .disabled(viewModel.isProcessing && !viewModel.isListening)
+                .scaleEffect(viewModel.isListening ? 1.2 : 1.0)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.isListening)
+
+                // Interrupt button - only shown when AI is responding
+                if viewModel.sessionState == .speaking || viewModel.sessionState == .processing {
+                    Button(action: {
+                        Task {
+                            await viewModel.interruptResponse()
+                        }
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.orange)
+                                .frame(width: 60, height: 60)
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 25))
+                                .foregroundColor(.white)
+                        }
+                    }
+                    .transition(.scale)
+                }
+            }
+            .padding(.bottom, 30)
+
+            // Error display
+            if let error = viewModel.errorMessage {
                 Text(error)
                     .font(.caption)
                     .foregroundColor(.red)
                     .padding(.horizontal)
+                    .multilineTextAlignment(.center)
             }
-
-            Spacer()
-
-            // Microphone button
-            Button(action: {
-                Task {
-                    await handleMicrophoneTap()
-                }
-            }) {
-                ZStack {
-                    Circle()
-                        .fill(isListening ? Color.red : Color.blue)
-                        .frame(width: 80, height: 80)
-
-                    if isProcessing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(1.5)
-                    } else {
-                        Image(systemName: isListening ? "mic.fill" : "mic")
-                            .font(.system(size: 35))
-                            .foregroundColor(.white)
-                    }
-                }
-            }
-            .disabled(isProcessing)
-            .scaleEffect(isListening ? 1.2 : 1.0)
-            .animation(.easeInOut(duration: 0.2), value: isListening)
 
             // Instructions
             Text(instructionText)
@@ -121,83 +134,52 @@ struct VoiceAssistantView: View {
         }
     }
 
+    // Helper computed properties
     private var statusColor: Color {
-        if isProcessing {
-            return .orange
-        } else if isListening {
-            return .red
-        } else {
-            return .green
+        switch viewModel.sessionState {
+        case .disconnected: return .gray
+        case .connecting: return .yellow
+        case .connected: return .green
+        case .listening: return .red
+        case .processing: return .orange
+        case .speaking: return .blue
+        case .error: return .red
         }
     }
 
     private var statusText: String {
-        // Use the actual status from view model
-        return viewModel.currentStatus
+        switch viewModel.sessionState {
+        case .disconnected: return "Disconnected"
+        case .connecting: return "Connecting..."
+        case .connected: return "Ready"
+        case .listening: return "Listening..."
+        case .processing: return "Thinking..."
+        case .speaking: return "Speaking..."
+        case .error: return "Error"
+        }
     }
 
     private var instructionText: String {
-        if isProcessing {
-            return "Please wait while processing your request..."
-        } else if isListening {
-            return "Speak now... Tap again to stop"
-        } else {
-            return "Tap the microphone to start speaking"
+        switch viewModel.sessionState {
+        case .disconnected, .connected:
+            return "Tap the microphone to start a conversation"
+        case .connecting:
+            return "Connecting to voice service..."
+        case .listening:
+            return "Speak now... Tap mic to stop"
+        case .processing:
+            return "Processing your request..."
+        case .speaking:
+            return "Assistant is responding... Tap stop to interrupt"
+        case .error:
+            return "An error occurred. Tap mic to try again"
         }
     }
+}
 
-    private func handleMicrophoneTap() async {
-        if isListening {
-            // Stop recording and process
-            isListening = false
-            isProcessing = true
-            errorMessage = nil
-
-            do {
-                // Process voice through SDK's unified pipeline with streaming
-                transcribedText = "Processing audio..."
-                responseText = ""
-
-                // Get audio data
-                let audioData = try await viewModel.audioCapture.stopRecording()
-
-                // Process with streaming for better UX
-                let result = try await viewModel.processVoiceWithStreaming(audioData)
-
-                // Update UI with results
-                transcribedText = result.transcription.text
-                responseText = result.llmResponse
-
-                // Show timing information
-                if !result.stageTiming.isEmpty {
-                    let timingInfo = result.stageTiming.map { "\($0.key.rawValue): \(String(format: "%.1f", $0.value))s" }
-                        .joined(separator: ", ")
-                    errorMessage = "Processing time: \(String(format: "%.1f", result.processingTime))s - \(timingInfo)"
-                }
-
-                // Response has already been spoken during streaming
-                // No need to speak again
-            } catch {
-                // Handle errors gracefully
-                if transcribedText == "Processing audio..." {
-                    transcribedText = "Failed to process audio"
-                }
-                responseText = "Error: \(error.localizedDescription)"
-                errorMessage = "Processing failed. Try using a smaller model or simpler prompt."
-            }
-
-            isProcessing = false
-        } else {
-            // Start recording
-            do {
-                try await viewModel.startRecording()
-                isListening = true
-                transcribedText = ""
-                responseText = ""
-                errorMessage = nil
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
+// Preview
+struct VoiceAssistantView_Previews: PreviewProvider {
+    static var previews: some View {
+        VoiceAssistantView()
     }
 }

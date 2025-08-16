@@ -4,6 +4,8 @@ import AVFoundation
 import WhisperKit
 import os
 
+// No type aliases needed anymore - SDK types are uniquely named
+
 /// WhisperKit implementation of VoiceService
 public class WhisperKitService: VoiceService {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitService")
@@ -13,6 +15,12 @@ public class WhisperKitService: VoiceService {
     private var currentModelPath: String?
     private var isInitialized: Bool = false
     private var whisperKit: WhisperKit?
+
+    // Properties for streaming
+    private var streamingTask: Task<Void, Error>?
+    private var audioAccumulator = Data()
+    private let minAudioLength = 8000  // 500ms at 16kHz
+    private let contextOverlap = 1600   // 100ms overlap for context
 
     // MARK: - VoiceService Implementation
 
@@ -152,6 +160,131 @@ public class WhisperKitService: VoiceService {
         }
         logger.debug("Converted to \(floatArray.count) float values")
         return floatArray
+    }
+
+    // MARK: - Streaming Support
+
+    /// Support for streaming transcription
+    public var supportsStreaming: Bool {
+        return true
+    }
+
+    /// Transcribe audio stream in real-time
+    public func transcribeStream(
+        audioStream: AsyncStream<VoiceAudioChunk>,
+        options: VoiceTranscriptionOptions
+    ) -> AsyncThrowingStream<VoiceTranscriptionSegment, Error> {
+        AsyncThrowingStream { continuation in
+            self.streamingTask = Task {
+                do {
+                    // Ensure WhisperKit is loaded
+                    guard let whisperKit = self.whisperKit else {
+                        if self.isInitialized {
+                            // Already initialized, but whisperKit is nil
+                            throw VoiceError.serviceNotInitialized
+                        } else {
+                            // Not initialized, try to initialize with default model
+                            try await self.initialize(modelPath: nil)
+                            guard let kit = self.whisperKit else {
+                                throw VoiceError.serviceNotInitialized
+                            }
+                        }
+                        return
+                    }
+
+                    // Process audio stream
+                    var audioBuffer = Data()
+                    var lastTranscript = ""
+
+                    for await chunk in audioStream {
+                        audioBuffer.append(chunk.data)
+
+                        // Process when we have enough audio (500ms)
+                        if audioBuffer.count >= minAudioLength {
+                            // Convert to float array for WhisperKit
+                            let floatArray = convertDataToFloatArray(audioBuffer)
+
+                            // Transcribe using WhisperKit with shorter settings for streaming
+                            let decodingOptions = DecodingOptions(
+                                task: options.task == .translate ? .translate : .transcribe,
+                                language: options.language.rawValue,
+                                temperature: 0.0,
+                                temperatureFallbackCount: 0,
+                                sampleLength: 224,  // Shorter for streaming
+                                usePrefillPrompt: false,
+                                detectLanguage: false,
+                                skipSpecialTokens: true,
+                                withoutTimestamps: false
+                            )
+
+                            let results = try await whisperKit.transcribe(
+                                audioArray: floatArray,
+                                decodeOptions: decodingOptions
+                            )
+
+                            // Get the transcribed text
+                            if let result = results.first {
+                                let newText = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                                // Only yield if there's new content
+                                if !newText.isEmpty && newText != lastTranscript {
+                                    let segment = VoiceTranscriptionSegment(
+                                        text: newText,
+                                        startTime: chunk.timestamp - 0.5,
+                                        endTime: chunk.timestamp,
+                                        confidence: 0.95,
+                                        language: options.language.rawValue
+                                    )
+                                    continuation.yield(segment)
+                                    lastTranscript = newText
+                                }
+                            }
+
+                            // Keep last 100ms for context continuity
+                            audioBuffer = Data(audioBuffer.suffix(contextOverlap))
+                        }
+                    }
+
+                    // Process any remaining audio
+                    if audioBuffer.count > 0 {
+                        // Final transcription with remaining audio
+                        let floatArray = convertDataToFloatArray(audioBuffer)
+
+                        let decodingOptions = DecodingOptions(
+                            task: options.task == .translate ? .translate : .transcribe,
+                            language: options.language.rawValue,
+                            temperature: 0.0,
+                            temperatureFallbackCount: 0,
+                            sampleLength: 224,
+                            usePrefillPrompt: false,
+                            detectLanguage: false,
+                            skipSpecialTokens: true,
+                            withoutTimestamps: false
+                        )
+
+                        let results = try await whisperKit.transcribe(
+                            audioArray: floatArray,
+                            decodeOptions: decodingOptions
+                        )
+
+                        if let result = results.first {
+                            let segment = VoiceTranscriptionSegment(
+                                text: result.text,
+                                startTime: Date().timeIntervalSince1970 - 0.1,
+                                endTime: Date().timeIntervalSince1970,
+                                confidence: 0.95,
+                                language: options.language.rawValue
+                            )
+                            continuation.yield(segment)
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 }
 

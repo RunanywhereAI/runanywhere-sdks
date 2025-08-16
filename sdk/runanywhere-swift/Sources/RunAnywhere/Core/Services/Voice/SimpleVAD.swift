@@ -1,5 +1,4 @@
 import Foundation
-import RunAnywhereSDK
 import Accelerate
 
 /// Simple energy-based voice activity detector
@@ -31,9 +30,10 @@ public class SimpleVAD: VoiceActivityDetector {
     private var speechStartTime: TimeInterval?
     private var silenceStartTime: TimeInterval?
 
-    public init() {
+    public init(sensitivity: VADSensitivity = .medium) {
+        self.sensitivity = sensitivity
         // Apply sensitivity to threshold
-        energyThreshold = sensitivity.threshold
+        self.energyThreshold = sensitivity.threshold
     }
 
     /// Detect voice activity in audio data
@@ -60,7 +60,7 @@ public class SimpleVAD: VoiceActivityDetector {
 
     /// Detect activity in streaming audio
     public func detectActivityStream(
-        audioStream: AsyncStream<AudioChunk>
+        audioStream: AsyncStream<VoiceAudioChunk>
     ) -> AsyncStream<VADSegment> {
         AsyncStream { continuation in
             Task {
@@ -124,6 +124,23 @@ public class SimpleVAD: VoiceActivityDetector {
                 }
             }
         }
+    }
+
+    // MARK: - Simple detection for Data (used by VoiceSessionManager)
+
+    /// Simple detection method that just checks energy level
+    public func detectActivity(_ audioData: Data) -> Bool {
+        let samples = audioData.withUnsafeBytes { buffer in
+            Array(buffer.bindMemory(to: Float.self))
+        }
+
+        guard !samples.isEmpty else { return false }
+
+        // Calculate RMS energy
+        let sumOfSquares = samples.reduce(0) { $0 + $1 * $1 }
+        let rms = sqrt(sumOfSquares / Float(samples.count))
+
+        return rms > energyThreshold
     }
 
     // MARK: - Private Methods

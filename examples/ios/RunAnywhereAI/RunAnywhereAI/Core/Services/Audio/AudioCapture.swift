@@ -1,6 +1,7 @@
 import AVFoundation
 import Foundation
 import os
+import RunAnywhereSDK
 
 public class AudioCapture: NSObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "AudioCapture")
@@ -10,6 +11,11 @@ public class AudioCapture: NSObject {
     private var recordingBuffer: [Float] = []
     private var isRecording = false
     private var converter: AVAudioConverter?
+
+    // Properties for continuous capture
+    private var continuationTask: Task<Void, Never>?
+    private var streamContinuation: AsyncStream<VoiceAudioChunk>.Continuation?
+    private var sequenceNumber: Int = 0
 
     public override init() {
         inputNode = audioEngine.inputNode
@@ -240,6 +246,215 @@ public class AudioCapture: NSObject {
 
     public func getRecordingDuration() -> TimeInterval {
         Double(recordingBuffer.count) / 16000.0
+    }
+
+    // MARK: - Continuous Capture Methods
+
+    /// Start continuous audio capture with streaming
+    public func startContinuousCapture() -> AsyncStream<VoiceAudioChunk> {
+        // Stop any existing capture
+        stopContinuousCapture()
+
+        // Reset sequence number
+        sequenceNumber = 0
+
+        return AsyncStream { continuation in
+            self.streamContinuation = continuation
+
+            Task {
+                do {
+                    // Configure audio session for real-time
+                    try await self.configureAudioSession()
+
+                    // Prepare the audio engine first
+                    self.audioEngine.prepare()
+
+                    // Get the actual hardware format after prepare
+                    let inputFormat = self.inputNode.outputFormat(forBus: 0)
+
+                    self.logger.info("Continuous capture format: \(inputFormat.sampleRate)Hz, \(inputFormat.channelCount) channels")
+
+                    // Ensure the format is valid
+                    guard inputFormat.sampleRate > 0 && inputFormat.channelCount > 0 else {
+                        self.logger.warning("Invalid format detected, attempting reset...")
+
+                        // Reset the audio engine completely
+                        self.audioEngine.stop()
+                        self.audioEngine.reset()
+
+                        // Reconfigure audio session
+                        try await self.configureAudioSession()
+
+                        // Create new audio engine instance
+                        self.audioEngine = AVAudioEngine()
+                        self.inputNode = self.audioEngine.inputNode
+                        self.audioEngine.prepare()
+
+                        // Try again after reset
+                        let retryFormat = self.inputNode.outputFormat(forBus: 0)
+                        self.logger.info("Retry format: \(retryFormat.sampleRate)Hz, \(retryFormat.channelCount) channels")
+
+                        guard retryFormat.sampleRate > 0 && retryFormat.channelCount > 0 else {
+                            self.logger.error("Invalid format after reset")
+                            continuation.finish()
+                            return
+                        }
+
+                        // Create converter with retry format
+                        if retryFormat != self.targetFormat {
+                            self.converter = AVAudioConverter(from: retryFormat, to: self.targetFormat)
+                        }
+
+                        // Install tap with retry format
+                        self.inputNode.installTap(onBus: 0,
+                                                 bufferSize: 512,
+                                                 format: retryFormat) { [weak self] buffer, time in
+                            guard let self = self else { return }
+
+                            if let processedData = self.processBufferForStreaming(buffer, time: time) {
+                                let chunk = VoiceAudioChunk(
+                                    data: processedData,
+                                    timestamp: Date().timeIntervalSince1970,
+                                    sampleRate: Int(self.targetFormat.sampleRate),
+                                    channels: Int(self.targetFormat.channelCount),
+                                    sequenceNumber: self.sequenceNumber,
+                                    isFinal: false
+                                )
+                                self.sequenceNumber += 1
+                                continuation.yield(chunk)
+                            }
+                        }
+
+                        // Start audio engine
+                        try self.audioEngine.start()
+                        self.logger.info("Continuous audio capture started (retry path)")
+                        return  // IMPORTANT: Exit here after handling invalid format
+                    }
+
+                    // Valid format path - Create converter for format conversion if needed
+                    if inputFormat != self.targetFormat {
+                        self.converter = AVAudioConverter(from: inputFormat, to: self.targetFormat)
+                    }
+
+                    // Install tap with small buffer for low latency (512 samples ~11ms at 44.1kHz)
+                    self.inputNode.installTap(onBus: 0,
+                                             bufferSize: 512,
+                                             format: inputFormat) { [weak self] buffer, time in
+                        guard let self = self else { return }
+
+                        // Process and resample the audio
+                        if let processedData = self.processBufferForStreaming(buffer, time: time) {
+                            // Create AudioChunk
+                            let chunk = VoiceAudioChunk(
+                                data: processedData,
+                                timestamp: Date().timeIntervalSince1970,
+                                sampleRate: Int(self.targetFormat.sampleRate),
+                                channels: Int(self.targetFormat.channelCount),
+                                sequenceNumber: self.sequenceNumber,
+                                isFinal: false
+                            )
+                            self.sequenceNumber += 1
+
+                            continuation.yield(chunk)
+                        }
+                    }
+
+                    // Start audio engine after installing tap
+                    try self.audioEngine.start()
+                    self.logger.info("Continuous audio capture started")
+                } catch {
+                    self.logger.error("Failed to start continuous capture: \(error)")
+                    continuation.finish()
+                }
+            }
+        }
+    }
+
+    /// Stop continuous audio capture
+    public func stopContinuousCapture() {
+        audioEngine.inputNode.removeTap(onBus: 0)
+        audioEngine.stop()
+        streamContinuation?.finish()
+        streamContinuation = nil
+        continuationTask?.cancel()
+        continuationTask = nil
+        converter = nil
+        logger.info("Continuous audio capture stopped")
+    }
+
+    /// Process buffer for streaming (convert to 16kHz mono for WhisperKit)
+    private func processBufferForStreaming(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) -> Data? {
+        var targetBuffer: AVAudioPCMBuffer
+
+        // Convert format if needed
+        if buffer.format != targetFormat {
+            guard let converter = converter else {
+                logger.error("Converter not available")
+                return nil
+            }
+
+            // Calculate output frame capacity
+            let outputFrameCapacity = AVAudioFrameCount(
+                Double(buffer.frameLength) * (targetFormat.sampleRate / buffer.format.sampleRate)
+            )
+
+            guard let convertedBuffer = AVAudioPCMBuffer(
+                pcmFormat: targetFormat,
+                frameCapacity: outputFrameCapacity
+            ) else {
+                logger.error("Failed to create converted buffer")
+                return nil
+            }
+
+            var error: NSError?
+            let status = converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
+                outStatus.pointee = .haveData
+                return buffer
+            }
+
+            guard status == .haveData else {
+                if let error = error {
+                    logger.error("Conversion error: \(error)")
+                }
+                return nil
+            }
+
+            targetBuffer = convertedBuffer
+        } else {
+            targetBuffer = buffer
+        }
+
+        // Convert buffer to Data
+        return bufferToData(targetBuffer)
+    }
+
+    /// Convert AVAudioPCMBuffer to Data
+    private func bufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
+        guard let channelData = buffer.floatChannelData else {
+            logger.warning("No channel data in buffer")
+            return nil
+        }
+
+        let channelDataValue = channelData.pointee
+        let channelDataCount = Int(buffer.frameLength)
+
+        let samples = Array(UnsafeBufferPointer(
+            start: channelDataValue,
+            count: channelDataCount
+        ))
+
+        return samples.withUnsafeBufferPointer { bufferPointer in
+            Data(buffer: bufferPointer)
+        }
+    }
+}
+
+// Extension for Data to Float conversion (needed for WhisperKit)
+extension Data {
+    func toFloatArray() -> [Float] {
+        return self.withUnsafeBytes { buffer in
+            Array(buffer.bindMemory(to: Float.self))
+        }
     }
 }
 

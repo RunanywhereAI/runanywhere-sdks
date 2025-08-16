@@ -1,7 +1,7 @@
 import Foundation
 
 /// A chunk of audio data for streaming processing
-public struct AudioChunk {
+public struct VoiceAudioChunk {
     /// The audio data
     public let data: Data
 

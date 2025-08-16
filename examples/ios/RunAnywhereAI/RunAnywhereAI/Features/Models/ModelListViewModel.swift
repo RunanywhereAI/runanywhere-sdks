@@ -149,6 +149,50 @@ class ModelListViewModel: ObservableObject {
             compatibleFrameworks: [.whisperKit],
             preferredFramework: .whisperKit,
             supportsThinking: false
+        ),
+
+        // MARK: - LiquidAI Models
+
+        // LiquidAI LFM2 350M Q4_K_M (Smallest, fastest)
+        ModelInfo(
+            id: "lfm2-350m-q4-k-m",
+            name: "LiquidAI LFM2 350M Q4_K_M",
+            format: .gguf,
+            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf"),
+            estimatedMemory: 250_000_000, // 250MB
+            contextLength: 32768,
+            downloadSize: 218_690_000, // ~219MB
+            compatibleFrameworks: [.llamaCpp],
+            preferredFramework: .llamaCpp,
+            supportsThinking: false
+        ),
+
+        // LiquidAI LFM2 350M Q6_K (Best balance)
+        ModelInfo(
+            id: "lfm2-350m-q6-k",
+            name: "LiquidAI LFM2 350M Q6_K",
+            format: .gguf,
+            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q6_K.gguf"),
+            estimatedMemory: 350_000_000, // 350MB
+            contextLength: 32768,
+            downloadSize: 279_790_000, // ~280MB
+            compatibleFrameworks: [.llamaCpp],
+            preferredFramework: .llamaCpp,
+            supportsThinking: false
+        ),
+
+        // LiquidAI LFM2 350M Q8_0 (Highest quality)
+        ModelInfo(
+            id: "lfm2-350m-q8-0",
+            name: "LiquidAI LFM2 350M Q8_0",
+            format: .gguf,
+            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf"),
+            estimatedMemory: 400_000_000, // 400MB
+            contextLength: 32768,
+            downloadSize: 361_650_000, // ~362MB
+            compatibleFrameworks: [.llamaCpp],
+            preferredFramework: .llamaCpp,
+            supportsThinking: false
         )
     ]
 

@@ -21,7 +21,7 @@ public protocol WakeWordDetector: AnyObject {
     /// - Parameter audioStream: Stream of audio chunks
     /// - Returns: Stream of wake word detections
     func processStream(
-        _ audioStream: AsyncStream<AudioChunk>
+        _ audioStream: AsyncStream<VoiceAudioChunk>
     ) -> AsyncThrowingStream<WakeWordDetection, Error>
 
     /// Whether the detector is currently listening

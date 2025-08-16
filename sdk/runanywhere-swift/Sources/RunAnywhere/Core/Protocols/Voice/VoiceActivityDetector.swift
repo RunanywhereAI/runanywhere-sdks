@@ -11,7 +11,7 @@ public protocol VoiceActivityDetector: AnyObject {
     /// - Parameter audioStream: Async stream of audio chunks
     /// - Returns: Async stream of VAD segments
     func detectActivityStream(
-        audioStream: AsyncStream<AudioChunk>
+        audioStream: AsyncStream<VoiceAudioChunk>
     ) -> AsyncStream<VADSegment>
 
     /// Sensitivity level for voice detection
