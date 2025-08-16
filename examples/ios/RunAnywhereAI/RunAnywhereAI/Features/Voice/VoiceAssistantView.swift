@@ -19,9 +19,15 @@ struct VoiceAssistantView: View {
 
             // Status indicator
             HStack {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 12, height: 12)
+                if viewModel.currentStatus.contains("Loading") {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .frame(width: 12, height: 12)
+                } else {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 12, height: 12)
+                }
                 Text(statusText)
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -126,13 +132,8 @@ struct VoiceAssistantView: View {
     }
 
     private var statusText: String {
-        if isProcessing {
-            return "Processing..."
-        } else if isListening {
-            return "Listening..."
-        } else {
-            return "Ready"
-        }
+        // Use the actual status from view model
+        return viewModel.currentStatus
     }
 
     private var instructionText: String {

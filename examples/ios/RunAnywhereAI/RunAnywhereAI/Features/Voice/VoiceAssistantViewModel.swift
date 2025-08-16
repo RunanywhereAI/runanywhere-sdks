@@ -10,12 +10,15 @@ class VoiceAssistantViewModel: ObservableObject {
     private let sdk = RunAnywhereSDK.shared
     let audioCapture = AudioCapture()  // Made accessible for VoiceAssistantView
     private let ttsService = SystemTTSService()
+    private var whisperKitService: WhisperKitService?
 
     @Published var isInitialized = false
     @Published var currentStatus = "Initializing..."
+    @Published var isWhisperReady = false
 
     func initialize() async {
         logger.info("Initializing VoiceAssistantViewModel...")
+
         // Request microphone permission
         logger.info("Requesting microphone permission...")
         let hasPermission = await AudioCapture.requestMicrophonePermission()
@@ -26,21 +29,39 @@ class VoiceAssistantViewModel: ObservableObject {
             return
         }
 
-        // Initialize voice service through SDK
-        // The SDK should already have WhisperKit adapter registered from app startup
+        // Pre-initialize WhisperKit for faster first transcription
+        currentStatus = "Loading speech recognition model..."
+        await preloadWhisperKit()
+
         logger.info("Voice assistant initialized")
-        currentStatus = "Voice assistant ready"
+        currentStatus = "Ready to listen"
         isInitialized = true
+    }
+
+    private func preloadWhisperKit() async {
+        logger.info("Pre-loading WhisperKit model...")
+        do {
+            // Create and initialize WhisperKit service
+            whisperKitService = WhisperKitService()
+            try await whisperKitService?.initialize(modelPath: "whisper-base")
+            isWhisperReady = true
+            logger.info("✅ WhisperKit pre-loaded and ready")
+        } catch {
+            logger.error("Failed to pre-load WhisperKit: \(error)")
+            // Continue anyway - it will be initialized on first use
+        }
     }
 
     func startRecording() async throws {
         logger.info("Starting recording...")
+        currentStatus = "Listening..."
         try await audioCapture.startRecording()
         logger.info("Recording started")
     }
 
     func stopRecordingAndProcess() async throws -> VoicePipelineResult {
         logger.info("Stopping recording and processing...")
+        currentStatus = "Processing..."
 
         // Stop recording and get audio data
         logger.info("Getting audio data...")
@@ -49,6 +70,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         // Process through voice pipeline with proper timeouts
         logger.info("Processing voice query with SDK orchestrator...")
+        currentStatus = "Transcribing..."
         let result = try await sdk.processVoiceQuery(
             audio: audioData,
             voiceModelId: "whisper-base",
@@ -59,6 +81,7 @@ class VoiceAssistantViewModel: ObservableObject {
         logger.info("Input: '\(result.transcription.text, privacy: .public)'")
         logger.info("Output: '\(result.llmResponse, privacy: .public)'")
 
+        currentStatus = "Ready to listen"
         return result
     }
 
