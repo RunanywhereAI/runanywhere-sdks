@@ -200,8 +200,12 @@ public extension TextToSpeechService {
             Task {
                 do {
                     let audio = try await synthesize(text: text, options: options)
+                    // Convert Data to Float samples for new VoiceAudioChunk format
+                    let samples = audio.withUnsafeBytes { buffer in
+                        Array(buffer.bindMemory(to: Float.self))
+                    }
                     let chunk = VoiceAudioChunk(
-                        data: audio,
+                        samples: samples,
                         timestamp: 0,
                         sampleRate: options.sampleRate,
                         channels: 1,

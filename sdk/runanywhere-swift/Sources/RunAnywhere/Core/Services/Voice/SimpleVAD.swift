@@ -34,6 +34,7 @@ public class SimpleVAD: VoiceActivityDetector {
         self.sensitivity = sensitivity
         // Apply sensitivity to threshold
         self.energyThreshold = sensitivity.threshold
+        print("🔧 VAD Initialized: sensitivity=\(sensitivity), threshold=\(energyThreshold)")
     }
 
     /// Detect voice activity in audio data
@@ -65,7 +66,7 @@ public class SimpleVAD: VoiceActivityDetector {
         AsyncStream { continuation in
             Task {
                 for await chunk in audioStream {
-                    let samples = convertDataToFloatArray(chunk.data)
+                    let samples = chunk.samples
                     let energy = calculateEnergy(samples)
 
                     // Update energy history
@@ -140,6 +141,14 @@ public class SimpleVAD: VoiceActivityDetector {
         let sumOfSquares = samples.reduce(0) { $0 + $1 * $1 }
         let rms = sqrt(sumOfSquares / Float(samples.count))
 
+        // Debug: Find max amplitude for comparison
+        let maxAmplitude = samples.map { abs($0) }.max() ?? 0.0
+
+        // Log detailed energy info occasionally
+        if Int.random(in: 1...100) == 1 {  // Random 1% chance for more frequent debugging
+            print("🔍 VAD Debug: RMS=\(String(format: "%.6f", rms)), Max=\(String(format: "%.6f", maxAmplitude)), Threshold=\(String(format: "%.6f", energyThreshold)), Result=\(rms > energyThreshold ? "SPEECH" : "SILENCE")")
+        }
+
         return rms > energyThreshold
     }
 
@@ -147,25 +156,19 @@ public class SimpleVAD: VoiceActivityDetector {
 
     /// Convert Data to float array
     private func convertDataToFloatArray(_ data: Data) -> [Float] {
-        let count = data.count / MemoryLayout<Int16>.size
-        var samples = [Float](repeating: 0, count: count)
-
-        data.withUnsafeBytes { buffer in
-            guard let int16Pointer = buffer.bindMemory(to: Int16.self).baseAddress else { return }
-
-            for i in 0..<count {
-                samples[i] = Float(int16Pointer[i]) / Float(Int16.max)
-            }
+        // Data is already Float32 from AudioCapture (16kHz, mono, Float32)
+        let floatArray = data.withUnsafeBytes { buffer in
+            Array(buffer.bindMemory(to: Float.self))
         }
-
-        return samples
+        return floatArray
     }
 
     /// Calculate energy of audio samples
     private func calculateEnergy(_ samples: [Float]) -> Float {
         var energy: Float = 0
         vDSP_measqv(samples, 1, &energy, vDSP_Length(samples.count))
-        return energy
+        // Convert mean-square to RMS for better threshold matching
+        return sqrt(energy)
     }
 
     /// Calculate zero crossing rate

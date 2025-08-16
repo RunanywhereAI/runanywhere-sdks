@@ -151,7 +151,10 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
         DispatchQueue.main.async {
             self.assistantResponse = text
-            self.logger.info("AI Response: '\(text.prefix(100))...'")
+            // Only log when response is complete
+            if text.count > 50 && !text.hasSuffix("...") {
+                self.logger.info("AI Response completed: '\(text.prefix(50))...'")
+            }
         }
     }
 

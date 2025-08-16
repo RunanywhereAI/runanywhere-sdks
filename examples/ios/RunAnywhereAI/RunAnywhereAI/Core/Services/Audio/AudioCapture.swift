@@ -303,6 +303,7 @@ public class AudioCapture: NSObject {
                         // Create converter with retry format
                         if retryFormat != self.targetFormat {
                             self.converter = AVAudioConverter(from: retryFormat, to: self.targetFormat)
+                            self.logger.info("Created audio converter: \(retryFormat.sampleRate)Hz -> \(self.targetFormat.sampleRate)Hz")
                         }
 
                         // Install tap with retry format
@@ -312,8 +313,12 @@ public class AudioCapture: NSObject {
                             guard let self = self else { return }
 
                             if let processedData = self.processBufferForStreaming(buffer, time: time) {
+                                // Convert Data to Float samples for new VoiceAudioChunk format
+                                let samples = processedData.withUnsafeBytes { buffer in
+                                    Array(buffer.bindMemory(to: Float.self))
+                                }
                                 let chunk = VoiceAudioChunk(
-                                    data: processedData,
+                                    samples: samples,
                                     timestamp: Date().timeIntervalSince1970,
                                     sampleRate: Int(self.targetFormat.sampleRate),
                                     channels: Int(self.targetFormat.channelCount),
@@ -334,6 +339,7 @@ public class AudioCapture: NSObject {
                     // Valid format path - Create converter for format conversion if needed
                     if inputFormat != self.targetFormat {
                         self.converter = AVAudioConverter(from: inputFormat, to: self.targetFormat)
+                        self.logger.info("Created audio converter: \(inputFormat.sampleRate)Hz -> \(self.targetFormat.sampleRate)Hz")
                     }
 
                     // Install tap with small buffer for low latency (512 samples ~11ms at 44.1kHz)
@@ -344,9 +350,13 @@ public class AudioCapture: NSObject {
 
                         // Process and resample the audio
                         if let processedData = self.processBufferForStreaming(buffer, time: time) {
+                            // Convert Data to Float samples for new VoiceAudioChunk format
+                            let samples = processedData.withUnsafeBytes { buffer in
+                                Array(buffer.bindMemory(to: Float.self))
+                            }
                             // Create AudioChunk
                             let chunk = VoiceAudioChunk(
-                                data: processedData,
+                                samples: samples,
                                 timestamp: Date().timeIntervalSince1970,
                                 sampleRate: Int(self.targetFormat.sampleRate),
                                 channels: Int(self.targetFormat.channelCount),
@@ -354,6 +364,16 @@ public class AudioCapture: NSObject {
                                 isFinal: false
                             )
                             self.sequenceNumber += 1
+
+                            // Debug logging every 50th chunk
+                            if self.sequenceNumber % 50 == 0 {
+                                let sampleCount = processedData.count / 4  // Float32
+                                let duration = Float(sampleCount) / Float(self.targetFormat.sampleRate)
+                                self.logger.debug("📢 AudioCapture chunk #\(self.sequenceNumber):")
+                                self.logger.debug("  Size: \(processedData.count) bytes = \(sampleCount) samples")
+                                self.logger.debug("  Duration: \(String(format: "%.3f", duration))s")
+                                self.logger.debug("  Format: \(Int(self.targetFormat.sampleRate))Hz, \(Int(self.targetFormat.channelCount)) channel(s)")
+                            }
 
                             continuation.yield(chunk)
                         }
@@ -389,7 +409,8 @@ public class AudioCapture: NSObject {
         // Convert format if needed
         if buffer.format != targetFormat {
             guard let converter = converter else {
-                logger.error("Converter not available")
+                logger.error("Converter not available for format conversion")
+                logger.error("Input format: \(buffer.format.sampleRate)Hz, Target: \(self.targetFormat.sampleRate)Hz")
                 return nil
             }
 

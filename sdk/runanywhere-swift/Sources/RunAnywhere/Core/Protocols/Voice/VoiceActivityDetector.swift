@@ -7,6 +7,11 @@ public protocol VoiceActivityDetector: AnyObject {
     /// - Returns: VAD result with speech segments and metrics
     func detectActivity(in audio: Data) -> VADResult
 
+    /// Simple voice activity detection for streaming (no duration requirements)
+    /// - Parameter audio: Audio data to analyze
+    /// - Returns: True if speech is detected, false otherwise
+    func detectActivity(_ audio: Data) -> Bool
+
     /// Detect voice activity in a streaming audio source
     /// - Parameter audioStream: Async stream of audio chunks
     /// - Returns: Async stream of VAD segments
@@ -137,15 +142,15 @@ public enum VADSensitivity {
     /// Custom sensitivity with specific threshold
     case custom(Float)
 
-    /// Get the energy threshold value
+    /// Get the energy threshold value (calibrated for RMS values)
     public var threshold: Float {
         switch self {
         case .low:
-            return 0.01
+            return 0.005   // Less sensitive - reduces false positives from background noise
         case .medium:
-            return 0.05
+            return 0.008   // Slightly more sensitive for better speech capture
         case .high:
-            return 0.1
+            return 0.02    // More conservative - only detects clear speech
         case .custom(let value):
             return value
         }
