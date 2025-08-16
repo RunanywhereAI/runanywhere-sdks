@@ -1,7 +1,7 @@
 import Foundation
 
 /// Result from speech-to-text transcription
-public struct TranscriptionResult {
+public struct VoiceTranscriptionResult {
     /// The transcribed text
     public let text: String
 

@@ -95,6 +95,9 @@ cd examples/android/RunAnywhereAI/
 To get logs for sample app and sdk use this in another terminal:
 log stream --predicate 'subsystem CONTAINS "com.runanywhere"' --info --debug
 
+For physical device:
+idevicesyslog | grep "com.runanywhere"
+
 #### Quick Build & Run (Recommended)
 ```bash
 # Navigate to iOS example

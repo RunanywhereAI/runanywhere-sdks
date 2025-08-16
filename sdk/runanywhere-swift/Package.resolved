@@ -37,30 +37,12 @@
       }
     },
     {
-      "identity" : "jinja",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/johnmai-dev/Jinja",
-      "state" : {
-        "revision" : "bb238dd96fbe4c18014f3107c00edd6edb15428e",
-        "version" : "1.2.4"
-      }
-    },
-    {
       "identity" : "pulse",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kean/Pulse",
       "state" : {
         "revision" : "3ac5ee35ab233e900aa484919803d51791d1e351",
         "version" : "4.2.7"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser.git",
-      "state" : {
-        "revision" : "309a47b2b1d9b5e991f36961c983ecec72275be3",
-        "version" : "1.6.1"
       }
     },
     {
@@ -73,15 +55,6 @@
       }
     },
     {
-      "identity" : "swift-collections",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-collections.git",
-      "state" : {
-        "revision" : "8c0c0a8b49e080e54e5e328cc552821ff07cd341",
-        "version" : "1.2.1"
-      }
-    },
-    {
       "identity" : "swift-crypto",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
@@ -91,30 +64,12 @@
       }
     },
     {
-      "identity" : "swift-transformers",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-transformers.git",
-      "state" : {
-        "revision" : "8a83416cc00ab07a5de9991e6ad817a9b8588d20",
-        "version" : "0.1.15"
-      }
-    },
-    {
       "identity" : "swiftlintplugins",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/SimplyDanny/SwiftLintPlugins",
       "state" : {
         "revision" : "8545ddf4de043e6f2051c5cf204f39ef778ebf6b",
         "version" : "0.59.1"
-      }
-    },
-    {
-      "identity" : "whisperkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/argmaxinc/WhisperKit",
-      "state" : {
-        "revision" : "c814caea8876036f0c87a0de29552f028d59832d",
-        "version" : "0.13.1"
       }
     },
     {

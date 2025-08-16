@@ -153,14 +153,32 @@ struct VoiceAssistantView: View {
             errorMessage = nil
 
             do {
+                // Process voice through SDK's unified pipeline
+                transcribedText = "Processing audio..."
+                responseText = "Waiting for response..."
+
                 let result = try await viewModel.stopRecordingAndProcess()
-                transcribedText = result.inputText
-                responseText = result.outputText
+
+                // Update UI with results
+                transcribedText = result.transcription.text
+                responseText = result.llmResponse
+
+                // Show timing information
+                if !result.stageTiming.isEmpty {
+                    let timingInfo = result.stageTiming.map { "\($0.key.rawValue): \(String(format: "%.1f", $0.value))s" }
+                        .joined(separator: ", ")
+                    errorMessage = "Processing time: \(timingInfo)"
+                }
 
                 // Speak the response
                 await viewModel.speakResponse(responseText)
             } catch {
-                errorMessage = error.localizedDescription
+                // Handle errors gracefully
+                if transcribedText == "Processing audio..." {
+                    transcribedText = "Failed to process audio"
+                }
+                responseText = "Error: \(error.localizedDescription)"
+                errorMessage = "Processing failed. Try using a smaller model or simpler prompt."
             }
 
             isProcessing = false

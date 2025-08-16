@@ -12,7 +12,7 @@ public class VoiceSession {
     public private(set) var state: VoiceSessionState
 
     /// All transcription results in this session
-    public private(set) var transcripts: [TranscriptionResult] = []
+    public private(set) var transcripts: [VoiceTranscriptionResult] = []
 
     /// Configuration for this session
     public let configuration: VoiceSessionConfig
@@ -73,7 +73,7 @@ public class VoiceSession {
     }
 
     /// Add a transcription result to the session
-    public func addTranscript(_ result: TranscriptionResult) {
+    public func addTranscript(_ result: VoiceTranscriptionResult) {
         lock.lock()
         defer { lock.unlock() }
         transcripts.append(result)

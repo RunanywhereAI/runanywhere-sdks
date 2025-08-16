@@ -12,14 +12,14 @@ public extension RunAnywhereSDK {
     func transcribe(
         audio: Data,
         modelId: String = "whisper-base",
-        options: TranscriptionOptions = TranscriptionOptions()
-    ) async throws -> TranscriptionResult {
+        options: VoiceTranscriptionOptions = VoiceTranscriptionOptions()
+    ) async throws -> VoiceTranscriptionResult {
         try await ensureInitialized()
 
         // Find appropriate voice service
         guard let voiceService = findVoiceService(for: modelId) else {
             // No adapter available, return placeholder
-            return TranscriptionResult(
+            return VoiceTranscriptionResult(
                 text: "No voice adapter registered. Please register a UnifiedFrameworkAdapter with voice support.",
                 language: options.language.rawValue,
                 confidence: 0.0,
@@ -65,48 +65,57 @@ public extension RunAnywhereSDK {
         return nil
     }
 
+    /// Process voice query with streaming events
+    /// - Parameters:
+    ///   - audio: Audio data to process
+    ///   - config: Pipeline configuration
+    /// - Returns: Stream of pipeline events
+    func processVoiceStream(
+        audio: Data,
+        config: VoicePipelineConfig? = nil
+    ) -> AsyncThrowingStream<VoicePipelineEvent, Error> {
+        let orchestrator = serviceContainer.voiceOrchestrator
+        return orchestrator.processVoicePipeline(
+            audio: audio,
+            config: config ?? VoicePipelineConfig.default
+        )
+    }
+
     /// Process voice query (transcribe and generate response)
     /// - Parameters:
     ///   - audio: Audio data to transcribe
     ///   - voiceModelId: Voice model for transcription
     ///   - llmModelId: LLM model for response generation (uses current if nil)
-    /// - Returns: Voice response with input and output text
+    ///   - ttsEnabled: Whether to enable text-to-speech
+    /// - Returns: Complete pipeline result
     func processVoiceQuery(
         audio: Data,
         voiceModelId: String = "whisper-base",
-        llmModelId: String? = nil
-    ) async throws -> VoiceResponse {
+        llmModelId: String? = nil,
+        ttsEnabled: Bool = false,
+        systemPrompt: String? = nil
+    ) async throws -> VoicePipelineResult {
         try await ensureInitialized()
 
-        // Transcribe audio to text
-        let transcription = try await transcribe(
+        let config = VoicePipelineConfig(
+            sttModelId: voiceModelId,
+            llmModelId: llmModelId,
+            ttsEnabled: ttsEnabled,
+            streamingEnabled: false,
+            timeouts: VoicePipelineConfig.PipelineTimeouts(
+                transcription: 30.0,
+                llmGeneration: 60.0,  // Fixed: increased from default
+                textToSpeech: 30.0
+            ),
+            systemPrompt: systemPrompt ?? "You are a helpful, friendly voice assistant. Respond naturally and conversationally, keeping responses concise and suitable for text-to-speech. Avoid URLs, code snippets, or complex formatting."
+        )
+
+        let orchestrator = serviceContainer.voiceOrchestrator
+        return try await orchestrator.processVoiceQuery(
             audio: audio,
-            modelId: voiceModelId
-        )
-
-        // Generate response using existing generation service
-        let textResponse = try await generate(
-            prompt: transcription.text,
-            options: GenerationOptions()
-        )
-
-        return VoiceResponse(
-            inputText: transcription.text,
-            outputText: textResponse.text
+            config: config
         )
     }
 }
 
-/// Response from voice processing
-public struct VoiceResponse {
-    /// The transcribed input text
-    public let inputText: String
-
-    /// The generated output text
-    public let outputText: String
-
-    public init(inputText: String, outputText: String) {
-        self.inputText = inputText
-        self.outputText = outputText
-    }
-}
+// VoiceResponse is now replaced by VoicePipelineResult for better structure

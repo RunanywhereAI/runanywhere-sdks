@@ -8,8 +8,8 @@ public protocol VoiceService: AnyObject {
     /// Transcribe audio data to text
     func transcribe(
         audio: Data,
-        options: TranscriptionOptions
-    ) async throws -> TranscriptionResult
+        options: VoiceTranscriptionOptions
+    ) async throws -> VoiceTranscriptionResult
 
     /// Check if service is ready
     var isReady: Bool { get }
@@ -27,7 +27,7 @@ public protocol VoiceService: AnyObject {
     /// - Returns: Stream of transcription segments
     func transcribeStream(
         audioStream: AsyncStream<AudioChunk>,
-        options: TranscriptionOptions
+        options: VoiceTranscriptionOptions
     ) -> AsyncThrowingStream<TranscriptionSegment, Error>
 
     /// Check if streaming is supported
@@ -42,7 +42,7 @@ public extension VoiceService {
     /// Default implementation returns unsupported stream
     func transcribeStream(
         audioStream: AsyncStream<AudioChunk>,
-        options: TranscriptionOptions
+        options: VoiceTranscriptionOptions
     ) -> AsyncThrowingStream<TranscriptionSegment, Error> {
         AsyncThrowingStream { continuation in
             continuation.finish(throwing: VoiceError.streamingNotSupported)

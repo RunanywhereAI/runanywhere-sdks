@@ -47,6 +47,24 @@ public class ServiceContainer {
         StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
+    /// Voice orchestrator
+    private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
+        DefaultVoiceOrchestrator(
+            voiceServiceProvider: { [weak self] in
+                // This will be resolved at runtime when processVoiceQuery is called
+                return nil // Voice service is created dynamically based on model
+            },
+            generationService: generationService,
+            streamingService: streamingService,
+            ttsServiceProvider: { [weak self] in
+                // TTS service will be integrated later
+                return nil
+            },
+            adapterRegistry: adapterRegistry,
+            modelRegistry: modelRegistry
+        )
+    }()
+
 /// Validation service
     private(set) lazy var validationService: ValidationService = {
         ValidationService()

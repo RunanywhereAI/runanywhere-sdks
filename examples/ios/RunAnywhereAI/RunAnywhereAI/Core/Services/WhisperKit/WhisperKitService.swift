@@ -1,93 +1,88 @@
 import Foundation
 import RunAnywhereSDK
 import AVFoundation
-#if canImport(WhisperKit)
 import WhisperKit
-#endif
+import os
 
 /// WhisperKit implementation of VoiceService
 public class WhisperKitService: VoiceService {
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitService")
 
     // MARK: - Properties
 
     private var currentModelPath: String?
     private var isInitialized: Bool = false
-
-    #if canImport(WhisperKit)
     private var whisperKit: WhisperKit?
-    #endif
 
     // MARK: - VoiceService Implementation
 
     public func initialize(modelPath: String?) async throws {
-        #if canImport(WhisperKit)
+        logger.info("Starting initialization...")
+        logger.debug("Model path requested: \(modelPath ?? "default", privacy: .public)")
+
         do {
-            whisperKit = try await WhisperKit(
-                computeOptions: WhisperKit.getComputeOptions(),
-                audioProcessor: AudioProcessor(),
-                logLevel: .info
-            )
+            // Initialize WhisperKit with default settings
+            // Using WhisperKit's default initialization
+            logger.info("Creating WhisperKit instance...")
+            whisperKit = try await WhisperKit()
             currentModelPath = modelPath ?? "openai/whisper-base"
             isInitialized = true
-            print("WhisperKitService initialized with actual WhisperKit model: \(currentModelPath ?? "default")")
+            logger.info("✅ Successfully initialized with model: \(self.currentModelPath ?? "default", privacy: .public)")
+            logger.debug("isInitialized: \(self.isInitialized)")
         } catch {
-            print("Failed to initialize WhisperKit: \(error)")
+            logger.error("❌ Failed to initialize WhisperKit: \(error, privacy: .public)")
+            logger.error("Error details: \(error.localizedDescription, privacy: .public)")
             throw VoiceError.transcriptionFailed(error)
         }
-        #else
-        // Fallback to simulated initialization when WhisperKit is not available
-        currentModelPath = modelPath ?? "whisper-base"
-        isInitialized = true
-        print("WhisperKitService initialized with simulated model: \(currentModelPath ?? "default")")
-        #endif
     }
 
     public func transcribe(
         audio: Data,
-        options: TranscriptionOptions
-    ) async throws -> TranscriptionResult {
-        guard isInitialized else {
-            throw VoiceError.serviceNotInitialized
-        }
+        options: VoiceTranscriptionOptions
+    ) async throws -> VoiceTranscriptionResult {
+        logger.info("transcribe() called")
+        logger.debug("Audio data size: \(audio.count) bytes")
+        logger.debug("Options - Language: \(options.language.rawValue, privacy: .public), Task: \(String(describing: options.task), privacy: .public)")
 
-        #if canImport(WhisperKit)
-        guard let whisperKit = whisperKit else {
+        guard isInitialized, let whisperKit = whisperKit else {
+            logger.error("❌ Service not initialized!")
+            logger.error("isInitialized: \(self.isInitialized), whisperKit: \(self.whisperKit != nil)")
             throw VoiceError.serviceNotInitialized
         }
 
         do {
             // Convert Data to audio samples for WhisperKit
+            logger.info("Converting audio data to float array...")
             let audioSamples = convertDataToFloatArray(audio)
+            logger.debug("Converted to \(audioSamples.count) samples")
+            logger.debug("Duration: \(Double(audioSamples.count) / 16000.0) seconds")
 
             // Perform transcription using WhisperKit
-            let transcriptionResult = try await whisperKit.transcribe(
+            logger.info("Starting WhisperKit transcription...")
+            let transcriptionResults = try await whisperKit.transcribe(
                 audioArray: audioSamples
             )
+            logger.info("Transcription completed")
+            logger.debug("Results count: \(transcriptionResults.count)")
 
             // Extract the transcribed text
-            let transcribedText = transcriptionResult.first?.text ?? ""
+            let transcribedText = transcriptionResults.first?.text ?? ""
+            logger.info("Transcribed text: '\(transcribedText, privacy: .public)'")
 
             // Return the result
-            return TranscriptionResult(
+            let result = VoiceTranscriptionResult(
                 text: transcribedText,
-                language: transcriptionResult.first?.language ?? options.language.rawValue,
+                language: transcriptionResults.first?.language ?? options.language.rawValue,
                 confidence: 0.95, // WhisperKit doesn't provide confidence scores directly
                 duration: Double(audioSamples.count) / 16000.0 // Based on 16kHz sample rate
             )
+            logger.info("✅ Returning result with text: '\(result.text, privacy: .public)'")
+            return result
         } catch {
+            logger.error("❌ Transcription failed: \(error, privacy: .public)")
+            logger.error("Error details: \(error.localizedDescription, privacy: .public)")
             throw VoiceError.transcriptionFailed(error)
         }
-        #else
-        // Fallback to simulated transcription when WhisperKit is not available
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-
-        return TranscriptionResult(
-            text: "This is a simulated transcription. WhisperKit not available.",
-            language: options.language.rawValue,
-            confidence: 0.95,
-            duration: Double(audio.count) / 32000.0 // Estimate based on 16kHz mono audio
-        )
-        #endif
     }
 
     public var isReady: Bool {
@@ -101,20 +96,20 @@ public class WhisperKitService: VoiceService {
     public func cleanup() async {
         isInitialized = false
         currentModelPath = nil
-        #if canImport(WhisperKit)
         whisperKit = nil
-        #endif
     }
 
     // MARK: - Initialization
 
     public init() {
+        logger.info("Service instance created")
         // No initialization needed for basic service
     }
 
     // MARK: - Helper Methods
 
     private func convertDataToFloatArray(_ data: Data) -> [Float] {
+        logger.debug("Converting \(data.count) bytes to float array...")
         let floatCount = data.count / MemoryLayout<Float>.size
         var floatArray = [Float](repeating: 0, count: floatCount)
         _ = data.withUnsafeBytes { bytes in
@@ -122,6 +117,7 @@ public class WhisperKitService: VoiceService {
                 bytes.copyBytes(to: buffer)
             }
         }
+        logger.debug("Converted to \(floatArray.count) float values")
         return floatArray
     }
 }
