@@ -153,11 +153,15 @@ struct VoiceAssistantView: View {
             errorMessage = nil
 
             do {
-                // Process voice through SDK's unified pipeline
+                // Process voice through SDK's unified pipeline with streaming
                 transcribedText = "Processing audio..."
-                responseText = "Waiting for response..."
+                responseText = ""
 
-                let result = try await viewModel.stopRecordingAndProcess()
+                // Get audio data
+                let audioData = try await viewModel.audioCapture.stopRecording()
+
+                // Process with streaming for better UX
+                let result = try await viewModel.processVoiceWithStreaming(audioData)
 
                 // Update UI with results
                 transcribedText = result.transcription.text
@@ -167,11 +171,11 @@ struct VoiceAssistantView: View {
                 if !result.stageTiming.isEmpty {
                     let timingInfo = result.stageTiming.map { "\($0.key.rawValue): \(String(format: "%.1f", $0.value))s" }
                         .joined(separator: ", ")
-                    errorMessage = "Processing time: \(timingInfo)"
+                    errorMessage = "Processing time: \(String(format: "%.1f", result.processingTime))s - \(timingInfo)"
                 }
 
-                // Speak the response
-                await viewModel.speakResponse(responseText)
+                // Response has already been spoken during streaming
+                // No need to speak again
             } catch {
                 // Handle errors gracefully
                 if transcribedText == "Processing audio..." {

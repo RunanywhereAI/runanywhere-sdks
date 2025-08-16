@@ -86,6 +86,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         var lastResult: VoicePipelineResult?
         var accumulatedResponse = ""
+        var ttsBuffer = ""  // Buffer for sentence-level TTS
 
         // Configure pipeline with streaming enabled for better UX
         let config = VoicePipelineConfig(
@@ -100,7 +101,8 @@ class VoiceAssistantViewModel: ObservableObject {
             ),
             generationOptions: GenerationOptions(
                 maxTokens: 200,  // Increased for better responses
-                temperature: 0.7
+                temperature: 0.7,
+                systemPrompt: "You are a helpful, friendly voice assistant. Respond naturally and conversationally, keeping responses brief and to the point."
             )
         )
 
@@ -121,8 +123,35 @@ class VoiceAssistantViewModel: ObservableObject {
 
             case .llmGenerationProgress(let text, let tokens):
                 // Update UI with streaming text
+                let previousLength = accumulatedResponse.count
                 accumulatedResponse = text
-                logger.debug("LLM streaming: \(tokens) tokens")
+
+                // Get the new tokens added
+                let newContent = String(text.dropFirst(previousLength))
+                ttsBuffer += newContent
+
+                logger.debug("LLM streaming: \(tokens) tokens, new content: '\(newContent)'")
+
+                // Check if we have a complete sentence to speak
+                if ttsBuffer.contains(where: { ".!?".contains($0) }) {
+                    // Find the last complete sentence
+                    if let lastSentenceEnd = ttsBuffer.lastIndex(where: { ".!?".contains($0) }) {
+                        let sentenceEndIndex = ttsBuffer.index(after: lastSentenceEnd)
+                        let sentence = String(ttsBuffer[..<sentenceEndIndex])
+
+                        // Speak the sentence asynchronously
+                        if !sentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Task {
+                                logger.info("Speaking sentence: '\(sentence)'")
+                                await self.ttsService.speak(text: sentence)
+                            }
+                        }
+
+                        // Remove spoken sentence from buffer
+                        ttsBuffer = String(ttsBuffer[sentenceEndIndex...])
+                    }
+                }
+
                 await MainActor.run {
                     // Show partial response for better UX
                     let preview = text.prefix(100)
@@ -131,6 +160,16 @@ class VoiceAssistantViewModel: ObservableObject {
 
             case .llmGenerationCompleted(let text):
                 logger.info("LLM generation completed: '\(text.prefix(100), privacy: .public)'...")
+
+                // Speak any remaining text in the buffer
+                if !ttsBuffer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Task {
+                        logger.info("Speaking remaining text: '\(ttsBuffer)'")
+                        await self.ttsService.speak(text: ttsBuffer)
+                    }
+                    ttsBuffer = ""
+                }
+
                 await MainActor.run {
                     self.currentStatus = "Speaking response..."
                 }
@@ -153,10 +192,8 @@ class VoiceAssistantViewModel: ObservableObject {
                     self.currentStatus = "Response complete"
                 }
 
-                // Speak the complete response if TTS wasn't streamed
-                if !config.ttsEnabled {
-                    await speakResponse(result.llmResponse)
-                }
+                // TTS is handled during streaming, so we don't need to speak again
+                // The response has already been spoken sentence by sentence during generation
 
             case .error(let stage, let error):
                 logger.error("Pipeline error at \(stage.rawValue): \(error)")

@@ -21,13 +21,20 @@ public class WhisperKitService: VoiceService {
         logger.debug("Model path requested: \(modelPath ?? "default", privacy: .public)")
 
         do {
-            // Initialize WhisperKit with default settings
-            // Using WhisperKit's default initialization
-            logger.info("Creating WhisperKit instance...")
-            whisperKit = try await WhisperKit()
-            currentModelPath = modelPath ?? "openai/whisper-base"
+            // Try to initialize WhisperKit with default model (it will use cached models)
+            // WhisperKit will automatically look for downloaded models in the default location
+            logger.info("Creating WhisperKit instance (will use cached models if available)")
+
+            // Initialize WhisperKit without specifying model - it will use the default or cached one
+            whisperKit = try await WhisperKit(
+                verbose: false,
+                logLevel: .error,
+                prewarm: true
+            )
+
+            currentModelPath = modelPath ?? "whisper-base"
             isInitialized = true
-            logger.info("✅ Successfully initialized with model: \(self.currentModelPath ?? "default", privacy: .public)")
+            logger.info("✅ Successfully initialized WhisperKit")
             logger.debug("isInitialized: \(self.isInitialized)")
         } catch {
             logger.error("❌ Failed to initialize WhisperKit: \(error, privacy: .public)")
@@ -107,6 +114,26 @@ public class WhisperKitService: VoiceService {
     }
 
     // MARK: - Helper Methods
+
+    private func mapModelIdToWhisperKitName(_ modelId: String) -> String {
+        // Map common model IDs to WhisperKit model names
+        switch modelId.lowercased() {
+        case "whisper-tiny", "tiny":
+            return "openai_whisper-tiny"
+        case "whisper-base", "base":
+            return "openai_whisper-base"
+        case "whisper-small", "small":
+            return "openai_whisper-small"
+        case "whisper-medium", "medium":
+            return "openai_whisper-medium"
+        case "whisper-large", "large":
+            return "openai_whisper-large-v3"
+        default:
+            // Default to base if not recognized
+            logger.warning("Unknown model ID: \(modelId), defaulting to whisper-base")
+            return "openai_whisper-base"
+        }
+    }
 
     private func convertDataToFloatArray(_ data: Data) -> [Float] {
         logger.debug("Converting \(data.count) bytes to float array...")
