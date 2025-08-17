@@ -67,7 +67,18 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
             voiceSession = sdk.createVoiceSession(
                 config: config,
                 audioCaptureProvider: { [weak self] in
-                    self?.audioCapture.startContinuousCapture() ?? AsyncStream { _ in }
+                    // Return a simple stream - VAD will handle the actual audio processing
+                    return AsyncStream { continuation in
+                        // This stream is kept alive for the duration of the session
+                        // The actual audio processing happens in the VAD detector
+                        Task {
+                            // Keep the stream alive
+                            while !Task.isCancelled {
+                                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
+                            }
+                            continuation.finish()
+                        }
+                    }
                 },
                 stopAudioCapture: { [weak self] in
                     self?.audioCapture.stopContinuousCapture()
