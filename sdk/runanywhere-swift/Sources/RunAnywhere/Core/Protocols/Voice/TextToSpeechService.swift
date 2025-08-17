@@ -32,7 +32,7 @@ public protocol TextToSpeechService: AnyObject {
     func synthesizeStream(
         text: String,
         options: TTSOptions
-    ) -> AsyncThrowingStream<AudioChunk, Error>
+    ) -> AsyncThrowingStream<VoiceAudioChunk, Error>
 
     /// Stop current speech
     func stop()
@@ -195,15 +195,21 @@ public extension TextToSpeechService {
     func synthesizeStream(
         text: String,
         options: TTSOptions
-    ) -> AsyncThrowingStream<AudioChunk, Error> {
+    ) -> AsyncThrowingStream<VoiceAudioChunk, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
                     let audio = try await synthesize(text: text, options: options)
-                    let chunk = AudioChunk(
-                        data: audio,
+                    // Convert Data to Float samples for new VoiceAudioChunk format
+                    let samples = audio.withUnsafeBytes { buffer in
+                        Array(buffer.bindMemory(to: Float.self))
+                    }
+                    let chunk = VoiceAudioChunk(
+                        samples: samples,
                         timestamp: 0,
                         sampleRate: options.sampleRate,
+                        channels: 1,
+                        sequenceNumber: 0,
                         isFinal: true
                     )
                     continuation.yield(chunk)

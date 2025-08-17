@@ -1,9 +1,9 @@
 import Foundation
 
 /// A chunk of audio data for streaming processing
-public struct AudioChunk {
-    /// The audio data
-    public let data: Data
+public struct VoiceAudioChunk {
+    /// The audio samples as Float32 array (SIMPLIFIED - no more Data conversion)
+    public let samples: [Float]
 
     /// Timestamp when this chunk was captured
     public let timestamp: TimeInterval
@@ -21,14 +21,14 @@ public struct AudioChunk {
     public let isFinal: Bool
 
     public init(
-        data: Data,
+        samples: [Float],
         timestamp: TimeInterval,
         sampleRate: Int = 16000,
         channels: Int = 1,
         sequenceNumber: Int = 0,
         isFinal: Bool = false
     ) {
-        self.data = data
+        self.samples = samples
         self.timestamp = timestamp
         self.sampleRate = sampleRate
         self.channels = channels
@@ -36,16 +36,18 @@ public struct AudioChunk {
         self.isFinal = isFinal
     }
 
+    /// Legacy Data property for backward compatibility (converts from Float samples)
+    public var data: Data {
+        return Data(bytes: samples, count: samples.count * MemoryLayout<Float>.size)
+    }
+
     /// Duration of this audio chunk in seconds
     public var duration: TimeInterval {
-        let bytesPerSample = 2 // Assuming 16-bit audio
-        let samples = data.count / (bytesPerSample * channels)
-        return TimeInterval(samples) / TimeInterval(sampleRate)
+        return TimeInterval(samples.count) / TimeInterval(sampleRate * channels)
     }
 
     /// Number of samples in this chunk
     public var sampleCount: Int {
-        let bytesPerSample = 2 // Assuming 16-bit audio
-        return data.count / (bytesPerSample * channels)
+        return samples.count / channels
     }
 }

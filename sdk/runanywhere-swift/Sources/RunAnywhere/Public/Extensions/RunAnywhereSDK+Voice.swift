@@ -116,6 +116,31 @@ public extension RunAnywhereSDK {
             config: config
         )
     }
+
+    /// Create a new voice session for real-time conversation
+    /// - Parameters:
+    ///   - config: Session configuration
+    ///   - audioCaptureProvider: Optional provider for audio capture stream
+    ///   - stopAudioCapture: Optional callback to stop audio capture
+    /// - Returns: A new VoiceSessionManager instance
+    public func createVoiceSession(
+        config: VoiceSessionConfig = VoiceSessionConfig(),
+        audioCaptureProvider: (() -> AsyncStream<VoiceAudioChunk>)? = nil,
+        stopAudioCapture: (() -> Void)? = nil
+    ) -> VoiceSessionManager {
+        logger.info("Creating new voice session")
+
+        // Get voice orchestrator from service container
+        let orchestrator = serviceContainer.voiceOrchestrator
+
+        // Create and return session manager
+        return VoiceSessionManager(
+            voiceOrchestrator: orchestrator,
+            config: config,
+            audioCaptureProvider: audioCaptureProvider,
+            stopAudioCapture: stopAudioCapture
+        )
+    }
 }
 
 // VoiceResponse is now replaced by VoicePipelineResult for better structure

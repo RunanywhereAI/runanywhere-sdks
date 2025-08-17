@@ -13,13 +13,12 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
 
     public let framework: LLMFramework = .whisperKit
 
-    public let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToVoice]
+    public let supportedModalities: Set<FrameworkModality> = [.voiceToText]
 
     public let supportedFormats: [ModelFormat] = [.mlmodel, .mlpackage]
 
     // Cache service instances to avoid re-initialization
     private var cachedWhisperKitService: WhisperKitService?
-    private var cachedTTSService: SystemTTSServiceWrapper?
 
     // Track last usage for smart cleanup
     private var lastWhisperKitUsage: Date?
@@ -52,15 +51,9 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
             lastWhisperKitUsage = Date()
             return service
         case .textToVoice:
-            // Return cached instance if available
-            if let cached = cachedTTSService {
-                logger.info("Returning cached SystemTTSServiceWrapper for text-to-voice")
-                return cached
-            }
-            logger.info("Creating new SystemTTSServiceWrapper for text-to-voice")
-            let service = SystemTTSServiceWrapper()
-            cachedTTSService = service
-            return service
+            // TTS is now handled by the SDK
+            logger.warning("Text-to-voice is now handled by the SDK, not WhisperKit")
+            return nil
         default:
             logger.warning("Unsupported modality: \(modality.rawValue, privacy: .public)")
             return nil
@@ -93,17 +86,9 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
             lastWhisperKitUsage = Date()
             return service
         case .textToVoice:
-            // Use cached service if available
-            if let cached = cachedTTSService {
-                logger.info("Returning cached SystemTTSServiceWrapper (no model loading needed)")
-                return cached
-            }
-
-            // TTS doesn't need model loading, just return the service
-            logger.info("Creating SystemTTSServiceWrapper (no model loading needed)")
-            let service = SystemTTSServiceWrapper()
-            cachedTTSService = service
-            return service
+            // TTS is now handled by the SDK
+            logger.warning("Text-to-voice is now handled by the SDK, not WhisperKit")
+            throw SDKError.unsupportedModality("TTS is handled by SDK")
         default:
             logger.error("Unsupported modality: \(modality.rawValue, privacy: .public)")
             throw SDKError.unsupportedModality(modality.rawValue)
@@ -154,7 +139,5 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         await cachedWhisperKitService?.cleanup()
         cachedWhisperKitService = nil
         lastWhisperKitUsage = nil
-        // TTS doesn't need cleanup
-        cachedTTSService = nil
     }
 }
