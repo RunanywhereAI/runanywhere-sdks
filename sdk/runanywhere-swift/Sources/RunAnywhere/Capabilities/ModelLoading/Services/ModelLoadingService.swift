@@ -40,15 +40,22 @@ public class ModelLoadingService {
 
         logger.info("✅ Found model in registry: \(modelInfo.name)")
 
-        // Validate model file exists
-        guard let localPath = modelInfo.localPath else {
-            throw SDKError.modelNotFound("Model '\(modelId)' not downloaded")
-        }
+        // Check if this is a built-in model (e.g., Foundation Models)
+        let isBuiltIn = modelInfo.localPath?.scheme == "builtin"
 
-        // Validate model
-        let validationResult = try await validationService.validate(localPath)
-        if !validationResult.errors.isEmpty {
-            throw SDKError.validationFailed(validationResult.errors.first!)
+        if !isBuiltIn {
+            // Validate model file exists for non-built-in models
+            guard let localPath = modelInfo.localPath else {
+                throw SDKError.modelNotFound("Model '\(modelId)' not downloaded")
+            }
+
+            // Validate model
+            let validationResult = try await validationService.validate(localPath)
+            if !validationResult.errors.isEmpty {
+                throw SDKError.validationFailed(validationResult.errors.first!)
+            }
+        } else {
+            logger.info("🏗️ Built-in model detected, skipping file validation")
         }
 
         // Check memory availability

@@ -298,7 +298,7 @@ public class VoiceSessionManager {
                 llmGeneration: 60,
                 textToSpeech: 30
             ),
-            generationOptions: GenerationOptions(
+           generationOptions: RunAnywhereGenerationOptions(
                 maxTokens: 500,
                 temperature: 0.7
             )

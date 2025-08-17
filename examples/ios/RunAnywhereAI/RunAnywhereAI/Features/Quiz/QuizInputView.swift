@@ -17,10 +17,31 @@ struct QuizInputView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
+                    // Experimental badge
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("EXPERIMENTAL FEATURE")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.15))
+                    .cornerRadius(12)
+
+                    Text("🚧 In Development")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .italic()
+
                     Text("Paste educational content to generate true/false questions")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
+                        .padding(.top, 4)
                 }
                 .padding(.top, 40)
 

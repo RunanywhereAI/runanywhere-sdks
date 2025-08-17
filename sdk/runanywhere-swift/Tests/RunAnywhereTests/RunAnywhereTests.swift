@@ -15,7 +15,7 @@ final class RunAnywhereSDKTests: XCTestCase {
 
     func testGenerationOptions() throws {
         // Test generation options with default values
-        let options = GenerationOptions()
+        let options = RunAnywhereGenerationOptions()
 
         XCTAssertEqual(options.maxTokens, 100)
         XCTAssertEqual(options.temperature, 0.7)

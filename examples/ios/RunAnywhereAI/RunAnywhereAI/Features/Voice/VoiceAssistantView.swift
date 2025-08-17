@@ -158,10 +158,14 @@ struct VoiceAssistantView: View {
                 }) {
                     ZStack {
                         Circle()
-                            .fill(viewModel.isListening ? Color.red : Color.blue)
+                            .fill(micButtonColor)
                             .frame(width: 80, height: 80)
 
-                        if viewModel.isProcessing && !viewModel.isListening {
+                        if viewModel.sessionState == .connecting {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+                        } else if viewModel.isProcessing && !viewModel.isListening {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(1.5)
@@ -229,6 +233,16 @@ struct VoiceAssistantView: View {
     }
 
     // Helper computed properties
+    private var micButtonColor: Color {
+        switch viewModel.sessionState {
+        case .connecting: return .yellow
+        case .listening: return .red
+        case .processing: return .orange
+        case .speaking: return .red  // Red when speaking so user can dismiss
+        default: return .blue
+        }
+    }
+
     private var statusColor: Color {
         switch viewModel.sessionState {
         case .disconnected: return .gray

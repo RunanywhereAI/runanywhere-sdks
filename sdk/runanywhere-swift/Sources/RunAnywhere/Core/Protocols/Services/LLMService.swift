@@ -11,7 +11,7 @@ public protocol LLMService: AnyObject {
     ///   - prompt: The input prompt
     ///   - options: Generation options
     /// - Returns: Generated text
-    func generate(prompt: String, options: GenerationOptions) async throws -> String
+    func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String
 
     /// Stream generate text from a prompt
     /// - Parameters:
@@ -20,7 +20,7 @@ public protocol LLMService: AnyObject {
     ///   - onToken: Callback for each generated token
     func streamGenerate(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws
 

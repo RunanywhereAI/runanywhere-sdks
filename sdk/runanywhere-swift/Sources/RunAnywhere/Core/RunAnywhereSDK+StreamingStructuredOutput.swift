@@ -79,7 +79,7 @@ public extension RunAnywhereSDK {
     func generateStructuredStream<T: Generatable>(
         _ type: T.Type,
         content: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) -> StructuredOutputStreamResult<T> {
         // Create a shared accumulator
         let accumulator = StreamAccumulator()
@@ -91,7 +91,7 @@ public extension RunAnywhereSDK {
         let systemPrompt = handler.getSystemPrompt(for: type)
 
         // Create effective options with system prompt
-        let effectiveOptions = GenerationOptions(
+        let effectiveOptions = RunAnywhereGenerationOptions(
             maxTokens: options?.maxTokens ?? type.generationHints?.maxTokens ?? 1500,
             temperature: options?.temperature ?? type.generationHints?.temperature ?? 0.7,
             topP: options?.topP ?? 1.0,

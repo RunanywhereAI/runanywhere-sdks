@@ -21,7 +21,7 @@ public struct VoicePipelineConfig {
     public let timeouts: PipelineTimeouts
 
     /// LLM generation options
-    public let generationOptions: GenerationOptions
+    public let generationOptions: RunAnywhereGenerationOptions
 
     /// System prompt for conversational context
     public let systemPrompt: String?
@@ -33,7 +33,7 @@ public struct VoicePipelineConfig {
         ttsVoice: String? = nil,
         streamingEnabled: Bool = true,
         timeouts: PipelineTimeouts = PipelineTimeouts(),
-        generationOptions: GenerationOptions? = nil,
+        generationOptions: RunAnywhereGenerationOptions? = nil,
         systemPrompt: String? = nil
     ) {
         self.sttModelId = sttModelId
@@ -49,14 +49,14 @@ public struct VoicePipelineConfig {
             self.generationOptions = providedOptions
         } else if let systemPrompt = systemPrompt {
             // Create default options with the provided system prompt
-            self.generationOptions = GenerationOptions(
+            self.generationOptions = RunAnywhereGenerationOptions(
                 maxTokens: 100,
                 temperature: 0.7,
                 systemPrompt: systemPrompt
             )
         } else {
             // Use default conversational options
-            self.generationOptions = GenerationOptions(
+            self.generationOptions = RunAnywhereGenerationOptions(
                 maxTokens: 100,
                 temperature: 0.7
             )

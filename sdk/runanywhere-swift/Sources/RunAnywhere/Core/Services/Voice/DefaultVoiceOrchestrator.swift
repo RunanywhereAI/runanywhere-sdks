@@ -253,7 +253,7 @@ final class DefaultVoiceOrchestrator: VoiceOrchestrator {
     private func processLLMGeneration(
         prompt: String,
         modelId: String?,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         timeout: TimeInterval,
         progressHandler: ((String, Int) -> Void)?
     ) async throws -> String {

@@ -30,7 +30,7 @@ public class BenchmarkExecutor {
 
         _ = try await service.generate(
             prompt: "Hello",
-            options: GenerationOptions(maxTokens: 5, temperature: 0.1)
+            options: RunAnywhereGenerationOptions(maxTokens: 5, temperature: 0.1)
         )
     }
 
@@ -87,7 +87,7 @@ public class BenchmarkExecutor {
         // Execute generation
         try await service.streamGenerate(
             prompt: prompt.text,
-            options: GenerationOptions(
+            options: RunAnywhereGenerationOptions(
                 maxTokens: prompt.expectedTokens,
                 temperature: 0.7
             )
