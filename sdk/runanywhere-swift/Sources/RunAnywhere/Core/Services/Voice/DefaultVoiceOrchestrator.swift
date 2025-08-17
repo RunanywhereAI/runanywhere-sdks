@@ -278,9 +278,25 @@ final class DefaultVoiceOrchestrator: VoiceOrchestrator {
                 return nil
             }
 
-            // For now, return nil as TTS needs to be properly integrated
-            // This will be implemented when TTS service is added to SDK
-            return nil
+            // Create TTS options
+            let options = TTSOptions(
+                voice: voice,
+                language: "en-US",
+                rate: 1.0,
+                pitch: 1.0,
+                volume: 1.0,
+                audioFormat: .pcm,
+                sampleRate: 16000,
+                useSSML: false
+            )
+
+            // Speak the text directly through system TTS
+            // Note: System TTS plays audio directly, doesn't return raw data
+            try await ttsService.speak(text: text, options: options)
+
+            // Return empty data as system TTS plays directly
+            // The audio is played through the device speakers
+            return Data()
         }
     }
 

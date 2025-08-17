@@ -8,7 +8,6 @@ import os
 class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
     private let sdk = RunAnywhereSDK.shared
-    private let ttsService = SystemTTSService()
     private let audioCapture = AudioCapture()
 
     // MARK: - Published Properties
@@ -169,9 +168,15 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
         DispatchQueue.main.async {
             self.assistantResponse = text
-            // Only log when response is complete
-            if text.count > 50 && !text.hasSuffix("...") {
+
+            // Log when response is complete
+            let isComplete = !text.hasSuffix("...") &&
+                            (text.hasSuffix(".") || text.hasSuffix("!") || text.hasSuffix("?") ||
+                             text.hasSuffix(")") || text.count > 100)
+
+            if isComplete && !text.isEmpty {
                 self.logger.info("AI Response completed: '\(text.prefix(50))...'")
+                // TTS is now handled by the SDK pipeline when ttsEnabled is true
             }
         }
     }
@@ -222,7 +227,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
 
     func speakResponse(_ text: String) async {
         logger.info("Speaking response: '\(text, privacy: .public)'")
-        await ttsService.speak(text: text)
-        logger.info("Response spoken")
+        // TTS is now handled by the SDK pipeline
+        logger.info("TTS handled by SDK")
     }
 }

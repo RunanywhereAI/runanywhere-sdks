@@ -2,6 +2,33 @@ import Foundation
 import AVFoundation
 import os
 
+/// Thread-safe actor for managing audio buffer
+private actor AudioBufferActor {
+    private var buffer: [Float] = []
+
+    func append(contentsOf samples: [Float]) {
+        buffer.append(contentsOf: samples)
+    }
+
+    func clear() {
+        buffer = []
+    }
+
+    func getAndClear() -> [Float] {
+        let current = buffer
+        buffer = []
+        return current
+    }
+
+    func count() -> Int {
+        return buffer.count
+    }
+
+    func isEmpty() -> Bool {
+        return buffer.isEmpty
+    }
+}
+
 /// Simplified Voice Session Manager with WebRTC VAD
 public class VoiceSessionManager {
     // MARK: - Properties
@@ -20,8 +47,8 @@ public class VoiceSessionManager {
     // Configuration
     private let config: VoiceSessionConfig
 
-    // Audio buffer for accumulating speech
-    private var speechBuffer: [Float] = []
+    // Audio buffer for accumulating speech - protected by actor for thread safety
+    private let audioBufferActor = AudioBufferActor()
     private let minSpeechDuration: TimeInterval = 2.0 // Minimum 2 seconds of speech
 
     // MARK: - Session States
@@ -165,13 +192,16 @@ public class VoiceSessionManager {
             case .started:
                 self.logger.info("🎤 Speech started")
                 self.updateState(.listening)
-                self.speechBuffer = [] // Clear buffer for new speech
+                Task {
+                    await self.audioBufferActor.clear() // Clear buffer for new speech
+                }
 
             case .ended:
                 self.logger.info("🔇 Speech ended")
                 // Process accumulated speech buffer
-                if !self.speechBuffer.isEmpty {
-                    Task {
+                Task {
+                    let isEmpty = await self.audioBufferActor.isEmpty()
+                    if !isEmpty {
                         await self.processSpeechBuffer()
                     }
                 }
@@ -211,16 +241,18 @@ public class VoiceSessionManager {
 
                     // Only accumulate audio when we're actively listening (after speech started)
                     if self.state == .listening {
-                        self.speechBuffer.append(contentsOf: chunk.samples)
-                        if self.speechBuffer.count % 16000 == 0 { // Log every second of buffered audio
-                            self.logger.debug("Speech buffer: \(self.speechBuffer.count) samples (\(self.speechBuffer.count/16000)s)")
+                        await self.audioBufferActor.append(contentsOf: chunk.samples)
+                        let bufferCount = await self.audioBufferActor.count()
+                        if bufferCount % 16000 == 0 { // Log every second of buffered audio
+                            self.logger.debug("Speech buffer: \(bufferCount) samples (\(bufferCount/16000)s)")
                         }
                     }
                 } else {
                     // No VAD - accumulate audio and process periodically
-                    self.speechBuffer.append(contentsOf: chunk.samples)
+                    await self.audioBufferActor.append(contentsOf: chunk.samples)
 
-                    let bufferDuration = TimeInterval(self.speechBuffer.count) / 16000.0
+                    let bufferCount = await self.audioBufferActor.count()
+                    let bufferDuration = TimeInterval(bufferCount) / 16000.0
                     if bufferDuration >= self.minSpeechDuration {
                         await self.processSpeechBuffer()
                     }
@@ -228,13 +260,15 @@ public class VoiceSessionManager {
             }
 
             // Process any remaining audio
-            if !self.speechBuffer.isEmpty {
+            let isEmpty = await self.audioBufferActor.isEmpty()
+            if !isEmpty {
                 await self.processSpeechBuffer()
             }
         }
     }
 
     private func processSpeechBuffer() async {
+        let speechBuffer = await audioBufferActor.getAndClear()
         guard !speechBuffer.isEmpty else { return }
 
         let sampleCount = speechBuffer.count
@@ -243,7 +277,6 @@ public class VoiceSessionManager {
         // Skip very short segments (less than 0.5 seconds) to avoid WhisperKit issues
         if duration < 0.5 {
             logger.warning("Skipping short audio segment: \(String(format: "%.2f", duration))s (\(sampleCount) samples)")
-            speechBuffer = []
             updateState(.connected)
             return
         }
@@ -252,9 +285,6 @@ public class VoiceSessionManager {
 
         // Convert to Data for orchestrator
         let audioData = Data(bytes: speechBuffer, count: sampleCount * MemoryLayout<Float>.size)
-
-        // Clear buffer for next speech segment
-        speechBuffer = []
 
         // Create pipeline config
         let pipelineConfig = VoicePipelineConfig(

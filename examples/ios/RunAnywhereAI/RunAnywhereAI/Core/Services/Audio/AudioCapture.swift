@@ -146,9 +146,9 @@ public class AudioCapture: NSObject {
     // MARK: - Audio Engine Methods
 
     private func startAudioEngine() throws {
-        // Configure audio session
+        // Configure audio session for both recording and playback
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.record, mode: .measurement, options: [])
+        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
         try audioSession.setActive(true)
 
         // Create and configure audio engine
