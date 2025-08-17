@@ -72,21 +72,25 @@ struct QuizInputView: View {
                 }
                 .padding(.horizontal)
 
-                // Model Status (temporarily hidden for debugging)
-                if !viewModel.isModelLoaded && false {
-                    HStack {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(.orange)
+                // Model Status
+                HStack {
+                    Image(systemName: viewModel.isModelLoaded ? "checkmark.circle.fill" : "info.circle.fill")
+                        .foregroundColor(viewModel.isModelLoaded ? .green : .orange)
 
+                    if viewModel.isModelLoaded {
+                        Text("Using model: \(viewModel.loadedModelName ?? "Unknown")")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    } else {
                         Text("Please load a model from the Models tab to generate quizzes")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
                 }
+                .padding()
+                .background(Color(.systemGray6))
+                .cornerRadius(12)
+                .padding(.horizontal)
 
                 // Generate Button
                 Button(action: {

@@ -207,6 +207,11 @@ class ChatViewModel: ObservableObject {
             object: nil
         )
 
+        // Ensure user settings are applied (safety check)
+        Task {
+            await ensureSettingsAreApplied()
+        }
+
         // Delay analytics initialization to avoid crash during SDK startup
         // Analytics will be initialized when the view appears or when first used
     }
@@ -297,9 +302,11 @@ class ChatViewModel: ObservableObject {
                 let fullPrompt = prompt
                 logger.info("📝 Sending new message only: \(fullPrompt)")
 
+                // Get SDK configuration for generation options
+                let effectiveSettings = await sdk.getGenerationSettings()
                 let options = RunAnywhereGenerationOptions(
-                    maxTokens: 500,
-                    temperature: 0.7
+                    maxTokens: effectiveSettings.maxTokens,
+                    temperature: Float(effectiveSettings.temperature)
                     // No context passed - it's all in the prompt now
                 )
 
@@ -769,6 +776,21 @@ class ChatViewModel: ObservableObject {
 
     func createNewConversation() {
         clearChat()
+    }
+
+    private func ensureSettingsAreApplied() async {
+        // Load user settings from UserDefaults and apply to SDK if needed
+        let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+        let temperature = savedTemperature != 0 ? savedTemperature : 0.7
+
+        let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+        let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
+
+        // Apply settings to SDK (this is idempotent, so safe to call multiple times)
+        await sdk.setTemperature(Float(temperature))
+        await sdk.setMaxTokens(maxTokens)
+
+        logger.info("🔧 Ensured settings are applied - Temperature: \(temperature), MaxTokens: \(maxTokens)")
     }
 
     deinit {

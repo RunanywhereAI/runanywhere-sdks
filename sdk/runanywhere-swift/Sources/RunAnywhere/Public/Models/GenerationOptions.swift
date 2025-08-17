@@ -35,6 +35,9 @@ public struct RunAnywhereGenerationOptions {
     /// Structured output configuration (optional)
     public let structuredOutput: StructuredOutputConfig?
 
+    /// System prompt to define AI behavior and formatting rules
+    public let systemPrompt: String?
+
     /// Initialize generation options
     /// - Parameters:
     ///   - maxTokens: Maximum tokens to generate (default: 100)
@@ -48,6 +51,7 @@ public struct RunAnywhereGenerationOptions {
     ///   - frameworkOptions: Framework-specific options
     ///   - preferredExecutionTarget: Preferred execution target
     ///   - structuredOutput: Structured output configuration (optional)
+    ///   - systemPrompt: System prompt for AI behavior (optional)
     public init(
         maxTokens: Int = 100,
         temperature: Float = 0.7,
@@ -59,7 +63,8 @@ enableRealTimeTracking: Bool = true,
         tokenBudget: TokenBudget? = nil,
         frameworkOptions: FrameworkOptions? = nil,
         preferredExecutionTarget: ExecutionTarget? = nil,
-        structuredOutput: StructuredOutputConfig? = nil
+        structuredOutput: StructuredOutputConfig? = nil,
+        systemPrompt: String? = nil
     ) {
         self.maxTokens = maxTokens
         self.temperature = temperature
@@ -72,5 +77,6 @@ self.enableRealTimeTracking = enableRealTimeTracking
         self.frameworkOptions = frameworkOptions
         self.preferredExecutionTarget = preferredExecutionTarget
         self.structuredOutput = structuredOutput
+        self.systemPrompt = systemPrompt
     }
 }

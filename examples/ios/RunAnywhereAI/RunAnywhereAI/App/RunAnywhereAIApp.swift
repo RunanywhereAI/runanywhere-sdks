@@ -61,7 +61,7 @@ struct RunAnywhereAIApp: App {
 
             // Register framework adapters before initializing SDK
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
-            
+
             // Register Foundation Models adapter for iOS 26+
             if #available(iOS 26.0, *) {
                 RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
@@ -79,6 +79,9 @@ struct RunAnywhereAIApp: App {
             print("⏱️  Initialization time: \(String(format: "%.2f", initTime)) seconds")
             print("📊 SDK Status: Ready for on-device AI inference")
             print("🔧 Registered frameworks: LLMSwift, FoundationModels")
+
+            // Load and apply user settings before marking as initialized
+            await loadAndApplyUserSettings()
 
             // Mark as initialized
             await MainActor.run {
@@ -146,6 +149,24 @@ struct RunAnywhereAIApp: App {
             print("⚠️ Failed to auto-load model: \(error)")
             print("💡 User will need to select a model manually")
         }
+    }
+
+    private func loadAndApplyUserSettings() async {
+        print("⚙️ Loading user settings from UserDefaults...")
+
+        // Load temperature setting
+        let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+        let temperature = savedTemperature != 0 ? savedTemperature : 0.7
+
+        // Load max tokens setting
+        let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+        let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
+
+        // Apply settings to SDK
+        await RunAnywhereSDK.shared.setTemperature(Float(temperature))
+        await RunAnywhereSDK.shared.setMaxTokens(maxTokens)
+
+        print("✅ Applied user settings - Temperature: \(temperature), MaxTokens: \(maxTokens)")
     }
 }
 
