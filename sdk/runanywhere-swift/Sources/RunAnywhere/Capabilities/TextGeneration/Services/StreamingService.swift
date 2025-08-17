@@ -19,7 +19,7 @@ public class StreamingService {
     /// Generate streaming text using the loaded model
     public func generateStream(
         prompt: String,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) -> AsyncThrowingStream<String, Error> {
         return AsyncThrowingStream { continuation in
             Task {
@@ -91,7 +91,7 @@ public class StreamingService {
     /// Generate streaming text with token-level granularity
     public func generateTokenStream(
         prompt: String,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) -> AsyncThrowingStream<StreamingToken, Error> {
         return AsyncThrowingStream { continuation in
             Task {

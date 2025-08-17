@@ -297,7 +297,7 @@ class ChatViewModel: ObservableObject {
                 let fullPrompt = prompt
                 logger.info("📝 Sending new message only: \(fullPrompt)")
 
-                let options = GenerationOptions(
+                let options = RunAnywhereGenerationOptions(
                     maxTokens: 500,
                     temperature: 0.7
                     // No context passed - it's all in the prompt now
@@ -897,7 +897,7 @@ class ChatViewModel: ObservableObject {
         thinkingText: String?,
         tokensPerSecondHistory: [Double],
         wasInterrupted: Bool,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) -> MessageAnalytics? {
 
         guard let modelName = loadedModelName,

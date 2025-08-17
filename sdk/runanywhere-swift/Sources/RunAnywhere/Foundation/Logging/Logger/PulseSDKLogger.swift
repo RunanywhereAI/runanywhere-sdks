@@ -125,12 +125,12 @@ internal final class PulseSDKLogger {
     // MARK: - Generation Logging
 
     /// Log generation start
-    func logGenerationStart(_ options: GenerationOptions, metadata: [String: Any]? = nil) {
+    func logGenerationStart(_ options: RunAnywhereGenerationOptions, metadata: [String: Any]? = nil) {
         var enrichedMetadata = metadata ?? [:]
         enrichedMetadata["generationOptions"] = [
             "maxTokens": options.maxTokens,
             "temperature": options.temperature,
-            // systemPrompt not available in GenerationOptions
+            // systemPrompt not available in RunAnywhereGenerationOptions
             "tokenBudget": options.tokenBudget?.maxTokens ?? 0
         ]
         enrichedMetadata["event"] = "generation_start"

@@ -275,12 +275,12 @@ class QuizViewModel: ObservableObject {
             // Test 1: Check if we can even create simple options
             // NSLog("🔄 QUIZ DEBUG: Creating GenerationOptions...")
 
-            let simpleOptions = GenerationOptions(
+            let simpleOptions = RunAnywhereGenerationOptions(
                 maxTokens: 50,
                 temperature: 0.5,
-                preferredExecutionTarget: .onDevice
+                preferredExecutionTarget: ExecutionTarget.onDevice
             )
-            // NSLog("✅ QUIZ DEBUG: GenerationOptions created successfully")
+            // NSLog("✅ QUIZ DEBUG: RunAnywhereGenerationOptions created successfully")
 
             let simplePrompt = "Say hello."
             // NSLog("🔄 QUIZ DEBUG: About to test SDK with simple prompt: '%@'", simplePrompt)
@@ -328,11 +328,11 @@ class QuizViewModel: ObservableObject {
             - Respond with ONLY the JSON, no other text
             """
 
-            let options = GenerationOptions(
+            let options = RunAnywhereGenerationOptions(
                 maxTokens: 2000,
                 temperature: 0.1,  // Lower temperature for more consistent formatting
                 topP: 0.9,
-                preferredExecutionTarget: .onDevice  // Force on-device execution
+                preferredExecutionTarget: ExecutionTarget.onDevice  // Force on-device execution
             )
 
             let generatedQuiz: QuizGeneration
