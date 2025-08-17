@@ -133,6 +133,12 @@ extension RunAnywhereSDK {
             thinkingTagPattern: thinkingTagPattern
         )
     }
+    
+    /// Register a built-in model (no download required)
+    /// - Parameter model: The model info to register
+    public func registerBuiltInModel(_ model: ModelInfo) {
+        (serviceContainer.modelRegistry as! RegistryService).registerModel(model)
+    }
 
     /// Update thinking support for an existing model
     /// - Parameters:
