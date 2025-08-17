@@ -197,7 +197,7 @@ class FoundationModelsService: LLMService {
             }
 
             // Create GenerationOptions for Foundation Models
-            let foundationOptions = RunAnywhereGenerationOptions(temperature: Double(options.temperature))
+            let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
 
             // Use respond(to:options:) method as per documentation
             let response = try await session.respond(to: prompt, options: foundationOptions)
@@ -250,7 +250,7 @@ class FoundationModelsService: LLMService {
             }
 
             // Create GenerationOptions for Foundation Models
-            let foundationOptions = RunAnywhereGenerationOptions(temperature: Double(options.temperature))
+            let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
 
             // Use native streaming with streamResponse(to:options:)
             let responseStream = session.streamResponse(to: prompt, options: foundationOptions)
