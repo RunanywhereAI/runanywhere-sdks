@@ -119,7 +119,7 @@ public class LLMSwiftService: LLMService {
         }
     }
 
-    public func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         logger.info("🔧 Starting generation for prompt: \(prompt.prefix(50))...")
 
         guard let llm = llm else {
@@ -219,7 +219,7 @@ public class LLMSwiftService: LLMService {
 
     public func streamGenerate(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         logger.info("🔧 streamGenerate called!")
@@ -379,7 +379,7 @@ public class LLMSwiftService: LLMService {
         return ext == "gguf" ? .gguf : .ggml
     }
 
-    private func applyGenerationOptions(_ options: GenerationOptions, to llm: LLM) async {
+    private func applyGenerationOptions(_ options: RunAnywhereGenerationOptions, to llm: LLM) async {
         // LLM.swift Configuration requires apiKey, so we'll use generation parameters directly
         // The parameters will be applied during the respond() call
         // This is a placeholder for compatibility

@@ -36,7 +36,7 @@ public class GenerationService {
     /// Generate text using the loaded model
     public func generate(
         prompt: String,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) async throws -> GenerationResult {
         // Start performance tracking
         _ = Date() // Will be used for performance metrics in future
@@ -105,7 +105,7 @@ public class GenerationService {
 
     private func generateOnDevice(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         framework: LLMFramework?
     ) async throws -> GenerationResult {
         logger.info("🚀 Starting on-device generation")
@@ -195,7 +195,7 @@ public class GenerationService {
 
     private func generateInCloud(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         provider: String?
     ) async throws -> GenerationResult {
         // Placeholder implementation
@@ -215,7 +215,7 @@ public class GenerationService {
 
     private func generateHybrid(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         devicePortion: Double,
         framework: LLMFramework?
     ) async throws -> GenerationResult {

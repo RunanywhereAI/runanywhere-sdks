@@ -7,7 +7,7 @@ extension StreamingService {
     /// Generate streaming text with analytics tracking
     public func generateStreamWithAnalytics(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         sessionId: UUID? = nil,
         analytics: GenerationAnalyticsService? = nil
     ) -> AsyncThrowingStream<String, Error> {
@@ -157,7 +157,7 @@ extension StreamingService {
     /// Generate streaming text with analytics tracking and live metrics
     public func generateStreamWithLiveMetrics(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         sessionId: UUID? = nil,
         analytics: GenerationAnalyticsService? = nil,
         onMetrics: @escaping (LiveGenerationMetrics) -> Void

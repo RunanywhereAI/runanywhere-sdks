@@ -204,7 +204,7 @@ struct ModelSelectionSheet: View {
                             .foregroundColor(.blue)
                             .font(.caption)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("iOS 18+ with Apple Intelligence")
+                            Text("iOS 26+ with Apple Intelligence")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

@@ -2,9 +2,14 @@ import Foundation
 import RunAnywhereSDK
 import OSLog
 
-/// Adapter for Apple's native Foundation Models framework (iOS 18.0+)
+// Import FoundationModels with conditional compilation
+#if canImport(FoundationModels)
+import FoundationModels
+#endif
+
+/// Adapter for Apple's native Foundation Models framework (iOS 26.0+)
 /// Uses Apple's built-in language models without requiring external model files
-@available(iOS 18.0, *)
+@available(iOS 26.0, *)
 public class FoundationModelsAdapter: FrameworkAdapter {
     public var framework: LLMFramework { .foundationModels }
     
@@ -21,14 +26,12 @@ public class FoundationModelsAdapter: FrameworkAdapter {
     public func canHandle(model: ModelInfo) -> Bool {
         // Foundation Models doesn't need external model files
         // It can handle any request as it uses Apple's built-in models
-        if #available(iOS 18.0, *) {
-            // Check if the model name indicates it's for Foundation Models
-            return model.name.lowercased().contains("foundation") || 
-                   model.name.lowercased().contains("apple") ||
-                   model.id == "foundation-models-default"
-        } else {
-            return false
-        }
+        guard #available(iOS 26.0, *) else { return false }
+        
+        // Check if the model name indicates it's for Foundation Models
+        return model.name.lowercased().contains("foundation") || 
+               model.name.lowercased().contains("apple") ||
+               model.id == "foundation-models-default"
     }
     
     public func createService() -> LLMService {
@@ -66,15 +69,18 @@ public class FoundationModelsAdapter: FrameworkAdapter {
 }
 
 /// Service implementation for Apple's Foundation Models
-@available(iOS 18.0, *)
+@available(iOS 26.0, *)
 class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
     private var _modelInfo: LoadedModelInfo?
     private var _isReady = false
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FoundationModels")
     
-    // TODO: Add actual Foundation Models API when available
-    // Currently using mock implementation as the exact API is not public yet
+    #if canImport(FoundationModels)
+    // The actual FoundationModels types
+    private var languageModel: SystemLanguageModel?
+    private var session: LanguageModelSession?
+    #endif
     
     var isReady: Bool { _isReady }
     var modelInfo: LoadedModelInfo? { _modelInfo }
@@ -84,103 +90,162 @@ class FoundationModelsService: LLMService {
     }
     
     func initialize(modelPath: String) async throws {
-        logger.info("Initializing Apple Foundation Models (iOS 18+)")
+        logger.info("Initializing Apple Foundation Models (iOS 26+)")
         
-        // TODO: Initialize actual Foundation Models API when available
-        // The exact API for Foundation Models in iOS 18 is not yet public
-        // This is a placeholder implementation
+        #if canImport(FoundationModels)
+        guard #available(iOS 26.0, *) else {
+            logger.error("iOS 26.0+ not available")
+            throw LLMServiceError.modelNotLoaded
+        }
         
-        // Simulate initialization
-        try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        logger.info("FoundationModels framework is available, proceeding with initialization")
         
-        _modelInfo = LoadedModelInfo(
-            id: "foundation-models-ios18",
-            name: "Apple Foundation Model (iOS 18)",
-            framework: .foundationModels,
-            format: .mlmodel,
-            memoryUsage: 500_000_000, // 500MB estimate
-            contextLength: 8192, // Typical context for modern models
-            configuration: hardwareConfig ?? HardwareConfiguration()
-        )
-        _isReady = true
-        logger.info("Foundation Models initialized successfully")
+        do {
+            // Create the system language model using the default property
+            logger.info("Getting SystemLanguageModel.default...")
+            languageModel = SystemLanguageModel.default
+            logger.info("SystemLanguageModel.default obtained successfully")
+            
+            // Check availability status
+            switch languageModel?.availability {
+            case .available:
+                logger.info("Foundation Models is available")
+                
+                // Create session with instructions as per Apple documentation
+                logger.info("Creating LanguageModelSession with instructions...")
+                let instructions = """
+                You are a helpful AI assistant integrated into the RunAnywhere app. \
+                Provide concise, accurate responses that are appropriate for mobile users. \
+                Keep responses brief but informative.
+                """
+                session = LanguageModelSession(instructions: instructions)
+                logger.info("LanguageModelSession created successfully")
+                
+            case .unavailable(.deviceNotEligible):
+                logger.error("Device not eligible for Apple Intelligence")
+                throw LLMServiceError.modelNotLoaded
+            case .unavailable(.appleIntelligenceNotEnabled):
+                logger.error("Apple Intelligence not enabled. Please enable it in Settings.")
+                throw LLMServiceError.modelNotLoaded
+            case .unavailable(.modelNotReady):
+                logger.error("Model not ready. It may be downloading or initializing.")
+                throw LLMServiceError.modelNotLoaded
+            case .unavailable(let other):
+                logger.error("Foundation Models unavailable: \(String(describing: other))")
+                throw LLMServiceError.modelNotLoaded
+            case .none:
+                logger.error("Could not determine model availability")
+                throw LLMServiceError.modelNotLoaded
+            }
+            
+            _modelInfo = LoadedModelInfo(
+                id: "foundation-models-native",
+                name: "Apple Foundation Model",
+                framework: .foundationModels,
+                format: .mlmodel,
+                memoryUsage: 500_000_000, // 500MB estimate
+                contextLength: 4096, // 4096 tokens as per documentation
+                configuration: hardwareConfig ?? HardwareConfiguration()
+            )
+            _isReady = true
+            logger.info("Foundation Models initialized successfully")
+        } catch {
+            logger.error("Failed to initialize Foundation Models: \(error)")
+            throw LLMServiceError.modelNotLoaded
+        }
+        #else
+        // Foundation Models framework not available
+        logger.error("FoundationModels framework not available")
+        throw LLMServiceError.modelNotLoaded
+        #endif
     }
     
-    func generate(prompt: String, options: GenerationOptions) async throws -> String {
+    func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         guard isReady else {
             throw LLMServiceError.notInitialized
         }
         
-        logger.debug("Generating response with iOS 18 Foundation Models")
+        logger.debug("Generating response for prompt: \(prompt.prefix(100))...")
         
-        // TODO: Use actual Foundation Models API when available
-        // This is a placeholder that simulates the behavior
+        #if canImport(FoundationModels)
+        guard let session = session else {
+            logger.error("Session not available - was initialization successful?")
+            throw LLMServiceError.notInitialized
+        }
         
-        // Simulate generation time
-        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-        
-        // Return a contextual response
-        let response = generateMockResponse(for: prompt, options: options)
-        
-        logger.debug("Generated response successfully")
-        return response
+        do {
+            // Check if session is responding to another request
+            if session.isResponding {
+                logger.warning("Session is already responding to another request")
+                throw LLMServiceError.notInitialized
+            }
+            
+            // Create GenerationOptions for Foundation Models
+            let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
+            
+            // Use respond(to:options:) method as per documentation
+            let response = try await session.respond(to: prompt, options: foundationOptions)
+            
+            logger.debug("Generated response successfully")
+            return response.content
+        } catch let error as LanguageModelSession.GenerationError {
+            logger.error("Foundation Models generation error: \(error)")
+            switch error {
+            case .exceededContextWindowSize:
+                logger.error("Exceeded context window size - please reduce prompt length")
+                throw LLMServiceError.notInitialized
+            default:
+                logger.error("Other generation error: \(error)")
+                throw LLMServiceError.notInitialized
+            }
+        } catch {
+            logger.error("Generation failed: \(error)")
+            throw LLMServiceError.notInitialized
+        }
+        #else
+        // Foundation Models framework not available
+        logger.error("FoundationModels framework not available")
+        throw LLMServiceError.notInitialized
+        #endif
     }
     
     func streamGenerate(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isReady else {
             throw LLMServiceError.notInitialized
         }
         
-        logger.debug("Starting streaming generation with iOS 18 Foundation Models")
+        logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
         
-        // TODO: Use actual Foundation Models streaming API when available
+        // Foundation Models may not support streaming directly
+        // Use regular generation and simulate streaming
+        let response = try await generate(prompt: prompt, options: options)
         
-        let response = generateMockResponse(for: prompt, options: options)
+        // Simulate streaming by breaking the response into chunks
         let words = response.split(separator: " ")
-        
-        // Stream tokens with realistic timing
-        for (index, word) in words.enumerated() {
+        for word in words {
             onToken(String(word) + " ")
-            
-            // Variable delay for more realistic streaming
-            let delay: UInt64 = index < 3 ? 100_000_000 : 30_000_000 // 100ms for first tokens, then 30ms
-            try await Task.sleep(nanoseconds: delay)
+            try await Task.sleep(nanoseconds: 10_000_000) // 10ms between words
         }
-        
-        logger.debug("Completed streaming generation")
     }
     
     func cleanup() async {
         logger.info("Cleaning up Foundation Models")
+        
+        #if canImport(FoundationModels)
+        // Clean up the session
+        session = nil
+        languageModel = nil
+        #endif
+        
         _isReady = false
         _modelInfo = nil
     }
     
     func getModelMemoryUsage() async throws -> Int64 {
         return _modelInfo?.memoryUsage ?? 0
-    }
-    
-    // MARK: - Private Helpers
-    
-    private func generateMockResponse(for prompt: String, options: GenerationOptions) -> String {
-        let promptLower = prompt.lowercased()
-        
-        // Generate contextual responses based on the prompt
-        if promptLower.contains("hello") || promptLower.contains("hi") {
-            return "Hello! I'm powered by Apple's Foundation Models, running natively on iOS 18. This provides fast, private, on-device AI capabilities. How can I help you today?"
-        } else if promptLower.contains("what") && promptLower.contains("can") && promptLower.contains("do") {
-            return "With iOS 18's Foundation Models, I can help with text generation, question answering, summarization, and many other language tasks. All processing happens on-device for maximum privacy and speed."
-        } else if promptLower.contains("privacy") {
-            return "Foundation Models in iOS 18 prioritizes privacy by running entirely on-device. Your data never leaves your device, ensuring complete privacy while still providing powerful AI capabilities."
-        } else if promptLower.contains("how") && promptLower.contains("work") {
-            return "iOS 18's Foundation Models leverages Apple's Neural Engine and advanced hardware acceleration to run sophisticated language models directly on your device. This enables real-time responses without internet connectivity."
-        } else {
-            // Default response
-            return "I'm processing your request using iOS 18's Foundation Models. This cutting-edge technology brings powerful AI capabilities directly to your device, ensuring both privacy and performance. Your request about '\(prompt.prefix(50))' is being handled entirely on-device."
-        }
     }
 }

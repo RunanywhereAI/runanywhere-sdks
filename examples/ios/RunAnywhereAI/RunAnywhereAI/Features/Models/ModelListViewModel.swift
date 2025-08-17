@@ -22,7 +22,7 @@ class ModelListViewModel: ObservableObject {
 
     // MARK: - Predefined Models
     private let predefinedModels: [ModelInfo] = [
-        // Apple Foundation Models (iOS 18+)
+        // Apple Foundation Models (iOS 26+)
         ModelInfo(
             id: "foundation-models-default",
             name: "Apple Foundation Model",
@@ -137,10 +137,10 @@ class ModelListViewModel: ObservableObject {
         // Start with predefined models - filter based on iOS version
         var allModels: [ModelInfo] = []
         
-        // Add Foundation Model only if iOS 18+ is available
-        if #available(iOS 18.0, *) {
+        // Add Foundation Model only if iOS 26+ is available
+        if #available(iOS 26.0, *) {
             allModels = predefinedModels
-            print("iOS 18+ detected - Foundation Models available")
+            print("iOS 26+ detected - Foundation Models available")
         } else {
             // Filter out Foundation Models for older iOS versions
             allModels = predefinedModels.filter { $0.preferredFramework != .foundationModels }

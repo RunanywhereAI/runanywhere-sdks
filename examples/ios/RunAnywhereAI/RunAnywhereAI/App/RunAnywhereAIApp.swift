@@ -62,8 +62,8 @@ struct RunAnywhereAIApp: App {
             // Register framework adapters before initializing SDK
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
             
-            // Register Foundation Models adapter for iOS 18+
-            if #available(iOS 18.0, *) {
+            // Register Foundation Models adapter for iOS 26+
+            if #available(iOS 26.0, *) {
                 RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
             }
 

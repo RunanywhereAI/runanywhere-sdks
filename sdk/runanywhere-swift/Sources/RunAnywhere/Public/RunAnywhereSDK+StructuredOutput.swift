@@ -13,7 +13,7 @@ extension RunAnywhereSDK {
     public func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
         // Create structured output config
         let structuredConfig = StructuredOutputConfig(
@@ -24,10 +24,10 @@ extension RunAnywhereSDK {
         )
 
         // Create options with structured output
-        let effectiveOptions: GenerationOptions
+        let effectiveOptions: RunAnywhereGenerationOptions
         if let options = options {
             // Merge with existing options
-            effectiveOptions = GenerationOptions(
+            effectiveOptions = RunAnywhereGenerationOptions(
                 maxTokens: options.maxTokens,
                 temperature: options.temperature,
                 topP: options.topP,
@@ -42,7 +42,7 @@ enableRealTimeTracking: options.enableRealTimeTracking,
             )
         } else {
             // Use defaults with structured output
-            effectiveOptions = GenerationOptions(structuredOutput: structuredConfig)
+            effectiveOptions = RunAnywhereGenerationOptions(structuredOutput: structuredConfig)
         }
 
         // Generate with structured output
@@ -68,7 +68,7 @@ enableRealTimeTracking: options.enableRealTimeTracking,
         _ type: T.Type,
         prompt: String,
         validationMode: SchemaValidationMode,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
         // Create structured output config with custom validation
         let structuredConfig = StructuredOutputConfig(
@@ -79,9 +79,9 @@ enableRealTimeTracking: options.enableRealTimeTracking,
         )
 
         // Create options with structured output
-        let effectiveOptions: GenerationOptions
+        let effectiveOptions: RunAnywhereGenerationOptions
         if let options = options {
-            effectiveOptions = GenerationOptions(
+            effectiveOptions = RunAnywhereGenerationOptions(
                 maxTokens: options.maxTokens,
                 temperature: options.temperature,
                 topP: options.topP,
@@ -95,7 +95,7 @@ enableRealTimeTracking: options.enableRealTimeTracking,
                 structuredOutput: structuredConfig
             )
         } else {
-            effectiveOptions = GenerationOptions(structuredOutput: structuredConfig)
+            effectiveOptions = RunAnywhereGenerationOptions(structuredOutput: structuredConfig)
         }
 
         // Generate with structured output
@@ -120,12 +120,12 @@ enableRealTimeTracking: options.enableRealTimeTracking,
     public func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> GenerationResult {
         // Create options with structured output
-        let effectiveOptions: GenerationOptions
+        let effectiveOptions: RunAnywhereGenerationOptions
         if let options = options {
-            effectiveOptions = GenerationOptions(
+            effectiveOptions = RunAnywhereGenerationOptions(
                 maxTokens: options.maxTokens,
                 temperature: options.temperature,
                 topP: options.topP,
@@ -139,7 +139,7 @@ enableRealTimeTracking: options.enableRealTimeTracking,
                 structuredOutput: structuredOutput
             )
         } else {
-            effectiveOptions = GenerationOptions(structuredOutput: structuredOutput)
+            effectiveOptions = RunAnywhereGenerationOptions(structuredOutput: structuredOutput)
         }
 
         return try await generate(prompt: prompt, options: effectiveOptions)
