@@ -45,6 +45,12 @@ extension RunAnywhereSDK {
         serviceContainer.generationService.setCurrentModel(nil)
     }
 
+    /// Get the currently loaded model
+    /// - Returns: The currently loaded model, or nil if no model is loaded
+    public func getCurrentModel() -> ModelInfo? {
+        return currentModel
+    }
+
     /// List available models
     /// - Returns: Array of available models
     public func listAvailableModels() async throws -> [ModelInfo] {

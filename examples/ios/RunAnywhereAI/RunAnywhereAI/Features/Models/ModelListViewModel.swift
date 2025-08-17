@@ -30,7 +30,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf"),
             estimatedMemory: 1_200_000_000, // 1.2GB
             contextLength: 131072,
-            downloadSize: 750_000_000, // ~750MB
+            downloadSize: 1_100_000_000, // ~1.1GB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
@@ -44,7 +44,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf"),
             estimatedMemory: 1_800_000_000, // 1.8GB
             contextLength: 8192,
-            downloadSize: 1_300_000_000, // ~1.3GB
+            downloadSize: 1_700_000_000, // ~1.7GB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
@@ -58,7 +58,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf"),
             estimatedMemory: 600_000_000, // 600MB
             contextLength: 32768,
-            downloadSize: 400_000_000, // ~400MB
+            downloadSize: 650_000_000, // ~650MB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
@@ -72,7 +72,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf"),
             estimatedMemory: 500_000_000, // 500MB
             contextLength: 8192,
-            downloadSize: 380_000_000, // ~380MB
+            downloadSize: 385_000_000, // ~385MB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: false
@@ -86,7 +86,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf"),
             estimatedMemory: 1_600_000_000, // 1.6GB
             contextLength: 32768,
-            downloadSize: 1_100_000_000, // ~1.1GB
+            downloadSize: 1_400_000_000, // ~1.4GB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
@@ -100,7 +100,7 @@ class ModelListViewModel: ObservableObject {
             downloadURL: URL(string: "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"),
             estimatedMemory: 800_000_000, // 800MB
             contextLength: 32768,
-            downloadSize: 650_000_000, // ~650MB
+            downloadSize: 656_000_000, // ~656MB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
             supportsThinking: true
@@ -114,7 +114,7 @@ class ModelListViewModel: ObservableObject {
             id: "whisper-tiny",
             name: "Whisper Tiny",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-tiny.en/"), // Base URL for strategy
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en"), // Base URL for strategy
             estimatedMemory: 39_000_000, // 39MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 39_000_000, // ~39MB
@@ -128,7 +128,7 @@ class ModelListViewModel: ObservableObject {
             id: "whisper-base",
             name: "Whisper Base",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-base/"), // Base URL for strategy
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base"), // Base URL for strategy
             estimatedMemory: 74_000_000, // 74MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 74_000_000, // ~74MB
@@ -142,7 +142,7 @@ class ModelListViewModel: ObservableObject {
             id: "whisper-small",
             name: "Whisper Small",
             format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-small/"), // Base URL for strategy
+            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-small"), // Base URL for strategy
             estimatedMemory: 244_000_000, // 244MB
             contextLength: 0, // Not applicable for voice models
             downloadSize: 244_000_000, // ~244MB

@@ -17,6 +17,9 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     @Published var errorMessage: String?
     @Published var isInitialized = false
     @Published var currentStatus = "Initializing..."
+    @Published var currentLLMModel: String = ""
+    @Published var whisperModel: String = "Whisper Base"
+    private let whisperModelName: String = "whisper-base"  // Track the actual model being used
 
     // MARK: - Real-time Voice Session
     private var voiceSession: VoiceSessionManager?
@@ -39,9 +42,61 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
             return
         }
 
+        // Get current LLM model info from ModelManager or ModelListViewModel
+        updateModelInfo()
+
+        // Set the Whisper model display name
+        updateWhisperModelName()
+
+        // Listen for model changes
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("ModelLoaded"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.updateModelInfo()
+        }
+
         logger.info("Voice assistant initialized")
         currentStatus = "Ready to listen"
         isInitialized = true
+    }
+
+    private func updateModelInfo() {
+        // Try ModelManager first
+        if let model = ModelManager.shared.getCurrentModel() {
+            currentLLMModel = model.name
+            logger.info("Using LLM model from ModelManager: \(self.currentLLMModel)")
+        }
+        // Fallback to ModelListViewModel
+        else if let model = ModelListViewModel.shared.currentModel {
+            currentLLMModel = model.name
+            logger.info("Using LLM model from ModelListViewModel: \(self.currentLLMModel)")
+        }
+        // Default if no model loaded
+        else {
+            currentLLMModel = "No model loaded"
+            logger.info("No LLM model currently loaded")
+        }
+    }
+
+    private func updateWhisperModelName() {
+        // Map the whisper model ID to a display name
+        switch whisperModelName {
+        case "whisper-base":
+            whisperModel = "Whisper Base"
+        case "whisper-small":
+            whisperModel = "Whisper Small"
+        case "whisper-medium":
+            whisperModel = "Whisper Medium"
+        case "whisper-large":
+            whisperModel = "Whisper Large"
+        case "whisper-large-v3":
+            whisperModel = "Whisper Large v3"
+        default:
+            whisperModel = whisperModelName.replacingOccurrences(of: "-", with: " ").capitalized
+        }
+        logger.info("Using Whisper model: \(self.whisperModel)")
     }
 
     // MARK: - Real-time Conversation Methods
@@ -121,7 +176,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
 
     // MARK: - VoiceSessionDelegate Implementation
 
-    func voiceSession(_ session: VoiceSessionManager, didChangeState state: VoiceSessionManager.SessionState) {
+    nonisolated func voiceSession(_ session: VoiceSessionManager, didChangeState state: VoiceSessionManager.SessionState) {
         DispatchQueue.main.async {
             self.sessionState = state
 
@@ -152,7 +207,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         }
     }
 
-    func voiceSession(_ session: VoiceSessionManager, didReceiveTranscript text: String, isFinal: Bool) {
+    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveTranscript text: String, isFinal: Bool) {
         DispatchQueue.main.async {
             self.currentTranscript = text
 
@@ -165,7 +220,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         }
     }
 
-    func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
+    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
         DispatchQueue.main.async {
             self.assistantResponse = text
 
@@ -181,7 +236,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         }
     }
 
-    func voiceSession(_ session: VoiceSessionManager, didEncounterError error: Error) {
+    nonisolated func voiceSession(_ session: VoiceSessionManager, didEncounterError error: Error) {
         DispatchQueue.main.async {
             self.errorMessage = error.localizedDescription
             self.isProcessing = false
@@ -189,7 +244,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         }
     }
 
-    func voiceSession(_ session: VoiceSessionManager, didReceiveAudio data: Data) {
+    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveAudio data: Data) {
         // Audio playback handled by TTS service
         // Can add custom audio handling here if needed
         Task {

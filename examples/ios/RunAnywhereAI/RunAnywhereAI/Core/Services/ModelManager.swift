@@ -57,9 +57,8 @@ class ModelManager: ObservableObject {
     }
 
     func getCurrentModel() -> ModelInfo? {
-        // Since SDK properties are private, return nil for now
-        // In a real implementation, this would use public SDK methods
-        return nil
+        // Use the SDK's public method to get the current model
+        return sdk.getCurrentModel()
     }
 
     func isModelLoaded(_ modelId: String) -> Bool {

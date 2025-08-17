@@ -7,10 +7,97 @@ struct VoiceAssistantView: View {
 
     var body: some View {
         VStack(spacing: 20) {
-            Text("Voice Assistant")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-                .padding(.top)
+            // Title with experimental badge
+            VStack(spacing: 8) {
+                Text("Voice Assistant")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                HStack(spacing: 4) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                    Text("EXPERIMENTAL FEATURE")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.orange)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.15))
+                .cornerRadius(12)
+
+                Text("🚧 In Development")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
+            .padding(.top)
+
+            // Model info badges
+            HStack(spacing: 12) {
+                // LLM Model Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "brain")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("LLM")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(viewModel.currentLLMModel.isEmpty ? "Loading..." : viewModel.currentLLMModel)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(8)
+
+                // Whisper Model Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "waveform")
+                        .font(.caption)
+                        .foregroundColor(.green)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("STT")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text(viewModel.whisperModel)
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.green.opacity(0.1))
+                .cornerRadius(8)
+
+                // TTS Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "speaker.wave.2")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("TTS")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("System")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.purple.opacity(0.1))
+                .cornerRadius(8)
+            }
+            .padding(.horizontal)
 
             // Status indicator
             HStack {
@@ -120,12 +207,19 @@ struct VoiceAssistantView: View {
             }
 
             // Instructions
-            Text(instructionText)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-                .padding(.bottom)
+            VStack(spacing: 6) {
+                Text(instructionText)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Text("⚠️ This feature is under active development")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                    .italic()
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
         }
         .onAppear {
             Task {
