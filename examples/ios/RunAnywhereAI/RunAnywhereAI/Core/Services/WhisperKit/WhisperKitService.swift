@@ -123,15 +123,21 @@ public class WhisperKitService: VoiceService {
             )
         }
 
-        // Ensure minimum audio length for better transcription quality
-        var paddedSamples = samples
-        let minRequiredSamples = 32000 // 2 seconds minimum for reliable transcription
+        // For short audio, don't pad with zeros - WhisperKit handles it better
+        var processedSamples = samples
+
+        // Only pad if extremely short (less than 0.5 seconds)
+        let minRequiredSamples = 8000 // 0.5 seconds minimum
         if samples.count < minRequiredSamples {
-            logger.info("📏 Padding audio from \(samples.count) to \(minRequiredSamples) samples for better transcription")
-            paddedSamples = samples + Array(repeating: 0.0, count: minRequiredSamples - samples.count)
+            logger.info("📏 Audio too short (\(samples.count) samples), padding to \(minRequiredSamples)")
+            // Pad with very low noise instead of zeros to avoid silence detection
+            let noise = (0..<(minRequiredSamples - samples.count)).map { _ in Float.random(in: -0.0001...0.0001) }
+            processedSamples = samples + noise
+        } else {
+            logger.info("📏 Processing \(samples.count) samples without padding")
         }
 
-        return try await transcribeWithSamples(paddedSamples, options: options, originalDuration: duration)
+        return try await transcribeWithSamples(processedSamples, options: options, originalDuration: duration)
     }
 
     private func transcribeWithSamples(
@@ -146,6 +152,9 @@ public class WhisperKitService: VoiceService {
         logger.info("Starting WhisperKit transcription with \(audioSamples.count) samples...")
 
         // Use conservative decoding options to prevent garbled output
+        // Adjust noSpeechThreshold based on audio length
+        let noSpeechThresh: Float = audioSamples.count < 32000 ? 0.3 : 0.6  // Lower for short audio
+
         let decodingOptions = DecodingOptions(
             task: .transcribe,
             language: "en",  // Force English to avoid language detection issues
@@ -158,7 +167,7 @@ public class WhisperKitService: VoiceService {
             withoutTimestamps: true,  // Remove timestamps for cleaner text
             compressionRatioThreshold: 2.4,  // Stricter compression ratio
             logProbThreshold: -1.0,  // More conservative log probability
-            noSpeechThreshold: 0.6  // Higher threshold for detecting no speech
+            noSpeechThreshold: noSpeechThresh  // Adaptive threshold based on audio length
         )
 
         logger.info("Using decoding options:")

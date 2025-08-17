@@ -76,16 +76,37 @@ public class VoiceSessionManager {
 
         updateState(.connecting)
 
+        // Pre-initialize WhisperKit for faster first transcription
+        logger.info("Pre-initializing speech recognition model: \(self.config.recognitionModel)")
+        do {
+            // Trigger initialization through the orchestrator
+            let testConfig = VoicePipelineConfig(
+                sttModelId: self.config.recognitionModel,
+                llmModelId: self.config.llmModel,
+                ttsEnabled: false,
+                streamingEnabled: false
+            )
+            // Pre-warm the voice service
+            _ = try? await voiceOrchestrator.processVoiceQuery(
+                audio: Data(repeating: 0, count: 16000), // 1 second of silence
+                config: testConfig
+            )
+            logger.info("Speech recognition model pre-initialized successfully")
+        } catch {
+            logger.warning("Failed to pre-initialize speech model: \(error)")
+            // Continue anyway - it will initialize on first use
+        }
+
         // Initialize Simple Energy VAD if enabled
         if config.enableVAD {
             vadDetector = SimpleEnergyVAD(
                 sampleRate: 16000,
                 frameLength: 0.1,
-                energyThreshold: 0.025
+                energyThreshold: 0.01  // Lowered from 0.025 for better sensitivity
             )
             setupVADCallbacks()
             vadDetector?.start()
-            logger.info("Simple Energy VAD initialized and started")
+            logger.info("Simple Energy VAD initialized with threshold: 0.01")
         }
 
         // Get audio stream
@@ -171,8 +192,18 @@ public class VoiceSessionManager {
             guard let self = self else { return }
 
             self.logger.info("Starting audio processing pipeline")
+            var chunkCount = 0
 
             for await chunk in audioStream {
+                chunkCount += 1
+
+                // Log every 10th chunk to avoid spam (every second at 100ms chunks)
+                if chunkCount % 10 == 0 {
+                    let maxAmplitude = chunk.samples.map { abs($0) }.max() ?? 0
+                    let rms = sqrt(chunk.samples.reduce(0) { $0 + $1 * $1 } / Float(chunk.samples.count))
+                    self.logger.debug("Audio chunk #\(chunkCount): \(chunk.samples.count) samples, RMS: \(String(format: "%.4f", rms)), Max: \(String(format: "%.4f", maxAmplitude))")
+                }
+
                 // If VAD is enabled, feed audio to VAD for analysis
                 if self.config.enableVAD {
                     // Process audio through VAD
@@ -181,6 +212,9 @@ public class VoiceSessionManager {
                     // Only accumulate audio when we're actively listening (after speech started)
                     if self.state == .listening {
                         self.speechBuffer.append(contentsOf: chunk.samples)
+                        if self.speechBuffer.count % 16000 == 0 { // Log every second of buffered audio
+                            self.logger.debug("Speech buffer: \(self.speechBuffer.count) samples (\(self.speechBuffer.count/16000)s)")
+                        }
                     }
                 } else {
                     // No VAD - accumulate audio and process periodically
@@ -205,6 +239,14 @@ public class VoiceSessionManager {
 
         let sampleCount = speechBuffer.count
         let duration = Float(sampleCount) / 16000.0
+
+        // Skip very short segments (less than 0.5 seconds) to avoid WhisperKit issues
+        if duration < 0.5 {
+            logger.warning("Skipping short audio segment: \(String(format: "%.2f", duration))s (\(sampleCount) samples)")
+            speechBuffer = []
+            updateState(.connected)
+            return
+        }
 
         logger.info("Processing speech buffer: \(sampleCount) samples (\(String(format: "%.2f", duration))s)")
 

@@ -67,20 +67,15 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
             voiceSession = sdk.createVoiceSession(
                 config: config,
                 audioCaptureProvider: { [weak self] in
-                    // Return a simple stream - VAD will handle the actual audio processing
-                    return AsyncStream { continuation in
-                        // This stream is kept alive for the duration of the session
-                        // The actual audio processing happens in the VAD detector
-                        Task {
-                            // Keep the stream alive
-                            while !Task.isCancelled {
-                                try await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
-                            }
-                            continuation.finish()
-                        }
+                    // Connect to the actual audio capture stream
+                    guard let self = self else {
+                        return AsyncStream { $0.finish() }
                     }
+                    self.logger.info("Starting audio capture stream")
+                    return self.audioCapture.startContinuousCapture()
                 },
                 stopAudioCapture: { [weak self] in
+                    self?.logger.info("Stopping audio capture")
                     self?.audioCapture.stopContinuousCapture()
                 }
             )
@@ -102,10 +97,22 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
 
     /// Stop conversation
     func stopConversation() async {
+        logger.info("Stopping conversation...")
         isListening = false
+
+        // First stop listening if we're in that state
+        if sessionState == .listening {
+            await voiceSession?.stopListening()
+        }
+
+        // Then disconnect the session
         await voiceSession?.disconnect()
         voiceSession = nil
+
+        // Reset UI state
         currentStatus = "Ready to listen"
+        sessionState = .disconnected
+        logger.info("Conversation stopped")
     }
 
     /// Interrupt AI response

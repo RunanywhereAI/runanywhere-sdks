@@ -12,6 +12,7 @@
 - Always make sure that you're using structured types, never use strings directly so that we can keep things consistent and scalable and not make mistakes.
 - Read files FULLY to understand the FULL context. Only use tools when the file is large and you are short on context.
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- When fixing issues focus on SIMPLICITY, and following Clean SOLID principles, do not add complicated logic unless necessary!
 
 ## Repository Overview
 
