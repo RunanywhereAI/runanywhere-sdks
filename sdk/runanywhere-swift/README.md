@@ -1,16 +1,35 @@
 # RunAnywhere Swift SDK
 
-RunAnywhere is a powerful Swift SDK that enables intelligent AI model execution with automatic routing between on-device and cloud models. It optimizes for cost, privacy, and performance while providing a unified interface for various AI model formats.
+**Privacy-first, on-device AI SDK for iOS** that brings powerful language models directly to your applications. RunAnywhere enables high-performance text generation, voice AI capabilities, and structured outputs - all while keeping user data private and secure on-device.
 
-## Features
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
+    <img src="https://img.shields.io/badge/▶️_Watch_Demo-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo" />
+  </a>
+  <a href="https://testflight.apple.com/join/xc4HVVJE">
+    <img src="https://img.shields.io/badge/📱_Try_iOS_App-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Try on TestFlight" />
+  </a>
+  <a href="https://runanywhere.ai">
+    <img src="https://img.shields.io/badge/🌐_Visit_Website-green?style=for-the-badge" alt="Visit Website" />
+  </a>
+</p>
 
-- 🚀 **Intelligent Routing**: Automatically decides between on-device and cloud execution based on device capabilities, model requirements, and user preferences
-- 🔒 **Privacy-First**: Prioritizes on-device execution for sensitive data with configurable privacy policies
-- 💰 **Cost Optimization**: Real-time cost tracking and savings calculations
-- 🎯 **Multi-Format Support**: Seamlessly works with GGUF, ONNX, Core ML, MLX, and TensorFlow Lite models
-- 📱 **Cross-Platform**: Supports iOS 13.0+, macOS 10.15+, tvOS 13.0+, and watchOS 6.0+
-- 🔄 **Automatic Model Management**: Handles model downloading, caching, and memory management
-- 📊 **Performance Monitoring**: Built-in metrics for latency, token throughput, and resource usage
+## ✨ Features
+
+### Core Capabilities
+- 💬 **Text Generation** - High-performance on-device text generation with streaming support
+- 🎙️ **Voice AI Workflow** - Real-time voice conversations with WhisperKit transcription (Experimental)
+- 📋 **Structured Outputs** - Type-safe JSON generation with schema validation (Experimental)
+- 🧠 **Thinking Models** - Support for models with thinking tags (`<think>...</think>`)
+- 🏗️ **Model Management** - Automatic downloading, caching, and lifecycle management
+- 📊 **Performance Analytics** - Real-time metrics for latency, throughput, and resource usage
+
+### Technical Highlights
+- 🔒 **Privacy-First** - All processing happens on-device by default
+- 🚀 **Multi-Framework** - GGUF models via llama.cpp, Apple Foundation Models (iOS 18+)
+- ⚡ **Native Performance** - Optimized for Apple Silicon with Metal acceleration
+- 🧠 **Smart Memory** - Automatic memory optimization and cleanup
+- 📱 **Cross-Platform** - iOS 13.0+, macOS 10.15+, tvOS 13.0+, watchOS 6.0+
 
 ## Requirements
 
@@ -25,14 +44,14 @@ RunAnywhere is a powerful Swift SDK that enables intelligent AI model execution 
 Add RunAnywhere to your project using Swift Package Manager:
 
 1. In Xcode, select **File > Add Package Dependencies**
-2. Enter the repository URL: `https://github.com/yourusername/runanywhere-swift`
-3. Select the version you want to use
+2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
+3. Select the latest version
 
 Or add it to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/runanywhere-swift", from: "1.0.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
 ]
 ```
 
@@ -46,10 +65,10 @@ import RunAnywhere
 // Initialize with your API key
 try await RunAnywhereSDK.shared.initialize(
     apiKey: "your-api-key",
-    configuration: Configuration(
-        allowCloudFallback: true,
-        privacyMode: .balanced,
-        debugMode: true
+    configuration: SDKConfiguration(
+        privacyMode: .strict,      // On-device only
+        debugMode: true,
+        telemetryLevel: .minimal   // Privacy-conscious telemetry
     )
 )
 ```
@@ -57,16 +76,16 @@ try await RunAnywhereSDK.shared.initialize(
 ### 2. Load a Model
 
 ```swift
-// Load a model by name (automatic format detection)
-let model = try await RunAnywhereSDK.shared.loadModel("llama-3.2-1b")
+// Load a model from the registry
+try await RunAnywhereSDK.shared.loadModel(
+    "llama-3.2-1b-instruct",
+    framework: .llmSwift  // Uses llama.cpp under the hood
+)
 
-// Or load with specific options
-let model = try await RunAnywhereSDK.shared.loadModel(
-    "llama-3.2-1b",
-    options: ModelLoadOptions(
-        preferredExecution: .onDevice,
-        maxMemoryUsage: 2_000_000_000 // 2GB
-    )
+// Or use Apple's Foundation Models (iOS 18+)
+try await RunAnywhereSDK.shared.loadModel(
+    "system",
+    framework: .foundationModels
 )
 ```
 
@@ -74,134 +93,169 @@ let model = try await RunAnywhereSDK.shared.loadModel(
 
 ```swift
 // Simple generation
-let result = try await model.generate(
-    prompt: "Explain quantum computing in simple terms",
+let result = try await RunAnywhereSDK.shared.generateText(
+    "Explain quantum computing in simple terms",
     options: GenerationOptions(
         maxTokens: 100,
-        temperature: 0.7
+        temperature: 0.7,
+        stream: false
     )
 )
 
 print(result.text)
-print("Cost: $\(result.estimatedCost)")
-print("Tokens/sec: \(result.tokensPerSecond)")
+print("Tokens/sec: \(result.performance.tokensPerSecond)")
+print("Latency: \(result.performance.firstTokenLatency)ms")
 ```
 
-### 4. Chat Conversations
-
-```swift
-// Create a conversation context
-let context = RunAnywhereSDK.shared.createContext()
-
-// Add messages
-context.addMessage(Message(role: .user, content: "What is Swift?"))
-context.addMessage(Message(role: .assistant, content: "Swift is a modern programming language..."))
-context.addMessage(Message(role: .user, content: "What are its main features?"))
-
-// Generate with context
-let result = try await model.generate(
-    context: context,
-    options: GenerationOptions(maxTokens: 200)
-)
-```
-
-## Basic Usage Examples
-
-### Privacy-Focused Generation
-
-```swift
-// Configure for maximum privacy
-let configuration = Configuration(
-    allowCloudFallback: false,  // Never use cloud
-    privacyMode: .strict,        // Strictest privacy settings
-    localModelPath: "/path/to/models"
-)
-
-try await RunAnywhereSDK.shared.initialize(apiKey: apiKey, configuration: configuration)
-```
-
-### Cost-Optimized Generation
-
-```swift
-// Set cost thresholds
-let options = GenerationOptions(
-    maxTokens: 100,
-    costThreshold: 0.001,  // Switch to cheaper option if cost exceeds $0.001
-    preferredExecution: .auto
-)
-
-let result = try await model.generate(prompt: prompt, options: options)
-print("Actual cost: $\(result.estimatedCost)")
-print("Savings: $\(result.estimatedSavings)")
-```
-
-### Streaming Responses
+### 4. Streaming Generation
 
 ```swift
 // Stream tokens as they're generated
-let stream = try await model.generateStream(
-    prompt: "Write a story about a robot",
+for try await chunk in RunAnywhereSDK.shared.generateTextStream(
+    "Write a short story about AI",
     options: GenerationOptions(maxTokens: 500)
+) {
+    print(chunk.text, terminator: "")
+    // Update UI with partial results
+}
+```
+
+## Advanced Features
+
+### Voice AI Conversations (Experimental)
+
+```swift
+// Start a voice session with real-time transcription
+let voiceSession = try await RunAnywhereSDK.shared.startVoiceSession(
+    delegate: self
 )
 
-for try await token in stream {
-    print(token, terminator: "")
+// Start listening
+try await voiceSession.startListening()
+
+// Handle voice session events
+func voiceSession(_ session: VoiceSession, didTranscribe text: String) {
+    print("User said: \(text)")
+}
+
+func voiceSession(_ session: VoiceSession, didGenerate response: String) {
+    print("AI response: \(response)")
 }
 ```
 
-## Model Support
-
-RunAnywhere supports various model formats out of the box:
-
-- **GGUF**: Llama, Mistral, and other popular models
-- **Core ML**: Apple's optimized format for iOS/macOS
-- **MLX**: Apple's new ML framework models
-- **ONNX**: Cross-platform neural network models
-- **TensorFlow Lite**: Lightweight TensorFlow models
-
-## Error Handling
+### Structured Output Generation (Experimental)
 
 ```swift
-do {
-    let result = try await model.generate(prompt: "Hello")
-} catch RunAnywhereError.modelNotFound {
-    print("Model not available")
-} catch RunAnywhereError.insufficientMemory {
-    print("Not enough memory for on-device execution")
-} catch RunAnywhereError.networkError(let error) {
-    print("Network error: \(error)")
-} catch {
-    print("Unexpected error: \(error)")
+// Define your output structure
+struct QuizQuestion: Generatable {
+    let question: String
+    let options: [String]
+    let correctAnswer: Int
+    let explanation: String
 }
+
+// Generate structured data
+let quiz: QuizQuestion = try await RunAnywhereSDK.shared.generateStructuredOutput(
+    prompt: "Create a quiz question about Swift programming",
+    type: QuizQuestion.self,
+    options: StructuredOutputOptions(
+        validationMode: .strict,
+        maxRetries: 3
+    )
+)
+
+print("Question: \(quiz.question)")
+print("Options: \(quiz.options)")
 ```
 
-## Advanced Configuration
-
-### Custom Hardware Detection
+### Thinking Models Support
 
 ```swift
-// Implement custom hardware capability detection
-class MyHardwareDetector: HardwareDetector {
-    func detectCapabilities() -> HardwareCapabilities {
-        // Custom detection logic
-    }
-}
+// Use models with thinking capabilities
+let result = try await RunAnywhereSDK.shared.generateText(
+    "Solve this step by step: What is 15% of 240?",
+    options: GenerationOptions(
+        parseThinking: true  // Separates thinking from final answer
+    )
+)
 
-RunAnywhereSDK.shared.setHardwareDetector(MyHardwareDetector())
+if let thinking = result.thinking {
+    print("Model's thought process: \(thinking)")
+}
+print("Final answer: \(result.text)")
 ```
 
-### Authentication Provider
+## Supported Models & Frameworks
+
+### Currently Implemented
+- **GGUF Models** (via llama.cpp/LLM.swift)
+  - Llama 3.2 (1B, 3B)
+  - Mistral 7B
+  - Qwen 2.5 (0.5B, 1.5B, 3B)
+  - Gemma 2 (2B)
+  - Phi 3.5 Mini
+  - All quantization levels (Q2_K to Q8_0)
+
+- **Apple Foundation Models** (iOS 26+ Experimental)
+  - System language model
+  - Requires Apple Intelligence eligibility
+
+- **WhisperKit** (Voice Transcription)
+  - whisper-tiny, base, small, medium models
+  - Real-time streaming transcription
+
+### Model Registry
+The SDK includes a built-in model registry with metadata for popular models. Models are automatically downloaded and cached on first use.
+
+## Performance & Analytics
+
+### Real-time Monitoring
 
 ```swift
-// Implement custom authentication
-class MyAuthProvider: AuthProvider {
-    func getAuthToken() async throws -> String {
-        // Custom auth logic
-        return "bearer-token"
-    }
-}
+// Monitor generation performance
+let result = try await RunAnywhereSDK.shared.generateText(
+    prompt,
+    options: GenerationOptions(collectMetrics: true)
+)
 
-RunAnywhereSDK.shared.setAuthProvider(MyAuthProvider())
+print("""
+Performance Metrics:
+- Tokens/second: \(result.performance.tokensPerSecond)
+- First token latency: \(result.performance.firstTokenLatency)ms
+- Total duration: \(result.performance.totalDuration)ms
+- Memory used: \(result.performance.peakMemoryUsage / 1024 / 1024)MB
+""")
+```
+
+### Analytics Export
+
+```swift
+// Export performance data
+let analytics = try await RunAnywhereSDK.shared.exportAnalytics(
+    format: .json,
+    timeRange: .last24Hours
+)
+```
+
+## Memory Management
+
+```swift
+// Configure memory limits
+let config = SDKConfiguration(
+    memoryConfiguration: MemoryConfiguration(
+        maxMemoryUsage: 2_000_000_000,  // 2GB limit
+        lowMemoryThreshold: 0.8,        // Warn at 80% usage
+        aggressiveCleanup: true         // Aggressive memory cleanup
+    )
+)
+
+// Monitor memory usage
+let memoryInfo = RunAnywhereSDK.shared.currentMemoryUsage()
+print("Current usage: \(memoryInfo.usedMemory / 1024 / 1024)MB")
+print("Available: \(memoryInfo.availableMemory / 1024 / 1024)MB")
+
+// Manual cleanup
+try await RunAnywhereSDK.shared.clearCache()
 ```
 
 ## Development
@@ -236,34 +290,47 @@ swift test --enable-code-coverage
 swift test --filter RunAnywhereTests.GenerationTests
 ```
 
-## Documentation
+## 📚 Documentation
 
-- [Architecture Overview](docs/ARCHITECTURE.md) - Detailed SDK architecture and design
-- [API Reference](docs/API_REFERENCE.md) - Complete API documentation
-- [Migration Guide](docs/MIGRATION.md) - Upgrading from previous versions
-- [Examples](examples/) - Sample applications and code snippets
+### Architecture & Guides
+- [Architecture Overview](docs/ARCHITECTURE_V2.md) - Detailed SDK architecture
+- [Public API Reference](docs/PUBLIC_API_REFERENCE.md) - Complete API documentation
+- [Structured Output Guide](docs/STRUCTURED_OUTPUT_GUIDE.md) - Type-safe generation
+- [Environment Configuration](docs/ENVIRONMENT_CONFIGURATION.md) - Setup guide
 
-## Contributing
+### Sample Code
+- [iOS Demo App](../../examples/ios/RunAnywhereAI/) - Full-featured example application
+- [Code Examples](../../examples/ios/RunAnywhereAI/docs/) - Common use cases
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+## 🤝 Contributing
 
+We welcome contributions from the community!
+
+### How to Contribute
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+3. Write tests for your changes
+4. Ensure all tests pass (`swift test`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+See our [Contributing Guidelines](../../CONTRIBUTING.md) for more details.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Support
+## 💬 Community & Support
 
-- 📧 Email: support@runanywhere.ai
-- 💬 Discord: [Join our community](https://discord.gg/runanywhere)
-- 📚 Documentation: [docs.runanywhere.ai](https://docs.runanywhere.ai)
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/runanywhere-swift/issues)
+- **Website**: [runanywhere.ai](https://runanywhere.ai)
+- **Discord**: [Join our community](https://discord.gg/runanywhere)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
+- **Email**: founders@runanywhere.ai
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
-Built with ❤️ by the RunAnywhere team. Special thanks to all our contributors and the open-source community.
+Built with ❤️ by the RunAnywhere team. Special thanks to:
+- The LLM.swift and llama.cpp communities
+- WhisperKit contributors
+- Our beta testers and early adopters
