@@ -220,16 +220,12 @@ class FoundationModelsService: LLMService {
         
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
         
-        // Foundation Models may not support streaming directly
-        // Use regular generation and simulate streaming
+        // Foundation Models doesn't support native streaming
+        // Get the complete response and send it immediately
         let response = try await generate(prompt: prompt, options: options)
         
-        // Simulate streaming by breaking the response into chunks
-        let words = response.split(separator: " ")
-        for word in words {
-            onToken(String(word) + " ")
-            try await Task.sleep(nanoseconds: 10_000_000) // 10ms between words
-        }
+        // Send the entire response at once since we already have it
+        onToken(response)
     }
     
     func cleanup() async {
