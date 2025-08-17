@@ -21,6 +21,8 @@ public enum ModelArchitecture: String, CaseIterable {
     case starcoder
     case codegen
     case custom
+    case whisper
+    case wav2vec2
 
     public var displayName: String {
         switch self {
@@ -36,6 +38,8 @@ public enum ModelArchitecture: String, CaseIterable {
         case .starcoder: return "StarCoder"
         case .codegen: return "CodeGen"
         case .custom: return "Custom"
+        case .whisper: return "Whisper"
+        case .wav2vec2: return "Wav2Vec2"
         }
     }
 }

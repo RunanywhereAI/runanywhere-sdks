@@ -13,6 +13,8 @@ public enum LLMFramework: String, CaseIterable, Codable {
     case picoLLM = "PicoLLM"
     case mlc = "MLC"
     case mediaPipe = "MediaPipe"
+    case whisperKit = "WhisperKit"
+    case openAIWhisper = "OpenAIWhisper"
 
     /// Human-readable display name for the framework
     public var displayName: String {
@@ -28,6 +30,8 @@ public enum LLMFramework: String, CaseIterable, Codable {
         case .picoLLM: return "Pico LLM"
         case .mlc: return "MLC"
         case .mediaPipe: return "MediaPipe"
+        case .whisperKit: return "WhisperKit"
+        case .openAIWhisper: return "OpenAI Whisper"
         }
     }
 }

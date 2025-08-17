@@ -8,24 +8,26 @@
 4. [Layer Architecture](#layer-architecture)
 5. [Capabilities System](#capabilities-system)
 6. [Core Infrastructure](#core-infrastructure)
-7. [Data Flow](#data-flow)
-8. [Key Components](#key-components)
-9. [Detailed Component Analysis](#detailed-component-analysis)
-10. [Core Interaction Flows](#core-interaction-flows)
-11. [File-Level Details](#file-level-details)
-12. [Edge Cases and Error Scenarios](#edge-cases-and-error-scenarios)
-13. [Implementation Status](#implementation-status)
-14. [Developer Guide](#developer-guide)
-15. [Extension Points](#extension-points)
+7. [Voice System Architecture](#voice-system-architecture)
+8. [Data Flow](#data-flow)
+9. [Key Components](#key-components)
+10. [Detailed Component Analysis](#detailed-component-analysis)
+11. [Core Interaction Flows](#core-interaction-flows)
+12. [File-Level Details](#file-level-details)
+13. [Edge Cases and Error Scenarios](#edge-cases-and-error-scenarios)
+14. [Implementation Status](#implementation-status)
+15. [Developer Guide](#developer-guide)
+16. [Extension Points](#extension-points)
 
 ## Introduction
 
 The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides intelligent routing between on-device and cloud AI models. Built with a clean 5-layer architecture, the SDK emphasizes privacy-first design, cost optimization, and developer experience.
 
 **Current State (v2.0):**
-- **Files**: 292 Swift files organized across 5 architectural layers
+- **Files**: 303 Swift files organized across 5 architectural layers
 - **Capabilities**: 20+ modular capability systems with 60+ models
-- **Frameworks**: Support for CoreML, TensorFlow Lite, GGUF, MLX, ONNX, ExecuTorch, PicoLLM, MLC, and more
+- **Frameworks**: Support for CoreML, TensorFlow Lite, GGUF, MLX, ONNX, ExecuTorch, PicoLLM, MLC, WhisperKit, and more
+- **Voice Support**: Complete voice pipeline with STT, TTS, VAD, and wake word detection
 - **Platforms**: iOS 13.0+, macOS 10.15+, tvOS 13.0+, watchOS 6.0+
 - **Concurrency**: Modern Swift async/await throughout with sophisticated error handling
 - **Configuration**: Device-only execution with comprehensive analytics and monitoring
@@ -68,6 +70,7 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
 │                         PUBLIC API LAYER                            │
 │  RunAnywhereSDK • Configuration • GenerationOptions • ModelInfo     │
 │  Structured Output • Error Types • Framework Availability           │
+│  Voice API (transcribe, processVoiceQuery)                          │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -76,7 +79,7 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
 │  Validation • Tokenization • Storage • Monitoring • ABTesting      │
 │  ErrorRecovery • StructuredOutput • Progress • Registry • Profiling │
 │  GenerationAnalytics • Benchmarking • Compatibility                │
-│  DeviceCapability (Hardware Detection)                              │
+│  DeviceCapability (Hardware Detection) • Voice (STT/TTS/VAD)        │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
                      ┌──────────────┴──────────────┐
@@ -114,8 +117,10 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
 **Key Components**:
 - `/Public/RunAnywhereSDK.swift` - Main singleton entry point (841 lines)
 - `/Public/RunAnywhereSDK+StructuredOutput.swift` - Structured output extensions
+- `/Public/RunAnywhereSDK+Voice.swift` - Voice API extensions (transcribe, processVoiceQuery)
 - `/Public/Configuration/` - SDK setup and policies (7 files)
 - `/Public/Models/` - Public data models (8 files)
+- `/Public/Models/Voice/` - Voice-specific models (TranscriptionResult, VoiceSession, etc.)
 - `/Public/Errors/` - User-facing error types (2 files)
 - `/Public/StructuredOutput/` - Type-safe structured generation (1 file)
 
@@ -128,6 +133,7 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
 **Key Features**:
 - Model management (load/unload/list/download/delete)
 - Text generation (standard, streaming, structured)
+- Voice processing (transcription, voice queries, TTS integration)
 - Configuration management (dynamic settings)
 - Analytics and monitoring access
 - Storage management
@@ -205,6 +211,27 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
     - Real-time thermal monitoring
     - Battery state tracking (iOS)
     - Memory pressure detection
+
+#### Voice Processing (Integrated with Orchestrator)
+- **Voice Protocols**: `/Core/Protocols/Voice/`
+  - Core STT/TTS service protocols with streaming support
+  - Voice activity detection and wake word protocols
+  - Performance monitoring for voice operations
+  - **NEW**: VoiceOrchestrator for complete pipeline management
+- **Voice Models**: `/Public/Models/Voice/`
+  - Transcription results and options
+  - Voice session management
+  - Audio streaming data structures
+  - **NEW**: VoicePipelineEvent, VoicePipelineConfig, VoicePipelineResult
+- **Voice Services**: `/Core/Services/Voice/`
+  - **NEW**: DefaultVoiceOrchestrator implementation
+- **Voice Integration**:
+  - Unified framework adapter pattern for voice services
+  - Complete STT → LLM → TTS pipeline orchestration
+  - Real-time streaming events with progress tracking
+  - Seamless integration with existing model loading pipeline
+  - Full participation in memory and error management
+  - Comprehensive analytics and performance tracking
 
 ### 3. Core Layer
 
@@ -399,6 +426,248 @@ RunAnywhere/
 - System metrics collection
 - Report generation in multiple formats
 
+## Voice System Architecture
+
+### Overview
+
+The RunAnywhere SDK implements a comprehensive voice processing system that seamlessly integrates speech-to-text (STT), text-to-speech (TTS), and voice activity detection (VAD) capabilities. The voice system follows the SDK's modular architecture using unified framework adapters and protocol-based design.
+
+### Voice Pipeline Flow
+
+```
+Audio Input → VAD → STT (WhisperKit) → LLM Processing → TTS → Audio Output
+     ↓              ↓                        ↓               ↓
+AudioCapture → SimpleVAD → WhisperKitService → RunAnywhereSDK → SystemTTS
+```
+
+### Voice Components
+
+#### SDK Core Voice Components
+
+**Protocols** (`/Core/Protocols/Voice/`):
+- **VoiceService** - Core STT protocol with streaming support
+- **TextToSpeechService** - Comprehensive TTS protocol with voice management
+- **VoiceActivityDetector** - VAD protocol for speech detection
+- **WakeWordDetector** - Wake word detection capabilities
+- **VoicePerformanceMonitor** - Voice-specific performance tracking
+
+**Models** (`/Public/Models/Voice/`):
+- **VoiceSession** - Session management with state transitions
+- **TranscriptionResult** - STT output structure with confidence scores
+- **TranscriptionOptions** - STT configuration (language, task, etc.)
+- **TranscriptionSegment** - Streaming transcription chunks
+- **AudioChunk** - Audio data container for streaming
+
+**Public API** (`/Public/Extensions/`):
+- **RunAnywhereSDK+Voice** - Voice API extensions
+  - `transcribe(audio:modelId:)` - Single audio transcription
+  - `processVoiceQuery(audio:voiceModelId:llmModelId:)` - End-to-end voice processing
+
+### Framework Modality System
+
+Voice is integrated through the unified framework modality system:
+
+```swift
+public enum FrameworkModality: String, CaseIterable {
+    case textToText = "text-to-text"
+    case voiceToText = "voice-to-text"      // STT
+    case textToVoice = "text-to-voice"      // TTS
+    case imageToText = "image-to-text"
+    case textToImage = "text-to-image"
+    case multimodal = "multimodal"
+}
+```
+
+### Voice Adapter Pattern
+
+Voice frameworks use the same unified adapter pattern as LLM frameworks:
+
+```swift
+public protocol UnifiedFrameworkAdapter {
+    var supportedModalities: Set<FrameworkModality> { get }
+    func createService(for modality: FrameworkModality) -> Any?
+}
+
+// Example: WhisperKit supports both STT and TTS
+class WhisperKitAdapter: UnifiedFrameworkAdapter {
+    let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToVoice]
+
+    func createService(for modality: FrameworkModality) -> Any? {
+        switch modality {
+        case .voiceToText: return WhisperKitService()
+        case .textToVoice: return SystemTTSServiceWrapper()
+        default: return nil
+        }
+    }
+}
+```
+
+### Voice Session Management
+
+The SDK provides comprehensive voice session management:
+
+```swift
+public enum VoiceSessionState {
+    case idle        // Session created but not started
+    case listening   // Actively recording audio
+    case processing  // Transcribing or processing
+    case speaking    // TTS playback
+    case ended       // Session completed
+}
+
+public class VoiceSession {
+    let id: String
+    let configuration: VoiceSessionConfig
+    var state: VoiceSessionState
+    var transcripts: [TranscriptionResult]
+    var duration: TimeInterval
+}
+```
+
+### Voice Processing Flow
+
+#### Complete Voice Query Processing
+
+```swift
+// High-level voice query processing in SDK
+func processVoiceQuery(audio: Data, voiceModelId: String, llmModelId: String?) async throws -> VoiceResponse {
+    // 1. Service Discovery
+    let voiceService = findVoiceService(for: voiceModelId)
+
+    // 2. Transcription (STT)
+    try await voiceService.initialize(modelPath: voiceModelId)
+    let transcription = try await voiceService.transcribe(audio: audio, options: TranscriptionOptions())
+
+    // 3. LLM Processing
+    let textResponse = try await generate(prompt: transcription.text, options: GenerationOptions())
+
+    // 4. Return structured response
+    return VoiceResponse(
+        inputText: transcription.text,
+        outputText: textResponse.text
+    )
+}
+```
+
+### Streaming Support
+
+The voice system includes comprehensive streaming support for real-time processing:
+
+```swift
+// Streaming transcription
+func transcribeStream(
+    audioStream: AsyncStream<AudioChunk>,
+    options: TranscriptionOptions
+) -> AsyncThrowingStream<TranscriptionSegment, Error>
+
+// Streaming VAD
+func detectActivityStream(
+    audioStream: AsyncStream<AudioChunk>
+) -> AsyncStream<VADSegment>
+
+// Streaming TTS
+func speakStream(
+    textStream: AsyncStream<String>,
+    voice: TTSVoice?
+) -> AsyncThrowingStream<AudioData, Error>
+```
+
+### Voice Performance Monitoring
+
+Voice operations are tracked with specialized metrics:
+
+```swift
+public protocol VoicePerformanceMonitor {
+    func trackTranscription(duration: TimeInterval, audioLength: TimeInterval, model: String)
+    func trackTTS(duration: TimeInterval, textLength: Int, voice: String)
+    func trackVAD(processingTime: TimeInterval, audioLength: TimeInterval)
+    func getMetrics() -> VoicePerformanceMetrics
+}
+
+public struct VoicePerformanceMetrics {
+    let averageTranscriptionRTF: Float    // Real-time factor (< 1.0 is good)
+    let averageTTSLatency: TimeInterval
+    let averageVADLatency: TimeInterval
+    let totalTranscriptions: Int
+}
+```
+
+### Voice Orchestrator (NEW)
+
+The SDK now includes a comprehensive Voice Orchestrator system that manages the complete voice pipeline with streaming events and real-time feedback.
+
+#### Orchestrator Components
+
+**Core Protocol** (`/Core/Protocols/Voice/VoiceOrchestrator.swift`):
+```swift
+public protocol VoiceOrchestrator {
+    func processVoicePipeline(audio: Data, config: VoicePipelineConfig)
+        -> AsyncThrowingStream<VoicePipelineEvent, Error>
+    func processVoiceQuery(audio: Data, config: VoicePipelineConfig)
+        async throws -> VoicePipelineResult
+}
+```
+
+**Pipeline Events** (`/Public/Models/Voice/VoicePipelineEvent.swift`):
+- Real-time pipeline event notifications
+- Progress tracking for each stage
+- Stage-specific error reporting
+
+**Pipeline Configuration** (`/Public/Models/Voice/VoicePipelineConfig.swift`):
+- Configurable timeouts per stage (STT: 30s, LLM: 60s, TTS: 30s)
+- Generation options integration
+- Streaming enable/disable control
+
+#### Pipeline Event Flow
+
+```
+1. started(sessionId) → Pipeline initialization
+2. transcriptionStarted → transcriptionProgress → transcriptionCompleted
+3. llmGenerationStarted → llmGenerationProgress → llmGenerationCompleted
+4. ttsStarted → ttsProgress → ttsCompleted (if enabled)
+5. completed(result) → Final result with timing metrics
+```
+
+#### Key Features
+
+- **Unified Pipeline Management**: Single orchestrator handles STT → LLM → TTS
+- **Streaming Events**: Real-time updates for UI responsiveness
+- **Stage Timing**: Performance metrics for each pipeline stage
+- **Error Recovery**: Stage-specific error handling and timeouts
+- **Flexible Configuration**: Per-stage timeout and option customization
+
+### Integration with Existing Capabilities
+
+Voice seamlessly integrates with existing SDK capabilities:
+
+- **Model Loading**: Voice models use the same loading pipeline
+- **Memory Management**: Voice services participate in memory pressure handling
+- **Error Recovery**: Voice errors use the same recovery strategies
+- **Analytics**: Voice operations tracked alongside text generation
+- **Configuration**: Voice settings managed through unified configuration
+- **Service Container**: Voice orchestrator registered in dependency injection container
+
+### Sample App Implementation
+
+The sample iOS app demonstrates complete voice integration:
+
+**Audio Services** (`/Core/Services/Audio/`):
+- **AudioCapture** - AVAudioEngine-based recording at 16kHz mono
+- **SimpleVAD** - Energy-based voice activity detection
+- **AudioProcessor** - Audio preprocessing utilities
+
+**Voice Framework** (`/Core/Services/WhisperKit/`):
+- **WhisperKitAdapter** - UnifiedFrameworkAdapter implementation
+- **WhisperKitService** - VoiceService with dual-mode (actual/simulated)
+
+**TTS Services** (`/Core/Services/TTS/`):
+- **SystemTTSService** - AVSpeechSynthesizer implementation
+- **SystemTTSServiceWrapper** - Protocol adapter for TTS
+
+**UI Components** (`/Features/Voice/`):
+- **VoiceAssistantView** - SwiftUI interface with microphone controls
+- **VoiceAssistantViewModel** - Business logic coordinator
+
 ## Core Infrastructure
 
 ### ServiceContainer Architecture
@@ -541,7 +810,7 @@ User → SDK.generate(prompt, options)
 
 ### Public API Design
 
-**Main SDK Interface** (`RunAnywhereSDK.swift` - 841 lines):
+**Main SDK Interface** (`RunAnywhereSDK.swift` - 841 lines + Voice Extensions):
 ```swift
 RunAnywhereSDK.shared
 ├── Initialization
@@ -557,6 +826,11 @@ RunAnywhereSDK.shared
 │   ├── generate(prompt:options:) async throws -> GenerationResult
 │   ├── generateStream(prompt:options:) -> AsyncThrowingStream<String, Error>
 │   └── generateStructured(_:prompt:options:) async throws -> T
+├── Voice Processing (Enhanced with Orchestrator)
+│   ├── transcribe(audio:modelId:) async throws -> VoiceTranscriptionResult
+│   ├── processVoiceQuery(audio:voiceModelId:llmModelId:ttsEnabled:) async throws -> VoicePipelineResult
+│   ├── processVoiceStream(audio:config:) -> AsyncThrowingStream<VoicePipelineEvent, Error>
+│   └── transcribeStream(audioStream:options:) -> AsyncThrowingStream<TranscriptionSegment, Error>
 ├── Configuration Management
 │   ├── setTemperature(_:) async
 │   ├── setMaxTokens(_:) async
@@ -1341,12 +1615,24 @@ ProcessInfo.processInfo.thermalState
 ### ✅ Fully Implemented (Production Ready)
 
 #### Core Infrastructure
-- **SDK Architecture**: Complete 5-layer architecture with 292 Swift files
+- **SDK Architecture**: Complete 5-layer architecture with 303 Swift files
 - **Dependency Injection**: ServiceContainer with 25+ services and health monitoring
 - **Hardware Detection**: Cross-platform capability detection with caching
 - **Memory Management**: Advanced memory management with pressure handling and LRU eviction
 - **Error Handling**: Comprehensive error system with recovery suggestions
 - **Configuration System**: Dynamic configuration with persistence (when database enabled)
+
+#### Voice Processing (Enhanced with Orchestrator)
+- **Voice Orchestrator**: Complete pipeline management with streaming events
+- **Voice Pipeline**: End-to-end STT → LLM → TTS processing
+- **Speech-to-Text**: WhisperKit integration with streaming support
+- **Text-to-Speech**: System TTS with multiple voice options (protocol ready)
+- **Voice Activity Detection**: Energy-based VAD implementation
+- **Session Management**: Comprehensive voice session tracking
+- **Audio Processing**: Professional-grade audio preprocessing
+- **Pipeline Events**: Real-time progress tracking and error reporting
+- **Configurable Timeouts**: Per-stage timeout management (STT: 30s, LLM: 60s, TTS: 30s)
+- **Unified Adapters**: Voice integrated through unified framework adapter pattern
 
 #### Model Management
 - **Model Validation**: Complete validation pipeline for all supported formats
@@ -1735,12 +2021,14 @@ protocol HardwareDetector {
 
 ## Summary
 
-The RunAnywhere Swift SDK v2.0 represents a sophisticated, production-ready foundation for on-device AI with:
+The RunAnywhere Swift SDK v2.0 represents a sophisticated, production-ready foundation for on-device AI with comprehensive voice capabilities:
 
 ### Architectural Excellence
 - **Clean 6-Layer Architecture**: 303 Swift files organized with clear separation of concerns
 - **Modular Design**: 20+ independent capability modules with 60+ data models
+- **Voice Integration**: Complete voice pipeline with STT, TTS, VAD, and wake word support
 - **Protocol-Based Extensibility**: Easy integration of new frameworks and capabilities
+- **Unified Framework Adapters**: Single adapter pattern for all modalities (text, voice, image)
 - **Dependency Injection**: ServiceContainer in Foundation layer managing 25+ services with health monitoring
 - **Type-Safe Configuration**: Enum-based configuration system replacing string constants
 - **Dedicated Data Layer**: Complete separation of data access from business logic

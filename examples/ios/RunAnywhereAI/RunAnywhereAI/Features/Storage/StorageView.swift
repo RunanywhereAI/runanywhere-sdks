@@ -80,15 +80,9 @@ struct StorageView: View {
                     .foregroundColor(.secondary)
                     .font(.caption)
             } else {
-                ForEach(viewModel.storedModels, id: \.name) { model in
+                ForEach(viewModel.storedModels, id: \.id) { model in
                     StoredModelRow(model: model) {
-                        // Extract modelId from filename
-                        // Filename format: [modelId].[format]
-                        let filename = model.path.lastPathComponent
-                        if let dotIndex = filename.lastIndex(of: ".") {
-                            let modelId = String(filename[..<dotIndex])
-                            await viewModel.deleteModel(modelId)
-                        }
+                        await viewModel.deleteModel(model.id)
                     }
                 }
             }

@@ -23,7 +23,7 @@ let package = Package(
         .package(url: "https://github.com/groue/GRDB.swift", from: "7.6.1"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.57.1"),
-        .package(url: "https://github.com/kean/Pulse", from: "4.0.0")
+        .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
     ],
     targets: [
         .target(
@@ -35,7 +35,7 @@ let package = Package(
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .product(name: "GRDB", package: "GRDB.swift"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
-                .product(name: "Pulse", package: "Pulse")
+                .product(name: "Pulse", package: "Pulse"),
             ],
             path: "Sources/RunAnywhere",
             swiftSettings: [

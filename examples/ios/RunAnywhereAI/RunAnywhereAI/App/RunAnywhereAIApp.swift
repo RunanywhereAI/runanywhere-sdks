@@ -7,9 +7,12 @@
 
 import SwiftUI
 import RunAnywhereSDK
+import UIKit
+import os
 
 @main
 struct RunAnywhereAIApp: App {
+    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "RunAnywhereAIApp")
     @StateObject private var modelManager = ModelManager.shared
     @State private var isSDKInitialized = false
     @State private var initializationError: Error?
@@ -21,7 +24,7 @@ struct RunAnywhereAIApp: App {
                     ContentView()
                         .environmentObject(modelManager)
                         .onAppear {
-                            print("🎉 RunAnywhereAI: App is ready to use!")
+                            logger.info("🎉 App is ready to use!")
                         }
                 } else if let error = initializationError {
                     InitializationErrorView(error: error) {
@@ -35,9 +38,15 @@ struct RunAnywhereAIApp: App {
                 }
             }
             .task {
-                print("🏁 RunAnywhereAI: App launched, initializing SDK...")
+                logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
                 await initializeBundledModels()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+                logger.warning("⚠️ Memory warning received, cleaning up cached services")
+                Task {
+                    await WhisperKitAdapter.shared.forceCleanup()
+                }
             }
         }
     }
@@ -67,18 +76,28 @@ struct RunAnywhereAIApp: App {
                 RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
             }
 
+            // Register voice framework adapter (now uses unified adapter with singleton)
+            logger.info("🎤 Registering WhisperKitAdapter...")
+            RunAnywhereSDK.shared.registerFrameworkAdapter(WhisperKitAdapter.shared)
+            logger.info("✅ WhisperKitAdapter registered")
+
+            // Register WhisperKit download strategy
+            logger.info("📥 Registering WhisperKit download strategy...")
+            RunAnywhereSDK.shared.registerDownloadStrategy(WhisperKitDownloadStrategy())
+            logger.info("✅ WhisperKit download strategy registered")
+
             // Initialize the SDK
             let startTime = Date()
-            print("🚀 RunAnywhereSDK: Starting initialization...")
-            print("📋 Configuration: API Key: \(config.apiKey.prefix(8))..., Routing: \(config.routingPolicy), Privacy: \(config.privacyMode)")
+            logger.info("🚀 Starting SDK initialization...")
+            logger.debug("📋 Configuration: API Key: \(String(config.apiKey.prefix(8)), privacy: .public)..., Routing: \(String(describing: config.routingPolicy), privacy: .public), Privacy: \(String(describing: config.privacyMode), privacy: .public)")
 
             try await RunAnywhereSDK.shared.initialize(configuration: config)
 
             let initTime = Date().timeIntervalSince(startTime)
-            print("✅ RunAnywhereSDK: Successfully initialized!")
-            print("⏱️  Initialization time: \(String(format: "%.2f", initTime)) seconds")
-            print("📊 SDK Status: Ready for on-device AI inference")
-            print("🔧 Registered frameworks: LLMSwift, FoundationModels")
+            logger.info("✅ SDK successfully initialized!")
+            logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
+            logger.info("📊 SDK Status: Ready for on-device AI inference")
+            logger.info("🔧 Registered frameworks: LLMSwift, FoundationModels, WhisperKit")
 
             // Load and apply user settings before marking as initialized
             await loadAndApplyUserSettings()
@@ -91,9 +110,9 @@ struct RunAnywhereAIApp: App {
             // Auto-load first available model
             await autoLoadFirstModel()
         } catch {
-            print("❌ RunAnywhereSDK: Initialization failed!")
-            print("🔍 Error: \(error)")
-            print("💡 Tip: Check your API key and network connection")
+            logger.error("❌ SDK initialization failed!")
+            logger.error("🔍 Error: \(error, privacy: .public)")
+            logger.error("💡 Tip: Check your API key and network connection")
             await MainActor.run {
                 initializationError = error
             }
@@ -113,7 +132,7 @@ struct RunAnywhereAIApp: App {
     }
 
     private func autoLoadFirstModel() async {
-        print("🤖 Auto-loading first available model...")
+        logger.info("🤖 Auto-loading first available model...")
 
         do {
             // Get available models from SDK
@@ -127,12 +146,12 @@ struct RunAnywhereAIApp: App {
             let modelToLoad = llamaCppModels.first ?? anyDownloadedModels.first
 
             if let model = modelToLoad {
-                print("✅ Found model to auto-load: \(model.name) (Framework: \(model.compatibleFrameworks.first?.displayName ?? "Unknown"))")
+                logger.info("✅ Found model to auto-load: \(model.name, privacy: .public) (Framework: \(model.compatibleFrameworks.first?.displayName ?? "Unknown", privacy: .public))")
 
                 // Load the model
                 try await RunAnywhereSDK.shared.loadModel(model.id)
 
-                print("🎉 Successfully auto-loaded model: \(model.name)")
+                logger.info("🎉 Successfully auto-loaded model: \(model.name, privacy: .public)")
 
                 // Update ModelListViewModel to reflect the loaded model
                 await ModelListViewModel.shared.setCurrentModel(model)
@@ -141,18 +160,18 @@ struct RunAnywhereAIApp: App {
                 NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
 
             } else {
-                print("ℹ️ No downloaded models available for auto-loading")
-                print("💡 User will need to download and select a model manually")
+                logger.info("ℹ️ No downloaded models available for auto-loading")
+                logger.info("💡 User will need to download and select a model manually")
             }
 
         } catch {
-            print("⚠️ Failed to auto-load model: \(error)")
-            print("💡 User will need to select a model manually")
+            logger.warning("⚠️ Failed to auto-load model: \(error, privacy: .public)")
+            logger.info("💡 User will need to select a model manually")
         }
     }
 
     private func loadAndApplyUserSettings() async {
-        print("⚙️ Loading user settings from UserDefaults...")
+        logger.info("⚙️ Loading user settings from UserDefaults...")
 
         // Load temperature setting
         let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
@@ -166,7 +185,7 @@ struct RunAnywhereAIApp: App {
         await RunAnywhereSDK.shared.setTemperature(Float(temperature))
         await RunAnywhereSDK.shared.setMaxTokens(maxTokens)
 
-        print("✅ Applied user settings - Temperature: \(temperature), MaxTokens: \(maxTokens)")
+        logger.info("✅ Applied user settings - Temperature: \(temperature, privacy: .public), MaxTokens: \(maxTokens, privacy: .public)")
     }
 }
 

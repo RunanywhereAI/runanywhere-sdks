@@ -1,5 +1,26 @@
 # RunAnywhere Swift SDK - Public API Reference
 
+## Overview
+
+The RunAnywhere Swift SDK is a comprehensive on-device AI platform providing privacy-first execution with multi-framework support. It offers a unified interface for various ML frameworks including Core ML, MLX, llama.cpp, TensorFlow Lite, ONNX, WhisperKit, and more.
+
+### Key Features
+
+- **Privacy-First Design**: Default device-only routing for maximum privacy
+- **Multi-Framework Support**: Unified API across 15+ ML frameworks
+- **Multi-Modal Capabilities**: Text generation, voice transcription, structured output
+- **Intelligent Model Management**: Automatic discovery, downloading, validation
+- **Performance Monitoring**: Real-time analytics, benchmarking, A/B testing
+- **Cost Optimization**: Token budget management and savings tracking
+- **Thinking/Reasoning Support**: Extract reasoning from models like DeepSeek-R1
+- **Streaming Support**: Real-time token streaming for better UX
+
+### Supported Frameworks
+
+- **Text Generation**: Core ML, MLX, llama.cpp, GGUF, ONNX, TensorFlow Lite, ExecuTorch, Swift Transformers, Foundation Models, PicoLLM, MLC, MediaPipe
+- **Voice/Audio**: WhisperKit, OpenAI Whisper
+- **Custom**: Extensible framework adapter system
+
 ## Table of Contents
 
 1. [Getting Started](#getting-started)
@@ -7,13 +28,14 @@
 3. [Model Management](#model-management)
 4. [Text Generation](#text-generation)
 5. [Structured Output](#structured-output)
-6. [Configuration Management](#configuration-management)
-7. [Analytics & Monitoring](#analytics--monitoring)
-8. [Storage Management](#storage-management)
-9. [Framework Management](#framework-management)
-10. [Error Handling](#error-handling)
-11. [Data Types](#data-types)
-12. [Advanced Features](#advanced-features)
+6. [Voice & Audio](#voice--audio)
+7. [Configuration Management](#configuration-management)
+8. [Analytics & Monitoring](#analytics--monitoring)
+9. [Storage Management](#storage-management)
+10. [Framework Management](#framework-management)
+11. [Error Handling](#error-handling)
+12. [Data Types](#data-types)
+13. [Advanced Features](#advanced-features)
 
 ## Getting Started
 
@@ -61,6 +83,7 @@ public func initialize(configuration: Configuration) async throws
 - `configuration`: SDK configuration including API key and settings
 
 **Throws:**
+- `SDKError.notInitialized`: If initialization fails
 - `RunAnywhereError.alreadyInitialized`: If SDK is already initialized
 - `RunAnywhereError.invalidConfiguration`: If configuration is invalid
 
@@ -75,6 +98,36 @@ let config = Configuration(
 
 try await RunAnywhereSDK.shared.initialize(configuration: config)
 ```
+
+### waitForInitialization()
+
+Waits for SDK initialization to complete.
+
+```swift
+public func waitForInitialization() async throws
+```
+
+**Throws:**
+- `SDKError.notInitialized`: If initialization fails
+
+### isInitialized
+
+Check if SDK is initialized.
+
+```swift
+public var isInitialized: Bool { get }
+```
+
+### registerDownloadStrategy(_:)
+
+Register a custom download strategy for models.
+
+```swift
+public func registerDownloadStrategy(_ strategy: DownloadStrategy)
+```
+
+**Parameters:**
+- `strategy`: Custom download strategy implementation
 
 ### Configuration Options
 
@@ -202,6 +255,23 @@ public func addModelFromURL(
 - `estimatedSize`: Estimated download size
 - `supportsThinking`: Whether model supports reasoning
 - `thinkingTagPattern`: Pattern for extracting thinking
+
+### updateModelThinkingSupport(modelId:supportsThinking:thinkingTagPattern:)
+
+Updates thinking/reasoning support for a model.
+
+```swift
+public func updateModelThinkingSupport(
+    modelId: String,
+    supportsThinking: Bool,
+    thinkingTagPattern: ThinkingTagPattern? = nil
+) async
+```
+
+**Parameters:**
+- `modelId`: Model identifier
+- `supportsThinking`: Whether model supports reasoning
+- `thinkingTagPattern`: Pattern for extracting thinking tags
 
 ## Text Generation
 
@@ -340,6 +410,46 @@ public func generateStructured<T: Generatable>(
 - `prompt`: Input prompt
 - `options`: Generation options
 
+### generateStructured(_:prompt:validationMode:options:)
+
+Generates structured output with validation mode.
+
+```swift
+public func generateStructured<T: Generatable>(
+    _ type: T.Type,
+    prompt: String,
+    validationMode: SchemaValidationMode,
+    options: GenerationOptions? = nil
+) async throws -> T
+```
+
+### generateWithStructuredOutput(prompt:structuredOutput:options:)
+
+Generates with raw structured output configuration.
+
+```swift
+public func generateWithStructuredOutput(
+    prompt: String,
+    structuredOutput: StructuredOutputConfig,
+    options: GenerationOptions? = nil
+) async throws -> GenerationResult
+```
+
+### generateStructuredStream(_:content:options:)
+
+Generates structured output as a stream.
+
+```swift
+public func generateStructuredStream<T: Generatable>(
+    _ type: T.Type,
+    content: String,
+    options: GenerationOptions? = nil
+) -> StructuredOutputStreamResult<T>
+```
+
+**Returns:**
+- `StructuredOutputStreamResult<T>`: Stream result with text stream and final structured result
+
 **Example:**
 ```swift
 struct Recipe: Generatable, Codable {
@@ -364,10 +474,23 @@ struct Recipe: Generatable, Codable {
     }
 }
 
+// Standard generation
 let recipe = try await RunAnywhereSDK.shared.generateStructured(
     Recipe.self,
     prompt: "Create a recipe for chocolate chip cookies"
 )
+
+// Streaming generation
+let streamResult = RunAnywhereSDK.shared.generateStructuredStream(
+    Recipe.self,
+    content: "Create a recipe for chocolate chip cookies"
+)
+
+for try await chunk in streamResult.textStream {
+    print(chunk, terminator: "")
+}
+
+let recipe = try await streamResult.result
 ```
 
 ### Generatable Protocol
@@ -385,6 +508,164 @@ public enum SchemaValidationMode {
     case strict      // Fail if output doesn't match exactly
     case lenient     // Allow minor deviations
     case bestEffort  // Extract what's possible
+}
+```
+
+### Structured Output Configuration
+
+```swift
+public struct StructuredOutputConfig {
+    public let jsonSchema: String
+    public let validationMode: SchemaValidationMode
+    public let strategy: StructuredOutputStrategy
+}
+
+public enum StructuredOutputStrategy {
+    case automatic
+    case jsonSchemaInPrompt
+    case frameworkConstraints
+    case postProcessing
+}
+```
+
+## Voice & Audio
+
+### transcribe(audio:modelId:options:)
+
+Transcribes audio to text using voice models.
+
+```swift
+public func transcribe(
+    audio: Data,
+    modelId: String = "whisper-base",
+    options: TranscriptionOptions = TranscriptionOptions()
+) async throws -> TranscriptionResult
+```
+
+**Parameters:**
+- `audio`: Audio data to transcribe
+- `modelId`: Voice model identifier (default: "whisper-base")
+- `options`: Transcription options
+
+**Returns:**
+- `TranscriptionResult`: Transcription with metadata
+
+**Throws:**
+- `VoiceError.serviceNotInitialized`: Voice service not initialized
+- `VoiceError.transcriptionFailed`: Transcription failed
+- `VoiceError.modelNotFound`: Model not found
+- `VoiceError.audioFormatNotSupported`: Audio format not supported
+
+### processVoiceQuery(audio:voiceModelId:llmModelId:)
+
+Processes a voice query through transcription and LLM generation.
+
+```swift
+public func processVoiceQuery(
+    audio: Data,
+    voiceModelId: String = "whisper-base",
+    llmModelId: String? = nil
+) async throws -> VoiceResponse
+```
+
+**Parameters:**
+- `audio`: Audio data to process
+- `voiceModelId`: Voice model for transcription
+- `llmModelId`: Optional LLM model for generation
+
+**Returns:**
+- `VoiceResponse`: Contains input and output text
+
+### TranscriptionOptions
+
+```swift
+public struct TranscriptionOptions {
+    public enum Language: String, CaseIterable {
+        case auto = "auto"
+        case english = "en"
+        case spanish = "es"
+        case french = "fr"
+        case german = "de"
+        case chinese = "zh"
+        case japanese = "ja"
+        // ... more languages
+    }
+
+    public enum Task {
+        case transcribe  // Transcribe in original language
+        case translate   // Translate to English
+    }
+
+    public var language: Language = .auto
+    public var task: Task = .transcribe
+    public var temperature: Float = 0.0
+    public var enableTimestamps: Bool = false
+    public var maxLength: Int? = nil
+}
+```
+
+### TranscriptionResult
+
+```swift
+public struct TranscriptionResult {
+    public let text: String
+    public let language: String?
+    public let confidence: Float
+    public let duration: TimeInterval
+    public let segments: [TranscriptionSegment]?
+}
+
+public struct TranscriptionSegment {
+    public let text: String
+    public let start: TimeInterval
+    public let end: TimeInterval
+    public let confidence: Float
+}
+```
+
+### VoiceResponse
+
+```swift
+public struct VoiceResponse {
+    public let inputText: String      // Transcribed text
+    public let outputText: String     // LLM response
+    public let transcriptionResult: TranscriptionResult
+    public let generationResult: GenerationResult?
+}
+```
+
+### Voice Session Management
+
+```swift
+public struct VoiceSession {
+    public let id: UUID
+    public let startTime: Date
+    public var transcriptions: [TranscriptionResult]
+    public var generations: [GenerationResult]
+}
+```
+
+### Audio Chunk Handling
+
+```swift
+public struct AudioChunk {
+    public let data: Data
+    public let timestamp: Date
+    public let duration: TimeInterval
+}
+```
+
+### Voice Error Types
+
+```swift
+public enum VoiceError: LocalizedError {
+    case serviceNotInitialized
+    case transcriptionFailed(Error)
+    case streamingNotSupported
+    case languageNotSupported(String)
+    case modelNotFound(String)
+    case audioFormatNotSupported
+    case insufficientAudioData
 }
 ```
 
@@ -551,26 +832,56 @@ print("Freed: \(result.freedSpace) bytes")
 
 ## Framework Management
 
-### Register Framework Adapter
+### registerFrameworkAdapter(_:)
+
+Register a custom framework adapter.
 
 ```swift
-public func registerFrameworkAdapter(_ adapter: FrameworkAdapter)
+public func registerFrameworkAdapter(_ adapter: UnifiedFrameworkAdapter)
 ```
 
-### Get Framework Information
+**Parameters:**
+- `adapter`: Unified framework adapter implementation
+
+### Framework Discovery
 
 ```swift
 // Get registered adapters
-let adapters = RunAnywhereSDK.shared.getRegisteredAdapters()
+public func getRegisteredAdapters() -> [LLMFramework: UnifiedFrameworkAdapter]
 
 // Get available frameworks
-let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
+public func getAvailableFrameworks() -> [LLMFramework]
 
 // Get detailed availability
-let availability = RunAnywhereSDK.shared.getFrameworkAvailability()
+public func getFrameworkAvailability() -> [FrameworkAvailability]
 
 // Get models for framework
-let models = RunAnywhereSDK.shared.getModelsForFramework(.coreML)
+public func getModelsForFramework(_ framework: LLMFramework) -> [ModelInfo]
+```
+
+### Modality-Based Framework Management
+
+```swift
+// Get frameworks supporting a specific modality
+public func getFrameworks(for modality: FrameworkModality) -> [LLMFramework]
+
+// Get primary modality for a framework
+public func getPrimaryModality(for framework: LLMFramework) -> FrameworkModality
+
+// Check if framework supports modality
+public func frameworkSupports(_ framework: LLMFramework, modality: FrameworkModality) -> Bool
+```
+
+### FrameworkModality
+
+```swift
+public enum FrameworkModality: String, CaseIterable {
+    case textToText = "text-to-text"       // Traditional LLM
+    case voiceToText = "voice-to-text"     // Speech recognition
+    case textToVoice = "text-to-voice"     // Text-to-speech
+    case imageToText = "image-to-text"     // Vision understanding
+    case multimodal = "multimodal"         // Multiple modalities
+}
 ```
 
 ### Framework Options
@@ -603,6 +914,27 @@ let mlxOptions = MLXOptions(
 ```
 
 ## Error Handling
+
+### SDKError
+
+Core SDK error type:
+
+```swift
+public enum SDKError: LocalizedError {
+    case notInitialized
+    case notImplemented
+    case modelNotFound(String)
+    case loadingFailed(String)
+    case generationFailed(String)
+    case generationTimeout(String)
+    case frameworkNotAvailable(LLMFramework)
+    case downloadFailed(Error)
+    case validationFailed(ValidationError)
+    case routingFailed(String)
+    case databaseInitializationFailed(Error)
+    case unsupportedModality(String)
+}
+```
 
 ### RunAnywhereError
 
@@ -646,6 +978,36 @@ public enum RunAnywhereError: LocalizedError {
     // Feature errors
     case featureNotAvailable(String)
     case notImplemented(String)
+}
+```
+
+### StructuredOutputError
+
+Structured output validation errors:
+
+```swift
+public enum StructuredOutputError: LocalizedError {
+    case invalidJSON(String)
+    case validationFailed(String)
+    case extractionFailed(String)
+    case schemaGenerationFailed(String)
+    case streamingNotSupported
+}
+```
+
+### VoiceError
+
+Voice and audio processing errors:
+
+```swift
+public enum VoiceError: LocalizedError {
+    case serviceNotInitialized
+    case transcriptionFailed(Error)
+    case streamingNotSupported
+    case languageNotSupported(String)
+    case modelNotFound(String)
+    case audioFormatNotSupported
+    case insufficientAudioData
 }
 ```
 
@@ -739,8 +1101,38 @@ public enum LLMFramework: String, CaseIterable {
     case transformers = "Transformers"
     case llamaCpp = "LlamaCpp"
     case whisper = "Whisper"
+    case whisperKit = "WhisperKit"
+    case openAIWhisper = "OpenAIWhisper"
     case execuTorch = "ExecuTorch"
+    case swiftTransformers = "SwiftTransformers"
+    case foundationModels = "FoundationModels"
+    case picoLLM = "PicoLLM"
+    case mlc = "MLC"
+    case mediaPipe = "MediaPipe"
     case custom = "Custom"
+}
+```
+
+### ThinkingTagPattern
+
+```swift
+public struct ThinkingTagPattern: Codable {
+    public let startTag: String
+    public let endTag: String
+
+    public init(startTag: String, endTag: String) {
+        self.startTag = startTag
+        self.endTag = endTag
+    }
+}
+```
+
+### StructuredOutputStreamResult
+
+```swift
+public struct StructuredOutputStreamResult<T: Generatable> {
+    public let textStream: AsyncThrowingStream<String, Error>
+    public let result: Task<T, Error>
 }
 ```
 

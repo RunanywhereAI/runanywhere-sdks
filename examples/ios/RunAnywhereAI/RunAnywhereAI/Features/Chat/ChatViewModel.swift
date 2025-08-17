@@ -956,7 +956,7 @@ class ChatViewModel: ObservableObject {
             temperature: Double(options.temperature),
             maxTokens: options.maxTokens,
             topP: Double(options.topP),
-            topK: nil // topK not available in current GenerationOptions
+            topK: nil // topK not available in currentRunAnywhereGenerationOptions
         )
 
         return MessageAnalytics(

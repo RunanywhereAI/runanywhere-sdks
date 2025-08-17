@@ -13,6 +13,7 @@
 		543028462E442716008361DD /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 543028452E442716008361DD /* LLM */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
 		547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 547F7D7D2E3735100061BAED /* ZIPFoundation */; };
+		54C716C02E4FB77700B94B7D /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54C716BF2E4FB77700B94B7D /* WhisperKit */; };
 		54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596142E39C32A0057B6CE /* backend_coreml */; };
 		54F596172E39C32A0057B6CE /* backend_mps in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596162E39C32A0057B6CE /* backend_mps */; };
 		54F596192E39C32A0057B6CE /* backend_xnnpack in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596182E39C32A0057B6CE /* backend_xnnpack */; };
@@ -79,6 +80,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				543028462E442716008361DD /* LLM in Frameworks */,
+				54C716C02E4FB77700B94B7D /* WhisperKit in Frameworks */,
 				54F5961B2E39C32A0057B6CE /* executorch in Frameworks */,
 				54F596172E39C32A0057B6CE /* backend_mps in Frameworks */,
 				547F70B12E35CE270061BAED /* Transformers in Frameworks */,
@@ -189,6 +191,7 @@
 				54F596202E39C32A0057B6CE /* kernels_quantized */,
 				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
 				543028452E442716008361DD /* LLM */,
+				54C716BF2E4FB77700B94B7D /* WhisperKit */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -276,6 +279,7 @@
 				54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */,
 				541E22702E3BE21200EBF8FA /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
 				543028442E442716008361DD /* XCLocalSwiftPackageReference "../../../EXTERNAL/LLM.swift" */,
+				54C716BE2E4FB77700B94B7D /* XCRemoteSwiftPackageReference "WhisperKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -550,6 +554,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -591,6 +597,8 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RunAnywhere;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "RunAnywhere AI needs access to your microphone to transcribe your voice input and provide voice-based interactions.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "RunAnywhere AI uses speech recognition to convert your voice to text for processing.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -779,6 +787,14 @@
 				minimumVersion = 0.9.19;
 			};
 		};
+		54C716BE2E4FB77700B94B7D /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.13.1;
+			};
+		};
 		54F596132E39C32A0057B6CE /* XCRemoteSwiftPackageReference "executorch" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pytorch/executorch.git";
@@ -807,6 +823,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		54C716BF2E4FB77700B94B7D /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 54C716BE2E4FB77700B94B7D /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
 		};
 		54F596142E39C32A0057B6CE /* backend_coreml */ = {
 			isa = XCSwiftPackageProductDependency;
