@@ -237,7 +237,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 💬 Community & Support
 
-- **Discord**: [Join our community](https://discord.gg/runanywhere)
+- **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
 - **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
 - **Email**: founders@runanywhere.ai
 - **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
