@@ -220,12 +220,57 @@ class FoundationModelsService: LLMService {
         
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
         
-        // Foundation Models doesn't support native streaming
-        // Get the complete response and send it immediately
-        let response = try await generate(prompt: prompt, options: options)
+        #if canImport(FoundationModels)
+        guard let session = session else {
+            logger.error("Session not available for streaming")
+            throw LLMServiceError.notInitialized
+        }
         
-        // Send the entire response at once since we already have it
-        onToken(response)
+        do {
+            // Check if session is responding to another request
+            if session.isResponding {
+                logger.warning("Session is already responding to another request")
+                throw LLMServiceError.notInitialized
+            }
+            
+            // Create GenerationOptions for Foundation Models
+            let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
+            
+            // Use native streaming with streamResponse(to:options:)
+            let responseStream = session.streamResponse(to: prompt, options: foundationOptions)
+            
+            // Stream tokens as they arrive
+            var previousContent = ""
+            for try await partialResponse in responseStream {
+                // partialResponse contains the aggregated response so far
+                // We need to send only the new tokens
+                if partialResponse.count > previousContent.count {
+                    let newTokens = String(partialResponse.dropFirst(previousContent.count))
+                    onToken(newTokens)
+                    previousContent = partialResponse
+                }
+            }
+            
+            logger.debug("Streaming generation completed successfully")
+        } catch let error as LanguageModelSession.GenerationError {
+            logger.error("Foundation Models streaming error: \(error)")
+            switch error {
+            case .exceededContextWindowSize:
+                logger.error("Exceeded context window size during streaming")
+                throw LLMServiceError.notInitialized
+            default:
+                logger.error("Other streaming error: \(error)")
+                throw LLMServiceError.notInitialized
+            }
+        } catch {
+            logger.error("Streaming generation failed: \(error)")
+            throw LLMServiceError.notInitialized
+        }
+        #else
+        // Foundation Models framework not available
+        logger.error("FoundationModels framework not available for streaming")
+        throw LLMServiceError.notInitialized
+        #endif
     }
     
     func cleanup() async {
