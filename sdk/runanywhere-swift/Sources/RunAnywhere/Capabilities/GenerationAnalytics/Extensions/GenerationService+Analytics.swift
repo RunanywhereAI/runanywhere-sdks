@@ -6,7 +6,7 @@ extension GenerationService {
     /// Generate text with analytics tracking
     public func generateWithAnalytics(
         prompt: String,
-        options: GenerationOptions,
+        options: RunAnywhereGenerationOptions,
         sessionId: UUID? = nil,
         analytics: GenerationAnalyticsService? = nil
     ) async throws -> GenerationResult {

@@ -262,6 +262,7 @@ class QuizViewModel: ObservableObject {
         // Cancel any existing generation task
         generationTask?.cancel()
 
+
         generationTask = Task {
             do {
                 // Check if a model is already loaded
@@ -273,7 +274,7 @@ class QuizViewModel: ObservableObject {
 
                 // Get SDK configuration for generation options
                 let effectiveSettings = await sdk.getGenerationSettings()
-                let options = GenerationOptions(
+                let options = RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature),
                     topP: 0.9,

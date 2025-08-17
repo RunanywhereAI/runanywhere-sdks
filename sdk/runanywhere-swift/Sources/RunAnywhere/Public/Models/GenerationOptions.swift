@@ -1,7 +1,7 @@
 import Foundation
 
 /// Options for text generation
-public struct GenerationOptions {
+public struct RunAnywhereGenerationOptions {
     /// Maximum number of tokens to generate
     public let maxTokens: Int
 

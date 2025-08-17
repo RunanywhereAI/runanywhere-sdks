@@ -304,7 +304,7 @@ class ChatViewModel: ObservableObject {
 
                 // Get SDK configuration for generation options
                 let effectiveSettings = await sdk.getGenerationSettings()
-                let options = GenerationOptions(
+                let options = RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature)
                     // No context passed - it's all in the prompt now
@@ -919,7 +919,7 @@ class ChatViewModel: ObservableObject {
         thinkingText: String?,
         tokensPerSecondHistory: [Double],
         wasInterrupted: Bool,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) -> MessageAnalytics? {
 
         guard let modelName = loadedModelName,

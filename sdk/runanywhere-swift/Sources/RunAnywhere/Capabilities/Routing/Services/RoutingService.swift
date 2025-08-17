@@ -19,7 +19,7 @@ public class RoutingService {
     public func determineRouting(
         prompt: String,
         context: Any?,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision {
         // FORCE ON-DEVICE ONLY - ignore all other logic
         logger.info("🔒 FORCED LOCAL-ONLY ROUTING: Always using on-device execution")
@@ -36,7 +36,7 @@ public class RoutingService {
         _ target: ExecutionTarget,
         prompt: String,
         context: Any?,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision {
         switch target {
         case .onDevice:
@@ -72,7 +72,7 @@ public class RoutingService {
     private func checkPolicyConstraints(
         prompt: String,
         context: Any?,
-        options: GenerationOptions
+        options: RunAnywhereGenerationOptions
     ) async throws -> RoutingDecision? {
         // Check for privacy-sensitive content
         if detectPrivacySensitiveContent(prompt) {
@@ -86,7 +86,7 @@ public class RoutingService {
         return nil
     }
 
-    private func analyzeComplexity(prompt: String, options: GenerationOptions) -> TaskComplexity {
+    private func analyzeComplexity(prompt: String, options: RunAnywhereGenerationOptions) -> TaskComplexity {
         let promptLength = prompt.count
         let maxTokens = options.maxTokens ?? 100
 
@@ -105,7 +105,7 @@ public class RoutingService {
         return prompt.count / 4
     }
 
-    private func selectBestFramework(for options: GenerationOptions) -> LLMFramework? {
+    private func selectBestFramework(for options: RunAnywhereGenerationOptions) -> LLMFramework? {
         // Prefer user's framework choice if available
         if let userFramework = getUserPreferredFramework(from: options) {
             return userFramework
@@ -115,7 +115,7 @@ public class RoutingService {
         return .coreML
     }
 
-    private func getUserPreferredFramework(from options: GenerationOptions) -> LLMFramework? {
+    private func getUserPreferredFramework(from options: RunAnywhereGenerationOptions) -> LLMFramework? {
         // Check if user has specified a framework preference
         // This is a simplified implementation
         return nil
@@ -151,12 +151,12 @@ private enum TaskComplexity {
 public class CostCalculator {
     public init() {}
 
-    public func calculateOnDeviceCost(tokenCount: Int, options: GenerationOptions) async -> Double {
+    public func calculateOnDeviceCost(tokenCount: Int, options: RunAnywhereGenerationOptions) async -> Double {
         // On-device is essentially free (just battery/processing)
         return 0.0
     }
 
-    public func calculateCloudCost(tokenCount: Int, options: GenerationOptions) async -> Double {
+    public func calculateCloudCost(tokenCount: Int, options: RunAnywhereGenerationOptions) async -> Double {
         // Simple cost model: $0.001 per token
         return Double(tokenCount) * 0.001
     }

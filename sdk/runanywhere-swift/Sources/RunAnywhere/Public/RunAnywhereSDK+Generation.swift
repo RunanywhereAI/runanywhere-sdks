@@ -11,7 +11,7 @@ extension RunAnywhereSDK {
     /// - Returns: The generation result
     public func generate(
         prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> GenerationResult {
         logger.info("🚀 Starting generation for prompt: \(prompt.prefix(50))...")
 
@@ -34,7 +34,7 @@ extension RunAnywhereSDK {
         let effectiveSettings = await getGenerationSettings()
 
         // Create options with configuration defaults if not provided
-        let effectiveOptions = options ?? GenerationOptions(
+        let effectiveOptions = options ?? RunAnywhereGenerationOptions(
             maxTokens: effectiveSettings.maxTokens,
             temperature: Float(effectiveSettings.temperature),
             topP: Float(effectiveSettings.topP)
@@ -68,7 +68,7 @@ extension RunAnywhereSDK {
     /// - Returns: An async stream of generated text chunks
     public func generateStream(
         prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) -> AsyncThrowingStream<String, Error> {
         guard _isInitialized else {
             return AsyncThrowingStream { continuation in
@@ -88,7 +88,7 @@ extension RunAnywhereSDK {
                 let effectiveSettings = await getGenerationSettings()
 
                 // Create options with configuration defaults if not provided
-                let effectiveOptions = options ?? GenerationOptions(
+                let effectiveOptions = options ?? RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature),
                     topP: Float(effectiveSettings.topP)

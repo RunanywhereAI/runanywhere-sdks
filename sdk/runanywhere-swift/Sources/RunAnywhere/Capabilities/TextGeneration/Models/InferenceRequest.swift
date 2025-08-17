@@ -4,14 +4,14 @@ import Foundation
 internal struct InferenceRequest {
     let id: UUID
     let prompt: String
-    let options: GenerationOptions?
+    let options: RunAnywhereGenerationOptions?
     let timestamp: Date
     let estimatedTokens: Int?
     let priority: RequestPriority
 
     init(
         prompt: String,
-        options: GenerationOptions? = nil,
+        options: RunAnywhereGenerationOptions? = nil,
         estimatedTokens: Int? = nil,
         priority: RequestPriority = .normal
     ) {

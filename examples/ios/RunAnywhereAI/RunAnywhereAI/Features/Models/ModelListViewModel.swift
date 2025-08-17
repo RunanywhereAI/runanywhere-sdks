@@ -22,6 +22,20 @@ class ModelListViewModel: ObservableObject {
 
     // MARK: - Predefined Models
     private let predefinedModels: [ModelInfo] = [
+        // Apple Foundation Models (iOS 26+)
+        ModelInfo(
+            id: "foundation-models-default",
+            name: "Apple Foundation Model",
+            format: .mlmodel,
+            downloadURL: nil, // Built-in, no download needed
+            estimatedMemory: 500_000_000, // 500MB
+            contextLength: 8192,
+            downloadSize: 0, // Built-in
+            compatibleFrameworks: [.foundationModels],
+            preferredFramework: .foundationModels,
+            supportsThinking: false
+        ),
+        
         // Llama-3.2 1B Q6_K
         ModelInfo(
             id: "llama-3.2-1b-instruct-q6-k",
@@ -120,8 +134,18 @@ class ModelListViewModel: ObservableObject {
         // First, register predefined models with SDK if they have download URLs
         await registerPredefinedModels()
 
-        // Start with predefined models
-        var allModels = predefinedModels
+        // Start with predefined models - filter based on iOS version
+        var allModels: [ModelInfo] = []
+        
+        // Add Foundation Model only if iOS 26+ is available
+        if #available(iOS 26.0, *) {
+            allModels = predefinedModels
+            print("iOS 26+ detected - Foundation Models available")
+        } else {
+            // Filter out Foundation Models for older iOS versions
+            allModels = predefinedModels.filter { $0.preferredFramework != .foundationModels }
+            print("iOS < 18 - Foundation Models not available")
+        }
 
         do {
             // Add any existing SDK models
@@ -141,10 +165,43 @@ class ModelListViewModel: ObservableObject {
         availableModels = allModels
         currentModel = nil
         isLoading = false
+        
+        print("Available models count: \(availableModels.count)")
+        for model in availableModels {
+            print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
+        }
     }
 
     private func registerPredefinedModels() async {
         for model in predefinedModels {
+            // Handle Foundation Models separately (no download URL needed)
+            if model.preferredFramework == .foundationModels {
+                do {
+                    // Check if model is already registered
+                    let existingModels = try await sdk.listAvailableModels()
+                    let alreadyRegistered = existingModels.contains { $0.id == model.id }
+                    
+                    if !alreadyRegistered {
+                        // Register Foundation Model directly with the SDK's registry
+                        print("Registering Foundation Model: \(model.name)")
+                        
+                        // Create a model info with a "built-in" path indicator
+                        var foundationModel = model
+                        foundationModel.localPath = URL(string: "builtin://foundation-models")
+                        
+                        // Register using the SDK's public API
+                        sdk.registerBuiltInModel(foundationModel)
+                        print("Successfully registered Foundation Model: \(model.name)")
+                    } else {
+                        print("Foundation Model already registered")
+                    }
+                } catch {
+                    print("Failed to check Foundation Model: \(error)")
+                }
+                continue
+            }
+            
+            // For models that need downloading
             guard let downloadURL = model.downloadURL else { continue }
 
             do {
