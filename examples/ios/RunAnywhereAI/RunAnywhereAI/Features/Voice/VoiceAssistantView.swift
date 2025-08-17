@@ -149,7 +149,11 @@ struct VoiceAssistantView: View {
                 // Mic button - tap to start/stop
                 Button(action: {
                     Task {
-                        if viewModel.isListening {
+                        // If in any active state, stop the conversation
+                        if viewModel.sessionState == .listening ||
+                           viewModel.sessionState == .speaking ||
+                           viewModel.sessionState == .processing ||
+                           viewModel.sessionState == .connecting {
                             await viewModel.stopConversation()
                         } else {
                             await viewModel.startConversation()
@@ -170,13 +174,14 @@ struct VoiceAssistantView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(1.5)
                         } else {
-                            Image(systemName: viewModel.isListening ? "mic.fill" : "mic")
+                            Image(systemName: viewModel.sessionState == .speaking ? "stop.fill" :
+                                            (viewModel.isListening ? "mic.fill" : "mic"))
                                 .font(.system(size: 35))
                                 .foregroundColor(.white)
                         }
                     }
                 }
-                .disabled(viewModel.isProcessing && !viewModel.isListening)
+                .disabled(false)  // Always enabled so user can stop at any time
                 .scaleEffect(viewModel.isListening ? 1.2 : 1.0)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.isListening)
 

@@ -153,6 +153,14 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     func stopConversation() async {
         logger.info("Stopping conversation...")
         isListening = false
+        isProcessing = false  // Ensure processing state is cleared
+
+        // Interrupt any ongoing response first (including TTS)
+        if sessionState == .speaking || sessionState == .processing {
+            await voiceSession?.interrupt()
+            // Give a small delay for interrupt to complete
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        }
 
         // First stop listening if we're in that state
         if sessionState == .listening {
@@ -166,6 +174,10 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         // Reset UI state
         currentStatus = "Ready to listen"
         sessionState = .disconnected
+
+        // Clear any lingering error messages
+        errorMessage = nil
+
         logger.info("Conversation stopped")
     }
 

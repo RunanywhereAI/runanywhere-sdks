@@ -43,6 +43,7 @@ public class VoiceSessionManager {
     private var streamTask: Task<Void, Never>?
     private var vadDetector: SimpleEnergyVAD?
     private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "VoiceSessionManager")
+    private var ttsService: TextToSpeechService?
 
     // Configuration
     private let config: VoiceSessionConfig
@@ -103,6 +104,10 @@ public class VoiceSessionManager {
 
         updateState(.connecting)
 
+        // Initialize TTS service
+        ttsService = SystemTextToSpeechService()
+        try? await ttsService?.initialize()
+
         // Pre-initialize WhisperKit for faster first transcription
         logger.info("Pre-initializing speech recognition model: \(self.config.recognitionModel)")
         do {
@@ -149,10 +154,14 @@ public class VoiceSessionManager {
 
     /// Disconnect session
     public func disconnect() async {
+        // Stop TTS if playing
+        ttsService?.stop()
+
         streamTask?.cancel()
         stopAudioCapture?()
         vadDetector?.stop()
         vadDetector = nil
+        ttsService = nil
         updateState(.disconnected)
         logger.info("Session disconnected")
     }
@@ -175,6 +184,11 @@ public class VoiceSessionManager {
     /// Interrupt current generation
     public func interrupt() async {
         logger.info("Interrupting current generation")
+
+        // Stop TTS immediately
+        ttsService?.stop()
+
+        // Cancel ongoing stream task
         streamTask?.cancel()
 
         if let audioStream = audioCaptureProvider?() {
