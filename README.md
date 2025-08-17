@@ -33,7 +33,10 @@ The Android SDK is under active development. We're bringing the same powerful on
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/main-screenshot.jpg" alt="RunAnywhere SDK in Action" width="600"/>
+  <img src="docs/screenshots/main-screenshot.jpg" alt="Chat with RunAnywhere" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/chat-interface.png" alt="Chat Analytics" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/quiz-flow.png" alt="Structured Output" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/voice-ai.png" alt="Voice AI" width="200"/>
 </p>
 
 ## 📦 What's Included
