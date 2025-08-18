@@ -67,6 +67,7 @@ public enum VoiceError: LocalizedError {
     case modelNotFound(String)
     case audioFormatNotSupported
     case insufficientAudioData
+    case noVoiceServiceAvailable
 
     public var errorDescription: String? {
         switch self {
@@ -84,6 +85,8 @@ public enum VoiceError: LocalizedError {
             return "Audio format is not supported"
         case .insufficientAudioData:
             return "Insufficient audio data for transcription"
+        case .noVoiceServiceAvailable:
+            return "No voice service available for transcription"
         }
     }
 }

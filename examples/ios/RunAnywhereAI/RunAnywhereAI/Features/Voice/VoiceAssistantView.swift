@@ -4,6 +4,7 @@ import AVFoundation
 
 struct VoiceAssistantView: View {
     @StateObject private var viewModel = VoiceAssistantViewModel()
+    @State private var showTranscriptionView = false
 
     var body: some View {
         VStack(spacing: 20) {
@@ -141,6 +142,33 @@ struct VoiceAssistantView: View {
                 .frame(maxHeight: 200)
             }
             .padding(.horizontal)
+
+            // Mode Switch Button
+            Button(action: {
+                showTranscriptionView = true
+            }) {
+                HStack {
+                    Image(systemName: "text.quote")
+                        .font(.system(size: 16))
+                    Text("Transcription Only Mode")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.blue, Color.purple]),
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
+            }
+            .sheet(isPresented: $showTranscriptionView) {
+                TranscriptionView()
+            }
 
             Spacer()
 
