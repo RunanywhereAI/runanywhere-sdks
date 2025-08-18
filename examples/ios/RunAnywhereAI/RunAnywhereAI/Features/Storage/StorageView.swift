@@ -12,6 +12,82 @@ struct StorageView: View {
     @StateObject private var viewModel = StorageViewModel()
 
     var body: some View {
+        #if os(macOS)
+        // macOS: Custom layout without List
+        ScrollView {
+            VStack(alignment: .leading, spacing: 30) {
+                Text("Storage Management")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 10)
+                
+                // Storage Overview Card
+                VStack(alignment: .leading, spacing: 20) {
+                    HStack {
+                        Text("Storage Overview")
+                            .font(.headline)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            Task {
+                                await viewModel.refreshData()
+                            }
+                        }) {
+                            Label("Refresh", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    
+                    VStack(spacing: 0) {
+                        storageOverviewContent
+                    }
+                    .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(10)
+                }
+                
+                // Downloaded Models Card
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Downloaded Models")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(spacing: 0) {
+                        storedModelsContent
+                    }
+                    .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(10)
+                }
+                
+                // Storage Management Card
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Storage Management")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+                    
+                    VStack(spacing: 0) {
+                        cacheManagementContent
+                    }
+                    .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(10)
+                }
+                
+                Spacer(minLength: 30)
+            }
+            .padding(30)
+            .frame(maxWidth: 1000, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.windowBackgroundColor))
+        .task {
+            await viewModel.loadData()
+        }
+        #else
+        // iOS: Keep NavigationView
         NavigationView {
             List {
                 storageOverviewSection
@@ -20,7 +96,6 @@ struct StorageView: View {
             }
             .navigationTitle("Storage")
             .toolbar {
-                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Refresh") {
                         Task {
@@ -28,22 +103,52 @@ struct StorageView: View {
                         }
                     }
                 }
-                #else
-                ToolbarItem(placement: .primaryAction) {
-                    Button("Refresh") {
-                        Task {
-                            await viewModel.refreshData()
-                        }
-                    }
-                }
-                #endif
             }
             .task {
                 await viewModel.loadData()
             }
         }
+        #endif
     }
 
+    #if os(macOS)
+    private var storageOverviewContent: some View {
+        VStack(alignment: .leading, spacing: 16) {
+                // Total storage usage
+                HStack {
+                    Label("Total Usage", systemImage: "externaldrive")
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: viewModel.totalStorageSize, countStyle: .file))
+                        .foregroundColor(.secondary)
+                }
+
+                // Available space
+                HStack {
+                    Label("Available Space", systemImage: "externaldrive.badge.plus")
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: viewModel.availableSpace, countStyle: .file))
+                        .foregroundColor(.green)
+                }
+
+                // Models storage
+                HStack {
+                    Label("Models Storage", systemImage: "cpu")
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: viewModel.modelStorageSize, countStyle: .file))
+                        .foregroundColor(.blue)
+                }
+
+                // Models count
+                HStack {
+                    Label("Downloaded Models", systemImage: "number")
+                    Spacer()
+                    Text("\(viewModel.storedModels.count)")
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    #endif
+    
     private var storageOverviewSection: some View {
         Section("Storage Overview") {
             VStack(alignment: .leading, spacing: 12) {
@@ -83,6 +188,38 @@ struct StorageView: View {
         }
     }
 
+    #if os(macOS)
+    private var storedModelsContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if viewModel.storedModels.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 12) {
+                        Image(systemName: "cube")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary.opacity(0.5))
+                        Text("No models downloaded yet")
+                            .foregroundColor(.secondary)
+                            .font(.callout)
+                    }
+                    .padding(.vertical, 30)
+                    Spacer()
+                }
+            } else {
+                ForEach(viewModel.storedModels, id: \.id) { model in
+                    StoredModelRow(model: model) {
+                        await viewModel.deleteModel(model.id)
+                    }
+                    if model.id != viewModel.storedModels.last?.id {
+                        Divider()
+                            .padding(.vertical, 4)
+                    }
+                }
+            }
+        }
+    }
+    #endif
+    
     private var storedModelsSection: some View {
         Section("Downloaded Models") {
             if viewModel.storedModels.isEmpty {
@@ -99,6 +236,62 @@ struct StorageView: View {
         }
     }
 
+    #if os(macOS)
+    private var cacheManagementContent: some View {
+        VStack(spacing: 16) {
+            Button(action: {
+                Task {
+                    await viewModel.clearCache()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                    Text("Clear Cache")
+                    Spacer()
+                    Text("Free up space by clearing cached data")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .background(Color.red.opacity(0.1))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+            )
+
+            Button(action: {
+                Task {
+                    await viewModel.cleanTempFiles()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "trash")
+                        .foregroundColor(.orange)
+                    Text("Clean Temporary Files")
+                    Spacer()
+                    Text("Remove temporary files and logs")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
+    #endif
+    
     private var cacheManagementSection: some View {
         Section("Storage Management") {
             Button(action: {

@@ -53,6 +53,12 @@ struct RunAnywhereAIApp: App {
             }
             #endif
         }
+        #if os(macOS)
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified)
+        .defaultSize(width: 1200, height: 800)
+        .windowResizability(.contentSize)
+        #endif
     }
 
     private func initializeSDK() async {

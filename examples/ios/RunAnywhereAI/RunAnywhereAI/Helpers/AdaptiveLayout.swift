@@ -80,9 +80,15 @@ struct AdaptiveButtonStyle: ButtonStyle {
     
     func makeBody(configuration: Configuration) -> some View {
         #if os(macOS)
-        configuration.label
-            .buttonStyle(isPrimary ? .borderedProminent : .bordered)
-            .controlSize(.regular)
+        if isPrimary {
+            configuration.label
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+        } else {
+            configuration.label
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+        }
         #else
         configuration.label
             .padding(.horizontal, isPrimary ? 16 : 12)

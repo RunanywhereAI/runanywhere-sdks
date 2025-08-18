@@ -42,17 +42,47 @@ struct ChatInterfaceView: View {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatInterfaceView")
 
     var body: some View {
+        Group {
+            #if os(macOS)
+            // macOS: No NavigationView to avoid sidebar
+            VStack(spacing: 0) {
+                // Add a custom toolbar for macOS
+                HStack {
+                    Button(action: { showingConversationList = true }) {
+                        Label("Conversations", systemImage: "list.bullet")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Spacer()
+                    
+                    Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    toolbarButtons
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(NSColor.windowBackgroundColor))
+                
+                Divider()
+                
+                chatMessagesView
+                inputArea
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.windowBackgroundColor))
+        #else
+        // iOS: Keep NavigationView
         NavigationView {
             VStack(spacing: 0) {
                 chatMessagesView
                 inputArea
             }
             .navigationTitle(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
-                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { showingConversationList = true }) {
                         Image(systemName: "list.bullet")
@@ -62,45 +92,36 @@ struct ChatInterfaceView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     toolbarButtons
                 }
-                #else
-                ToolbarItem(placement: .navigation) {
-                    Button(action: { showingConversationList = true }) {
-                        Image(systemName: "list.bullet")
-                    }
-                }
-
-                ToolbarItem(placement: .primaryAction) {
-                    toolbarButtons
-                }
-                #endif
             }
-            .sheet(isPresented: $showingConversationList) {
-                ConversationListView()
+        }
+        #endif
+        }
+        .sheet(isPresented: $showingConversationList) {
+            ConversationListView()
+        }
+        .sheet(isPresented: $showingModelSelection) {
+            ModelSelectionSheet { model in
+                await handleModelSelected(model)
             }
-            .sheet(isPresented: $showingModelSelection) {
-                ModelSelectionSheet { model in
-                    await handleModelSelected(model)
-                }
+        }
+        .sheet(isPresented: $showingChatDetails) {
+            ChatDetailsView(
+                messages: viewModel.messages,
+                conversation: viewModel.currentConversation
+            )
+        }
+        .onAppear {
+            setupInitialState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
+            Task {
+                await viewModel.checkModelStatus()
             }
-            .sheet(isPresented: $showingChatDetails) {
-                ChatDetailsView(
-                    messages: viewModel.messages,
-                    conversation: viewModel.currentConversation
-                )
-            }
-            .onAppear {
-                setupInitialState()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
-                Task {
-                    await viewModel.checkModelStatus()
-                }
-            }
-            .alert("Debug Info", isPresented: $showDebugAlert) {
-                Button("OK") { }
-            } message: {
-                Text(debugMessage)
-            }
+        }
+        .alert("Debug Info", isPresented: $showDebugAlert) {
+            Button("OK") { }
+        } message: {
+            Text(debugMessage)
         }
     }
 
@@ -293,24 +314,33 @@ struct ChatInterfaceView: View {
                     .foregroundColor(viewModel.messages.isEmpty ? .gray : .blue)
             }
             .disabled(viewModel.messages.isEmpty)
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
 
             Button(action: { showingModelSelection = true }) {
                 HStack(spacing: 4) {
                     Image(systemName: "cube")
                     if viewModel.isModelLoaded {
-                        Text("Switch")
+                        Text("Switch Model")
                             .font(.caption)
                     } else {
-                        Text("Select")
+                        Text("Select Model")
                             .font(.caption)
                     }
                 }
             }
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
 
             Button(action: { viewModel.clearChat() }) {
                 Image(systemName: "trash")
             }
             .disabled(viewModel.messages.isEmpty)
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
         }
     }
 

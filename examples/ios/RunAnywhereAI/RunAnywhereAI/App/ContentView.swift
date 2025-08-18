@@ -13,19 +13,29 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             ChatInterfaceView()
-            .tabItem {
-                Label("Chat", systemImage: "message")
-            }
-            .tag(0)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Chat", systemImage: "message")
+                }
+                .tag(0)
 
             StorageView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Storage", systemImage: "externaldrive")
                 }
                 .tag(1)
 
-            NavigationView {
+            Group {
+                #if os(macOS)
                 SimplifiedSettingsView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #else
+                NavigationView {
+                    SimplifiedSettingsView()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                #endif
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
@@ -33,17 +43,23 @@ struct ContentView: View {
             .tag(2)
 
             QuizView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Quiz", systemImage: "questionmark.circle")
                 }
                 .tag(3)
 
             VoiceAssistantView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Voice", systemImage: "mic")
                 }
                 .tag(4)
         }
+        #if os(macOS)
+        .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity,
+               minHeight: 600, idealHeight: 800, maxHeight: .infinity)
+        #endif
     }
 }
 

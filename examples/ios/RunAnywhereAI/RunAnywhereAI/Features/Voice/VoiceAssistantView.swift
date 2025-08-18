@@ -234,6 +234,12 @@ struct VoiceAssistantView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
+        .background(Color(NSColor.windowBackgroundColor))
+        #else
+        .background(Color(.systemBackground))
+        #endif
         .onAppear {
             Task {
                 await viewModel.initialize()
