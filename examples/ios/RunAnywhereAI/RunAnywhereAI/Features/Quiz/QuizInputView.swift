@@ -77,11 +77,23 @@ struct QuizInputView: View {
                             .frame(minHeight: 200)
                             .scrollContentBackground(.hidden)
                             .padding(8)
-                            .background(Color(.systemGray6))
+                            #if os(iOS)
+                            #if os(iOS)
+                .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
+                            #else
+                            .background(Color(NSColor.controlBackgroundColor))
+                            #endif
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
+                                    #if os(iOS)
                                     .stroke(Color(.systemGray4), lineWidth: 1)
+                                    #else
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                                    #endif
                             )
                     }
 
@@ -109,7 +121,11 @@ struct QuizInputView: View {
                     }
                 }
                 .padding()
+                #if os(iOS)
                 .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
                 .cornerRadius(12)
                 .padding(.horizontal)
 
@@ -148,7 +164,11 @@ struct QuizInputView: View {
                     }
                 }
                 .padding()
+                #if os(iOS)
                 .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
                 .cornerRadius(12)
                 .padding(.horizontal)
 

@@ -20,6 +20,7 @@ struct StorageView: View {
             }
             .navigationTitle("Storage")
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Refresh") {
                         Task {
@@ -27,6 +28,15 @@ struct StorageView: View {
                         }
                     }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh") {
+                        Task {
+                            await viewModel.refreshData()
+                        }
+                    }
+                }
+                #endif
             }
             .task {
                 await viewModel.loadData()

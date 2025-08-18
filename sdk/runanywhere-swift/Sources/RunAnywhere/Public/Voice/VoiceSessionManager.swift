@@ -104,9 +104,11 @@ public class VoiceSessionManager {
 
         updateState(.connecting)
 
-        // Initialize TTS service
-        ttsService = SystemTextToSpeechService()
-        try? await ttsService?.initialize()
+        // Initialize TTS service with proper priority
+        await Task(priority: .userInitiated) {
+            ttsService = SystemTextToSpeechService()
+            try? await ttsService?.initialize()
+        }.value
 
         // Pre-initialize WhisperKit for faster first transcription
         logger.info("Pre-initializing speech recognition model: \(self.config.recognitionModel)")
@@ -131,14 +133,16 @@ public class VoiceSessionManager {
 
         // Initialize Simple Energy VAD if enabled
         if config.enableVAD {
-            vadDetector = SimpleEnergyVAD(
-                sampleRate: 16000,
-                frameLength: 0.1,
-                energyThreshold: 0.01  // Lowered from 0.025 for better sensitivity
-            )
-            setupVADCallbacks()
-            vadDetector?.start()
-            logger.info("Simple Energy VAD initialized with threshold: 0.01")
+            await Task(priority: .userInitiated) {
+                vadDetector = SimpleEnergyVAD(
+                    sampleRate: 16000,
+                    frameLength: 0.1,
+                    energyThreshold: 0.01  // Lowered from 0.025 for better sensitivity
+                )
+                setupVADCallbacks()
+                vadDetector?.start()
+                logger.info("Simple Energy VAD initialized with threshold: 0.01")
+            }.value
         }
 
         // Get audio stream
@@ -155,13 +159,19 @@ public class VoiceSessionManager {
     /// Disconnect session
     public func disconnect() async {
         // Stop TTS if playing
-        ttsService?.stop()
+        await Task(priority: .userInitiated) {
+            ttsService?.stop()
+        }.value
 
         streamTask?.cancel()
         stopAudioCapture?()
-        vadDetector?.stop()
-        vadDetector = nil
-        ttsService = nil
+        // Stop and clear all resources with proper priority
+        await Task(priority: .userInitiated) {
+            vadDetector?.stop()
+            vadDetector = nil
+            ttsService = nil
+        }.value
+        
         updateState(.disconnected)
         logger.info("Session disconnected")
     }
@@ -185,8 +195,10 @@ public class VoiceSessionManager {
     public func interrupt() async {
         logger.info("Interrupting current generation")
 
-        // Stop TTS immediately
-        ttsService?.stop()
+        // Stop TTS immediately with proper priority
+        await Task(priority: .userInitiated) {
+            ttsService?.stop()
+        }.value
 
         // Cancel ongoing stream task
         streamTask?.cancel()
@@ -206,14 +218,14 @@ public class VoiceSessionManager {
             case .started:
                 self.logger.info("🎤 Speech started")
                 self.updateState(.listening)
-                Task {
+                Task(priority: .userInitiated) {
                     await self.audioBufferActor.clear() // Clear buffer for new speech
                 }
 
             case .ended:
                 self.logger.info("🔇 Speech ended")
                 // Process accumulated speech buffer
-                Task {
+                Task(priority: .userInitiated) {
                     let isEmpty = await self.audioBufferActor.isEmpty()
                     if !isEmpty {
                         await self.processSpeechBuffer()
@@ -232,7 +244,7 @@ public class VoiceSessionManager {
     }
 
     private func startProcessingPipeline(audioStream: AsyncStream<VoiceAudioChunk>) async {
-        streamTask = Task { [weak self] in
+        streamTask = Task(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
             self.logger.info("Starting audio processing pipeline")

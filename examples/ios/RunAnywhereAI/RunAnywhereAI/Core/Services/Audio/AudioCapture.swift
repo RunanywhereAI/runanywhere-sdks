@@ -136,20 +136,27 @@ public class AudioCapture: NSObject {
     }
 
     public static func requestMicrophonePermission() async -> Bool {
+        #if os(iOS) || os(tvOS) || os(watchOS)
         await withCheckedContinuation { continuation in
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
                 continuation.resume(returning: granted)
             }
         }
+        #else
+        // On macOS, microphone permission is handled differently
+        return true // macOS will prompt when actually using the microphone
+        #endif
     }
 
     // MARK: - Audio Engine Methods
 
     private func startAudioEngine() throws {
+        #if os(iOS) || os(tvOS) || os(watchOS)
         // Configure audio session for both recording and playback
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
         try audioSession.setActive(true)
+        #endif
 
         // Create and configure audio engine
         audioEngine = AVAudioEngine()
@@ -217,11 +224,13 @@ public class AudioCapture: NSObject {
         audioEngine?.stop()
         audioEngine = nil
 
+        #if os(iOS) || os(tvOS) || os(watchOS)
         do {
             try AVAudioSession.sharedInstance().setActive(false)
         } catch {
             logger.error("Failed to deactivate audio session: \(error)")
         }
+        #endif
     }
 
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {

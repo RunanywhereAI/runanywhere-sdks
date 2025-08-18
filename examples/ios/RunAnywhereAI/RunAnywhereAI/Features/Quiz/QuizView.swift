@@ -42,9 +42,17 @@ struct QuizView: View {
                 }
             }
             .navigationTitle("Quiz Generator")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+                ToolbarItem(placement: {
+                    #if os(iOS)
+                    return .navigationBarTrailing
+                    #else
+                    return .primaryAction
+                    #endif
+                }()) {
                     Button(action: { showingModelSelection = true }) {
                         HStack(spacing: 4) {
                             Image(systemName: "cube")

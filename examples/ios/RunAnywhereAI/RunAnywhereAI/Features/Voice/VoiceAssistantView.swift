@@ -119,7 +119,11 @@ struct VoiceAssistantView: View {
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
+                    #if os(iOS)
                     .background(Color(.secondarySystemBackground))
+                    #else
+                    .background(Color(NSColor.controlBackgroundColor))
+                    #endif
                     .cornerRadius(10)
                     .frame(minHeight: 80)
             }

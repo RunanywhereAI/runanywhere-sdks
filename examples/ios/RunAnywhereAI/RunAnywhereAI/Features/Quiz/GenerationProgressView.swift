@@ -49,7 +49,11 @@ struct GenerationProgressView: View {
                         .id("bottom")
                         .blur(radius: 8) // Blur the JSON content
                 }
+                #if os(iOS)
                 .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
                 .cornerRadius(12)
                 .frame(maxHeight: 300)
                 .onChange(of: generationText) { _ in
@@ -64,7 +68,11 @@ struct GenerationProgressView: View {
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .padding()
+                        #if os(iOS)
                         .background(Color(.systemBackground).opacity(0.9))
+                        #else
+                        .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
+                        #endif
                         .cornerRadius(8)
                 )
             }
@@ -79,7 +87,11 @@ struct GenerationProgressView: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 20)
+                #if os(iOS)
                 .fill(Color(.systemBackground))
+                #else
+                .fill(Color(NSColor.windowBackgroundColor))
+                #endif
                 .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         )
         .padding()

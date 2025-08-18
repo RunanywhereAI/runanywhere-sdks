@@ -25,69 +25,10 @@ struct AddModelFromURLView: View {
     let onModelAdded: (ModelInfo) -> Void
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section("Model Information") {
-                    TextField("Model Name", text: $modelName)
-                        .textFieldStyle(.roundedBorder)
-
-                    TextField("Download URL", text: $modelURL)
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(.URL)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                }
-
-                Section("Framework") {
-                    Picker("Target Framework", selection: $selectedFramework) {
-                        ForEach(availableFrameworks, id: \.self) { framework in
-                            Text(framework.displayName).tag(framework)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-
-                Section("Thinking Support") {
-                    Toggle("Model Supports Thinking", isOn: $supportsThinking)
-
-                    if supportsThinking {
-                        Toggle("Use Custom Tags", isOn: $useCustomThinkingTags)
-
-                        if useCustomThinkingTags {
-                            TextField("Opening Tag", text: $thinkingOpenTag)
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                                .autocorrectionDisabled()
-
-                            TextField("Closing Tag", text: $thinkingCloseTag)
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                                .autocorrectionDisabled()
-                        } else {
-                            HStack {
-                                Text("Default tags:")
-                                Text("<thinking>...</thinking>")
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-
-                Section("Advanced (Optional)") {
-                    TextField("Estimated Size (bytes)", text: $estimatedSize)
-                        .textFieldStyle(.roundedBorder)
-                        .keyboardType(.numberPad)
-                }
-
-                if let error = errorMessage {
-                    Section {
-                        Text(error)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                    }
-                }
-
+                formContent
+                
                 Section {
                     Button("Add Model") {
                         Task {
@@ -95,27 +36,124 @@ struct AddModelFromURLView: View {
                         }
                     }
                     .disabled(modelName.isEmpty || modelURL.isEmpty || isAdding)
+                    #if os(macOS)
+                    .buttonStyle(.borderedProminent)
+                    #endif
 
                     if isAdding {
                         HStack {
                             ProgressView()
+                                #if os(macOS)
+                                .controlSize(.small)
+                                #endif
                             Text("Adding model...")
+                                .foregroundColor(.secondary)
                         }
                     }
                 }
             }
+            #if os(macOS)
+            .formStyle(.grouped)
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
+            #endif
             .navigationTitle("Add Model from URL")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
                     }
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .keyboardShortcut(.escape)
+                }
+                #endif
             }
         }
+        #if os(macOS)
+        .padding()
+        #endif
         .task {
             await loadAvailableFrameworks()
+        }
+    }
+    
+    @ViewBuilder
+    private var formContent: some View {
+        Section("Model Information") {
+            TextField("Model Name", text: $modelName)
+                .textFieldStyle(.roundedBorder)
+
+            TextField("Download URL", text: $modelURL)
+                .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .keyboardType(.URL)
+                .autocapitalization(.none)
+                #endif
+                .autocorrectionDisabled()
+        }
+
+        Section("Framework") {
+            Picker("Target Framework", selection: $selectedFramework) {
+                ForEach(availableFrameworks, id: \.self) { framework in
+                    Text(framework.displayName).tag(framework)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+
+        Section("Thinking Support") {
+            Toggle("Model Supports Thinking", isOn: $supportsThinking)
+
+            if supportsThinking {
+                Toggle("Use Custom Tags", isOn: $useCustomThinkingTags)
+
+                if useCustomThinkingTags {
+                    TextField("Opening Tag", text: $thinkingOpenTag)
+                        .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        #endif
+                        .autocorrectionDisabled()
+
+                    TextField("Closing Tag", text: $thinkingCloseTag)
+                        .textFieldStyle(.roundedBorder)
+                        #if os(iOS)
+                        .autocapitalization(.none)
+                        #endif
+                        .autocorrectionDisabled()
+                } else {
+                    HStack {
+                        Text("Default tags:")
+                        Text("<thinking>...</thinking>")
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+
+        Section("Advanced (Optional)") {
+            TextField("Estimated Size (bytes)", text: $estimatedSize)
+                .textFieldStyle(.roundedBorder)
+                #if os(iOS)
+                .keyboardType(.numberPad)
+                #endif
+        }
+
+        if let error = errorMessage {
+            Section {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
         }
     }
 

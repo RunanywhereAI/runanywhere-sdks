@@ -66,12 +66,14 @@ struct SimplifiedSettingsView: View {
                     }
                 }
                 .sheet(isPresented: $showApiKeyEntry) {
-                    NavigationView {
+                    NavigationStack {
                         Form {
                             Section {
                                 SecureField("Enter API Key", text: $apiKey)
                                     .textContentType(.password)
+                                    #if os(iOS)
                                     .autocapitalization(.none)
+                                    #endif
                             } header: {
                                 Text("RunAnywhere API Key")
                             } footer: {
@@ -79,9 +81,16 @@ struct SimplifiedSettingsView: View {
                                     .font(.caption)
                             }
                         }
+                        #if os(macOS)
+                        .formStyle(.grouped)
+                        .frame(minWidth: 400, idealWidth: 450, minHeight: 200, idealHeight: 250)
+                        #endif
                         .navigationTitle("API Key")
+                        #if os(iOS)
                         .navigationBarTitleDisplayMode(.inline)
+                        #endif
                         .toolbar {
+                            #if os(iOS)
                             ToolbarItem(placement: .navigationBarLeading) {
                                 Button("Cancel") {
                                     showApiKeyEntry = false
@@ -94,8 +103,27 @@ struct SimplifiedSettingsView: View {
                                 }
                                 .disabled(apiKey.isEmpty)
                             }
+                            #else
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Cancel") {
+                                    showApiKeyEntry = false
+                                }
+                                .keyboardShortcut(.escape)
+                            }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Save") {
+                                    saveApiKey()
+                                    showApiKeyEntry = false
+                                }
+                                .disabled(apiKey.isEmpty)
+                                .keyboardShortcut(.return)
+                            }
+                            #endif
                         }
                     }
+                    #if os(macOS)
+                    .padding()
+                    #endif
                 }
             }
 

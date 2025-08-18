@@ -50,9 +50,17 @@ struct QuizCardView: View {
             }
             .font(.subheadline)
             .padding()
+            #if os(iOS)
             .background(Color(.systemGray6))
+            #else
+            .background(Color(NSColor.controlBackgroundColor))
+            #endif
         }
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         .cornerRadius(20)
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
         .offset(offset)

@@ -27,7 +27,7 @@ struct ModelSelectionSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 mainContentView
 
@@ -36,8 +36,11 @@ struct ModelSelectionSheet: View {
                 }
             }
             .navigationTitle("Select Model")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
                         dismiss()
@@ -51,14 +54,36 @@ struct ModelSelectionSheet: View {
                     }
                     .disabled(isLoadingModel)
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isLoadingModel)
+                    .keyboardShortcut(.escape)
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Add Model") {
+                        showingAddModelSheet = true
+                    }
+                    .disabled(isLoadingModel)
+                }
+                #endif
             }
         }
+        #if os(macOS)
+        .frame(minWidth: 600, idealWidth: 700, minHeight: 500, idealHeight: 600)
+        #endif
         .sheet(isPresented: $showingAddModelSheet) {
             AddModelFromURLView(onModelAdded: { modelInfo in
                 Task {
                     await viewModel.addImportedModel(modelInfo)
                 }
             })
+            #if os(macOS)
+            .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
+            #endif
         }
         .task {
             await loadInitialData()
@@ -90,7 +115,11 @@ struct ModelSelectionSheet: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(30)
+                #if os(iOS)
                 .background(Color(.systemBackground))
+                #else
+                .background(Color(NSColor.windowBackgroundColor))
+                #endif
                 .cornerRadius(12)
                 .shadow(radius: 10)
             }

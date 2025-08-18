@@ -285,8 +285,11 @@ struct ConversationListView: View {
             }
             .searchable(text: $searchQuery, prompt: "Search conversations")
             .navigationTitle("Conversations")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.large)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Done") {
                         dismiss()
@@ -303,6 +306,24 @@ struct ConversationListView: View {
                         Image(systemName: "plus")
                     }
                 }
+                #else
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .primaryAction) {
+                    Button(action: {
+                        let newConversation = store.createConversation()
+                        // Notify ChatViewModel about the new conversation
+                        NotificationCenter.default.post(name: Notification.Name("ConversationSelected"), object: newConversation)
+                        dismiss()
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                }
+                #endif
             }
             .alert("Delete Conversation?", isPresented: $showingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
