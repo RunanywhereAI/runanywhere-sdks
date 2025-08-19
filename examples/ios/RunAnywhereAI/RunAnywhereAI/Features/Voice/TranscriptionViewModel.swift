@@ -101,6 +101,32 @@ class TranscriptionViewModel: ObservableObject {
         voicePipeline = sdk.createVoicePipeline(config: config)
         voicePipeline?.delegate = self
 
+        // Initialize components first (VAD and STT only for transcription)
+        guard let pipeline = voicePipeline else {
+            errorMessage = "Failed to create pipeline"
+            currentStatus = "Error"
+            logger.error("Failed to create transcription pipeline")
+            return
+        }
+
+        // Initialize all components
+        currentStatus = "Initializing components..."
+        do {
+            for try await event in pipeline.initializeComponents() {
+                if case .componentInitialized(let name) = event {
+                    logger.info("Initialized: \(name)")
+                } else if case .componentInitializationFailed(let name, let error) = event {
+                    logger.error("Failed to initialize \(name): \(error)")
+                    throw error
+                }
+            }
+        } catch {
+            errorMessage = "Component initialization failed: \(error.localizedDescription)"
+            currentStatus = "Error"
+            logger.error("Component initialization failed: \(error)")
+            return
+        }
+
         // Start audio capture and process through pipeline
         let audioStream = audioCapture.startContinuousCapture()
 
@@ -112,7 +138,7 @@ class TranscriptionViewModel: ObservableObject {
         // Process audio through pipeline
         pipelineTask = Task {
             do {
-                for try await event in voicePipeline!.process(audioStream: audioStream) {
+                for try await event in pipeline.process(audioStream: audioStream) {
                     await handlePipelineEvent(event)
                 }
             } catch {
