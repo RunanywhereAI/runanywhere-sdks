@@ -3,8 +3,10 @@ import RunAnywhereSDK
 import AVFoundation
 import Combine
 import os
-#if os(iOS)
+#if os(iOS) || targetEnvironment(macCatalyst)
 import UIKit
+#elseif os(macOS)
+import AppKit
 #endif
 
 @MainActor
@@ -224,11 +226,12 @@ class TranscriptionViewModel: ObservableObject {
         let fullText = finalTranscripts.map { $0.text }.joined(separator: " ")
         let textToCopy = fullText.isEmpty ? partialTranscript : fullText
 
-        #if os(iOS)
+        #if os(iOS) || targetEnvironment(macCatalyst)
         UIPasteboard.general.string = textToCopy
         #elseif os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(textToCopy, forType: .string)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(textToCopy, forType: .string)
         #endif
 
         logger.info("Copied \(textToCopy.count) characters to clipboard")

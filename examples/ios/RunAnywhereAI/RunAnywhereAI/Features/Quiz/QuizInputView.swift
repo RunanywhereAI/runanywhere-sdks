@@ -177,7 +177,11 @@ struct QuizInputView: View {
                         }
                     }
                     .padding(12)
+                    #if os(iOS)
                     .background(Color(.systemGray6))
+                    #else
+                    .background(Color(NSColor.controlBackgroundColor))
+                    #endif
                     .cornerRadius(10)
                 }
                 .padding()
