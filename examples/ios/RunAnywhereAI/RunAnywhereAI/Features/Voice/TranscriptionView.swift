@@ -8,54 +8,90 @@ struct TranscriptionView: View {
     @State private var copiedToClipboard = false
 
     var body: some View {
+        #if os(macOS)
+        content
+            .frame(minWidth: 600, minHeight: 400)
+        #else
         NavigationView {
-            VStack(spacing: 0) {
-                // Header
-                headerView
+            content
+        }
+        #if !os(macOS)
+        .navigationViewStyle(StackNavigationViewStyle())
+        #endif
+        #endif
+    }
+    
+    private var content: some View {
+        VStack(spacing: 0) {
+            // Close button bar for macOS (or both platforms)
+            #if os(macOS)
+            HStack {
+                Spacer()
+                Button(action: { dismiss() }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding()
+            }
+            .background(Color(NSColor.windowBackgroundColor))
+            #endif
+            
+            // Header
+            headerView
 
-                // Transcription Display
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            // Final transcripts
-                            ForEach(viewModel.finalTranscripts) { segment in
-                                TranscriptSegmentView(
-                                    text: segment.text,
-                                    timestamp: segment.timestamp,
-                                    isFinal: true
-                                )
-                            }
-
-                            // Partial transcript
-                            if !viewModel.partialTranscript.isEmpty {
-                                TranscriptSegmentView(
-                                    text: viewModel.partialTranscript,
-                                    timestamp: Date(),
-                                    isFinal: false
-                                )
-                                .id("bottom")
-                            }
-
-                            // Empty state
-                            if viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty {
-                                emptyStateView
-                            }
+            // Transcription Display
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Final transcripts
+                        ForEach(viewModel.finalTranscripts) { segment in
+                            TranscriptSegmentView(
+                                text: segment.text,
+                                timestamp: segment.timestamp,
+                                isFinal: true
+                            )
                         }
-                        .padding()
+
+                        // Partial transcript
+                        if !viewModel.partialTranscript.isEmpty {
+                            TranscriptSegmentView(
+                                text: viewModel.partialTranscript,
+                                timestamp: Date(),
+                                isFinal: false
+                            )
+                            .id("bottom")
+                        }
+
+                        // Empty state
+                        if viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty {
+                            emptyStateView
+                        }
                     }
-                    .onChange(of: viewModel.partialTranscript) { _ in
-                        withAnimation {
-                            proxy.scrollTo("bottom", anchor: .bottom)
-                        }
+                    .padding()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .onChange(of: viewModel.partialTranscript) { _ in
+                    withAnimation {
+                        proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
-                .background(Color(.systemGray6))
-
-                // Control Panel
-                controlPanel
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            #if os(iOS)
+            .background(Color(.systemGray6))
+            #else
+            .background(Color(NSColor.controlBackgroundColor))
+            #endif
+
+            // Control Panel
+            controlPanel
+        }
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
@@ -81,8 +117,34 @@ struct TranscriptionView: View {
                     }
                     .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
                 }
+                #else
+                ToolbarItem(placement: .navigation) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .automatic) {
+                    Menu {
+                        Button(action: { copyToClipboard() }) {
+                            Label("Copy All", systemImage: "doc.on.doc")
+                        }
+
+                        Button(action: { exportTranscription() }) {
+                            Label("Export", systemImage: "square.and.arrow.up")
+                        }
+
+                        Button(action: { viewModel.clearTranscripts() }) {
+                            Label("Clear", systemImage: "trash")
+                        }
+                        .foregroundColor(.red)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
+                }
+                #endif
             }
-        }
         .task {
             await viewModel.initialize()
         }
@@ -104,9 +166,23 @@ struct TranscriptionView: View {
     // MARK: - Header View
 
     private var headerView: some View {
-        VStack(spacing: 8) {
+        let separatorColor = {
+            #if os(iOS)
+            return Color(.separator)
+            #else
+            return Color(NSColor.separatorColor)
+            #endif
+        }()
+        
+        return VStack(spacing: 8) {
+            #if os(macOS)
+            Text("Transcription Mode")
+                .font(.title2)
+                .fontWeight(.semibold)
+            #else
             Text("Transcription Mode")
                 .font(.headline)
+            #endif
 
             HStack {
                 Image(systemName: "mic.fill")
@@ -123,17 +199,25 @@ struct TranscriptionView: View {
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
+                    #if os(iOS)
                     .background(Color(.systemGray5))
+                    #else
+                    .background(Color(NSColor.unemphasizedSelectedContentBackgroundColor))
+                    #endif
                     .cornerRadius(6)
             }
             .padding(.horizontal)
         }
         .padding(.vertical, 12)
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         .overlay(
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(.separator)),
+                .foregroundColor(separatorColor),
             alignment: .bottom
         )
     }
@@ -162,10 +246,18 @@ struct TranscriptionView: View {
     // MARK: - Control Panel
 
     private var controlPanel: some View {
-        VStack(spacing: 0) {
+        let separatorColor = {
+            #if os(iOS)
+            return Color(.separator)
+            #else
+            return Color(NSColor.separatorColor)
+            #endif
+        }()
+        
+        return VStack(spacing: 0) {
             Rectangle()
                 .frame(height: 1)
-                .foregroundColor(Color(.separator))
+                .foregroundColor(separatorColor)
 
             HStack(spacing: 32) {
                 // Clear button
@@ -220,7 +312,11 @@ struct TranscriptionView: View {
             }
             .padding(.vertical, 20)
             .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
+            #if os(iOS)
+        .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         }
     }
 
@@ -296,7 +392,11 @@ struct TranscriptSegmentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 12)
+                #if os(iOS)
                 .fill(Color(.systemBackground))
+                #else
+                .fill(Color(NSColor.windowBackgroundColor))
+                #endif
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)

@@ -120,7 +120,11 @@ struct VoiceAssistantView: View {
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
+                    #if os(iOS)
                     .background(Color(.secondarySystemBackground))
+                    #else
+                    .background(Color(NSColor.controlBackgroundColor))
+                    #endif
                     .cornerRadius(10)
                     .frame(minHeight: 80)
             }
@@ -289,6 +293,12 @@ struct VoiceAssistantView: View {
             .padding(.horizontal)
             .padding(.bottom)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(macOS)
+        .background(Color(NSColor.windowBackgroundColor))
+        #else
+        .background(Color(.systemBackground))
+        #endif
         .onAppear {
             Task {
                 await viewModel.initialize()

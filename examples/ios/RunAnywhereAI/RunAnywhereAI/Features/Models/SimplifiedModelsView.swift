@@ -31,11 +31,19 @@ struct SimplifiedModelsView: View {
         }
         .navigationTitle("Models")
         .toolbar {
+            #if os(iOS)
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button("Add Model") {
                     showingAddModelSheet = true
                 }
             }
+            #else
+            ToolbarItem(placement: .primaryAction) {
+                Button("Add Model") {
+                    showingAddModelSheet = true
+                }
+            }
+            #endif
         }
         .sheet(isPresented: $showingAddModelSheet) {
             AddModelFromURLView(onModelAdded: { modelInfo in

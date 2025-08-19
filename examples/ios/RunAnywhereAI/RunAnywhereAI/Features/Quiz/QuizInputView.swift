@@ -85,11 +85,23 @@ struct QuizInputView: View {
                             .frame(height: geometry.size.height / 3)
                             .scrollContentBackground(.hidden)
                             .padding(8)
-                            .background(Color(.systemGray6))
+                            #if os(iOS)
+                            #if os(iOS)
+                .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
+                            #else
+                            .background(Color(NSColor.controlBackgroundColor))
+                            #endif
                             .cornerRadius(12)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
+                                    #if os(iOS)
                                     .stroke(Color(.systemGray4), lineWidth: 1)
+                                    #else
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 1)
+                                    #endif
                             )
                     }
 
@@ -119,10 +131,13 @@ struct QuizInputView: View {
 
                     Spacer()
                 }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
+                .padding()
+                #if os(iOS)
                 .background(Color(.systemGray6))
-                .cornerRadius(8)
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
+                .cornerRadius(12)
                 .padding(.horizontal)
 
                 // Generate Button
@@ -162,9 +177,20 @@ struct QuizInputView: View {
                         }
                     }
                     .padding(12)
+                    #if os(iOS)
                     .background(Color(.systemGray6))
+                    #else
+                    .background(Color(NSColor.controlBackgroundColor))
+                    #endif
                     .cornerRadius(10)
                 }
+                .padding()
+                #if os(iOS)
+                .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
+                .cornerRadius(12)
                 .padding(.horizontal)
 
                 Spacer(minLength: 16)
