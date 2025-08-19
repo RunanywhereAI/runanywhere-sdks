@@ -21,7 +21,8 @@
 | **Offline** | ✅ Works offline | ❌ Requires internet | ❌ Requires internet |
 | **Data Residency** | On-device | US/EU servers | US servers |
 
-**Real Example**: Processing 1000 customer support chats/day
+**Real Example**: Processing 1000 customer support chats/day.
+Cost Spend on LLM inference:
 - **OpenAI**: ~$450/month
 - **Claude**: ~$380/month  
 - **RunAnywhere**: $0/month (after one-time setup)
