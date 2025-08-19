@@ -18,6 +18,8 @@ public final class SystemTextToSpeechService: NSObject, TextToSpeechService {
     public func initialize() async throws {
         #if os(iOS) || os(tvOS) || os(watchOS)
         // Configure audio session for playback on iOS/tvOS/watchOS
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // Configure audio session for playback on iOS/tvOS/watchOS
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
         try audioSession.setActive(true)

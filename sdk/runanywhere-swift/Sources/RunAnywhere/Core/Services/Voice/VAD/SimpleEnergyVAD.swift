@@ -5,7 +5,7 @@ import os
 
 /// Simple energy-based Voice Activity Detection
 /// Based on WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
-public class SimpleEnergyVAD: NSObject {
+public class SimpleEnergyVAD: NSObject, VADService {
     // MARK: - Properties
 
     private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "SimpleEnergyVAD")
@@ -54,6 +54,31 @@ public class SimpleEnergyVAD: NSObject {
         super.init()
 
         logger.info("SimpleEnergyVAD initialized - sampleRate: \(sampleRate), frameLength: \(self.frameLengthSamples) samples, threshold: \(energyThreshold)")
+    }
+
+    // MARK: - VADService Protocol Implementation
+
+    /// Initialize the VAD service
+    public func initialize() async throws {
+        start()
+    }
+
+    /// Current speech activity state
+    public var isSpeechActive: Bool {
+        return isCurrentlySpeaking
+    }
+
+    /// Frame length in seconds
+    public var frameLength: Float {
+        return Float(frameLengthSamples) / Float(sampleRate)
+    }
+
+    /// Reset the VAD state
+    public func reset() {
+        stop()
+        isCurrentlySpeaking = false
+        consecutiveSilentFrames = 0
+        consecutiveVoiceFrames = 0
     }
 
     // MARK: - Public Methods
@@ -114,9 +139,11 @@ public class SimpleEnergyVAD: NSObject {
 
     /// Process a raw audio array for voice activity detection
     /// - Parameter audioData: Array of Float audio samples
-    public func processAudioData(_ audioData: [Float]) {
-        guard isActive else { return }
-        guard !audioData.isEmpty else { return }
+    /// - Returns: Whether speech is detected in current frame
+    @discardableResult
+    public func processAudioData(_ audioData: [Float]) -> Bool {
+        guard isActive else { return false }
+        guard !audioData.isEmpty else { return false }
 
         // Calculate energy
         let energy = calculateAverageEnergy(of: audioData)
@@ -127,6 +154,8 @@ public class SimpleEnergyVAD: NSObject {
 
         // Update state
         updateVoiceActivityState(hasVoice: hasVoice)
+
+        return hasVoice
     }
 
     // MARK: - Private Methods
@@ -202,11 +231,4 @@ public class SimpleEnergyVAD: NSObject {
             Data(buffer: bufferPointer)
         }
     }
-}
-
-// MARK: - Speech Activity Event
-
-public enum SpeechActivityEvent {
-    case started
-    case ended
 }

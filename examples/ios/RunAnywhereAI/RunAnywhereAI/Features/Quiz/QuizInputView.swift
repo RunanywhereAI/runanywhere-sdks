@@ -5,55 +5,62 @@ struct QuizInputView: View {
     @FocusState private var isTextEditorFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "brain.head.profile")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
+        GeometryReader { geometry in
+            VStack(spacing: 16) {
+                // Header - Compact version
+                VStack(spacing: 6) {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 40))
+                            .foregroundColor(.accentColor)
 
-                    Text("Create a Quiz")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Create a Quiz")
+                                .font(.title2)
+                                .fontWeight(.bold)
 
-                    // Experimental badge
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        Text("EXPERIMENTAL FEATURE")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.orange)
+                            Text("Paste educational content to generate questions")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        // Experimental badge
+                        VStack(spacing: 2) {
+                            HStack(spacing: 2) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.orange)
+                                Text("EXPERIMENTAL")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.orange)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .cornerRadius(8)
+
+                            Text("🚧 In Development")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .italic()
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.15))
-                    .cornerRadius(12)
-
-                    Text("🚧 In Development")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .italic()
-
-                    Text("Paste educational content to generate true/false questions")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 4)
                 }
-                .padding(.top, 40)
+                .padding(.horizontal)
+                .padding(.top, 8)
 
-                // Input Section
-                VStack(alignment: .leading, spacing: 12) {
+                // Input Section with Fixed Height
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Text("Educational Content")
                             .font(.headline)
 
                         Spacer()
 
-                        VStack(alignment: .trailing, spacing: 4) {
+                        VStack(alignment: .trailing, spacing: 2) {
                             Text("\(viewModel.inputCharacterCount) / \(viewModel.maxInputCharacters)")
                                 .font(.caption)
                                 .foregroundColor(viewModel.inputCharacterCount > viewModel.maxInputCharacters ? .red : .secondary)
@@ -64,6 +71,7 @@ struct QuizInputView: View {
                         }
                     }
 
+                    // Fixed height TextEditor - 1/3 of screen height
                     ZStack(alignment: .topLeading) {
                         if viewModel.inputText.isEmpty {
                             Text("Paste your lesson, article, or educational content here...")
@@ -74,7 +82,7 @@ struct QuizInputView: View {
 
                         TextEditor(text: $viewModel.inputText)
                             .focused($isTextEditorFocused)
-                            .frame(minHeight: 200)
+                            .frame(height: geometry.size.height / 3)
                             .scrollContentBackground(.hidden)
                             .padding(8)
                             #if os(iOS)
@@ -105,20 +113,23 @@ struct QuizInputView: View {
                 }
                 .padding(.horizontal)
 
-                // Model Status
+                // Model Status - Compact
                 HStack {
                     Image(systemName: viewModel.isModelLoaded ? "checkmark.circle.fill" : "info.circle.fill")
                         .foregroundColor(viewModel.isModelLoaded ? .green : .orange)
+                        .font(.subheadline)
 
                     if viewModel.isModelLoaded {
-                        Text("Using model: \(viewModel.loadedModelName ?? "Unknown")")
-                            .font(.subheadline)
+                        Text("Using: \(viewModel.loadedModelName ?? "Unknown")")
+                            .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
-                        Text("Please load a model from the Models tab to generate quizzes")
-                            .font(.subheadline)
+                        Text("Please load a model from the Models tab")
+                            .font(.caption)
                             .foregroundColor(.secondary)
                     }
+
+                    Spacer()
                 }
                 .padding()
                 #if os(iOS)
@@ -142,7 +153,7 @@ struct QuizInputView: View {
                             .fontWeight(.semibold)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 14)
                     .background(viewModel.canGenerateQuiz ? Color.accentColor : Color.gray)
                     .foregroundColor(.white)
                     .cornerRadius(12)
@@ -150,18 +161,24 @@ struct QuizInputView: View {
                 .disabled(!viewModel.canGenerateQuiz)
                 .padding(.horizontal)
 
-                // Instructions
-                VStack(alignment: .leading, spacing: 12) {
-                    Label("Tips for better results:", systemImage: "lightbulb.fill")
-                        .font(.headline)
-                        .foregroundColor(.accentColor)
-
+                // Tips - Scrollable if needed
+                ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
-                        BulletPoint(text: "Use educational content like lessons, articles, or study materials")
-                        BulletPoint(text: "Longer content generates more questions (up to 10)")
-                        BulletPoint(text: "Questions will test understanding, not just memorization")
-                        BulletPoint(text: "Each question includes an explanation")
+                        Label("Tips for better results:", systemImage: "lightbulb.fill")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.accentColor)
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            BulletPoint(text: "Use educational content like lessons or articles")
+                            BulletPoint(text: "Longer content generates more questions (up to 10)")
+                            BulletPoint(text: "Questions test understanding, not memorization")
+                            BulletPoint(text: "Each question includes an explanation")
+                        }
                     }
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(10)
                 }
                 .padding()
                 #if os(iOS)
@@ -172,7 +189,7 @@ struct QuizInputView: View {
                 .cornerRadius(12)
                 .padding(.horizontal)
 
-                Spacer(minLength: 50)
+                Spacer(minLength: 16)
             }
         }
         .onTapGesture {

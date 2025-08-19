@@ -5,188 +5,253 @@
 </p>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Android SDK CI](https://github.com/your-org/runanywhere-sdks/actions/workflows/android-sdk.yml/badge.svg)](https://github.com/your-org/runanywhere-sdks/actions/workflows/android-sdk.yml)
-[![iOS SDK CI](https://github.com/your-org/runanywhere-sdks/actions/workflows/ios-sdk.yml/badge.svg)](https://github.com/your-org/runanywhere-sdks/actions/workflows/ios-sdk.yml)
+[![iOS SDK](https://img.shields.io/badge/iOS%20SDK-Available-brightgreen.svg)](sdk/runanywhere-swift/)
+[![Android SDK](https://img.shields.io/badge/Android%20SDK-Coming%20Soon-yellow.svg)](sdk/runanywhere-android/)
 
-Cross-platform SDKs for the RunAnywhere on-device AI platform. RunAnywhere provides intelligent routing between on-device and cloud AI models to optimize for cost, privacy, and performance.
+**Privacy-first, on-device AI SDKs** that bring powerful language models directly to your iOS and Android applications. RunAnywhere enables intelligent AI execution with automatic optimization for performance, privacy, and user experience.
 
-## 🏗️ Repository Components
+## 🚀 Current Status
 
-This repository contains four main components:
+### ✅ iOS SDK - **Available**
+The iOS SDK provides on-device text generation, voice AI capabilities, and structured outputs for privacy-first AI applications. [View iOS SDK →](sdk/runanywhere-swift/)
 
-### 📱 SDKs
-- **[Android SDK](sdk/runanywhere-android/)** - Kotlin-based SDK for Android applications
-- **[iOS SDK](sdk/runanywhere-swift/)** - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
+### 🏗️ Android SDK - **Coming Soon**
+The Android SDK is under active development. We're bringing the same powerful on-device AI capabilities to Android.
 
-### 🚀 Sample Applications
-- **[Android Demo App](examples/android/RunAnywhereAI/)** - Sample Android app demonstrating SDK usage
-- **[iOS Demo App](examples/ios/RunAnywhereAI/)** - Sample iOS app demonstrating SDK usage
+## 🎯 See It In Action
 
-## ✨ Key Features
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
+    <img src="https://img.shields.io/badge/▶️_Watch_Demo-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo" />
+  </a>
+  <a href="https://testflight.apple.com/join/xc4HVVJE">
+    <img src="https://img.shields.io/badge/📱_Try_iOS_App-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Try on TestFlight" />
+  </a>
+  <a href="https://runanywhere.ai">
+    <img src="https://img.shields.io/badge/🌐_Visit_Website-green?style=for-the-badge" alt="Visit Website" />
+  </a>
+</p>
 
-- **🤖 Intelligent Routing**: Automatically decides between on-device and cloud AI models
-- **💰 Cost Optimization**: Real-time cost and savings tracking
-- **🔒 Privacy-First**: Keep sensitive data on-device when possible
-- **🔄 Universal Model Support**: GGUF, ONNX, Core ML, MLX, TensorFlow Lite
-- **⚡ Modern APIs**: Async/await patterns with Kotlin coroutines and Swift concurrency
-- **📊 Performance Metrics**: Detailed execution statistics and model performance data
+<p align="center">
+  <img src="docs/screenshots/main-screenshot.jpg" alt="Chat with RunAnywhere" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/chat-interface.png" alt="Chat Analytics" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/quiz-flow.png" alt="Structured Output" width="200"/>
+  <img src="examples/ios/RunAnywhereAI/docs/screenshots/voice-ai.png" alt="Voice AI" width="200"/>
+</p>
+
+## 📦 What's Included
+
+### iOS Components (Available Now)
+- **[iOS SDK](sdk/runanywhere-swift/)** - Swift Package with comprehensive on-device AI capabilities
+- **[iOS Demo App](examples/ios/RunAnywhereAI/)** - Full-featured sample app showcasing all SDK features
+
+### Android Components (Coming Soon)
+- **[Android SDK](sdk/runanywhere-android/)** - Kotlin-based SDK (in development)
+- **[Android Demo App](examples/android/RunAnywhereAI/)** - Sample app (in development)
+
+## ✨ iOS SDK Features
+
+### Core Capabilities
+- **💬 Text Generation** - High-performance on-device text generation with streaming support
+- **🎙️ Voice AI Workflow** - Real-time voice conversations with transcription and synthesis (Experimental)
+- **📋 Structured Outputs** - Type-safe JSON generation with schema validation (Experimental)
+- **🏗️ Model Management** - Automatic model downloading, caching, and lifecycle management
+- **📊 Performance Analytics** - Real-time metrics for latency, throughput, and resource usage
+
+### Technical Highlights
+- **🔒 Privacy-First Architecture** - All processing happens on-device by default
+- **🚀 Multi-Framework Support** - GGUF models via llama.cpp, Apple Foundation Models (iOS 18+)
+- **⚡ Native Performance** - Optimized for Apple Silicon with Metal acceleration
+- **🧠 Smart Memory Management** - Automatic memory optimization and cleanup
+- **📱 Cross-Platform** - iOS 13.0+, macOS 10.15+, tvOS 13.0+, watchOS 6.0+
+
+## 🗺️ Roadmap
+
+### Next Release
+- [ ] **Android SDK** - Full parity with iOS features
+- [ ] **Hybrid Routing** - Intelligent on-device + cloud execution
+- [ ] **Advanced Analytics** - Usage insights and performance dashboards
+
+### Upcoming Features
+- [ ] **Remote Configuration** - Dynamic model and routing updates
+- [ ] **Enterprise Features** - Team management and usage controls
+- [ ] **Extended Model Support** - ONNX, TensorFlow Lite, Core ML optimizations
+
+### Future Vision
+- [ ] **Multi-Modal Support** - Image and audio understanding
 
 ## 🚀 Quick Start
 
-### Android SDK
-
-```kotlin
-// Initialize the SDK
-val sdk = RunAnywhereSDK.getInstance()
-sdk.initialize(apiKey = "your-api-key")
-
-// Generate text
-val options = GenerationOptions(
-    maxTokens = 100,
-    temperature = 0.7f
-)
-
-val result = sdk.generateText("Hello, world!", options)
-println("Generated: ${result.text}")
-println("Cost: $${result.cost}")
-```
-
-### iOS SDK
+### iOS SDK (Available Now)
 
 ```swift
+import RunAnywhere
+
 // Initialize the SDK
 let sdk = RunAnywhereSDK.shared
-await sdk.initialize(apiKey: "your-api-key")
-
-// Generate text
-let options = GenerationOptions(
-    maxTokens: 100,
-    temperature: 0.7
+try await sdk.initialize(
+    apiKey: "your-api-key",
+    configuration: SDKConfiguration(
+        privacyMode: .strict,  // On-device only
+        debugMode: true
+    )
 )
 
-let result = await sdk.generateText("Hello, world!", options: options)
+// Generate text
+let result = try await sdk.generateText(
+    "Explain quantum computing in simple terms",
+    options: GenerationOptions(
+        maxTokens: 100,
+        temperature: 0.7,
+        stream: true
+    )
+)
+
 print("Generated: \(result.text)")
-print("Cost: $\(result.cost)")
+print("Tokens/sec: \(result.performance.tokensPerSecond)")
 ```
 
-## 📋 Requirements
+[View full iOS documentation →](sdk/runanywhere-swift/)
 
-### Android SDK
+### Android SDK (Coming Soon)
+
+```kotlin
+// Android SDK is under active development
+// Check back soon for updates
+```
+
+## 📋 System Requirements
+
+### iOS SDK
+- **Platforms**: iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
+- **Development**: Xcode 15.0+, Swift 5.9+
+- **Recommended**: iOS 17.0+ for full feature support
+- **Foundation Models**: iOS 26.0+ with Apple Intelligence
+
+### Android SDK (Coming Soon)
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 36
 - **Kotlin**: 2.0.21+
 - **Gradle**: 8.11.1+
 
+## 🛠️ Installation
+
 ### iOS SDK
-- **iOS**: 13.0+ / **macOS**: 10.15+ / **tvOS**: 13.0+ / **watchOS**: 6.0+
-- **Swift**: 5.9+
-- **Xcode**: 15.0+
 
-## 🛠️ Development
+#### Swift Package Manager (Recommended)
 
-### Building the Android SDK
+Add RunAnywhere to your project:
 
-```bash
-cd sdk/runanywhere-android/
-./gradlew build
-./gradlew test
-./gradlew lint
+1. In Xcode, select **File > Add Package Dependencies**
+2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
+3. Select the latest version
+
+Or add to your `Package.swift`:
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
+]
 ```
 
-### Building the iOS SDK
+#### CocoaPods
 
-```bash
-cd sdk/runanywhere-swift/
-swift build
-swift test
-swiftlint
+```ruby
+pod 'RunAnywhere', '~> 0.13'
 ```
 
-### Running Example Apps
+### Android SDK (Coming Soon)
 
-#### Android Example
-```bash
-cd examples/android/RunAnywhereAI/
-./gradlew installDebug
+```gradle
+// Coming soon
+dependencies {
+    implementation 'ai.runanywhere:sdk:0.13.0'
+}
 ```
 
-#### iOS Example
-```bash
-cd examples/ios/RunAnywhereAI/
-open RunAnywhereAI.xcodeproj
+## 💡 Example Use Cases
+
+### Privacy-First Chat Application
+```swift
+// All processing stays on-device
+let sdk = RunAnywhereSDK.shared
+let result = try await sdk.generateText(
+    userMessage,
+    options: GenerationOptions(privacyMode: .strict)
+)
 ```
 
-## 🧪 Testing
-
-Both SDKs include comprehensive test suites:
-
-```bash
-# Android
-./gradlew test
-
-# iOS
-swift test --enable-code-coverage
+### Voice Assistant
+```swift
+// Real-time voice conversations (Experimental)
+let voiceSession = try await sdk.startVoiceSession()
+voiceSession.delegate = self
+try await voiceSession.startListening()
 ```
 
-## 🔍 Code Quality & Linting
+### Structured Data Generation
+```swift
+// Type-safe JSON generation (Experimental)
+struct QuizQuestion: Generatable {
+    let question: String
+    let options: [String]
+    let correctAnswer: Int
+}
 
-We enforce strict code quality standards including mandatory GitHub issue references for all TODO comments.
-
-### Running Lint Checks
-
-```bash
-# Run all lint checks (iOS + Android)
-./scripts/lint-all.sh
-
-# iOS-specific lint checks
-./scripts/lint-ios.sh
-
-# Android-specific lint checks
-./scripts/lint-android.sh
-
-# Find TODOs without issue references
-./scripts/fix-todos.sh
-```
-
-### TODO Policy
-
-All TODO-style comments must reference a GitHub issue:
-- ✅ Correct: `// TODO: #123 - Implement error handling`
-- ❌ Wrong: `// TODO: Implement error handling`
-
-See [TODO Policy](docs/TODO_POLICY.md) for details.
-
-### Pre-commit Hooks
-
-Install pre-commit hooks to catch issues before committing:
-```bash
-pre-commit install
+let quiz: QuizQuestion = try await sdk.generateStructuredOutput(
+    prompt: "Create a quiz question about space",
+    type: QuizQuestion.self
+)
 ```
 
 ## 📖 Documentation
 
-- [Android SDK Documentation](sdk/runanywhere-android/README.md)
-- [iOS SDK Documentation](sdk/runanywhere-swift/README.md)
-- [Android Example Documentation](examples/android/RunAnywhereAI/README.md)
-- [iOS Example Documentation](examples/ios/RunAnywhereAI/README.md)
+### iOS SDK
+- **[iOS SDK Documentation](sdk/runanywhere-swift/)** - Complete API reference and guides
+- **[iOS Sample App](examples/ios/RunAnywhereAI/)** - Full-featured demo application
+- **[Architecture Overview](sdk/runanywhere-swift/docs/ARCHITECTURE_V2.md)** - Technical deep dive
+
+### Android SDK
+- **[Android SDK](sdk/runanywhere-android/)** - Coming soon
+- **[Android Sample App](examples/android/RunAnywhereAI/)** - Coming soon
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to:
+We welcome contributions from the community! Here's how you can help:
 
-- Report bugs
-- Suggest features
-- Submit pull requests
-- Set up your development environment
+### Ways to Contribute
+- 🐛 **Report bugs** - Help us identify and fix issues
+- 💡 **Suggest features** - Share your ideas for improvements
+- 📝 **Improve documentation** - Help make our docs clearer
+- 🔧 **Submit pull requests** - Contribute code directly
+
+### Getting Started
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+See our [Contributing Guidelines](CONTRIBUTING.md) for detailed instructions.
 
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🏢 About RunAnywhere
+## 💬 Community & Support
 
-RunAnywhere is building the future of on-device AI, providing developers with intelligent routing capabilities that balance cost, privacy, and performance. Our platform automatically decides when to run AI models locally versus in the cloud, optimizing for your specific use case.
+- **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/RunanywhereAI/runanywhere-sdks/issues)
+- **Email**: founders@runanywhere.ai
+- **Twitter**: [@RunanywhereAI](https://twitter.com/RunanywhereAI)
+
+## 🙏 Acknowledgments
+
+Built with ❤️ by the RunAnywhere team. Special thanks to:
+- The open-source community for inspiring this project
+- Our early adopters and beta testers
+- Contributors who help make this SDK better
 
 ---
 
-**Questions?** Feel free to open an issue or reach out to our team.
+**Ready to build privacy-first AI apps?** [Get started with our iOS SDK →](sdk/runanywhere-swift/)

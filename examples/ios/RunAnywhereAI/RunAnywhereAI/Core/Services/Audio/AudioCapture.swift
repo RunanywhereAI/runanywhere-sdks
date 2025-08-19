@@ -100,7 +100,7 @@ public class AudioCapture: NSObject {
         sequenceNumber += 1
         streamContinuation?.yield(chunk)
 
-        logger.debug("Sent audio chunk #\(self.sequenceNumber): \(self.audioBuffer.count) samples")
+        // logger.debug("Sent audio chunk #\(self.sequenceNumber): \(self.audioBuffer.count) samples")
         audioBuffer = []
     }
 
@@ -258,7 +258,7 @@ public class AudioCapture: NSObject {
             sequenceNumber += 1
             streamContinuation?.yield(chunk)
 
-            logger.debug("Sent audio chunk #\(self.sequenceNumber): \(chunkSamples.count) samples")
+            // logger.debug("Sent audio chunk #\(self.sequenceNumber): \(chunkSamples.count) samples")
         }
     }
 }
