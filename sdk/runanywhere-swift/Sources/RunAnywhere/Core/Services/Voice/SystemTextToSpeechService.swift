@@ -16,11 +16,16 @@ public final class SystemTextToSpeechService: NSObject, TextToSpeechService {
     // MARK: - TextToSpeechService Protocol
 
     public func initialize() async throws {
-        // Configure audio session for playback
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // Configure audio session for playback on iOS/tvOS/watchOS
         let audioSession = AVAudioSession.sharedInstance()
         try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
         try audioSession.setActive(true)
         logger.info("System TTS initialized with playback configuration")
+        #else
+        // On macOS, no audio session configuration needed
+        logger.info("System TTS initialized")
+        #endif
     }
 
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {
@@ -128,11 +133,13 @@ public final class SystemTextToSpeechService: NSObject, TextToSpeechService {
 
     public func cleanup() async {
         stop()
+        #if os(iOS) || os(tvOS) || os(watchOS)
         do {
             try AVAudioSession.sharedInstance().setActive(false)
         } catch {
             logger.error("Failed to deactivate audio session: \(error)")
         }
+        #endif
     }
 
     // MARK: - Private Methods

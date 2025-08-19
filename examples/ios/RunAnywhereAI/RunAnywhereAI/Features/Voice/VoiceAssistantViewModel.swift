@@ -5,7 +5,7 @@ import Combine
 import os
 
 @MainActor
-class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
+class VoiceAssistantViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
     private let sdk = RunAnywhereSDK.shared
     private let audioCapture = AudioCapture()
@@ -19,12 +19,41 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     @Published var currentStatus = "Initializing..."
     @Published var currentLLMModel: String = ""
     @Published var whisperModel: String = "Whisper Base"
-    private let whisperModelName: String = "whisper-base"  // Track the actual model being used
-
-    // MARK: - Real-time Voice Session
-    private var voiceSession: VoiceSessionManager?
-    @Published var sessionState: VoiceSessionManager.SessionState = .disconnected
     @Published var isListening: Bool = false
+
+    // Session state for UI
+    enum SessionState: Equatable {
+        case disconnected
+        case connecting
+        case connected
+        case listening
+        case processing
+        case speaking
+        case error(String)
+
+        static func == (lhs: SessionState, rhs: SessionState) -> Bool {
+            switch (lhs, rhs) {
+            case (.disconnected, .disconnected),
+                 (.connecting, .connecting),
+                 (.connected, .connected),
+                 (.listening, .listening),
+                 (.processing, .processing),
+                 (.speaking, .speaking):
+                return true
+            case (.error(let lhsMessage), .error(let rhsMessage)):
+                return lhsMessage == rhsMessage
+            default:
+                return false
+            }
+        }
+    }
+    @Published var sessionState: SessionState = .disconnected
+    @Published var isSpeechDetected: Bool = false
+
+    // MARK: - Pipeline State
+    private var voicePipeline: ModularVoicePipeline?
+    private var pipelineTask: Task<Void, Never>?
+    private let whisperModelName: String = "whisper-base"
 
     // MARK: - Initialization
 
@@ -42,7 +71,7 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
             return
         }
 
-        // Get current LLM model info from ModelManager or ModelListViewModel
+        // Get current LLM model info
         updateModelInfo()
 
         // Set the Whisper model display name
@@ -54,7 +83,9 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.updateModelInfo()
+            Task { @MainActor in
+                self?.updateModelInfo()
+            }
         }
 
         logger.info("Voice assistant initialized")
@@ -81,7 +112,6 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
     }
 
     private func updateWhisperModelName() {
-        // Map the whisper model ID to a display name
         switch whisperModelName {
         case "whisper-base":
             whisperModel = "Whisper Base"
@@ -99,83 +129,99 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
         logger.info("Using Whisper model: \(self.whisperModel)")
     }
 
-    // MARK: - Real-time Conversation Methods
+    // MARK: - Conversation Control
 
-    /// Start real-time conversation
+    /// Start real-time conversation using modular pipeline
     func startConversation() async {
-        do {
-            // Create voice session with configuration
-            let config = VoiceSessionConfig(
-                recognitionModel: "whisper-base",
-                ttsModel: "system",
-                enableVAD: true,
-                enableStreaming: true,
-                maxSessionDuration: 300,
-                silenceTimeout: 2.0,
-                language: "en",
-                useLLM: true,
-                llmModel: nil  // Use default model
-            )
+        logger.info("Starting conversation with modular pipeline...")
 
-            // Create voice session with audio capture providers
-            voiceSession = sdk.createVoiceSession(
-                config: config,
-                audioCaptureProvider: { [weak self] in
-                    // Connect to the actual audio capture stream
-                    guard let self = self else {
-                        return AsyncStream { $0.finish() }
-                    }
-                    self.logger.info("Starting audio capture stream")
-                    return self.audioCapture.startContinuousCapture()
-                },
-                stopAudioCapture: { [weak self] in
-                    self?.logger.info("Stopping audio capture")
-                    self?.audioCapture.stopContinuousCapture()
-                }
-            )
-            voiceSession?.delegate = self
+        sessionState = .connecting
+        currentStatus = "Initializing components..."
 
-            // Connect and start listening
-            try await voiceSession?.connect()
-            try await voiceSession?.startListening()
+        // Create pipeline configuration
+        // Skip LLM in pipeline since app already has working LLM service
+        let hasWorkingLLM = currentLLMModel != "No model loaded"
 
-            isListening = true
-            errorMessage = nil
-            currentStatus = "Listening..."
-        } catch {
-            errorMessage = "Failed to start conversation: \(error.localizedDescription)"
-            isListening = false
-            logger.error("Failed to start conversation: \(error)")
+        let config = ModularPipelineConfig(
+            components: hasWorkingLLM ? [.vad, .stt, .tts] : [.vad, .stt, .llm, .tts],
+            vad: VADConfig(),
+            stt: VoiceSTTConfig(modelId: whisperModelName),
+            llm: hasWorkingLLM ? nil : VoiceLLMConfig(modelId: currentLLMModel),
+            tts: VoiceTTSConfig(voice: "system")
+        )
+
+        // Create the pipeline
+        voicePipeline = sdk.createVoicePipeline(config: config)
+        voicePipeline?.delegate = self
+
+        // Initialize components first
+        guard let pipeline = voicePipeline else {
+            sessionState = .error("Failed to create pipeline")
+            currentStatus = "Error"
+            errorMessage = "Failed to create voice pipeline"
+            return
         }
+
+        // Initialize all components
+        do {
+            for try await event in pipeline.initializeComponents() {
+                await handleInitializationEvent(event)
+            }
+        } catch {
+            sessionState = .error("Initialization failed: \(error.localizedDescription)")
+            currentStatus = "Error"
+            errorMessage = "Component initialization failed: \(error.localizedDescription)"
+            logger.error("Component initialization failed: \(error)")
+            return
+        }
+
+        // Start audio capture after initialization is complete
+        let audioStream = audioCapture.startContinuousCapture()
+
+        sessionState = .listening
+        isListening = true
+        currentStatus = "Listening..."
+        errorMessage = nil
+
+        // Process audio through pipeline
+        pipelineTask = Task {
+            do {
+                for try await event in voicePipeline!.process(audioStream: audioStream) {
+                    await handlePipelineEvent(event)
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Pipeline error: \(error.localizedDescription)"
+                    self.sessionState = .error(error.localizedDescription)
+                    self.isListening = false
+                }
+            }
+        }
+
+        logger.info("Conversation pipeline started")
     }
 
     /// Stop conversation
     func stopConversation() async {
         logger.info("Stopping conversation...")
+
         isListening = false
-        isProcessing = false  // Ensure processing state is cleared
+        isProcessing = false
+        isSpeechDetected = false
 
-        // Interrupt any ongoing response first (including TTS)
-        if sessionState == .speaking || sessionState == .processing {
-            await voiceSession?.interrupt()
-            // Give a small delay for interrupt to complete
-            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-        }
+        // Cancel pipeline task
+        pipelineTask?.cancel()
+        pipelineTask = nil
 
-        // First stop listening if we're in that state
-        if sessionState == .listening {
-            await voiceSession?.stopListening()
-        }
+        // Stop audio capture
+        audioCapture.stopContinuousCapture()
 
-        // Then disconnect the session
-        await voiceSession?.disconnect()
-        voiceSession = nil
+        // Clean up pipeline
+        voicePipeline = nil
 
         // Reset UI state
         currentStatus = "Ready to listen"
         sessionState = .disconnected
-
-        // Clear any lingering error messages
         errorMessage = nil
 
         logger.info("Conversation stopped")
@@ -183,101 +229,118 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
 
     /// Interrupt AI response
     func interruptResponse() async {
-        await voiceSession?.interrupt()
+        // In the modular pipeline, we can stop and restart
+        await stopConversation()
     }
 
-    // MARK: - VoiceSessionDelegate Implementation
+    // MARK: - Initialization Event Handling
 
-    nonisolated func voiceSession(_ session: VoiceSessionManager, didChangeState state: VoiceSessionManager.SessionState) {
-        DispatchQueue.main.async {
-            self.sessionState = state
+    @MainActor
+    private func handleInitializationEvent(_ event: ModularPipelineEvent) {
+        switch event {
+        case .componentInitializing(let componentName):
+            currentStatus = "Initializing \(componentName)..."
+            logger.info("Initializing component: \(componentName)")
 
-            switch state {
-            case .listening:
-                self.isProcessing = false
-                self.isListening = true
-                self.currentStatus = "Listening..."
-            case .processing:
-                self.isProcessing = true
-                self.currentStatus = "Thinking..."
-            case .speaking:
-                self.isProcessing = true
-                self.currentStatus = "Speaking..."
-            case .connected:
-                self.currentStatus = "Ready"
-            case .connecting:
-                self.currentStatus = "Connecting..."
-            case .disconnected:
-                self.currentStatus = "Disconnected"
-                self.isListening = false
-            case .error(let errorMessage):
-                self.errorMessage = errorMessage
-                self.isProcessing = false
-                self.isListening = false
-                self.currentStatus = "Error"
+        case .componentInitialized(let componentName):
+            currentStatus = "\(componentName) ready"
+            logger.info("Component initialized: \(componentName)")
+
+        case .componentInitializationFailed(let componentName, let error):
+            sessionState = .error("Failed to initialize \(componentName)")
+            currentStatus = "Error"
+            errorMessage = "Failed to initialize \(componentName): \(error.localizedDescription)"
+            logger.error("Component initialization failed for \(componentName): \(error)")
+
+        case .allComponentsInitialized:
+            currentStatus = "All components ready"
+            logger.info("All components initialized successfully")
+
+        default:
+            break
+        }
+    }
+
+    // MARK: - Pipeline Event Handling
+
+    private func handlePipelineEvent(_ event: ModularPipelineEvent) async {
+        await MainActor.run {
+            switch event {
+            case .vadSpeechStart:
+                sessionState = .listening
+                currentStatus = "Listening..."
+                isSpeechDetected = true
+                logger.info("Speech detected")
+
+            case .vadSpeechEnd:
+                isSpeechDetected = false
+                logger.info("Speech ended")
+
+            case .sttPartialTranscript(let text):
+                currentTranscript = text
+                logger.info("Partial transcript: '\(text)'")
+
+            case .sttFinalTranscript(let text):
+                currentTranscript = text
+                sessionState = .processing
+                currentStatus = "Thinking..."
+                isProcessing = true
+                logger.info("Final transcript: '\(text)'")
+
+            case .llmThinking:
+                sessionState = .processing
+                currentStatus = "Thinking..."
+                assistantResponse = ""
+
+            case .llmPartialResponse(let text):
+                assistantResponse = text
+
+            case .llmFinalResponse(let text):
+                assistantResponse = text
+                sessionState = .speaking
+                currentStatus = "Speaking..."
+                logger.info("AI Response: '\(text.prefix(50))...'")
+
+            case .ttsStarted:
+                sessionState = .speaking
+                currentStatus = "Speaking..."
+
+            case .ttsCompleted:
+                sessionState = .listening
+                currentStatus = "Listening..."
+                isProcessing = false
+                // Clear transcript for next interaction
+                currentTranscript = ""
+
+            case .pipelineError(let error):
+                errorMessage = error.localizedDescription
+                sessionState = .error(error.localizedDescription)
+                isProcessing = false
+                isListening = false
+                logger.error("Pipeline error: \(error)")
+
+            case .pipelineStarted:
+                logger.info("Pipeline started")
+
+            case .pipelineCompleted:
+                logger.info("Pipeline completed")
+
+            default:
+                break
             }
         }
     }
 
-    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveTranscript text: String, isFinal: Bool) {
-        DispatchQueue.main.async {
-            self.currentTranscript = text
-
-            // Clear response when new transcript starts
-            if !isFinal && self.assistantResponse.isEmpty == false {
-                self.assistantResponse = ""
-            }
-
-            self.logger.info("Transcript (\(isFinal ? "final" : "partial")): '\(text)'")
-        }
-    }
-
-    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveResponse text: String) {
-        DispatchQueue.main.async {
-            self.assistantResponse = text
-
-            // Log when response is complete
-            let isComplete = !text.hasSuffix("...") &&
-                            (text.hasSuffix(".") || text.hasSuffix("!") || text.hasSuffix("?") ||
-                             text.hasSuffix(")") || text.count > 100)
-
-            if isComplete && !text.isEmpty {
-                self.logger.info("AI Response completed: '\(text.prefix(50))...'")
-                // TTS is now handled by the SDK pipeline when ttsEnabled is true
-            }
-        }
-    }
-
-    nonisolated func voiceSession(_ session: VoiceSessionManager, didEncounterError error: Error) {
-        DispatchQueue.main.async {
-            self.errorMessage = error.localizedDescription
-            self.isProcessing = false
-            self.logger.error("Voice session error: \(error)")
-        }
-    }
-
-    nonisolated func voiceSession(_ session: VoiceSessionManager, didReceiveAudio data: Data) {
-        // Audio playback handled by TTS service
-        // Can add custom audio handling here if needed
-        Task {
-            // Play audio through TTS service if needed
-            // For now, TTS is handled internally
-        }
-    }
-
-    // MARK: - Legacy Methods (for backward compatibility)
+    // MARK: - Legacy Compatibility Methods
 
     func startRecording() async throws {
-        // Convert to new real-time approach
         await startConversation()
     }
 
     func stopRecordingAndProcess() async throws -> VoicePipelineResult {
-        // This method is kept for backward compatibility
-        // In real-time mode, processing happens continuously
         await stopConversation()
 
-        // Return a mock result since real-time doesn't have a single result
+        // Return a mock result for compatibility
         return VoicePipelineResult(
             transcription: VoiceTranscriptionResult(
                 text: currentTranscript,
@@ -294,7 +357,26 @@ class VoiceAssistantViewModel: ObservableObject, VoiceSessionDelegate {
 
     func speakResponse(_ text: String) async {
         logger.info("Speaking response: '\(text, privacy: .public)'")
-        // TTS is now handled by the SDK pipeline
-        logger.info("TTS handled by SDK")
+        // TTS is now handled by the pipeline
+    }
+}
+
+// MARK: - ModularVoicePipelineDelegate
+
+extension VoiceAssistantViewModel: @preconcurrency ModularVoicePipelineDelegate {
+    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didReceiveEvent event: ModularPipelineEvent) {
+        Task { @MainActor in
+            await handlePipelineEvent(event)
+        }
+    }
+
+    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
+        Task { @MainActor in
+            errorMessage = error.localizedDescription
+            sessionState = .error(error.localizedDescription)
+            isListening = false
+            isProcessing = false
+            logger.error("Pipeline error: \(error)")
+        }
     }
 }
