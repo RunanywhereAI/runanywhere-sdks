@@ -139,14 +139,12 @@ class VoiceAssistantViewModel: ObservableObject {
         currentStatus = "Initializing components..."
 
         // Create pipeline configuration
-        // Skip LLM in pipeline since app already has working LLM service
-        let hasWorkingLLM = currentLLMModel != "No model loaded"
-
+        // Always include LLM component for complete pipeline flow
         let config = ModularPipelineConfig(
-            components: hasWorkingLLM ? [.vad, .stt, .tts] : [.vad, .stt, .llm, .tts],
+            components: [.vad, .stt, .llm, .tts],
             vad: VADConfig(),
             stt: VoiceSTTConfig(modelId: whisperModelName),
-            llm: hasWorkingLLM ? nil : VoiceLLMConfig(modelId: currentLLMModel),
+            llm: VoiceLLMConfig(modelId: "default", systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational."),
             tts: VoiceTTSConfig(voice: "system")
         )
 

@@ -4,22 +4,92 @@ import RunAnywhereSDK
 struct TranscriptionView: View {
     @StateObject private var viewModel = TranscriptionViewModel()
     @Environment(\.dismiss) private var dismiss
-    @State private var isExporting = false
     @State private var copiedToClipboard = false
+    @State private var showModelInfo = false
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header
-                headerView
+                // Clean, minimal header
+                HStack {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                            .padding(10)
+                            .background(Color(.tertiarySystemBackground))
+                            .clipShape(Circle())
+                    }
 
-                // Transcription Display
+                    Spacer()
+
+                    // Minimal status
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(viewModel.isTranscribing ? Color.red : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(viewModel.currentStatus)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    // Options menu
+                    Menu {
+                        Button(action: { copyToClipboard() }) {
+                            Label("Copy All", systemImage: "doc.on.doc")
+                        }
+
+                        Button(action: { viewModel.clearTranscripts() }) {
+                            Label("Clear", systemImage: "trash")
+                        }
+                        .foregroundColor(.red)
+
+                        Divider()
+
+                        Button(action: { withAnimation { showModelInfo.toggle() } }) {
+                            Label(showModelInfo ? "Hide Info" : "Show Info", systemImage: "info.circle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondary)
+                            .padding(10)
+                            .background(Color(.tertiarySystemBackground))
+                            .clipShape(Circle())
+                    }
+                    .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 15)
+
+                // Collapsible model info
+                if showModelInfo {
+                    HStack {
+                        Image(systemName: "waveform")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                        Text("STT: \(viewModel.whisperModel)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.08))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Main transcription area
                 ScrollViewReader { proxy in
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 16) {
                             // Final transcripts
                             ForEach(viewModel.finalTranscripts) { segment in
-                                TranscriptSegmentView(
+                                CleanTranscriptSegment(
                                     text: segment.text,
                                     timestamp: segment.timestamp,
                                     isFinal: true
@@ -28,7 +98,7 @@ struct TranscriptionView: View {
 
                             // Partial transcript
                             if !viewModel.partialTranscript.isEmpty {
-                                TranscriptSegmentView(
+                                CleanTranscriptSegment(
                                     text: viewModel.partialTranscript,
                                     timestamp: Date(),
                                     isFinal: false
@@ -38,10 +108,20 @@ struct TranscriptionView: View {
 
                             // Empty state
                             if viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty {
-                                emptyStateView
+                                VStack(spacing: 12) {
+                                    Image(systemName: "text.quote")
+                                        .font(.system(size: 48))
+                                        .foregroundColor(.secondary.opacity(0.3))
+                                    Text("Tap to start transcribing")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 150)
                             }
                         }
-                        .padding()
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 20)
                     }
                     .onChange(of: viewModel.partialTranscript) { _ in
                         withAnimation {
@@ -49,185 +129,80 @@ struct TranscriptionView: View {
                         }
                     }
                 }
-                .background(Color(.systemGray6))
 
-                // Control Panel
-                controlPanel
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
+                Spacer()
+
+                // Minimal control area
+                VStack(spacing: 20) {
+                    // Error message (if any)
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 20)
                     }
-                }
 
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: { copyToClipboard() }) {
-                            Label("Copy All", systemImage: "doc.on.doc")
+                    // Main mic button
+                    Button(action: {
+                        Task {
+                            if viewModel.isTranscribing {
+                                await viewModel.stopTranscription()
+                            } else {
+                                await viewModel.startTranscription()
+                            }
                         }
+                    }) {
+                        ZStack {
+                            Circle()
+                                .fill(viewModel.isTranscribing ? Color.red : Color.blue)
+                                .frame(width: 72, height: 72)
 
-                        Button(action: { exportTranscription() }) {
-                            Label("Export", systemImage: "square.and.arrow.up")
-                        }
+                            // Pulsing effect when transcribing
+                            if viewModel.isTranscribing {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                                    .scaleEffect(viewModel.isTranscribing ? 1.3 : 1.0)
+                                    .opacity(viewModel.isTranscribing ? 0 : 0.8)
+                                    .animation(
+                                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
+                                        value: viewModel.isTranscribing
+                                    )
+                            }
 
-                        Button(action: { viewModel.clearTranscripts() }) {
-                            Label("Clear", systemImage: "trash")
+                            Image(systemName: viewModel.isTranscribing ? "stop.fill" : "mic.fill")
+                                .font(.system(size: 28))
+                                .foregroundColor(.white)
                         }
-                        .foregroundColor(.red)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
                     }
-                    .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
+
+                    // Subtle instruction
+                    Text(viewModel.isTranscribing ? "Listening... Tap to stop" : "Tap to transcribe")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
                 }
+                .padding(.bottom, 30)
             }
+            .background(Color(.systemBackground))
+            .navigationBarHidden(true)
         }
         .task {
             await viewModel.initialize()
-        }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-            Button("OK") {
-                viewModel.errorMessage = nil
-            }
-        } message: {
-            Text(viewModel.errorMessage ?? "")
         }
         .overlay(alignment: .top) {
             if copiedToClipboard {
                 ToastView(message: "Copied to clipboard")
                     .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.top, 50)
             }
         }
     }
 
-    // MARK: - Header View
-
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            Text("Transcription Mode")
-                .font(.headline)
-
-            HStack {
-                Image(systemName: "mic.fill")
-                    .foregroundColor(viewModel.isTranscribing ? .green : .gray)
-                    .symbolEffect(.pulse, value: viewModel.isTranscribing)
-
-                Text(viewModel.currentStatus)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                Text(viewModel.whisperModel)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(.systemGray5))
-                    .cornerRadius(6)
-            }
-            .padding(.horizontal)
-        }
-        .padding(.vertical, 12)
-        .background(Color(.systemBackground))
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(Color(.separator)),
-            alignment: .bottom
-        )
-    }
-
-    // MARK: - Empty State
-
-    private var emptyStateView: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "mic.slash")
-                .font(.system(size: 48))
-                .foregroundColor(.secondary)
-
-            Text("No transcription yet")
-                .font(.headline)
-                .foregroundColor(.secondary)
-
-            Text("Tap the microphone button to start transcribing")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 60)
-    }
-
-    // MARK: - Control Panel
-
-    private var controlPanel: some View {
-        VStack(spacing: 0) {
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(Color(.separator))
-
-            HStack(spacing: 32) {
-                // Clear button
-                Button(action: {
-                    viewModel.clearTranscripts()
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "xmark.circle")
-                            .font(.system(size: 24))
-                        Text("Clear")
-                            .font(.caption)
-                    }
-                }
-                .foregroundColor(.secondary)
-                .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
-
-                // Main transcribe button
-                Button(action: {
-                    Task {
-                        if viewModel.isTranscribing {
-                            await viewModel.stopTranscription()
-                        } else {
-                            await viewModel.startTranscription()
-                        }
-                    }
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(viewModel.isTranscribing ? Color.red : Color.blue)
-                            .frame(width: 72, height: 72)
-
-                        Image(systemName: viewModel.isTranscribing ? "stop.fill" : "mic.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.white)
-                    }
-                }
-                .disabled(!viewModel.isInitialized)
-
-                // Copy button
-                Button(action: {
-                    copyToClipboard()
-                }) {
-                    VStack(spacing: 4) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 24))
-                        Text("Copy")
-                            .font(.caption)
-                    }
-                }
-                .foregroundColor(.secondary)
-                .disabled(viewModel.finalTranscripts.isEmpty && viewModel.partialTranscript.isEmpty)
-            }
-            .padding(.vertical, 20)
-            .frame(maxWidth: .infinity)
-            .background(Color(.systemBackground))
-        }
-    }
-
-    // MARK: - Actions
+    // MARK: - Helper Functions
 
     private func copyToClipboard() {
-        viewModel.copyToClipboard()
+        let fullText = viewModel.finalTranscripts.map { $0.text }.joined(separator: "\n")
+        UIPasteboard.general.string = fullText
 
         withAnimation {
             copiedToClipboard = true
@@ -239,91 +214,51 @@ struct TranscriptionView: View {
             }
         }
     }
-
-    private func exportTranscription() {
-        let text = viewModel.exportTranscripts()
-
-        #if os(iOS)
-        let activityController = UIActivityViewController(
-            activityItems: [text],
-            applicationActivities: nil
-        )
-
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootViewController = windowScene.windows.first?.rootViewController {
-            rootViewController.present(activityController, animated: true)
-        }
-        #endif
-    }
 }
 
-// MARK: - Transcript Segment View
-
-struct TranscriptSegmentView: View {
+// Clean transcript segment view
+struct CleanTranscriptSegment: View {
     let text: String
     let timestamp: Date
     let isFinal: Bool
 
-    private var timeString: String {
+    private let formatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.timeStyle = .medium
-        return formatter.string(from: timestamp)
-    }
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(timeString)
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-
-                if !isFinal {
-                    Image(systemName: "ellipsis")
-                        .font(.caption2)
-                        .foregroundColor(.blue)
-                        .symbolEffect(.pulse)
-                }
-
-                Spacer()
-            }
+            Text(formatter.string(from: timestamp))
+                .font(.caption2)
+                .foregroundColor(.secondary.opacity(0.7))
 
             Text(text)
                 .font(.body)
                 .foregroundColor(isFinal ? .primary : .secondary)
                 .opacity(isFinal ? 1.0 : 0.7)
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isFinal ? Color.clear : Color.blue.opacity(0.3), lineWidth: 1)
-        )
     }
 }
 
-// MARK: - Toast View
-
+// Simple toast view for notifications
 struct ToastView: View {
     let message: String
 
     var body: some View {
         Text(message)
-            .font(.subheadline)
-            .foregroundColor(.white)
+            .font(.caption)
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             .background(Color.black.opacity(0.8))
+            .foregroundColor(.white)
             .cornerRadius(20)
-            .padding(.top, 50)
     }
 }
 
-// MARK: - Preview
-
+// Preview
 struct TranscriptionView_Previews: PreviewProvider {
     static var previews: some View {
         TranscriptionView()

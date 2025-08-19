@@ -24,4 +24,4 @@ end
 
 target 'RunAnywhereAIUITests' do
   inherit! :search_paths
-end
+end-

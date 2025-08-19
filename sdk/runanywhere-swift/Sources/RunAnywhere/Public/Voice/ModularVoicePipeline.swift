@@ -31,6 +31,7 @@ public class ModularVoicePipeline {
     private var sttService: VoiceService?
     private var llmService: LLMService?
     private var ttsService: TextToSpeechService?
+    private var useGenerationService: Bool = false
 
     // Audio management
     private var floatBuffer: [Float] = []  // Buffer for Float samples
@@ -82,7 +83,12 @@ public class ModularVoicePipeline {
         }
 
         if config.components.contains(.llm) {
-            self.llmService = llmService
+            if let llmService = llmService {
+                self.llmService = llmService
+            } else {
+                // If no LLM service provided, we'll use GenerationService directly
+                self.useGenerationService = true
+            }
         }
 
         if config.components.contains(.tts) {
@@ -108,21 +114,35 @@ public class ModularVoicePipeline {
                     componentsToInit.append(("STT", { try await stt.initialize(modelPath: modelPath) }))
                 }
 
-                if let llm = llmService, config.components.contains(.llm) {
-                    if llm.isReady {
-                        // LLM service is already initialized, emit events immediately
-                        logger.debug("LLM service already ready, skipping initialization")
+                if config.components.contains(.llm) {
+                    if let llm = llmService {
+                        if llm.isReady {
+                            // LLM service is already initialized, emit events immediately
+                            logger.debug("LLM service already ready, skipping initialization")
+                            continuation.yield(.componentInitialized("LLM"))
+                        } else {
+                            // Only try to initialize if we have a valid model path
+                            // Don't try to initialize with "default" or empty string
+                            if let modelId = config.llm?.modelId,
+                               !modelId.isEmpty && modelId != "default" {
+                                logger.debug("Initializing LLM with model: \(modelId)")
+                                componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
+                            } else {
+                                // No valid model path - skip initialization
+                                // The service should already be initialized if it's from GenerationService
+                                logger.debug("No valid model path for LLM initialization, assuming already initialized")
+                                continuation.yield(.componentInitialized("LLM"))
+                            }
+                        }
+                    } else if useGenerationService {
+                        // Using generation service directly, no initialization needed
+                        logger.debug("Using GenerationService directly, no LLM initialization needed")
                         continuation.yield(.componentInitialized("LLM"))
                     } else {
-                        // Check if we have a valid model path, otherwise try to use the existing app's LLM
-                        if let modelId = config.llm?.modelId, !modelId.isEmpty, modelId != "default" {
-                            logger.debug("Initializing LLM with model: \(modelId)")
-                            componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
-                        } else {
-                            // No valid model path, but LLM component requested - try to skip and emit success
-                            logger.debug("No valid LLM model path, assuming existing app LLM will be used")
-                            continuation.yield(.componentInitialized("LLM"))
-                        }
+                        // No LLM service available but component requested
+                        // This is OK - we'll fall back to GenerationService in processing
+                        logger.debug("No LLM service available, will use GenerationService fallback")
+                        continuation.yield(.componentInitialized("LLM"))
                     }
                 }
 
@@ -366,7 +386,7 @@ public class ModularVoicePipeline {
 
         // Rest of the processing can continue as before...
         // Step 3: LLM (if enabled)
-        if let llm = llmService, config.components.contains(.llm), let transcript = currentData as? String {
+        if config.components.contains(.llm), let transcript = currentData as? String {
             continuation.yield(.llmThinking)
 
             let options = RunAnywhereGenerationOptions(
@@ -375,10 +395,28 @@ public class ModularVoicePipeline {
                 systemPrompt: config.llm?.systemPrompt
             )
 
-            let response = try await llm.generate(
-                prompt: transcript,
-                options: options
-            )
+            let response: String
+            if let llm = llmService, llm.isReady {
+                // Use the provided LLM service if it's ready
+                logger.debug("Using initialized LLM service for generation")
+                response = try await llm.generate(
+                    prompt: transcript,
+                    options: options
+                )
+            } else if useGenerationService || llmService == nil {
+                // Use the SDK's generation service directly
+                logger.debug("Using GenerationService directly for LLM processing")
+                let generationService = RunAnywhereSDK.shared.serviceContainer.generationService
+                let result = try await generationService.generate(
+                    prompt: transcript,
+                    options: options
+                )
+                response = result.text
+            } else {
+                // LLM service exists but not ready - this shouldn't happen after initialization
+                logger.error("LLM service exists but is not ready after initialization")
+                throw LLMServiceError.notInitialized
+            }
 
             continuation.yield(.llmFinalResponse(response))
             currentData = response
@@ -458,8 +496,14 @@ extension RunAnywhereSDK {
     /// Create a modular voice pipeline with the specified configuration
     /// This is the single API for all voice processing needs
     public func createVoicePipeline(config: ModularPipelineConfig) -> ModularVoicePipeline {
-        let llmService = config.components.contains(.llm) ?
-            findLLMService(for: config.llm?.modelId) : nil
+        var llmService: LLMService? = nil
+
+        // Only try to find an LLM service if LLM component is requested
+        if config.components.contains(.llm) {
+            // Try to find an LLM service, but don't fail if none found
+            // The pipeline will fall back to using GenerationService directly
+            llmService = findLLMService(for: config.llm?.modelId)
+        }
 
         return ModularVoicePipeline(
             config: config,

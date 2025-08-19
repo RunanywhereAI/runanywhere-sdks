@@ -131,8 +131,12 @@ public class LLMSwiftService: LLMService {
         logger.info("🔍 LLM instance: \(String(describing: llm))")
         logger.info("🔍 Model path: \(self.modelPath ?? "nil")")
 
-        // Let LLM.swift manage its own conversation history
-        // This maintains context across multiple turns
+        // Clear conversation history for voice interactions to ensure clean context
+        // This prevents confusion from previous interactions
+        if options.systemPrompt?.contains("voice assistant") == true {
+            logger.info("🧹 Clearing conversation history for voice interaction")
+            llm.history.removeAll()
+        }
 
         // Apply generation options
         await applyGenerationOptions(options, to: llm)
@@ -163,8 +167,22 @@ public class LLMSwiftService: LLMService {
             let response = try await withThrowingTaskGroup(of: String.self) { group in
                 group.addTask {
                     // Call getCompletion which handles the generation internally
-                    let result = await llm.getCompletion(from: fullPrompt)
-                    self.logger.info("✅ Got response from getCompletion: \(result.prefix(100))...")
+                    // For voice assistant, pass the prompt directly to get a proper response
+                    let result: String
+                    if options.systemPrompt?.contains("voice assistant") == true {
+                        // For voice, use respond method which handles conversation better
+                        var responseText = ""
+                        await llm.respond(to: fullPrompt) { response in
+                            for await token in response {
+                                responseText += token
+                            }
+                            return responseText
+                        }
+                        result = responseText
+                    } else {
+                        result = await llm.getCompletion(from: fullPrompt)
+                    }
+                    self.logger.info("✅ Got response from LLM: \(result.prefix(100))...")
                     return result
                 }
 
