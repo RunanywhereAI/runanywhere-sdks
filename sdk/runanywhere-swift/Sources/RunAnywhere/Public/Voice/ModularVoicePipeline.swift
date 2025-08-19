@@ -23,7 +23,7 @@ public enum VoiceComponent: String, CaseIterable {
 
 /// A simplified, modular voice pipeline that can run any combination of components
 public class ModularVoicePipeline {
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "ModularVoicePipeline")
+    private let logger = SDKLogger(category: "ModularVoicePipeline")
     private let config: ModularPipelineConfig
 
     // Component instances (created based on config)
@@ -33,10 +33,13 @@ public class ModularVoicePipeline {
     private var ttsService: TextToSpeechService?
 
     // Audio management
-    private var audioBuffer = Data()
+    private var floatBuffer: [Float] = []  // Buffer for Float samples
     private var isProcessing = false
     private var isSpeechActive = false
     private var isInitialized = false
+    private var speechStartTime: Date?
+    private let minSpeechDuration: TimeInterval = 1.0 // Minimum 1.0 seconds of speech for better transcription
+    private let transcriptionQueue = DispatchQueue(label: "com.runanywhere.transcription", qos: .userInitiated)
 
     public weak var delegate: ModularVoicePipelineDelegate?
 
@@ -60,7 +63,7 @@ public class ModularVoicePipeline {
                     energyThreshold: vadConfig.energyThreshold
                 )
                 vad.onSpeechActivity = { [weak self] event in
-                    print("ModularPipeline: VAD speech activity event: \(event)")
+                    self?.logger.debug("VAD speech activity event: \(event)")
                     switch event {
                     case .started:
                         self?.isSpeechActive = true
@@ -93,62 +96,57 @@ public class ModularVoicePipeline {
     public func initializeComponents() -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                do {
-                    var componentsToInit: [(String, () async throws -> Void)] = []
+                var componentsToInit: [(String, () async throws -> Void)] = []
 
-                    // Build list of components to initialize
-                    if let vad = vadComponent, config.components.contains(.vad) {
-                        componentsToInit.append(("VAD", { try await vad.initialize() }))
-                    }
-
-                    if let stt = sttService, config.components.contains(.stt) {
-                        let modelPath = config.stt?.modelId
-                        componentsToInit.append(("STT", { try await stt.initialize(modelPath: modelPath) }))
-                    }
-
-                    if let llm = llmService, config.components.contains(.llm) {
-                        if llm.isReady {
-                            // LLM service is already initialized, emit events immediately
-                            print("ModularPipeline: LLM service already ready, skipping initialization")
-                            continuation.yield(.componentInitialized("LLM"))
-                        } else {
-                            // Check if we have a valid model path, otherwise try to use the existing app's LLM
-                            if let modelId = config.llm?.modelId, !modelId.isEmpty, modelId != "default" {
-                                print("ModularPipeline: Initializing LLM with model: \(modelId)")
-                                componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
-                            } else {
-                                // No valid model path, but LLM component requested - try to skip and emit success
-                                print("ModularPipeline: No valid LLM model path, assuming existing app LLM will be used")
-                                continuation.yield(.componentInitialized("LLM"))
-                            }
-                        }
-                    }
-
-                    if let tts = ttsService, config.components.contains(.tts) {
-                        componentsToInit.append(("TTS", { try await tts.initialize() }))
-                    }
-
-                    // Initialize each component
-                    for (componentName, initFunction) in componentsToInit {
-                        continuation.yield(.componentInitializing(componentName))
-
-                        do {
-                            try await initFunction()
-                            continuation.yield(.componentInitialized(componentName))
-                        } catch {
-                            continuation.yield(.componentInitializationFailed(componentName, error))
-                            continuation.finish(throwing: error)
-                            return
-                        }
-                    }
-
-                    isInitialized = true
-                    continuation.yield(.allComponentsInitialized)
-                    continuation.finish()
-
-                } catch {
-                    continuation.finish(throwing: error)
+                // Build list of components to initialize
+                if let vad = vadComponent, config.components.contains(.vad) {
+                    componentsToInit.append(("VAD", { try await vad.initialize() }))
                 }
+
+                if let stt = sttService, config.components.contains(.stt) {
+                    let modelPath = config.stt?.modelId
+                    componentsToInit.append(("STT", { try await stt.initialize(modelPath: modelPath) }))
+                }
+
+                if let llm = llmService, config.components.contains(.llm) {
+                    if llm.isReady {
+                        // LLM service is already initialized, emit events immediately
+                        logger.debug("LLM service already ready, skipping initialization")
+                        continuation.yield(.componentInitialized("LLM"))
+                    } else {
+                        // Check if we have a valid model path, otherwise try to use the existing app's LLM
+                        if let modelId = config.llm?.modelId, !modelId.isEmpty, modelId != "default" {
+                            logger.debug("Initializing LLM with model: \(modelId)")
+                            componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
+                        } else {
+                            // No valid model path, but LLM component requested - try to skip and emit success
+                            logger.debug("No valid LLM model path, assuming existing app LLM will be used")
+                            continuation.yield(.componentInitialized("LLM"))
+                        }
+                    }
+                }
+
+                if let tts = ttsService, config.components.contains(.tts) {
+                    componentsToInit.append(("TTS", { try await tts.initialize() }))
+                }
+
+                // Initialize each component
+                for (componentName, initFunction) in componentsToInit {
+                    continuation.yield(.componentInitializing(componentName))
+
+                    do {
+                        try await initFunction()
+                        continuation.yield(.componentInitialized(componentName))
+                    } catch {
+                        continuation.yield(.componentInitializationFailed(componentName, error))
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                }
+
+                isInitialized = true
+                continuation.yield(.allComponentsInitialized)
+                continuation.finish()
             }
         }
     }
@@ -176,7 +174,7 @@ public class ModularVoicePipeline {
                     }
 
                     // Process any remaining buffered audio
-                    if !audioBuffer.isEmpty {
+                    if !floatBuffer.isEmpty {
                         try await finalizeProcessing(continuation: continuation)
                     }
 
@@ -198,20 +196,21 @@ public class ModularVoicePipeline {
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
 
+        // Get float samples from chunk - needed for both VAD and non-VAD paths
+        let floatArray = chunk.samples
+
         // Step 1: VAD (if enabled)
         if let vad = vadComponent, config.components.contains(.vad) {
-            // Use samples directly from chunk, no conversion needed
-            let floatArray = chunk.samples
 
             // Process audio through VAD and check result
             let hasVoice = vad.processAudioData(floatArray)
 
-            // Debug logging
-            if floatArray.count > 0 {
-                let energy = floatArray.map { $0 * $0 }.reduce(0, +) / Float(floatArray.count)
-                let rms = sqrt(energy)
-                print("ModularPipeline: Processing \(floatArray.count) samples, RMS: \(rms), hasVoice: \(hasVoice), isSpeechActive: \(isSpeechActive)")
-            }
+            // Debug logging - commented out to reduce noise
+            // if floatArray.count > 0 {
+            //     let energy = floatArray.map { $0 * $0 }.reduce(0, +) / Float(floatArray.count)
+            //     let rms = sqrt(energy)
+            //     logger.debug("Processing \(floatArray.count) samples, RMS: \(rms), hasVoice: \(hasVoice), isSpeechActive: \(isSpeechActive)")
+            // }
 
             // Handle speech state transitions
             let wasSpeaking = isSpeechActive
@@ -220,94 +219,152 @@ public class ModularVoicePipeline {
             if hasVoice && !wasSpeaking {
                 // Speech just started
                 isSpeechActive = true
-                audioBuffer = Data() // Clear any old data
+                speechStartTime = Date()
+                floatBuffer = []  // Clear float buffer
                 continuation.yield(.vadSpeechStart)
-                print("ModularPipeline: Speech started, beginning to buffer audio")
+                logger.info("Speech started, beginning to buffer audio")
             }
 
             // Always buffer audio when speech is active
             if isSpeechActive {
-                audioBuffer.append(chunk.data)
-                print("ModularPipeline: Buffering audio, total buffer size: \(audioBuffer.count) bytes")
+                // Buffer float samples directly (no need for Data conversion)
+                floatBuffer.append(contentsOf: floatArray)  // Use the float samples directly
+                // logger.debug("Buffering audio, total samples: \(floatBuffer.count)")
             }
 
-            // Check if speech ended
+            // Check if speech ended - but ensure minimum duration
             if !hasVoice && wasSpeaking {
-                // Speech just ended
-                isSpeechActive = false
-                continuation.yield(.vadSpeechEnd)
-                print("ModularPipeline: Speech ended, processing \(audioBuffer.count) bytes of audio")
+                let speechDuration = Date().timeIntervalSince(speechStartTime ?? Date())
 
-                // Process the buffered audio
-                if !audioBuffer.isEmpty {
-                    try await processBufferedAudio(continuation: continuation)
-                    audioBuffer = Data()
+                // Only process if we have enough speech
+                if speechDuration >= minSpeechDuration && !floatBuffer.isEmpty {
+                    // Speech ended with sufficient duration
+                    isSpeechActive = false
+                    continuation.yield(.vadSpeechEnd)
+                    logger.info("Speech ended after \(speechDuration)s, processing \(floatBuffer.count) samples")
+
+                    // Process the buffered audio asynchronously
+                    let floatsToProcess = floatBuffer
+                    floatBuffer = []
+
+                    // Non-blocking transcription
+                    Task.detached { [weak self] in
+                        guard let self = self else { return }
+                        do {
+                            try await self.processBufferedAudioAsync(
+                                floatSamples: floatsToProcess,
+                                continuation: continuation
+                            )
+                        } catch {
+                            self.logger.error("Async audio processing failed: \(error)")
+                            continuation.yield(.pipelineError(error))
+                        }
+                    }
+                } else if speechDuration < minSpeechDuration {
+                    // Speech was too short, keep buffering
+                    // logger.debug("Speech too short (\(speechDuration)s), continuing to buffer")
                 }
             }
         } else {
             // No VAD, buffer all audio
-            audioBuffer.append(chunk.data)
+            floatBuffer.append(contentsOf: floatArray)
 
             // Process periodically
-            if audioBuffer.count > 32000 { // ~2 seconds at 16kHz
-                print("ModularPipeline: No VAD, processing \(audioBuffer.count) bytes periodically")
-                try await processBufferedAudio(continuation: continuation)
-                audioBuffer = Data()
+            if floatBuffer.count > 32000 { // ~2 seconds at 16kHz
+                // logger.debug("No VAD, processing \(floatBuffer.count) samples periodically")
+
+                let floatsToProcess = floatBuffer
+                floatBuffer = []
+
+                // Process asynchronously
+                Task.detached { [weak self] in
+                    guard let self = self else { return }
+                    do {
+                        try await self.processBufferedAudioAsync(
+                            floatSamples: floatsToProcess,
+                            continuation: continuation
+                        )
+                    } catch {
+                        self.logger.error("Async audio processing failed: \(error)")
+                        continuation.yield(.pipelineError(error))
+                    }
+                }
             }
         }
     }
 
-    private func processBufferedAudio(
+    private func processBufferedAudioAsync(
+        floatSamples: [Float],
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
-        guard !audioBuffer.isEmpty else {
-            print("ModularPipeline: processBufferedAudio called with empty buffer, skipping")
+        guard !floatSamples.isEmpty else {
+            // logger.debug("processBufferedAudioAsync called with empty samples, skipping")
             return
         }
 
-        print("ModularPipeline: processBufferedAudio starting with \(audioBuffer.count) bytes")
+        // logger.debug("processBufferedAudioAsync starting with \(floatSamples.count) float samples")
 
-        var currentData: Any = audioBuffer
+        var currentData: Any = floatSamples
 
         // Step 2: STT (if enabled)
         if let stt = sttService, config.components.contains(.stt), let sttConfig = config.stt {
-            print("ModularPipeline: STT service found, preparing to transcribe")
+            // logger.debug("STT service found, preparing to transcribe")
 
             let options = VoiceTranscriptionOptions(
                 language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english
             )
 
-            print("ModularPipeline: Calling STT.transcribe with \(audioBuffer.count) bytes of audio")
+            // Check the service's preferred audio format
+            let preferredFormat = stt.preferredAudioFormat
+            // logger.debug("STT service prefers \(preferredFormat) format")
 
             do {
-                let result = try await stt.transcribe(
-                    audio: audioBuffer,
-                    options: options
-                )
+                let result: VoiceTranscriptionResult
+
+                if preferredFormat == .floatArray {
+                    // Service prefers Float arrays - pass directly
+                    // logger.debug("Using Float array transcription with \(floatSamples.count) samples")
+                    result = try await stt.transcribe(
+                        samples: floatSamples,
+                        options: options
+                    )
+                } else {
+                    // Service prefers Data - convert Float array to Data
+                    // logger.debug("Converting \(floatSamples.count) float samples to Data")
+                    let audioData = floatSamples.withUnsafeBytes { bytes in
+                        Data(bytes)
+                    }
+                    // logger.debug("Calling STT.transcribe with \(audioData.count) bytes")
+                    result = try await stt.transcribe(
+                        audio: audioData,
+                        options: options
+                    )
+                }
 
                 let transcript = result.text
-                print("ModularPipeline: STT transcription result: '\(transcript)'")
+                logger.info("STT transcription result: '\(transcript)'")
 
                 if !transcript.isEmpty {
                     continuation.yield(.sttFinalTranscript(transcript))
                     currentData = transcript
                 } else {
-                    print("ModularPipeline: WARNING - STT returned empty transcript")
+                    logger.warning("STT returned empty transcript")
                 }
             } catch {
-                print("ModularPipeline: ERROR - STT transcription failed: \(error)")
+                logger.error("STT transcription failed: \(error)")
                 throw error
             }
 
             // If no LLM, stop here
             if !config.components.contains(.llm) {
-                print("ModularPipeline: No LLM component, stopping after STT")
+                // logger.debug("No LLM component, stopping after STT")
                 return
             }
         } else {
-            print("ModularPipeline: No STT service available or not configured")
+            // logger.debug("No STT service available or not configured")
         }
 
+        // Rest of the processing can continue as before...
         // Step 3: LLM (if enabled)
         if let llm = llmService, config.components.contains(.llm), let transcript = currentData as? String {
             continuation.yield(.llmThinking)
@@ -336,10 +393,6 @@ public class ModularVoicePipeline {
         if let tts = ttsService, config.components.contains(.tts), let text = currentData as? String {
             continuation.yield(.ttsStarted)
 
-            // For now, just speak the text
-            // TTS synthesizes and plays directly
-            continuation.yield(.ttsStarted)
-
             let ttsOptions = TTSOptions(
                 voice: config.tts?.voice,
                 language: "en",
@@ -351,6 +404,26 @@ public class ModularVoicePipeline {
 
             continuation.yield(.ttsCompleted)
         }
+    }
+
+    private func processBufferedAudio(
+        continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
+    ) async throws {
+        guard !floatBuffer.isEmpty else {
+            // logger.debug("processBufferedAudio called with empty buffer, skipping")
+            return
+        }
+
+        // logger.debug("processBufferedAudio starting with \(floatBuffer.count) float samples")
+
+        // Use the float-based method for consistency
+        try await processBufferedAudioAsync(
+            floatSamples: floatBuffer,
+            continuation: continuation
+        )
+
+        // Clear buffers after processing
+        floatBuffer = []
     }
 
     private func finalizeProcessing(

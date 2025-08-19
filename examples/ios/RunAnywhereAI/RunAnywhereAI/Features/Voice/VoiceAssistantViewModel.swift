@@ -48,6 +48,7 @@ class VoiceAssistantViewModel: ObservableObject {
         }
     }
     @Published var sessionState: SessionState = .disconnected
+    @Published var isSpeechDetected: Bool = false
 
     // MARK: - Pipeline State
     private var voicePipeline: ModularVoicePipeline?
@@ -206,6 +207,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         isListening = false
         isProcessing = false
+        isSpeechDetected = false
 
         // Cancel pipeline task
         pipelineTask?.cancel()
@@ -267,9 +269,11 @@ class VoiceAssistantViewModel: ObservableObject {
             case .vadSpeechStart:
                 sessionState = .listening
                 currentStatus = "Listening..."
+                isSpeechDetected = true
                 logger.info("Speech detected")
 
             case .vadSpeechEnd:
+                isSpeechDetected = false
                 logger.info("Speech ended")
 
             case .sttPartialTranscript(let text):

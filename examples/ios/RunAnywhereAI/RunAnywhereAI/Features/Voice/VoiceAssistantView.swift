@@ -189,9 +189,41 @@ struct VoiceAssistantView: View {
                     }
                 }) {
                     ZStack {
+                        // Fixed size container to prevent layout shifts
                         Circle()
                             .fill(micButtonColor)
                             .frame(width: 80, height: 80)
+                            .overlay(
+                                // Animated border when speaking
+                                Circle()
+                                    .stroke(
+                                        viewModel.isSpeechDetected ? Color.blue : Color.clear,
+                                        lineWidth: viewModel.isSpeechDetected ? 3 : 0
+                                    )
+                                    .scaleEffect(viewModel.isSpeechDetected ? 1.15 : 1.0)
+                                    .opacity(viewModel.isSpeechDetected ? 0.8 : 0)
+                                    .animation(.easeInOut(duration: 0.3), value: viewModel.isSpeechDetected)
+                            )
+                            .overlay(
+                                // Subtle pulsing glow effect
+                                Circle()
+                                    .stroke(
+                                        LinearGradient(
+                                            gradient: Gradient(colors: [Color.blue.opacity(0.6), Color.blue.opacity(0.2)]),
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        ),
+                                        lineWidth: 2
+                                    )
+                                    .scaleEffect(viewModel.isSpeechDetected ? 1.25 : 1.0)
+                                    .opacity(viewModel.isSpeechDetected ? 0.5 : 0)
+                                    .animation(
+                                        viewModel.isSpeechDetected ?
+                                            .easeInOut(duration: 0.8).repeatForever(autoreverses: true) :
+                                            .easeInOut(duration: 0.3),
+                                        value: viewModel.isSpeechDetected
+                                    )
+                            )
 
                         if viewModel.sessionState == .connecting {
                             ProgressView()
@@ -209,9 +241,8 @@ struct VoiceAssistantView: View {
                         }
                     }
                 }
+                .frame(width: 120, height: 120)  // Fixed frame to prevent layout shifts
                 .disabled(false)  // Always enabled so user can stop at any time
-                .scaleEffect(viewModel.isListening ? 1.2 : 1.0)
-                .animation(.easeInOut(duration: 0.2), value: viewModel.isListening)
 
                 // Interrupt button - only shown when AI is responding
                 if viewModel.sessionState == .speaking || viewModel.sessionState == .processing {

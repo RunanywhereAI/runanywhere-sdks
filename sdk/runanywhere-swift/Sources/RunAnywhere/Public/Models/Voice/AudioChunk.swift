@@ -38,7 +38,9 @@ public struct VoiceAudioChunk {
 
     /// Legacy Data property for backward compatibility (converts from Float samples)
     public var data: Data {
-        return Data(bytes: samples, count: samples.count * MemoryLayout<Float>.size)
+        return samples.withUnsafeBytes { bytes in
+            Data(bytes)
+        }
     }
 
     /// Duration of this audio chunk in seconds

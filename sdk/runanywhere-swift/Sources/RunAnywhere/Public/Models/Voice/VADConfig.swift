@@ -12,9 +12,9 @@ public struct VADConfig {
     public let voiceHysteresis: Int
 
     public init(
-        energyThreshold: Float = 0.02,
-        silenceTimeout: TimeInterval = 2.0,
-        voiceHysteresis: Int = 3
+        energyThreshold: Float = 0.01,  // Lower threshold for better sensitivity
+        silenceTimeout: TimeInterval = 1.0,  // Shorter timeout for quicker response
+        voiceHysteresis: Int = 2  // Reduced hysteresis for faster detection
     ) {
         self.energyThreshold = energyThreshold
         self.silenceTimeout = silenceTimeout

@@ -1,5 +1,11 @@
 import Foundation
 
+/// Enum to specify preferred audio format for the service
+public enum VoiceServiceAudioFormat {
+    case data       // Service prefers raw Data
+    case floatArray // Service prefers Float array samples
+}
+
 /// Protocol for voice transcription services
 public protocol VoiceService: AnyObject {
     /// Initialize the voice service with an optional model path
@@ -10,6 +16,15 @@ public protocol VoiceService: AnyObject {
         audio: Data,
         options: VoiceTranscriptionOptions
     ) async throws -> VoiceTranscriptionResult
+
+    /// Transcribe audio samples to text (optional - implement if preferred format is floatArray)
+    func transcribe(
+        samples: [Float],
+        options: VoiceTranscriptionOptions
+    ) async throws -> VoiceTranscriptionResult
+
+    /// Preferred audio format for this service
+    var preferredAudioFormat: VoiceServiceAudioFormat { get }
 
     /// Check if service is ready
     var isReady: Bool { get }
@@ -39,6 +54,21 @@ public protocol VoiceService: AnyObject {
 
 // MARK: - Default implementations for optional methods
 public extension VoiceService {
+    /// Default implementation for Float array transcription - converts to Data
+    func transcribe(
+        samples: [Float],
+        options: VoiceTranscriptionOptions
+    ) async throws -> VoiceTranscriptionResult {
+        // Default implementation converts Float array to Data
+        let data = samples.withUnsafeBytes { bytes in
+            Data(bytes)
+        }
+        return try await transcribe(audio: data, options: options)
+    }
+
+    /// Default preferred format is Data for backward compatibility
+    var preferredAudioFormat: VoiceServiceAudioFormat { .data }
+
     /// Default implementation returns unsupported stream
     func transcribeStream(
         audioStream: AsyncStream<VoiceAudioChunk>,
