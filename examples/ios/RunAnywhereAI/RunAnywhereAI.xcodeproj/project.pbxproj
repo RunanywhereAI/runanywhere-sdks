@@ -39,18 +39,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		073DEC243B98FCB21305BBEF /* libPods-RunAnywhereAIUITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAIUITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		0C6190DD4A6B0BFF9057666D /* Pods-RunAnywhereAITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.release.xcconfig"; sourceTree = "<group>"; };
-		1A33B9E0485890CABB40309E /* Pods-RunAnywhereAIUITests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.release.xcconfig"; sourceTree = "<group>"; };
-		3ACBE63C083393F9E5BED3E2 /* Pods_RunAnywhereAI.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunAnywhereAI.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A1F02E2F250200337F2F /* RunAnywhereAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RunAnywhereAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A1FE2E2F250400337F2F /* RunAnywhereAITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5480A2082E2F250400337F2F /* RunAnywhereAIUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunAnywhereAIUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		5C0ED3F4213BACD2E335C6B1 /* Pods-RunAnywhereAIUITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAIUITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAIUITests/Pods-RunAnywhereAIUITests.debug.xcconfig"; sourceTree = "<group>"; };
-		6BE500CC17E99C1A7781BE00 /* Pods-RunAnywhereAITests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAITests.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAITests/Pods-RunAnywhereAITests.debug.xcconfig"; sourceTree = "<group>"; };
-		8D7B784CD1F41F7F0BC59945 /* Pods-RunAnywhereAI.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.debug.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.debug.xcconfig"; sourceTree = "<group>"; };
-		E2A6FD9EF5CE5C983A489FE9 /* libPods-RunAnywhereAITests.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-RunAnywhereAITests.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		FA8CA97C590524AC5642BCF3 /* Pods-RunAnywhereAI.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunAnywhereAI.release.xcconfig"; path = "Target Support Files/Pods-RunAnywhereAI/Pods-RunAnywhereAI.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -108,16 +99,6 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		48F1C6AE972BAB1328D34971 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-				3ACBE63C083393F9E5BED3E2 /* Pods_RunAnywhereAI.framework */,
-				E2A6FD9EF5CE5C983A489FE9 /* libPods-RunAnywhereAITests.a */,
-				073DEC243B98FCB21305BBEF /* libPods-RunAnywhereAIUITests.a */,
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		5480A1E72E2F250200337F2F = {
 			isa = PBXGroup;
 			children = (
@@ -125,8 +106,6 @@
 				5480A2012E2F250400337F2F /* RunAnywhereAITests */,
 				5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */,
 				5480A1F12E2F250200337F2F /* Products */,
-				F6EFD36220C47AA4E19CBE98 /* Pods */,
-				48F1C6AE972BAB1328D34971 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -140,19 +119,6 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		F6EFD36220C47AA4E19CBE98 /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				8D7B784CD1F41F7F0BC59945 /* Pods-RunAnywhereAI.debug.xcconfig */,
-				FA8CA97C590524AC5642BCF3 /* Pods-RunAnywhereAI.release.xcconfig */,
-				6BE500CC17E99C1A7781BE00 /* Pods-RunAnywhereAITests.debug.xcconfig */,
-				0C6190DD4A6B0BFF9057666D /* Pods-RunAnywhereAITests.release.xcconfig */,
-				5C0ED3F4213BACD2E335C6B1 /* Pods-RunAnywhereAIUITests.debug.xcconfig */,
-				1A33B9E0485890CABB40309E /* Pods-RunAnywhereAIUITests.release.xcconfig */,
-			);
-			path = Pods;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -160,7 +126,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5480A2122E2F250400337F2F /* Build configuration list for PBXNativeTarget "RunAnywhereAI" */;
 			buildPhases = (
-				D8F8E39571C734582319D5DB /* [CP] Check Pods Manifest.lock */,
 				5480A1EC2E2F250200337F2F /* Sources */,
 				5480A1ED2E2F250200337F2F /* Frameworks */,
 				5480A1EE2E2F250200337F2F /* Resources */,
@@ -356,28 +321,6 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		D8F8E39571C734582319D5DB /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-RunAnywhereAI-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -537,7 +480,6 @@
 		};
 		5480A2132E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 8D7B784CD1F41F7F0BC59945 /* Pods-RunAnywhereAI.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -579,7 +521,6 @@
 		};
 		5480A2142E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = FA8CA97C590524AC5642BCF3 /* Pods-RunAnywhereAI.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -622,7 +563,6 @@
 		};
 		5480A2162E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 6BE500CC17E99C1A7781BE00 /* Pods-RunAnywhereAITests.debug.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -646,7 +586,6 @@
 		};
 		5480A2172E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 0C6190DD4A6B0BFF9057666D /* Pods-RunAnywhereAITests.release.xcconfig */;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
@@ -669,7 +608,6 @@
 		};
 		5480A2192E2F250400337F2F /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5C0ED3F4213BACD2E335C6B1 /* Pods-RunAnywhereAIUITests.debug.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 5;
@@ -692,7 +630,6 @@
 		};
 		5480A21A2E2F250400337F2F /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 1A33B9E0485890CABB40309E /* Pods-RunAnywhereAIUITests.release.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 5;

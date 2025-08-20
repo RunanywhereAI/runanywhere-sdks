@@ -1,6 +1,6 @@
 #!/bin/bash
 # build_and_run.sh - Build, install, and run the RunAnywhereAI app
-# Usage: ./build_and_run.sh [simulator|device] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]
+# Usage: ./build_and_run.sh [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]
 # Examples:
 #   ./build_and_run.sh simulator "iPhone 16 Pro"
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --add-models
@@ -9,6 +9,8 @@
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --clean
 #   ./build_and_run.sh simulator "iPhone 16 Pro" --clean-data
+#   ./build_and_run.sh mac
+#   ./build_and_run.sh mac --clean
 #
 # IMPORTANT: Swift Macro Support Fix
 # ----------------------------------
@@ -64,11 +66,7 @@ check_requirements() {
         missing_tools+=("xcrun (Xcode Command Line Tools)")
     fi
 
-    # Check for pod
-    if ! command -v pod &> /dev/null; then
-        print_warning "CocoaPods not found. Some dependencies may not work."
-        print_warning "Install with: sudo gem install cocoapods"
-    fi
+    # CocoaPods is no longer required - using Swift Package Manager only
 
     # Check if any required tools are missing
     if [ ${#missing_tools[@]} -gt 0 ]; then
@@ -96,18 +94,20 @@ ADD_MODELS=false
 BUILD_SDK=false
 CLEAN_BUILD=false
 CLEAN_DATA=false
+FORCE_PROJECT=false
 
 # Check for help flag
 if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: $0 [simulator|device] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data]"
+    echo "Usage: $0 [simulator|device|mac] [device-name-or-id] [--add-models] [--build-sdk] [--clean] [--clean-data] [--use-project]"
     echo ""
     echo "Arguments:"
-    echo "  simulator|device    Target type (default: device)"
-    echo "  device-name-or-id   Device name or ID (optional for simulator)"
-    echo "  --add-models        Add model files to Xcode project (optional)"
-    echo "  --build-sdk         Build the RunAnywhere SDK before building the app (optional)"
-    echo "  --clean             Clean all build artifacts before building (optional)"
-    echo "  --clean-data        Clean app data including database (optional)"
+    echo "  simulator|device|mac  Target type (default: device)"
+    echo "  device-name-or-id     Device name or ID (optional for simulator, not used for mac)"
+    echo "  --add-models          Add model files to Xcode project (optional)"
+    echo "  --build-sdk           Build the RunAnywhere SDK before building the app (optional)"
+    echo "  --clean               Clean all build artifacts before building (optional)"
+    echo "  --clean-data          Clean app data including database (optional)"
+    echo "  --use-project         (Deprecated - always uses .xcodeproj now)"
     echo ""
     echo "Examples:"
     echo "  $0 simulator \"iPhone 16 Pro\""
@@ -117,6 +117,8 @@ if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  $0 simulator \"iPhone 16 Pro\" --build-sdk"
     echo "  $0 simulator \"iPhone 16 Pro\" --clean"
     echo "  $0 simulator \"iPhone 16 Pro\" --clean-data"
+    echo "  $0 mac"
+    echo "  $0 mac --clean"
     exit 0
 fi
 
@@ -131,29 +133,32 @@ for arg in "${@:3}"; do
     elif [ "$arg" = "--clean-data" ]; then
         CLEAN_DATA=true
         CLEAN_BUILD=true  # Clean data implies clean build
+    elif [ "$arg" = "--use-project" ]; then
+        FORCE_PROJECT=true
     fi
 done
 
 # Default values
-WORKSPACE="RunAnywhereAI.xcworkspace"
+PROJECT="RunAnywhereAI.xcodeproj"
 SCHEME="RunAnywhereAI"
 CONFIGURATION="Debug"
 BUNDLE_ID="com.runanywhere.RunAnywhereAI"
 
-# Function to fix Pods scripts for Xcode 16
+# Always use project file now (no CocoaPods workspace)
+USE_PROJECT=true
+
+# Function no longer needed - CocoaPods removed
 fix_pods_script() {
-    # Simply call the external fix script
-    if [ -x "scripts/fix_pods_sandbox.sh" ]; then
-        print_status "Fixing Pods scripts for Xcode 16 sandbox compatibility..."
-        ./scripts/fix_pods_sandbox.sh
-    else
-        print_warning "fix_pods_sandbox.sh not found or not executable"
-    fi
+    # CocoaPods has been removed - using Swift Package Manager only
+    return 0
 }
 
 # Function to get device destination
 get_destination() {
-    if [ "$TARGET_TYPE" = "simulator" ]; then
+    if [ "$TARGET_TYPE" = "mac" ]; then
+        # For macOS
+        echo "platform=macOS"
+    elif [ "$TARGET_TYPE" = "simulator" ]; then
         # First, check if there's already a booted simulator matching our criteria
         if [ -n "$DEVICE_NAME" ]; then
             # Check if the requested device is already booted
@@ -181,7 +186,11 @@ get_destination() {
         # For device - use xcodebuild to get device IDs that work with build system
         if [ -z "$DEVICE_NAME" ]; then
             # Get first connected device UUID using xcodebuild destinations
-            DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            if [ "$USE_PROJECT" = "true" ]; then
+                DEVICE_ID=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            else
+                DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            fi
             if [ -z "$DEVICE_ID" ]; then
                 print_error "No connected iOS device found!"
                 exit 1
@@ -192,7 +201,11 @@ get_destination() {
             echo "platform=iOS,id=$DEVICE_NAME"
         else
             # It's a device name, try to find its ID using xcodebuild destinations
-            DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            if [ "$USE_PROJECT" = "true" ]; then
+                DEVICE_ID=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            else
+                DEVICE_ID=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$DEVICE_NAME" | head -1 | sed -n 's/.*id:\([^,]*\).*/\1/p')
+            fi
             if [ -z "$DEVICE_ID" ]; then
                 print_error "Device '$DEVICE_NAME' not found!"
                 exit 1
@@ -218,24 +231,19 @@ clean_build_artifacts() {
 
     # Clean using xcodebuild
     print_status "Running xcodebuild clean..."
-    xcodebuild clean -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+    if [ "$USE_PROJECT" = "true" ]; then
+        xcodebuild clean -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+    else
+        xcodebuild clean -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" >/dev/null 2>&1 || true
+    fi
 
     # Clean Swift Package Manager cache
     print_status "Cleaning Swift Package Manager cache..."
     rm -rf .build/
     rm -rf ~/Library/Caches/org.swift.swiftpm/
 
-    # Clean Pods and reinstall
-    print_status "Cleaning and reinstalling CocoaPods..."
-    if [ -d "Pods" ]; then
-        rm -rf Pods/
-    fi
-    if [ -f "Podfile.lock" ]; then
-        rm -f Podfile.lock
-    fi
-
-    print_status "Running pod install..."
-    pod install
+    # CocoaPods removed - no need to clean Pods
+    print_status "CocoaPods dependencies removed - using Swift Package Manager"
 }
 
 # Function to clean app data
@@ -266,7 +274,11 @@ clean_app_data() {
 # Function to get DerivedData path
 get_derived_data_path() {
     # First try to get from xcodebuild
-    local derived_data=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
+    if [ "$USE_PROJECT" = "true" ]; then
+        local derived_data=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
+    else
+        local derived_data=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILD_ROOT" | head -1 | awk '{print $3}' | sed 's|/Build/Products||')
+    fi
 
     if [ -n "$derived_data" ] && [ -d "$derived_data" ]; then
         echo "$derived_data"
@@ -337,7 +349,13 @@ print_status "Building for destination: $DESTINATION"
 # Build the app
 print_status "Building the app..."
 # Removed debug output
-if xcodebuild -workspace "$WORKSPACE" \
+if [ "$USE_PROJECT" = "true" ]; then
+    BUILD_CMD="xcodebuild -project \"$PROJECT\""
+else
+    BUILD_CMD="xcodebuild -workspace \"$WORKSPACE\""
+fi
+
+if eval "$BUILD_CMD" \
     -scheme "$SCHEME" \
     -configuration "$CONFIGURATION" \
     -destination "$DESTINATION" \
@@ -351,13 +369,53 @@ else
 fi
 
 # Install and run
-if [ "$TARGET_TYPE" = "simulator" ]; then
+if [ "$TARGET_TYPE" = "mac" ]; then
+    # For macOS
+    print_status "Running on macOS..."
+
+    # Get the app path
+    if [ "$USE_PROJECT" = "true" ]; then
+        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    else
+        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    fi
+
+    if [ -n "$BUILD_DIR" ]; then
+        APP_PATH="$BUILD_DIR/$SCHEME.app"
+    fi
+
+    # Verify the app exists
+    if [ ! -d "$APP_PATH" ]; then
+        print_warning "App not found at expected path, searching for built app..."
+
+        # Search in DerivedData
+        DERIVED_DATA=$(get_derived_data_path)
+        APP_PATH=$(find "$DERIVED_DATA" -name "${SCHEME}.app" -path "*/Debug/*" -not -path "*/Index.noindex/*" -not -path "*-iphonesimulator/*" -not -path "*-iphoneos/*" 2>/dev/null | head -1)
+
+        if [ ! -d "$APP_PATH" ]; then
+            print_error "Could not find built app!"
+            print_error "You may need to clean and rebuild. Try: $0 mac --clean"
+            exit 1
+        fi
+    fi
+
+    print_status "Found app at: $APP_PATH"
+
+    # Launch the macOS app
+    print_status "Launching macOS app..."
+    open "$APP_PATH"
+
+elif [ "$TARGET_TYPE" = "simulator" ]; then
     # For simulator
     print_status "Installing on simulator..."
 
     # Get the app path - use xcodebuild to get the exact build location
     print_debug "Getting build directory from xcodebuild..."
-    BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    if [ "$USE_PROJECT" = "true" ]; then
+        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    else
+        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    fi
 
     if [ -n "$BUILD_DIR" ]; then
         APP_PATH="$BUILD_DIR/$SCHEME.app"
@@ -425,7 +483,11 @@ else
 
     # Get the devicectl ID for the same device (needed for installation)
     # Map from Xcode device ID to devicectl device ID using device name
-    DEVICE_NAME_FOR_INSTALL=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
+    if [ "$USE_PROJECT" = "true" ]; then
+        DEVICE_NAME_FOR_INSTALL=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
+    else
+        DEVICE_NAME_FOR_INSTALL=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -showdestinations 2>/dev/null | grep "platform:iOS" | grep -v "Simulator" | grep "$XCODE_DEVICE_ID" | sed -n 's/.*name:\([^}]*\).*/\1/p' | sed 's/  *$//')
+    fi
 
     if [ -n "$DEVICE_NAME_FOR_INSTALL" ]; then
         DEVICECTL_ID=$(xcrun devicectl list devices | grep "$DEVICE_NAME_FOR_INSTALL" | grep "connected" | head -1 | awk '{print $3}')
@@ -443,7 +505,11 @@ else
 
     # Get the built app path - use xcodebuild to get the exact build location
     print_debug "Getting build directory from xcodebuild..."
-    BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    if [ "$USE_PROJECT" = "true" ]; then
+        BUILD_DIR=$(xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    else
+        BUILD_DIR=$(xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration "$CONFIGURATION" -destination "$DESTINATION" -showBuildSettings 2>/dev/null | grep -E "^\s*BUILT_PRODUCTS_DIR" | head -1 | awk '{print $3}')
+    fi
 
     if [ -n "$BUILD_DIR" ]; then
         APP_PATH="$BUILD_DIR/$SCHEME.app"
