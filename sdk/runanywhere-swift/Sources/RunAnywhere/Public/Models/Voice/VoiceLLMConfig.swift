@@ -17,6 +17,11 @@ public struct VoiceLLMConfig {
     /// Maximum tokens to generate
     public let maxTokens: Int
 
+    /// Convenience property for accessing streaming flag
+    public var useStreaming: Bool {
+        return streamingEnabled
+    }
+
     public init(
         modelId: String? = nil,
         systemPrompt: String? = nil,

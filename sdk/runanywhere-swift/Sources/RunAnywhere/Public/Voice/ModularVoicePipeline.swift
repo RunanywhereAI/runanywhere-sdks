@@ -42,6 +42,9 @@ public class ModularVoicePipeline {
     private let minSpeechDuration: TimeInterval = 1.0 // Minimum 1.0 seconds of speech for better transcription
     private let transcriptionQueue = DispatchQueue(label: "com.runanywhere.transcription", qos: .userInitiated)
 
+    // Streaming TTS handler
+    private var streamingTTSHandler: StreamingTTSHandler?
+
     public weak var delegate: ModularVoicePipelineDelegate?
 
     public init(
@@ -93,6 +96,10 @@ public class ModularVoicePipeline {
 
         if config.components.contains(.tts) {
             self.ttsService = ttsService ?? SystemTextToSpeechService()
+            // Initialize streaming TTS handler if we have TTS
+            if let tts = self.ttsService {
+                self.streamingTTSHandler = StreamingTTSHandler(ttsService: tts)
+            }
         }
     }
 
@@ -267,8 +274,8 @@ public class ModularVoicePipeline {
                     let floatsToProcess = floatBuffer
                     floatBuffer = []
 
-                    // Non-blocking transcription
-                    Task.detached { [weak self] in
+                    // Non-blocking transcription using structured concurrency
+                    Task { [weak self] in
                         guard let self = self else { return }
                         do {
                             try await self.processBufferedAudioAsync(
@@ -296,8 +303,8 @@ public class ModularVoicePipeline {
                 let floatsToProcess = floatBuffer
                 floatBuffer = []
 
-                // Process asynchronously
-                Task.detached { [weak self] in
+                // Process asynchronously using structured concurrency
+                Task { [weak self] in
                     guard let self = self else { return }
                     do {
                         try await self.processBufferedAudioAsync(
@@ -395,52 +402,95 @@ public class ModularVoicePipeline {
                 systemPrompt: config.llm?.systemPrompt
             )
 
-            let response: String
-            if let llm = llmService, llm.isReady {
-                // Use the provided LLM service if it's ready
-                logger.debug("Using initialized LLM service for generation")
-                response = try await llm.generate(
-                    prompt: transcript,
-                    options: options
-                )
-            } else if useGenerationService || llmService == nil {
-                // Use the SDK's generation service directly
-                logger.debug("Using GenerationService directly for LLM processing")
-                let generationService = RunAnywhereSDK.shared.serviceContainer.generationService
-                let result = try await generationService.generate(
-                    prompt: transcript,
-                    options: options
-                )
-                response = result.text
-            } else {
-                // LLM service exists but not ready - this shouldn't happen after initialization
-                logger.error("LLM service exists but is not ready after initialization")
-                throw LLMServiceError.notInitialized
-            }
+            // Check if streaming is enabled (prefer streaming for voice pipelines)
+            let useStreaming = config.llm?.useStreaming ?? true
 
-            continuation.yield(.llmFinalResponse(response))
-            currentData = response
+            if useStreaming && llmService != nil && llmService!.isReady {
+                // Use streaming for real-time responses
+                logger.debug("Using streaming LLM service for real-time generation")
 
-            // If no TTS, stop here
-            if !config.components.contains(.tts) {
+                // Reset streaming TTS handler for new response
+                streamingTTSHandler?.reset()
+
+                var fullResponse = ""
+                var firstTokenReceived = false
+
+                try await llmService!.streamGenerate(
+                    prompt: transcript,
+                    options: options,
+                    onToken: { [weak self] token in
+                        guard let self = self else { return }
+                        if !firstTokenReceived {
+                            firstTokenReceived = true
+                            continuation.yield(.llmStreamStarted)
+                        }
+                        fullResponse += token
+                        continuation.yield(.llmStreamToken(token))
+
+                        // Process token for streaming TTS if enabled
+                        if self.config.components.contains(.tts),
+                           let handler = self.streamingTTSHandler {
+                            Task {
+                                await handler.processStreamingText(
+                                    token,
+                                    config: self.config.tts,
+                                    continuation: continuation
+                                )
+                            }
+                        }
+                    }
+                )
+
+                // Flush any remaining text in TTS buffer
+                if config.components.contains(.tts),
+                   let handler = streamingTTSHandler {
+                    let ttsOptions = createTTSOptions()
+                    await handler.flushRemaining(options: ttsOptions, continuation: continuation)
+                }
+
+                continuation.yield(.llmFinalResponse(fullResponse))
+                currentData = fullResponse
+
+                // No need for additional TTS - streaming handler takes care of it
                 return
+            } else {
+                // Fall back to non-streaming generation
+                let response: String
+                if let llm = llmService, llm.isReady {
+                    // Use the provided LLM service if it's ready
+                    logger.debug("Using initialized LLM service for generation")
+                    response = try await llm.generate(
+                        prompt: transcript,
+                        options: options
+                    )
+                } else if useGenerationService || llmService == nil {
+                    // Use the SDK's generation service directly
+                    logger.debug("Using GenerationService directly for LLM processing")
+                    let generationService = RunAnywhereSDK.shared.serviceContainer.generationService
+                    let result = try await generationService.generate(
+                        prompt: transcript,
+                        options: options
+                    )
+                    response = result.text
+                } else {
+                    // LLM service exists but not ready - this shouldn't happen after initialization
+                    logger.error("LLM service exists but is not ready after initialization")
+                    throw LLMServiceError.notInitialized
+                }
+
+                continuation.yield(.llmFinalResponse(response))
+                currentData = response
+
+                // If no TTS, stop here
+                if !config.components.contains(.tts) {
+                    return
+                }
             }
         }
 
         // Step 4: TTS (if enabled)
-        if let tts = ttsService, config.components.contains(.tts), let text = currentData as? String {
-            continuation.yield(.ttsStarted)
-
-            let ttsOptions = TTSOptions(
-                voice: config.tts?.voice,
-                language: "en",
-                rate: config.tts?.rate ?? 1.0,
-                pitch: config.tts?.pitch ?? 1.0,
-                volume: config.tts?.volume ?? 1.0
-            )
-            try await tts.speak(text: text, options: ttsOptions)
-
-            continuation.yield(.ttsCompleted)
+        if let text = currentData as? String {
+            try await performTTS(text: text, continuation: continuation)
         }
     }
 
@@ -469,6 +519,35 @@ public class ModularVoicePipeline {
     ) async throws {
         try await processBufferedAudio(continuation: continuation)
     }
+
+    // MARK: - TTS Helper Methods
+
+    /// Create TTS options from configuration
+    private func createTTSOptions() -> TTSOptions {
+        return TTSOptions(
+            voice: config.tts?.voice,
+            language: "en",
+            rate: config.tts?.rate ?? 1.0,
+            pitch: config.tts?.pitch ?? 1.0,
+            volume: config.tts?.volume ?? 1.0
+        )
+    }
+
+    /// Perform TTS for given text
+    private func performTTS(
+        text: String,
+        continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
+    ) async throws {
+        guard let tts = ttsService, config.components.contains(.tts) else {
+            return
+        }
+
+        continuation.yield(.ttsStarted)
+        let ttsOptions = createTTSOptions()
+        try await tts.speak(text: text, options: ttsOptions)
+        continuation.yield(.ttsCompleted)
+    }
+
 
     // MARK: - Component Factory Methods
 

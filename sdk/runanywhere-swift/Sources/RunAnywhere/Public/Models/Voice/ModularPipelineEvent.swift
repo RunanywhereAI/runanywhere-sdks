@@ -16,6 +16,8 @@ public enum ModularPipelineEvent {
     case llmThinking
     case llmPartialResponse(String)
     case llmFinalResponse(String)
+    case llmStreamStarted
+    case llmStreamToken(String)
 
     // TTS events
     case ttsStarted
