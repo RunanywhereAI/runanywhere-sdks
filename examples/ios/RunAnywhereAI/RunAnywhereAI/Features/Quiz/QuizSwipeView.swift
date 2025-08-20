@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
 struct QuizSwipeView: View {
     @ObservedObject var viewModel: QuizViewModel
@@ -27,7 +32,11 @@ struct QuizSwipeView: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Rectangle()
+                        #if os(iOS)
                         .fill(Color(.systemGray5))
+                        #else
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        #endif
                         .frame(height: 4)
 
                     Rectangle()
@@ -183,7 +192,11 @@ struct InstructionsOverlay: View {
             .cornerRadius(12)
         }
         .padding(30)
+        #if os(iOS)
         .background(Color(UIColor.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         .cornerRadius(20)
         .shadow(radius: 20)
     }

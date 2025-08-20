@@ -11,7 +11,11 @@ struct QuizResultsView: View {
                 // Score Circle
                 ZStack {
                     Circle()
+                        #if os(iOS)
                         .stroke(Color(.systemGray5), lineWidth: 20)
+                        #else
+                        .stroke(Color(NSColor.controlBackgroundColor), lineWidth: 20)
+                        #endif
                         .frame(width: 200, height: 200)
 
                     Circle()
@@ -73,7 +77,11 @@ struct QuizResultsView: View {
                     )
                 }
                 .padding()
+                #if os(iOS)
                 .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
                 .cornerRadius(16)
                 .padding(.horizontal)
 
@@ -109,7 +117,11 @@ struct QuizResultsView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    #if os(iOS)
+                .background(Color(.systemGray6))
+                #else
+                .background(Color(NSColor.controlBackgroundColor))
+                #endif
                     .cornerRadius(16)
                     .padding(.horizontal)
                 }
@@ -141,7 +153,11 @@ struct QuizResultsView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
+                        #if os(iOS)
                         .background(Color(.systemGray5))
+                        #else
+                        .background(Color(NSColor.controlBackgroundColor))
+                        #endif
                         .foregroundColor(.primary)
                         .cornerRadius(12)
                     }
@@ -246,7 +262,11 @@ struct IncorrectAnswerCard: View {
                 .foregroundColor(.secondary)
         }
         .padding()
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         .cornerRadius(12)
     }
 }

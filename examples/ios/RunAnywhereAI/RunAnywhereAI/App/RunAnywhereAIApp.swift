@@ -7,7 +7,9 @@
 
 import SwiftUI
 import RunAnywhereSDK
+#if canImport(UIKit)
 import UIKit
+#endif
 import os
 
 @main
@@ -42,13 +44,21 @@ struct RunAnywhereAIApp: App {
                 await initializeSDK()
                 await initializeBundledModels()
             }
+            #if os(iOS)
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
                 logger.warning("⚠️ Memory warning received, cleaning up cached services")
                 Task {
                     await WhisperKitAdapter.shared.forceCleanup()
                 }
             }
+            #endif
         }
+        #if os(macOS)
+        .windowStyle(.titleBar)
+        .windowToolbarStyle(.unified)
+        .defaultSize(width: 1200, height: 800)
+        .windowResizability(.contentSize)
+        #endif
     }
 
     private func initializeSDK() async {
@@ -71,8 +81,8 @@ struct RunAnywhereAIApp: App {
             // Register framework adapters before initializing SDK
             RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
 
-            // Register Foundation Models adapter for iOS 26+
-            if #available(iOS 26.0, *) {
+            // Register Foundation Models adapter for iOS 26+ and macOS 26+
+            if #available(iOS 26.0, macOS 26.0, *) {
                 RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
             }
 
@@ -216,7 +226,11 @@ struct InitializationLoadingView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
         .onAppear {
             isAnimating = true
         }
@@ -251,6 +265,10 @@ struct InitializationErrorView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        #if os(iOS)
         .background(Color(.systemBackground))
+        #else
+        .background(Color(NSColor.windowBackgroundColor))
+        #endif
     }
 }

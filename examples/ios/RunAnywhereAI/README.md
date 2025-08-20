@@ -1,53 +1,54 @@
 # RunAnywhereAI iOS Sample App
 
-A comprehensive iOS example app showcasing advanced on-device AI capabilities with multiple LLM frameworks, benchmarking tools, and performance optimization features.
+An iOS example app demonstrating the RunAnywhere SDK's on-device AI capabilities, including text generation, voice AI workflows, and model management features.
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
+    <img src="https://img.shields.io/badge/▶️_Watch_Demo-red?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo" />
+  </a>
+  <a href="https://testflight.apple.com/join/xc4HVVJE">
+    <img src="https://img.shields.io/badge/📱_Try_on_TestFlight-blue?style=for-the-badge&logo=apple&logoColor=white" alt="Try on TestFlight" />
+  </a>
+  <a href="https://runanywhere.ai">
+    <img src="https://img.shields.io/badge/🌐_Visit_Website-green?style=for-the-badge" alt="Visit Website" />
+  </a>
+</p>
 
 📖 **For detailed features documentation, see [FEATURES.md](./FEATURES.md)**
 
 ## Features
 
-### 🤖 Multi-Framework Support
-Integrates 10+ LLM frameworks including:
-- **llama.cpp** (GGUF models)
-- **Core ML** (Apple's native ML framework)
-- **MLX** (Apple Silicon optimized)
-- **ONNX Runtime** (Cross-platform inference)
-- **TensorFlow Lite** (Mobile-optimized ML)
-- **ExecuTorch** (PyTorch mobile runtime)
-- **MLC LLM** (Machine Learning Compilation)
-- **Swift Transformers** (Native Swift implementation)
-- **PicoLLM** (Lightweight inference engine)
-- **Foundation Models** (System-level APIs)
+### 🤖 Model Framework Support
+- **GGUF Models** via llama.cpp/LLM.swift
+- **Apple Foundation Models** (iOS 26+ Experimental)
+- **WhisperKit** for voice transcription
+- Architecture prepared for additional frameworks
 
-### 💬 Advanced Chat Interface
-- **Enhanced Chat View**: Full-featured chat UI with streaming responses
-- **Chat Interface View**: Specialized chat components
-- **Message Management**: Support for enhanced chat messages with metadata
-- **Conversation Export**: Export chat histories
-- **Conversation Store**: Persistent chat storage
+### 💬 Chat Interface
+- **Chat View**: Interactive chat UI with streaming responses
+- **Message Management**: Chat messages with metadata
+- **Conversation History**: Message persistence
+- **Markdown Rendering**: Rich text display
+- **Code Highlighting**: Syntax highlighting for code blocks
 
-### 📊 Performance & Benchmarking
-- **Comprehensive Benchmarking Suite**: Multi-framework performance testing
-- **Real-time Performance Monitoring**: Live metrics during inference
-- **Memory Profiling**: Track memory usage and optimization
-- **Performance Dashboard**: Visual charts and analytics
-- **A/B Testing Framework**: Compare different configurations
-- **Benchmark Service**: Automated performance testing
+### 📊 Performance Monitoring
+- **Real-time Metrics**: Token generation speed, latency tracking
+- **Memory Monitoring**: Track memory usage during inference
+- **Performance Analytics**: Generation statistics and metrics
+- **Benchmark Tools**: Model performance testing
 
-### 🔧 Model Management & Conversion
-- **Model Repository**: Centralized model storage and management
-- **Model Compatibility Checker**: Validate model-framework compatibility
-- **Model Conversion Wizard**: Convert between different model formats
-- **Model Format Detection**: Automatic format identification
-- **Model Quantization**: Optimize models for mobile deployment
-- **Model Import/Download**: Easy model acquisition and management
-- **Bundled Models Service**: Pre-packaged model management
+### 🔧 Model Management
+- **Model Registry**: Built-in model catalog with metadata
+- **Automatic Downloading**: On-demand model fetching
+- **Model Caching**: Efficient storage and retrieval
+- **Format Support**: GGUF models with various quantization levels
+- **Memory-Aware Loading**: Smart model loading based on available memory
 
-### 🚀 Framework Exploration
-- **Framework Capability Explorer**: Interactive framework comparison
-- **Model Compatibility Matrix**: Visual compatibility overview
-- **Framework Configurations**: Optimized settings per framework
-- **Dependency Container**: Modular service architecture
+### 🚀 Additional Features
+- **Voice AI Workflow** (Experimental): Real-time voice conversations
+- **Structured Outputs** (Experimental): Type-safe JSON generation
+- **Thinking Models**: Support for models with thinking processes
+- **Privacy Controls**: On-device processing configuration
 
 ### ⚙️ Advanced Configuration
 - **Settings View**: Comprehensive configuration options
@@ -56,105 +57,13 @@ Integrates 10+ LLM frameworks including:
 - **Service Lifecycle Management**: Proper resource handling
 - **Logging System**: Comprehensive debug and performance logging
 
-## Project Structure
+## Screenshots
 
-```
-RunAnywhereAI/
-├── Models/
-│   ├── ChatMessage.swift
-│   ├── ChatMessageEnhanced.swift
-│   ├── GenerationOptions.swift
-│   └── ModelInfo.swift
-├── Services/
-│   ├── LLMService/
-│   │   ├── BaseLLMService.swift
-│   │   ├── CoreMLService.swift
-│   │   ├── FoundationModelsService.swift
-│   │   ├── FrameworkInfo.swift
-│   │   ├── LLMCapabilities.swift
-│   │   ├── LLMInference.swift
-│   │   ├── LLMMetrics.swift
-│   │   ├── LLMModelLoader.swift
-│   │   ├── LLMProtocol.swift
-│   │   ├── LlamaCppService.swift
-│   │   └── MLXService.swift
-│   ├── Benchmarking/
-│   │   └── BenchmarkSuite.swift
-│   ├── Configuration/
-│   │   ├── ConfigurationFactory.swift
-│   │   └── FrameworkConfigurations.swift
-│   ├── Logging/
-│   │   ├── LLMService+Logging.swift
-│   │   └── Logger.swift
-│   ├── ModelManagement/
-│   │   ├── ModelCompatibilityMatrix.swift
-│   │   ├── ModelConverter.swift
-│   │   ├── ModelFormatDetector.swift
-│   │   └── ModelRepository.swift
-│   ├── Monitoring/
-│   │   └── RealtimePerformanceMonitor.swift
-│   ├── Profiling/
-│   │   └── MemoryProfiler.swift
-│   ├── Testing/
-│   │   └── ABTestingFramework.swift
-│   ├── Tokenization/
-│   │   └── Tokenizer.swift
-│   ├── BenchmarkService.swift
-│   ├── BundledModelsService.swift
-│   ├── ConversationExporter.swift
-│   ├── ConversationStore.swift
-│   ├── DependencyContainer.swift
-│   ├── ExecuTorchService.swift
-│   ├── FrameworkConfiguration.swift
-│   ├── LLMError+Extended.swift
-│   ├── LLMError.swift
-│   ├── MLCService.swift
-│   ├── MemoryManager.swift
-│   ├── ModelCompatibilityChecker.swift
-│   ├── ModelLoader.swift
-│   ├── ModelManager.swift
-│   ├── ONNXService.swift
-│   ├── PerformanceMonitor.swift
-│   ├── PicoLLMService.swift
-│   ├── ServiceLifecycleObserverImpl.swift
-│   ├── SwiftTransformersService.swift
-│   ├── TFLiteService.swift
-│   └── UnifiedLLMService.swift
-├── ViewModels/
-│   ├── ChatViewModel.swift
-│   ├── ChatViewModelEnhanced.swift
-│   ├── ComparisonViewModel.swift
-│   ├── FrameworkCapabilityExplorerViewModel.swift
-│   ├── ModelConversionWizardViewModel.swift
-│   ├── ModelListViewModel.swift
-│   └── ModelQuantizationViewModel.swift
-├── Views/
-│   ├── Chat/
-│   │   └── ChatInterfaceView.swift
-│   ├── Comparison/
-│   │   └── ComparisonView.swift
-│   ├── Dashboard/
-│   │   ├── Charts/
-│   │   │   └── DashboardCharts.swift
-│   │   └── PerformanceDashboardView.swift
-│   ├── FrameworkExplorer/
-│   │   └── FrameworkCapabilityExplorerView.swift
-│   ├── ModelConversion/
-│   │   └── ModelConversionWizardView.swift
-│   ├── Quantization/
-│   │   └── ModelQuantizationView.swift
-│   ├── BenchmarkView.swift
-│   ├── ChatView.swift
-│   ├── MemoryMonitorView.swift
-│   ├── ModelDownloadView.swift
-│   ├── ModelImportView.swift
-│   ├── ModelListView.swift
-│   ├── ModelLoadingView.swift
-│   └── SettingsView.swift
-├── Utilities/
-│   └── Constants.swift
-└── ContentView.swift
-```
+<p align="center">
+  <img src="docs/screenshots/chat-interface.png" alt="Chat Interface" width="250"/>
+  <img src="docs/screenshots/quiz-flow.png" alt="Model Selection" width="250"/>
+  <img src="docs/screenshots/voice-ai.png" alt="Voice AI" width="250"/>
+</p>
 
 ## App Navigation
 
@@ -327,24 +236,18 @@ This script:
 
 This app demonstrates integration patterns for multiple LLM frameworks:
 
-### Currently Available Services
-- **Core ML**: Apple's native ML framework (iOS 17.0+)
-- **MLX**: Apple Silicon-optimized framework (iOS 17.0+)
-- **ONNX Runtime**: Cross-platform inference engine
-- **TensorFlow Lite**: Mobile-optimized TensorFlow
-- **Foundation Models**: System-level model APIs (iOS 18.0+)
+### Currently Implemented
+- **RunAnywhere SDK**: Core SDK integration with llama.cpp
+- **Foundation Models**: Apple's system models (iOS 26.0+ Experimental)
+- **WhisperKit**: Voice transcription models
 
-### Integration-Ready Services
-Each service includes the interface and architecture for:
-- **llama.cpp**: GGUF model support with C++ bridge
-- **Core ML**: Apple's native ML framework integration
+### Architecture Prepared For
+The app's modular architecture is ready for additional frameworks:
+- **Core ML**: Apple's native ML framework
 - **MLX**: Apple Silicon-optimized framework
-- **ONNX Runtime**: Cross-platform model execution
-- **TensorFlow Lite**: Mobile-optimized TensorFlow
-- **ExecuTorch**: PyTorch mobile runtime
-- **MLC LLM**: Machine learning compilation framework
-- **Swift Transformers**: Pure Swift transformer implementation
-- **PicoLLM**: Lightweight inference engine
+- **ONNX Runtime**: Cross-platform inference
+- **TensorFlow Lite**: Mobile ML models
+These services have interfaces defined but require actual framework integration.
 
 ### Adding Real Framework Support
 To integrate actual frameworks:

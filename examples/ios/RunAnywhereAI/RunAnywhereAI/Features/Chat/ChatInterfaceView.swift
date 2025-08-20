@@ -8,6 +8,26 @@
 import SwiftUI
 import RunAnywhereSDK
 import os.log
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
+
+// MARK: - Platform-specific colors
+#if os(iOS)
+private let platformBackgroundColor = UIColor.systemGroupedBackground
+private let platformSystemBackground = UIColor.systemBackground
+private let platformSeparator = UIColor.separator
+private let platformSystemGray5 = UIColor.systemGray5
+private let platformSystemGray6 = UIColor.systemGray6
+#else
+private let platformBackgroundColor = NSColor.controlBackgroundColor
+private let platformSystemBackground = NSColor.controlBackgroundColor
+private let platformSeparator = NSColor.separatorColor
+private let platformSystemGray5 = NSColor.controlColor
+private let platformSystemGray6 = NSColor.controlBackgroundColor
+#endif
 
 struct ChatInterfaceView: View {
     @StateObject private var viewModel = ChatViewModel()
@@ -22,6 +42,39 @@ struct ChatInterfaceView: View {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatInterfaceView")
 
     var body: some View {
+        Group {
+            #if os(macOS)
+            // macOS: No NavigationView to avoid sidebar
+            VStack(spacing: 0) {
+                // Add a custom toolbar for macOS
+                HStack {
+                    Button(action: { showingConversationList = true }) {
+                        Label("Conversations", systemImage: "list.bullet")
+                    }
+                    .buttonStyle(.bordered)
+                    
+                    Spacer()
+                    
+                    Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
+                        .font(.headline)
+                    
+                    Spacer()
+                    
+                    toolbarButtons
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(NSColor.windowBackgroundColor))
+                
+                Divider()
+                
+                chatMessagesView
+                inputArea
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(NSColor.windowBackgroundColor))
+        #else
+        // iOS: Keep NavigationView
         NavigationView {
             VStack(spacing: 0) {
                 chatMessagesView
@@ -40,33 +93,35 @@ struct ChatInterfaceView: View {
                     toolbarButtons
                 }
             }
-            .sheet(isPresented: $showingConversationList) {
-                ConversationListView()
+        }
+        #endif
+        }
+        .sheet(isPresented: $showingConversationList) {
+            ConversationListView()
+        }
+        .sheet(isPresented: $showingModelSelection) {
+            ModelSelectionSheet { model in
+                await handleModelSelected(model)
             }
-            .sheet(isPresented: $showingModelSelection) {
-                ModelSelectionSheet { model in
-                    await handleModelSelected(model)
-                }
+        }
+        .sheet(isPresented: $showingChatDetails) {
+            ChatDetailsView(
+                messages: viewModel.messages,
+                conversation: viewModel.currentConversation
+            )
+        }
+        .onAppear {
+            setupInitialState()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
+            Task {
+                await viewModel.checkModelStatus()
             }
-            .sheet(isPresented: $showingChatDetails) {
-                ChatDetailsView(
-                    messages: viewModel.messages,
-                    conversation: viewModel.currentConversation
-                )
-            }
-            .onAppear {
-                setupInitialState()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ModelLoaded"))) { _ in
-                Task {
-                    await viewModel.checkModelStatus()
-                }
-            }
-            .alert("Debug Info", isPresented: $showDebugAlert) {
-                Button("OK") { }
-            } message: {
-                Text(debugMessage)
-            }
+        }
+        .alert("Debug Info", isPresented: $showDebugAlert) {
+            Button("OK") { }
+        } message: {
+            Text(debugMessage)
         }
     }
 
@@ -142,7 +197,7 @@ struct ChatInterfaceView: View {
                 }
                 .defaultScrollAnchor(.bottom)
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color(platformBackgroundColor))
             .contentShape(Rectangle()) // Makes entire area tappable
             .onTapGesture {
                 // Dismiss keyboard when tapping outside
@@ -206,6 +261,7 @@ struct ChatInterfaceView: View {
                     }
                 }
             }
+            #if os(iOS)
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
                 // Scroll to bottom when keyboard shows
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -240,6 +296,7 @@ struct ChatInterfaceView: View {
                     }
                 }
             }
+            #endif
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MessageContentUpdated"))) { _ in
                 // Scroll to bottom during streaming updates (less frequent to avoid jitter)
                 if viewModel.isGenerating {
@@ -257,24 +314,33 @@ struct ChatInterfaceView: View {
                     .foregroundColor(viewModel.messages.isEmpty ? .gray : .blue)
             }
             .disabled(viewModel.messages.isEmpty)
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
 
             Button(action: { showingModelSelection = true }) {
                 HStack(spacing: 4) {
                     Image(systemName: "cube")
                     if viewModel.isModelLoaded {
-                        Text("Switch")
+                        Text("Switch Model")
                             .font(.caption)
                     } else {
-                        Text("Select")
+                        Text("Select Model")
                             .font(.caption)
                     }
                 }
             }
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
 
             Button(action: { viewModel.clearChat() }) {
                 Image(systemName: "trash")
             }
             .disabled(viewModel.messages.isEmpty)
+            #if os(macOS)
+            .buttonStyle(.bordered)
+            #endif
         }
     }
 
@@ -323,7 +389,7 @@ struct ChatInterfaceView: View {
                 .disabled(!viewModel.canSend)
             }
             .padding()
-            .background(Color(.systemBackground))
+            .background(Color(platformSystemBackground))
             .animation(.easeInOut(duration: 0.25), value: isTextFieldFocused)
         }
     }
@@ -421,11 +487,11 @@ struct ChatInterfaceView: View {
         .padding(.vertical, 6)
         .background(
             Rectangle()
-                .fill(Color(.systemBackground).opacity(0.95))
+                .fill(Color(platformSystemBackground).opacity(0.95))
                 .overlay(
                     Rectangle()
                         .frame(height: 0.5)
-                        .foregroundColor(Color(.separator))
+                        .foregroundColor(Color(platformSeparator))
                         .offset(y: 12)
                 )
         )
@@ -479,7 +545,7 @@ struct TypingIndicatorView: View {
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(.systemGray5))
+                        .fill(Color(platformSystemGray5))
                         .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
                         .overlay(
                             RoundedRectangle(cornerRadius: 16)
@@ -605,7 +671,7 @@ struct MessageBubbleView: View {
                     .padding(12)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(.systemGray6))
+                            .fill(Color(platformSystemGray6))
                     )
 
                     // Subtle completion status
@@ -813,7 +879,7 @@ struct MessageBubbleView: View {
                         .fill(message.role == .user ?
                               LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.9)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing) :
-                              LinearGradient(colors: [Color(.systemGray5), Color(.systemGray6)],
+                              LinearGradient(colors: [Color(platformSystemGray5), Color(platformSystemGray6)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
@@ -867,13 +933,23 @@ struct ChatDetailsView: View {
                     .tag(2)
             }
             .navigationTitle("Chat Analytics")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
             .toolbar {
+                #if os(iOS)
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
                         dismiss()
                     }
                 }
+                #else
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+                #endif
             }
         }
     }
@@ -936,7 +1012,7 @@ struct ChatOverviewTab: View {
                 .padding()
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.systemGray6))
+                        .fill(Color(platformSystemGray6))
                 )
 
                 // Performance Highlights
@@ -982,7 +1058,7 @@ struct ChatOverviewTab: View {
                     .padding()
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(.systemGray6))
+                            .fill(Color(platformSystemGray6))
                     )
                 }
 
@@ -1065,7 +1141,8 @@ struct MessageAnalyticsTab: View {
 
     var body: some View {
         List {
-            ForEach(Array(analyticsMessages.enumerated()), id: \.1.0.id) { index, messageWithAnalytics in
+            ForEach(analyticsMessages.indices, id: \.self) { index in
+                let messageWithAnalytics = analyticsMessages[index]
                 let (message, analytics) = messageWithAnalytics
                 MessageAnalyticsRow(
                     messageNumber: index + 1,
@@ -1074,7 +1151,9 @@ struct MessageAnalyticsTab: View {
                 )
             }
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
     }
 }
 
@@ -1222,7 +1301,7 @@ struct PerformanceTab: View {
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(.systemGray6))
+                                    .fill(Color(platformSystemGray6))
                             )
                         }
                     }

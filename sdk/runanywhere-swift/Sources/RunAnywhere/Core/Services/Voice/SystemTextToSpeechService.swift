@@ -23,8 +23,8 @@ public final class SystemTextToSpeechService: NSObject, TextToSpeechService {
         try audioSession.setActive(true)
         logger.info("System TTS initialized with playback configuration")
         #else
-        // On macOS, no audio session configuration needed
-        logger.info("System TTS initialized")
+        // macOS doesn't require audio session configuration
+        logger.info("System TTS initialized for macOS")
         #endif
     }
 

@@ -9,7 +9,7 @@ import FoundationModels
 
 /// Adapter for Apple's native Foundation Models framework (iOS 26.0+)
 /// Uses Apple's built-in language models without requiring external model files
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public var framework: LLMFramework { .foundationModels }
     public let supportedModalities: Set<FrameworkModality> = [.textToText]
@@ -26,7 +26,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public func canHandle(model: ModelInfo) -> Bool {
         // Foundation Models doesn't need external model files
         // It can handle any request as it uses Apple's built-in models
-        guard #available(iOS 26.0, *) else { return false }
+        guard #available(iOS 26.0, macOS 26.0, *) else { return false }
 
         // Check if the model name indicates it's for Foundation Models
         return model.name.lowercased().contains("foundation") ||
@@ -85,7 +85,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
 }
 
 /// Service implementation for Apple's Foundation Models
-@available(iOS 26.0, *)
+@available(iOS 26.0, macOS 26.0, *)
 class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
     private var _modelInfo: LoadedModelInfo?
@@ -94,8 +94,8 @@ class FoundationModelsService: LLMService {
 
     #if canImport(FoundationModels)
     // The actual FoundationModels types
-    private var languageModel: SystemLanguageModel?
-    private var session: LanguageModelSession?
+    private var languageModel: Any? // Will be cast to SystemLanguageModel when used
+    private var session: Any? // Will be cast to LanguageModelSession when used
     #endif
 
     var isReady: Bool { _isReady }
@@ -106,11 +106,11 @@ class FoundationModelsService: LLMService {
     }
 
     func initialize(modelPath: String) async throws {
-        logger.info("Initializing Apple Foundation Models (iOS 26+)")
+        logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
         #if canImport(FoundationModels)
-        guard #available(iOS 26.0, *) else {
-            logger.error("iOS 26.0+ not available")
+        guard #available(iOS 26.0, macOS 26.0, *) else {
+            logger.error("iOS 26.0+ or macOS 26.0+ not available")
             throw LLMServiceError.modelNotLoaded
         }
 
@@ -119,11 +119,12 @@ class FoundationModelsService: LLMService {
         do {
             // Create the system language model using the default property
             logger.info("Getting SystemLanguageModel.default...")
-            languageModel = SystemLanguageModel.default
+            let model = SystemLanguageModel.default
+            languageModel = model
             logger.info("SystemLanguageModel.default obtained successfully")
 
             // Check availability status
-            switch languageModel?.availability {
+            switch model.availability {
             case .available:
                 logger.info("Foundation Models is available")
 
@@ -149,8 +150,8 @@ class FoundationModelsService: LLMService {
             case .unavailable(let other):
                 logger.error("Foundation Models unavailable: \(String(describing: other))")
                 throw LLMServiceError.modelNotLoaded
-            case .none:
-                logger.error("Could not determine model availability")
+            @unknown default:
+                logger.error("Unknown availability status")
                 throw LLMServiceError.modelNotLoaded
             }
 
@@ -184,14 +185,14 @@ class FoundationModelsService: LLMService {
         logger.debug("Generating response for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
-        guard let session = session else {
+        guard let sessionObj = session as? LanguageModelSession else {
             logger.error("Session not available - was initialization successful?")
             throw LLMServiceError.notInitialized
         }
 
         do {
             // Check if session is responding to another request
-            if session.isResponding {
+            if sessionObj.isResponding {
                 logger.warning("Session is already responding to another request")
                 throw LLMServiceError.notInitialized
             }
@@ -200,7 +201,7 @@ class FoundationModelsService: LLMService {
             let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
 
             // Use respond(to:options:) method as per documentation
-            let response = try await session.respond(to: prompt, options: foundationOptions)
+            let response = try await sessionObj.respond(to: prompt, options: foundationOptions)
 
             logger.debug("Generated response successfully")
             return response.content
@@ -237,14 +238,14 @@ class FoundationModelsService: LLMService {
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
-        guard let session = session else {
+        guard let sessionObj = session as? LanguageModelSession else {
             logger.error("Session not available for streaming")
             throw LLMServiceError.notInitialized
         }
 
         do {
             // Check if session is responding to another request
-            if session.isResponding {
+            if sessionObj.isResponding {
                 logger.warning("Session is already responding to another request")
                 throw LLMServiceError.notInitialized
             }
@@ -253,7 +254,7 @@ class FoundationModelsService: LLMService {
             let foundationOptions = GenerationOptions(temperature: Double(options.temperature))
 
             // Use native streaming with streamResponse(to:options:)
-            let responseStream = session.streamResponse(to: prompt, options: foundationOptions)
+            let responseStream = sessionObj.streamResponse(to: prompt, options: foundationOptions)
 
             // Stream tokens as they arrive
             var previousContent = ""

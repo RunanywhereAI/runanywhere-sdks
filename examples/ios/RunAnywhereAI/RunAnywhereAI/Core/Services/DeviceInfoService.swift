@@ -6,7 +6,11 @@
 //
 
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#else
+import AppKit
+#endif
 import RunAnywhereSDK
 
 @MainActor
@@ -35,7 +39,11 @@ class DeviceInfoService: ObservableObject {
         let chipName = await getChipName()
         let (totalMemory, availableMemory) = await getMemoryInfo()
         let neuralEngineAvailable = await isNeuralEngineAvailable()
+        #if os(iOS) || os(tvOS)
         let osVersion = UIDevice.current.systemVersion
+        #else
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersionString
+        #endif
         let appVersion = getAppVersion()
 
         deviceInfo = SystemDeviceInfo(
@@ -62,7 +70,11 @@ class DeviceInfoService: ObservableObject {
             return identifier + String(unicodeScalar)
         }
 
+        #if os(iOS) || os(tvOS)
         return identifier.isEmpty ? UIDevice.current.model : identifier
+        #else
+        return identifier.isEmpty ? "Mac" : identifier
+        #endif
     }
 
     private func getChipName() async -> String {

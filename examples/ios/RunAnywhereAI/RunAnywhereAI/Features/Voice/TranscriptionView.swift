@@ -8,6 +8,10 @@ struct TranscriptionView: View {
     @State private var showModelInfo = false
 
     var body: some View {
+        #if os(macOS)
+        content
+            .frame(minWidth: 600, minHeight: 400)
+        #else
         NavigationView {
             VStack(spacing: 0) {
                 // Clean, minimal header

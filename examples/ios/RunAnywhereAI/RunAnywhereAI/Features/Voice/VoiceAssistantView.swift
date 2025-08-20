@@ -195,6 +195,11 @@ struct VoiceAssistantView: View {
                     .font(.caption2)
                     .foregroundColor(.secondary.opacity(0.7))
                     .multilineTextAlignment(.center)
+
+                Text("⚠️ This feature is under active development")
+                    .font(.caption2)
+                    .foregroundColor(.orange)
+                    .italic()
                     .padding(.horizontal, 40)
             }
             .padding(.bottom, 30)
