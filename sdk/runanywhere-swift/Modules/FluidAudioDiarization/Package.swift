@@ -14,8 +14,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // FluidAudio dependency
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.3.0"),
+        // FluidAudio dependency - using main branch for iOS fix
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
         // Reference to main SDK for protocols
         .package(path: "../../"),
     ],
