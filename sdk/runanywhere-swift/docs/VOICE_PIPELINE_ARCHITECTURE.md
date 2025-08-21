@@ -505,20 +505,6 @@ SDKLogger.setLevel(.debug, for: "VoiceCapabilityService")
 SDKLogger.setLevel(.debug, for: "VADHandler")
 ```
 
-## 🧹 Cleanup Required
-
-### Legacy Components (To Be Removed)
-The following files contain old logic and should be deleted:
-
-1. **`Core/Protocols/Voice/VoiceOrchestrator.swift`** - ❌ UNUSED
-2. **`Core/Services/Voice/DefaultVoiceOrchestrator.swift`** - ❌ UNUSED
-3. **`Core/Protocols/Voice/VoiceActivityDetector.swift`** - ❌ UNUSED
-4. **`Core/Protocols/Voice/VoicePerformanceMonitor.swift`** - ❌ UNUSED
-5. **`Public/Models/Voice/VoicePipelineConfig.swift`** - ❌ OLD CONFIG
-
-### ServiceContainer Cleanup
-Remove the unused `voiceOrchestrator` property from ServiceContainer.swift that creates DefaultVoiceOrchestrator but is never used.
-
 ## 📚 Related Documentation
 
 - [SDK Architecture Overview](./ARCHITECTURE_V2.md)
