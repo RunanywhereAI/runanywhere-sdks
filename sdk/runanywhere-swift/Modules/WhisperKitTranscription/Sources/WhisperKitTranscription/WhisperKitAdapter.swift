@@ -4,7 +4,7 @@ import os
 
 /// WhisperKit adapter for voice transcription
 public class WhisperKitAdapter: UnifiedFrameworkAdapter {
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitAdapter")
+    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitAdapter")
 
     // Singleton instance to ensure caching works across the app
     public static let shared = WhisperKitAdapter()

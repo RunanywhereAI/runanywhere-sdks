@@ -3,31 +3,12 @@ import RunAnywhereSDK
 import LLM
 import os.log
 
-// Define LLMError for handling LLM.swift specific errors
-enum LLMError: LocalizedError {
-    case modelLoadFailed
-    case initializationFailed
-    case generationFailed(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .modelLoadFailed:
-            return "Failed to load the LLM model"
-        case .initializationFailed:
-            return "Failed to initialize LLM service"
-        case .generationFailed(let reason):
-            return "Generation failed: \(reason)"
-        }
-    }
-}
-
 public class LLMSwiftService: LLMService {
     private var llm: LLM?
     private var modelPath: String?
     private var _modelInfo: LoadedModelInfo?
-    // Removed context property - no longer using Context type
     private let hardwareConfig: HardwareConfiguration?
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "LLMSwiftService")
+    private let logger = Logger(subsystem: "com.runanywhere.llmswift", category: "LLMSwiftService")
 
     public var isReady: Bool { llm != nil }
     public var modelInfo: LoadedModelInfo? { _modelInfo }
@@ -52,7 +33,7 @@ public class LLMSwiftService: LLMService {
 
         // Configure LLM with hardware settings
         let maxTokens = 2048 // Default context length
-        let template = determineTemplate(from: modelPath, systemPrompt: nil)
+        let template = LLMSwiftTemplateResolver.determineTemplate(from: modelPath, systemPrompt: nil)
         logger.info("📝 Using template: \(String(describing: template)), maxTokens: \(maxTokens)")
 
         // Initialize LLM instance
@@ -68,7 +49,7 @@ public class LLMSwiftService: LLMService {
             )
 
             guard let llm = self.llm else {
-                throw LLMError.modelLoadFailed
+                throw LLMSwiftError.modelLoadFailed
             }
 
             logger.info("✅ LLM instance created")
@@ -78,7 +59,7 @@ public class LLMSwiftService: LLMService {
             guard let llm = self.llm else {
                 throw FrameworkError(
                     framework: .llamaCpp,
-                    underlying: LLMError.modelLoadFailed,
+                    underlying: LLMSwiftError.modelLoadFailed,
                     context: "Failed to initialize LLM.swift with model at \(modelPath)"
                 )
             }
@@ -86,14 +67,11 @@ public class LLMSwiftService: LLMService {
             // Skip the test prompt to avoid blocking during initialization
             logger.info("✅ Skipping test prompt to avoid blocking")
 
-            // Note: Will configure generation parameters during inference
-            // LLM.swift Configuration API requires apiKey parameter
-
             // Create model info
             guard self.llm != nil else {
                 throw FrameworkError(
                     framework: .llamaCpp,
-                    underlying: LLMError.modelLoadFailed,
+                    underlying: LLMSwiftError.modelLoadFailed,
                     context: "Failed to initialize LLM.swift with model at \(modelPath)"
                 )
             }
@@ -131,16 +109,13 @@ public class LLMSwiftService: LLMService {
         logger.info("🔍 LLM instance: \(String(describing: llm))")
         logger.info("🔍 Model path: \(self.modelPath ?? "nil")")
 
-        // Let LLM.swift manage its own conversation history
-        // This maintains context across multiple turns
-
         // Apply generation options
         await applyGenerationOptions(options, to: llm)
 
         // Handle system prompt if provided
         if let systemPrompt = options.systemPrompt, let modelPath = self.modelPath {
             logger.info("🔧 Applying system prompt: \(systemPrompt.prefix(100))...")
-            let newTemplate = determineTemplate(from: modelPath, systemPrompt: systemPrompt)
+            let newTemplate = LLMSwiftTemplateResolver.determineTemplate(from: modelPath, systemPrompt: systemPrompt)
             llm.template = newTemplate
         }
 
@@ -172,12 +147,12 @@ public class LLMSwiftService: LLMService {
                     // Timeout task
                     try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
                     self.logger.error("❌ Generation timed out after 60 seconds")
-                    throw LLMError.generationFailed("Generation timed out after 60 seconds")
+                    throw LLMSwiftError.generationFailed("Generation timed out after 60 seconds")
                 }
 
                 // Return the first completed task (either result or timeout)
                 guard let result = try await group.next() else {
-                    throw LLMError.generationFailed("No result from generation")
+                    throw LLMSwiftError.generationFailed("No result from generation")
                 }
 
                 // Cancel the other task
@@ -197,10 +172,6 @@ public class LLMSwiftService: LLMService {
                     }
                 }
             }
-
-            // Note: We return the raw response including any thinking tags
-            // The SDK's GenerationService will handle parsing thinking content
-            // based on the model's configuration
 
             // Limit to max tokens if specified (but preserve thinking tags)
             if options.maxTokens > 0 {
@@ -243,16 +214,13 @@ public class LLMSwiftService: LLMService {
         // Handle system prompt if provided
         if let systemPrompt = options.systemPrompt, let modelPath = self.modelPath {
             logger.info("🔧 Applying system prompt for streaming: \(systemPrompt.prefix(100))...")
-            let newTemplate = determineTemplate(from: modelPath, systemPrompt: systemPrompt)
+            let newTemplate = LLMSwiftTemplateResolver.determineTemplate(from: modelPath, systemPrompt: systemPrompt)
             llm.template = newTemplate
         }
 
         // Include context
         let fullPrompt = buildPromptWithContext(prompt)
         logger.info("📝 Full streaming prompt length: \(fullPrompt.count) characters")
-
-        // Let LLM.swift manage its own conversation history for streaming
-        // This maintains context across multiple turns
 
         // Create streaming callback
         let maxTokens = options.maxTokens > 0 ? options.maxTokens : Int.max
@@ -288,10 +256,6 @@ public class LLMSwiftService: LLMService {
 
                     // Accumulate response to check for stop sequences
                     accumulatedResponse += token
-
-                    // Note: We stream all tokens including thinking tags
-                    // The SDK's StreamingService will handle parsing and filtering
-                    // thinking content based on the model's configuration
 
                     // Check stop sequences in accumulated response
                     if !options.stopSequences.isEmpty {
@@ -360,43 +324,6 @@ public class LLMSwiftService: LLMService {
 
 
     // MARK: - Private Helpers
-
-    private func determineTemplate(from path: String, systemPrompt: String? = nil) -> Template {
-        let filename = URL(fileURLWithPath: path).lastPathComponent.lowercased()
-
-        logger.info("🔍 Determining template for filename: \(filename)")
-        if let systemPrompt = systemPrompt {
-            logger.info("📝 Using system prompt: \(systemPrompt.prefix(100))...")
-        }
-
-        if filename.contains("qwen") {
-            // Qwen models typically use ChatML format
-            logger.info("✅ Using ChatML template for Qwen model")
-            return .chatML(systemPrompt)
-        } else if filename.contains("chatml") || filename.contains("openai") {
-            return .chatML(systemPrompt)
-        } else if filename.contains("alpaca") {
-            return .alpaca(systemPrompt)
-        } else if filename.contains("llama") {
-            return .llama(systemPrompt)
-        } else if filename.contains("mistral") {
-            // Mistral doesn't support system prompts in the same way
-            if systemPrompt != nil {
-                logger.warning("⚠️ Mistral template doesn't support system prompts, ignoring")
-            }
-            return .mistral
-        } else if filename.contains("gemma") {
-            // Gemma doesn't support system prompts in the same way
-            if systemPrompt != nil {
-                logger.warning("⚠️ Gemma template doesn't support system prompts, ignoring")
-            }
-            return .gemma
-        }
-
-        // Default to ChatML
-        logger.info("⚠️ Using default ChatML template")
-        return .chatML(systemPrompt)
-    }
 
     private func determineFormat(from path: String) -> ModelFormat {
         let ext = URL(fileURLWithPath: path).pathExtension.lowercased()

@@ -4,11 +4,9 @@ import AVFoundation
 import WhisperKit
 import os
 
-// No type aliases needed anymore - SDK types are uniquely named
-
 /// WhisperKit implementation of VoiceService
 public class WhisperKitService: VoiceService {
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitService")
+    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitService")
 
     // MARK: - Properties
 
@@ -301,8 +299,6 @@ public class WhisperKitService: VoiceService {
         }
     }
 
-    // REMOVED: All conversion methods - no longer needed with simplified pipeline
-
     // MARK: - Streaming Support
 
     /// Support for streaming transcription
@@ -474,30 +470,5 @@ public class WhisperKitService: VoiceService {
         }
 
         return false
-    }
-}
-
-// MARK: - Voice Error
-
-public enum VoiceError: LocalizedError {
-    case serviceNotInitialized
-    case modelNotFound(String)
-    case transcriptionFailed(Error)
-    case insufficientMemory
-    case unsupportedAudioFormat
-
-    public var errorDescription: String? {
-        switch self {
-        case .serviceNotInitialized:
-            return "Voice service is not initialized"
-        case .modelNotFound(let model):
-            return "Model not found: \(model)"
-        case .transcriptionFailed(let error):
-            return "Transcription failed: \(error.localizedDescription)"
-        case .insufficientMemory:
-            return "Insufficient memory for voice processing"
-        case .unsupportedAudioFormat:
-            return "Unsupported audio format"
-        }
     }
 }
