@@ -77,14 +77,14 @@ public class WhisperKitService: VoiceService {
         audio: Data,
         options: VoiceTranscriptionOptions
     ) async throws -> VoiceTranscriptionResult {
-        // Convert Data to Float array for legacy compatibility
+        // Convert Data to Float array
         let audioSamples = audio.withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
         }
         return try await transcribe(samples: audioSamples, options: options)
     }
 
-    /// SIMPLIFIED: Direct transcription with Float samples (no conversion needed)
+    /// Direct transcription with Float samples
     public func transcribe(
         samples: [Float],
         options: VoiceTranscriptionOptions
@@ -338,7 +338,7 @@ public class WhisperKitService: VoiceService {
 
                         // Process when we have enough audio (500ms)
                         if audioBuffer.count >= minAudioLength {
-                            // Convert to float array for WhisperKit (SIMPLIFIED)
+                            // Convert to float array for WhisperKit
                             let floatArray = audioBuffer.withUnsafeBytes { buffer in
                                 Array(buffer.bindMemory(to: Float.self))
                             }
@@ -386,7 +386,7 @@ public class WhisperKitService: VoiceService {
 
                     // Process any remaining audio
                     if audioBuffer.count > 0 {
-                        // Final transcription with remaining audio (SIMPLIFIED)
+                        // Final transcription with remaining audio
                         let floatArray = audioBuffer.withUnsafeBytes { buffer in
                             Array(buffer.bindMemory(to: Float.self))
                         }

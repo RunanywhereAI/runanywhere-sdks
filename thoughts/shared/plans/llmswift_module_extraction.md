@@ -397,10 +397,10 @@ This plan ensures a clean extraction that follows established patterns while mai
    - **LLMSwiftTemplateResolver.swift**: Extracted template determination logic into utility struct
 
 3. **Package Configuration**
-   - Created Package.swift with correct dependencies:
-     - LLM.swift from EXTERNAL directory
+   - Created Package.swift with dependencies:
+     - LLM.swift from GitHub (https://github.com/eastriverlee/LLM.swift, branch: main)
      - RunAnywhereSDK from parent package
-   - Fixed path references (needed 4 levels up: `../../../../EXTERNAL/LLM.swift`)
+   - Platform requirements: iOS 16+, macOS 13+, tvOS 16+, watchOS 9+
 
 4. **Documentation**
    - Created comprehensive README.md with:
@@ -412,26 +412,46 @@ This plan ensures a clean extraction that follows established patterns while mai
 
 5. **Sample App Updates**
    - Added `import LLMSwift` to RunAnywhereAIApp.swift
-   - Removed original LLMSwift directory from sample app
-   - User will add module dependency via Xcode interface
+   - Removed original LLMSwift directory from sample app (`RunAnywhereAI/Core/Services/LLMSwift/`)
+   - Module dependency added via Xcode interface
+   - FoundationModelsAdapter kept separate at `RunAnywhereAI/Core/Services/Foundation/`
 
 6. **Verification**
    - Module builds successfully with `swift build`
    - All public interfaces maintained
    - Logger subsystem updated to `com.runanywhere.llmswift`
+   - Sample app builds successfully with the new module
 
-### Next Steps for Integration
+### Final Module Structure
 
-1. Open RunAnywhereAI.xcworkspace in Xcode
-2. Add local package dependency to the LLMSwift module
-3. Build and test the sample app with the new module
-4. Verify all LLM functionality works as expected
+```
+/sdk/runanywhere-swift/Modules/LLMSwift/
+├── Package.swift
+├── README.md
+├── Sources/
+│   └── LLMSwift/
+│       ├── LLMSwiftAdapter.swift       (105 lines - Framework adapter)
+│       ├── LLMSwiftService.swift       (348 lines - Core service)
+│       ├── LLMSwiftError.swift         (22 lines - Error types)
+│       └── LLMSwiftTemplateResolver.swift (50 lines - Template logic)
+└── Tests/
+    └── LLMSwiftTests/                  (Empty - tests to be added)
+```
+
+### Legacy Code Cleanup
+
+- ✅ Removed `/examples/ios/RunAnywhereAI/RunAnywhereAI/Core/Services/LLMSwift/` directory
+- ✅ All LLMSwift code now lives in the module
+- ✅ No direct imports of LLM framework in the sample app
+- ✅ Clean separation between module and app code
 
 ### Benefits Achieved
 
 - ✅ Clean separation of concerns
 - ✅ Reusable module following SDK patterns
-- ✅ Consistent with FluidAudioDiarization module structure
+- ✅ Consistent with FluidAudioDiarization and WhisperKitTranscription module structure
 - ✅ Self-contained with clear dependencies
 - ✅ Properly documented public API
 - ✅ Ready for independent versioning and distribution
+- ✅ Uses latest LLM.swift from GitHub repository
+- ✅ No legacy code remaining in sample app

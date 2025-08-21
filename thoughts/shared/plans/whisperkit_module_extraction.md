@@ -295,3 +295,39 @@ No other files directly import WhisperKit, making the extraction clean and strai
 - ✅ Ready for independent versioning and distribution
 - ✅ Proper separation of concerns
 - ✅ Reusable across multiple projects
+
+## Legacy Code Removal - August 21, 2025
+
+### Cleaned Up Legacy References
+
+1. **WhisperKitService.swift**
+   - Removed "legacy compatibility" comment from Data to Float array conversion
+   - Removed "SIMPLIFIED" comment from transcription method
+   - Cleaned up inline comments referencing simplified pipeline
+   - Removed any conversion method references
+
+2. **WhisperKitAdapter.swift**
+   - Removed text-to-voice (TTS) handling cases
+   - Removed warnings about TTS being handled by SDK
+   - Simplified switch statements to only handle voice-to-text modality
+   - Cleaned up unnecessary default cases for unsupported modalities
+
+3. **Package Updates**
+   - Updated WhisperKit dependency to exact version 0.13.1 (matching sample app)
+   - Updated iOS platform requirement to iOS 16+ (matching WhisperKit requirements)
+
+### Code Quality Improvements
+
+- **Cleaner API**: Removed confusion around TTS support (WhisperKit is STT-only)
+- **Simpler Logic**: Removed unnecessary switch cases and legacy handling
+- **Clear Comments**: Updated comments to reflect actual functionality
+- **No Legacy Debt**: Module is now free of any legacy or deprecated code paths
+
+### Final Module State
+
+The WhisperKitTranscription module is now:
+- Pure speech-to-text functionality only
+- No legacy compatibility code
+- Clean, modern Swift implementation
+- Ready for production use
+- Matches exact dependency versions with sample app

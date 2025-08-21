@@ -50,10 +50,6 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
             cachedWhisperKitService = service
             lastWhisperKitUsage = Date()
             return service
-        case .textToVoice:
-            // TTS is now handled by the SDK
-            logger.warning("Text-to-voice is now handled by the SDK, not WhisperKit")
-            return nil
         default:
             logger.warning("Unsupported modality: \(modality.rawValue, privacy: .public)")
             return nil
@@ -85,10 +81,6 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
             logger.info("WhisperKitService initialized")
             lastWhisperKitUsage = Date()
             return service
-        case .textToVoice:
-            // TTS is now handled by the SDK
-            logger.warning("Text-to-voice is now handled by the SDK, not WhisperKit")
-            throw SDKError.unsupportedModality("TTS is handled by SDK")
         default:
             logger.error("Unsupported modality: \(modality.rawValue, privacy: .public)")
             throw SDKError.unsupportedModality(modality.rawValue)
