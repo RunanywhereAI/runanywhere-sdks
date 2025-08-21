@@ -70,8 +70,11 @@ class TranscriptionViewModel: ObservableObject {
         // Set the Whisper model display name
         updateWhisperModelName()
 
+        // FluidAudio is always available
+        logger.info("✅ FluidAudioDiarization module is available")
+        currentStatus = "Ready (FluidAudio)"
+
         logger.info("Transcription service initialized")
-        currentStatus = "Ready to transcribe"
         isInitialized = true
     }
 
@@ -105,21 +108,35 @@ class TranscriptionViewModel: ObservableObject {
         logger.info("Starting transcription with modular pipeline...")
 
         // Create a simple transcription-only pipeline config
+        // Lower VAD threshold from 0.02 to 0.01 for better voice detection
         let config = ModularPipelineConfig.transcriptionWithVAD(
             sttModel: whisperModelName,
-            vadThreshold: 0.02
+            vadThreshold: 0.01  // Lowered for more sensitive voice detection
         )
 
-        // Create the pipeline
-        voicePipeline = sdk.createVoicePipeline(config: config)
-        voicePipeline?.delegate = self
-
-        // Enable speaker diarization and continuous mode
+        // Create the pipeline with FluidAudio diarization if enabled
         if enableSpeakerDiarization {
+            logger.info("Using FluidAudioDiarization for speaker detection")
+            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(
+                sdk: sdk,
+                config: config
+            )
             voicePipeline?.enableSpeakerDiarization(true)
             voicePipeline?.enableContinuousMode(true)
-            logger.info("Enabled speaker diarization and continuous mode")
+        } else {
+            // Create standard pipeline
+            voicePipeline = sdk.createVoicePipeline(config: config)
+            voicePipeline?.delegate = self
+
+            // Enable speaker diarization with default implementation
+            if enableSpeakerDiarization {
+                voicePipeline?.enableSpeakerDiarization(true)
+                voicePipeline?.enableContinuousMode(true)
+                logger.info("Enabled speaker diarization with default implementation")
+            }
         }
+
+        voicePipeline?.delegate = self
 
         // Initialize components first (VAD and STT only for transcription)
         guard let pipeline = voicePipeline else {

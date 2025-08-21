@@ -12,7 +12,8 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationProtocol {
     private var currentSpeaker: SpeakerInfo?
 
     /// Speaker change threshold (cosine similarity)
-    private let speakerChangeThreshold: Float = 0.7
+    /// Lowered from 0.7 to 0.5 for better speaker differentiation
+    private let speakerChangeThreshold: Float = 0.5
 
     /// Minimum segments before confirming new speaker
     private let minSegmentsForNewSpeaker: Int = 2
