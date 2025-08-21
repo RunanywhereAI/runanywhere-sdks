@@ -1,631 +1,531 @@
-# Complete Voice Pipeline Architecture Documentation
+# Voice Pipeline Architecture - RunAnywhere Swift SDK
+
+## Overview
+
+The Voice Pipeline in the RunAnywhere Swift SDK provides comprehensive voice processing capabilities including Voice Activity Detection (VAD), Speech-to-Text (STT), Large Language Model processing (LLM), Text-to-Speech (TTS), and Speaker Diarization. The architecture follows the SDK's standard 5-layer pattern for maximum modularity, testability, and maintainability.
 
 ## Table of Contents
-1. [Executive Summary](#executive-summary)
-2. [High-Level Architecture](#high-level-architecture)
-3. [Component Architecture](#component-architecture)
-4. [Model Loading & Initialization](#model-loading--initialization)
-5. [Voice Service Implementation](#voice-service-implementation)
-6. [Data Flow Architecture](#data-flow-architecture)
-7. [Integration Points](#integration-points)
-8. [Sequence Diagrams](#sequence-diagrams)
-9. [Implementation Guidelines](#implementation-guidelines)
+1. [Architecture Layers](#🏗️-architecture-layers)
+2. [Voice Processing Pipeline](#🔄-voice-processing-pipeline)
+3. [Configuration System](#🎛️-configuration-system)
+4. [Event System](#📊-event-system)
+5. [Service Integration](#🔌-service-integration)
+6. [Testing Strategy](#🧪-testing-strategy)
+7. [Analytics & Monitoring](#📈-analytics--monitoring)
+8. [Usage Examples](#🚀-usage-examples)
+9. [Platform Support](#🔧-platform-support)
+10. [Migration Guide](#🏁-migration-guide)
 
----
+## 🏗️ Architecture Layers
 
-## Executive Summary
+### 1. Foundation Layer
+**Location**: `Sources/RunAnywhere/Foundation/`
 
-The RunAnywhere Voice Pipeline is a modular, privacy-first voice AI system designed for on-device processing with optional cloud fallback. The architecture supports flexible component composition allowing developers to use individual components (transcription-only) or complete pipelines (VAD → STT → LLM → TTS).
+**Components**:
+- **ServiceContainer.swift**: Dependency injection container with voice capability integration
+- **AdapterRegistry.swift**: Registration and discovery of voice adapters
 
-### Key Features
-- **Modular Architecture**: Mix and match VAD, STT, LLM, and TTS components
-- **On-Device First**: All processing happens locally by default
-- **Real-Time Processing**: Streaming support with <100ms latency targets
-- **Framework Agnostic**: Supports WhisperKit, CoreML, MLX, ONNX, TFLite
-- **Event-Driven**: Reactive architecture with comprehensive event system
+**Responsibilities**:
+- Dependency injection for voice components
+- Service discovery and lifecycle management
+- Cross-cutting concerns like logging and configuration
 
----
+### 2. Infrastructure Layer
+**Location**: `Sources/RunAnywhere/Infrastructure/Voice/`
 
-## High-Level Architecture
-
-```mermaid
-graph TB
-    subgraph "User Interface Layer"
-        VA[VoiceAssistantView]
-        TV[TranscriptionView]
-        VM1[VoiceAssistantViewModel]
-        VM2[TranscriptionViewModel]
-    end
-
-    subgraph "Audio Capture Layer"
-        AC[AudioCapture<br/>AVAudioEngine]
-        MP[Microphone<br/>Permissions]
-    end
-
-    subgraph "Voice Pipeline Core"
-        MVP[ModularVoicePipeline]
-        subgraph "Pipeline Components"
-            VAD[VAD Component<br/>SimpleEnergyVAD]
-            STT[STT Component<br/>WhisperKit]
-            LLM[LLM Component<br/>Local/Cloud Models]
-            TTS[TTS Component<br/>System TTS]
-        end
-    end
-
-    subgraph "SDK Services Layer"
-        MLS[ModelLoadingService]
-        AR[AdapterRegistry]
-        UA[UnifiedFrameworkAdapter]
-        VS[VoiceService Protocol]
-        TTSS[TextToSpeechService Protocol]
-    end
-
-    subgraph "Model Management"
-        MR[ModelRegistry]
-        MD[Model Downloads]
-        MV[Model Validation]
-    end
-
-    VA --> VM1
-    TV --> VM2
-    VM1 --> MVP
-    VM2 --> MVP
-    AC --> MVP
-    MP --> AC
-    MVP --> VAD
-    MVP --> STT
-    MVP --> LLM
-    MVP --> TTS
-    STT --> VS
-    TTS --> TTSS
-    MLS --> AR
-    AR --> UA
-    UA --> VS
-    MLS --> MR
-    MLS --> MD
-    MLS --> MV
+**Platform Audio Management**:
+```
+Infrastructure/Voice/Platform/
+├── iOSAudioSession.swift          # iOS-specific audio session management
+└── macOSAudioSession.swift        # macOS-specific audio session management
 ```
 
----
+**Service Adapters**:
+```
+Infrastructure/Voice/Adapters/
+└── SystemTTSAdapter.swift         # System Text-to-Speech implementation
+```
 
-## Component Architecture
+**Responsibilities**:
+- Platform-specific audio session configuration
+- Audio permissions and interruption handling
+- System service integrations (TTS, audio I/O)
+- Hardware abstraction layer
 
-### 1. Audio Capture System
+### 3. Core Layer
+**Location**: `Sources/RunAnywhere/Core/`
 
-**AudioCapture.swift**
+**Service Protocols**:
+```
+Core/Protocols/Voice/
+├── VoiceService.swift              # Main voice service interface + VoiceError enum
+├── TextToSpeechService.swift       # TTS service contract
+├── VADService.swift               # Voice Activity Detection contract
+├── SpeakerDiarizationProtocol.swift # Speaker identification contract
+└── WakeWordDetector.swift         # Wake word detection interface
+```
+
+**Responsibilities**:
+- Protocol definitions for voice services
+- Core error handling (`VoiceError` enum)
+- Service contracts and interfaces
+- Framework-agnostic abstractions
+
+### 4. Capabilities Layer
+**Location**: `Sources/RunAnywhere/Capabilities/Voice/`
+
+**Main Services**:
+```
+Capabilities/Voice/Services/
+├── VoiceCapabilityService.swift    # Main voice capability orchestrator
+├── VoicePipelineManager.swift      # Modular pipeline manager (was ModularVoicePipeline)
+├── VoiceAnalyticsService.swift     # Voice processing analytics
+├── VoiceSessionManager.swift       # Session lifecycle management
+└── DefaultSpeakerDiarization.swift # Default speaker diarization implementation
+```
+
+**Processing Handlers**:
+```
+Capabilities/Voice/Handlers/
+├── VADHandler.swift               # Voice Activity Detection processing
+├── STTHandler.swift               # Speech-to-Text processing
+├── LLMHandler.swift               # LLM processing and streaming
+├── TTSHandler.swift               # Text-to-Speech processing
+└── SpeakerDiarizationHandler.swift # Speaker identification processing
+```
+
+**Specialized Operations**:
+```
+Capabilities/Voice/Operations/
+└── StreamingTTSOperation.swift    # Streaming TTS for real-time speech
+```
+
+**Processing Strategies**:
+```
+Capabilities/Voice/Strategies/
+├── VAD/
+│   └── SimpleEnergyVAD.swift      # Energy-based voice activity detection
+└── AudioSegmentation/
+    └── AudioSegmentationStrategy.swift # Audio segmentation strategies
+```
+
+**Factories**:
+```
+Capabilities/Voice/Factories/
+└── DiarizationFactory.swift      # Speaker diarization factory
+```
+
+**Data Models**:
+```
+Capabilities/Voice/Models/
+└── VoiceSession.swift             # Voice session data model
+```
+
+**Responsibilities**:
+- Voice capability orchestration and coordination
+- Pipeline flow management and component delegation
+- Processing handlers for each pipeline stage
+- Analytics and performance monitoring
+- Session management and state tracking
+
+### 5. Public Layer
+**Location**: `Sources/RunAnywhere/Public/`
+
+**Public API**:
+```
+Public/Extensions/
+└── RunAnywhereSDK+Voice.swift     # Public voice API surface
+```
+
+**Configuration Models**:
+```
+Public/Models/Voice/
+├── ModularPipelineConfig.swift    # ✅ NEW: Modern modular configuration
+├── ModularPipelineEvent.swift     # ✅ NEW: Modular pipeline events
+├── VoicePipelineEvent.swift       # Pipeline events
+├── VoiceProcessingMode.swift      # Audio processing modes
+├── VoiceSTTConfig.swift           # Speech-to-Text configuration
+├── VoiceLLMConfig.swift           # LLM configuration
+├── VoiceTTSConfig.swift           # Text-to-Speech configuration
+└── VADConfig.swift               # Voice Activity Detection configuration
+```
+
+**Audio & Transcription Models**:
+```
+Public/Models/Voice/
+├── AudioChunk.swift               # Audio data structures
+├── TranscriptionOptions.swift     # Transcription configuration
+├── TranscriptionResult.swift      # Transcription results
+└── TranscriptionSegment.swift     # Transcription segments
+```
+
+**Responsibilities**:
+- User-facing API surface
+- Configuration and event models
+- Public type definitions
+- API documentation and examples
+
+## 🔄 Voice Processing Pipeline
+
+### Pipeline Flow
+```
+Audio Input → VAD → STT → LLM → TTS → Audio Output
+              ↓     ↓     ↓     ↓
+            Events Events Events Events
+```
+
+### Component Interaction
+```
+VoiceCapabilityService
+├── Creates → VoicePipelineManager
+├── Manages → VoiceSessionManager
+└── Tracks → VoiceAnalyticsService
+
+VoicePipelineManager
+├── Delegates → VADHandler
+├── Delegates → STTHandler
+├── Delegates → LLMHandler
+├── Delegates → TTSHandler
+└── Delegates → SpeakerDiarizationHandler
+
+Each Handler
+├── Uses → Platform Services (via ServiceContainer)
+├── Emits → ModularPipelineEvent
+└── Processes → Specific pipeline stage
+```
+
+### Data Flow
+1. **Audio Input**: Raw audio chunks from microphone/file
+2. **VAD Processing**: Voice activity detection and speech segmentation
+3. **STT Processing**: Speech-to-text conversion with optional speaker diarization
+4. **LLM Processing**: Language model processing for conversational AI
+5. **TTS Processing**: Text-to-speech synthesis for responses
+6. **Event Emission**: Real-time events for UI updates and monitoring
+
+## 🎛️ Configuration System
+
+### Modern Configuration (ModularPipelineConfig)
 ```swift
-// Core Audio Pipeline
-AVAudioEngine → AVAudioInputNode → Audio Format Conversion → Float Samples Stream
-
-// Configuration
-- Sample Rate: 16kHz (optimized for speech)
-- Format: Mono, Float32
-- Buffer Size: 1024 frames
-- Chunk Duration: 100ms (1600 samples)
-```
-
-### 2. Voice Activity Detection (VAD)
-
-**SimpleEnergyVAD Implementation**
-```swift
-// Energy-Based Detection Algorithm
-1. Calculate RMS energy: √(Σ(x²)/n)
-2. Apply hysteresis thresholds:
-   - Speech Start: energy > threshold * 1.2
-   - Speech End: energy < threshold * 0.8
-3. Frame-based analysis (100ms frames)
-4. Minimum speech duration: 1.0 seconds
-
-// Configuration
-- Energy Threshold: 0.022 (adjustable)
-- Hysteresis Factor: 1.5
-- Min Speech Duration: 1.0s
-- Frame Length: 100ms
-```
-
-### 3. Speech-to-Text (STT)
-
-**WhisperKit Integration**
-```swift
-// Model Variants
-- whisper-tiny: 3MB, fastest, lower accuracy
-- whisper-base: 145MB, balanced
-- whisper-small: 487MB, good accuracy
-- whisper-medium: 1.5GB, high accuracy
-- whisper-large: 3.1GB, best accuracy
-
-// Audio Processing Pipeline
-Float Samples → WhisperKit Encoder → Decoder → Text Output
-```
-
-### 4. Language Model (LLM)
-
-**LLM Service Integration**
-```swift
-// Supported Frameworks
-- MLX Models (Apple Silicon optimized)
-- GGUF Models (quantized)
-- CoreML Models
-- Cloud Fallback (OpenAI, Anthropic)
-
-// Processing Flow
-Transcript → Context Building → Generation → Response
-```
-
-### 5. Text-to-Speech (TTS)
-
-**System TTS Service**
-```swift
-// AVSpeechSynthesizer Pipeline
-Text → AVSpeechUtterance → Voice Selection → Audio Output
-
-// Configuration
-- Voice: System voices by identifier
-- Rate: 0.0 - 1.0 (default: 0.5)
-- Pitch: 0.5 - 2.0 (default: 1.0)
-- Volume: 0.0 - 1.0 (default: 1.0)
-```
-
----
-
-## Model Loading & Initialization
-
-### Model Loading Architecture
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant MLS as ModelLoadingService
-    participant AR as AdapterRegistry
-    participant UA as UnifiedAdapter
-    participant Service
-
-    App->>SDK: loadModel("whisper-base")
-    SDK->>MLS: loadModel(modelId)
-    MLS->>MLS: Check if already loaded
-    MLS->>AR: findBestAdapter(modelInfo)
-    AR->>UA: canHandle(model)?
-    UA-->>AR: true
-    AR-->>MLS: WhisperKitAdapter
-    MLS->>UA: loadModel(modelInfo, modality)
-    UA->>Service: Initialize WhisperKit
-    Service->>Service: Download model if needed
-    Service->>Service: Load model weights
-    Service-->>UA: WhisperKitService
-    UA-->>MLS: Service instance
-    MLS-->>SDK: LoadedModel
-    SDK-->>App: Ready for use
-```
-
-### WhisperKit Model Initialization
-
-```swift
-// Step 1: Model Path Resolution
-let modelPath = resolveModelPath(modelName: "whisper-base")
-// Checks: ~/Library/Caches/WhisperKit/models/
-
-// Step 2: Model Download (if needed)
-if !FileManager.default.fileExists(atPath: modelPath) {
-    await downloadModel(from: huggingFaceRepo)
-}
-
-// Step 3: WhisperKit Initialization
-let whisperKit = try await WhisperKit(
-    computeUnits: .cpuAndNeuralEngine,
-    verbose: true,
-    logLevel: .debug,
-    prewarm: true,
-    load: true,
-    download: true
+let config = ModularPipelineConfig(
+    components: [.vad, .stt, .llm, .tts],
+    vad: VADConfig(energyThreshold: 0.02),
+    stt: VoiceSTTConfig(modelId: "whisper-base", language: "en"),
+    llm: VoiceLLMConfig(modelId: "llama-7b"),
+    tts: VoiceTTSConfig(voice: "system"),
+    streamingEnabled: true
 )
-
-// Step 4: Model Loading
-try await whisperKit.loadModels(modelPath: modelPath)
-
-// Step 5: Service Registration
-adapterRegistry.register(WhisperKitService(whisperKit))
 ```
 
-### LLM Model Initialization
+### Component Selection
+Components can be mixed and matched:
+- **Transcription Only**: `[.stt]`
+- **Transcription with VAD**: `[.vad, .stt]`
+- **Conversational (No TTS)**: `[.vad, .stt, .llm]`
+- **Full Pipeline**: `[.vad, .stt, .llm, .tts]`
 
+### Convenience Builders
 ```swift
-// Step 1: Model Discovery
-let modelInfo = modelRegistry.getModel(by: "llama-3.2-1b")
-
-// Step 2: Framework Selection
-let adapter = adapterRegistry.findBestAdapter(for: modelInfo)
-// Checks: MLX > GGUF > CoreML > Cloud
-
-// Step 3: Memory Check
-let canAllocate = memoryManager.canAllocate(modelInfo.estimatedMemory)
-
-// Step 4: Model Loading
-let service = try await adapter.loadModel(modelInfo, for: .textToText)
-
-// Step 5: Service Configuration
-service.configure(with: HardwareConfiguration(
-    useGPU: true,
-    useNeuralEngine: true,
-    maxMemory: 4_000_000_000 // 4GB
-))
+// Quick configurations
+ModularPipelineConfig.transcriptionOnly()
+ModularPipelineConfig.transcriptionWithVAD()
+ModularPipelineConfig.conversationalNoTTS()
+ModularPipelineConfig.fullPipeline()
 ```
 
----
+## 📊 Event System
 
-## Voice Service Implementation
-
-### Creating a Custom Voice Service
-
+### Event Types
 ```swift
-// Step 1: Implement VoiceService Protocol
-public class CustomVoiceService: VoiceService {
-    // Required properties
-    public var preferredAudioFormat: VoiceServiceAudioFormat { .floatArray }
-    public var isReady: Bool { model != nil }
-    public var currentModel: String? { modelName }
+public enum ModularPipelineEvent {
+    // VAD events
+    case vadSpeechStart, vadSpeechEnd
+    case vadAudioLevel(Float)
 
-    // Required methods
-    public func initialize(modelPath: String?) async throws {
-        // Load your model here
-    }
+    // STT events
+    case sttPartialTranscript(String)
+    case sttFinalTranscript(String)
+    case sttLanguageDetected(String)
 
-    public func transcribe(
-        samples: [Float],
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
-        // Implement transcription logic
-    }
+    // STT with Speaker Diarization
+    case sttPartialTranscriptWithSpeaker(String, SpeakerInfo)
+    case sttFinalTranscriptWithSpeaker(String, SpeakerInfo)
+    case sttNewSpeakerDetected(SpeakerInfo)
 
-    // Optional streaming support
-    public func transcribeStream(
-        audioStream: AsyncStream<VoiceAudioChunk>,
-        options: VoiceTranscriptionOptions
-    ) -> AsyncThrowingStream<VoiceTranscriptionSegment, Error> {
-        // Implement streaming transcription
-    }
+    // LLM events
+    case llmThinking, llmStreamStarted
+    case llmPartialResponse(String)
+    case llmFinalResponse(String)
+    case llmStreamToken(String)
+
+    // TTS events
+    case ttsStarted, ttsCompleted
+    case ttsAudioChunk(Data)
+
+    // Pipeline events
+    case pipelineStarted, pipelineCompleted
+    case pipelineError(Error)
+
+    // Component lifecycle
+    case componentInitializing(String)
+    case componentInitialized(String)
+    case componentInitializationFailed(String, Error)
+    case allComponentsInitialized
 }
+```
 
-// Step 2: Create Framework Adapter
-public class CustomVoiceAdapter: UnifiedFrameworkAdapter {
-    public var framework: LLMFramework { .custom }
-    public var supportedModalities: Set<FrameworkModality> { [.voiceToText] }
-
-    public func loadModel(
-        _ model: ModelInfo,
-        for modality: FrameworkModality
-    ) async throws -> Any {
-        let service = CustomVoiceService()
-        try await service.initialize(modelPath: model.localPath?.path)
-        return service
+### Event Handling
+```swift
+extension MyViewModel: VoicePipelineManagerDelegate {
+    func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
+        switch event {
+        case .sttFinalTranscript(let text):
+            // Handle transcription
+        case .llmPartialResponse(let response):
+            // Handle LLM streaming
+        case .ttsStarted:
+            // Handle TTS start
+        // ... other events
+        }
     }
 }
-
-// Step 3: Register with SDK
-RunAnywhereSDK.shared.adapterRegistry.register(CustomVoiceAdapter())
 ```
 
----
+## 🔌 Service Integration
 
-## Data Flow Architecture
-
-### Complete Voice Pipeline Flow
-
-```mermaid
-graph LR
-    subgraph "Audio Input"
-        M[Microphone] --> AE[AVAudioEngine]
-        AE --> FC[Format Converter<br/>16kHz Mono Float32]
-    end
-
-    subgraph "VAD Processing"
-        FC --> VAD[Energy VAD]
-        VAD --> SD{Speech<br/>Detected?}
-        SD -->|Yes| AB[Audio Buffer]
-        SD -->|No| VAD
-    end
-
-    subgraph "STT Processing"
-        AB --> WK[WhisperKit]
-        WK --> TR[Transcript]
-    end
-
-    subgraph "LLM Processing"
-        TR --> CTX[Context Builder]
-        CTX --> LLM[Language Model]
-        LLM --> RESP[Response]
-    end
-
-    subgraph "TTS Processing"
-        RESP --> TTS[System TTS]
-        TTS --> SPK[Speaker Output]
-    end
-
-    subgraph "Event Stream"
-        VAD -.-> E1[VAD Events]
-        WK -.-> E2[STT Events]
-        LLM -.-> E3[LLM Events]
-        TTS -.-> E4[TTS Events]
-    end
-```
-
-### Audio Format Transformations
+### Service Discovery
+The voice capability integrates with the SDK's service discovery system:
 
 ```swift
-// 1. Microphone Input (AVAudioEngine)
-// Format: 48kHz, Stereo, Float32
+// Automatic service discovery
+let voiceService = serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base")
+let llmService = serviceContainer.voiceCapabilityService.findLLMService(for: "llama-7b")
+let ttsService = serviceContainer.textToSpeechService
+```
 
-// 2. Format Conversion
-// Target: 16kHz, Mono, Float32
-AVAudioConverter.convert(
-    from: inputFormat,
-    to: AVAudioFormat(
-        commonFormat: .pcmFormatFloat32,
-        sampleRate: 16000,
-        channels: 1,
-        interleaved: false
-    )
-)
+### Dependency Injection
+All components receive dependencies through the ServiceContainer:
+- Voice services (STT models)
+- LLM services (language models)
+- TTS services (text-to-speech)
+- Audio session management
+- Analytics and monitoring
 
-// 3. Audio Chunks
-struct VoiceAudioChunk {
-    let samples: [Float]      // Float array
-    let timestamp: Date
-    let sampleRate: Double    // 16000
-    let channels: Int         // 1
-}
+## 🧪 Testing Strategy
 
-// 4. Service-Specific Formats
-if service.preferredAudioFormat == .floatArray {
-    // Pass Float array directly
-    service.transcribe(samples: chunk.samples)
-} else {
-    // Convert to Data
-    let data = chunk.samples.withUnsafeBytes { Data($0) }
-    service.transcribe(audio: data)
+### Unit Testing
+Each component can be tested independently:
+```swift
+// Handler testing
+let vadHandler = VADHandler()
+let mockVADService = MockVADService()
+let result = vadHandler.processAudio(chunk, vad: mockVADService)
+
+// Service testing
+let voiceCapability = VoiceCapabilityService()
+let pipeline = voiceCapability.createPipeline(config: testConfig)
+```
+
+### Integration Testing
+```swift
+// Full pipeline testing
+let sdk = RunAnywhereSDK.shared
+let pipeline = sdk.createVoicePipeline(config: ModularPipelineConfig.fullPipeline())
+pipeline.delegate = testDelegate
+// Test audio processing flow
+```
+
+### Mocking
+Each layer can be mocked independently:
+- Mock voice services for STT testing
+- Mock LLM services for conversation testing
+- Mock audio sessions for platform testing
+
+## 📈 Analytics & Monitoring
+
+### Voice Analytics
+```swift
+public struct VoiceMetrics {
+    public let totalTranscriptions: Int
+    public let averageTranscriptionTime: TimeInterval
+    public let totalSpeechDuration: TimeInterval
+    public let errorRate: Float
+    public let pipelineMetrics: [PipelineMetric]
 }
 ```
 
----
+### Performance Tracking
+- Component initialization times
+- Processing latencies per stage
+- Memory usage monitoring
+- Error rate tracking
+- User engagement metrics
 
-## Integration Points
+## 🚀 Usage Examples
 
-### 1. SDK Integration
-
+### Basic Transcription
 ```swift
-// Initialize SDK
-RunAnywhereSDK.shared.initialize(
-    apiKey: "your-api-key",
-    config: Configuration(
-        defaultFramework: .whisperKit,
-        enableVoice: true
-    )
-)
+import RunAnywhereSDK
 
-// Create Voice Pipeline
-let pipeline = ModularVoicePipeline(
-    config: ModularPipelineConfig(
-        components: [.vad, .stt, .llm, .tts],
-        vad: VADConfig(energyThreshold: 0.022),
-        stt: VoiceSTTConfig(modelId: "whisper-base"),
-        llm: VoiceLLMConfig(modelId: "llama-3.2-1b"),
-        tts: VoiceTTSConfig(voice: "com.apple.ttsbundle.Samantha")
-    )
-)
+let sdk = RunAnywhereSDK.shared
+let config = ModularPipelineConfig.transcriptionOnly()
+let pipeline = sdk.createVoicePipeline(config: config)
+pipeline.delegate = self
 
-// Process Audio Stream
-let audioCapture = AudioCapture()
-let audioStream = try await audioCapture.startCapture()
-
-for await event in pipeline.process(audioStream: audioStream) {
+// Start transcription
+let audioStream = createAudioStream()
+for await event in sdk.processVoice(audioStream: audioStream, config: config) {
     switch event {
-    case .vadSpeechStart:
-        // Update UI: Show listening indicator
     case .sttFinalTranscript(let text):
-        // Display transcript
-    case .llmFinalResponse(let response):
-        // Show AI response
-    case .ttsCompleted:
-        // Hide speaking indicator
+        print("Transcribed: \(text)")
+    default:
+        break
     }
 }
 ```
 
-### 2. Framework Adapter Registry
-
+### Conversational AI
 ```swift
-// Built-in Adapters
-- WhisperKitAdapter: Speech-to-text using WhisperKit
-- MLXAdapter: LLM inference using MLX framework
-- GGUFAdapter: Quantized model support
-- CoreMLAdapter: Apple's Core ML models
-- TransformersAdapter: Hugging Face models
+let config = ModularPipelineConfig.fullPipeline(
+    sttModel: "whisper-base",
+    llmModel: "llama-7b",
+    ttsVoice: "system"
+)
 
-// Adapter Selection Logic
-1. Check model's preferredFramework
-2. Verify framework availability
-3. Check hardware compatibility
-4. Select best adapter based on:
-   - Performance characteristics
-   - Memory requirements
-   - Feature support
+let pipeline = sdk.createVoicePipeline(config: config)
+pipeline.delegate = self
+
+// Full conversational flow with TTS responses
+pipeline.startContinuousMode()
 ```
 
-### 3. Service Discovery
-
+### Speaker Diarization
 ```swift
-// Find Voice Service
-let voiceService = RunAnywhereSDK.shared.findVoiceService(
-    modelId: "whisper-base"
+let diarization = try DiarizationFactory.createFluidAudioDiarization()
+let config = ModularPipelineConfig.transcriptionWithVAD()
+
+let pipeline = sdk.createVoicePipeline(
+    config: config,
+    speakerDiarization: diarization
 )
 
-// Find TTS Service
-let ttsService = RunAnywhereSDK.shared.findTTSService(
-    voice: "com.apple.ttsbundle.Samantha"
-)
+// Receive speaker-aware transcripts
+func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
+    switch event {
+    case .sttFinalTranscriptWithSpeaker(let text, let speaker):
+        print("Speaker \(speaker.id): \(text)")
+    case .sttNewSpeakerDetected(let speaker):
+        print("New speaker detected: \(speaker.id)")
+    default:
+        break
+    }
+}
+```
 
-// Find LLM Service
-let llmService = RunAnywhereSDK.shared.findLLMService(
-    modelId: "llama-3.2-1b"
+## 🔧 Platform Support
+
+### iOS Features
+- AVAudioSession integration
+- Background audio processing
+- Interruption handling
+- Microphone permissions
+
+### macOS Features
+- AVAudioEngine integration
+- Input device selection
+- Audio level monitoring
+- System audio routing
+
+### Cross-Platform
+- Unified API surface
+- Platform-specific optimizations
+- Consistent behavior across platforms
+
+## 🏁 Migration Guide
+
+### From Legacy ModularVoicePipeline
+```swift
+// OLD (no longer supported)
+let oldPipeline = ModularVoicePipeline(config: legacyConfig)
+
+// NEW
+let newPipeline = sdk.createVoicePipeline(config: modularConfig)
+```
+
+### Configuration Migration
+```swift
+// OLD VoicePipelineConfig (REMOVED)
+// This configuration format is no longer supported
+
+// NEW ModularPipelineConfig
+let newConfig = ModularPipelineConfig(
+    components: [.vad, .stt, .llm, .tts],
+    stt: VoiceSTTConfig(modelId: "whisper-base"),
+    llm: VoiceLLMConfig(modelId: "llama-7b"),
+    tts: VoiceTTSConfig(voice: "system")
 )
 ```
 
----
+### Delegate Migration
+```swift
+// OLD
+extension MyClass: ModularVoicePipelineDelegate { ... }
 
-## Sequence Diagrams
-
-### Full Conversation Flow
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI as VoiceAssistantView
-    participant VM as ViewModel
-    participant AC as AudioCapture
-    participant MVP as ModularPipeline
-    participant VAD
-    participant STT as WhisperKit
-    participant LLM
-    participant TTS
-
-    User->>UI: Tap microphone
-    UI->>VM: startSession()
-    VM->>AC: startCapture()
-    AC->>MVP: audioStream
-
-    loop Audio Processing
-        MVP->>VAD: processAudio()
-        VAD-->>MVP: speechDetected
-    end
-
-    MVP->>STT: transcribe(audioBuffer)
-    STT-->>MVP: "What's the weather?"
-    MVP->>UI: sttFinalTranscript
-
-    MVP->>LLM: generate(transcript)
-    LLM-->>MVP: "The weather is sunny..."
-    MVP->>UI: llmFinalResponse
-
-    MVP->>TTS: speak(response)
-    TTS-->>User: Audio output
-    MVP->>UI: ttsCompleted
+// NEW
+extension MyClass: VoicePipelineManagerDelegate {
+    func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
+        // Handle events (same event types)
+    }
+}
 ```
 
-### Transcription-Only Flow
+## 🔍 Troubleshooting
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant UI as TranscriptionView
-    participant VM as TranscriptionViewModel
-    participant MVP as ModularPipeline
-    participant VAD
-    participant STT as WhisperKit
+### Common Issues
 
-    User->>UI: Start transcription
-    UI->>VM: startTranscription()
-    VM->>MVP: configure([.vad, .stt])
+**Pipeline Creation Fails**
+- Verify model availability through service discovery
+- Check configuration component dependencies
+- Ensure proper ServiceContainer initialization
 
-    loop Continuous Transcription
-        MVP->>VAD: processAudio()
-        VAD-->>MVP: speechDetected
-        MVP->>STT: transcribe(buffer)
-        STT-->>MVP: partial/final transcript
-        MVP->>VM: transcriptSegment
-        VM->>UI: updateTranscript()
-    end
+**Audio Processing Issues**
+- Check microphone permissions
+- Verify audio session configuration
+- Monitor audio interruption events
 
-    User->>UI: Stop transcription
-    UI->>VM: stopTranscription()
-    VM->>MVP: stop()
+**Performance Issues**
+- Use VoiceAnalyticsService to identify bottlenecks
+- Consider reducing component complexity
+- Monitor memory usage during long sessions
+
+### Debug Logging
+```swift
+// Enable voice logging
+SDKLogger.setLevel(.debug, for: "VoicePipelineManager")
+SDKLogger.setLevel(.debug, for: "VoiceCapabilityService")
+SDKLogger.setLevel(.debug, for: "VADHandler")
 ```
 
----
+## 🧹 Cleanup Required
 
-## Implementation Guidelines
+### Legacy Components (To Be Removed)
+The following files contain old logic and should be deleted:
 
-### Best Practices
+1. **`Core/Protocols/Voice/VoiceOrchestrator.swift`** - ❌ UNUSED
+2. **`Core/Services/Voice/DefaultVoiceOrchestrator.swift`** - ❌ UNUSED
+3. **`Core/Protocols/Voice/VoiceActivityDetector.swift`** - ❌ UNUSED
+4. **`Core/Protocols/Voice/VoicePerformanceMonitor.swift`** - ❌ UNUSED
+5. **`Public/Models/Voice/VoicePipelineConfig.swift`** - ❌ OLD CONFIG
 
-1. **Memory Management**
-   - Cache service instances for 5 minutes
-   - Clear audio buffers after processing
-   - Monitor memory usage during model loading
+### ServiceContainer Cleanup
+Remove the unused `voiceOrchestrator` property from ServiceContainer.swift that creates DefaultVoiceOrchestrator but is never used.
 
-2. **Error Handling**
-   - Implement fallback for each component
-   - Provide meaningful error messages
-   - Log errors with appropriate privacy levels
+## 📚 Related Documentation
 
-3. **Performance Optimization**
-   - Use Float arrays for audio when possible
-   - Process audio in chunks (100ms)
-   - Implement async/await for non-blocking operations
-
-4. **Audio Session Management**
-   ```swift
-   // iOS Audio Session Setup
-   let session = AVAudioSession.sharedInstance()
-   try session.setCategory(.playAndRecord, options: [.defaultToSpeaker])
-   try session.setActive(true)
-   ```
-
-5. **Model Selection**
-   ```swift
-   // Choose model based on device capabilities
-   let deviceMemory = ProcessInfo.processInfo.physicalMemory
-   let modelSize = deviceMemory > 8_000_000_000 ? "medium" : "base"
-   ```
-
-### Testing Strategies
-
-1. **Unit Tests**
-   - Test each component independently
-   - Mock audio streams for consistent testing
-   - Verify error handling paths
-
-2. **Integration Tests**
-   - Test complete pipeline flows
-   - Verify component interactions
-   - Test fallback mechanisms
-
-3. **Performance Tests**
-   - Measure transcription latency
-   - Monitor memory usage
-   - Test with various audio conditions
-
-### Debugging Tips
-
-1. **Enable Verbose Logging**
-   ```swift
-   SDKLogger.setLogLevel(.debug)
-   WhisperKit.verbose = true
-   ```
-
-2. **Monitor Pipeline Events**
-   ```swift
-   for await event in pipeline.process(audioStream) {
-       print("Pipeline Event: \(event)")
-   }
-   ```
-
-3. **Check Audio Format**
-   ```swift
-   print("Sample Rate: \(chunk.sampleRate)")
-   print("Channels: \(chunk.channels)")
-   print("Samples: \(chunk.samples.count)")
-   ```
+- [SDK Architecture Overview](./ARCHITECTURE_V2.md)
+- [Service Container Guide](./SERVICE_CONTAINER.md)
+- [Model Management](./MODEL_MANAGEMENT.md)
+- [Speaker Diarization Integration](./SPEAKER_DIARIZATION.md)
 
 ---
 
-## Conclusion
-
-The RunAnywhere Voice Pipeline provides a comprehensive, modular solution for voice AI applications. Its architecture supports flexible configuration, efficient on-device processing, and seamless integration with various ML frameworks. The event-driven design ensures responsive user experiences while the abstraction layers enable easy customization and extension.
-
-Key strengths:
-- **Modularity**: Use only the components you need
-- **Performance**: Optimized for real-time processing
-- **Privacy**: On-device first approach
-- **Flexibility**: Support for multiple frameworks and models
-- **Extensibility**: Easy to add custom implementations
-
-This architecture serves as the foundation for building sophisticated voice-enabled applications while maintaining simplicity and performance.
+*This architecture documentation reflects the completed voice capability refactoring that transformed the monolithic ModularVoicePipeline into a clean, modular, 5-layer architecture following SOLID principles and the SDK's standard patterns.*

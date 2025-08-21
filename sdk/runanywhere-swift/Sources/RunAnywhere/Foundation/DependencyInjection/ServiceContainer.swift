@@ -52,27 +52,6 @@ public class ServiceContainer {
         VoiceCapabilityService()
     }()
 
-    /// Voice orchestrator
-    private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
-        // Create TTS service instance
-        let ttsService = SystemTextToSpeechService()
-
-        return DefaultVoiceOrchestrator(
-            voiceServiceProvider: { [weak self] in
-                // This will be resolved at runtime when processVoiceQuery is called
-                return nil // Voice service is created dynamically based on model
-            },
-            generationService: generationService,
-            streamingService: streamingService,
-            ttsServiceProvider: { [ttsService] in
-                // Return the system TTS service
-                try await ttsService.initialize()
-                return ttsService
-            },
-            adapterRegistry: adapterRegistry,
-            modelRegistry: modelRegistry
-        )
-    }()
 
 /// Validation service
     private(set) lazy var validationService: ValidationService = {
