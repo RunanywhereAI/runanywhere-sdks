@@ -22,8 +22,8 @@ public enum VoiceComponent: String, CaseIterable {
 // MARK: - Modular Voice Pipeline
 
 /// A simplified, modular voice pipeline that can run any combination of components
-public class ModularVoicePipeline {
-    private let logger = SDKLogger(category: "ModularVoicePipeline")
+public class VoicePipelineManager {
+    private let logger = SDKLogger(category: "VoicePipelineManager")
     private let config: ModularPipelineConfig
 
     // Component instances (created based on config)
@@ -33,14 +33,16 @@ public class ModularVoicePipeline {
     private var ttsService: TextToSpeechService?
     private var useGenerationService: Bool = false
 
+    // Handlers for component processing
+    private let vadHandler = VADHandler()
+    private let sttHandler = STTHandler()
+    private let llmHandler = LLMHandler()
+    private let ttsHandler = TTSHandler()
+    private let speakerDiarizationHandler = SpeakerDiarizationHandler()
+
     // Audio management
-    private var floatBuffer: [Float] = []  // Buffer for Float samples
     private var isProcessing = false
-    private var isSpeechActive = false
     private var isInitialized = false
-    private var speechStartTime: Date?
-    private var lastSpeechTime: Date?  // Track when speech was last detected
-    private let minSpeechDuration: TimeInterval = 1.0 // Minimum 1.0 seconds of speech for better transcription
     private let transcriptionQueue = DispatchQueue(label: "com.runanywhere.transcription", qos: .userInitiated)
 
     // Audio segmentation strategy
@@ -280,100 +282,32 @@ public class ModularVoicePipeline {
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
 
-        // Get float samples from chunk - needed for both VAD and non-VAD paths
-        let floatArray = chunk.samples
-
         // Step 1: VAD (if enabled)
         if let vad = vadComponent, config.components.contains(.vad) {
-
-            // Process audio through VAD and check result
-            let hasVoice = vad.processAudioData(floatArray)
-
-            // Debug logging - commented out to reduce noise
-            // if floatArray.count > 0 {
-            //     let energy = floatArray.map { $0 * $0 }.reduce(0, +) / Float(floatArray.count)
-            //     let rms = sqrt(energy)
-            //     logger.debug("Processing \(floatArray.count) samples, RMS: \(rms), hasVoice: \(hasVoice), isSpeechActive: \(isSpeechActive)")
-            // }
-
-            // Handle speech state transitions
-            let wasSpeaking = isSpeechActive
-
-            // Check if speech state changed
-            if hasVoice && !wasSpeaking {
-                // Speech just started
-                isSpeechActive = true
-                speechStartTime = Date()
-                lastSpeechTime = Date()
-                floatBuffer = []  // Clear float buffer
-                continuation.yield(.vadSpeechStart)
-                logger.info("Speech started, beginning to buffer audio")
-            }
-
-            // Always buffer audio when speech is active
-            if isSpeechActive {
-                // Buffer float samples directly (no need for Data conversion)
-                floatBuffer.append(contentsOf: floatArray)  // Use the float samples directly
-                // logger.debug("Buffering audio, total samples: \(floatBuffer.count)")
-
-                // Update last speech time if voice detected
-                if hasVoice {
-                    lastSpeechTime = Date()
-                }
-            }
-
-            // Check if we should process based on segmentation strategy
-            if isSpeechActive && !floatBuffer.isEmpty {
-                let speechDuration = Date().timeIntervalSince(speechStartTime ?? Date())
-                let silenceDuration = Date().timeIntervalSince(lastSpeechTime ?? Date())
-
-                // Ask segmentation strategy if we should process
-                let shouldProcess = segmentationStrategy.shouldProcessAudio(
-                    audioBuffer: floatBuffer,
-                    sampleRate: 16000,
-                    silenceDuration: silenceDuration,
-                    speechDuration: speechDuration
-                )
-
-                if shouldProcess {
-                    // Process the audio
-                    isSpeechActive = false
-                    continuation.yield(.vadSpeechEnd)
-                    logger.info("Speech segment complete after \(speechDuration)s (silence: \(silenceDuration)s), processing \(floatBuffer.count) samples")
-
-                    // Process the buffered audio asynchronously
-                    let floatsToProcess = floatBuffer
-                    floatBuffer = []
-
-                    // Reset segmentation strategy
-                    segmentationStrategy.reset()
-
-                    // Non-blocking transcription using structured concurrency
-                    Task { [weak self] in
-                        guard let self = self else { return }
-                        do {
-                            try await self.processBufferedAudioAsync(
-                                floatSamples: floatsToProcess,
-                                continuation: continuation
-                            )
-                        } catch {
-                            self.logger.error("Async audio processing failed: \(error)")
-                            continuation.yield(.pipelineError(error))
-                        }
+            // Use VAD handler for processing
+            if let floatsToProcess = vadHandler.processAudioChunk(
+                chunk,
+                vad: vad,
+                segmentationStrategy: segmentationStrategy,
+                continuation: continuation
+            ) {
+                // Process the buffered audio asynchronously
+                Task { [weak self] in
+                    guard let self = self else { return }
+                    do {
+                        try await self.processBufferedAudioAsync(
+                            floatSamples: floatsToProcess,
+                            continuation: continuation
+                        )
+                    } catch {
+                        self.logger.error("Async audio processing failed: \(error)")
+                        continuation.yield(.pipelineError(error))
                     }
                 }
             }
         } else {
-            // No VAD, buffer all audio
-            floatBuffer.append(contentsOf: floatArray)
-
-            // Process periodically
-            if floatBuffer.count > 32000 { // ~2 seconds at 16kHz
-                // logger.debug("No VAD, processing \(floatBuffer.count) samples periodically")
-
-                let floatsToProcess = floatBuffer
-                floatBuffer = []
-
+            // No VAD, use handler for buffering
+            if let floatsToProcess = vadHandler.processWithoutVAD(chunk) {
                 // Process asynchronously using structured concurrency
                 Task { [weak self] in
                     guard let self = self else { return }
@@ -396,17 +330,13 @@ public class ModularVoicePipeline {
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
         guard !floatSamples.isEmpty else {
-            // logger.debug("processBufferedAudioAsync called with empty samples, skipping")
             return
         }
-
-        // logger.debug("processBufferedAudioAsync starting with \(floatSamples.count) float samples")
 
         var currentData: Any = floatSamples
 
         // Step 2: STT (if enabled)
         if let stt = sttService, config.components.contains(.stt), let sttConfig = config.stt {
-            // logger.debug("STT service found, preparing to transcribe")
 
             let options = VoiceTranscriptionOptions(
                 language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english,

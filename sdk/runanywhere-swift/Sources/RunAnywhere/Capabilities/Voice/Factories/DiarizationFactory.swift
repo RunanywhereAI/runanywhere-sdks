@@ -30,7 +30,7 @@ extension RunAnywhereSDK {
     public func createVoicePipelineWithDiarization(
         config: ModularPipelineConfig,
         diarizationType: DiarizationType = .default
-    ) async throws -> ModularVoicePipeline {
+    ) async throws -> VoicePipelineManager {
 
         let diarizationService: SpeakerDiarizationProtocol?
 
