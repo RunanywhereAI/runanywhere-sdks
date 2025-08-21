@@ -4,8 +4,8 @@ import PackageDescription
 let package = Package(
     name: "FluidAudioDiarization",
     platforms: [
-        .iOS(.v16),      // FluidAudio actually supports iOS 16+
-        .macOS(.v13)     // FluidAudio actually supports macOS 13+
+        .iOS(.v17),      // FluidAudio requires iOS 17+
+        .macOS(.v14)     // FluidAudio requires macOS 14+
     ],
     products: [
         .library(
@@ -14,10 +14,10 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // FluidAudio dependency from local path
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.2.0"),
+        // FluidAudio dependency
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.3.0"),
         // Reference to main SDK for protocols
-        .package(name: "runanywhere-swift", path: "../../")  // Points to main SDK
+        .package(path: "../../"),
     ],
     targets: [
         .target(

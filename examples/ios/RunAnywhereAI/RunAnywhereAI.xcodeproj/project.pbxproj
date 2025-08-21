@@ -11,6 +11,7 @@
 		543028462E442716008361DD /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 543028452E442716008361DD /* LLM */; };
 		547F70B12E35CE270061BAED /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 547F70B02E35CE270061BAED /* Transformers */; };
 		547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 547F7D7D2E3735100061BAED /* ZIPFoundation */; };
+		548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */ = {isa = PBXBuildFile; productRef = 548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */; };
 		54C716C02E4FB77700B94B7D /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 54C716BF2E4FB77700B94B7D /* WhisperKit */; };
 		54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596142E39C32A0057B6CE /* backend_coreml */; };
 		54F596172E39C32A0057B6CE /* backend_mps in Frameworks */ = {isa = PBXBuildFile; productRef = 54F596162E39C32A0057B6CE /* backend_mps */; };
@@ -70,6 +71,7 @@
 				543028462E442716008361DD /* LLM in Frameworks */,
 				54C716C02E4FB77700B94B7D /* WhisperKit in Frameworks */,
 				54F5961B2E39C32A0057B6CE /* executorch in Frameworks */,
+				548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */,
 				54F596172E39C32A0057B6CE /* backend_mps in Frameworks */,
 				547F70B12E35CE270061BAED /* Transformers in Frameworks */,
 				54F596192E39C32A0057B6CE /* backend_xnnpack in Frameworks */,
@@ -151,6 +153,7 @@
 				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
 				543028452E442716008361DD /* LLM */,
 				54C716BF2E4FB77700B94B7D /* WhisperKit */,
+				548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -239,7 +242,7 @@
 				54C716BE2E4FB77700B94B7D /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
 				5896159F2E542E4600663F7F /* XCRemoteSwiftPackageReference "LLM" */,
-				548CA0742E56BB0C0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */,
+				548CA0752E56D0DC0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -692,7 +695,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		548CA0742E56BB0C0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */ = {
+		548CA0752E56D0DC0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization";
 		};
@@ -763,6 +766,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 547F7D7C2E3735100061BAED /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = FluidAudioDiarization;
 		};
 		54C716BF2E4FB77700B94B7D /* WhisperKit */ = {
 			isa = XCSwiftPackageProductDependency;
