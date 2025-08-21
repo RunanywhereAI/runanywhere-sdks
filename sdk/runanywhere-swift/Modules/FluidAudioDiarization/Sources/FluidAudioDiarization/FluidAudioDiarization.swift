@@ -14,17 +14,25 @@ public class FluidAudioDiarization: SpeakerDiarizationProtocol {
     private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
     private let diarizationQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
 
+    // Audio buffering for minimum chunk size (3 seconds recommended)
+    private var audioAccumulator: [Float] = []
+    private let minimumChunkDuration: Float = 3.0  // seconds
+    private var lastProcessedEmbedding: [Float]?
+
     /// Configuration for diarization
     private let config: DiarizerConfig
 
     /// Initialize FluidAudio diarization service
     /// - Parameter threshold: Similarity threshold for speaker matching (0.5-0.9)
-    public init(threshold: Float = 0.7) async throws {
-        // Configure diarization
+    public init(threshold: Float = 0.65) async throws {
+        // Configure diarization with appropriate threshold
         var config = DiarizerConfig.default
+        // Set clustering threshold directly - no compensation needed
+        // DiarizerManager will use this for clustering and multiply by 1.2 for speaker assignment
+        // For speakers with ~26% difference, we need a threshold between 0.26 and 0.65
         config.clusteringThreshold = threshold
-        config.minSpeechDuration = 1.0
-        config.minSilenceGap = 0.5
+        config.minSpeechDuration = 0.5  // Reduced from 1.0 for quicker speaker detection
+        config.minSilenceGap = 0.3  // Reduced from 0.5 for better responsiveness
         self.config = config
 
         // Initialize DiarizerManager
@@ -45,39 +53,57 @@ public class FluidAudioDiarization: SpeakerDiarizationProtocol {
     public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
         return diarizationQueue.sync {
             do {
-                // Perform diarization on the audio buffer
+                // Perform diarization to extract embeddings
                 let result = try diarizerManager.performCompleteDiarization(
                     audioBuffer,
                     sampleRate: sampleRate
                 )
 
-                // Process the segments to find the dominant speaker
-                if let firstSegment = result.segments.first {
-                    // Check if this speaker already exists
-                    if let existingSpeaker = diarizerManager.speakerManager.getSpeaker(for: firstSegment.speakerId) {
-                        let speakerInfo = mapToSpeakerInfo(existingSpeaker)
-                        currentSpeaker = speakerInfo
-                        return speakerInfo
-                    } else {
-                        // Create new speaker
-                        let speakerInfo = SpeakerInfo(
-                            id: firstSegment.speakerId,
-                            name: "Speaker \(firstSegment.speakerId)",
-                            embedding: firstSegment.embedding
-                        )
-                        speakers[speakerInfo.id] = speakerInfo
-                        currentSpeaker = speakerInfo
+                // Get the first segment's embedding (for short audio chunks, usually only one segment)
+                guard let firstSegment = result.segments.first else {
+                    logger.debug("No speaker segment found in audio")
+                    return currentSpeaker ?? createUnknownSpeaker()
+                }
+
+                let embedding = firstSegment.embedding
+
+                // Use the speaker manager to assign/find speaker based on embedding
+                // This maintains speaker database across calls
+                let speechDuration = Float(audioBuffer.count) / Float(sampleRate)
+                let fluidSpeaker = diarizerManager.speakerManager.assignSpeaker(
+                    embedding,
+                    speechDuration: speechDuration,
+                    confidence: firstSegment.qualityScore
+                )
+
+                if let fluidSpeaker = fluidSpeaker {
+                    let speakerInfo = mapToSpeakerInfo(fluidSpeaker)
+
+                    // Track new speakers
+                    if speakers[speakerInfo.id] == nil {
                         logger.info("New speaker detected: \(speakerInfo.id)")
-                        return speakerInfo
+                        speakers[speakerInfo.id] = speakerInfo
                     }
+
+                    // Log speaker changes
+                    if self.currentSpeaker?.id != speakerInfo.id {
+                        logger.debug("Speaker changed from \(self.currentSpeaker?.id ?? "none") to \(speakerInfo.id)")
+                    }
+
+                    currentSpeaker = speakerInfo
+                    return speakerInfo
                 } else {
-                    // No speaker detected, return unknown
-                    return createUnknownSpeaker()
+                    // No speaker assigned, return current or unknown
+                    return currentSpeaker ?? createUnknownSpeaker()
                 }
             } catch {
                 logger.error("FluidAudio diarization failed: \(error.localizedDescription)")
-                // Fallback to unknown speaker on error
-                return createUnknownSpeaker()
+                // Fallback to current speaker or unknown on error
+                if let current = currentSpeaker {
+                    return current
+                } else {
+                    return createUnknownSpeaker()
+                }
             }
         }
     }

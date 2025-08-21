@@ -11,13 +11,13 @@ class FluidAudioIntegration {
     /// Create FluidAudioDiarization service
     static func createDiarizationService() async -> SpeakerDiarizationProtocol? {
         do {
-            logger.info("Initializing FluidAudioDiarization...")
-            let diarization = try await FluidAudioDiarization(threshold: 0.65)  // Lower threshold for better speaker separation
-            logger.info("✅ FluidAudioDiarization initialized successfully")
+            // Use a threshold between standard (0.65) and measured distance (0.26)
+            // 0.45 provides good balance for similar speakers while avoiding over-segmentation
+            let diarization = try await FluidAudioDiarization(threshold: 0.45)
+            logger.info("FluidAudioDiarization initialized successfully")
             return diarization
         } catch {
             logger.error("Failed to initialize FluidAudioDiarization: \(error)")
-            logger.error("Falling back to default diarization")
             return nil
         }
     }
@@ -31,13 +31,23 @@ class FluidAudioIntegration {
         let diarizationService = await createDiarizationService()
 
         if let diarization = diarizationService {
-            logger.info("Creating voice pipeline with FluidAudioDiarization")
-            return sdk.createVoicePipeline(
-                config: config,
-                speakerDiarization: diarization
+            // Use smart phrase segmentation for better diarization accuracy
+            let segmentationStrategy = SmartPhraseSegmentation(
+                minimumPhraseLength: 3.0,   // Minimum 3 seconds for reliable diarization
+                optimalPhraseLength: 8.0,   // 8 seconds is optimal for speaker identification
+                phraseEndSilence: 2.0,      // 2 seconds of silence indicates phrase end
+                briefPauseThreshold: 0.5    // Brief pauses (breathing) don't trigger processing
             )
+
+            let pipeline = sdk.createVoicePipeline(
+                config: config,
+                speakerDiarization: diarization,
+                segmentationStrategy: segmentationStrategy
+            )
+            logger.debug("Pipeline created with FluidAudio diarization")
+            return pipeline
         } else {
-            logger.info("Creating voice pipeline with default diarization")
+            logger.info("Using default diarization (FluidAudio unavailable)")
             return sdk.createVoicePipeline(config: config)
         }
     }

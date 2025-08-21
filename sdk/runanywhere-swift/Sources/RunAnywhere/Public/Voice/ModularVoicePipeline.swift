@@ -39,8 +39,12 @@ public class ModularVoicePipeline {
     private var isSpeechActive = false
     private var isInitialized = false
     private var speechStartTime: Date?
+    private var lastSpeechTime: Date?  // Track when speech was last detected
     private let minSpeechDuration: TimeInterval = 1.0 // Minimum 1.0 seconds of speech for better transcription
     private let transcriptionQueue = DispatchQueue(label: "com.runanywhere.transcription", qos: .userInitiated)
+
+    // Audio segmentation strategy
+    private var segmentationStrategy: AudioSegmentationStrategy
 
     // Streaming TTS handler
     private var streamingTTSHandler: StreamingTTSHandler?
@@ -59,9 +63,13 @@ public class ModularVoicePipeline {
         voiceService: VoiceService? = nil,
         llmService: LLMService? = nil,
         ttsService: TextToSpeechService? = nil,
-        speakerDiarization: SpeakerDiarizationProtocol? = nil
+        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        segmentationStrategy: AudioSegmentationStrategy? = nil
     ) {
         self.config = config
+
+        // Use provided segmentation strategy or default
+        self.segmentationStrategy = segmentationStrategy ?? DefaultAudioSegmentation()
 
         // Initialize only requested components
         if config.components.contains(.vad) {
@@ -296,6 +304,7 @@ public class ModularVoicePipeline {
                 // Speech just started
                 isSpeechActive = true
                 speechStartTime = Date()
+                lastSpeechTime = Date()
                 floatBuffer = []  // Clear float buffer
                 continuation.yield(.vadSpeechStart)
                 logger.info("Speech started, beginning to buffer audio")
@@ -306,22 +315,38 @@ public class ModularVoicePipeline {
                 // Buffer float samples directly (no need for Data conversion)
                 floatBuffer.append(contentsOf: floatArray)  // Use the float samples directly
                 // logger.debug("Buffering audio, total samples: \(floatBuffer.count)")
+
+                // Update last speech time if voice detected
+                if hasVoice {
+                    lastSpeechTime = Date()
+                }
             }
 
-            // Check if speech ended - but ensure minimum duration
-            if !hasVoice && wasSpeaking {
+            // Check if we should process based on segmentation strategy
+            if isSpeechActive && !floatBuffer.isEmpty {
                 let speechDuration = Date().timeIntervalSince(speechStartTime ?? Date())
+                let silenceDuration = Date().timeIntervalSince(lastSpeechTime ?? Date())
 
-                // Only process if we have enough speech
-                if speechDuration >= minSpeechDuration && !floatBuffer.isEmpty {
-                    // Speech ended with sufficient duration
+                // Ask segmentation strategy if we should process
+                let shouldProcess = segmentationStrategy.shouldProcessAudio(
+                    audioBuffer: floatBuffer,
+                    sampleRate: 16000,
+                    silenceDuration: silenceDuration,
+                    speechDuration: speechDuration
+                )
+
+                if shouldProcess {
+                    // Process the audio
                     isSpeechActive = false
                     continuation.yield(.vadSpeechEnd)
-                    logger.info("Speech ended after \(speechDuration)s, processing \(floatBuffer.count) samples")
+                    logger.info("Speech segment complete after \(speechDuration)s (silence: \(silenceDuration)s), processing \(floatBuffer.count) samples")
 
                     // Process the buffered audio asynchronously
                     let floatsToProcess = floatBuffer
                     floatBuffer = []
+
+                    // Reset segmentation strategy
+                    segmentationStrategy.reset()
 
                     // Non-blocking transcription using structured concurrency
                     Task { [weak self] in
@@ -336,9 +361,6 @@ public class ModularVoicePipeline {
                             continuation.yield(.pipelineError(error))
                         }
                     }
-                } else if speechDuration < minSpeechDuration {
-                    // Speech was too short, keep buffering
-                    // logger.debug("Speech too short (\(speechDuration)s), continuing to buffer")
                 }
             }
         } else {
@@ -647,7 +669,8 @@ extension RunAnywhereSDK {
     /// This is the single API for all voice processing needs
     public func createVoicePipeline(
         config: ModularPipelineConfig,
-        speakerDiarization: SpeakerDiarizationProtocol? = nil
+        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        segmentationStrategy: AudioSegmentationStrategy? = nil
     ) -> ModularVoicePipeline {
         var llmService: LLMService? = nil
 
@@ -664,7 +687,8 @@ extension RunAnywhereSDK {
             voiceService: findVoiceService(for: config.stt?.modelId ?? "whisper-base"),
             llmService: llmService,
             ttsService: findTTSService(),
-            speakerDiarization: speakerDiarization
+            speakerDiarization: speakerDiarization,
+            segmentationStrategy: segmentationStrategy
         )
     }
 
