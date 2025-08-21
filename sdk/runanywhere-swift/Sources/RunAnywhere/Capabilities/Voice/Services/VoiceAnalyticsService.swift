@@ -169,14 +169,6 @@ public struct PipelineMetric {
     public let totalDuration: TimeInterval
 }
 
-/// Pipeline stage enum
-public enum PipelineStage: String {
-    case vad = "VAD"
-    case stt = "STT"
-    case llm = "LLM"
-    case tts = "TTS"
-}
-
 /// Voice processing metrics
 public struct VoiceMetrics {
     public let totalTranscriptions: Int

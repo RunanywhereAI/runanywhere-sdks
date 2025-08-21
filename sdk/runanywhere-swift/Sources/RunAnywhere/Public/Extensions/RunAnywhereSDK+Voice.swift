@@ -63,36 +63,6 @@ public extension RunAnywhereSDK {
         )
     }
 
-    /// Create a voice pipeline with legacy configuration (backward compatibility)
-    /// - Parameter config: Legacy voice pipeline configuration
-    /// - Returns: Configured voice pipeline
-    public func createVoicePipeline(config: VoicePipelineConfig) -> VoicePipelineManager {
-        // Convert legacy config to modular config
-        var components: Set<VoiceComponent> = [.vad, .stt]
-        if config.llmModelId != nil {
-            components.insert(.llm)
-        }
-        if config.enableTTS {
-            components.insert(.tts)
-        }
-
-        let modularConfig = ModularPipelineConfig(
-            components: components,
-            stt: VoiceSTTConfig(
-                modelId: config.sttModelId,
-                language: config.language,
-                options: config.transcriptionOptions
-            ),
-            llm: config.llmModelId.map {
-                VoiceLLMConfig(modelId: $0, systemPrompt: config.systemPrompt)
-            },
-            tts: config.enableTTS ?
-                VoiceTTSConfig(voice: config.ttsVoice, language: config.language) : nil,
-            vad: VoiceVADConfig()
-        )
-
-        return createVoicePipeline(config: modularConfig)
-    }
 
     // MARK: - Service Discovery (Delegated to VoiceCapabilityService)
 

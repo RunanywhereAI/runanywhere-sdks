@@ -29,6 +29,7 @@ public enum VoicePipelineEvent {
 
 /// Stages in the voice pipeline
 public enum PipelineStage: String, CaseIterable {
+    case vad = "VAD"
     case transcription = "Speech-to-Text"
     case llmGeneration = "LLM Generation"
     case textToSpeech = "Text-to-Speech"

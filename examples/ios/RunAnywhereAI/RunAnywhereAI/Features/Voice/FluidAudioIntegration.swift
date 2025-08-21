@@ -26,7 +26,7 @@ class FluidAudioIntegration {
     static func createVoicePipelineWithDiarization(
         sdk: RunAnywhereSDK,
         config: ModularPipelineConfig
-    ) async -> ModularVoicePipeline {
+    ) async -> VoicePipelineManager {
         // Try to create FluidAudio diarization
         let diarizationService = await createDiarizationService()
 

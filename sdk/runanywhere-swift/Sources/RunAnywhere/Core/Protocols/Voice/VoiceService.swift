@@ -98,6 +98,9 @@ public enum VoiceError: LocalizedError {
     case audioFormatNotSupported
     case insufficientAudioData
     case noVoiceServiceAvailable
+    case audioSessionNotConfigured
+    case audioSessionActivationFailed
+    case microphonePermissionDenied
 
     public var errorDescription: String? {
         switch self {
@@ -117,6 +120,12 @@ public enum VoiceError: LocalizedError {
             return "Insufficient audio data for transcription"
         case .noVoiceServiceAvailable:
             return "No voice service available for transcription"
+        case .audioSessionNotConfigured:
+            return "Audio session is not configured"
+        case .audioSessionActivationFailed:
+            return "Failed to activate audio session"
+        case .microphonePermissionDenied:
+            return "Microphone permission was denied"
         }
     }
 }

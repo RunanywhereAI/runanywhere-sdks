@@ -26,6 +26,10 @@ public class VoicePipelineManager {
     private let logger = SDKLogger(category: "VoicePipelineManager")
     private let config: ModularPipelineConfig
 
+    // State management
+    private var isSpeechActive: Bool = false
+    private var floatBuffer = [Float]()
+
     // Component instances (created based on config)
     private var vadComponent: VADService?
     private var sttService: VoiceService?
@@ -57,7 +61,7 @@ public class VoicePipelineManager {
     private var continuousMode: Bool = false
     private var sessionStartTime: Date?
 
-    public weak var delegate: ModularVoicePipelineDelegate?
+    public weak var delegate: VoicePipelineManagerDelegate?
 
     public init(
         config: ModularPipelineConfig,
@@ -587,9 +591,9 @@ public class VoicePipelineManager {
 
 // MARK: - Pipeline Delegate
 
-public protocol ModularVoicePipelineDelegate: AnyObject {
-    func pipeline(_ pipeline: ModularVoicePipeline, didReceiveEvent event: ModularPipelineEvent)
-    func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error)
+public protocol VoicePipelineManagerDelegate: AnyObject {
+    func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent)
+    func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error)
 }
 
 // MARK: - SDK Extension

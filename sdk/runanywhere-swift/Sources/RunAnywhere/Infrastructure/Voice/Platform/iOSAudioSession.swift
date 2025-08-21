@@ -104,7 +104,7 @@ public class iOSAudioSession {
 
     @objc private func handleRouteChange(notification: Notification) {
         guard let userInfo = notification.userInfo,
-              let reasonValue = userInfo[AVAudioSession.routeChangeReasonKey] as? UInt,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
             return
         }
@@ -133,7 +133,7 @@ public class iOSAudioSession {
 
     @objc private func handleInterruption(notification: Notification) {
         guard let userInfo = notification.userInfo,
-              let typeValue = userInfo[AVAudioSession.interruptionTypeKey] as? UInt,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
             return
         }
@@ -143,7 +143,7 @@ public class iOSAudioSession {
             logger.info("Audio session interrupted")
             // Handle interruption began
         case .ended:
-            if let optionsValue = userInfo[AVAudioSession.interruptionOptionKey] as? UInt {
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                 if options.contains(.shouldResume) {
                     logger.info("Audio session interruption ended, should resume")
@@ -173,17 +173,5 @@ public class iOSAudioSession {
     }
 }
 
-/// Voice processing mode
-public enum VoiceProcessingMode {
-    case recording
-    case playback
-    case conversation
-}
 
-/// Voice audio session errors
-public enum VoiceError: Error {
-    case audioSessionNotConfigured
-    case microphonePermissionDenied
-    case audioSessionActivationFailed
-}
 #endif
