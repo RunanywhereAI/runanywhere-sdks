@@ -25,11 +25,31 @@ public struct VoiceTranscriptionOptions {
     /// Task to perform
     public var task: Task
 
+    /// Enable speaker diarization (detect different speakers)
+    public var enableSpeakerDiarization: Bool
+
+    /// Maximum number of speakers to detect (nil for automatic)
+    public var maxSpeakers: Int?
+
+    /// Minimum duration for speaker segments (in seconds)
+    public var minSpeakerDuration: TimeInterval
+
+    /// Enable continuous mode for real-time streaming
+    public var continuousMode: Bool
+
     public init(
         language: Language = .auto,
-        task: Task = .transcribe
+        task: Task = .transcribe,
+        enableSpeakerDiarization: Bool = false,
+        maxSpeakers: Int? = nil,
+        minSpeakerDuration: TimeInterval = 1.0,
+        continuousMode: Bool = false
     ) {
         self.language = language
         self.task = task
+        self.enableSpeakerDiarization = enableSpeakerDiarization
+        self.maxSpeakers = maxSpeakers
+        self.minSpeakerDuration = minSpeakerDuration
+        self.continuousMode = continuousMode
     }
 }

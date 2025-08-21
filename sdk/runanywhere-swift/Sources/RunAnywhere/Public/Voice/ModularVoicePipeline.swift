@@ -45,6 +45,12 @@ public class ModularVoicePipeline {
     // Streaming TTS handler
     private var streamingTTSHandler: StreamingTTSHandler?
 
+    // Speaker diarization
+    private var speakerDiarizationService: SpeakerDiarizationService?
+    private var enableSpeakerDiarization: Bool = false
+    private var continuousMode: Bool = false
+    private var sessionStartTime: Date?
+
     public weak var delegate: ModularVoicePipelineDelegate?
 
     public init(
@@ -101,6 +107,41 @@ public class ModularVoicePipeline {
                 self.streamingTTSHandler = StreamingTTSHandler(ttsService: tts)
             }
         }
+    }
+
+    // MARK: - Configuration
+
+    /// Enable speaker diarization for transcription
+    public func enableSpeakerDiarization(_ enable: Bool = true) {
+        self.enableSpeakerDiarization = enable
+        if enable && speakerDiarizationService == nil {
+            speakerDiarizationService = SpeakerDiarizationService()
+            logger.info("Speaker diarization enabled")
+        } else if !enable {
+            speakerDiarizationService = nil
+            logger.info("Speaker diarization disabled")
+        }
+    }
+
+    /// Enable continuous mode for real-time streaming transcription
+    public func enableContinuousMode(_ enable: Bool = true) {
+        self.continuousMode = enable
+        logger.info("Continuous mode \(enable ? "enabled" : "disabled")")
+    }
+
+    /// Get all detected speakers
+    public func getAllSpeakers() -> [SpeakerInfo] {
+        return speakerDiarizationService?.getAllSpeakers() ?? []
+    }
+
+    /// Update speaker name
+    public func updateSpeakerName(speakerId: String, name: String) {
+        speakerDiarizationService?.updateSpeakerName(speakerId: speakerId, name: name)
+    }
+
+    /// Reset speaker diarization
+    public func resetSpeakerDiarization() {
+        speakerDiarizationService?.reset()
     }
 
     // MARK: - Initialization
@@ -338,7 +379,9 @@ public class ModularVoicePipeline {
             // logger.debug("STT service found, preparing to transcribe")
 
             let options = VoiceTranscriptionOptions(
-                language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english
+                language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english,
+                enableSpeakerDiarization: enableSpeakerDiarization,
+                continuousMode: continuousMode
             )
 
             // Check the service's preferred audio format
@@ -372,7 +415,27 @@ public class ModularVoicePipeline {
                 logger.info("STT transcription result: '\(transcript)'")
 
                 if !transcript.isEmpty {
-                    continuation.yield(.sttFinalTranscript(transcript))
+                    // Handle speaker diarization if enabled
+                    if enableSpeakerDiarization, let diarizationService = speakerDiarizationService {
+                        // Detect speaker from audio features
+                        let speaker = diarizationService.detectSpeakerFromAudio(
+                            audioBuffer: floatSamples,
+                            sampleRate: 16000
+                        )
+
+                        // Check if speaker changed
+                        let previousSpeaker = diarizationService.getCurrentSpeaker()
+                        if previousSpeaker?.id != speaker.id {
+                            continuation.yield(.sttSpeakerChanged(from: previousSpeaker, to: speaker))
+                        }
+
+                        // Emit transcript with speaker info
+                        continuation.yield(.sttFinalTranscriptWithSpeaker(transcript, speaker))
+                        logger.info("Transcript with speaker \(speaker.name ?? speaker.id): '\(transcript)'")
+                    } else {
+                        // Regular transcript without speaker info
+                        continuation.yield(.sttFinalTranscript(transcript))
+                    }
                     currentData = transcript
                 } else {
                     logger.warning("STT returned empty transcript")

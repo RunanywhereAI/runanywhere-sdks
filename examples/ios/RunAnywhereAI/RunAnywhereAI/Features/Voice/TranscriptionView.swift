@@ -67,18 +67,44 @@ struct TranscriptionView: View {
 
             // Model info section
             if showModelInfo {
-                HStack {
-                    Image(systemName: "waveform")
-                        .font(.caption2)
-                        .foregroundColor(.green)
-                    Text("STT: \(viewModel.whisperModel)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "waveform")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                        Text("STT: \(viewModel.whisperModel)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.green.opacity(0.08))
+                    .cornerRadius(8)
+
+                    // Speaker diarization indicator
+                    if viewModel.enableSpeakerDiarization {
+                        HStack {
+                            Image(systemName: "person.2.fill")
+                                .font(.caption2)
+                                .foregroundColor(.blue)
+                            Text("Speaker Detection: ON")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            if !viewModel.detectedSpeakers.isEmpty {
+                                Text("•")
+                                    .foregroundColor(.secondary.opacity(0.5))
+                                Text("\(viewModel.detectedSpeakers.count) speakers")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.08))
+                        .cornerRadius(8)
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Color.green.opacity(0.08))
-                .cornerRadius(8)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 10)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -93,7 +119,8 @@ struct TranscriptionView: View {
                             CleanTranscriptSegment(
                                 text: segment.text,
                                 timestamp: segment.timestamp,
-                                isFinal: true
+                                isFinal: true,
+                                speaker: segment.speaker
                             )
                         }
 
@@ -102,7 +129,8 @@ struct TranscriptionView: View {
                             CleanTranscriptSegment(
                                 text: viewModel.partialTranscript,
                                 timestamp: Date(),
-                                isFinal: false
+                                isFinal: false,
+                                speaker: viewModel.currentSpeaker
                             )
                             .id("bottom")
                         }
@@ -245,18 +273,44 @@ struct TranscriptionView: View {
 
                 // Collapsible model info
                 if showModelInfo {
-                    HStack {
-                        Image(systemName: "waveform")
-                            .font(.caption2)
-                            .foregroundColor(.green)
-                        Text("STT: \(viewModel.whisperModel)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "waveform")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                            Text("STT: \(viewModel.whisperModel)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.08))
+                        .cornerRadius(8)
+
+                        // Speaker diarization indicator
+                        if viewModel.enableSpeakerDiarization {
+                            HStack {
+                                Image(systemName: "person.2.fill")
+                                    .font(.caption2)
+                                    .foregroundColor(.blue)
+                                Text("Speaker Detection: ON")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                if !viewModel.detectedSpeakers.isEmpty {
+                                    Text("•")
+                                        .foregroundColor(.secondary.opacity(0.5))
+                                    Text("\(viewModel.detectedSpeakers.count) speakers")
+                                        .font(.caption)
+                                        .foregroundColor(.blue)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.08))
+                            .cornerRadius(8)
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.green.opacity(0.08))
-                    .cornerRadius(8)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 10)
                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -271,7 +325,8 @@ struct TranscriptionView: View {
                                 CleanTranscriptSegment(
                                     text: segment.text,
                                     timestamp: segment.timestamp,
-                                    isFinal: true
+                                    isFinal: true,
+                                    speaker: segment.speaker
                                 )
                             }
 
@@ -280,7 +335,8 @@ struct TranscriptionView: View {
                                 CleanTranscriptSegment(
                                     text: viewModel.partialTranscript,
                                     timestamp: Date(),
-                                    isFinal: false
+                                    isFinal: false,
+                                    speaker: viewModel.currentSpeaker
                                 )
                                 .id("bottom")
                             }
@@ -404,11 +460,12 @@ struct TranscriptionView: View {
     }
 }
 
-// Clean transcript segment view
+// Clean transcript segment view with speaker support
 struct CleanTranscriptSegment: View {
     let text: String
     let timestamp: Date
     let isFinal: Bool
+    let speaker: SpeakerInfo?
 
     private let formatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -416,18 +473,65 @@ struct CleanTranscriptSegment: View {
         return formatter
     }()
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(formatter.string(from: timestamp))
-                .font(.caption2)
-                .foregroundColor(.secondary.opacity(0.7))
+    // Speaker colors - assign colors based on speaker ID
+    private func speakerColor(for speakerId: String?) -> Color {
+        guard let id = speakerId else { return .gray }
+        let colors: [Color] = [.blue, .green, .orange, .purple, .pink, .cyan, .indigo, .mint]
+        let hash = abs(id.hashValue)
+        return colors[hash % colors.count]
+    }
 
-            Text(text)
-                .font(.body)
-                .foregroundColor(isFinal ? .primary : .secondary)
-                .opacity(isFinal ? 1.0 : 0.7)
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            // Speaker indicator
+            if let speaker = speaker {
+                VStack(spacing: 4) {
+                    Circle()
+                        .fill(speakerColor(for: speaker.id))
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Text(String((speaker.name ?? speaker.id).prefix(1)).uppercased())
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                        )
+
+                    Text(speaker.name ?? "Speaker")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(width: 50)
+            }
+
+            // Transcript content
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(formatter.string(from: timestamp))
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.7))
+
+                    if speaker != nil {
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.5))
+
+                        Text(speaker?.name ?? speaker?.id ?? "Unknown")
+                            .font(.caption2)
+                            .foregroundColor(speakerColor(for: speaker?.id))
+                            .fontWeight(.medium)
+                    }
+                }
+
+                Text(text)
+                    .font(.body)
+                    .foregroundColor(isFinal ? .primary : .secondary)
+                    .opacity(isFinal ? 1.0 : 0.7)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 }
 

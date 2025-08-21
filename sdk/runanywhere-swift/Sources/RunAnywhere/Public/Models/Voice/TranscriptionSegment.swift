@@ -26,6 +26,9 @@ public struct VoiceTranscriptionSegment {
     /// Word-level timestamps if available
     public let wordTimestamps: [WordTimestamp]?
 
+    /// Speaker information for this segment
+    public let speaker: SpeakerInfo?
+
     public init(
         text: String,
         startTime: TimeInterval,
@@ -34,7 +37,8 @@ public struct VoiceTranscriptionSegment {
         confidence: Float = 1.0,
         language: String? = nil,
         alternatives: [(text: String, confidence: Float)] = [],
-        wordTimestamps: [WordTimestamp]? = nil
+        wordTimestamps: [WordTimestamp]? = nil,
+        speaker: SpeakerInfo? = nil
     ) {
         self.text = text
         self.startTime = startTime
@@ -44,6 +48,7 @@ public struct VoiceTranscriptionSegment {
         self.language = language
         self.alternatives = alternatives
         self.wordTimestamps = wordTimestamps
+        self.speaker = speaker
     }
 
     /// Duration of this segment
