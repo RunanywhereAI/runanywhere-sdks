@@ -88,19 +88,67 @@ public class VoiceCapabilityService {
 
         logger.debug("Finding voice service for model: \(modelId)")
 
-        // This would integrate with the SDK's model loading service
-        // For now, return nil - actual implementation would use ServiceContainer
+        // Access ServiceContainer through shared instance
+        let container = ServiceContainer.shared
+
+        // Try to find a model info for this modelId
+        if let model = try? container.modelRegistry.getModel(by: modelId) {
+            // Find adapter that can handle this model
+            if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
+               unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
+                // Create a voice service from the unified adapter
+                if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
+                    return voiceService
+                }
+            }
+        }
+
+        // Fallback: Find any framework that supports voice-to-text
+        let voiceFrameworks = container.adapterRegistry.getFrameworks(for: FrameworkModality.voiceToText)
+        if let firstVoiceFramework = voiceFrameworks.first,
+           let adapter = container.adapterRegistry.getAdapter(for: firstVoiceFramework) {
+            if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
+                return voiceService
+            }
+        }
+
         return nil
     }
 
     /// Find LLM service for the given model ID
     private func findLLMService(for modelId: String?) -> LLMService? {
+        let container = ServiceContainer.shared
+
+        // First, check if there's already a loaded model in the GenerationService
+        if let currentModel = container.generationService.getCurrentModel() {
+            return currentModel.service
+        }
+
+        // If no model is loaded and a specific modelId is requested
         guard let modelId = modelId else { return nil }
 
         logger.debug("Finding LLM service for model: \(modelId)")
 
-        // This would integrate with the SDK's model loading service
-        // For now, return nil - actual implementation would use ServiceContainer
+        if let model = try? container.modelRegistry.getModel(by: modelId) {
+            // Find adapter that can handle this model
+            if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
+               unifiedAdapter.supportedModalities.contains(FrameworkModality.textToText) {
+                // Create an LLM service from the unified adapter
+                if let llmService = unifiedAdapter.createService(for: FrameworkModality.textToText) as? LLMService {
+                    return llmService
+                }
+            }
+        }
+
+        // Fallback: Find any framework that supports text generation
+        let textFrameworks = container.adapterRegistry.getFrameworks(for: FrameworkModality.textToText)
+        if let firstTextFramework = textFrameworks.first,
+           let adapter = container.adapterRegistry.getAdapter(for: firstTextFramework) {
+            if let llmService = adapter.createService(for: FrameworkModality.textToText) as? LLMService {
+                return llmService
+            }
+        }
+
         return nil
     }
 
@@ -109,7 +157,6 @@ public class VoiceCapabilityService {
         logger.debug("Finding TTS service")
 
         // Return system TTS service by default
-        // In actual implementation, this would check available services
-        return nil
+        return SystemTextToSpeechService()
     }
 }

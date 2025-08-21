@@ -47,6 +47,11 @@ public class ServiceContainer {
         StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
+    /// Voice capability service
+    private(set) lazy var voiceCapabilityService: VoiceCapabilityService = {
+        VoiceCapabilityService()
+    }()
+
     /// Voice orchestrator
     private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
         // Create TTS service instance
@@ -355,6 +360,15 @@ public class ServiceContainer {
             // Storage monitoring is now handled by SimplifiedFileManager
         }
 
+        // Initialize voice capability service
+        do {
+            try await voiceCapabilityService.initialize()
+            logger.info("Voice capability service initialized")
+        } catch {
+            logger.warning("Failed to initialize voice capability service: \(error)")
+            // Voice is optional, don't fail the entire initialization
+        }
+
         // Start service health monitoring
         await startHealthMonitoring()
     }
@@ -368,6 +382,7 @@ public class ServiceContainer {
         health["storage"] = await checkStorageServiceHealth()
         health["validation"] = await checkValidationServiceHealth()
         health["compatibility"] = await checkCompatibilityServiceHealth()
+        health["voice"] = voiceCapabilityService.isHealthy()
         // Removed tokenizer health check
 
         return health

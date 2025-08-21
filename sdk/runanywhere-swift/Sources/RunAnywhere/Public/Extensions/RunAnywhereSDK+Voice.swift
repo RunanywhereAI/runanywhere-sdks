@@ -30,75 +30,82 @@ public extension RunAnywhereSDK {
         return result
     }
 
+    // MARK: - Voice Pipeline API
+
+    /// Create a modular voice pipeline with the specified configuration
+    /// - Parameters:
+    ///   - config: Pipeline configuration
+    ///   - speakerDiarization: Optional speaker diarization service
+    ///   - segmentationStrategy: Optional audio segmentation strategy
+    /// - Returns: Configured voice pipeline
+    public func createVoicePipeline(
+        config: ModularPipelineConfig,
+        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        segmentationStrategy: AudioSegmentationStrategy? = nil
+    ) -> VoicePipelineManager {
+        // Delegate to voice capability service
+        return serviceContainer.voiceCapabilityService.createPipeline(config: config)
+    }
+
+    /// Process voice input through the complete pipeline
+    /// - Parameters:
+    ///   - audioStream: Stream of audio chunks
+    ///   - config: Pipeline configuration
+    /// - Returns: Stream of pipeline events
+    public func processVoice(
+        audioStream: AsyncStream<VoiceAudioChunk>,
+        config: ModularPipelineConfig
+    ) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
+        // Delegate to voice capability service
+        return serviceContainer.voiceCapabilityService.processVoice(
+            audioStream: audioStream,
+            config: config
+        )
+    }
+
+    /// Create a voice pipeline with legacy configuration (backward compatibility)
+    /// - Parameter config: Legacy voice pipeline configuration
+    /// - Returns: Configured voice pipeline
+    public func createVoicePipeline(config: VoicePipelineConfig) -> VoicePipelineManager {
+        // Convert legacy config to modular config
+        var components: Set<VoiceComponent> = [.vad, .stt]
+        if config.llmModelId != nil {
+            components.insert(.llm)
+        }
+        if config.enableTTS {
+            components.insert(.tts)
+        }
+
+        let modularConfig = ModularPipelineConfig(
+            components: components,
+            stt: VoiceSTTConfig(
+                modelId: config.sttModelId,
+                language: config.language,
+                options: config.transcriptionOptions
+            ),
+            llm: config.llmModelId.map {
+                VoiceLLMConfig(modelId: $0, systemPrompt: config.systemPrompt)
+            },
+            tts: config.enableTTS ?
+                VoiceTTSConfig(voice: config.ttsVoice, language: config.language) : nil,
+            vad: VoiceVADConfig()
+        )
+
+        return createVoicePipeline(config: modularConfig)
+    }
+
+    // MARK: - Service Discovery (Delegated to VoiceCapabilityService)
+
     /// Find appropriate voice service for model
     func findVoiceService(for modelId: String) -> VoiceService? {
-        // Try to find a model info for this modelId
-        if let model = try? serviceContainer.modelRegistry.getModel(by: modelId) {
-            // Find adapter that can handle this model
-            if let unifiedAdapter = serviceContainer.adapterRegistry.findBestAdapter(for: model),
-               unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
-                // Create a voice service from the unified adapter
-                if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                    return voiceService
-                }
-            }
-        }
-
-        // Fallback: Find any framework that supports voice-to-text
-        let voiceFrameworks = serviceContainer.adapterRegistry.getFrameworks(for: FrameworkModality.voiceToText)
-        if let firstVoiceFramework = voiceFrameworks.first,
-           let adapter = serviceContainer.adapterRegistry.getAdapter(for: firstVoiceFramework) {
-            if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                return voiceService
-            }
-        }
-
-        return nil
+        // Delegate to voice capability service
+        return serviceContainer.voiceCapabilityService.findVoiceService(for: modelId)
     }
 
     /// Find appropriate TTS service
-    func findTTSService() -> TextToSpeechService {
-        // For now, always use system TTS
-        return SystemTextToSpeechService()
-    }
-
-    /// Find appropriate generation service
-    func findGenerationService() -> GenerationService {
-        return serviceContainer.generationService
-    }
-
-    /// Find appropriate LLM service for a model
-    func findLLMService(for modelId: String? = nil) -> LLMService? {
-        // First, check if there's already a loaded model in the GenerationService
-        // This is the most common case - reuse the existing LLM instance
-        if let currentModel = serviceContainer.generationService.getCurrentModel() {
-            // Return the already initialized and ready LLM service
-            return currentModel.service
-        }
-
-        // If no model is loaded and a specific modelId is requested, try to create a new service
-        if let modelId = modelId,
-           let model = try? serviceContainer.modelRegistry.getModel(by: modelId) {
-            // Find adapter that can handle this model
-            if let unifiedAdapter = serviceContainer.adapterRegistry.findBestAdapter(for: model),
-               unifiedAdapter.supportedModalities.contains(FrameworkModality.textToText) {
-                // Create an LLM service from the unified adapter
-                if let llmService = unifiedAdapter.createService(for: FrameworkModality.textToText) as? LLMService {
-                    return llmService
-                }
-            }
-        }
-
-        // Fallback: Find any framework that supports text generation
-        let textFrameworks = serviceContainer.adapterRegistry.getFrameworks(for: FrameworkModality.textToText)
-        if let firstTextFramework = textFrameworks.first,
-           let adapter = serviceContainer.adapterRegistry.getAdapter(for: firstTextFramework) {
-            if let llmService = adapter.createService(for: FrameworkModality.textToText) as? LLMService {
-                return llmService
-            }
-        }
-
-        return nil
+    func findTTSService() -> TextToSpeechService? {
+        // Delegate to voice capability service
+        return serviceContainer.voiceCapabilityService.findTTSService()
     }
 
 }
