@@ -1,8 +1,9 @@
 import Foundation
 import Accelerate
 
-/// Service for managing speaker diarization in real-time transcription
-public class SpeakerDiarizationService {
+/// Default implementation of speaker diarization using simple audio features
+/// This provides basic speaker tracking functionality without external dependencies
+public class DefaultSpeakerDiarization: SpeakerDiarizationProtocol {
 
     /// Manages detected speakers and their profiles
     private var speakers: [String: SpeakerInfo] = [:]
@@ -25,26 +26,21 @@ public class SpeakerDiarizationService {
     /// Lock for thread safety
     private let lock = NSLock()
 
-    public init() {}
+    /// Logger
+    private let logger = SDKLogger(category: "DefaultSpeakerDiarization")
 
-    /// Process audio features to detect/identify speaker
-    public func processSpeakerFeatures(
-        embedding: [Float]?,
-        audioFeatures: [String: Any]? = nil
-    ) -> SpeakerInfo {
+    public init() {
+        logger.debug("Initialized default speaker diarization")
+    }
+
+    // MARK: - SpeakerDiarizationProtocol Implementation
+
+    public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
         lock.lock()
         defer { lock.unlock() }
 
-        // If no embedding provided, use or create default speaker
-        guard let embedding = embedding else {
-            if let current = currentSpeaker {
-                return current
-            } else {
-                let speaker = createNewSpeaker(embedding: nil)
-                currentSpeaker = speaker
-                return speaker
-            }
-        }
+        // Create a simple embedding from audio features
+        let embedding = createSimpleEmbedding(from: audioBuffer)
 
         // Try to match with existing speakers
         if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
@@ -55,8 +51,47 @@ public class SpeakerDiarizationService {
         // Create new speaker if no match found
         let newSpeaker = createNewSpeaker(embedding: embedding)
         currentSpeaker = newSpeaker
+        logger.info("Detected new speaker: \(newSpeaker.id)")
         return newSpeaker
     }
+
+    public func updateSpeakerName(speakerId: String, name: String) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if var speaker = speakers[speakerId] {
+            speaker.name = name
+            speakers[speakerId] = speaker
+            logger.debug("Updated speaker name: \(speakerId) -> \(name)")
+        }
+    }
+
+    public func getAllSpeakers() -> [SpeakerInfo] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return Array(speakers.values)
+    }
+
+    public func getCurrentSpeaker() -> SpeakerInfo? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return currentSpeaker
+    }
+
+    public func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+
+        speakers.removeAll()
+        currentSpeaker = nil
+        temporarySpeakerSegments.removeAll()
+        nextSpeakerId = 1
+        logger.debug("Reset speaker diarization state")
+    }
+
+    // MARK: - Private Methods
 
     /// Find speaker that matches the given embedding
     private func findMatchingSpeaker(embedding: [Float]) -> SpeakerInfo? {
@@ -80,11 +115,12 @@ public class SpeakerDiarizationService {
     /// Create a new speaker profile
     private func createNewSpeaker(embedding: [Float]?) -> SpeakerInfo {
         let speakerId = "speaker_\(nextSpeakerId)"
+        let speakerNumber = nextSpeakerId
         nextSpeakerId += 1
 
         let speaker = SpeakerInfo(
             id: speakerId,
-            name: "Speaker \(nextSpeakerId - 1)",
+            name: "Speaker \(speakerNumber)",
             embedding: embedding
         )
 
@@ -108,58 +144,8 @@ public class SpeakerDiarizationService {
         return denominator > 0 ? dotProduct / denominator : 0
     }
 
-    /// Update speaker name
-    public func updateSpeakerName(speakerId: String, name: String) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if var speaker = speakers[speakerId] {
-            speaker.name = name
-            speakers[speakerId] = speaker
-        }
-    }
-
-    /// Get all detected speakers
-    public func getAllSpeakers() -> [SpeakerInfo] {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return Array(speakers.values)
-    }
-
-    /// Reset speaker detection
-    public func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-
-        speakers.removeAll()
-        currentSpeaker = nil
-        temporarySpeakerSegments.removeAll()
-        nextSpeakerId = 1
-    }
-
-    /// Get current speaker
-    public func getCurrentSpeaker() -> SpeakerInfo? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return currentSpeaker
-    }
-
-    /// Simulate speaker detection from audio features (placeholder for real implementation)
-    public func detectSpeakerFromAudio(audioBuffer: [Float], sampleRate: Int = 16000) -> SpeakerInfo {
-        // This is a simplified placeholder
-        // In a real implementation, you would:
-        // 1. Extract voice features (MFCCs, pitch, formants)
-        // 2. Generate speaker embeddings using a neural network
-        // 3. Compare with existing speakers
-
-        // For now, create a simple hash-based "embedding" from audio statistics
-        let embedding = createSimpleEmbedding(from: audioBuffer)
-        return processSpeakerFeatures(embedding: embedding)
-    }
-
-    /// Create a simple embedding from audio (placeholder)
+    /// Create a simple embedding from audio (placeholder for real speaker embedding)
+    /// In production, this would use a neural network to generate speaker embeddings
     private func createSimpleEmbedding(from audioBuffer: [Float]) -> [Float] {
         guard !audioBuffer.isEmpty else { return Array(repeating: 0, count: 128) }
 

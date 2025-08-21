@@ -239,6 +239,7 @@
 				54C716BE2E4FB77700B94B7D /* XCRemoteSwiftPackageReference "WhisperKit" */,
 				58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */,
 				5896159F2E542E4600663F7F /* XCRemoteSwiftPackageReference "LLM" */,
+				548CA0742E56BB0C0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -691,6 +692,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		548CA0742E56BB0C0061CCF5 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization";
+		};
 		58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift";

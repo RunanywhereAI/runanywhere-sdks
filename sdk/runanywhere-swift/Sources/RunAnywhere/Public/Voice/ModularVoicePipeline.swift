@@ -46,7 +46,7 @@ public class ModularVoicePipeline {
     private var streamingTTSHandler: StreamingTTSHandler?
 
     // Speaker diarization
-    private var speakerDiarizationService: SpeakerDiarizationService?
+    private var speakerDiarizationService: SpeakerDiarizationProtocol?
     private var enableSpeakerDiarization: Bool = false
     private var continuousMode: Bool = false
     private var sessionStartTime: Date?
@@ -58,7 +58,8 @@ public class ModularVoicePipeline {
         vadService: VADService? = nil,
         voiceService: VoiceService? = nil,
         llmService: LLMService? = nil,
-        ttsService: TextToSpeechService? = nil
+        ttsService: TextToSpeechService? = nil,
+        speakerDiarization: SpeakerDiarizationProtocol? = nil
     ) {
         self.config = config
 
@@ -107,6 +108,12 @@ public class ModularVoicePipeline {
                 self.streamingTTSHandler = StreamingTTSHandler(ttsService: tts)
             }
         }
+
+        // Use injected speaker diarization service if provided
+        if let customDiarization = speakerDiarization {
+            self.speakerDiarizationService = customDiarization
+            logger.debug("Using custom speaker diarization service")
+        }
     }
 
     // MARK: - Configuration
@@ -115,8 +122,9 @@ public class ModularVoicePipeline {
     public func enableSpeakerDiarization(_ enable: Bool = true) {
         self.enableSpeakerDiarization = enable
         if enable && speakerDiarizationService == nil {
-            speakerDiarizationService = SpeakerDiarizationService()
-            logger.info("Speaker diarization enabled")
+            // Create default implementation if none provided
+            speakerDiarizationService = DefaultSpeakerDiarization()
+            logger.info("Speaker diarization enabled with default implementation")
         } else if !enable {
             speakerDiarizationService = nil
             logger.info("Speaker diarization disabled")
@@ -418,8 +426,8 @@ public class ModularVoicePipeline {
                     // Handle speaker diarization if enabled
                     if enableSpeakerDiarization, let diarizationService = speakerDiarizationService {
                         // Detect speaker from audio features
-                        let speaker = diarizationService.detectSpeakerFromAudio(
-                            audioBuffer: floatSamples,
+                        let speaker = diarizationService.detectSpeaker(
+                            from: floatSamples,
                             sampleRate: 16000
                         )
 
@@ -637,7 +645,10 @@ public protocol ModularVoicePipelineDelegate: AnyObject {
 extension RunAnywhereSDK {
     /// Create a modular voice pipeline with the specified configuration
     /// This is the single API for all voice processing needs
-    public func createVoicePipeline(config: ModularPipelineConfig) -> ModularVoicePipeline {
+    public func createVoicePipeline(
+        config: ModularPipelineConfig,
+        speakerDiarization: SpeakerDiarizationProtocol? = nil
+    ) -> ModularVoicePipeline {
         var llmService: LLMService? = nil
 
         // Only try to find an LLM service if LLM component is requested
@@ -652,7 +663,8 @@ extension RunAnywhereSDK {
             vadService: nil, // Will use default SimpleEnergyVAD
             voiceService: findVoiceService(for: config.stt?.modelId ?? "whisper-base"),
             llmService: llmService,
-            ttsService: findTTSService()
+            ttsService: findTTSService(),
+            speakerDiarization: speakerDiarization
         )
     }
 

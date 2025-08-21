@@ -3,6 +3,7 @@
 ## Table of Contents
 1. [SDK Context Management](#sdk-context-management) - **Priority: High** 🔄
 2. [SDK Template/Prompt Format Support](#sdk-templateprompt-format-support) - **Priority: Medium**
+3. [FluidAudio Model Download Integration](#fluidaudio-model-download-integration) - **Priority: Medium** 🎙️
 
 ---
 
@@ -57,3 +58,35 @@ Move template determination from LLMSwiftService to SDK level for better abstrac
 - Map SDK template types to framework-specific formats in adapters
 
 **Benefits:** Centralized template logic, consistent across frameworks, better abstraction.
+
+---
+
+## FluidAudio Model Download Integration
+
+**Priority: Medium** 🎙️
+
+Integrate FluidAudio's speaker diarization model downloads into SDK's unified model management system.
+
+**Current State:**
+- FluidAudio downloads its own models (~100MB from HuggingFace)
+- Stored in `~/Library/Application Support/FluidAudio/Models/`
+- Separate from SDK's model management
+
+**Target State:**
+- Register FluidAudio models in SDK's `ModelRegistry`
+- Use SDK's `DownloadManager` for unified progress tracking
+- Store in SDK location: `Documents/RunAnywhere/Models/FluidAudio/`
+
+**Implementation Phases:**
+
+1. **Register Models** - Add FluidAudio models to ModelRegistry
+2. **Download Strategy** - Create `FluidAudioDownloadStrategy` wrapping FluidAudio's downloader
+3. **Storage Migration** - Move models to SDK's unified location
+4. **Update Integration** - Modify `FluidAudioDiarization` to use SDK paths
+
+**Files to Create:**
+- `FluidAudioDownloadStrategy.swift` - Download strategy implementation
+- `FluidAudioModelRegistry.swift` - Model registration
+- `FluidAudioMigration.swift` - Storage migration logic
+
+**Benefits:** Unified model management, consistent UX, single progress indicator, better error handling.
