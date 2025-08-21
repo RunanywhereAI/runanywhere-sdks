@@ -40,7 +40,7 @@ public class VoicePipelineManager {
     // Handlers for component processing
     private let vadHandler = VADHandler()
     private let sttHandler = STTHandler()
-    private let llmHandler = LLMHandler()
+    private let llmHandler = VoiceLLMHandler()
     private let ttsHandler = TTSHandler()
     private let speakerDiarizationHandler = SpeakerDiarizationHandler()
 

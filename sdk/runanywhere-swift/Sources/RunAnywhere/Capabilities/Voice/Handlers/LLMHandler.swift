@@ -2,7 +2,7 @@ import Foundation
 import os
 
 /// Handles Language Model processing in the voice pipeline
-public class LLMHandler {
+public class VoiceLLMHandler {
     private let logger = SDKLogger(category: "LLMHandler")
 
     public init() {}
