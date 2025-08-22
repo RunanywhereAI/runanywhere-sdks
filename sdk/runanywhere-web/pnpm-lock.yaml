@@ -111,6 +111,25 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)
 
+  packages/tts:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+      eventemitter3:
+        specifier: ^5.0.1
+        version: 5.0.1
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^6.0.3
+        version: 6.3.5(@types/node@22.17.2)(yaml@2.8.1)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)
+
   packages/voice:
     dependencies:
       '@ricky0123/vad-web':

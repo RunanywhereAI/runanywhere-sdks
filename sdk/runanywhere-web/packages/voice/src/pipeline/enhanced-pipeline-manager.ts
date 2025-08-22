@@ -9,13 +9,17 @@ import {
 import { WebVADService, VAD_SERVICE_TOKEN } from '../services/vad/vad-service';
 import { WhisperService, WhisperConfig, TranscriptionResult } from '@runanywhere/transcription';
 import { LLMService, LLMConfig, CompletionResult } from '@runanywhere/llm';
+import { TTSService, TTSConfig, SynthesisResult } from '@runanywhere/tts';
 
 export interface EnhancedPipelineConfig {
   vadConfig?: any;
   whisperConfig?: Partial<WhisperConfig>;
   llmConfig?: Partial<LLMConfig>;
+  ttsConfig?: Partial<TTSConfig>;
   enableTranscription?: boolean;
   enableLLM?: boolean;
+  enableTTS?: boolean;
+  autoPlayTTS?: boolean;
   maxHistorySize?: number;
 }
 
@@ -31,9 +35,15 @@ export interface EnhancedPipelineEvents {
   'llmStart': { prompt: string };
   'llmToken': { token: string; position: number };
   'llmResponse': CompletionResult;
+  'ttsStart': { text: string };
+  'ttsProgress': { text: string; progress: number };
+  'ttsComplete': SynthesisResult;
+  'ttsPlaybackStart': void;
+  'ttsPlaybackEnd': void;
   'pipelineComplete': {
     transcription: TranscriptionResult;
     llmResponse?: CompletionResult;
+    ttsResult?: SynthesisResult;
   };
 }
 
@@ -41,6 +51,7 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
   private vadService?: WebVADService;
   private whisperService?: WhisperService;
   private llmService?: LLMService;
+  private ttsService?: TTSService;
   private isProcessing = false;
   private audioBuffer: Float32Array[] = [];
   private sessionId: SessionId;
@@ -80,13 +91,24 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
         logger.info('LLM service initialized', 'Pipeline');
       }
 
+      // Initialize TTS if enabled
+      if (this.config.enableTTS) {
+        this.ttsService = new TTSService(this.config.ttsConfig);
+        const result = await this.ttsService.initialize();
+        if (!result.success) {
+          return result;
+        }
+        logger.info('TTS service initialized', 'Pipeline');
+      }
+
       this.setupEventHandlers();
 
       logger.info('Enhanced pipeline initialized', 'Pipeline', {
         sessionId: this.sessionId,
         pipelineId: this.pipelineId,
         transcription: this.config.enableTranscription !== false,
-        llm: this.config.enableLLM === true
+        llm: this.config.enableLLM === true,
+        tts: this.config.enableTTS === true
       });
 
       return Result.ok(undefined);
@@ -131,6 +153,29 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
         this.emit('llmStart', data);
       });
     }
+
+    // TTS events
+    if (this.ttsService) {
+      this.ttsService.on('synthesisStart', (data: any) => {
+        this.emit('ttsStart', data);
+      });
+
+      this.ttsService.on('synthesisProgress', (progress: any) => {
+        this.emit('ttsProgress', progress);
+      });
+
+      this.ttsService.on('synthesisComplete', (result: SynthesisResult) => {
+        this.emit('ttsComplete', result);
+      });
+
+      this.ttsService.on('playbackStart', () => {
+        this.emit('ttsPlaybackStart');
+      });
+
+      this.ttsService.on('playbackEnd', () => {
+        this.emit('ttsPlaybackEnd');
+      });
+    }
   }
 
   private async processAudio(audio: Float32Array): Promise<void> {
@@ -144,6 +189,7 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
     try {
       let transcriptionResult: TranscriptionResult | undefined;
       let llmResult: CompletionResult | undefined;
+      let ttsResult: SynthesisResult | undefined;
 
       // Transcribe audio
       if (this.whisperService) {
@@ -160,10 +206,24 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
             if (llmResponse.success) {
               llmResult = llmResponse.value;
               this.emit('llmResponse', llmResult);
+
+              // Process with TTS if enabled
+              if (this.ttsService && llmResult.text.trim()) {
+                const ttsResponse = await this.ttsService.synthesize(llmResult.text);
+
+                if (ttsResponse.success) {
+                  ttsResult = ttsResponse.value;
+
+                  // Auto-play if configured
+                  if (this.config.autoPlayTTS) {
+                    await this.ttsService.play(ttsResult.audioBuffer);
+                  }
+                }
+              }
             }
           }
         } else {
-      logger.error(`Transcription failed: ${result.error.message}`, 'Pipeline');
+          logger.error(`Transcription failed: ${result.error.message}`, 'Pipeline');
           this.emit('error', result.error);
         }
       }
@@ -172,7 +232,8 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
       if (transcriptionResult) {
         this.emit('pipelineComplete', {
           transcription: transcriptionResult,
-          llmResponse: llmResult
+          llmResponse: llmResult,
+          ttsResult: ttsResult
         });
       }
 
@@ -233,14 +294,16 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
     const vadHealthy = this.vadService?.isHealthy() ?? false;
     const whisperHealthy = this.whisperService?.isHealthy() ?? true;
     const llmHealthy = this.llmService?.isHealthy() ?? true;
+    const ttsHealthy = this.ttsService?.isHealthy() ?? true;
 
-    return vadHealthy && whisperHealthy && llmHealthy;
+    return vadHealthy && whisperHealthy && llmHealthy && ttsHealthy;
   }
 
   destroy(): void {
     this.vadService?.destroy();
     this.whisperService?.destroy();
     this.llmService?.destroy();
+    this.ttsService?.destroy();
     this.removeAllListeners();
 
     logger.info('Enhanced pipeline destroyed', 'Pipeline');

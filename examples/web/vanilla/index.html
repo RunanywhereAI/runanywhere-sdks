@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RunAnywhere Voice Pipeline Demo - Phase 2</title>
+  <title>RunAnywhere Voice Pipeline Demo - Phase 3</title>
   <style>
     * {
       margin: 0;
@@ -356,6 +356,33 @@
           <em style="opacity: 0.6;">AI response will appear here...</em>
         </div>
         <div id="llmStreaming" style="margin-top: 10px; color: #667eea; font-style: italic; min-height: 30px;">
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3: TTS (Text-to-Speech) -->
+    <div class="phase3-container" style="margin-bottom: 30px;">
+      <div class="tts-container" style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+        <div class="section-header" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; color: #333;">
+          🔊 Text-to-Speech
+        </div>
+        <div id="ttsStatus" style="margin-bottom: 10px; color: #666; font-size: 0.9rem;">
+          <em style="opacity: 0.6;">TTS ready...</em>
+        </div>
+        <div id="ttsText" style="min-height: 60px; color: #666; font-size: 1rem; line-height: 1.5; background: white; padding: 15px; border-radius: 8px; border: 2px solid #e9ecef;">
+          <em style="opacity: 0.6;">AI response will be spoken here...</em>
+        </div>
+        <div class="tts-controls" style="margin-top: 15px; display: flex; gap: 10px; align-items: center;">
+          <button id="playTTSBtn" disabled style="background: #667eea; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500;">
+            ▶️ Play
+          </button>
+          <button id="stopTTSBtn" disabled style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 500;">
+            ⏹️ Stop
+          </button>
+          <label style="margin-left: auto; display: flex; align-items: center; gap: 8px; color: #666; font-size: 0.9rem;">
+            <input type="checkbox" id="autoPlayTTS" checked style="transform: scale(1.2);">
+            Auto-play
+          </label>
         </div>
       </div>
     </div>

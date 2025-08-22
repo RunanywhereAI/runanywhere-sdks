@@ -1,7 +1,9 @@
 import {
   VoicePipelineManager,
   PipelineEvent,
-  PipelineState
+  PipelineState,
+  EnhancedVoicePipelineManager,
+  EnhancedPipelineEvents
 } from '@runanywhere/voice';
 import {
   logger,
@@ -36,8 +38,16 @@ const partialTranscriptionEl = document.getElementById('partialTranscription') a
 const llmResponseEl = document.getElementById('llmResponse') as HTMLDivElement;
 const llmStreamingEl = document.getElementById('llmStreaming') as HTMLDivElement;
 
+// Phase 3 TTS UI Elements
+const ttsStatusEl = document.getElementById('ttsStatus') as HTMLDivElement;
+const ttsTextEl = document.getElementById('ttsText') as HTMLDivElement;
+const playTTSBtn = document.getElementById('playTTSBtn') as HTMLButtonElement;
+const stopTTSBtn = document.getElementById('stopTTSBtn') as HTMLButtonElement;
+const autoPlayTTSCheckbox = document.getElementById('autoPlayTTS') as HTMLInputElement;
+
 // State
 let pipeline: VoicePipelineManager | null = null;
+let enhancedPipeline: EnhancedVoicePipelineManager | null = null;
 let container: DIContainer | null = null;
 let speechCount = 0;
 let totalDuration = 0;
@@ -45,6 +55,7 @@ let energySum = 0;
 let energyCount = 0;
 let animationId: number | null = null;
 let audioLevels: number[] = new Array(50).fill(0);
+let currentTTSAudio: AudioBuffer | null = null;
 
 // Initialize canvas size
 function resizeCanvas() {
@@ -128,16 +139,7 @@ function updateMetrics(duration: number = 0, energy: number = 0) {
   }
 }
 
-// Update health status
-async function updateHealth() {
-  if (!pipeline) {
-    healthEl.textContent = '🔴';
-    return;
-  }
-
-  const health = await pipeline.getHealth();
-  healthEl.textContent = health.overall ? '🟢' : '🔴';
-}
+// Update health status (moved to end of file)
 
 // Handle pipeline events
 function handlePipelineEvent(event: PipelineEvent) {
@@ -267,6 +269,131 @@ function handleLLMEvent(event: any) {
   }
 }
 
+// Handle Enhanced Pipeline Events (Phase 2 + 3)
+function handleEnhancedPipelineEvent(eventName: keyof EnhancedPipelineEvents, ...args: any[]) {
+  console.log('Enhanced pipeline event:', eventName, args);
+
+  switch (eventName) {
+    case 'started':
+      updateStatus('Listening...', 'listening');
+      addEvent('STARTED', 'Enhanced pipeline started');
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      pauseBtn.disabled = false;
+      pauseBtn.textContent = 'Pause';
+      if (!animationId) {
+        drawVisualization();
+      }
+      break;
+
+    case 'stopped':
+      updateStatus('Stopped', 'idle');
+      addEvent('STOPPED', 'Enhanced pipeline stopped');
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      pauseBtn.disabled = true;
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+      break;
+
+    case 'vadSpeechStart':
+      updateStatus('Speaking...', 'speaking');
+      addEvent('SPEECH_START', 'Voice activity detected');
+      break;
+
+    case 'vadSpeechEnd':
+      updateStatus('Processing...', 'speaking');
+      addEvent('SPEECH_END', 'Speech ended, processing...');
+      break;
+
+    case 'transcriptionStart':
+      addEvent('TRANSCRIPTION_START', 'Starting transcription...');
+      break;
+
+    case 'partialTranscription':
+      const partial = args[0];
+      partialTranscriptionEl.textContent = partial.text;
+      break;
+
+    case 'transcription':
+      const transcription = args[0];
+      transcriptionEl.innerHTML = `<strong>Latest:</strong> ${transcription.text}`;
+      partialTranscriptionEl.textContent = "";
+      addEvent('TRANSCRIPTION', transcription.text);
+      break;
+
+    case 'llmStart':
+      llmStreamingEl.textContent = "AI is thinking...";
+      addEvent('LLM_START', 'AI processing started...');
+      break;
+
+    case 'llmToken':
+      const tokenData = args[0];
+      llmResponseEl.textContent = (llmResponseEl.textContent || '') + tokenData.token;
+      break;
+
+    case 'llmResponse':
+      const llmResult = args[0];
+      llmStreamingEl.textContent = "";
+      addEvent('LLM_COMPLETE', `AI response completed (${llmResult.text.length} chars)`);
+      break;
+
+    case 'ttsStart':
+      const ttsStart = args[0];
+      ttsStatusEl.innerHTML = '<em style="color: #667eea;">🔊 Synthesizing speech...</em>';
+      ttsTextEl.textContent = ttsStart.text;
+      addEvent('TTS_START', `Synthesizing: "${ttsStart.text.substring(0, 50)}..."`);
+      break;
+
+    case 'ttsProgress':
+      const progress = args[0];
+      ttsStatusEl.innerHTML = `<em style="color: #667eea;">🔊 Synthesizing... ${Math.round(progress.progress * 100)}%</em>`;
+      break;
+
+    case 'ttsComplete':
+      const ttsResult = args[0];
+      ttsStatusEl.innerHTML = '<em style="color: #28a745;">✅ Speech synthesis complete</em>';
+      currentTTSAudio = ttsResult.audioBuffer;
+      playTTSBtn.disabled = false;
+      addEvent('TTS_COMPLETE', `Synthesis completed (${ttsResult.duration.toFixed(2)}s)`);
+      break;
+
+    case 'ttsPlaybackStart':
+      ttsStatusEl.innerHTML = '<em style="color: #667eea;">🔊 Playing audio...</em>';
+      stopTTSBtn.disabled = false;
+      playTTSBtn.disabled = true;
+      addEvent('TTS_PLAYBACK_START', 'Audio playback started');
+      break;
+
+    case 'ttsPlaybackEnd':
+      ttsStatusEl.innerHTML = '<em style="color: #666;">TTS ready...</em>';
+      stopTTSBtn.disabled = true;
+      playTTSBtn.disabled = false;
+      addEvent('TTS_PLAYBACK_END', 'Audio playback finished');
+      setTimeout(() => {
+        updateStatus('Listening...', 'listening');
+      }, 500);
+      break;
+
+    case 'pipelineComplete':
+      const results = args[0];
+      addEvent('PIPELINE_COMPLETE', `Full pipeline completed - Transcription: "${results.transcription.text.substring(0, 30)}..."`);
+      setTimeout(() => {
+        updateStatus('Listening...', 'listening');
+      }, 1000);
+      break;
+
+    case 'error':
+      const error = args[0];
+      updateStatus(`Error: ${error.message}`, 'error');
+      addEvent('ERROR', error.message);
+      ttsStatusEl.innerHTML = `<em style="color: #dc3545;">❌ Error: ${error.message}</em>`;
+      break;
+  }
+}
+
 // Initialize pipeline
 initBtn.addEventListener('click', async () => {
   try {
@@ -277,36 +404,74 @@ initBtn.addEventListener('click', async () => {
     // Create DI container
     container = new DIContainer();
 
-    // Create pipeline with VAD enabled
-    pipeline = new VoicePipelineManager({
-      vad: {
-        enabled: true,
-        config: {
-          positiveSpeechThreshold: 0.9,
-          negativeSpeechThreshold: 0.75,
-          minSpeechFrames: 5,
-          frameSamples: 1536,
-          submitUserSpeechOnPause: true
-        }
+    // Register VAD service in container (as expected by enhanced pipeline)
+    const { VAD_SERVICE_TOKEN, WebVADService } = await import('@runanywhere/voice');
+    container.register(VAD_SERVICE_TOKEN, () => new WebVADService({
+      positiveSpeechThreshold: 0.9,
+      negativeSpeechThreshold: 0.75,
+      minSpeechFrames: 5,
+      frameSamples: 1536,
+      submitUserSpeechOnPause: true
+    }));
+
+    // Create enhanced pipeline with all Phase 2/3 features
+    enhancedPipeline = new EnhancedVoicePipelineManager(container, {
+      vadConfig: {
+        positiveSpeechThreshold: 0.9,
+        negativeSpeechThreshold: 0.75,
+        minSpeechFrames: 5,
+        frameSamples: 1536,
+        submitUserSpeechOnPause: true
       },
-      performance: {
-        useWebWorkers: false, // Disabled for demo simplicity
-        bufferSize: 4096
+      enableTranscription: true,
+      enableLLM: true,
+      enableTTS: true,
+      autoPlayTTS: autoPlayTTSCheckbox.checked,
+      whisperConfig: {
+        model: 'whisper-tiny' // Use smaller model for demo
+      },
+      llmConfig: {
+        baseUrl: 'http://localhost:11434/v1', // Default Ollama endpoint
+        model: 'llama3.2:1b',
+        maxTokens: 150,
+        temperature: 0.7,
+        systemPrompt: 'You are a helpful voice assistant. Keep responses concise and conversational.'
+      },
+      ttsConfig: {
+        engine: 'web-speech',
+        voice: 'default',
+        rate: 1.0,
+        pitch: 1.0
       }
-    }, container);
+    });
 
-    // Set up event handlers
-    pipeline.on('event', handlePipelineEvent);
+    // Set up enhanced event handlers
+    enhancedPipeline.on('vadSpeechStart', () => handleEnhancedPipelineEvent('vadSpeechStart'));
+    enhancedPipeline.on('vadSpeechEnd', (audio) => handleEnhancedPipelineEvent('vadSpeechEnd', audio));
+    enhancedPipeline.on('transcriptionStart', () => handleEnhancedPipelineEvent('transcriptionStart'));
+    enhancedPipeline.on('partialTranscription', (partial) => handleEnhancedPipelineEvent('partialTranscription', partial));
+    enhancedPipeline.on('transcription', (result) => handleEnhancedPipelineEvent('transcription', result));
+    enhancedPipeline.on('llmStart', (data) => handleEnhancedPipelineEvent('llmStart', data));
+    enhancedPipeline.on('llmToken', (token) => handleEnhancedPipelineEvent('llmToken', token));
+    enhancedPipeline.on('llmResponse', (response) => handleEnhancedPipelineEvent('llmResponse', response));
+    enhancedPipeline.on('ttsStart', (data) => handleEnhancedPipelineEvent('ttsStart', data));
+    enhancedPipeline.on('ttsProgress', (progress) => handleEnhancedPipelineEvent('ttsProgress', progress));
+    enhancedPipeline.on('ttsComplete', (result) => handleEnhancedPipelineEvent('ttsComplete', result));
+    enhancedPipeline.on('ttsPlaybackStart', () => handleEnhancedPipelineEvent('ttsPlaybackStart'));
+    enhancedPipeline.on('ttsPlaybackEnd', () => handleEnhancedPipelineEvent('ttsPlaybackEnd'));
+    enhancedPipeline.on('pipelineComplete', (results) => handleEnhancedPipelineEvent('pipelineComplete', results));
+    enhancedPipeline.on('started', () => handleEnhancedPipelineEvent('started'));
+    enhancedPipeline.on('stopped', () => handleEnhancedPipelineEvent('stopped'));
+    enhancedPipeline.on('error', (error) => handleEnhancedPipelineEvent('error', error));
 
-    // Initialize the pipeline
-    await pipeline.initialize();
+    // Initialize the enhanced pipeline
+    await enhancedPipeline.initialize();
 
     // Update metrics periodically
     setInterval(() => {
       updateHealth();
-      if (pipeline) {
-        const metrics = pipeline.getMetrics();
-        console.log('Pipeline metrics:', metrics);
+      if (enhancedPipeline) {
+        console.log('Enhanced pipeline health:', enhancedPipeline.isHealthy());
       }
     }, 5000);
 
@@ -322,8 +487,8 @@ initBtn.addEventListener('click', async () => {
 // Start listening
 startBtn.addEventListener('click', async () => {
   try {
-    if (!pipeline) return;
-    await pipeline.start();
+    if (!enhancedPipeline) return;
+    await enhancedPipeline.start();
   } catch (error) {
     console.error('Start error:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -334,24 +499,84 @@ startBtn.addEventListener('click', async () => {
 
 // Stop listening
 stopBtn.addEventListener('click', () => {
-  if (!pipeline) return;
-  pipeline.stop();
+  if (!enhancedPipeline) return;
+  enhancedPipeline.stop();
 });
 
 // Pause/Resume
-pauseBtn.addEventListener('click', () => {
-  if (!pipeline) return;
+pauseBtn.addEventListener('click', async () => {
+  if (!enhancedPipeline) return;
 
-  const state = pipeline.getState();
-  if (state === PipelineState.RUNNING) {
-    pipeline.pause();
-  } else if (state === PipelineState.PAUSED) {
-    pipeline.resume();
+  try {
+    if (pauseBtn.textContent === 'Pause') {
+      await enhancedPipeline.pause();
+    } else {
+      await enhancedPipeline.resume();
+    }
+  } catch (error) {
+    console.error('Pause/Resume error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    addEvent('ERROR', errorMessage);
   }
 });
 
+// TTS Button Handlers
+playTTSBtn.addEventListener('click', async () => {
+  if (!currentTTSAudio || !enhancedPipeline) return;
+
+  try {
+    // Get TTS service from enhanced pipeline and play audio manually
+    const audioContext = new AudioContext();
+    const source = audioContext.createBufferSource();
+    source.buffer = currentTTSAudio;
+    source.connect(audioContext.destination);
+
+    playTTSBtn.disabled = true;
+    stopTTSBtn.disabled = false;
+    handleEnhancedPipelineEvent('ttsPlaybackStart');
+
+    source.onended = () => {
+      handleEnhancedPipelineEvent('ttsPlaybackEnd');
+    };
+
+    source.start();
+  } catch (error) {
+    console.error('TTS playback error:', error);
+    addEvent('TTS_ERROR', error instanceof Error ? error.message : String(error));
+  }
+});
+
+stopTTSBtn.addEventListener('click', () => {
+  // In a real implementation, we'd stop the audio source
+  // For now, just update UI
+  handleEnhancedPipelineEvent('ttsPlaybackEnd');
+});
+
+// Auto-play TTS checkbox handler
+autoPlayTTSCheckbox.addEventListener('change', () => {
+  if (enhancedPipeline) {
+    // Update the enhanced pipeline config
+    enhancedPipeline['config'].autoPlayTTS = autoPlayTTSCheckbox.checked;
+    addEvent('CONFIG_UPDATE', `Auto-play TTS: ${autoPlayTTSCheckbox.checked ? 'enabled' : 'disabled'}`);
+  }
+});
+
+// Update health status
+async function updateHealth() {
+  if (!enhancedPipeline) {
+    healthEl.textContent = '🔴';
+    return;
+  }
+
+  const health = enhancedPipeline.isHealthy();
+  healthEl.textContent = health ? '🟢' : '🔴';
+}
+
 // Clean up on page unload
 window.addEventListener('beforeunload', () => {
+  if (enhancedPipeline) {
+    enhancedPipeline.destroy();
+  }
   if (pipeline) {
     pipeline.destroy();
   }
@@ -364,6 +589,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 // Log initial message
-addEvent('WELCOME', 'Click Initialize to begin');
-console.log('RunAnywhere Voice Pipeline Demo - Phase 1');
+addEvent('WELCOME', 'Click Initialize to begin Phase 3 Demo');
+console.log('RunAnywhere Voice Pipeline Demo - Phase 3');
 console.log('SDK Version: 0.1.0');
+console.log('Features: VAD + Whisper STT + LLM + TTS');
