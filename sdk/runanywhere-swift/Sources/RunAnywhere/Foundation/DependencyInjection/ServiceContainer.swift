@@ -47,27 +47,11 @@ public class ServiceContainer {
         StreamingService(generationService: generationService, modelLoadingService: modelLoadingService)
     }()
 
-    /// Voice orchestrator
-    private(set) lazy var voiceOrchestrator: VoiceOrchestrator = {
-        // Create TTS service instance
-        let ttsService = SystemTextToSpeechService()
-
-        return DefaultVoiceOrchestrator(
-            voiceServiceProvider: { [weak self] in
-                // This will be resolved at runtime when processVoiceQuery is called
-                return nil // Voice service is created dynamically based on model
-            },
-            generationService: generationService,
-            streamingService: streamingService,
-            ttsServiceProvider: { [ttsService] in
-                // Return the system TTS service
-                try await ttsService.initialize()
-                return ttsService
-            },
-            adapterRegistry: adapterRegistry,
-            modelRegistry: modelRegistry
-        )
+    /// Voice capability service
+    private(set) lazy var voiceCapabilityService: VoiceCapabilityService = {
+        VoiceCapabilityService()
     }()
+
 
 /// Validation service
     private(set) lazy var validationService: ValidationService = {
@@ -355,6 +339,15 @@ public class ServiceContainer {
             // Storage monitoring is now handled by SimplifiedFileManager
         }
 
+        // Initialize voice capability service
+        do {
+            try await voiceCapabilityService.initialize()
+            logger.info("Voice capability service initialized")
+        } catch {
+            logger.warning("Failed to initialize voice capability service: \(error)")
+            // Voice is optional, don't fail the entire initialization
+        }
+
         // Start service health monitoring
         await startHealthMonitoring()
     }
@@ -368,6 +361,7 @@ public class ServiceContainer {
         health["storage"] = await checkStorageServiceHealth()
         health["validation"] = await checkValidationServiceHealth()
         health["compatibility"] = await checkCompatibilityServiceHealth()
+        health["voice"] = voiceCapabilityService.isHealthy()
         // Removed tokenizer health check
 
         return health

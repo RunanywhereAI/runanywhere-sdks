@@ -29,7 +29,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var enableSpeakerDiarization: Bool = true
 
     // MARK: - Transcription State
-    private var voicePipeline: ModularVoicePipeline?
+    private var voicePipeline: VoicePipelineManager?
     private let whisperModelName: String = "whisper-base"
     private var audioStreamContinuation: AsyncStream<VoiceAudioChunk>.Continuation?
     private var pipelineTask: Task<Void, Never>?
@@ -349,16 +349,16 @@ class TranscriptionViewModel: ObservableObject {
     }
 }
 
-// MARK: - ModularVoicePipelineDelegate
+// MARK: - VoicePipelineManagerDelegate
 
-extension TranscriptionViewModel: @preconcurrency ModularVoicePipelineDelegate {
-    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didReceiveEvent event: ModularPipelineEvent) {
+extension TranscriptionViewModel: @preconcurrency VoicePipelineManagerDelegate {
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
         Task { @MainActor in
             await handlePipelineEvent(event)
         }
     }
 
-    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error) {
         Task { @MainActor in
             errorMessage = error.localizedDescription
             isTranscribing = false
