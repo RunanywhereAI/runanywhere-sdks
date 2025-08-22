@@ -248,8 +248,7 @@ export class TTSService extends EventEmitter<TTSEvents> {
     }
 
     try {
-      // For streaming, we'll chunk the text and synthesize parts
-      const chunkSize = options.chunkSize || 50;
+      // For streaming, we'll split text into sentences
       const sentences = this.splitIntoSentences(text);
       let sequence = 0;
 
