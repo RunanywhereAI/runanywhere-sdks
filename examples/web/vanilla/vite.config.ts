@@ -8,8 +8,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@runanywhere/core': path.resolve(__dirname, '../../packages/core/src'),
-      '@runanywhere/voice': path.resolve(__dirname, '../../packages/voice/src')
+      '@runanywhere/core': path.resolve(__dirname, '../../../sdk/runanywhere-web/packages/core/dist/index.js'),
+      '@runanywhere/voice': path.resolve(__dirname, '../../../sdk/runanywhere-web/packages/voice/dist/index.js')
     }
   },
   build: {

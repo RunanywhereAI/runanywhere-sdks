@@ -9,8 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@runanywhere/core": "workspace:*",
-    "@runanywhere/voice": "workspace:*"
+    "@runanywhere/core": "file:../../../sdk/runanywhere-web/packages/core",
+    "@runanywhere/voice": "file:../../../sdk/runanywhere-web/packages/voice"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
