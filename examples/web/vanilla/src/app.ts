@@ -30,6 +30,12 @@ const healthEl = document.getElementById('health') as HTMLDivElement;
 const canvas = document.getElementById('visualizer') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 
+// Phase 2 UI Elements
+const transcriptionEl = document.getElementById('transcription') as HTMLDivElement;
+const partialTranscriptionEl = document.getElementById('partialTranscription') as HTMLDivElement;
+const llmResponseEl = document.getElementById('llmResponse') as HTMLDivElement;
+const llmStreamingEl = document.getElementById('llmStreaming') as HTMLDivElement;
+
 // State
 let pipeline: VoicePipelineManager | null = null;
 let container: DIContainer | null = null;
@@ -187,10 +193,13 @@ function handlePipelineEvent(event: PipelineEvent) {
       break;
 
     case 'vad:speech_end':
-      updateStatus('Listening...', 'listening');
+      updateStatus('Processing...', 'speaking');
       const duration = event.duration;
       addEvent('SPEECH_END', `Duration: ${duration.toFixed(2)}s, Samples: ${event.audio.length}`);
       updateMetrics(duration);
+
+      // Phase 2 features will be triggered by enhanced pipeline events
+      // when transcription and LLM services are integrated
       break;
 
     case 'vad:audio_level':
@@ -212,6 +221,48 @@ function handlePipelineEvent(event: PipelineEvent) {
     case 'error':
       updateStatus(`Error: ${event.error.message}`, 'error');
       addEvent('ERROR', event.error.message);
+      break;
+  }
+}
+
+// Handle Phase 2 transcription events
+function handleTranscriptionEvent(event: any) {
+  switch (event.type) {
+    case 'transcription:partial':
+      partialTranscriptionEl.textContent = event.text;
+      break;
+
+    case 'transcription:final':
+      transcriptionEl.innerHTML = `<strong>Latest:</strong> ${event.text}`;
+      partialTranscriptionEl.textContent = "";
+      addEvent('TRANSCRIPTION', event.text);
+      break;
+
+    case 'transcription:error':
+      addEvent('TRANSCRIPTION_ERROR', event.error.message);
+      break;
+  }
+}
+
+// Handle Phase 2 LLM events
+function handleLLMEvent(event: any) {
+  switch (event.type) {
+    case 'llm:streaming':
+      llmStreamingEl.textContent = "AI is thinking...";
+      llmResponseEl.textContent = event.text;
+      break;
+
+    case 'llm:complete':
+      llmStreamingEl.textContent = "";
+      addEvent('LLM_RESPONSE', 'Response completed');
+      setTimeout(() => {
+        updateStatus('Listening...', 'listening');
+      }, 1000);
+      break;
+
+    case 'llm:error':
+      llmStreamingEl.textContent = "";
+      addEvent('LLM_ERROR', event.error.message);
       break;
   }
 }

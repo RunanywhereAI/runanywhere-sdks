@@ -71,11 +71,13 @@ export class EnhancedVoicePipelineManager extends EventEmitter<EnhancedPipelineE
         if (!result.success) {
           return result;
         }
+        logger.info('Whisper service initialized', 'Pipeline');
       }
 
       // Initialize LLM if enabled
       if (this.config.enableLLM) {
         this.llmService = new LLMService(this.config.llmConfig);
+        logger.info('LLM service initialized', 'Pipeline');
       }
 
       this.setupEventHandlers();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RunAnywhere Voice Pipeline Demo - Phase 1</title>
+  <title>RunAnywhere Voice Pipeline Demo - Phase 2</title>
   <style>
     * {
       margin: 0;
@@ -333,6 +333,31 @@
 
     <div class="audio-visualizer">
       <canvas id="visualizer"></canvas>
+    </div>
+
+    <!-- Phase 2: Transcription and LLM Response -->
+    <div class="phase2-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+      <div class="transcription-container" style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+        <div class="section-header" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; color: #333;">
+          🎙️ Transcription
+        </div>
+        <div id="transcription" style="min-height: 100px; color: #666; font-size: 1rem; line-height: 1.5;">
+          <em style="opacity: 0.6;">Speak to see transcription...</em>
+        </div>
+        <div id="partialTranscription" style="margin-top: 10px; color: #999; font-style: italic; min-height: 30px;">
+        </div>
+      </div>
+
+      <div class="llm-container" style="background: #f8f9fa; border-radius: 12px; padding: 20px;">
+        <div class="section-header" style="font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; color: #333;">
+          🤖 AI Response
+        </div>
+        <div id="llmResponse" style="min-height: 100px; color: #666; font-size: 1rem; line-height: 1.5;">
+          <em style="opacity: 0.6;">AI response will appear here...</em>
+        </div>
+        <div id="llmStreaming" style="margin-top: 10px; color: #667eea; font-style: italic; min-height: 30px;">
+        </div>
+      </div>
     </div>
 
     <div class="events-container">

@@ -119,6 +119,12 @@ importers:
       '@runanywhere/core':
         specifier: workspace:*
         version: link:../core
+      '@runanywhere/llm':
+        specifier: workspace:*
+        version: link:../llm
+      '@runanywhere/transcription':
+        specifier: workspace:*
+        version: link:../transcription
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1

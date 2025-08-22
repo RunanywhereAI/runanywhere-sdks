@@ -13,13 +13,15 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc -b && vite build",
+    "build": "vite build && tsc --emitDeclarationOnly",
     "test": "vitest",
     "typecheck": "tsc -b",
     "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {
     "@runanywhere/core": "workspace:*",
+    "@runanywhere/transcription": "workspace:*",
+    "@runanywhere/llm": "workspace:*",
     "@ricky0123/vad-web": "^0.0.24",
     "eventemitter3": "^5.0.1"
   },
