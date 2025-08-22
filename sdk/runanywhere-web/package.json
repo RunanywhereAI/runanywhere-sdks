@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm -r --parallel dev",
-    "build": "pnpm -r build",
+    "build": "pnpm build:core && pnpm build:packages",
+    "build:core": "pnpm --filter '@runanywhere/core' build",
+    "build:packages": "pnpm --filter '@runanywhere/llm' build && pnpm --filter '@runanywhere/transcription' build && pnpm --filter '@runanywhere/tts' build && pnpm --filter '@runanywhere/voice' build",
     "test": "pnpm -r test",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",

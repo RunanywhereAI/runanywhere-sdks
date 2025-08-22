@@ -1,36 +1,37 @@
 import { defineConfig } from 'vite';
-import path from 'path';
 
 export default defineConfig({
   build: {
     lib: {
-      entry: path.resolve(__dirname, 'src/index.ts'),
-      name: 'RunAnywhereVoice',
-      fileName: 'index',
-      formats: ['es', 'cjs']
+      entry: 'src/index.ts',
+      name: 'RunAnywhereReact',
+      fileName: (format) => `index.${format === 'es' ? 'js' : format}`,
+      formats: ['es']
     },
     rollupOptions: {
       external: [
-        'eventemitter3',
+        'react',
+        'react-dom',
         '@runanywhere/core',
+        '@runanywhere/voice',
         '@runanywhere/transcription',
         '@runanywhere/llm',
-        '@runanywhere/tts',
-        '@ricky0123/vad-web'
+        '@runanywhere/tts'
       ],
       output: {
         globals: {
-          'eventemitter3': 'EventEmitter3',
+          'react': 'React',
+          'react-dom': 'ReactDOM',
           '@runanywhere/core': 'RunAnywhereCore',
+          '@runanywhere/voice': 'RunAnywhereVoice',
           '@runanywhere/transcription': 'RunAnywhereTranscription',
           '@runanywhere/llm': 'RunAnywhereLLM',
-          '@runanywhere/tts': 'RunAnywhereTTS',
-          '@ricky0123/vad-web': 'VADWeb'
+          '@runanywhere/tts': 'RunAnywhereTTS'
         }
       }
     },
     target: 'es2020',
-    sourcemap: true,
-    minify: false
+    minify: false,
+    sourcemap: true
   }
 });

@@ -144,6 +144,9 @@ importers:
       '@runanywhere/transcription':
         specifier: workspace:*
         version: link:../transcription
+      '@runanywhere/tts':
+        specifier: workspace:*
+        version: link:../tts
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1

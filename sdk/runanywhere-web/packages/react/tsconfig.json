@@ -13,7 +13,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "jsx": "react-jsx"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]

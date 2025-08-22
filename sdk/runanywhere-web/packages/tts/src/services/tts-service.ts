@@ -228,7 +228,7 @@ export class TTSService extends EventEmitter<TTSEvents> {
         reject(new Error(`Speech synthesis error: ${event.error}`));
       };
 
-      this.synthesizer.speak(utterance);
+      this.synthesizer!.speak(utterance);
     });
   }
 

@@ -13,9 +13,9 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly",
+    "build": "tsc && vite build",
     "test": "vitest",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@runanywhere/core": "workspace:*",

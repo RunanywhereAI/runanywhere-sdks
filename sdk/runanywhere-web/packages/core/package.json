@@ -13,10 +13,9 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build && tsc --emitDeclarationOnly",
-    "build:types": "tsc --emitDeclarationOnly --outDir dist",
+    "build": "tsc && vite build",
     "test": "vitest",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist node_modules .turbo"
   },
   "dependencies": {
