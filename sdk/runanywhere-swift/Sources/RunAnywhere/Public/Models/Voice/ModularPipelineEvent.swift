@@ -12,10 +12,18 @@ public enum ModularPipelineEvent {
     case sttFinalTranscript(String)
     case sttLanguageDetected(String)
 
+    // STT with Speaker Diarization events
+    case sttPartialTranscriptWithSpeaker(String, SpeakerInfo)
+    case sttFinalTranscriptWithSpeaker(String, SpeakerInfo)
+    case sttNewSpeakerDetected(SpeakerInfo)
+    case sttSpeakerChanged(from: SpeakerInfo?, to: SpeakerInfo)
+
     // LLM events
     case llmThinking
     case llmPartialResponse(String)
     case llmFinalResponse(String)
+    case llmStreamStarted
+    case llmStreamToken(String)
 
     // TTS events
     case ttsStarted

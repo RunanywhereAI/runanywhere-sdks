@@ -69,7 +69,14 @@ public extension RunAnywhereSDK {
 
     /// Find appropriate LLM service for a model
     func findLLMService(for modelId: String? = nil) -> LLMService? {
-        // Try to find a model info for this modelId
+        // First, check if there's already a loaded model in the GenerationService
+        // This is the most common case - reuse the existing LLM instance
+        if let currentModel = serviceContainer.generationService.getCurrentModel() {
+            // Return the already initialized and ready LLM service
+            return currentModel.service
+        }
+
+        // If no model is loaded and a specific modelId is requested, try to create a new service
         if let modelId = modelId,
            let model = try? serviceContainer.modelRegistry.getModel(by: modelId) {
             // Find adapter that can handle this model

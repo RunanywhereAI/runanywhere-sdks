@@ -24,6 +24,9 @@ class TranscriptionViewModel: ObservableObject {
     @Published var whisperModel: String = "Whisper Base"
     @Published var partialTranscript: String = ""
     @Published var finalTranscripts: [TranscriptSegment] = []
+    @Published var detectedSpeakers: [SpeakerInfo] = []
+    @Published var currentSpeaker: SpeakerInfo?
+    @Published var enableSpeakerDiarization: Bool = true
 
     // MARK: - Transcription State
     private var voicePipeline: ModularVoicePipeline?
@@ -37,6 +40,14 @@ class TranscriptionViewModel: ObservableObject {
         let text: String
         let timestamp: Date
         let isFinal: Bool
+        let speaker: SpeakerInfo?
+
+        init(text: String, timestamp: Date, isFinal: Bool, speaker: SpeakerInfo? = nil) {
+            self.text = text
+            self.timestamp = timestamp
+            self.isFinal = isFinal
+            self.speaker = speaker
+        }
     }
 
     // MARK: - Initialization
@@ -59,8 +70,11 @@ class TranscriptionViewModel: ObservableObject {
         // Set the Whisper model display name
         updateWhisperModelName()
 
+        // FluidAudio is always available
+        logger.info("✅ FluidAudioDiarization module is available")
+        currentStatus = "Ready (FluidAudio)"
+
         logger.info("Transcription service initialized")
-        currentStatus = "Ready to transcribe"
         isInitialized = true
     }
 
@@ -94,13 +108,34 @@ class TranscriptionViewModel: ObservableObject {
         logger.info("Starting transcription with modular pipeline...")
 
         // Create a simple transcription-only pipeline config
+        // Lower VAD threshold from 0.02 to 0.01 for better voice detection
         let config = ModularPipelineConfig.transcriptionWithVAD(
             sttModel: whisperModelName,
-            vadThreshold: 0.02
+            vadThreshold: 0.01  // Lowered for more sensitive voice detection
         )
 
-        // Create the pipeline
-        voicePipeline = sdk.createVoicePipeline(config: config)
+        // Create the pipeline with FluidAudio diarization if enabled
+        if enableSpeakerDiarization {
+            logger.info("Using FluidAudioDiarization for speaker detection")
+            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(
+                sdk: sdk,
+                config: config
+            )
+            voicePipeline?.enableSpeakerDiarization(true)
+            voicePipeline?.enableContinuousMode(true)
+        } else {
+            // Create standard pipeline
+            voicePipeline = sdk.createVoicePipeline(config: config)
+            voicePipeline?.delegate = self
+
+            // Enable speaker diarization with default implementation
+            if enableSpeakerDiarization {
+                voicePipeline?.enableSpeakerDiarization(true)
+                voicePipeline?.enableContinuousMode(true)
+                logger.info("Enabled speaker diarization with default implementation")
+            }
+        }
+
         voicePipeline?.delegate = self
 
         // Initialize components first (VAD and STT only for transcription)
@@ -181,7 +216,8 @@ class TranscriptionViewModel: ObservableObject {
             finalTranscripts.append(TranscriptSegment(
                 text: partialTranscript,
                 timestamp: Date(),
-                isFinal: true
+                isFinal: true,
+                speaker: currentSpeaker
             ))
             partialTranscript = ""
         }
@@ -258,12 +294,47 @@ class TranscriptionViewModel: ObservableObject {
                     finalTranscripts.append(TranscriptSegment(
                         text: text,
                         timestamp: Date(),
-                        isFinal: true
+                        isFinal: true,
+                        speaker: nil
                     ))
                     partialTranscript = ""
                     transcriptionText = finalTranscripts.map { $0.text }.joined(separator: " ")
                 }
                 logger.info("Final transcript: '\(text)'")
+
+            case .sttFinalTranscriptWithSpeaker(let text, let speaker):
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    finalTranscripts.append(TranscriptSegment(
+                        text: text,
+                        timestamp: Date(),
+                        isFinal: true,
+                        speaker: speaker
+                    ))
+                    partialTranscript = ""
+                    transcriptionText = finalTranscripts.map { $0.text }.joined(separator: " ")
+                    currentSpeaker = speaker
+
+                    // Update detected speakers list
+                    if !detectedSpeakers.contains(where: { $0.id == speaker.id }) {
+                        detectedSpeakers.append(speaker)
+                    }
+                }
+                logger.info("Final transcript from \(speaker.name ?? speaker.id): '\(text)'")
+
+            case .sttPartialTranscriptWithSpeaker(let text, let speaker):
+                partialTranscript = text
+                currentSpeaker = speaker
+                logger.info("Partial transcript from \(speaker.name ?? speaker.id): '\(text)'")
+
+            case .sttNewSpeakerDetected(let speaker):
+                if !detectedSpeakers.contains(where: { $0.id == speaker.id }) {
+                    detectedSpeakers.append(speaker)
+                }
+                logger.info("New speaker detected: \(speaker.name ?? speaker.id)")
+
+            case .sttSpeakerChanged(let from, let to):
+                currentSpeaker = to
+                logger.info("Speaker changed from \(from?.name ?? from?.id ?? "unknown") to \(to.name ?? to.id)")
 
             case .pipelineError(let error):
                 errorMessage = error.localizedDescription

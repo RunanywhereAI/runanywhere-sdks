@@ -14,6 +14,10 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 - When fixing issues focus on SIMPLICITY, and following Clean SOLID principles, do not add complicated logic unless necessary!
 
+## Swift specific rules:
+- Use the latest Swift 6 APIs always.
+- Do not use NSLock as it is outdated.
+
 ## Repository Overview
 
 This repository contains cross-platform SDKs for the RunAnywhere on-device AI platform. The platform provides intelligent routing between on-device and cloud AI models to optimize for cost and privacy.

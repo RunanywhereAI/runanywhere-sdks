@@ -31,6 +31,7 @@ public class ModularVoicePipeline {
     private var sttService: VoiceService?
     private var llmService: LLMService?
     private var ttsService: TextToSpeechService?
+    private var useGenerationService: Bool = false
 
     // Audio management
     private var floatBuffer: [Float] = []  // Buffer for Float samples
@@ -38,8 +39,21 @@ public class ModularVoicePipeline {
     private var isSpeechActive = false
     private var isInitialized = false
     private var speechStartTime: Date?
+    private var lastSpeechTime: Date?  // Track when speech was last detected
     private let minSpeechDuration: TimeInterval = 1.0 // Minimum 1.0 seconds of speech for better transcription
     private let transcriptionQueue = DispatchQueue(label: "com.runanywhere.transcription", qos: .userInitiated)
+
+    // Audio segmentation strategy
+    private var segmentationStrategy: AudioSegmentationStrategy
+
+    // Streaming TTS handler
+    private var streamingTTSHandler: StreamingTTSHandler?
+
+    // Speaker diarization
+    private var speakerDiarizationService: SpeakerDiarizationProtocol?
+    private var enableSpeakerDiarization: Bool = false
+    private var continuousMode: Bool = false
+    private var sessionStartTime: Date?
 
     public weak var delegate: ModularVoicePipelineDelegate?
 
@@ -48,9 +62,14 @@ public class ModularVoicePipeline {
         vadService: VADService? = nil,
         voiceService: VoiceService? = nil,
         llmService: LLMService? = nil,
-        ttsService: TextToSpeechService? = nil
+        ttsService: TextToSpeechService? = nil,
+        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        segmentationStrategy: AudioSegmentationStrategy? = nil
     ) {
         self.config = config
+
+        // Use provided segmentation strategy or default
+        self.segmentationStrategy = segmentationStrategy ?? DefaultAudioSegmentation()
 
         // Initialize only requested components
         if config.components.contains(.vad) {
@@ -82,12 +101,63 @@ public class ModularVoicePipeline {
         }
 
         if config.components.contains(.llm) {
-            self.llmService = llmService
+            if let llmService = llmService {
+                self.llmService = llmService
+            } else {
+                // If no LLM service provided, we'll use GenerationService directly
+                self.useGenerationService = true
+            }
         }
 
         if config.components.contains(.tts) {
             self.ttsService = ttsService ?? SystemTextToSpeechService()
+            // Initialize streaming TTS handler if we have TTS
+            if let tts = self.ttsService {
+                self.streamingTTSHandler = StreamingTTSHandler(ttsService: tts)
+            }
         }
+
+        // Use injected speaker diarization service if provided
+        if let customDiarization = speakerDiarization {
+            self.speakerDiarizationService = customDiarization
+            logger.debug("Using custom speaker diarization service")
+        }
+    }
+
+    // MARK: - Configuration
+
+    /// Enable speaker diarization for transcription
+    public func enableSpeakerDiarization(_ enable: Bool = true) {
+        self.enableSpeakerDiarization = enable
+        if enable && speakerDiarizationService == nil {
+            // Create default implementation if none provided
+            speakerDiarizationService = DefaultSpeakerDiarization()
+            logger.info("Speaker diarization enabled with default implementation")
+        } else if !enable {
+            speakerDiarizationService = nil
+            logger.info("Speaker diarization disabled")
+        }
+    }
+
+    /// Enable continuous mode for real-time streaming transcription
+    public func enableContinuousMode(_ enable: Bool = true) {
+        self.continuousMode = enable
+        logger.info("Continuous mode \(enable ? "enabled" : "disabled")")
+    }
+
+    /// Get all detected speakers
+    public func getAllSpeakers() -> [SpeakerInfo] {
+        return speakerDiarizationService?.getAllSpeakers() ?? []
+    }
+
+    /// Update speaker name
+    public func updateSpeakerName(speakerId: String, name: String) {
+        speakerDiarizationService?.updateSpeakerName(speakerId: speakerId, name: name)
+    }
+
+    /// Reset speaker diarization
+    public func resetSpeakerDiarization() {
+        speakerDiarizationService?.reset()
     }
 
     // MARK: - Initialization
@@ -108,21 +178,35 @@ public class ModularVoicePipeline {
                     componentsToInit.append(("STT", { try await stt.initialize(modelPath: modelPath) }))
                 }
 
-                if let llm = llmService, config.components.contains(.llm) {
-                    if llm.isReady {
-                        // LLM service is already initialized, emit events immediately
-                        logger.debug("LLM service already ready, skipping initialization")
+                if config.components.contains(.llm) {
+                    if let llm = llmService {
+                        if llm.isReady {
+                            // LLM service is already initialized, emit events immediately
+                            logger.debug("LLM service already ready, skipping initialization")
+                            continuation.yield(.componentInitialized("LLM"))
+                        } else {
+                            // Only try to initialize if we have a valid model path
+                            // Don't try to initialize with "default" or empty string
+                            if let modelId = config.llm?.modelId,
+                               !modelId.isEmpty && modelId != "default" {
+                                logger.debug("Initializing LLM with model: \(modelId)")
+                                componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
+                            } else {
+                                // No valid model path - skip initialization
+                                // The service should already be initialized if it's from GenerationService
+                                logger.debug("No valid model path for LLM initialization, assuming already initialized")
+                                continuation.yield(.componentInitialized("LLM"))
+                            }
+                        }
+                    } else if useGenerationService {
+                        // Using generation service directly, no initialization needed
+                        logger.debug("Using GenerationService directly, no LLM initialization needed")
                         continuation.yield(.componentInitialized("LLM"))
                     } else {
-                        // Check if we have a valid model path, otherwise try to use the existing app's LLM
-                        if let modelId = config.llm?.modelId, !modelId.isEmpty, modelId != "default" {
-                            logger.debug("Initializing LLM with model: \(modelId)")
-                            componentsToInit.append(("LLM", { try await llm.initialize(modelPath: modelId) }))
-                        } else {
-                            // No valid model path, but LLM component requested - try to skip and emit success
-                            logger.debug("No valid LLM model path, assuming existing app LLM will be used")
-                            continuation.yield(.componentInitialized("LLM"))
-                        }
+                        // No LLM service available but component requested
+                        // This is OK - we'll fall back to GenerationService in processing
+                        logger.debug("No LLM service available, will use GenerationService fallback")
+                        continuation.yield(.componentInitialized("LLM"))
                     }
                 }
 
@@ -220,6 +304,7 @@ public class ModularVoicePipeline {
                 // Speech just started
                 isSpeechActive = true
                 speechStartTime = Date()
+                lastSpeechTime = Date()
                 floatBuffer = []  // Clear float buffer
                 continuation.yield(.vadSpeechStart)
                 logger.info("Speech started, beginning to buffer audio")
@@ -230,25 +315,41 @@ public class ModularVoicePipeline {
                 // Buffer float samples directly (no need for Data conversion)
                 floatBuffer.append(contentsOf: floatArray)  // Use the float samples directly
                 // logger.debug("Buffering audio, total samples: \(floatBuffer.count)")
+
+                // Update last speech time if voice detected
+                if hasVoice {
+                    lastSpeechTime = Date()
+                }
             }
 
-            // Check if speech ended - but ensure minimum duration
-            if !hasVoice && wasSpeaking {
+            // Check if we should process based on segmentation strategy
+            if isSpeechActive && !floatBuffer.isEmpty {
                 let speechDuration = Date().timeIntervalSince(speechStartTime ?? Date())
+                let silenceDuration = Date().timeIntervalSince(lastSpeechTime ?? Date())
 
-                // Only process if we have enough speech
-                if speechDuration >= minSpeechDuration && !floatBuffer.isEmpty {
-                    // Speech ended with sufficient duration
+                // Ask segmentation strategy if we should process
+                let shouldProcess = segmentationStrategy.shouldProcessAudio(
+                    audioBuffer: floatBuffer,
+                    sampleRate: 16000,
+                    silenceDuration: silenceDuration,
+                    speechDuration: speechDuration
+                )
+
+                if shouldProcess {
+                    // Process the audio
                     isSpeechActive = false
                     continuation.yield(.vadSpeechEnd)
-                    logger.info("Speech ended after \(speechDuration)s, processing \(floatBuffer.count) samples")
+                    logger.info("Speech segment complete after \(speechDuration)s (silence: \(silenceDuration)s), processing \(floatBuffer.count) samples")
 
                     // Process the buffered audio asynchronously
                     let floatsToProcess = floatBuffer
                     floatBuffer = []
 
-                    // Non-blocking transcription
-                    Task.detached { [weak self] in
+                    // Reset segmentation strategy
+                    segmentationStrategy.reset()
+
+                    // Non-blocking transcription using structured concurrency
+                    Task { [weak self] in
                         guard let self = self else { return }
                         do {
                             try await self.processBufferedAudioAsync(
@@ -260,9 +361,6 @@ public class ModularVoicePipeline {
                             continuation.yield(.pipelineError(error))
                         }
                     }
-                } else if speechDuration < minSpeechDuration {
-                    // Speech was too short, keep buffering
-                    // logger.debug("Speech too short (\(speechDuration)s), continuing to buffer")
                 }
             }
         } else {
@@ -276,8 +374,8 @@ public class ModularVoicePipeline {
                 let floatsToProcess = floatBuffer
                 floatBuffer = []
 
-                // Process asynchronously
-                Task.detached { [weak self] in
+                // Process asynchronously using structured concurrency
+                Task { [weak self] in
                     guard let self = self else { return }
                     do {
                         try await self.processBufferedAudioAsync(
@@ -311,7 +409,9 @@ public class ModularVoicePipeline {
             // logger.debug("STT service found, preparing to transcribe")
 
             let options = VoiceTranscriptionOptions(
-                language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english
+                language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english,
+                enableSpeakerDiarization: enableSpeakerDiarization,
+                continuousMode: continuousMode
             )
 
             // Check the service's preferred audio format
@@ -345,7 +445,27 @@ public class ModularVoicePipeline {
                 logger.info("STT transcription result: '\(transcript)'")
 
                 if !transcript.isEmpty {
-                    continuation.yield(.sttFinalTranscript(transcript))
+                    // Handle speaker diarization if enabled
+                    if enableSpeakerDiarization, let diarizationService = speakerDiarizationService {
+                        // Detect speaker from audio features
+                        let speaker = diarizationService.detectSpeaker(
+                            from: floatSamples,
+                            sampleRate: 16000
+                        )
+
+                        // Check if speaker changed
+                        let previousSpeaker = diarizationService.getCurrentSpeaker()
+                        if previousSpeaker?.id != speaker.id {
+                            continuation.yield(.sttSpeakerChanged(from: previousSpeaker, to: speaker))
+                        }
+
+                        // Emit transcript with speaker info
+                        continuation.yield(.sttFinalTranscriptWithSpeaker(transcript, speaker))
+                        logger.info("Transcript with speaker \(speaker.name ?? speaker.id): '\(transcript)'")
+                    } else {
+                        // Regular transcript without speaker info
+                        continuation.yield(.sttFinalTranscript(transcript))
+                    }
                     currentData = transcript
                 } else {
                     logger.warning("STT returned empty transcript")
@@ -366,7 +486,7 @@ public class ModularVoicePipeline {
 
         // Rest of the processing can continue as before...
         // Step 3: LLM (if enabled)
-        if let llm = llmService, config.components.contains(.llm), let transcript = currentData as? String {
+        if config.components.contains(.llm), let transcript = currentData as? String {
             continuation.yield(.llmThinking)
 
             let options = RunAnywhereGenerationOptions(
@@ -375,34 +495,95 @@ public class ModularVoicePipeline {
                 systemPrompt: config.llm?.systemPrompt
             )
 
-            let response = try await llm.generate(
-                prompt: transcript,
-                options: options
-            )
+            // Check if streaming is enabled (prefer streaming for voice pipelines)
+            let useStreaming = config.llm?.useStreaming ?? true
 
-            continuation.yield(.llmFinalResponse(response))
-            currentData = response
+            if useStreaming && llmService != nil && llmService!.isReady {
+                // Use streaming for real-time responses
+                logger.debug("Using streaming LLM service for real-time generation")
 
-            // If no TTS, stop here
-            if !config.components.contains(.tts) {
+                // Reset streaming TTS handler for new response
+                streamingTTSHandler?.reset()
+
+                var fullResponse = ""
+                var firstTokenReceived = false
+
+                try await llmService!.streamGenerate(
+                    prompt: transcript,
+                    options: options,
+                    onToken: { [weak self] token in
+                        guard let self = self else { return }
+                        if !firstTokenReceived {
+                            firstTokenReceived = true
+                            continuation.yield(.llmStreamStarted)
+                        }
+                        fullResponse += token
+                        continuation.yield(.llmStreamToken(token))
+
+                        // Process token for streaming TTS if enabled
+                        if self.config.components.contains(.tts),
+                           let handler = self.streamingTTSHandler {
+                            Task {
+                                await handler.processStreamingText(
+                                    token,
+                                    config: self.config.tts,
+                                    continuation: continuation
+                                )
+                            }
+                        }
+                    }
+                )
+
+                // Flush any remaining text in TTS buffer
+                if config.components.contains(.tts),
+                   let handler = streamingTTSHandler {
+                    let ttsOptions = createTTSOptions()
+                    await handler.flushRemaining(options: ttsOptions, continuation: continuation)
+                }
+
+                continuation.yield(.llmFinalResponse(fullResponse))
+                currentData = fullResponse
+
+                // No need for additional TTS - streaming handler takes care of it
                 return
+            } else {
+                // Fall back to non-streaming generation
+                let response: String
+                if let llm = llmService, llm.isReady {
+                    // Use the provided LLM service if it's ready
+                    logger.debug("Using initialized LLM service for generation")
+                    response = try await llm.generate(
+                        prompt: transcript,
+                        options: options
+                    )
+                } else if useGenerationService || llmService == nil {
+                    // Use the SDK's generation service directly
+                    logger.debug("Using GenerationService directly for LLM processing")
+                    let generationService = RunAnywhereSDK.shared.serviceContainer.generationService
+                    let result = try await generationService.generate(
+                        prompt: transcript,
+                        options: options
+                    )
+                    response = result.text
+                } else {
+                    // LLM service exists but not ready - this shouldn't happen after initialization
+                    logger.error("LLM service exists but is not ready after initialization")
+                    throw LLMServiceError.notInitialized
+                }
+
+                continuation.yield(.llmFinalResponse(response))
+                currentData = response
+
+                // If no TTS, stop here
+                if !config.components.contains(.tts) {
+                    return
+                }
             }
         }
 
         // Step 4: TTS (if enabled)
-        if let tts = ttsService, config.components.contains(.tts), let text = currentData as? String {
-            continuation.yield(.ttsStarted)
-
-            let ttsOptions = TTSOptions(
-                voice: config.tts?.voice,
-                language: "en",
-                rate: config.tts?.rate ?? 1.0,
-                pitch: config.tts?.pitch ?? 1.0,
-                volume: config.tts?.volume ?? 1.0
-            )
-            try await tts.speak(text: text, options: ttsOptions)
-
-            continuation.yield(.ttsCompleted)
+        if let text = currentData as? String {
+            try await performTTS(text: text, continuation: continuation)
         }
     }
 
@@ -432,6 +613,35 @@ public class ModularVoicePipeline {
         try await processBufferedAudio(continuation: continuation)
     }
 
+    // MARK: - TTS Helper Methods
+
+    /// Create TTS options from configuration
+    private func createTTSOptions() -> TTSOptions {
+        return TTSOptions(
+            voice: config.tts?.voice,
+            language: "en",
+            rate: config.tts?.rate ?? 1.0,
+            pitch: config.tts?.pitch ?? 1.0,
+            volume: config.tts?.volume ?? 1.0
+        )
+    }
+
+    /// Perform TTS for given text
+    private func performTTS(
+        text: String,
+        continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
+    ) async throws {
+        guard let tts = ttsService, config.components.contains(.tts) else {
+            return
+        }
+
+        continuation.yield(.ttsStarted)
+        let ttsOptions = createTTSOptions()
+        try await tts.speak(text: text, options: ttsOptions)
+        continuation.yield(.ttsCompleted)
+    }
+
+
     // MARK: - Component Factory Methods
 
     /// Create a VAD service based on configuration
@@ -457,16 +667,28 @@ public protocol ModularVoicePipelineDelegate: AnyObject {
 extension RunAnywhereSDK {
     /// Create a modular voice pipeline with the specified configuration
     /// This is the single API for all voice processing needs
-    public func createVoicePipeline(config: ModularPipelineConfig) -> ModularVoicePipeline {
-        let llmService = config.components.contains(.llm) ?
-            findLLMService(for: config.llm?.modelId) : nil
+    public func createVoicePipeline(
+        config: ModularPipelineConfig,
+        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        segmentationStrategy: AudioSegmentationStrategy? = nil
+    ) -> ModularVoicePipeline {
+        var llmService: LLMService? = nil
+
+        // Only try to find an LLM service if LLM component is requested
+        if config.components.contains(.llm) {
+            // Try to find an LLM service, but don't fail if none found
+            // The pipeline will fall back to using GenerationService directly
+            llmService = findLLMService(for: config.llm?.modelId)
+        }
 
         return ModularVoicePipeline(
             config: config,
             vadService: nil, // Will use default SimpleEnergyVAD
             voiceService: findVoiceService(for: config.stt?.modelId ?? "whisper-base"),
             llmService: llmService,
-            ttsService: findTTSService()
+            ttsService: findTTSService(),
+            speakerDiarization: speakerDiarization,
+            segmentationStrategy: segmentationStrategy
         )
     }
 
