@@ -1,5 +1,4 @@
 {
-  "originHash" : "bb4e1f7c674c691f91234b6ae009ae828fefe2e9209900bb46803a9069f75368",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -20,30 +19,12 @@
       }
     },
     {
-      "identity" : "executorch",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch.git",
-      "state" : {
-        "branch" : "swiftpm-0.7.0",
-        "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
-      }
-    },
-    {
       "identity" : "files",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/JohnSundell/Files.git",
       "state" : {
         "revision" : "e85f2b4a8dfa0f242889f45236f3867d16e40480",
         "version" : "4.3.0"
-      }
-    },
-    {
-      "identity" : "fluidaudio",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/FluidInference/FluidAudio.git",
-      "state" : {
-        "branch" : "main",
-        "revision" : "8cc38d7d055f521c0b05bd6ba217bca66108efc1"
       }
     },
     {
@@ -65,15 +46,6 @@
       }
     },
     {
-      "identity" : "llm.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/eastriverlee/LLM.swift",
-      "state" : {
-        "branch" : "main",
-        "revision" : "4c4e909ac4758c628c9cd263a0c25b6edff5526d"
-      }
-    },
-    {
       "identity" : "pulse",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kean/Pulse",
@@ -87,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
-        "version" : "1.4.0"
+        "revision" : "309a47b2b1d9b5e991f36961c983ecec72275be3",
+        "version" : "1.6.1"
       }
     },
     {
@@ -119,27 +91,18 @@
       }
     },
     {
-      "identity" : "swift-syntax",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-syntax.git",
-      "state" : {
-        "revision" : "21b3b45635decd1a0b89968f81b6d9a93128f773",
-        "version" : "602.0.0-prerelease-2025-08-11"
-      }
-    },
-    {
       "identity" : "swift-transformers",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-transformers",
+      "location" : "https://github.com/huggingface/swift-transformers.git",
       "state" : {
-        "revision" : "e5bf0627bd134cf8ddc407cda403ae84207af959",
-        "version" : "0.1.22"
+        "revision" : "8a83416cc00ab07a5de9991e6ad817a9b8588d20",
+        "version" : "0.1.15"
       }
     },
     {
       "identity" : "whisperkit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/argmaxinc/WhisperKit.git",
+      "location" : "https://github.com/argmaxinc/WhisperKit",
       "state" : {
         "revision" : "c814caea8876036f0c87a0de29552f028d59832d",
         "version" : "0.13.1"
@@ -148,12 +111,12 @@
     {
       "identity" : "zipfoundation",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/weichsel/ZIPFoundation",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
       "state" : {
         "revision" : "02b6abe5f6eef7e3cbd5f247c5cc24e246efcfe0",
         "version" : "0.9.19"
       }
     }
   ],
-  "version" : 3
+  "version" : 2
 }

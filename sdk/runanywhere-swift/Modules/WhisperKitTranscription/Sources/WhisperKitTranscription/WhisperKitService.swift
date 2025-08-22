@@ -4,11 +4,9 @@ import AVFoundation
 import WhisperKit
 import os
 
-// No type aliases needed anymore - SDK types are uniquely named
-
 /// WhisperKit implementation of VoiceService
 public class WhisperKitService: VoiceService {
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "WhisperKitService")
+    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitService")
 
     // MARK: - Properties
 
@@ -79,14 +77,14 @@ public class WhisperKitService: VoiceService {
         audio: Data,
         options: VoiceTranscriptionOptions
     ) async throws -> VoiceTranscriptionResult {
-        // Convert Data to Float array for legacy compatibility
+        // Convert Data to Float array
         let audioSamples = audio.withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
         }
         return try await transcribe(samples: audioSamples, options: options)
     }
 
-    /// SIMPLIFIED: Direct transcription with Float samples (no conversion needed)
+    /// Direct transcription with Float samples
     public func transcribe(
         samples: [Float],
         options: VoiceTranscriptionOptions
@@ -301,8 +299,6 @@ public class WhisperKitService: VoiceService {
         }
     }
 
-    // REMOVED: All conversion methods - no longer needed with simplified pipeline
-
     // MARK: - Streaming Support
 
     /// Support for streaming transcription
@@ -342,7 +338,7 @@ public class WhisperKitService: VoiceService {
 
                         // Process when we have enough audio (500ms)
                         if audioBuffer.count >= minAudioLength {
-                            // Convert to float array for WhisperKit (SIMPLIFIED)
+                            // Convert to float array for WhisperKit
                             let floatArray = audioBuffer.withUnsafeBytes { buffer in
                                 Array(buffer.bindMemory(to: Float.self))
                             }
@@ -390,7 +386,7 @@ public class WhisperKitService: VoiceService {
 
                     // Process any remaining audio
                     if audioBuffer.count > 0 {
-                        // Final transcription with remaining audio (SIMPLIFIED)
+                        // Final transcription with remaining audio
                         let floatArray = audioBuffer.withUnsafeBytes { buffer in
                             Array(buffer.bindMemory(to: Float.self))
                         }
@@ -474,30 +470,5 @@ public class WhisperKitService: VoiceService {
         }
 
         return false
-    }
-}
-
-// MARK: - Voice Error
-
-public enum VoiceError: LocalizedError {
-    case serviceNotInitialized
-    case modelNotFound(String)
-    case transcriptionFailed(Error)
-    case insufficientMemory
-    case unsupportedAudioFormat
-
-    public var errorDescription: String? {
-        switch self {
-        case .serviceNotInitialized:
-            return "Voice service is not initialized"
-        case .modelNotFound(let model):
-            return "Model not found: \(model)"
-        case .transcriptionFailed(let error):
-            return "Transcription failed: \(error.localizedDescription)"
-        case .insufficientMemory:
-            return "Insufficient memory for voice processing"
-        case .unsupportedAudioFormat:
-            return "Unsupported audio format"
-        }
     }
 }

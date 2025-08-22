@@ -7,6 +7,8 @@
 
 import SwiftUI
 import RunAnywhereSDK
+import LLMSwift
+import WhisperKitTranscription
 #if canImport(UIKit)
 import UIKit
 #endif

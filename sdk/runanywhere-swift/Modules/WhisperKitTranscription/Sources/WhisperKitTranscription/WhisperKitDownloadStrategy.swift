@@ -3,7 +3,7 @@ import RunAnywhereSDK
 import os
 
 /// Custom download strategy for WhisperKit models that require multiple files
-class WhisperKitDownloadStrategy: DownloadStrategy {
+public class WhisperKitDownloadStrategy: DownloadStrategy {
     // WhisperKit model structure: mlmodelc directories contain multiple files
     // Note: Not all models have all files, we'll check existence before downloading
     private let mlmodelcFiles = [
@@ -35,15 +35,19 @@ class WhisperKitDownloadStrategy: DownloadStrategy {
     ]
 
     // Use the SDK's logger directly
-    private let logger = os.Logger(subsystem: "com.runanywhere.app", category: "WhisperKitDownload")
+    private let logger = os.Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitDownload")
 
-    func canHandle(model: ModelInfo) -> Bool {
+    public init() {
+        // Public initializer for use outside the module
+    }
+
+    public func canHandle(model: ModelInfo) -> Bool {
         // Handle models marked as WhisperKit
         model.preferredFramework == .whisperKit ||
         model.compatibleFrameworks.contains(.whisperKit)
     }
 
-    func download(
+    public func download(
         model: ModelInfo,
         to destinationFolder: URL,
         progressHandler: ((Double) -> Void)?
