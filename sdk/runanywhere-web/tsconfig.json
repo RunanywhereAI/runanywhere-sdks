@@ -1,0 +1,9 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/voice" },
+    { "path": "./packages/transcription" },
+    { "path": "./packages/llm" }
+  ]
+}

@@ -1,5 +1,5 @@
 {
-  "name": "@runanywhere/core",
+  "name": "@runanywhere/transcription",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,16 +14,15 @@
   "scripts": {
     "dev": "vite build --watch",
     "build": "tsc -b && vite build",
-    "build:types": "tsc --emitDeclarationOnly --outDir dist",
     "test": "vitest",
-    "typecheck": "tsc -b",
-    "clean": "rm -rf dist node_modules .turbo"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
+    "@runanywhere/core": "workspace:*",
+    "@xenova/transformers": "^2.17.0",
     "eventemitter3": "^5.0.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
     "vitest": "^2.1.8"

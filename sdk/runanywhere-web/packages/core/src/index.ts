@@ -14,3 +14,6 @@ export * from './utils/logger';
 
 // DI Container
 export * from './di/container';
+
+// Monitoring
+export * from './monitoring/performance-monitor';
