@@ -9,6 +9,8 @@ Brief description of the changes made.
 
 ## Testing
 - [ ] Tests pass locally
+- [ ] Tested on Macbook if swift changes
+- [ ] Tested on Tablet/iPad if swift changes
 - [ ] Added/updated tests for changes
 
 ## Labels
@@ -22,3 +24,6 @@ Please add the appropriate label(s):
 - [ ] Code follows project style guidelines
 - [ ] Self-review completed
 - [ ] Documentation updated (if needed)
+
+## Screenshots - Attach all the relevant UI changes screenshots for iOS/Android and MacOS/Tablet/large screen sizes
+- 
