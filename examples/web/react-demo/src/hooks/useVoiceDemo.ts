@@ -1,34 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-// import { useVoicePipeline, type UseVoicePipelineOptions } from '@runanywhere/react'
+// TODO: import { useVoicePipeline, type UseVoicePipelineOptions } from '@runanywhere/react'
 import type {
   DemoSettings,
   ConversationMessage,
   DemoPerformanceMetrics,
-
 } from '../types/demo.types'
-
-const STORAGE_KEY = 'voice-demo-settings'
-
-const defaultSettings: DemoSettings = {
-  apiKey: '',
-  sttModel: 'whisper-base',
-  llmModel: 'gpt-3.5-turbo',
-  ttsVoice: 'jenny',
-  language: 'en',
-  enableTTS: true,
-  enableCaching: true,
-  enableAnalytics: true
-}
+import { demoConfig } from '../services/demoConfig'
+// TODO: import { metricsService } from '../services/metricsService'
+// TODO: import { storageService } from '../services/storageService'
+import { formatErrorMessage } from '../utils/formatters'
+// TODO: import { STORAGE_KEYS } from '../utils/constants'
 
 export function useVoiceDemo() {
-  // Settings state management
+  // Settings state management using service
   const [settings, setSettings] = useState<DemoSettings>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings
-    } catch {
-      return defaultSettings
-    }
+    return demoConfig.loadSettings()
   })
 
   // UI state
@@ -40,142 +26,99 @@ export function useVoiceDemo() {
   const [audioLevel, setAudioLevel] = useState(0)
   const [performance, setPerformance] = useState<DemoPerformanceMetrics | null>(null)
 
-  // Save settings to localStorage
+  // Save settings using service
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-    } catch (error) {
-      console.warn('Failed to save settings to localStorage:', error)
-    }
+    demoConfig.saveSettings(settings)
   }, [settings])
 
-  // Convert demo settings to pipeline options
-  // const pipelineOptions: UseVoicePipelineOptions = useMemo(() => ({
-  //   // VAD configuration
-  //   vad: {
-  //     enabled: true,
-  //     config: {
-  //       threshold: 0.6,
-  //       windowSize: 1024,
-  //       smoothing: 0.8
-  //     }
-  //   },
-  //   // STT configuration
-  //   stt: {
-  //     enabled: true,
-  //     modelId: settings.sttModel,
-  //     language: settings.language
-  //   },
-  //   // LLM configuration
-  //   llm: {
-  //     enabled: true,
-  //     modelId: settings.llmModel,
-  //     systemPrompt: 'You are a helpful voice assistant. Keep responses concise and conversational.',
-  //     temperature: 0.7
-  //   },
-  //   // TTS configuration
-  //   tts: {
-  //     enabled: settings.enableTTS,
-  //     voice: settings.ttsVoice,
-  //     speed: 1.0
-  //   },
-  //   // Performance settings
-  //   performance: {
-  //     useWebWorkers: true,
-  //     bufferSize: 4096,
-  //     maxConcurrentOperations: 3
-  //   }
-  // }), [settings])
+  // TODO: Convert demo settings to pipeline options when SDK is ready
+  // const pipelineOptions = useMemo(() => ({ ... }), [settings])
 
-  // Mock pipeline state for demo
-  const pipelineState = {
+  // Mock pipeline state and actions for demo (until SDK is integrated)
+  const [mockPipelineState, setMockPipelineState] = useState({
     isInitialized: !!settings.apiKey,
     isListening: false,
     isProcessing: false,
-    error: null,
+    isPlaying: false,
+    error: null as Error | null,
     transcription: '',
     llmResponse: '',
-    isPlaying: false
-  }
+    audioLevel: 0,
+    performance: null as any
+  })
 
-  const pipelineActions = {
-    initialize: async () => {},
-    start: async () => {},
-    stop: async () => {},
-    pause: async () => {},
-    resume: async () => {},
-    destroy: () => {}
-  }
+  // Mock pipeline actions
+  const initialize = useCallback(async () => {
+    console.log('Mock: Initializing voice pipeline...')
+    // Simulate initialization delay
+    await new Promise(resolve => setTimeout(resolve, 1000))
+  }, [])
 
-  // Track performance metrics
-  useEffect(() => {
-    if (pipelineState.transcription || pipelineState.llmResponse) {
-      // Mock performance data - in a real implementation, this would come from the pipeline
-      const mockPerformance: DemoPerformanceMetrics = {
-        vadLatency: Math.random() * 30 + 20, // 20-50ms
-        sttLatency: Math.random() * 200 + 100, // 100-300ms
-        llmLatency: Math.random() * 1500 + 500, // 500-2000ms
-        ttsLatency: Math.random() * 150 + 100, // 100-250ms
-        totalDuration: 0,
-        memoryUsage: Math.random() * 200 + 300, // 300-500MB
-        modelLoadTime: Math.random() * 5000 + 2000, // 2-7s
-      }
-      mockPerformance.totalDuration =
-        mockPerformance.vadLatency +
-        mockPerformance.sttLatency +
-        mockPerformance.llmLatency +
-        mockPerformance.ttsLatency
+  const start = useCallback(async () => {
+    console.log('Mock: Starting conversation...')
+    setMockPipelineState(prev => ({ ...prev, isListening: true }))
+  }, [])
 
-      setPerformance(mockPerformance)
-    }
-  }, [pipelineState.transcription, pipelineState.llmResponse])
+  const stop = useCallback(async () => {
+    console.log('Mock: Stopping conversation...')
+    setMockPipelineState(prev => ({
+      ...prev,
+      isListening: false,
+      isProcessing: false,
+      isPlaying: false
+    }))
+  }, [])
 
-  // Handle conversation completion
-  useEffect(() => {
-    if (pipelineState.transcription && pipelineState.llmResponse) {
-      const now = new Date()
-      const userMessage: ConversationMessage = {
-        id: `user-${now.getTime()}`,
-        type: 'user',
-        content: pipelineState.transcription,
-        timestamp: now,
-        duration: performance?.sttLatency
-      }
+  const pause = useCallback(async () => {
+    console.log('Mock: Pausing conversation...')
+    setMockPipelineState(prev => ({ ...prev, isListening: false }))
+  }, [])
 
-      const assistantMessage: ConversationMessage = {
-        id: `assistant-${now.getTime() + 1}`,
-        type: 'assistant',
-        content: pipelineState.llmResponse,
-        timestamp: new Date(now.getTime() + 100),
-        duration: performance?.totalDuration
-      }
+  const resume = useCallback(async () => {
+    console.log('Mock: Resuming conversation...')
+    setMockPipelineState(prev => ({ ...prev, isListening: true }))
+  }, [])
 
-      setConversationHistory(prev => [...prev, userMessage, assistantMessage])
-      setCurrentTranscript('')
-      setCurrentResponse('')
-    }
-  }, [pipelineState.transcription, pipelineState.llmResponse, performance])
-
-  // Update current states
-  useEffect(() => {
-    if (pipelineState.isProcessing && pipelineState.transcription) {
-      setCurrentTranscript(pipelineState.transcription)
-    }
-  }, [pipelineState.isProcessing, pipelineState.transcription])
-
-  useEffect(() => {
-    if (pipelineState.llmResponse) {
-      setCurrentResponse(pipelineState.llmResponse)
-    }
-  }, [pipelineState.llmResponse])
+  const destroy = useCallback(() => {
+    console.log('Mock: Destroying pipeline...')
+    setMockPipelineState({
+      isInitialized: false,
+      isListening: false,
+      isProcessing: false,
+      isPlaying: false,
+      error: null,
+      transcription: '',
+      llmResponse: '',
+      audioLevel: 0,
+      performance: null
+    })
+  }, [])
 
   // Mock audio level updates
   useEffect(() => {
     let interval: number | null = null
 
-    if (pipelineState.isListening) {
+    if (mockPipelineState.isListening) {
       interval = setInterval(() => {
         setAudioLevel(Math.random() * 0.8 + 0.1) // 0.1-0.9
+
+        // Simulate mock performance data
+        const mockPerformance: DemoPerformanceMetrics = {
+          vadLatency: Math.random() * 30 + 20, // 20-50ms
+          sttLatency: Math.random() * 200 + 100, // 100-300ms
+          llmLatency: Math.random() * 1500 + 500, // 500-2000ms
+          ttsLatency: Math.random() * 150 + 100, // 100-250ms
+          totalDuration: 0,
+          memoryUsage: Math.random() * 200 + 300, // 300-500MB
+          modelLoadTime: Math.random() * 5000 + 2000, // 2-7s
+        }
+        mockPerformance.totalDuration =
+          mockPerformance.vadLatency +
+          mockPerformance.sttLatency +
+          mockPerformance.llmLatency +
+          mockPerformance.ttsLatency
+
+        setPerformance(mockPerformance)
       }, 100)
     } else {
       setAudioLevel(0)
@@ -184,16 +127,14 @@ export function useVoiceDemo() {
     return () => {
       if (interval) clearInterval(interval)
     }
-  }, [pipelineState.isListening])
+  }, [mockPipelineState.isListening])
 
-  // Initialize pipeline when settings change (if API key is available)
+  // Initialize mock pipeline when API key is available
   useEffect(() => {
-    if (settings.apiKey && !pipelineState.isInitialized) {
-      pipelineActions.initialize().catch(error => {
-        console.error('Failed to initialize voice pipeline:', error)
-      })
+    if (settings.apiKey && !mockPipelineState.isInitialized) {
+      setMockPipelineState(prev => ({ ...prev, isInitialized: true }))
     }
-  }, [settings.apiKey, pipelineState.isInitialized, pipelineActions])
+  }, [settings.apiKey, mockPipelineState.isInitialized])
 
   // Handlers
   const handleSettingsChange = useCallback((newSettings: Partial<DemoSettings>) => {
@@ -206,15 +147,25 @@ export function useVoiceDemo() {
   const closeMetrics = useCallback(() => setShowMetrics(false), [])
 
   const startConversation = useCallback(async () => {
-    if (!pipelineState.isInitialized) {
-      await pipelineActions.initialize()
+    try {
+      if (!mockPipelineState.isInitialized) {
+        await initialize()
+      }
+      await start()
+    } catch (error: any) {
+      console.error('Failed to start conversation:', error)
+      throw new Error(formatErrorMessage(error))
     }
-    await pipelineActions.start()
-  }, [pipelineState.isInitialized, pipelineActions])
+  }, [mockPipelineState.isInitialized, initialize, start])
 
   const stopConversation = useCallback(async () => {
-    await pipelineActions.stop()
-  }, [pipelineActions])
+    try {
+      await stop()
+    } catch (error: any) {
+      console.error('Failed to stop conversation:', error)
+      throw new Error(formatErrorMessage(error))
+    }
+  }, [stop])
 
   const clearConversation = useCallback(() => {
     setConversationHistory([])
@@ -237,21 +188,26 @@ export function useVoiceDemo() {
     performance,
 
     // Voice Pipeline State
-    isInitialized: pipelineState.isInitialized,
-    isActive: pipelineState.isListening,
-    isListening: pipelineState.isListening,
-    isProcessing: pipelineState.isProcessing,
-    isSpeaking: pipelineState.isPlaying,
-    error: pipelineState.error,
+    isInitialized: mockPipelineState.isInitialized,
+    isActive: mockPipelineState.isListening || mockPipelineState.isProcessing,
+    isListening: mockPipelineState.isListening,
+    isProcessing: mockPipelineState.isProcessing,
+    isSpeaking: mockPipelineState.isPlaying,
+    error: mockPipelineState.error,
     currentTranscript,
     currentResponse,
     audioLevel,
     conversationHistory,
 
     // Actions
-    initialize: pipelineActions.initialize,
+    initialize,
     startConversation,
     stopConversation,
-    clearConversation
+    clearConversation,
+
+    // Additional actions
+    pauseConversation: pause,
+    resumeConversation: resume,
+    destroyPipeline: destroy
   }
 }

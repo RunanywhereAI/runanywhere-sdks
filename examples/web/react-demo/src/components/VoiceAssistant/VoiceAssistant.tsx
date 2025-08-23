@@ -6,6 +6,11 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline'
 import type { ConversationMessage, DemoPerformanceMetrics } from '../../types/demo.types'
+import { AudioVisualizer } from '../Common/AudioVisualizer'
+import { LoadingSpinner } from '../Common/LoadingSpinner'
+import { StatusIndicator } from '../Common/StatusIndicator'
+import { formatDuration, formatConfidence } from '../../utils/formatters'
+import { PERFORMANCE_THRESHOLDS } from '../../types/demo.types'
 
 interface VoiceAssistantProps {
   onShowSettings: () => void
@@ -86,10 +91,28 @@ export function VoiceAssistant({
   if (!isInitialized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-12 w-12 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
+        <div className="text-center max-w-md">
+          <LoadingSpinner size="large" className="justify-center mb-6" />
           <h2 className="text-xl font-semibold text-gray-800 mb-2">Initializing Voice SDK</h2>
-          <p className="text-gray-600">Loading models and setting up voice pipeline...</p>
+          <p className="text-gray-600 mb-4">Loading models and setting up voice pipeline...</p>
+
+          <div className="bg-blue-50 rounded-lg p-4 mt-6">
+            <h3 className="font-medium text-blue-900 mb-2 text-sm">Initialization Steps:</h3>
+            <div className="space-y-1 text-xs text-blue-800">
+              <div className="flex items-center gap-2">
+                <LoadingSpinner size="small" color="blue" />
+                <span>Loading speech recognition models</span>
+              </div>
+              <div className="flex items-center gap-2 text-blue-600">
+                <div className="w-4 h-4 flex items-center justify-center">⏳</div>
+                <span>Connecting to language model service</span>
+              </div>
+              <div className="flex items-center gap-2 text-blue-600">
+                <div className="w-4 h-4 flex items-center justify-center">⏳</div>
+                <span>Setting up audio processing</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -165,21 +188,57 @@ export function VoiceAssistant({
                    isActive ? 'Ready to listen' : 'Click to start'}
                 </div>
 
-                {audioLevel > 0 && isListening && (
-                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                    <div
-                      className="bg-green-500 h-2 rounded-full transition-all duration-100"
-                      style={{ width: `${Math.min(audioLevel * 100, 100)}%` }}
+                {/* Audio Visualizer */}
+                {(audioLevel > 0 || isListening) && (
+                  <div className="mb-4">
+                    <AudioVisualizer
+                      audioLevel={audioLevel}
+                      isActive={isListening}
+                      type="bars"
+                      size="small"
+                      color="#10B981"
+                      className="justify-center"
                     />
                   </div>
                 )}
 
                 {performance && (
-                  <div className="text-sm text-gray-500 grid grid-cols-2 gap-2">
-                    <div>STT: {Math.round(performance.sttLatency)}ms</div>
-                    <div>LLM: {Math.round(performance.llmLatency)}ms</div>
-                    <div>TTS: {Math.round(performance.ttsLatency)}ms</div>
-                    <div>Total: {Math.round(performance.totalDuration)}ms</div>
+                  <div className="text-sm text-gray-500 space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex items-center justify-between">
+                        <span>STT:</span>
+                        <div className="flex items-center gap-1">
+                          <StatusIndicator
+                            status={performance.sttLatency <= PERFORMANCE_THRESHOLDS.sttLatency.good ? 'good' :
+                                   performance.sttLatency <= PERFORMANCE_THRESHOLDS.sttLatency.warning ? 'warning' : 'error'}
+                            size="small"
+                          />
+                          <span className="font-mono">{Math.round(performance.sttLatency)}ms</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>LLM:</span>
+                        <div className="flex items-center gap-1">
+                          <StatusIndicator
+                            status={performance.llmLatency <= PERFORMANCE_THRESHOLDS.llmLatency.good ? 'good' :
+                                   performance.llmLatency <= PERFORMANCE_THRESHOLDS.llmLatency.warning ? 'warning' : 'error'}
+                            size="small"
+                          />
+                          <span className="font-mono">{Math.round(performance.llmLatency)}ms</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-200">
+                      <span className="font-medium">Total:</span>
+                      <div className="flex items-center gap-1">
+                        <StatusIndicator
+                          status={performance.totalDuration <= PERFORMANCE_THRESHOLDS.totalDuration.good ? 'good' :
+                                 performance.totalDuration <= PERFORMANCE_THRESHOLDS.totalDuration.warning ? 'warning' : 'error'}
+                          size="small"
+                        />
+                        <span className="font-mono font-medium">{formatDuration(performance.totalDuration, { short: true })}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -253,9 +312,24 @@ export function VoiceAssistant({
                           {message.type === 'user' ? 'You' : 'Assistant'}
                         </div>
                         <div className="whitespace-pre-wrap">{message.content}</div>
-                        <div className="text-xs opacity-75 mt-2">
-                          {message.timestamp.toLocaleTimeString()}
-                          {message.duration && ` • ${Math.round(message.duration)}ms`}
+                        <div className="text-xs opacity-75 mt-2 space-y-1">
+                          <div>
+                            {message.timestamp.toLocaleTimeString()}
+                            {message.duration && ` • ${formatDuration(message.duration, { short: true })}`}
+                          </div>
+                          {message.metadata && (
+                            <div className="flex gap-3 text-xs">
+                              {message.metadata.sttConfidence && (
+                                <span>Confidence: {formatConfidence(message.metadata.sttConfidence)}</span>
+                              )}
+                              {message.metadata.llmTokens && (
+                                <span>Tokens: {message.metadata.llmTokens}</span>
+                              )}
+                              {message.metadata.ttsSpeed && (
+                                <span>Speed: {message.metadata.ttsSpeed}x</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

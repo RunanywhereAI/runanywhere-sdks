@@ -1,6 +1,7 @@
 import { VoiceAssistant } from './components/VoiceAssistant/VoiceAssistant'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
 import { MetricsDashboard } from './components/Dashboard/MetricsDashboard'
+import { ErrorBoundary } from './components/Common/ErrorBoundary'
 import { useVoiceDemo } from './hooks/useVoiceDemo'
 
 function App() {
@@ -62,7 +63,7 @@ function App() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <VoiceAssistant
         onShowSettings={openSettings}
         onShowMetrics={openMetrics}
@@ -93,7 +94,7 @@ function App() {
         onClose={closeMetrics}
         performance={performance}
       />
-    </>
+    </ErrorBoundary>
   )
 }
 
