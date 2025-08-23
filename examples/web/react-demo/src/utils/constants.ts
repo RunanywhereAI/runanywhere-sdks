@@ -10,7 +10,6 @@ export const APP_DESCRIPTION = 'Ultra-low latency voice AI in your browser'
 // Storage keys
 export const STORAGE_KEYS = {
   SETTINGS: 'voice-demo-settings',
-  METRICS_HISTORY: 'voice-demo-metrics-history',
   CONVERSATION_HISTORY: 'voice-demo-conversations',
   USER_PREFERENCES: 'voice-demo-preferences',
   CACHE_MANIFEST: 'voice-demo-cache-manifest'
@@ -56,27 +55,6 @@ export const MODEL_CONFIG = {
   }
 } as const
 
-// Performance targets and thresholds
-export const PERFORMANCE_TARGETS = {
-  // Individual component targets (ms)
-  VAD_LATENCY_TARGET: 30,
-  STT_LATENCY_TARGET: 300,
-  LLM_LATENCY_TARGET: 1500,
-  TTS_LATENCY_TARGET: 200,
-
-  // End-to-end targets
-  TOTAL_LATENCY_TARGET: 500,
-  TOTAL_LATENCY_ACCEPTABLE: 1000,
-
-  // Memory targets
-  MEMORY_TARGET_MB: 400,
-  MEMORY_LIMIT_MB: 800,
-
-  // Quality targets
-  STT_CONFIDENCE_MIN: 0.7,
-  AUDIO_LEVEL_MIN: 0.1,
-  AUDIO_LEVEL_MAX: 0.9
-} as const
 
 // UI constants
 export const UI_CONFIG = {
@@ -103,7 +81,6 @@ export const UI_CONFIG = {
 
   // Component sizes
   VOICE_BUTTON_SIZE: 96, // px
-  METRICS_CARD_HEIGHT: 120, // px
   CONVERSATION_MAX_HEIGHT: 400, // px
 
   // Colors for status indicators
@@ -228,7 +205,6 @@ export const FEATURE_FLAGS = {
   ENABLE_MULTI_SPEAKER: false,
 
   // Debug features
-  ENABLE_PERFORMANCE_LOGGING: true,
   ENABLE_DEBUG_UI: false,
   ENABLE_MOCK_MODE: false
 } as const
@@ -237,7 +213,6 @@ export const FEATURE_FLAGS = {
 export const KEYBOARD_SHORTCUTS = {
   TOGGLE_RECORDING: 'Space',
   OPEN_SETTINGS: 'KeyS',
-  OPEN_METRICS: 'KeyM',
   CLEAR_CONVERSATION: 'KeyC',
   FOCUS_SEARCH: 'KeyF'
 } as const
@@ -261,22 +236,4 @@ export const BROWSER_REQUIREMENTS = {
   FIREFOX: 90,
   SAFARI: 15,
   EDGE: 90
-} as const
-
-// Analytics events (if analytics are enabled)
-export const ANALYTICS_EVENTS = {
-  // User actions
-  CONVERSATION_STARTED: 'conversation_started',
-  CONVERSATION_ENDED: 'conversation_ended',
-  MESSAGE_SENT: 'message_sent',
-  SETTINGS_CHANGED: 'settings_changed',
-
-  // Performance events
-  MODEL_LOADED: 'model_loaded',
-  INFERENCE_COMPLETED: 'inference_completed',
-  ERROR_OCCURRED: 'error_occurred',
-
-  // Feature usage
-  FEATURE_USED: 'feature_used',
-  SHORTCUT_USED: 'shortcut_used'
 } as const

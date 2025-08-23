@@ -13,7 +13,7 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "build:types": "tsc --emitDeclarationOnly",
     "test": "vitest",
     "typecheck": "tsc --noEmit"

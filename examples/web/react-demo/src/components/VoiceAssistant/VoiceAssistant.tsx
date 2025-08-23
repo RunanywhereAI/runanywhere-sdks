@@ -2,19 +2,14 @@ import { useCallback } from 'react'
 import {
   MicrophoneIcon,
   StopIcon,
-  Cog6ToothIcon,
-  ChartBarIcon
+  Cog6ToothIcon
 } from '@heroicons/react/24/outline'
-import type { ConversationMessage, DemoPerformanceMetrics } from '../../types/demo.types'
+import type { ConversationMessage } from '../../types/demo.types'
 import { AudioVisualizer } from '../Common/AudioVisualizer'
 import { LoadingSpinner } from '../Common/LoadingSpinner'
-import { StatusIndicator } from '../Common/StatusIndicator'
-import { formatDuration, formatConfidence } from '../../utils/formatters'
-import { PERFORMANCE_THRESHOLDS } from '../../types/demo.types'
 
 interface VoiceAssistantProps {
   onShowSettings: () => void
-  onShowMetrics: () => void
   // Voice state (would come from useVoiceDemo hook in real usage)
   isInitialized?: boolean
   isActive?: boolean
@@ -24,7 +19,6 @@ interface VoiceAssistantProps {
   currentResponse?: string
   audioLevel?: number
   error?: Error | null
-  performance?: DemoPerformanceMetrics | null
   conversationHistory?: ConversationMessage[]
   startConversation?: () => Promise<void>
   stopConversation?: () => Promise<void>
@@ -33,7 +27,6 @@ interface VoiceAssistantProps {
 
 export function VoiceAssistant({
   onShowSettings,
-  onShowMetrics,
   isInitialized = false,
   isActive = false,
   isListening = false,
@@ -42,7 +35,6 @@ export function VoiceAssistant({
   currentResponse = '',
   audioLevel = 0,
   error = null,
-  performance = null,
   conversationHistory = [],
   startConversation = async () => {},
   stopConversation = async () => {},
@@ -130,13 +122,6 @@ export function VoiceAssistant({
             </div>
             <div className="flex gap-3">
               <button
-                onClick={onShowMetrics}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ChartBarIcon className="h-5 w-5" />
-                <span>Metrics</span>
-              </button>
-              <button
                 onClick={onShowSettings}
                 className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -202,45 +187,6 @@ export function VoiceAssistant({
                   </div>
                 )}
 
-                {performance && (
-                  <div className="text-sm text-gray-500 space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center justify-between">
-                        <span>STT:</span>
-                        <div className="flex items-center gap-1">
-                          <StatusIndicator
-                            status={performance.sttLatency <= PERFORMANCE_THRESHOLDS.sttLatency.good ? 'good' :
-                                   performance.sttLatency <= PERFORMANCE_THRESHOLDS.sttLatency.warning ? 'warning' : 'error'}
-                            size="small"
-                          />
-                          <span className="font-mono">{Math.round(performance.sttLatency)}ms</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>LLM:</span>
-                        <div className="flex items-center gap-1">
-                          <StatusIndicator
-                            status={performance.llmLatency <= PERFORMANCE_THRESHOLDS.llmLatency.good ? 'good' :
-                                   performance.llmLatency <= PERFORMANCE_THRESHOLDS.llmLatency.warning ? 'warning' : 'error'}
-                            size="small"
-                          />
-                          <span className="font-mono">{Math.round(performance.llmLatency)}ms</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 border-t border-gray-200">
-                      <span className="font-medium">Total:</span>
-                      <div className="flex items-center gap-1">
-                        <StatusIndicator
-                          status={performance.totalDuration <= PERFORMANCE_THRESHOLDS.totalDuration.good ? 'good' :
-                                 performance.totalDuration <= PERFORMANCE_THRESHOLDS.totalDuration.warning ? 'warning' : 'error'}
-                          size="small"
-                        />
-                        <span className="font-mono font-medium">{formatDuration(performance.totalDuration, { short: true })}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Current Interaction */}
@@ -299,37 +245,21 @@ export function VoiceAssistant({
                   {conversationHistory.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
                         className={`max-w-md px-4 py-3 rounded-lg ${
-                          message.type === 'user'
+                          message.role === 'user'
                             ? 'bg-blue-500 text-white'
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
                         <div className="font-medium mb-1">
-                          {message.type === 'user' ? 'You' : 'Assistant'}
+                          {message.role === 'user' ? 'You' : 'Assistant'}
                         </div>
                         <div className="whitespace-pre-wrap">{message.content}</div>
-                        <div className="text-xs opacity-75 mt-2 space-y-1">
-                          <div>
-                            {message.timestamp.toLocaleTimeString()}
-                            {message.duration && ` • ${formatDuration(message.duration, { short: true })}`}
-                          </div>
-                          {message.metadata && (
-                            <div className="flex gap-3 text-xs">
-                              {message.metadata.sttConfidence && (
-                                <span>Confidence: {formatConfidence(message.metadata.sttConfidence)}</span>
-                              )}
-                              {message.metadata.llmTokens && (
-                                <span>Tokens: {message.metadata.llmTokens}</span>
-                              )}
-                              {message.metadata.ttsSpeed && (
-                                <span>Speed: {message.metadata.ttsSpeed}x</span>
-                              )}
-                            </div>
-                          )}
+                        <div className="text-xs opacity-75 mt-2">
+                          {new Date(message.timestamp).toLocaleTimeString()}
                         </div>
                       </div>
                     </div>

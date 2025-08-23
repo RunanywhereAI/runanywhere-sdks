@@ -166,12 +166,6 @@ export function SettingsPanel({ isOpen, onClose, currentConfig, onConfigChange }
                 onChange={(checked) => updateSetting('enableCaching', checked)}
               />
 
-              <ToggleSwitch
-                label="Analytics"
-                description="Track performance metrics"
-                checked={localSettings.enableAnalytics}
-                onChange={(checked) => updateSetting('enableAnalytics', checked)}
-              />
             </div>
           </section>
 

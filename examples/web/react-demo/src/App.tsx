@@ -1,6 +1,5 @@
 import { VoiceAssistant } from './components/VoiceAssistant/VoiceAssistant'
 import { SettingsPanel } from './components/Settings/SettingsPanel'
-import { MetricsDashboard } from './components/Dashboard/MetricsDashboard'
 import { ErrorBoundary } from './components/Common/ErrorBoundary'
 import { useVoiceDemo } from './hooks/useVoiceDemo'
 
@@ -11,10 +10,6 @@ function App() {
     showSettings,
     openSettings,
     closeSettings,
-    showMetrics,
-    openMetrics,
-    closeMetrics,
-    performance,
     error,
     isInitialized,
     isActive,
@@ -54,7 +49,6 @@ function App() {
               <li>• Real-time speech-to-text transcription</li>
               <li>• Streaming AI responses</li>
               <li>• Natural text-to-speech output</li>
-              <li>• Performance monitoring dashboard</li>
             </ul>
           </div>
         </div>
@@ -66,7 +60,6 @@ function App() {
     <ErrorBoundary>
       <VoiceAssistant
         onShowSettings={openSettings}
-        onShowMetrics={openMetrics}
         isInitialized={isInitialized}
         isActive={isActive}
         isListening={isListening}
@@ -75,7 +68,6 @@ function App() {
         currentResponse={currentResponse}
         audioLevel={audioLevel}
         error={error}
-        performance={performance}
         conversationHistory={conversationHistory}
         startConversation={startConversation}
         stopConversation={stopConversation}
@@ -87,12 +79,6 @@ function App() {
         onClose={closeSettings}
         currentConfig={settings}
         onConfigChange={handleSettingsChange}
-      />
-
-      <MetricsDashboard
-        isOpen={showMetrics}
-        onClose={closeMetrics}
-        performance={performance}
       />
     </ErrorBoundary>
   )

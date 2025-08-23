@@ -10,33 +10,23 @@ export interface DemoSettings {
   language: 'en' | 'es' | 'fr' | 'de' | 'it' | 'pt' | 'ru' | 'ja' | 'ko' | 'zh'
   enableTTS: boolean
   enableCaching: boolean
-  enableAnalytics: boolean
+  // Additional pipeline config
+  whisperModel: 'whisper-tiny' | 'whisper-base' | 'whisper-small'
+  llmEndpoint: string
+  temperature: number
+  maxTokens: number
+  systemPrompt: string
+  autoPlayTTS: boolean
+  ttsRate: number
+  ttsPitch: number
+  ttsVolume: number
 }
 
 export interface ConversationMessage {
   id: string
-  type: 'user' | 'assistant'
+  role: 'user' | 'assistant'
   content: string
-  timestamp: Date
-  duration?: number
-  metadata?: {
-    sttConfidence?: number
-    llmTokens?: number
-    ttsSpeed?: number
-  }
-}
-
-export interface DemoPerformanceMetrics {
-  vadLatency: number
-  sttLatency: number
-  llmLatency: number
-  ttsLatency: number
-  totalDuration: number
-  memoryUsage: number
-  modelLoadTime: number
-  sttConfidence?: number
-  llmTokensUsed?: number
-  networkLatency?: number
+  timestamp: number
 }
 
 export interface DemoState {
@@ -50,7 +40,6 @@ export interface DemoState {
   currentResponse: string
   audioLevel: number
   conversationHistory: ConversationMessage[]
-  performance: DemoPerformanceMetrics | null
 }
 
 export interface ModelInfo {
@@ -162,17 +151,14 @@ export const DEFAULT_DEMO_SETTINGS: DemoSettings = {
   language: 'en',
   enableTTS: true,
   enableCaching: true,
-  enableAnalytics: true
+  // Additional pipeline config
+  whisperModel: 'whisper-base',
+  llmEndpoint: 'http://localhost:8080/v1',
+  temperature: 0.7,
+  maxTokens: 500,
+  systemPrompt: 'You are a helpful voice assistant.',
+  autoPlayTTS: true,
+  ttsRate: 1.0,
+  ttsPitch: 1.0,
+  ttsVolume: 1.0
 }
-
-// Performance thresholds for status indicators
-export const PERFORMANCE_THRESHOLDS = {
-  vadLatency: { good: 50, warning: 100 },
-  sttLatency: { good: 300, warning: 1000 },
-  llmLatency: { good: 2000, warning: 5000 },
-  ttsLatency: { good: 250, warning: 1000 },
-  totalDuration: { good: 3000, warning: 8000 },
-  memoryUsage: { good: 512, warning: 1024 }
-} as const
-
-export type PerformanceStatus = 'good' | 'warning' | 'error'
