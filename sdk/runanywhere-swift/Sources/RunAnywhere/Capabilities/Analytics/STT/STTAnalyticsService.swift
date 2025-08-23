@@ -15,18 +15,18 @@ public struct STTEvent: AnalyticsEvent {
     public let type: String
     public let timestamp: Date
     public let sessionId: String?
-    public let properties: [String: String]
+    public let eventData: any AnalyticsEventData
 
     public init(
         type: STTEventType,
         sessionId: String? = nil,
-        properties: [String: String] = [:]
+        eventData: any AnalyticsEventData
     ) {
         self.id = UUID().uuidString
         self.type = type.rawValue
         self.timestamp = Date()
         self.sessionId = sessionId
-        self.properties = properties
+        self.eventData = eventData
     }
 }
 
@@ -176,19 +176,19 @@ public actor STTAnalyticsService: AnalyticsService {
         audioLength: TimeInterval,
         speaker: String? = nil
     ) async {
-        let properties: [String: String] = [
-            "word_count": String(text.split(separator: " ").count),
-            "confidence": String(confidence),
-            "duration_ms": String(duration * 1000),
-            "audio_length_ms": String(audioLength * 1000),
-            "real_time_factor": String(duration / audioLength),
-            "speaker_id": speaker ?? "unknown"
-        ]
+        let eventData = STTTranscriptionData(
+            wordCount: text.split(separator: " ").count,
+            confidence: confidence,
+            durationMs: duration * 1000,
+            audioLengthMs: audioLength * 1000,
+            realTimeFactor: duration / audioLength,
+            speakerId: speaker ?? "unknown"
+        )
 
         let event = STTEvent(
             type: .transcriptionCompleted,
             sessionId: currentSession?.id,
-            properties: properties
+            eventData: eventData
         )
 
         await track(event: event)
@@ -201,53 +201,103 @@ public actor STTAnalyticsService: AnalyticsService {
 
     /// Track speaker change
     public func trackSpeakerChange(from: String?, to: String) async {
+        let eventData = SpeakerChangeData(
+            fromSpeaker: from,
+            toSpeaker: to,
+            timestamp: Date().timeIntervalSince1970
+        )
         let event = STTEvent(
             type: .speakerChanged,
             sessionId: currentSession?.id,
-            properties: [
-                "from_speaker": from ?? "none",
-                "to_speaker": to,
-                "timestamp": String(Date().timeIntervalSince1970)
-            ]
+            eventData: eventData
         )
         await track(event: event)
     }
 
     /// Track language detection
     public func trackLanguageDetection(language: String, confidence: Float) async {
+        let eventData = LanguageDetectionData(
+            language: language,
+            confidence: confidence
+        )
         let event = STTEvent(
             type: .languageDetected,
             sessionId: currentSession?.id,
-            properties: [
-                "language": language,
-                "confidence": String(confidence)
-            ]
+            eventData: eventData
+        )
+        await track(event: event)
+    }
+
+    /// Track transcription start
+    public func trackTranscriptionStarted(audioLength: TimeInterval) async {
+        let eventData = TranscriptionStartData(
+            audioLengthMs: audioLength * 1000,
+            startTimestamp: Date().timeIntervalSince1970
+        )
+        let event = STTEvent(
+            type: .transcriptionStarted,
+            sessionId: currentSession?.id,
+            eventData: eventData
+        )
+        await track(event: event)
+    }
+
+    /// Track final transcript
+    public func trackFinalTranscript(text: String, confidence: Float, speaker: String? = nil) async {
+        let eventData = FinalTranscriptData(
+            textLength: text.count,
+            wordCount: text.split(separator: " ").count,
+            confidence: confidence,
+            speakerId: speaker ?? "unknown",
+            timestamp: Date().timeIntervalSince1970
+        )
+        let event = STTEvent(
+            type: .finalTranscript,
+            sessionId: currentSession?.id,
+            eventData: eventData
         )
         await track(event: event)
     }
 
     /// Track partial transcript
     public func trackPartialTranscript(text: String) async {
+        let eventData = PartialTranscriptData(
+            textLength: text.count,
+            wordCount: text.split(separator: " ").count
+        )
         let event = STTEvent(
             type: .partialTranscript,
             sessionId: currentSession?.id,
-            properties: [
-                "text_length": String(text.count),
-                "word_count": String(text.split(separator: " ").count)
-            ]
+            eventData: eventData
+        )
+        await track(event: event)
+    }
+
+    /// Track speaker detection
+    public func trackSpeakerDetection(speaker: String, confidence: Float) async {
+        let eventData = SpeakerDetectionData(
+            speakerId: speaker,
+            confidence: confidence,
+            timestamp: Date().timeIntervalSince1970
+        )
+        let event = STTEvent(
+            type: .speakerDetected,
+            sessionId: currentSession?.id,
+            eventData: eventData
         )
         await track(event: event)
     }
 
     /// Track error
-    public func trackError(error: Error, context: String) async {
+    public func trackError(error: Error, context: AnalyticsContext) async {
+        let eventData = ErrorEventData(
+            error: error.localizedDescription,
+            context: context
+        )
         let event = STTEvent(
             type: .error,
             sessionId: currentSession?.id,
-            properties: [
-                "error": error.localizedDescription,
-                "context": context
-            ]
+            eventData: eventData
         )
         await track(event: event)
     }

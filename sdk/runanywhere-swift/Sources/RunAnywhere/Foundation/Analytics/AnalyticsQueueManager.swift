@@ -81,7 +81,13 @@ public actor AnalyticsQueueManager {
         if AnalyticsLoggingConfig.shared.logToLocal {
             // Log analytics events locally instead of sending to network
             for event in batch {
-                logger.info("📊 Analytics: \(event.type) - \(event.properties)")
+                do {
+                    let jsonData = try JSONEncoder().encode(event.eventData)
+                    let jsonString = String(data: jsonData, encoding: .utf8) ?? "Failed to encode"
+                    logger.info("📊 Analytics: \(event.type) - \(jsonString)")
+                } catch {
+                    logger.info("📊 Analytics: \(event.type) - Failed to serialize event data")
+                }
             }
             // Remove from queue since we've "processed" them by logging
             eventQueue.removeFirst(min(batch.count, eventQueue.count))
@@ -95,12 +101,20 @@ public actor AnalyticsQueueManager {
         }
 
         // Convert to telemetry events
-        let telemetryEvents = batch.map { event in
-            TelemetryData(
-                eventType: event.type,
-                properties: event.properties,
-                timestamp: event.timestamp
-            )
+        let telemetryEvents = batch.compactMap { event -> TelemetryData? in
+            do {
+                let jsonData = try JSONEncoder().encode(event.eventData)
+                let jsonString = String(data: jsonData, encoding: .utf8) ?? "{}"
+
+                return TelemetryData(
+                    eventType: event.type,
+                    properties: ["structured_data": jsonString],
+                    timestamp: event.timestamp
+                )
+            } catch {
+                logger.error("Failed to serialize event data for telemetry: \(error)")
+                return nil
+            }
         }
 
         // Send to backend via existing telemetry repository

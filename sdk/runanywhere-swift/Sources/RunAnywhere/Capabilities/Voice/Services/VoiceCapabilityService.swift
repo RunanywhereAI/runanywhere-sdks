@@ -8,6 +8,7 @@ public class VoiceCapabilityService {
     // Services
     private let sessionManager: VoiceSessionManager
     private var analyticsService: VoiceAnalyticsService?
+    private var sttAnalyticsService: STTAnalyticsService?
 
     // State
     private var isInitialized = false
@@ -26,8 +27,9 @@ public class VoiceCapabilityService {
 
         logger.info("Initializing voice capability")
 
-        // Get analytics service from container
+        // Get analytics services from container
         analyticsService = await ServiceContainer.shared.voiceAnalytics
+        sttAnalyticsService = await ServiceContainer.shared.sttAnalytics
 
         // Initialize sub-services
         await sessionManager.initialize()
@@ -45,7 +47,7 @@ public class VoiceCapabilityService {
         // Track pipeline creation asynchronously
         Task {
             await analyticsService?.trackPipelineCreation(
-                components: config.components.map { $0.rawValue }
+                stages: config.components.map { $0.rawValue }
             )
         }
 
@@ -57,7 +59,9 @@ public class VoiceCapabilityService {
             llmService: findLLMService(for: config.llm?.modelId),
             ttsService: findTTSService(),
             speakerDiarization: nil,
-            segmentationStrategy: nil
+            segmentationStrategy: nil,
+            voiceAnalytics: analyticsService,
+            sttAnalytics: sttAnalyticsService
         )
     }
 

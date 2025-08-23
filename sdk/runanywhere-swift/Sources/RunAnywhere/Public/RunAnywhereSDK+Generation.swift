@@ -68,21 +68,20 @@ extension RunAnywhereSDK {
         do {
             let analyticsService = await serviceContainer.generationAnalytics
 
-            var properties: [String: String] = [:]
-            properties["model_id"] = result.modelUsed
-            properties["input_tokens"] = "\(prompt.count / 4)" // Rough token estimate
-            properties["output_tokens"] = "\(result.text.count / 4)" // Rough token estimate
-            properties["total_time"] = "\(result.latencyMs)"
-            properties["tokens_used"] = "\(result.tokensUsed)"
-            properties["framework"] = result.framework?.rawValue ?? "unknown"
-            properties["execution_target"] = result.executionTarget.rawValue
-            properties["hardware_used"] = result.hardwareUsed.rawValue
-            properties["memory_used"] = "\(result.memoryUsed)"
-            properties["saved_amount"] = "\(result.savedAmount)"
+            let eventData = GenerationCompletionData(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                executionTarget: result.executionTarget.rawValue,
+                inputTokens: prompt.count / 4, // Rough token estimate
+                outputTokens: result.text.count / 4, // Rough token estimate
+                totalTimeMs: Double(result.latencyMs),
+                timeToFirstTokenMs: 0, // Not tracked for non-streaming
+                tokensPerSecond: Double(result.tokensUsed) / (Double(result.latencyMs) / 1000.0)
+            )
 
             let event = GenerationEvent(
                 type: .generationCompleted,
-                properties: properties
+                eventData: eventData
             )
 
             await analyticsService.track(event: event)
@@ -99,17 +98,17 @@ extension RunAnywhereSDK {
         do {
             let analyticsService = await serviceContainer.generationAnalytics
 
-            var properties: [String: String] = [:]
-            properties["model_id"] = "streaming" // Will be updated when model is determined
-            properties["input_tokens"] = "\(prompt.count / 4)" // Rough token estimate
-            properties["output_tokens"] = "0"
-            properties["total_time"] = "0"
-            properties["framework"] = "unknown"
-            properties["execution_target"] = "unknown"
+            let eventData = GenerationStartData(
+                generationId: UUID().uuidString,
+                modelId: "streaming", // Will be updated when model is determined
+                executionTarget: "unknown",
+                promptTokens: prompt.count / 4, // Rough token estimate
+                maxTokens: options.maxTokens ?? 100
+            )
 
             let event = GenerationEvent(
                 type: .generationStarted,
-                properties: properties
+                eventData: eventData
             )
 
             await analyticsService.track(event: event)

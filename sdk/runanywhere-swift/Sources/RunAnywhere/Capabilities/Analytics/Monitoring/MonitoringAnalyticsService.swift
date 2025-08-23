@@ -15,18 +15,18 @@ public struct MonitoringEvent: AnalyticsEvent {
     public let type: String
     public let timestamp: Date
     public let sessionId: String?
-    public let properties: [String: String]
+    public let eventData: any AnalyticsEventData
 
     public init(
         type: MonitoringEventType,
         sessionId: String? = nil,
-        properties: [String: String] = [:]
+        eventData: any AnalyticsEventData
     ) {
         self.id = UUID().uuidString
         self.type = type.rawValue
         self.timestamp = Date()
         self.sessionId = sessionId
-        self.properties = properties
+        self.eventData = eventData
     }
 }
 
@@ -194,19 +194,17 @@ public actor MonitoringAnalyticsService: AnalyticsService {
             memorySamples.removeFirst()
         }
 
-        var properties: [String: String] = [
-            "cpu_usage": String(cpuUsage),
-            "memory_usage": String(memoryUsage)
-        ]
-
-        if let diskUsage = diskUsage {
-            properties["disk_usage"] = String(diskUsage)
-        }
+        let eventData = PerformanceMetricsData(
+            operationName: "system_monitoring",
+            durationMs: 0, // Not applicable for periodic monitoring
+            success: true,
+            errorCode: nil
+        )
 
         let event = MonitoringEvent(
             type: .performanceMetric,
             sessionId: currentSession?.id,
-            properties: properties
+            eventData: eventData
         )
 
         await track(event: event)
@@ -216,13 +214,14 @@ public actor MonitoringAnalyticsService: AnalyticsService {
     public func trackMemoryWarning(level: String, availableMemory: Int) async {
         warningCount += 1
 
+        let eventData = MemoryWarningData(
+            warningLevel: level,
+            availableMemoryMB: availableMemory
+        )
         let event = MonitoringEvent(
             type: .memoryWarning,
             sessionId: currentSession?.id,
-            properties: [
-                "warning_level": level,
-                "available_memory_mb": String(availableMemory)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -232,13 +231,16 @@ public actor MonitoringAnalyticsService: AnalyticsService {
     public func trackMemoryPressure(pressure: String, recommendation: String) async {
         warningCount += 1
 
+        let eventData = PerformanceMetricsData(
+            operationName: "memory_pressure",
+            durationMs: 0,
+            success: false,
+            errorCode: pressure
+        )
         let event = MonitoringEvent(
             type: .memoryPressure,
             sessionId: currentSession?.id,
-            properties: [
-                "pressure_level": pressure,
-                "recommendation": recommendation
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -248,13 +250,14 @@ public actor MonitoringAnalyticsService: AnalyticsService {
     public func trackCPUThreshold(usage: Double, threshold: Double) async {
         warningCount += 1
 
+        let eventData = CPUThresholdData(
+            cpuUsage: usage,
+            threshold: threshold
+        )
         let event = MonitoringEvent(
             type: .cpuThreshold,
             sessionId: currentSession?.id,
-            properties: [
-                "cpu_usage": String(usage),
-                "threshold": String(threshold)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -264,13 +267,14 @@ public actor MonitoringAnalyticsService: AnalyticsService {
     public func trackDiskSpaceWarning(availableSpace: Int, requiredSpace: Int) async {
         warningCount += 1
 
+        let eventData = DiskSpaceWarningData(
+            availableSpaceMB: availableSpace,
+            requiredSpaceMB: requiredSpace
+        )
         let event = MonitoringEvent(
             type: .diskSpaceWarning,
             sessionId: currentSession?.id,
-            properties: [
-                "available_space_mb": String(availableSpace),
-                "required_space_mb": String(requiredSpace)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -278,27 +282,29 @@ public actor MonitoringAnalyticsService: AnalyticsService {
 
     /// Track network latency
     public func trackNetworkLatency(endpoint: String, latency: TimeInterval) async {
+        let eventData = NetworkLatencyData(
+            endpoint: endpoint,
+            latencyMs: latency * 1000
+        )
         let event = MonitoringEvent(
             type: .networkLatency,
             sessionId: currentSession?.id,
-            properties: [
-                "endpoint": endpoint,
-                "latency_ms": String(latency * 1000)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
     }
 
     /// Track error
-    public func trackError(error: Error, context: String) async {
+    public func trackError(error: Error, context: AnalyticsContext) async {
+        let eventData = ErrorEventData(
+            error: error.localizedDescription,
+            context: context
+        )
         let event = MonitoringEvent(
             type: .error,
             sessionId: currentSession?.id,
-            properties: [
-                "error": error.localizedDescription,
-                "context": context
-            ]
+            eventData: eventData
         )
 
         await track(event: event)

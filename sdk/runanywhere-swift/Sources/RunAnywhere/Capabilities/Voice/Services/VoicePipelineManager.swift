@@ -37,9 +37,13 @@ public class VoicePipelineManager {
     private var ttsService: TextToSpeechService?
     private var useGenerationService: Bool = false
 
+    // Analytics services
+    private let voiceAnalytics: VoiceAnalyticsService?
+    private let sttAnalytics: STTAnalyticsService?
+
     // Handlers for component processing
     private let vadHandler = VADHandler()
-    private let sttHandler = STTHandler()
+    private var sttHandler: STTHandler
     private let llmHandler = VoiceLLMHandler()
     private let ttsHandler = TTSHandler()
     private let speakerDiarizationHandler = SpeakerDiarizationHandler()
@@ -70,12 +74,22 @@ public class VoicePipelineManager {
         llmService: LLMService? = nil,
         ttsService: TextToSpeechService? = nil,
         speakerDiarization: SpeakerDiarizationProtocol? = nil,
-        segmentationStrategy: AudioSegmentationStrategy? = nil
+        segmentationStrategy: AudioSegmentationStrategy? = nil,
+        voiceAnalytics: VoiceAnalyticsService? = nil,
+        sttAnalytics: STTAnalyticsService? = nil
     ) {
         self.config = config
+        self.voiceAnalytics = voiceAnalytics
+        self.sttAnalytics = sttAnalytics
 
         // Use provided segmentation strategy or default
         self.segmentationStrategy = segmentationStrategy ?? DefaultAudioSegmentation()
+
+        // Initialize STT handler with analytics services
+        self.sttHandler = STTHandler(
+            voiceAnalytics: voiceAnalytics,
+            sttAnalytics: sttAnalytics
+        )
 
         // Initialize only requested components
         if config.components.contains(.vad) {
@@ -256,6 +270,11 @@ public class VoicePipelineManager {
                         throw ModularPipelineError.notInitialized
                     }
 
+                    // Track pipeline start
+                    let stages = config.components.map { $0.rawValue }
+                    await voiceAnalytics?.trackPipelineStarted(stages: stages)
+                    let pipelineStartTime = Date()
+
                     continuation.yield(.pipelineStarted)
 
                     // Process audio through each component in sequence
@@ -268,10 +287,21 @@ public class VoicePipelineManager {
                         try await finalizeProcessing(continuation: continuation)
                     }
 
+                    // Track pipeline completion
+                    let pipelineEndTime = Date()
+                    let totalTime = pipelineEndTime.timeIntervalSince(pipelineStartTime)
+                    await voiceAnalytics?.trackPipelineExecution(
+                        stages: stages,
+                        totalTime: totalTime
+                    )
+
                     continuation.yield(.pipelineCompleted)
                     continuation.finish()
 
                 } catch {
+                    // Track pipeline error
+                    await voiceAnalytics?.trackError(error: error, context: .pipelineProcessing)
+
                     continuation.yield(.pipelineError(error))
                     continuation.finish(throwing: error)
                 }
@@ -341,6 +371,7 @@ public class VoicePipelineManager {
 
         // Step 2: STT (if enabled)
         if let stt = sttService, config.components.contains(.stt), let sttConfig = config.stt {
+            let sttStageStart = Date()
 
             let options = VoiceTranscriptionOptions(
                 language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english,
@@ -401,6 +432,14 @@ public class VoicePipelineManager {
                         continuation.yield(.sttFinalTranscript(transcript))
                     }
                     currentData = transcript
+
+                    // Track STT stage completion
+                    let sttStageEnd = Date()
+                    let sttStageDuration = sttStageEnd.timeIntervalSince(sttStageStart)
+                    await voiceAnalytics?.trackStageExecution(
+                        stage: .stt,
+                        duration: sttStageDuration
+                    )
                 } else {
                     logger.warning("STT returned empty transcript")
                 }

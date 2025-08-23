@@ -33,12 +33,12 @@ public protocol AnalyticsService: Actor {
 // MARK: - Event System
 
 /// Base protocol for all analytics events
-public protocol AnalyticsEvent: Sendable, Codable {
+public protocol AnalyticsEvent: Sendable {
     var id: String { get }
     var type: String { get }
     var timestamp: Date { get }
     var sessionId: String? { get }
-    var properties: [String: String] { get }
+    var eventData: any AnalyticsEventData { get }
 }
 
 // MARK: - Metrics System

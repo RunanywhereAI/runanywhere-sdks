@@ -15,18 +15,18 @@ public struct GenerationEvent: AnalyticsEvent {
     public let type: String
     public let timestamp: Date
     public let sessionId: String?
-    public let properties: [String: String]
+    public let eventData: any AnalyticsEventData
 
     public init(
         type: GenerationEventType,
         sessionId: String? = nil,
-        properties: [String: String] = [:]
+        eventData: any AnalyticsEventData
     ) {
         self.id = UUID().uuidString
         self.type = type.rawValue
         self.timestamp = Date()
         self.sessionId = sessionId
-        self.properties = properties
+        self.eventData = eventData
     }
 }
 
@@ -207,14 +207,17 @@ public actor GenerationAnalyticsService: AnalyticsService {
         )
         activeGenerations[id] = tracker
 
+        let eventData = GenerationStartData(
+            generationId: id,
+            modelId: modelId,
+            executionTarget: executionTarget,
+            promptTokens: 0, // Will be updated when available
+            maxTokens: 0 // Will be updated when available
+        )
         let event = GenerationEvent(
             type: .generationStarted,
             sessionId: currentSession?.id,
-            properties: [
-                "generation_id": id,
-                "model_id": modelId,
-                "execution_target": executionTarget
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -230,13 +233,14 @@ public actor GenerationAnalyticsService: AnalyticsService {
 
         let timeToFirstToken = tracker.firstTokenTime!.timeIntervalSince(tracker.startTime)
 
+        let eventData = FirstTokenData(
+            generationId: generationId,
+            timeToFirstTokenMs: timeToFirstToken * 1000
+        )
         let event = GenerationEvent(
             type: .firstTokenGenerated,
             sessionId: currentSession?.id,
-            properties: [
-                "generation_id": generationId,
-                "time_to_first_token_ms": String(timeToFirstToken * 1000)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -267,19 +271,20 @@ public actor GenerationAnalyticsService: AnalyticsService {
         totalInputTokens += inputTokens
         totalOutputTokens += outputTokens
 
+        let eventData = GenerationCompletionData(
+            generationId: generationId,
+            modelId: modelId,
+            executionTarget: executionTarget,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens,
+            totalTimeMs: totalTime * 1000,
+            timeToFirstTokenMs: timeToFirstToken * 1000,
+            tokensPerSecond: tokensPerSecond
+        )
         let event = GenerationEvent(
             type: .generationCompleted,
             sessionId: currentSession?.id,
-            properties: [
-                "generation_id": generationId,
-                "model_id": modelId,
-                "execution_target": executionTarget,
-                "input_tokens": String(inputTokens),
-                "output_tokens": String(outputTokens),
-                "total_time_ms": String(totalTime * 1000),
-                "time_to_first_token_ms": String(timeToFirstToken * 1000),
-                "tokens_per_second": String(tokensPerSecond)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -293,13 +298,14 @@ public actor GenerationAnalyticsService: AnalyticsService {
         generationId: String,
         tokensGenerated: Int
     ) async {
+        let eventData = StreamingUpdateData(
+            generationId: generationId,
+            tokensGenerated: tokensGenerated
+        )
         let event = GenerationEvent(
             type: .streamingUpdate,
             sessionId: currentSession?.id,
-            properties: [
-                "generation_id": generationId,
-                "tokens_generated": String(tokensGenerated)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -311,14 +317,15 @@ public actor GenerationAnalyticsService: AnalyticsService {
         loadTime: TimeInterval,
         success: Bool
     ) async {
+        let eventData = ModelLoadingData(
+            modelId: modelId,
+            loadTimeMs: loadTime * 1000,
+            success: success
+        )
         let event = GenerationEvent(
             type: .modelLoaded,
             sessionId: currentSession?.id,
-            properties: [
-                "model_id": modelId,
-                "load_time_ms": String(loadTime * 1000),
-                "success": String(success)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -326,26 +333,26 @@ public actor GenerationAnalyticsService: AnalyticsService {
 
     /// Track model unloading
     public func trackModelUnloading(modelId: String) async {
+        let eventData = ModelUnloadingData(modelId: modelId)
         let event = GenerationEvent(
             type: .modelUnloaded,
             sessionId: currentSession?.id,
-            properties: [
-                "model_id": modelId
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
     }
 
     /// Track error
-    public func trackError(error: Error, context: String) async {
+    public func trackError(error: Error, context: AnalyticsContext) async {
+        let eventData = ErrorEventData(
+            error: error.localizedDescription,
+            context: context
+        )
         let event = GenerationEvent(
             type: .error,
             sessionId: currentSession?.id,
-            properties: [
-                "error": error.localizedDescription,
-                "context": context
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -362,13 +369,14 @@ public actor GenerationAnalyticsService: AnalyticsService {
 
         let sessionId = await startSession(metadata: metadata)
 
+        let eventData = SessionStartedData(
+            modelId: modelId,
+            sessionType: type
+        )
         let event = GenerationEvent(
             type: .sessionStarted,
             sessionId: sessionId,
-            properties: [
-                "model_id": modelId,
-                "session_type": type
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -379,10 +387,14 @@ public actor GenerationAnalyticsService: AnalyticsService {
     public func endGenerationSession(sessionId: String) async {
         await endSession(sessionId: sessionId)
 
+        let eventData = SessionEndedData(
+            sessionId: sessionId,
+            duration: 0 // Duration tracking would need session start time
+        )
         let event = GenerationEvent(
             type: .sessionEnded,
             sessionId: sessionId,
-            properties: [:]
+            eventData: eventData
         )
 
         await track(event: event)

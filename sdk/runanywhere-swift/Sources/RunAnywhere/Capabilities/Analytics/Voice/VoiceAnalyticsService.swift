@@ -15,18 +15,18 @@ public struct VoiceEvent: AnalyticsEvent {
     public let type: String
     public let timestamp: Date
     public let sessionId: String?
-    public let properties: [String: String]
+    public let eventData: any AnalyticsEventData
 
     public init(
         type: VoiceEventType,
         sessionId: String? = nil,
-        properties: [String: String] = [:]
+        eventData: any AnalyticsEventData
     ) {
         self.id = UUID().uuidString
         self.type = type.rawValue
         self.timestamp = Date()
         self.sessionId = sessionId
-        self.properties = properties
+        self.eventData = eventData
     }
 }
 
@@ -181,14 +181,46 @@ public actor VoiceAnalyticsService: AnalyticsService {
     // MARK: - Voice-Specific Methods
 
     /// Track pipeline creation
-    public func trackPipelineCreation(components: [String]) async {
+    public func trackPipelineCreation(stages: [String]) async {
+        let eventData = PipelineCreationData(
+            stageCount: stages.count,
+            stages: stages
+        )
         let event = VoiceEvent(
             type: .pipelineCreated,
             sessionId: currentSession?.id,
-            properties: [
-                "component_count": String(components.count),
-                "components": components.joined(separator: ",")
-            ]
+            eventData: eventData
+        )
+
+        await track(event: event)
+    }
+
+    /// Track pipeline start
+    public func trackPipelineStarted(stages: [String]) async {
+        let eventData = PipelineStartedData(
+            stageCount: stages.count,
+            stages: stages,
+            startTimestamp: Date().timeIntervalSince1970
+        )
+        let event = VoiceEvent(
+            type: .pipelineStarted,
+            sessionId: currentSession?.id,
+            eventData: eventData
+        )
+
+        await track(event: event)
+    }
+
+    /// Track transcription start
+    public func trackTranscriptionStarted(audioLength: TimeInterval) async {
+        let eventData = TranscriptionStartData(
+            audioLengthMs: audioLength * 1000,
+            startTimestamp: Date().timeIntervalSince1970
+        )
+        let event = VoiceEvent(
+            type: .transcriptionStarted,
+            sessionId: currentSession?.id,
+            eventData: eventData
         )
 
         await track(event: event)
@@ -202,14 +234,15 @@ public actor VoiceAnalyticsService: AnalyticsService {
         totalPipelineExecutions += 1
         totalPipelineDuration += totalTime
 
+        let eventData = PipelineCompletionData(
+            stageCount: stages.count,
+            stages: stages,
+            totalTimeMs: totalTime * 1000
+        )
         let event = VoiceEvent(
             type: .pipelineCompleted,
             sessionId: currentSession?.id,
-            properties: [
-                "stage_count": String(stages.count),
-                "stages": stages.joined(separator: ","),
-                "total_time_ms": String(totalTime * 1000)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -227,15 +260,16 @@ public actor VoiceAnalyticsService: AnalyticsService {
         totalTranscriptionDuration += duration
         totalRealTimeFactor += realTimeFactor
 
+        let eventData = VoiceTranscriptionData(
+            durationMs: duration * 1000,
+            wordCount: wordCount,
+            audioLengthMs: audioLength * 1000,
+            realTimeFactor: realTimeFactor
+        )
         let event = VoiceEvent(
             type: .transcriptionCompleted,
             sessionId: currentSession?.id,
-            properties: [
-                "duration_ms": String(duration * 1000),
-                "word_count": String(wordCount),
-                "audio_length_ms": String(audioLength * 1000),
-                "real_time_factor": String(realTimeFactor)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
@@ -243,30 +277,32 @@ public actor VoiceAnalyticsService: AnalyticsService {
 
     /// Track stage execution
     public func trackStageExecution(
-        stageName: String,
+        stage: VoiceComponent,
         duration: TimeInterval
     ) async {
+        let eventData = StageExecutionData(
+            stageName: stage.rawValue,
+            durationMs: duration * 1000
+        )
         let event = VoiceEvent(
             type: .stageExecuted,
             sessionId: currentSession?.id,
-            properties: [
-                "stage_name": stageName,
-                "duration_ms": String(duration * 1000)
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
     }
 
     /// Track error
-    public func trackError(error: Error, context: String) async {
+    public func trackError(error: Error, context: AnalyticsContext) async {
+        let eventData = ErrorEventData(
+            error: error.localizedDescription,
+            context: context
+        )
         let event = VoiceEvent(
             type: .error,
             sessionId: currentSession?.id,
-            properties: [
-                "error": error.localizedDescription,
-                "context": context
-            ]
+            eventData: eventData
         )
 
         await track(event: event)
