@@ -18,16 +18,21 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@angular/core": ">=15.0.0"
+    "@angular/core": ">=16.0.0",
+    "@angular/common": ">=16.0.0",
+    "rxjs": ">=7.0.0"
   },
   "dependencies": {
     "@runanywhere/core": "workspace:*",
     "@runanywhere/voice": "workspace:*"
   },
   "devDependencies": {
-    "@angular/core": "^19.0.0",
+    "@angular/core": "^17.0.0",
+    "@angular/common": "^17.0.0",
+    "@types/node": "^20.14.2",
     "typescript": "^5.7.2",
-    "vite": "^6.0.3",
-    "vitest": "^2.1.8"
+    "vite": "^5.2.11",
+    "vitest": "^2.1.8",
+    "rxjs": "^7.8.0"
   }
 }

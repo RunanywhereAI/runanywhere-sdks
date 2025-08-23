@@ -71,8 +71,17 @@ cd ../..
 # Build framework packages
 echo "📦 Building @runanywhere/react..."
 cd packages/react
-npx tsc --emitDeclarationOnly
-npx vite build
+pnpm build
+cd ../..
+
+echo "📦 Building @runanywhere/vue..."
+cd packages/vue
+pnpm build
+cd ../..
+
+echo "📦 Building @runanywhere/angular..."
+cd packages/angular
+pnpm build
 cd ../..
 
 echo "✅ Build complete!"
@@ -81,6 +90,6 @@ echo "📊 Build Summary:"
 echo "  - Core packages: ✅"
 echo "  - Performance packages: ✅"
 echo "  - Service packages: ✅"
-echo "  - Framework adapters: ✅"
+echo "  - Framework adapters (React, Vue, Angular): ✅"
 echo ""
 echo "🎉 RunAnywhere Web Voice SDK built successfully!"

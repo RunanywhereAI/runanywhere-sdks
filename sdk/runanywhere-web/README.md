@@ -1,44 +1,44 @@
 # RunAnywhere Web Voice SDK
 
-A modern, TypeScript-first web SDK for voice AI pipelines that run directly in the browser. Built with latest web standards and optimized for performance.
+A comprehensive, TypeScript-first web SDK for complete voice AI pipelines that run directly in the browser. Features framework adapters for React, Vue, and Angular with full speech-to-text, LLM, and text-to-speech capabilities.
 
-## 🚀 Phase 1 Complete
+## 🚀 Phase 5 Complete - Framework Integration
 
-This implementation completes Phase 1 of the web voice pipeline, establishing:
+This implementation completes Phase 5 of the web voice pipeline, establishing a **complete voice AI ecosystem**:
 
+- ✅ **Complete Voice Pipeline** with STT, LLM, and TTS
+- ✅ **Framework Adapters** for React, Vue 3, and Angular
 - ✅ **Monorepo Structure** with PNPM workspaces
-- ✅ **Core Package** with Result types, error handling, logging, and DI
-- ✅ **Voice Package** with VAD service and pipeline manager
-- ✅ **Demo Application** with real-time visualization
-- ✅ **Modern TypeScript** with strict mode and latest patterns
-- ✅ **Build System** with Vite 6.x
+- ✅ **13 Specialized Packages** with modular architecture
+- ✅ **Production Ready** components and services
+- ✅ **Full TypeScript** support with strict mode
+- ✅ **Modern Build System** with Vite and optimizations
 
 ## 📦 Project Structure
 
 ```
 sdk/runanywhere-web/
 ├── packages/
-│   ├── core/          # Foundation utilities
-│   │   ├── src/
-│   │   │   ├── types/       # Result types, branded types
-│   │   │   ├── errors/      # Error system
-│   │   │   ├── utils/       # Logger
-│   │   │   └── di/          # Dependency injection
-│   │   └── package.json
+│   ├── core/              # Foundation utilities & DI container
+│   ├── voice/             # Complete voice pipeline manager
+│   ├── transcription/     # Speech-to-text services
+│   ├── llm/               # Large language model integration
+│   ├── tts/               # Text-to-speech services
+│   ├── cache/             # Caching strategies & persistence
+│   ├── monitoring/        # Performance tracking & analytics
+│   ├── optimization/      # Resource optimization & batching
+│   ├── workers/           # Web Workers for heavy processing
 │   │
-│   └── voice/         # Voice processing
-│       ├── src/
-│       │   ├── services/    # VAD service
-│       │   └── pipeline/    # Pipeline manager
-│       └── package.json
+│   └── framework-adapters/
+│       ├── react/         # React hooks & components
+│       ├── vue/           # Vue 3 composables & components
+│       └── angular/       # Angular services & components
 │
 ├── examples/
-│   └── vanilla/       # Demo application
-│       ├── src/
-│       ├── index.html
-│       └── package.json
+│   └── vanilla/           # Demo application
 │
-└── pnpm-workspace.yaml
+├── scripts/               # Build & development scripts
+└── pnpm-workspace.yaml    # Workspace configuration
 ```
 
 ## 🛠️ Technology Stack
@@ -59,6 +59,8 @@ sdk/runanywhere-web/
 
 ### Installation
 
+#### From Source (Development)
+
 ```bash
 # Clone the repository
 cd sdk/runanywhere-web
@@ -68,6 +70,22 @@ pnpm install
 
 # Build all packages
 pnpm build
+```
+
+#### Framework-Specific Packages
+
+```bash
+# React
+npm install @runanywhere/react @runanywhere/core @runanywhere/voice
+
+# Vue 3
+npm install @runanywhere/vue @runanywhere/core @runanywhere/voice
+
+# Angular
+npm install @runanywhere/angular @runanywhere/core @runanywhere/voice
+
+# Core only (vanilla JavaScript)
+npm install @runanywhere/voice @runanywhere/core
 ```
 
 ### Running the Demo
@@ -82,38 +100,177 @@ pnpm dev
 
 ## 💻 Usage
 
-### Basic Pipeline Setup
+### React Integration
+
+```tsx
+import { useVoicePipeline } from '@runanywhere/react';
+import { VoiceChat, VoicePipelineButton } from '@runanywhere/react';
+
+function VoiceApp() {
+  const [state, actions] = useVoicePipeline({
+    enableTranscription: true,
+    enableLLM: true,
+    enableTTS: true,
+    autoPlayTTS: true
+  });
+
+  return (
+    <div>
+      <h1>Voice AI Assistant</h1>
+      <VoicePipelineButton
+        config={{ enableTranscription: true, enableLLM: true }}
+        onTranscription={(result) => console.log('User said:', result.text)}
+        onLLMResponse={(result) => console.log('AI replied:', result.text)}
+      />
+      <VoiceChat
+        config={{ enableTranscription: true, enableLLM: true }}
+        className="voice-chat"
+      />
+    </div>
+  );
+}
+```
+
+### Vue 3 Integration
+
+```vue
+<template>
+  <div>
+    <h1>Voice AI Assistant</h1>
+    <VoicePipelineButton
+      :config="{ enableTranscription: true, enableLLM: true }"
+      @transcription="handleTranscription"
+      @llm-response="handleLLMResponse"
+    />
+    <VoiceChat
+      :config="{ enableTranscription: true, enableLLM: true }"
+      class="voice-chat"
+    />
+    <div v-if="!isReady" class="error">{{ state.error?.message }}</div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useVoicePipeline, VoiceChat, VoicePipelineButton } from '@runanywhere/vue';
+
+const { state, isReady, initialize, start, stop } = useVoicePipeline({
+  enableTranscription: true,
+  enableLLM: true,
+  enableTTS: true,
+  autoInitialize: true
+});
+
+const handleTranscription = (result) => {
+  console.log('User said:', result.text);
+};
+
+const handleLLMResponse = (result) => {
+  console.log('AI replied:', result.text);
+};
+</script>
+```
+
+### Angular Integration
 
 ```typescript
-import { VoicePipelineManager } from '@runanywhere/voice';
-import { logger, LogLevel } from '@runanywhere/core';
+// app.module.ts
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/common';
+import { RunAnywhereVoiceModule } from '@runanywhere/angular';
+import { AppComponent } from './app.component';
 
-// Configure logging
-logger.setLevel(LogLevel.DEBUG);
+@NgModule({
+  declarations: [AppComponent],
+  imports: [
+    BrowserModule,
+    RunAnywhereVoiceModule
+  ],
+  providers: [],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+```
 
-// Create pipeline
-const pipeline = new VoicePipelineManager({
-  vad: {
-    enabled: true,
-    config: {
-      positiveSpeechThreshold: 0.9,
-      negativeSpeechThreshold: 0.75,
-      minSpeechFrames: 5,
-      frameSamples: 1536
-    }
+```typescript
+// app.component.ts
+import { Component, OnInit } from '@angular/core';
+import { VoicePipelineService } from '@runanywhere/angular';
+
+@Component({
+  selector: 'app-root',
+  template: `
+    <h1>Voice AI Assistant</h1>
+    <runanywhere-voice-pipeline-button
+      [config]="config"
+      (transcription)="handleTranscription($event)"
+      (llmResponse)="handleLLMResponse($event)">
+    </runanywhere-voice-pipeline-button>
+
+    <runanywhere-voice-chat
+      [config]="config"
+      class="voice-chat">
+    </runanywhere-voice-chat>
+
+    <div *ngIf="!isReady" class="error">{{ error?.message }}</div>
+  `
+})
+export class AppComponent implements OnInit {
+  config = {
+    enableTranscription: true,
+    enableLLM: true,
+    enableTTS: true
+  };
+
+  constructor(public voiceService: VoicePipelineService) {}
+
+  async ngOnInit() {
+    await this.voiceService.initialize(this.config);
   }
+
+  get isReady() {
+    return this.voiceService.isReady$.pipe(tap(ready => console.log('Ready:', ready)));
+  }
+
+  get error() {
+    return this.voiceService.currentState.error;
+  }
+
+  handleTranscription(result: any) {
+    console.log('User said:', result.text);
+  }
+
+  handleLLMResponse(result: any) {
+    console.log('AI replied:', result.text);
+  }
+}
+```
+
+### Vanilla JavaScript (Core Pipeline)
+
+```typescript
+import { EnhancedVoicePipelineManager } from '@runanywhere/voice';
+import { DIContainer } from '@runanywhere/core';
+
+// Create DI container and pipeline
+const container = new DIContainer();
+const pipeline = new EnhancedVoicePipelineManager(container, {
+  enableTranscription: true,
+  enableLLM: true,
+  enableTTS: true,
+  autoPlayTTS: true
 });
 
 // Handle events
-pipeline.on('event', (event) => {
-  switch (event.type) {
-    case 'vad:speech_start':
-      console.log('Speech detected!');
-      break;
-    case 'vad:speech_end':
-      console.log('Speech ended, duration:', event.duration);
-      break;
-  }
+pipeline.on('transcription', (result) => {
+  console.log('User said:', result.text);
+});
+
+pipeline.on('llmResponse', (result) => {
+  console.log('AI replied:', result.text);
+});
+
+pipeline.on('ttsComplete', (result) => {
+  console.log('TTS audio ready');
 });
 
 // Initialize and start
@@ -164,27 +321,32 @@ const vad = await container.resolve<WebVADService>(VAD_SERVICE_TOKEN);
 
 ## 📊 Key Features
 
-### Phase 1 (Completed) ✅
-- Voice Activity Detection (VAD)
-- Pipeline orchestration
-- Event-driven architecture
-- Real-time metrics
-- Health monitoring
-- Demo application
+### Complete Voice AI Pipeline ✅
+- **Voice Activity Detection (VAD)** with @ricky0123/vad-web
+- **Speech-to-Text (STT)** with Transformers.js
+- **Large Language Model (LLM)** integration
+- **Text-to-Speech (TTS)** with Web Speech API & ONNX Runtime
+- **End-to-end pipeline** from audio input to audio output
 
-### Phase 2 (Upcoming) 🔜
-- Speech-to-Text (STT) with Transformers.js
-- Model management
-- Web Workers integration
-- Audio processing utilities
-- React integration package
+### Framework Integration ✅
+- **React Hooks & Components** - `useVoicePipeline`, `VoiceChat`, `VoicePipelineButton`
+- **Vue 3 Composables & Components** - `useVoicePipeline`, `VoiceChat`, `VoicePipelineButton`
+- **Angular Services & Components** - `VoicePipelineService`, `VoiceChatComponent`, `VoicePipelineButtonComponent`
+- **TypeScript Support** - Full type safety across all frameworks
 
-### Phase 3 (Future) 📅
-- Text-to-Speech (TTS) with ONNX Runtime
-- LLM integration
-- Streaming responses
-- Advanced audio features
-- Vue/Angular integrations
+### Performance & Optimization ✅
+- **Web Workers** for heavy processing tasks
+- **Caching System** for models and responses
+- **Performance Monitoring** with real-time metrics
+- **Resource Optimization** with batching and lazy loading
+- **Memory Management** with automatic cleanup
+
+### Production Features ✅
+- **Dependency Injection** with modern DI container
+- **Error Handling** with Result types and proper boundaries
+- **Event System** with type-safe event handling
+- **Health Monitoring** for all services
+- **Logging System** with configurable levels
 
 ## 🧪 Testing
 
@@ -255,5 +417,6 @@ For issues or questions, please file an issue in the repository.
 
 ---
 
-**Phase 1 Status**: ✅ Complete
-**Next**: Phase 2 - STT Integration with Transformers.js
+**Phase 5 Status**: ✅ Complete - Framework Integration
+**Current**: Production-ready voice AI SDK with React, Vue, and Angular support
+**Next**: Advanced features - Multi-language support, streaming optimizations

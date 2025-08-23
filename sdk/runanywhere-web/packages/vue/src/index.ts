@@ -1,11 +1,32 @@
-// Vue 3 Voice Pipeline Integration (Placeholder)
-// TODO: Implement Vue composables and components for voice pipeline
+// Composables
+export { useVoicePipeline } from './composables/useVoicePipeline';
 
-export function useVoicePipeline() {
-  // Placeholder for Vue composable
-  throw new Error('Vue integration not yet implemented. Please use the React package for now.');
-}
+// Components
+export { default as VoiceChat } from './components/VoiceChat.vue';
+export { default as VoicePipelineButton } from './components/VoicePipelineButton.vue';
+
+// Types
+export type {
+  VoicePipelineConfig,
+  ConversationEntry,
+  VoicePipelineState,
+  VoiceMetrics
+} from './types';
+
+// Re-export core types for convenience
+export type {
+  EnhancedPipelineConfig,
+  EnhancedPipelineEvents
+} from '@runanywhere/voice';
+
+// Vue plugin for easy installation
+import type { App } from 'vue';
+import VoiceChat from './components/VoiceChat.vue';
+import VoicePipelineButton from './components/VoicePipelineButton.vue';
 
 export default {
-  // Placeholder for Vue plugin
+  install(app: App) {
+    app.component('VoiceChat', VoiceChat);
+    app.component('VoicePipelineButton', VoicePipelineButton);
+  }
 };
