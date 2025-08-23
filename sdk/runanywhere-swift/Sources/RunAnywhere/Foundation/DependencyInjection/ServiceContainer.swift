@@ -203,45 +203,56 @@ public class ServiceContainer {
         }
     }
 
-    /// Generation analytics service
+    /// Generation analytics service - using unified pattern
     private var _generationAnalytics: GenerationAnalyticsService?
-
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
             if _generationAnalytics == nil {
-                if let syncService = await dataSyncService {
-                    let repository = GenerationAnalyticsRepositoryImpl(
-                        databaseManager: databaseManager,
-                        syncService: syncService
-                    )
-
-                    // Get telemetry repository - create a new instance
-                    let telemetryRepo = TelemetryRepositoryImpl(
-                        databaseManager: databaseManager,
-                        apiClient: apiClient
-                    )
-
-                    _generationAnalytics = GenerationAnalyticsServiceImpl(
-                        repository: repository,
-                        telemetryService: telemetryRepo,
-                        performanceMonitor: performanceMonitor
-                    )
-                } else {
-                    // Database is required for analytics
-                    logger.error("Database not available for GenerationAnalytics service")
-                    fatalError("Database is required for GenerationAnalytics service")
-                }
+                _generationAnalytics = await GenerationAnalyticsService(queueManager: analyticsQueueManager)
             }
-
-            guard let analytics = _generationAnalytics else {
-                logger.error("GenerationAnalytics service not available")
-                fatalError("Failed to initialize GenerationAnalytics service")
-            }
-
-            return analytics
+            return _generationAnalytics!
         }
     }
 
+    // MARK: - Unified Analytics Services
+
+    /// Analytics queue manager - centralized queue for all analytics
+    public var analyticsQueueManager: AnalyticsQueueManager {
+        AnalyticsQueueManager.shared
+    }
+
+    /// STT Analytics Service - using unified pattern
+    private var _sttAnalytics: STTAnalyticsService?
+    public var sttAnalytics: STTAnalyticsService {
+        get async {
+            if _sttAnalytics == nil {
+                _sttAnalytics = await STTAnalyticsService(queueManager: analyticsQueueManager)
+            }
+            return _sttAnalytics!
+        }
+    }
+
+    /// Voice Analytics Service - using unified pattern
+    private var _voiceAnalytics: VoiceAnalyticsService?
+    public var voiceAnalytics: VoiceAnalyticsService {
+        get async {
+            if _voiceAnalytics == nil {
+                _voiceAnalytics = await VoiceAnalyticsService(queueManager: analyticsQueueManager)
+            }
+            return _voiceAnalytics!
+        }
+    }
+
+    /// Monitoring Analytics Service - using unified pattern
+    private var _monitoringAnalytics: MonitoringAnalyticsService?
+    public var monitoringAnalytics: MonitoringAnalyticsService {
+        get async {
+            if _monitoringAnalytics == nil {
+                _monitoringAnalytics = await MonitoringAnalyticsService(queueManager: analyticsQueueManager)
+            }
+            return _monitoringAnalytics!
+        }
+    }
 
     // MARK: - Public Service Access
 
@@ -346,6 +357,16 @@ public class ServiceContainer {
         } catch {
             logger.warning("Failed to initialize voice capability service: \(error)")
             // Voice is optional, don't fail the entire initialization
+        }
+
+        // Initialize unified analytics queue manager
+        if let apiClient = apiClient {
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
+            logger.info("Analytics queue manager initialized")
         }
 
         // Start service health monitoring

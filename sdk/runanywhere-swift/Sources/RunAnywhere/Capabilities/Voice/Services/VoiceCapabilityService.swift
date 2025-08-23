@@ -7,14 +7,14 @@ public class VoiceCapabilityService {
 
     // Services
     private let sessionManager: VoiceSessionManager
-    private let analyticsService: VoiceAnalyticsService
+    private var analyticsService: VoiceAnalyticsService?
 
     // State
     private var isInitialized = false
 
     public init() {
         self.sessionManager = VoiceSessionManager()
-        self.analyticsService = VoiceAnalyticsService()
+        // Analytics service will be injected during initialization
     }
 
     /// Initialize the voice capability
@@ -26,9 +26,11 @@ public class VoiceCapabilityService {
 
         logger.info("Initializing voice capability")
 
+        // Get analytics service from container
+        analyticsService = await ServiceContainer.shared.voiceAnalytics
+
         // Initialize sub-services
         await sessionManager.initialize()
-        await analyticsService.initialize()
 
         isInitialized = true
         logger.info("Voice capability initialized successfully")
@@ -40,8 +42,12 @@ public class VoiceCapabilityService {
     public func createPipeline(config: ModularPipelineConfig) -> VoicePipelineManager {
         logger.debug("Creating voice pipeline with config: \(config.components)")
 
-        // Track pipeline creation
-        analyticsService.trackPipelineCreation(config: config)
+        // Track pipeline creation asynchronously
+        Task {
+            await analyticsService?.trackPipelineCreation(
+                components: config.components.map { $0.rawValue }
+            )
+        }
 
         // Create and return pipeline
         return VoicePipelineManager(
