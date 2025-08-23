@@ -25,7 +25,8 @@ export default defineConfig({
     },
     target: 'esnext',
     sourcemap: true,
-    minify: false
+    minify: false,
+    emptyOutDir: false
   },
   optimizeDeps: {
     exclude: ['@xenova/transformers']

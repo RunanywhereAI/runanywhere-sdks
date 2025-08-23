@@ -70,6 +70,22 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)
 
+  packages/cache:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.2
+        version: 20.19.11
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^5.2.11
+        version: 5.4.19(@types/node@20.19.11)
+
   packages/core:
     dependencies:
       eventemitter3:
@@ -110,6 +126,38 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)
+
+  packages/monitoring:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.2
+        version: 20.19.11
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^5.2.11
+        version: 5.4.19(@types/node@20.19.11)
+
+  packages/optimization:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.2
+        version: 20.19.11
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^5.2.11
+        version: 5.4.19(@types/node@20.19.11)
 
   packages/react:
     dependencies:
@@ -247,6 +295,34 @@ importers:
       vue:
         specifier: ^3.5.13
         version: 3.5.19(typescript@5.9.2)
+
+  packages/workers:
+    dependencies:
+      '@ricky0123/vad-web':
+        specifier: ^0.0.19
+        version: 0.0.19
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+      '@runanywhere/transcription':
+        specifier: workspace:*
+        version: link:../transcription
+      '@runanywhere/voice':
+        specifier: workspace:*
+        version: link:../voice
+      '@xenova/transformers':
+        specifier: ^2.17.2
+        version: 2.17.2
+    devDependencies:
+      '@types/node':
+        specifier: ^20.14.2
+        version: 20.19.11
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^5.2.11
+        version: 5.4.19(@types/node@20.19.11)
 
 packages:
 
@@ -686,6 +762,9 @@ packages:
   '@protobufjs/utf8@1.1.0':
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
 
+  '@ricky0123/vad-web@0.0.19':
+    resolution: {integrity: sha512-AEfWACMRZD5OnojNesNibWAdJPk0TVoOLGjD3B22bb4Fc3LCS0rWYfGuI7nLZz1l99IbHQeVICSR9amNNHdj1w==}
+
   '@ricky0123/vad-web@0.0.24':
     resolution: {integrity: sha512-uv6GWW/kq8BkVErMQzXp3uwSyYMT3w/3QJiUerVaaKp7EwhOTIRY+96EoyFdG2WOFU5RkLk/2CVGbI7nDlxhEg==}
 
@@ -804,6 +883,9 @@ packages:
 
   '@types/long@4.0.2':
     resolution: {integrity: sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==}
+
+  '@types/node@20.19.11':
+    resolution: {integrity: sha512-uug3FEEGv0r+jrecvUUpbY8lLisvIjg6AAic6a2bSP5OEOLeJsDSnvhCDov7ipFFMXS3orMpzlmi0ZcuGkBbow==}
 
   '@types/node@22.17.2':
     resolution: {integrity: sha512-gL6z5N9Jm9mhY+U2KXZpteb+09zyffliRkZyZOHODGATyC5B1Jt/7TzuuiLkFsSUMLbS1OLmlj/E+/3KF4Q/4w==}
@@ -2285,6 +2367,10 @@ snapshots:
 
   '@protobufjs/utf8@1.1.0': {}
 
+  '@ricky0123/vad-web@0.0.19':
+    dependencies:
+      onnxruntime-web: 1.14.0
+
   '@ricky0123/vad-web@0.0.24':
     dependencies:
       onnxruntime-web: 1.14.0
@@ -2367,6 +2453,10 @@ snapshots:
   '@types/json-schema@7.0.15': {}
 
   '@types/long@4.0.2': {}
+
+  '@types/node@20.19.11':
+    dependencies:
+      undici-types: 6.21.0
 
   '@types/node@22.17.2':
     dependencies:
@@ -3563,6 +3653,15 @@ snapshots:
       - sugarss
       - supports-color
       - terser
+
+  vite@5.4.19(@types/node@20.19.11):
+    dependencies:
+      esbuild: 0.21.5
+      postcss: 8.5.6
+      rollup: 4.47.1
+    optionalDependencies:
+      '@types/node': 20.19.11
+      fsevents: 2.3.3
 
   vite@5.4.19(@types/node@22.17.2):
     dependencies:

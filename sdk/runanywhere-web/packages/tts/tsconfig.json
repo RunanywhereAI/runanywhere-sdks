@@ -3,7 +3,7 @@
     "target": "ES2020",
     "module": "ESNext",
     "lib": ["ES2020", "DOM"],
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
     "allowJs": false,
     "strict": true,
     "esModuleInterop": true,
@@ -13,7 +13,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "noEmit": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]

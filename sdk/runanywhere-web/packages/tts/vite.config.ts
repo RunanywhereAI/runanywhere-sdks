@@ -19,6 +19,7 @@ export default defineConfig({
     },
     target: 'es2020',
     minify: false,
-    sourcemap: true
+    sourcemap: true,
+    emptyOutDir: false
   }
 });

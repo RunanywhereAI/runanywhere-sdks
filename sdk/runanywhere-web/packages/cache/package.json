@@ -1,0 +1,39 @@
+{
+  "name": "@runanywhere/cache",
+  "version": "0.1.0",
+  "description": "Caching and persistence layer for RunAnywhere Web Voice Pipeline",
+  "main": "dist/index.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && vite build",
+    "clean": "rm -rf dist tsconfig.tsbuildinfo",
+    "dev": "vite build --watch",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "runanywhere",
+    "cache",
+    "indexeddb",
+    "performance",
+    "models",
+    "ai"
+  ],
+  "author": "RunAnywhere AI",
+  "license": "MIT",
+  "dependencies": {
+    "@runanywhere/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.2",
+    "typescript": "^5.7.2",
+    "vite": "^5.2.11"
+  }
+}
