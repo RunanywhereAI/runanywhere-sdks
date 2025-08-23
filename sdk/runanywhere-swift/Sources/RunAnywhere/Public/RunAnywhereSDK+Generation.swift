@@ -43,22 +43,79 @@ extension RunAnywhereSDK {
         // Check if analytics is enabled
         let isAnalyticsEnabled = await getAnalyticsEnabled()
 
-        let result: GenerationResult
+        logger.debug("🚀 Calling GenerationService.generate()")
+        let result = try await serviceContainer.generationService.generate(
+            prompt: prompt,
+            options: effectiveOptions
+        )
+
+        // Track analytics if enabled
         if isAnalyticsEnabled {
-            result = try await serviceContainer.generationService.generateWithAnalytics(
-                prompt: prompt,
-                options: effectiveOptions
-            )
-        } else {
-            logger.debug("🚀 Calling GenerationService.generate()")
-            result = try await serviceContainer.generationService.generate(
-                prompt: prompt,
-                options: effectiveOptions
-            )
+            await trackGenerationAnalytics(result: result, prompt: prompt, options: effectiveOptions)
         }
 
         logger.info("✅ Generation completed successfully")
         return result
+    }
+
+    // MARK: - Analytics Helpers
+
+    private func trackGenerationAnalytics(
+        result: GenerationResult,
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ) async {
+        do {
+            let analyticsService = await serviceContainer.generationAnalytics
+
+            let eventData = GenerationCompletionData(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                executionTarget: result.executionTarget.rawValue,
+                inputTokens: prompt.count / 4, // Rough token estimate
+                outputTokens: result.text.count / 4, // Rough token estimate
+                totalTimeMs: Double(result.latencyMs),
+                timeToFirstTokenMs: 0, // Not tracked for non-streaming
+                tokensPerSecond: Double(result.tokensUsed) / (Double(result.latencyMs) / 1000.0)
+            )
+
+            let event = GenerationEvent(
+                type: .generationCompleted,
+                eventData: eventData
+            )
+
+            await analyticsService.track(event: event)
+            logger.debug("📊 Generation analytics tracked")
+        } catch {
+            logger.warning("Failed to track generation analytics: \(error)")
+        }
+    }
+
+    private func trackStreamingStarted(
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ) async {
+        do {
+            let analyticsService = await serviceContainer.generationAnalytics
+
+            let eventData = GenerationStartData(
+                generationId: UUID().uuidString,
+                modelId: "streaming", // Will be updated when model is determined
+                executionTarget: "unknown",
+                promptTokens: prompt.count / 4, // Rough token estimate
+                maxTokens: options.maxTokens ?? 100
+            )
+
+            let event = GenerationEvent(
+                type: .generationStarted,
+                eventData: eventData
+            )
+
+            await analyticsService.track(event: event)
+            logger.debug("📊 Streaming start analytics tracked")
+        } catch {
+            logger.warning("Failed to track streaming analytics: \(error)")
+        }
     }
 
     /// Generate text as a stream
@@ -98,17 +155,14 @@ extension RunAnywhereSDK {
                 let isAnalyticsEnabled = await getAnalyticsEnabled()
 
                 // Get the actual stream
-                let stream: AsyncThrowingStream<String, Error>
+                let stream = serviceContainer.streamingService.generateStream(
+                    prompt: prompt,
+                    options: effectiveOptions
+                )
+
+                // Track streaming analytics if enabled
                 if isAnalyticsEnabled {
-                    stream = serviceContainer.streamingService.generateStreamWithAnalytics(
-                        prompt: prompt,
-                        options: effectiveOptions
-                    )
-                } else {
-                    stream = serviceContainer.streamingService.generateStream(
-                        prompt: prompt,
-                        options: effectiveOptions
-                    )
+                    await trackStreamingStarted(prompt: prompt, options: effectiveOptions)
                 }
 
                 // Forward all values from the inner stream

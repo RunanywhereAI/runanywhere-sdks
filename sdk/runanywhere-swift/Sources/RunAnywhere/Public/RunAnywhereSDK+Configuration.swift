@@ -50,6 +50,19 @@ extension RunAnywhereSDK {
         logger.info("✅ TopK updated")
     }
 
+    // MARK: - Logging Settings
+
+    /// Enable or disable local analytics logging
+    public func setAnalyticsLogToLocal(enabled: Bool) async {
+        logger.info("Setting analytics log to local: \(enabled)")
+        AnalyticsLoggingConfig.shared.logToLocal = enabled
+    }
+
+    /// Get current local analytics logging status
+    public func getAnalyticsLogToLocal() -> Bool {
+        return AnalyticsLoggingConfig.shared.logToLocal
+    }
+
     /// Get current generation settings
     public func getGenerationSettings() async -> DefaultGenerationSettings {
         logger.info("📖 Getting generation settings")

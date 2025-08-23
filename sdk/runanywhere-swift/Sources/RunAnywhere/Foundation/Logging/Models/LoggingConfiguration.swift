@@ -15,6 +15,12 @@ public struct LoggingConfiguration {
     /// Enable remote logging (telemetry)
     public var enableRemoteLogging: Bool = false
 
+    /// Enable analytics event logging
+    public var enableAnalyticsLogging: Bool = false
+
+    /// Enable verbose/debug logging
+    public var enableVerboseLogging: Bool = false
+
     /// Remote logging endpoint
     public var remoteEndpoint: URL?
 
