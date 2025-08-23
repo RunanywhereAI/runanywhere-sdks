@@ -77,6 +77,17 @@ public actor AnalyticsQueueManager {
     }
 
     private func processBatch(_ batch: [any AnalyticsEvent]) async {
+        // Check if analytics logging is enabled - if yes, log locally instead of sending to network
+        if AnalyticsLoggingConfig.shared.logToLocal {
+            // Log analytics events locally instead of sending to network
+            for event in batch {
+                logger.info("📊 Analytics: \(event.type) - \(event.properties)")
+            }
+            // Remove from queue since we've "processed" them by logging
+            eventQueue.removeFirst(min(batch.count, eventQueue.count))
+            return
+        }
+
         guard let telemetryRepository = telemetryRepository else {
             logger.error("No telemetry repository configured")
             eventQueue.removeFirst(min(batch.count, eventQueue.count))
