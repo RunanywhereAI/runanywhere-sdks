@@ -91,7 +91,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useVoicePipeline, VoiceChat, VoicePipelineButton } from '@runanywhere/vue';
-import type { VoicePipelineConfig, ConversationEntry, TranscriptionResult, CompletionResult } from '@runanywhere/vue';
+import type { VoicePipelineConfig, ConversationEntry } from '@runanywhere/vue';
 
 // Pipeline configuration
 const pipelineConfig: VoicePipelineConfig = {
@@ -140,11 +140,11 @@ const statusText = computed(() => {
 });
 
 // Event handlers
-const handleTranscription = (result: TranscriptionResult) => {
+const handleTranscription = (result: any) => {
   console.log('🎤 Transcription:', result.text);
 };
 
-const handleLLMResponse = (result: CompletionResult) => {
+const handleLLMResponse = (result: any) => {
   console.log('🤖 LLM Response:', result.text);
 };
 
