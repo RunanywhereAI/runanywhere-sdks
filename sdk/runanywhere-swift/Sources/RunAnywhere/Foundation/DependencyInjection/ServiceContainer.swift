@@ -208,7 +208,7 @@ public class ServiceContainer {
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
             if _generationAnalytics == nil {
-                _generationAnalytics = await GenerationAnalyticsService(queueManager: analyticsQueueManager)
+                _generationAnalytics = GenerationAnalyticsService(queueManager: analyticsQueueManager)
             }
             return _generationAnalytics!
         }
@@ -226,7 +226,7 @@ public class ServiceContainer {
     public var sttAnalytics: STTAnalyticsService {
         get async {
             if _sttAnalytics == nil {
-                _sttAnalytics = await STTAnalyticsService(queueManager: analyticsQueueManager)
+                _sttAnalytics = STTAnalyticsService(queueManager: analyticsQueueManager)
             }
             return _sttAnalytics!
         }
@@ -237,7 +237,7 @@ public class ServiceContainer {
     public var voiceAnalytics: VoiceAnalyticsService {
         get async {
             if _voiceAnalytics == nil {
-                _voiceAnalytics = await VoiceAnalyticsService(queueManager: analyticsQueueManager)
+                _voiceAnalytics = VoiceAnalyticsService(queueManager: analyticsQueueManager)
             }
             return _voiceAnalytics!
         }
@@ -248,7 +248,7 @@ public class ServiceContainer {
     public var monitoringAnalytics: MonitoringAnalyticsService {
         get async {
             if _monitoringAnalytics == nil {
-                _monitoringAnalytics = await MonitoringAnalyticsService(queueManager: analyticsQueueManager)
+                _monitoringAnalytics = MonitoringAnalyticsService(queueManager: analyticsQueueManager)
             }
             return _monitoringAnalytics!
         }
@@ -382,7 +382,7 @@ public class ServiceContainer {
         health["storage"] = await checkStorageServiceHealth()
         health["validation"] = await checkValidationServiceHealth()
         health["compatibility"] = await checkCompatibilityServiceHealth()
-        health["voice"] = voiceCapabilityService.isHealthy()
+        health["voice"] = await voiceCapabilityService.isHealthy()
         // Removed tokenizer health check
 
         return health

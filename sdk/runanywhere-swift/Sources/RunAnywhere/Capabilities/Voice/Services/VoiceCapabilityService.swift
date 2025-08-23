@@ -76,14 +76,15 @@ public class VoiceCapabilityService {
 
     /// Check if the voice capability is healthy
     /// - Returns: True if healthy, false otherwise
-    public func isHealthy() -> Bool {
-        return isInitialized && sessionManager.isHealthy() && analyticsService.isHealthy()
+    public func isHealthy() async -> Bool {
+        let analyticsHealthy = await analyticsService?.isHealthy() ?? true
+        return isInitialized && sessionManager.isHealthy() && analyticsHealthy
     }
 
     /// Get current metrics for voice processing
     /// - Returns: Voice metrics
-    public func getMetrics() -> VoiceMetrics {
-        return analyticsService.getMetrics()
+    public func getMetrics() async -> VoiceMetrics {
+        return await analyticsService?.getMetrics() ?? VoiceMetrics()
     }
 
     // MARK: - Service Discovery
@@ -98,7 +99,7 @@ public class VoiceCapabilityService {
         let container = ServiceContainer.shared
 
         // Try to find a model info for this modelId
-        if let model = try? container.modelRegistry.getModel(by: modelId) {
+        if let model = container.modelRegistry.getModel(by: modelId) {
             // Find adapter that can handle this model
             if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
                unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
@@ -135,7 +136,7 @@ public class VoiceCapabilityService {
 
         logger.debug("Finding LLM service for model: \(modelId)")
 
-        if let model = try? container.modelRegistry.getModel(by: modelId) {
+        if let model = container.modelRegistry.getModel(by: modelId) {
             // Find adapter that can handle this model
             if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
                unifiedAdapter.supportedModalities.contains(FrameworkModality.textToText) {

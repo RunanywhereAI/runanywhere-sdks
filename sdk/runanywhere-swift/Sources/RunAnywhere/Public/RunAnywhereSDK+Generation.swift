@@ -43,22 +43,80 @@ extension RunAnywhereSDK {
         // Check if analytics is enabled
         let isAnalyticsEnabled = await getAnalyticsEnabled()
 
-        let result: GenerationResult
+        logger.debug("🚀 Calling GenerationService.generate()")
+        let result = try await serviceContainer.generationService.generate(
+            prompt: prompt,
+            options: effectiveOptions
+        )
+
+        // Track analytics if enabled
         if isAnalyticsEnabled {
-            result = try await serviceContainer.generationService.generateWithAnalytics(
-                prompt: prompt,
-                options: effectiveOptions
-            )
-        } else {
-            logger.debug("🚀 Calling GenerationService.generate()")
-            result = try await serviceContainer.generationService.generate(
-                prompt: prompt,
-                options: effectiveOptions
-            )
+            await trackGenerationAnalytics(result: result, prompt: prompt, options: effectiveOptions)
         }
 
         logger.info("✅ Generation completed successfully")
         return result
+    }
+
+    // MARK: - Analytics Helpers
+
+    private func trackGenerationAnalytics(
+        result: GenerationResult,
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ) async {
+        do {
+            let analyticsService = await serviceContainer.generationAnalytics
+
+            var properties: [String: String] = [:]
+            properties["model_id"] = result.modelUsed
+            properties["input_tokens"] = "\(prompt.count / 4)" // Rough token estimate
+            properties["output_tokens"] = "\(result.text.count / 4)" // Rough token estimate
+            properties["total_time"] = "\(result.latencyMs)"
+            properties["tokens_used"] = "\(result.tokensUsed)"
+            properties["framework"] = result.framework?.rawValue ?? "unknown"
+            properties["execution_target"] = result.executionTarget.rawValue
+            properties["hardware_used"] = result.hardwareUsed.rawValue
+            properties["memory_used"] = "\(result.memoryUsed)"
+            properties["saved_amount"] = "\(result.savedAmount)"
+
+            let event = GenerationEvent(
+                type: .generationCompleted,
+                properties: properties
+            )
+
+            await analyticsService.track(event: event)
+            logger.debug("📊 Generation analytics tracked")
+        } catch {
+            logger.warning("Failed to track generation analytics: \(error)")
+        }
+    }
+
+    private func trackStreamingStarted(
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ) async {
+        do {
+            let analyticsService = await serviceContainer.generationAnalytics
+
+            var properties: [String: String] = [:]
+            properties["model_id"] = "streaming" // Will be updated when model is determined
+            properties["input_tokens"] = "\(prompt.count / 4)" // Rough token estimate
+            properties["output_tokens"] = "0"
+            properties["total_time"] = "0"
+            properties["framework"] = "unknown"
+            properties["execution_target"] = "unknown"
+
+            let event = GenerationEvent(
+                type: .generationStarted,
+                properties: properties
+            )
+
+            await analyticsService.track(event: event)
+            logger.debug("📊 Streaming start analytics tracked")
+        } catch {
+            logger.warning("Failed to track streaming analytics: \(error)")
+        }
     }
 
     /// Generate text as a stream
@@ -98,17 +156,14 @@ extension RunAnywhereSDK {
                 let isAnalyticsEnabled = await getAnalyticsEnabled()
 
                 // Get the actual stream
-                let stream: AsyncThrowingStream<String, Error>
+                let stream = serviceContainer.streamingService.generateStream(
+                    prompt: prompt,
+                    options: effectiveOptions
+                )
+
+                // Track streaming analytics if enabled
                 if isAnalyticsEnabled {
-                    stream = serviceContainer.streamingService.generateStreamWithAnalytics(
-                        prompt: prompt,
-                        options: effectiveOptions
-                    )
-                } else {
-                    stream = serviceContainer.streamingService.generateStream(
-                        prompt: prompt,
-                        options: effectiveOptions
-                    )
+                    await trackStreamingStarted(prompt: prompt, options: effectiveOptions)
                 }
 
                 // Forward all values from the inner stream

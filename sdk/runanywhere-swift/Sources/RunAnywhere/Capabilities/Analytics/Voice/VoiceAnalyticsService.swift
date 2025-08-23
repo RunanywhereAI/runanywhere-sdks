@@ -65,7 +65,7 @@ public struct VoiceMetrics: AnalyticsMetrics {
         self.averageRealTimeFactor = 0
     }
 
-    internal init(
+    public init(
         totalEvents: Int,
         startTime: Date,
         lastEventTime: Date?,
@@ -84,6 +84,7 @@ public struct VoiceMetrics: AnalyticsMetrics {
         self.averagePipelineDuration = averagePipelineDuration
         self.averageRealTimeFactor = averageRealTimeFactor
     }
+
 }
 
 // MARK: - Voice Analytics Service

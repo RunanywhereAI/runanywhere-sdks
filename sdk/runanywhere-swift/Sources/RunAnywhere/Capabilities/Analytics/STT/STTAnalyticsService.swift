@@ -61,6 +61,22 @@ public struct STTMetrics: AnalyticsMetrics {
         self.averageConfidence = 0
         self.averageLatency = 0
     }
+
+    public init(
+        totalEvents: Int,
+        startTime: Date,
+        lastEventTime: Date?,
+        totalTranscriptions: Int,
+        averageConfidence: Float,
+        averageLatency: TimeInterval
+    ) {
+        self.totalEvents = totalEvents
+        self.startTime = startTime
+        self.lastEventTime = lastEventTime
+        self.totalTranscriptions = totalTranscriptions
+        self.averageConfidence = averageConfidence
+        self.averageLatency = averageLatency
+    }
 }
 
 // MARK: - STT Analytics Service
