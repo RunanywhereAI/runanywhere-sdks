@@ -193,15 +193,27 @@ importers:
       '@runanywhere/llm':
         specifier: file:../../../sdk/runanywhere-web/packages/llm
         version: file:packages/llm
+      '@runanywhere/llm-openai':
+        specifier: file:../../../sdk/runanywhere-web/packages/llm-openai
+        version: file:packages/llm-openai(@runanywhere/core@file:packages/core)
       '@runanywhere/react':
         specifier: file:../../../sdk/runanywhere-web/packages/react
         version: file:packages/react(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@runanywhere/stt-whisper':
+        specifier: file:../../../sdk/runanywhere-web/packages/stt-whisper
+        version: file:packages/stt-whisper(@runanywhere/core@file:packages/core)
       '@runanywhere/transcription':
         specifier: file:../../../sdk/runanywhere-web/packages/transcription
         version: file:packages/transcription
       '@runanywhere/tts':
         specifier: file:../../../sdk/runanywhere-web/packages/tts
         version: file:packages/tts
+      '@runanywhere/tts-webspeech':
+        specifier: file:../../../sdk/runanywhere-web/packages/tts-webspeech
+        version: file:packages/tts-webspeech(@runanywhere/core@file:packages/core)
+      '@runanywhere/vad-silero':
+        specifier: file:../../../sdk/runanywhere-web/packages/vad-silero
+        version: file:packages/vad-silero(@runanywhere/core@file:packages/core)
       '@runanywhere/voice':
         specifier: file:../../../sdk/runanywhere-web/packages/voice
         version: file:packages/voice
@@ -2453,6 +2465,14 @@ packages:
   '@rtsao/scc@1.1.0':
     resolution: {integrity: sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g==}
 
+  '@runanywhere/core@file:packages/core':
+    resolution: {directory: packages/core, type: directory}
+
+  '@runanywhere/llm-openai@file:packages/llm-openai':
+    resolution: {directory: packages/llm-openai, type: directory}
+    peerDependencies:
+      '@runanywhere/core': workspace:*
+
   '@runanywhere/llm@file:packages/llm':
     resolution: {directory: packages/llm, type: directory}
 
@@ -2462,11 +2482,26 @@ packages:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
 
+  '@runanywhere/stt-whisper@file:packages/stt-whisper':
+    resolution: {directory: packages/stt-whisper, type: directory}
+    peerDependencies:
+      '@runanywhere/core': workspace:*
+
   '@runanywhere/transcription@file:packages/transcription':
     resolution: {directory: packages/transcription, type: directory}
 
+  '@runanywhere/tts-webspeech@file:packages/tts-webspeech':
+    resolution: {directory: packages/tts-webspeech, type: directory}
+    peerDependencies:
+      '@runanywhere/core': workspace:*
+
   '@runanywhere/tts@file:packages/tts':
     resolution: {directory: packages/tts, type: directory}
+
+  '@runanywhere/vad-silero@file:packages/vad-silero':
+    resolution: {directory: packages/vad-silero, type: directory}
+    peerDependencies:
+      '@runanywhere/core': workspace:*
 
   '@runanywhere/voice@file:packages/voice':
     resolution: {directory: packages/voice, type: directory}
@@ -8570,6 +8605,18 @@ snapshots:
 
   '@rtsao/scc@1.1.0': {}
 
+  '@runanywhere/core@file:packages/core':
+    dependencies:
+      '@ricky0123/vad-web': 0.0.24
+      '@xenova/transformers': 2.17.2
+      eventemitter3: 5.0.1
+    transitivePeerDependencies:
+      - bare-buffer
+
+  '@runanywhere/llm-openai@file:packages/llm-openai(@runanywhere/core@file:packages/core)':
+    dependencies:
+      '@runanywhere/core': file:packages/core
+
   '@runanywhere/llm@file:packages/llm':
     dependencies:
       '@runanywhere/core': link:packages/core
@@ -8587,6 +8634,13 @@ snapshots:
       '@runanywhere/tts-webspeech': link:packages/tts-webspeech
       '@runanywhere/vad-silero': link:packages/vad-silero
 
+  '@runanywhere/stt-whisper@file:packages/stt-whisper(@runanywhere/core@file:packages/core)':
+    dependencies:
+      '@runanywhere/core': file:packages/core
+      '@xenova/transformers': 2.17.2
+    transitivePeerDependencies:
+      - bare-buffer
+
   '@runanywhere/transcription@file:packages/transcription':
     dependencies:
       '@runanywhere/core': link:packages/core
@@ -8595,10 +8649,19 @@ snapshots:
     transitivePeerDependencies:
       - bare-buffer
 
+  '@runanywhere/tts-webspeech@file:packages/tts-webspeech(@runanywhere/core@file:packages/core)':
+    dependencies:
+      '@runanywhere/core': file:packages/core
+
   '@runanywhere/tts@file:packages/tts':
     dependencies:
       '@runanywhere/core': link:packages/core
       eventemitter3: 5.0.1
+
+  '@runanywhere/vad-silero@file:packages/vad-silero(@runanywhere/core@file:packages/core)':
+    dependencies:
+      '@ricky0123/vad-web': 0.0.24
+      '@runanywhere/core': file:packages/core
 
   '@runanywhere/voice@file:packages/voice':
     dependencies:
@@ -10291,8 +10354,8 @@ snapshots:
       '@typescript-eslint/parser': 8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2)
       eslint: 9.33.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.9
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.33.0(jiti@1.21.7))
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1)(eslint@9.33.0(jiti@1.21.7))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7))
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.33.0(jiti@1.21.7))
       eslint-plugin-react: 7.37.5(eslint@9.33.0(jiti@1.21.7))
       eslint-plugin-react-hooks: 5.2.0(eslint@9.33.0(jiti@1.21.7))
@@ -10315,7 +10378,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0)(eslint@9.33.0(jiti@1.21.7)):
+  eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)):
     dependencies:
       '@nolyfill/is-core-module': 1.0.39
       debug: 4.4.1
@@ -10326,22 +10389,22 @@ snapshots:
       tinyglobby: 0.2.14
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1)(eslint@9.33.0(jiti@1.21.7))
+      eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7))
     transitivePeerDependencies:
       - supports-color
 
-  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.33.0(jiti@1.21.7)):
+  eslint-module-utils@2.12.1(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)):
     dependencies:
       debug: 3.2.7
     optionalDependencies:
       '@typescript-eslint/parser': 8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2)
       eslint: 9.33.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.9
-      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.33.0(jiti@1.21.7))
+      eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7))
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1)(eslint@9.33.0(jiti@1.21.7)):
+  eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -10352,7 +10415,7 @@ snapshots:
       doctrine: 2.1.0
       eslint: 9.33.0(jiti@1.21.7)
       eslint-import-resolver-node: 0.3.9
-      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1)(eslint@9.33.0(jiti@1.21.7))
+      eslint-module-utils: 2.12.1(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint-import-resolver-node@0.3.9)(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(@typescript-eslint/parser@8.40.0(eslint@9.33.0(jiti@1.21.7))(typescript@5.9.2))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7)))(eslint@9.33.0(jiti@1.21.7))
       hasown: 2.0.2
       is-core-module: 2.16.1
       is-glob: 4.0.3

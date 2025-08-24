@@ -3,23 +3,28 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /* config options here */
   webpack: (config, { isServer }) => {
-    // Handle binary node modules
+    // Completely ignore .node files
     config.module.rules.push({
       test: /\.node$/,
-      use: 'node-loader',
+      loader: 'ignore-loader',
     });
 
-    // Ignore ONNX runtime bindings in client bundle
+    // Handle ONNX runtime properly for client/server
     if (!isServer) {
+      // Client-side: use browser-compatible version
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'onnxruntime-node': 'onnxruntime-web',
+      };
+
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
         path: false,
         crypto: false,
+        stream: false,
+        buffer: false,
       };
-
-      // Ignore onnxruntime-node in browser builds
-      config.externals = [...(config.externals || []), 'onnxruntime-node'];
     }
 
     return config;

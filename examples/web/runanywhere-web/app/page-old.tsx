@@ -12,9 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   Mic, MicOff, Settings, Volume2, Zap, Brain, Shield, DollarSign,
   AlertCircle, Download, Play, Pause, FileAudio, MessageSquare, Sparkles,
-  Sun, Moon, Loader2
+  Sun, Moon
 } from 'lucide-react';
-import { useSDKPipeline } from '@/hooks/useSDKPipeline';
+import { useVoiceAssistant } from '@/hooks/useVoiceAssistant';
 
 export default function Home() {
   const [apiKey, setApiKey] = useState('');
@@ -24,27 +24,24 @@ export default function Home() {
   const [ttsText, setTtsText] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [llmMessage, setLlmMessage] = useState('');
+  const [llmResponse, setLlmResponse] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [sttModel, setSttModel] = useState('whisper-tiny');
+  const [downloadStatus, setDownloadStatus] = useState({
+    vad: false,
+    stt: false,
+    tts: false,
+    llm: false
+  });
 
-  // Use the SDK pipeline hook
+  // Use the voice assistant hook
   const {
     isListening,
     isProcessing,
     transcript,
     response,
     error,
-    modelStatus,
-    downloadProgress,
-    initializePipeline,
     toggleListening,
-    initializeVAD,
-    initializeSTT,
-    initializeTTS,
-    initializeLLM,
-    testTTS,
-    testLLM,
-  } = useSDKPipeline({
+  } = useVoiceAssistant({
     apiKey,
     useLocalModels,
     volume: volume[0],
@@ -73,49 +70,64 @@ export default function Home() {
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
       localStorage.setItem('openai_api_key', apiKey);
-      // Re-initialize LLM with new key
-      initializeLLM();
     }
   };
 
-  const handleDownloadVAD = async () => {
-    await initializeVAD();
+  const handleDownloadModel = (modelType: string) => {
+    // Simulate model download
+    setDownloadStatus(prev => ({ ...prev, [modelType]: true }));
+    setTimeout(() => {
+      alert(`${modelType.toUpperCase()} model downloaded successfully!`);
+    }, 1000);
   };
 
-  const handleDownloadSTT = async () => {
-    await initializeSTT(sttModel);
-  };
-
-  const handleDownloadTTS = async () => {
-    await initializeTTS();
-  };
-
-  const handleInitializePipeline = async () => {
-    await initializePipeline();
-  };
-
-  const handleTTS = async () => {
+  const handleTTS = () => {
     if (!ttsText.trim()) return;
+
     setIsSpeaking(true);
-    await testTTS(ttsText);
+    const utterance = new SpeechSynthesisUtterance(ttsText);
+    utterance.volume = volume[0];
+    utterance.rate = speed[0];
+    utterance.onend = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopTTS = () => {
+    window.speechSynthesis.cancel();
     setIsSpeaking(false);
   };
 
   const handleLLMSubmit = async () => {
     if (!llmMessage.trim() || !apiKey) return;
-    await testLLM(llmMessage);
-  };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'ready':
-        return <Badge variant="default">Ready</Badge>;
-      case 'downloading':
-        return <Badge variant="secondary">Downloading...</Badge>;
-      case 'error':
-        return <Badge variant="destructive">Error</Badge>;
-      default:
-        return <Badge variant="outline">Not Loaded</Badge>;
+    setLlmResponse('Processing...');
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-turbo-preview',
+          messages: [
+            { role: 'system', content: 'You are a helpful assistant. Keep responses concise.' },
+            { role: 'user', content: llmMessage }
+          ],
+          temperature: 0.7,
+          max_tokens: 150,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      setLlmResponse(data.choices[0].message.content);
+    } catch (err) {
+      setLlmResponse('Error: Failed to get response. Please check your API key.');
     }
   };
 
@@ -132,7 +144,7 @@ export default function Home() {
               <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                 RunAnywhere AI
               </h1>
-              <p className="text-sm text-muted-foreground">SDK-Powered Pipeline Testing</p>
+              <p className="text-sm text-muted-foreground">Modular AI Pipeline Testing</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -217,49 +229,28 @@ export default function Home() {
                     )}
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Initialize Pipeline Button */}
-                    {modelStatus.vad !== 'ready' || modelStatus.stt !== 'ready' || modelStatus.tts !== 'ready' ? (
+                    <div className="flex justify-center py-8 relative">
+                      {isListening && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="h-40 w-40 bg-primary/20 rounded-full animate-ping"></div>
+                        </div>
+                      )}
                       <Button
-                        onClick={handleInitializePipeline}
-                        className="w-full"
-                        disabled={isProcessing}
+                        size="lg"
+                        className={`h-28 w-28 sm:h-32 sm:w-32 rounded-full transition-all transform hover:scale-105 relative z-10 ${
+                          isListening
+                            ? 'bg-destructive hover:bg-destructive/90'
+                            : 'bg-primary hover:bg-primary/90'
+                        }`}
+                        onClick={toggleListening}
                       >
-                        {isProcessing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Initializing Pipeline...
-                          </>
+                        {isListening ? (
+                          <MicOff className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
                         ) : (
-                          <>
-                            <Download className="h-4 w-4 mr-2" />
-                            Initialize Full Pipeline
-                          </>
+                          <Mic className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
                         )}
                       </Button>
-                    ) : (
-                      <div className="flex justify-center py-8 relative">
-                        {isListening && (
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="h-40 w-40 bg-primary/20 rounded-full animate-ping"></div>
-                          </div>
-                        )}
-                        <Button
-                          size="lg"
-                          className={`h-28 w-28 sm:h-32 sm:w-32 rounded-full transition-all transform hover:scale-105 relative z-10 ${
-                            isListening
-                              ? 'bg-destructive hover:bg-destructive/90'
-                              : 'bg-primary hover:bg-primary/90'
-                          }`}
-                          onClick={toggleListening}
-                        >
-                          {isListening ? (
-                            <MicOff className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
-                          ) : (
-                            <Mic className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
-                          )}
-                        </Button>
-                      </div>
-                    )}
+                    </div>
 
                     {error && (
                       <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
@@ -295,62 +286,53 @@ export default function Home() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">VAD (Silero)</span>
-                      {getStatusBadge(modelStatus.vad)}
+                      <span className="text-sm text-muted-foreground">VAD (Voice Activity)</span>
+                      <Badge variant={downloadStatus.vad ? "default" : "secondary"}>
+                        {downloadStatus.vad ? "Ready" : "Not Loaded"}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">STT (Whisper)</span>
-                      {getStatusBadge(modelStatus.stt)}
+                      <Badge variant={downloadStatus.stt ? "default" : "secondary"}>
+                        {downloadStatus.stt ? "Ready" : "Not Loaded"}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">LLM (OpenAI)</span>
-                      {getStatusBadge(modelStatus.llm)}
+                      <Badge variant={apiKey ? "default" : "secondary"}>
+                        {apiKey ? "Configured" : "API Key Required"}
+                      </Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">TTS (Web Speech)</span>
-                      {getStatusBadge(modelStatus.tts)}
+                      <Badge variant="default">Ready</Badge>
                     </div>
                   </CardContent>
                 </Card>
 
                 <Card className="border-border bg-card">
                   <CardHeader>
-                    <CardTitle className="text-lg text-card-foreground">Model Management</CardTitle>
+                    <CardTitle className="text-lg text-card-foreground">Model Downloads</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <Button
-                      onClick={handleDownloadVAD}
-                      disabled={modelStatus.vad === 'ready' || modelStatus.vad === 'downloading'}
+                      onClick={() => handleDownloadModel('vad')}
+                      disabled={downloadStatus.vad}
                       className="w-full"
                       variant="outline"
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      {modelStatus.vad === 'ready' ? "VAD Ready" :
-                       modelStatus.vad === 'downloading' ? "Downloading..." : "Initialize VAD"}
+                      {downloadStatus.vad ? "VAD Model Ready" : "Download VAD Model"}
                     </Button>
                     <Button
-                      onClick={handleDownloadSTT}
-                      disabled={modelStatus.stt === 'ready' || modelStatus.stt === 'downloading'}
+                      onClick={() => handleDownloadModel('stt')}
+                      disabled={downloadStatus.stt}
                       className="w-full"
                       variant="outline"
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      {modelStatus.stt === 'ready' ? "Whisper Ready" :
-                       modelStatus.stt === 'downloading' ?
-                       `Downloading... ${downloadProgress.stt ? Math.round(downloadProgress.stt) : 0}%` :
-                       "Download Whisper"}
+                      {downloadStatus.stt ? "STT Model Ready" : "Download Whisper Model"}
                     </Button>
-                    {modelStatus.stt === 'idle' && (
-                      <select
-                        value={sttModel}
-                        onChange={(e) => setSttModel(e.target.value)}
-                        className="w-full p-2 border rounded bg-background text-foreground"
-                      >
-                        <option value="whisper-tiny">Whisper Tiny (39MB)</option>
-                        <option value="whisper-base">Whisper Base (74MB)</option>
-                        <option value="whisper-small">Whisper Small (244MB)</option>
-                      </select>
-                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -367,36 +349,22 @@ export default function Home() {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <Button
-                    onClick={handleDownloadVAD}
-                    disabled={modelStatus.vad === 'ready' || modelStatus.vad === 'downloading'}
+                    onClick={() => handleDownloadModel('vad')}
+                    disabled={downloadStatus.vad}
                     variant="outline"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {modelStatus.vad === 'ready' ? "VAD Ready" :
-                     modelStatus.vad === 'downloading' ? "Loading..." : "Initialize VAD"}
+                    {downloadStatus.vad ? "VAD Ready" : "Download VAD"}
                   </Button>
                   <Button
-                    onClick={handleDownloadSTT}
-                    disabled={modelStatus.stt === 'ready' || modelStatus.stt === 'downloading'}
+                    onClick={() => handleDownloadModel('stt')}
+                    disabled={downloadStatus.stt}
                     variant="outline"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {modelStatus.stt === 'ready' ? "Whisper Ready" :
-                     modelStatus.stt === 'downloading' ? "Loading..." : "Download Whisper"}
+                    {downloadStatus.stt ? "Whisper Ready" : "Download Whisper"}
                   </Button>
                 </div>
-
-                {modelStatus.stt === 'idle' && (
-                  <select
-                    value={sttModel}
-                    onChange={(e) => setSttModel(e.target.value)}
-                    className="w-full p-2 border rounded bg-background text-foreground"
-                  >
-                    <option value="whisper-tiny">Whisper Tiny (39MB - Fast)</option>
-                    <option value="whisper-base">Whisper Base (74MB - Balanced)</option>
-                    <option value="whisper-small">Whisper Small (244MB - Accurate)</option>
-                  </select>
-                )}
 
                 <div className="flex justify-center py-8">
                   <Button
@@ -407,7 +375,6 @@ export default function Home() {
                         : 'bg-primary hover:bg-primary/90'
                     }`}
                     onClick={toggleListening}
-                    disabled={modelStatus.vad !== 'ready' || modelStatus.stt !== 'ready'}
                   >
                     {isListening ? (
                       <MicOff className="h-8 w-8 text-primary-foreground" />
@@ -429,15 +396,15 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-4 pt-4">
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Model</p>
-                    <p className="font-medium text-card-foreground">{sttModel}</p>
+                    <p className="font-medium text-card-foreground">Whisper Tiny</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Language</p>
-                    <p className="font-medium text-card-foreground">Multi</p>
+                    <p className="font-medium text-card-foreground">English</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.stt}</p>
+                    <p className="text-xs text-muted-foreground">Latency</p>
+                    <p className="font-medium text-card-foreground">~200ms</p>
                   </div>
                 </div>
               </CardContent>
@@ -452,17 +419,6 @@ export default function Home() {
                 <CardDescription className="text-muted-foreground">Test TTS models independently</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Button
-                  onClick={handleDownloadTTS}
-                  disabled={modelStatus.tts === 'ready' || modelStatus.tts === 'downloading'}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {modelStatus.tts === 'ready' ? "TTS Ready" :
-                   modelStatus.tts === 'downloading' ? "Initializing..." : "Initialize TTS"}
-                </Button>
-
                 <div className="space-y-2">
                   <Label className="text-card-foreground">Enter text to speak:</Label>
                   <textarea
@@ -471,21 +427,20 @@ export default function Home() {
                     placeholder="Type something here..."
                     value={ttsText}
                     onChange={(e) => setTtsText(e.target.value)}
-                    disabled={modelStatus.tts !== 'ready'}
                   />
                 </div>
 
                 <div className="flex gap-4">
                   <Button
                     onClick={handleTTS}
-                    disabled={!ttsText.trim() || isSpeaking || modelStatus.tts !== 'ready'}
+                    disabled={!ttsText.trim() || isSpeaking}
                     className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Speak Text
                   </Button>
                   <Button
-                    onClick={() => setIsSpeaking(false)}
+                    onClick={stopTTS}
                     disabled={!isSpeaking}
                     variant="outline"
                   >
@@ -534,15 +489,15 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-4 pt-4">
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Engine</p>
-                    <p className="font-medium text-card-foreground">Web Speech API</p>
+                    <p className="font-medium text-card-foreground">Web Speech</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Voices</p>
+                    <p className="text-xs text-muted-foreground">Voice</p>
                     <p className="font-medium text-card-foreground">System</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.tts}</p>
+                    <p className="text-xs text-muted-foreground">Quality</p>
+                    <p className="font-medium text-card-foreground">High</p>
                   </div>
                 </div>
               </CardContent>
@@ -577,28 +532,19 @@ export default function Home() {
                 </div>
 
                 <Button
-                  disabled={!apiKey || !llmMessage.trim() || isProcessing}
+                  disabled={!apiKey || !llmMessage.trim()}
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                   onClick={handleLLMSubmit}
                 >
-                  {isProcessing ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      Send Message
-                    </>
-                  )}
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Send Message
                 </Button>
 
                 <div className="space-y-2">
                   <Label className="text-card-foreground">Response:</Label>
                   <div className="min-h-[100px] p-4 bg-muted rounded-lg border border-border">
                     <p className="text-card-foreground">
-                      {response || (apiKey ? "Response will appear here..." : "API key required")}
+                      {llmResponse || (apiKey ? "Response will appear here..." : "API key required")}
                     </p>
                   </div>
                 </div>
@@ -606,15 +552,15 @@ export default function Home() {
                 <div className="grid grid-cols-3 gap-4 pt-4">
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Model</p>
-                    <p className="font-medium text-card-foreground">GPT-4 Turbo</p>
+                    <p className="font-medium text-card-foreground">GPT-4</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.llm}</p>
+                    <p className="text-xs text-muted-foreground">Tokens</p>
+                    <p className="font-medium text-card-foreground">0</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">Provider</p>
-                    <p className="font-medium text-card-foreground">OpenAI</p>
+                    <p className="text-xs text-muted-foreground">Cost</p>
+                    <p className="font-medium text-card-foreground">$0.00</p>
                   </div>
                 </div>
               </CardContent>
