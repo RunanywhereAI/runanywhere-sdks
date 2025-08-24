@@ -17,3 +17,18 @@ export * from './di/container';
 
 // Monitoring
 export * from './monitoring/performance-monitor';
+
+// Adapter Interfaces
+export * from './interfaces';
+
+// Service Registry
+export * from './registry';
+
+// Pipeline Management
+export * from './pipeline';
+
+// Adapter Implementations
+export * from './adapters';
+
+// Model Management
+export * from './models';
