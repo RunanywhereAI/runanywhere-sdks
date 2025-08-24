@@ -153,7 +153,7 @@ export const DEFAULT_DEMO_SETTINGS: DemoSettings = {
   enableCaching: true,
   // Additional pipeline config
   whisperModel: 'whisper-base',
-  llmEndpoint: 'http://localhost:8080/v1',
+  llmEndpoint: 'https://api.openai.com/v1',
   temperature: 0.7,
   maxTokens: 500,
   systemPrompt: 'You are a helpful voice assistant.',

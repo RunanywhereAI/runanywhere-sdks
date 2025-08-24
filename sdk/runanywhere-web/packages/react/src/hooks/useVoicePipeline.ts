@@ -66,22 +66,27 @@ export function useVoicePipeline(
     isPlaying: false
   });
 
+  console.log('useVoicePipeline: Current state:', state, 'Options:', options);
+
   const initialize = useCallback(async () => {
     try {
       if (pipelineRef.current) {
         return;
       }
 
+      console.log('useVoicePipeline: Starting initialization', options);
+
       // Ensure adapters are registered
       const registry = ServiceRegistry.getInstance();
 
       // Check if adapters are available, if not, try to register them
       if (!isRegistered) {
+        console.log('useVoicePipeline: Registering adapters...');
         // These imports will auto-register the adapters
-        await import('@runanywhere/vad-silero').catch(() => {});
-        await import('@runanywhere/stt-whisper').catch(() => {});
-        await import('@runanywhere/llm-openai').catch(() => {});
-        await import('@runanywhere/tts-webspeech').catch(() => {});
+        await import('@runanywhere/vad-silero').catch((e) => console.warn('Failed to import vad-silero:', e));
+        await import('@runanywhere/stt-whisper').catch((e) => console.warn('Failed to import stt-whisper:', e));
+        await import('@runanywhere/llm-openai').catch((e) => console.warn('Failed to import llm-openai:', e));
+        await import('@runanywhere/tts-webspeech').catch((e) => console.warn('Failed to import tts-webspeech:', e));
         setIsRegistered(true);
       }
 

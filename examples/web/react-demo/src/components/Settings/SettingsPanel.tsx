@@ -11,6 +11,8 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ isOpen, onClose, currentConfig, onConfigChange }: SettingsPanelProps) {
+  console.log('SettingsPanel render:', { isOpen });
+
   const [localSettings, setLocalSettings] = useState<DemoSettings>(currentConfig)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -31,7 +33,12 @@ export function SettingsPanel({ isOpen, onClose, currentConfig, onConfigChange }
     onClose()
   }
 
-  if (!isOpen) return null
+  if (!isOpen) {
+    console.log('SettingsPanel: Not rendering because isOpen is false');
+    return null;
+  }
+
+  console.log('SettingsPanel: Rendering modal...');
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">

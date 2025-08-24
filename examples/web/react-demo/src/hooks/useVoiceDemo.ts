@@ -53,6 +53,14 @@ export function useVoiceDemo() {
   // Use the real voice pipeline
   const [pipelineState, pipelineActions] = useVoicePipeline(pipelineOptions)
 
+  // Debug logging
+  console.log('useVoiceDemo state:', {
+    settings,
+    pipelineState,
+    hasApiKey: !!settings.apiKey,
+    showSettings: showSettings
+  });
+
   // Update transcription history when pipeline detects speech
   useEffect(() => {
     if (pipelineState.transcription) {
@@ -118,7 +126,10 @@ export function useVoiceDemo() {
     setSettings(prev => ({ ...prev, ...newSettings }))
   }, [])
 
-  const openSettings = useCallback(() => setShowSettings(true), [])
+  const openSettings = useCallback(() => {
+    console.log('openSettings called, setting showSettings to true');
+    setShowSettings(true);
+  }, [])
   const closeSettings = useCallback(() => setShowSettings(false), [])
 
   const startConversation = useCallback(async () => {

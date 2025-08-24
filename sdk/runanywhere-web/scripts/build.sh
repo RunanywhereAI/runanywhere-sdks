@@ -23,7 +23,7 @@
 #   -d, --detailed          Detailed build with per-package progress
 #   -c, --clean             Clean all build artifacts before building
 #   -r, --run               Run demo app after successful build
-#   -t, --demo-type TYPE    Demo to run: react (default), vue, or angular
+#   -t, --demo-type TYPE    Demo to run: react (default), runanywhere, vue, or angular
 #   -v, --verbose           Show detailed build output
 #   -h, --help              Display help message
 #
@@ -90,7 +90,7 @@ show_help() {
     echo "  -d, --detailed          Detailed build with per-package output"
     echo "  -c, --clean             Clean build (remove dist folders first)"
     echo "  -r, --run               Run demo after building"
-    echo "  -t, --demo-type TYPE    Demo type to run (react|vue|angular) [default: react]"
+    echo "  -t, --demo-type TYPE    Demo type to run (react|runanywhere|vue|angular) [default: react]"
     echo "  -v, --verbose           Verbose output"
     echo "  -h, --help              Show this help message"
     echo ""
@@ -220,16 +220,29 @@ detailed_build() {
 # Function to run demo
 run_demo() {
     local demo_path=""
+    local dev_command=""
+    local port=""
 
     case $DEMO_TYPE in
         "react")
             demo_path="../../examples/web/react-demo"
+            dev_command="pnpm dev"
+            port="5173"
+            ;;
+        "runanywhere")
+            demo_path="../../examples/web/runanywhere-web"
+            dev_command="npm run dev"
+            port="3000"
             ;;
         "vue")
             demo_path="../../examples/web/vue-demo"
+            dev_command="pnpm dev"
+            port="5173"
             ;;
         "angular")
             demo_path="../../examples/web/angular-demo"
+            dev_command="pnpm dev"
+            port="5173"
             ;;
         *)
             print_error "Unknown demo type: $DEMO_TYPE"
@@ -248,20 +261,25 @@ run_demo() {
     # Install demo dependencies if needed
     if [ ! -d "node_modules" ]; then
         print_status "Installing demo dependencies..."
-        pnpm install
+        if [ "$DEMO_TYPE" = "runanywhere" ]; then
+            npm install
+        else
+            pnpm install
+        fi
     fi
 
     # Kill any existing processes
     pkill -f "vite" 2>/dev/null || true
+    pkill -f "next" 2>/dev/null || true
 
     print_success "🎉 SDK built successfully!"
     echo ""
-    print_status "Starting $DEMO_TYPE demo at http://localhost:5173"
+    print_status "Starting $DEMO_TYPE demo at http://localhost:$port"
     print_warning "Press Ctrl+C to stop the demo"
     echo ""
 
     # Start the demo
-    pnpm dev
+    $dev_command
 }
 
 # Parse command line arguments
@@ -366,7 +384,8 @@ else
     print_success "SDK built successfully!"
     echo ""
     print_info "To run a demo:"
-    echo "  $0 --run                    # Run React demo"
-    echo "  $0 --run --demo-type vue    # Run Vue demo"
-    echo "  $0 --run --demo-type angular # Run Angular demo"
+    echo "  $0 --run                          # Run React demo"
+    echo "  $0 --run --demo-type runanywhere  # Run RunAnywhere Next.js app"
+    echo "  $0 --run --demo-type vue          # Run Vue demo"
+    echo "  $0 --run --demo-type angular      # Run Angular demo"
 fi
