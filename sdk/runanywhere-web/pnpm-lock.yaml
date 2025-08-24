@@ -102,33 +102,24 @@ importers:
       '@heroicons/react':
         specifier: ^2.0.18
         version: 2.2.0(react@18.3.1)
-      '@runanywhere/cache':
-        specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/cache
       '@runanywhere/core':
         specifier: workspace:*
         version: link:../../../sdk/runanywhere-web/packages/core
-      '@runanywhere/llm':
+      '@runanywhere/llm-openai':
         specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/llm
-      '@runanywhere/monitoring':
-        specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/monitoring
+        version: link:../../../sdk/runanywhere-web/packages/llm-openai
       '@runanywhere/react':
         specifier: workspace:*
         version: link:../../../sdk/runanywhere-web/packages/react
-      '@runanywhere/transcription':
+      '@runanywhere/stt-whisper':
         specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/transcription
-      '@runanywhere/tts':
+        version: link:../../../sdk/runanywhere-web/packages/stt-whisper
+      '@runanywhere/tts-webspeech':
         specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/tts
-      '@runanywhere/voice':
+        version: link:../../../sdk/runanywhere-web/packages/tts-webspeech
+      '@runanywhere/vad-silero':
         specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/voice
-      '@runanywhere/workers':
-        specifier: workspace:*
-        version: link:../../../sdk/runanywhere-web/packages/workers
+        version: link:../../../sdk/runanywhere-web/packages/vad-silero
       eventemitter3:
         specifier: ^5.0.1
         version: 5.0.1
@@ -298,6 +289,19 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)
 
+  packages/llm-openai:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^6.0.6
+        version: 6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
+
   packages/monitoring:
     dependencies:
       '@runanywhere/core':
@@ -335,18 +339,6 @@ importers:
       '@runanywhere/core':
         specifier: workspace:*
         version: link:../core
-      '@runanywhere/llm':
-        specifier: workspace:*
-        version: link:../llm
-      '@runanywhere/transcription':
-        specifier: workspace:*
-        version: link:../transcription
-      '@runanywhere/tts':
-        specifier: workspace:*
-        version: link:../tts
-      '@runanywhere/voice':
-        specifier: workspace:*
-        version: link:../voice
     devDependencies:
       '@types/react':
         specifier: ^18.3.12
@@ -369,6 +361,35 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)
+    optionalDependencies:
+      '@runanywhere/llm-openai':
+        specifier: workspace:*
+        version: link:../llm-openai
+      '@runanywhere/stt-whisper':
+        specifier: workspace:*
+        version: link:../stt-whisper
+      '@runanywhere/tts-webspeech':
+        specifier: workspace:*
+        version: link:../tts-webspeech
+      '@runanywhere/vad-silero':
+        specifier: workspace:*
+        version: link:../vad-silero
+
+  packages/stt-whisper:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+      '@xenova/transformers':
+        specifier: ^2.17.2
+        version: 2.17.2
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^6.0.6
+        version: 6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
 
   packages/transcription:
     dependencies:
@@ -410,6 +431,35 @@ importers:
       vitest:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.17.2)(@vitest/ui@2.1.9)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)
+
+  packages/tts-webspeech:
+    dependencies:
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^6.0.6
+        version: 6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
+
+  packages/vad-silero:
+    dependencies:
+      '@ricky0123/vad-web':
+        specifier: ^0.0.24
+        version: 0.0.24
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.2
+      vite:
+        specifier: ^6.0.6
+        version: 6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
 
   packages/voice:
     dependencies:

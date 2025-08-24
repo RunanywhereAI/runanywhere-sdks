@@ -68,6 +68,31 @@ npx tsc --emitDeclarationOnly
 npx vite build
 cd ../..
 
+# Build individual adapter packages
+echo "📦 Building @runanywhere/vad-silero..."
+cd packages/vad-silero
+npx tsc --emitDeclarationOnly
+npx vite build
+cd ../..
+
+echo "📦 Building @runanywhere/stt-whisper..."
+cd packages/stt-whisper
+npx tsc --emitDeclarationOnly
+npx vite build
+cd ../..
+
+echo "📦 Building @runanywhere/llm-openai..."
+cd packages/llm-openai
+npx tsc --emitDeclarationOnly
+npx vite build
+cd ../..
+
+echo "📦 Building @runanywhere/tts-webspeech..."
+cd packages/tts-webspeech
+npx tsc --emitDeclarationOnly
+npx vite build
+cd ../..
+
 # Build framework packages
 echo "📦 Building @runanywhere/react..."
 cd packages/react

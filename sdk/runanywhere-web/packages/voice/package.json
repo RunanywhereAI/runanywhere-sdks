@@ -13,7 +13,7 @@
   },
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc && vite build",
+    "build": "tsc --emitDeclarationOnly && vite build",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist node_modules .turbo"

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { DIContainer } from '@runanywhere/core';
-import { EnhancedVoicePipelineManager, EnhancedPipelineConfig } from '@runanywhere/voice';
+import {
+  AdaptivePipelineManager,
+  type PipelineConfig,
+  ServiceRegistry,
+  AdapterType
+} from '@runanywhere/core';
 
 export interface VoicePipelineState {
   isInitialized: boolean;
@@ -21,15 +25,36 @@ export interface VoicePipelineActions {
   destroy: () => void;
 }
 
-export interface UseVoicePipelineOptions extends EnhancedPipelineConfig {
+export interface UseVoicePipelineOptions extends Partial<PipelineConfig> {
   autoStart?: boolean;
+  enableTranscription?: boolean;
+  enableLLM?: boolean;
+  enableTTS?: boolean;
+  autoPlayTTS?: boolean;
+  whisperConfig?: {
+    model?: string;
+  };
+  llmConfig?: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    systemPrompt?: string;
+  };
+  ttsConfig?: {
+    voice?: string;
+    rate?: number;
+    pitch?: number;
+    volume?: number;
+  };
 }
 
 export function useVoicePipeline(
   options: UseVoicePipelineOptions = {}
 ): [VoicePipelineState, VoicePipelineActions] {
-  const pipelineRef = useRef<EnhancedVoicePipelineManager | null>(null);
-  const containerRef = useRef<DIContainer | null>(null);
+  const pipelineRef = useRef<AdaptivePipelineManager | null>(null);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   const [state, setState] = useState<VoicePipelineState>({
     isInitialized: false,
@@ -47,51 +72,75 @@ export function useVoicePipeline(
         return;
       }
 
-      // Create DI container
-      containerRef.current = new DIContainer();
+      // Ensure adapters are registered
+      const registry = ServiceRegistry.getInstance();
+
+      // Check if adapters are available, if not, try to register them
+      if (!isRegistered) {
+        // These imports will auto-register the adapters
+        await import('@runanywhere/vad-silero').catch(() => {});
+        await import('@runanywhere/stt-whisper').catch(() => {});
+        await import('@runanywhere/llm-openai').catch(() => {});
+        await import('@runanywhere/tts-webspeech').catch(() => {});
+        setIsRegistered(true);
+      }
+
+      // Build pipeline configuration
+      const pipelineConfig: PipelineConfig = {
+        vad: { adapter: 'silero' },
+        stt: options.enableTranscription !== false ? {
+          adapter: 'whisper',
+          model: options.whisperConfig?.model || 'whisper-base'
+        } : undefined,
+        llm: options.enableLLM !== false && options.llmConfig?.apiKey ? {
+          adapter: 'openai',
+          config: options.llmConfig
+        } : undefined,
+        tts: options.enableTTS !== false ? {
+          adapter: 'webspeech',
+          config: options.ttsConfig
+        } : undefined
+      };
 
       // Initialize pipeline
-      pipelineRef.current = new EnhancedVoicePipelineManager(
-        containerRef.current,
-        options
-      );
+      pipelineRef.current = new AdaptivePipelineManager(pipelineConfig);
 
       // Set up event listeners
       const pipeline = pipelineRef.current;
 
-      pipeline.on('started', () => {
-        setState(prev => ({ ...prev, isListening: true }));
-      });
-
-      pipeline.on('stopped', () => {
-        setState(prev => ({ ...prev, isListening: false, isProcessing: false }));
+      pipeline.on('state_change', (pipelineState: any) => {
+        setState(prev => ({
+          ...prev,
+          isListening: pipelineState.isRunning,
+          isProcessing: pipelineState.isProcessing
+        }));
       });
 
       pipeline.on('error', (error: Error) => {
         setState(prev => ({ ...prev, error, isProcessing: false }));
       });
 
-      pipeline.on('vadSpeechStart', () => {
+      pipeline.on('speech_start', () => {
         setState(prev => ({ ...prev, isProcessing: true }));
       });
 
       pipeline.on('transcription', (result: any) => {
         setState(prev => ({
           ...prev,
-          transcription: result.text,
+          transcription: result.text || result,
           isProcessing: false
         }));
       });
 
-      pipeline.on('llmResponse', (result: any) => {
-        setState(prev => ({ ...prev, llmResponse: result.text }));
+      pipeline.on('llm_response', (result: any) => {
+        setState(prev => ({ ...prev, llmResponse: result.text || result }));
       });
 
-      pipeline.on('ttsPlaybackStart', () => {
+      pipeline.on('playback_start', () => {
         setState(prev => ({ ...prev, isPlaying: true }));
       });
 
-      pipeline.on('ttsPlaybackEnd', () => {
+      pipeline.on('playback_end', () => {
         setState(prev => ({ ...prev, isPlaying: false }));
       });
 
@@ -112,7 +161,7 @@ export function useVoicePipeline(
       const err = error instanceof Error ? error : new Error(String(error));
       setState(prev => ({ ...prev, error: err }));
     }
-  }, [options]);
+  }, [options, isRegistered]);
 
   const start = useCallback(async () => {
     if (!pipelineRef.current) {
@@ -146,9 +195,6 @@ export function useVoicePipeline(
     if (pipelineRef.current) {
       pipelineRef.current.destroy();
       pipelineRef.current = null;
-    }
-    if (containerRef.current) {
-      containerRef.current = null;
     }
     setState({
       isInitialized: false,

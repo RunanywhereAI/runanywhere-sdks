@@ -1,0 +1,47 @@
+{
+  "name": "@runanywhere/llm-openai",
+  "version": "1.0.0",
+  "description": "OpenAI LLM adapter for RunAnywhere Web SDK",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "npm run build:types && npm run build:bundle",
+    "build:types": "tsc --emitDeclarationOnly",
+    "build:bundle": "vite build",
+    "dev": "vite build --watch",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "@runanywhere/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vite": "^6.0.6"
+  },
+  "keywords": [
+    "llm",
+    "openai",
+    "gpt",
+    "chat",
+    "runanywhere",
+    "web-ai"
+  ],
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/runanywhere/web-sdk.git",
+    "directory": "packages/llm-openai"
+  },
+  "license": "MIT"
+}

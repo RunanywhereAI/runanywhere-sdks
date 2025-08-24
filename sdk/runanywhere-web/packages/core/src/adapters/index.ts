@@ -4,6 +4,9 @@
 
 import { ServiceRegistry } from '../registry/service-registry';
 
+// Base Adapter
+export { BaseAdapter } from './base.adapter';
+
 // VAD Adapters
 export { SileroVADAdapter, SileroVADAdapterMetadata } from './vad/silero-vad.adapter';
 

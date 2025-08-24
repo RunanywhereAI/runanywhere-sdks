@@ -18,6 +18,6 @@ export type {
 
 // Re-export core types for convenience
 export type {
-  EnhancedPipelineConfig,
-  EnhancedPipelineEvents
-} from '@runanywhere/voice';
+  PipelineConfig,
+  AdapterType
+} from '@runanywhere/core';

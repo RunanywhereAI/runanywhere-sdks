@@ -23,11 +23,13 @@
     "react-dom": ">=16.8.0"
   },
   "dependencies": {
-    "@runanywhere/core": "workspace:*",
-    "@runanywhere/voice": "workspace:*",
-    "@runanywhere/transcription": "workspace:*",
-    "@runanywhere/llm": "workspace:*",
-    "@runanywhere/tts": "workspace:*"
+    "@runanywhere/core": "workspace:*"
+  },
+  "optionalDependencies": {
+    "@runanywhere/vad-silero": "workspace:*",
+    "@runanywhere/stt-whisper": "workspace:*",
+    "@runanywhere/llm-openai": "workspace:*",
+    "@runanywhere/tts-webspeech": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
