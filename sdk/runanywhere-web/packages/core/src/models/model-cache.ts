@@ -150,7 +150,7 @@ export class ModelCache {
     // Store in IndexedDB
     if (this.db) {
       try {
-        await this.saveToD(modelId, data);
+        await this.saveToDB(modelId, data);
         logger.info(`Model ${modelId} cached successfully`, 'ModelCache', {
           size,
           memoryCache: true,
@@ -170,7 +170,7 @@ export class ModelCache {
     }
   }
 
-  private async saveToD(modelId: string, data: ArrayBuffer): Promise<void> {
+  private async saveToDB(modelId: string, data: ArrayBuffer): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.db) {
         resolve();
@@ -425,5 +425,15 @@ export class ModelCache {
       usage: this.currentMemorySize / this.maxMemorySize,
       modelCount: this.memory.size
     };
+  }
+
+  async clearCache(modelId?: string): Promise<void> {
+    if (modelId) {
+      // Clear specific model
+      await this.delete(modelId);
+    } else {
+      // Clear all models
+      await this.clear();
+    }
   }
 }

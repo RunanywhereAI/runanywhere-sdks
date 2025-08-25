@@ -1,222 +1,209 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-
-interface STTConfig {
-  model?: string;
-  language?: string;
-  task?: 'transcribe' | 'translate';
-}
+import { WhisperSTTAdapter, type WhisperSTTConfig } from '@runanywhere/stt-whisper';
+import type { TranscriptionResult, ModelInfo } from '@runanywhere/core';
 
 interface STTState {
   isInitialized: boolean;
+  isModelLoaded: boolean;
   isTranscribing: boolean;
-  transcript: string;
   error: string | null;
-  modelStatus: 'idle' | 'downloading' | 'ready' | 'error';
-  downloadProgress: number;
+  lastTranscription: TranscriptionResult | null;
+  modelLoadProgress: number;
+  modelLoadMessage: string;
 }
 
 /**
- * Hook for Speech-to-Text using Whisper via Web Worker
- * Single responsibility: Convert audio to text
- * IMPORTANT: Does NOT import transformers or SDK packages directly
+ * Hook that uses the @runanywhere/stt-whisper package
+ * This is an example of how to consume the STT SDK adapter in a React app
  */
-export function useSTT(config: STTConfig = {}) {
+export function useSTT(config?: Partial<WhisperSTTConfig>) {
   const [state, setState] = useState<STTState>({
     isInitialized: false,
+    isModelLoaded: false,
     isTranscribing: false,
-    transcript: '',
     error: null,
-    modelStatus: 'idle',
-    downloadProgress: 0,
+    lastTranscription: null,
+    modelLoadProgress: 0,
+    modelLoadMessage: '',
   });
 
-  const workerRef = useRef<Worker | null>(null);
-  const modelRef = useRef<string>(config.model || 'whisper-tiny');
+  const adapterRef = useRef<WhisperSTTAdapter | null>(null);
 
-  // Initialize STT Worker (no SDK imports!)
+  // Initialize STT
   const initialize = useCallback(async () => {
     if (state.isInitialized) return;
 
     try {
-      setState(prev => ({ ...prev, modelStatus: 'downloading' }));
+      console.log('[STT Adapter] Initializing...');
 
-      // Create worker for Whisper STT
-      const worker = new Worker('/worker-B8AxjfLB.js', { type: 'module' });
+      // Create adapter instance
+      const adapter = new WhisperSTTAdapter();
 
-      worker.addEventListener('message', (event) => {
-        const message = event.data;
-        console.log('[STT Worker]', message);
-
-        switch (message.status) {
-          case 'progress':
-            setState(prev => ({
-              ...prev,
-              downloadProgress: message.progress || 0
-            }));
-            break;
-
-          case 'ready':
-            setState(prev => ({
-              ...prev,
-              modelStatus: 'ready',
-              isInitialized: true,
-              error: null
-            }));
-            console.log('[STT] Model ready');
-            break;
-
-          case 'complete':
-            if (message.data?.text) {
-              setState(prev => ({
-                ...prev,
-                transcript: message.data.text,
-                isTranscribing: false
-              }));
-              console.log('[STT] Transcription:', message.data.text);
-            }
-            break;
-
-          case 'error':
-            setState(prev => ({
-              ...prev,
-              modelStatus: 'error',
-              error: `STT error: ${message.data?.message || 'Unknown error'}`,
-              isTranscribing: false
-            }));
-            break;
-        }
-      });
-
-      worker.addEventListener('error', (error) => {
-        console.error('[STT] Worker error:', error);
+      // Set up event listeners
+      adapter.on('model_loading', (progress) => {
+        console.log('[STT Adapter] Model loading', progress);
         setState(prev => ({
           ...prev,
-          modelStatus: 'error',
-          error: `Worker error: ${error.message}`,
+          modelLoadProgress: progress.progress || 0,
+          modelLoadMessage: progress.message || 'Loading...'
+        }));
+      });
+
+      adapter.on('error', (error: Error) => {
+        console.error('[STT Adapter] Error:', error.message);
+        setState(prev => ({
+          ...prev,
+          error: error.message,
           isTranscribing: false
         }));
       });
 
-      workerRef.current = worker;
-
-      // Initialize model with test audio
-      const testAudio = new Float32Array(16000);
-      worker.postMessage({
-        audio: testAudio,
-        model: `Xenova/${modelRef.current}`,
-        dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-        gpu: false,
-        subtask: config.task || 'transcribe',
-        language: config.language || null
+      // Initialize with config
+      const result = await adapter.initialize({
+        model: config?.model ?? 'whisper-tiny',
+        device: config?.device ?? 'wasm',
+        language: config?.language ?? 'en',
+        task: config?.task ?? 'transcribe',
+        dtype: config?.dtype ?? {
+          encoder_model: 'fp32',
+          decoder_model_merged: 'q4',
+        },
+        ...config
       });
 
-    } catch (err) {
+      if (!result.success) {
+        throw new Error('Failed to initialize STT');
+      }
+
+      adapterRef.current = adapter;
+
       setState(prev => ({
         ...prev,
-        modelStatus: 'error',
-        error: `STT initialization error: ${err}`
+        isInitialized: true,
+        error: null
       }));
-      console.error('[STT]', err);
-    }
-  }, [state.isInitialized, config.task, config.language]);
 
-  // Transcribe audio
-  const transcribe = useCallback(async (audioData: Float32Array) => {
-    if (!workerRef.current || state.modelStatus !== 'ready') {
-      console.error('[STT] Not ready to transcribe');
+      // Load the default model
+      const defaultModel = config?.model || 'whisper-tiny';
+      await loadModel(defaultModel);
+
+      console.log('[STT Adapter] Initialized successfully');
+    } catch (err) {
+      const error = `STT initialization error: ${err}`;
+      setState(prev => ({ ...prev, error }));
+      console.error('[STT Adapter]', error);
+    }
+  }, [state.isInitialized, config]);
+
+  // Load model
+  const loadModel = useCallback(async (modelId: string) => {
+    if (!adapterRef.current) {
+      console.warn('[STT Adapter] Adapter not initialized');
       return;
     }
 
-    setState(prev => ({
-      ...prev,
-      isTranscribing: true,
-      error: null
-    }));
+    try {
+      console.log('[STT Adapter] Loading model:', modelId);
+      setState(prev => ({ ...prev, isModelLoaded: false, error: null }));
+
+      const result = await adapterRef.current.loadModel(modelId);
+      if (!result.success) {
+        throw new Error(`Failed to load model: ${modelId}`);
+      }
+
+      // Check if model is actually loaded
+      const isLoaded = adapterRef.current.isModelLoaded();
+
+      setState(prev => ({
+        ...prev,
+        isModelLoaded: isLoaded,
+        modelLoadProgress: isLoaded ? 100 : prev.modelLoadProgress,
+        modelLoadMessage: isLoaded ? 'Model ready!' : prev.modelLoadMessage
+      }));
+
+      console.log('[STT Adapter] Model loaded successfully:', modelId);
+    } catch (err) {
+      const error = `Failed to load model: ${err}`;
+      setState(prev => ({ ...prev, error }));
+      console.error('[STT Adapter]', error);
+    }
+  }, []);
+
+  // Transcribe audio
+  const transcribe = useCallback(async (audio: Float32Array, options?: { language?: string; task?: 'transcribe' | 'translate' }) => {
+    if (!adapterRef.current || !state.isModelLoaded) {
+      console.warn('[STT Adapter] Adapter or model not ready');
+      return null;
+    }
 
     try {
-      workerRef.current.postMessage({
-        audio: audioData,
-        model: `Xenova/${modelRef.current}`,
-        dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-        gpu: false,
-        subtask: config.task || 'transcribe',
-        language: config.language || null
-      });
+      setState(prev => ({
+        ...prev,
+        isTranscribing: true,
+        error: null,
+        lastTranscription: null
+      }));
 
-      console.log('[STT] Transcribing audio...');
-    } catch (err) {
+      console.log('[STT Adapter] Starting transcription...', { audioLength: audio.length });
+
+      const result = await adapterRef.current.transcribe(audio, options);
+
+      if (!result.success) {
+        throw new Error('Transcription failed');
+      }
+
       setState(prev => ({
         ...prev,
         isTranscribing: false,
-        error: `Transcription error: ${err}`
+        lastTranscription: result.value
       }));
-      console.error('[STT]', err);
-    }
-  }, [state.modelStatus, config.task, config.language]);
 
-  // Transcribe from MediaStream
-  const transcribeStream = useCallback(async (stream: MediaStream) => {
-    if (!stream) {
-      console.error('[STT] No stream provided');
-      return;
-    }
+      console.log('[STT Adapter] Transcription completed:', result.value.text);
+      return result.value;
 
-    try {
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-
-      const audioChunks: Float32Array[] = [];
-
-      processor.onaudioprocess = (e) => {
-        const inputData = e.inputBuffer.getChannelData(0);
-        audioChunks.push(new Float32Array(inputData));
-      };
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-      // Record for 5 seconds (demo)
-      setTimeout(() => {
-        processor.disconnect();
-        source.disconnect();
-
-        // Concatenate audio chunks
-        const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
-        const audioData = new Float32Array(totalLength);
-        let offset = 0;
-        for (const chunk of audioChunks) {
-          audioData.set(chunk, offset);
-          offset += chunk.length;
-        }
-
-        // Transcribe the audio
-        transcribe(audioData);
-      }, 5000);
-
-      console.log('[STT] Recording audio for transcription...');
     } catch (err) {
+      const error = `Transcription error: ${err}`;
       setState(prev => ({
         ...prev,
-        error: `Stream transcription error: ${err}`
+        error,
+        isTranscribing: false
       }));
-      console.error('[STT]', err);
+      console.error('[STT Adapter]', error);
+      return null;
     }
-  }, [transcribe]);
+  }, [state.isModelLoaded]);
 
-  // Clear transcript
-  const clearTranscript = useCallback(() => {
-    setState(prev => ({ ...prev, transcript: '' }));
+  // Get available models
+  const getAvailableModels = useCallback((): ModelInfo[] => {
+    if (!adapterRef.current) return [];
+    return adapterRef.current.supportedModels;
+  }, []);
+
+  // Get loaded model
+  const getLoadedModel = useCallback(() => {
+    if (!adapterRef.current) return null;
+    return adapterRef.current.getLoadedModel();
+  }, []);
+
+  // Get metrics
+  const getMetrics = useCallback(() => {
+    if (!adapterRef.current) return null;
+    return adapterRef.current.getMetrics();
+  }, []);
+
+  // Clear last transcription
+  const clearTranscription = useCallback(() => {
+    setState(prev => ({ ...prev, lastTranscription: null }));
   }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (workerRef.current) {
-        workerRef.current.terminate();
-        workerRef.current = null;
+      if (adapterRef.current) {
+        adapterRef.current.destroy().catch(console.error);
+        adapterRef.current = null;
       }
     };
   }, []);
@@ -224,8 +211,11 @@ export function useSTT(config: STTConfig = {}) {
   return {
     ...state,
     initialize,
+    loadModel,
     transcribe,
-    transcribeStream,
-    clearTranscript,
+    getAvailableModels,
+    getLoadedModel,
+    getMetrics,
+    clearTranscription,
   };
 }

@@ -1,103 +1,252 @@
 /**
  * Whisper STT Web Worker
- * EXACT implementation based on whisper-web patterns
+ * Uses @huggingface/transformers with proper worker isolation to avoid bundle size issues
  */
 
-import { pipeline } from "@huggingface/transformers";
+import {
+    AutoTokenizer,
+    AutoProcessor,
+    WhisperForConditionalGeneration,
+    env,
+} from '@huggingface/transformers';
 
-// Define model factories - EXACT copy from whisper-web
-class PipelineFactory {
-    static task = null;
+// Configure environment for optimal loading
+env.allowLocalModels = false;
+env.backends.onnx.wasm.proxy = false;
+
+/**
+ * Singleton pipeline factory following transformers.js patterns
+ */
+class AutomaticSpeechRecognitionPipeline {
+    static model_id = null;
+    static tokenizer = null;
+    static processor = null;
     static model = null;
-    static dtype = null;
-    static gpu = false;
-    static instance = null;
+    static isInitialized = false;
 
-    static async getInstance(progress_callback = null) {
-        if (this.instance === null) {
-            this.instance = pipeline(this.task, this.model, {
-                dtype: this.dtype,
-                device: this.gpu ? "webgpu" : "wasm",
+    static async getInstance(model_id = 'onnx-community/whisper-tiny', dtype = null, device = 'wasm', progress_callback = null) {
+        // Check if we need to reload with different settings
+        if (this.model_id !== model_id || !this.isInitialized) {
+            this.model_id = model_id;
+
+            // Dispose previous instances
+            if (this.model) {
+                try {
+                    (await this.model).dispose();
+                } catch (e) {
+                    // Ignore disposal errors
+                }
+            }
+
+            // Reset instances
+            this.tokenizer = null;
+            this.processor = null;
+            this.model = null;
+            this.isInitialized = false;
+        }
+
+        // Load tokenizer
+        if (!this.tokenizer) {
+            this.tokenizer = AutoTokenizer.from_pretrained(this.model_id, {
                 progress_callback,
             });
         }
 
-        return this.instance;
-    }
-}
-
-class AutomaticSpeechRecognitionPipelineFactory extends PipelineFactory {
-    static task = "automatic-speech-recognition";
-    static model = null;
-    static dtype = null;
-    static gpu = false;
-}
-
-// Transcription function - EXACT copy from whisper-web
-const transcribe = async ({ audio, model, dtype, gpu, subtask, language }) => {
-    const isDistilWhisper = model.startsWith("distil-whisper/");
-
-    const p = AutomaticSpeechRecognitionPipelineFactory;
-    if (p.model !== model || p.dtype !== dtype || p.gpu !== gpu) {
-        // Invalidate model if different model, dtype, or gpu setting
-        p.model = model;
-        p.dtype = dtype;
-        p.gpu = gpu;
-
-        if (p.instance !== null) {
-            (await p.getInstance()).dispose();
-            p.instance = null;
+        // Load processor
+        if (!this.processor) {
+            this.processor = AutoProcessor.from_pretrained(this.model_id, {
+                progress_callback,
+            });
         }
+
+        // Load model
+        if (!this.model) {
+            const modelDtype = dtype || {
+                encoder_model: 'fp32',
+                decoder_model_merged: 'q4',
+            };
+
+            this.model = WhisperForConditionalGeneration.from_pretrained(this.model_id, {
+                dtype: modelDtype,
+                device: device as any, // Type assertion for device compatibility
+                progress_callback,
+            });
+        }
+
+        const [tokenizer, processor, model] = await Promise.all([
+            this.tokenizer,
+            this.processor,
+            this.model
+        ]);
+
+        this.isInitialized = true;
+        return { tokenizer, processor, model };
+    }
+}
+
+// Track processing state
+let isProcessing = false;
+
+/**
+ * Load model and warm up
+ */
+async function loadModel({ model_id, dtype, device }) {
+    try {
+        self.postMessage({ status: 'loading', message: 'Initializing Whisper model...' });
+
+        const { tokenizer, processor, model } = await AutomaticSpeechRecognitionPipeline.getInstance(
+            model_id,
+            dtype,
+            device,
+            (progress) => {
+                self.postMessage({
+                    status: 'progress',
+                    ...progress
+                });
+            }
+        );
+
+        self.postMessage({ status: 'loading', message: 'Warming up model...' });
+
+        // Warm up with dummy input (smaller for faster init)
+        const dummyInput = new Float32Array(16000).fill(0); // 1 second of silence
+        const inputs = await processor(dummyInput);
+        await model.generate({
+            ...inputs,
+            max_new_tokens: 1,
+        });
+
+        self.postMessage({ status: 'ready', message: 'Whisper model ready!' });
+    } catch (error) {
+        console.error('Failed to load model:', error);
+        self.postMessage({
+            status: 'error',
+            message: `Failed to load model: ${error.message}`,
+            error: error
+        });
+    }
+}
+
+/**
+ * Transcribe audio
+ */
+async function transcribeAudio({ audio, model_id, language, task }) {
+    if (isProcessing) {
+        self.postMessage({
+            status: 'error',
+            message: 'Already processing another request'
+        });
+        return;
     }
 
-    // Load transcriber model
-    const transcriber = await p.getInstance((data) => {
-        self.postMessage(data);
-    });
+    try {
+        isProcessing = true;
+        self.postMessage({ status: 'transcribing', message: 'Processing audio...' });
 
-    const chunk_length_s = isDistilWhisper ? 20 : 30;
-    const stride_length_s = isDistilWhisper ? 3 : 5;
+        const { tokenizer, processor, model } = await AutomaticSpeechRecognitionPipeline.getInstance(model_id);
 
-    // Actually run transcription - simplified version
-    const output = await transcriber(audio, {
-        // Greedy
-        top_k: 0,
-        do_sample: false,
+        // Process audio input
+        const inputs = await processor(audio);
 
-        // Sliding window
-        chunk_length_s,
-        stride_length_s,
-
-        // Language and task
-        language,
-        task: subtask,
-
-        // Return timestamps
-        return_timestamps: true,
-        force_full_sequences: false,
-    }).catch((error) => {
-        console.error(error);
-        self.postMessage({
-            status: "error",
-            data: error,
+        // Generate transcription
+        const generated_ids = await model.generate({
+            ...inputs,
+            max_new_tokens: 448, // Standard max for Whisper
+            language: language,
+            task: task || 'transcribe',
+            return_timestamps: true,
         });
-        return null;
-    });
 
-    return output;
-};
+        // Decode the generated tokens
+        const transcription = tokenizer.batch_decode(generated_ids, {
+            skip_special_tokens: true
+        });
 
-// Worker message handling - EXACT copy from whisper-web
-self.addEventListener("message", async (event) => {
-    const message = event.data;
+        // Format result
+        const result = {
+            text: transcription[0] || '',
+            language: language || 'en',
+            confidence: 0.95, // Placeholder - Whisper doesn't provide confidence directly
+            chunks: [], // Could be populated with timestamps if needed
+        };
 
-    // Do transcription
-    let transcript = await transcribe(message);
-    if (transcript === null) return;
+        self.postMessage({
+            status: 'complete',
+            data: result
+        });
 
-    // Send the result back to the main thread
-    self.postMessage({
-        status: "complete",
-        data: transcript,
-    });
+    } catch (error) {
+        console.error('Transcription error:', error);
+        self.postMessage({
+            status: 'error',
+            message: `Transcription failed: ${error.message}`,
+            error: error
+        });
+    } finally {
+        isProcessing = false;
+    }
+}
+
+// Worker message handler
+self.addEventListener('message', async (event) => {
+    const { type, data } = event.data;
+
+    switch (type) {
+        case 'load':
+            await loadModel(data || {
+                model_id: 'onnx-community/whisper-tiny',
+                dtype: {
+                    encoder_model: 'fp32',
+                    decoder_model_merged: 'q4',
+                },
+                device: 'wasm'
+            });
+            break;
+
+        case 'transcribe':
+            await transcribeAudio({
+                audio: data.audio,
+                model_id: data.model_id || 'onnx-community/whisper-tiny',
+                language: data.language,
+                task: data.task || 'transcribe'
+            });
+            break;
+
+        case 'dispose':
+            // Clean up resources
+            if (AutomaticSpeechRecognitionPipeline.model) {
+                try {
+                    (await AutomaticSpeechRecognitionPipeline.model).dispose();
+                } catch (e) {
+                    // Ignore disposal errors
+                }
+            }
+            AutomaticSpeechRecognitionPipeline.tokenizer = null;
+            AutomaticSpeechRecognitionPipeline.processor = null;
+            AutomaticSpeechRecognitionPipeline.model = null;
+            AutomaticSpeechRecognitionPipeline.isInitialized = false;
+            self.postMessage({ status: 'disposed' });
+            break;
+
+        default:
+            self.postMessage({
+                status: 'error',
+                message: `Unknown message type: ${type}`
+            });
+            break;
+    }
 });
+
+// Handle worker errors
+self.addEventListener('error', (error) => {
+    console.error('Worker error:', error);
+    self.postMessage({
+        status: 'error',
+        message: `Worker error: ${error.message}`,
+        error: error
+    });
+    isProcessing = false;
+});
+
+// Signal that worker is ready
+self.postMessage({ status: 'worker_ready', message: 'Whisper worker initialized' });

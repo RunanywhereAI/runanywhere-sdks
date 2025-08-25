@@ -20,6 +20,12 @@ export default defineConfig({
           '@runanywhere/core': 'RunAnywhereCore',
           '@xenova/transformers': 'Transformers',
           'eventemitter3': 'EventEmitter3'
+        },
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name === 'worker.js') {
+            return 'worker.js';
+          }
+          return '[name].[ext]';
         }
       }
     },
@@ -27,5 +33,11 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     minify: 'terser'
+  },
+  worker: {
+    format: 'es',
+    rollupOptions: {
+      external: ['@xenova/transformers']
+    }
   }
 });

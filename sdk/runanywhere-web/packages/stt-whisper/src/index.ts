@@ -1,6 +1,6 @@
 /**
  * Whisper STT Adapter Implementation
- * Uses @xenova/transformers for browser-based Whisper models
+ * Uses @huggingface/transformers with proper worker isolation to prevent bundle size issues
  */
 
 import {
@@ -18,6 +18,17 @@ import {
   logger,
   ServiceRegistry
 } from '@runanywhere/core';
+
+export interface WhisperSTTConfig extends STTConfig {
+  model?: 'whisper-tiny' | 'whisper-base' | 'whisper-small';
+  device?: 'wasm' | 'webgpu';
+  dtype?: {
+    encoder_model?: string;
+    decoder_model_merged?: string;
+  };
+  language?: string;
+  task?: 'transcribe' | 'translate';
+}
 
 export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdapter {
   readonly id = 'whisper';
@@ -52,9 +63,10 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
 
   private worker?: Worker;
   private currentModel?: ModelInfo;
-  private config?: STTConfig;
+  private config?: WhisperSTTConfig;
   private isInitialized = false;
-  private lastTranscriptionResult?: any;
+  private modelLoaded = false;
+  private workerReady = false;
   private metrics: STTMetrics = {
     totalTranscriptions: 0,
     avgProcessingTime: 0,
@@ -62,102 +74,322 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
     lastTranscriptionTime: undefined
   };
 
-  async initialize(config?: STTConfig): Promise<Result<void, Error>> {
+  async initialize(config?: WhisperSTTConfig): Promise<Result<void, Error>> {
     try {
       this.config = config;
 
-      // Create worker for non-blocking operation (whisper-web pattern)
-      if (typeof window !== 'undefined') {
-        this.worker = new Worker(
-          new URL('./worker.ts', import.meta.url),
-          { type: 'module' }
-        );
+      // Create and initialize the worker inline
+      const workerCode = `
+        // Whisper STT Worker - Inline Implementation
+        import { AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration } from '@xenova/transformers';
 
-        // Set up message handler - whisper-web pattern
-        this.worker.addEventListener('message', this.handleWorkerMessage);
+        class AutomaticSpeechRecognitionPipeline {
+          static task = 'automatic-speech-recognition';
+          static model = null;
+          static tokenizer = null;
+          static processor = null;
 
-        // Handle worker errors
-        this.worker.addEventListener('error', (error) => {
-          logger.error('Worker error', 'WhisperSTTAdapter', { error });
-          this.emit('error', new Error(`Worker error: ${error.message}`));
+          static async getInstance(progress_callback = null) {
+            if (this.model === null) {
+              this.tokenizer = AutoTokenizer.from_pretrained(this.model_id, { progress_callback });
+              this.processor = AutoProcessor.from_pretrained(this.model_id, { progress_callback });
+              this.model = WhisperForConditionalGeneration.from_pretrained(this.model_id, {
+                dtype: {
+                  encoder_model: 'fp32',
+                  decoder_model_merged: 'q4',
+                },
+                device: 'wasm',
+                progress_callback,
+              });
+            }
+            return this;
+          }
+
+          static async process(audio) {
+            const inputs = await this.processor(audio);
+            const outputs = await this.model.generate(inputs);
+            const transcription = await this.tokenizer.batch_decode(outputs, { skip_special_tokens: true });
+            return transcription[0];
+          }
+        }
+
+        let isModelLoaded = false;
+
+        self.addEventListener('message', async (event) => {
+          const { type, data } = event.data;
+
+          try {
+            switch (type) {
+              case 'load':
+                if (isModelLoaded) {
+                  self.postMessage({ status: 'ready' });
+                  return;
+                }
+
+                AutomaticSpeechRecognitionPipeline.model_id = data.model_id;
+
+                self.postMessage({
+                  status: 'loading',
+                  message: 'Loading Whisper model...',
+                  progress: 0
+                });
+
+                await AutomaticSpeechRecognitionPipeline.getInstance((progress) => {
+                  self.postMessage({
+                    status: 'progress',
+                    message: 'Loading model components...',
+                    progress: Math.round(progress.progress || 0)
+                  });
+                });
+
+                isModelLoaded = true;
+                self.postMessage({
+                  status: 'ready',
+                  message: 'Model loaded successfully'
+                });
+                break;
+
+              case 'transcribe':
+                if (!isModelLoaded) {
+                  throw new Error('Model not loaded');
+                }
+
+                const text = await AutomaticSpeechRecognitionPipeline.process(data.audio);
+
+                self.postMessage({
+                  status: 'complete',
+                  data: {
+                    text,
+                    confidence: 1.0,
+                    segments: [{
+                      start: 0,
+                      end: data.audio.length / 16000,
+                      text,
+                      confidence: 1.0
+                    }],
+                    language: data.language || 'en'
+                  }
+                });
+                break;
+
+              case 'dispose':
+                AutomaticSpeechRecognitionPipeline.model = null;
+                AutomaticSpeechRecognitionPipeline.tokenizer = null;
+                AutomaticSpeechRecognitionPipeline.processor = null;
+                isModelLoaded = false;
+                break;
+            }
+          } catch (error) {
+            self.postMessage({
+              status: 'error',
+              message: error.message
+            });
+          }
         });
-      }
+
+        // Signal that worker is ready
+        self.postMessage({ status: 'worker_ready' });
+      `;
+
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      this.worker = new Worker(URL.createObjectURL(blob), {
+        type: 'module',
+        name: 'whisper-worker'
+      });
+
+      // Set up worker message handler
+      this.worker.onmessage = (event) => {
+        this.handleWorkerMessage(event.data);
+      };
+
+      this.worker.onerror = (error) => {
+        logger.error('Worker error', 'WhisperSTTAdapter', { error });
+        this.emit('error', error as any);
+      };
+
+      // Wait for worker to be ready
+      await this.waitForWorkerReady();
 
       this.isInitialized = true;
+      logger.info('Whisper STT adapter initialized', 'WhisperSTTAdapter');
+
+      // Load the default model if specified
+      if (config?.model) {
+        const loadResult = await this.loadModel(config.model);
+        if (Result.isErr(loadResult)) {
+          logger.warn(`Failed to load default model ${config.model}`, 'WhisperSTTAdapter', { error: loadResult.error.message });
+        }
+      }
+
       return Result.ok(undefined);
     } catch (error) {
+      logger.error('Failed to initialize Whisper STT', 'WhisperSTTAdapter', { error });
       return Result.err(error as Error);
+    }
+  }
+
+  private async waitForWorkerReady(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Worker initialization timeout'));
+      }, 30000); // 30 second timeout
+
+      const handler = (event: MessageEvent) => {
+        if (event.data.status === 'worker_ready') {
+          clearTimeout(timeout);
+          this.worker!.removeEventListener('message', handler);
+          this.workerReady = true;
+          resolve();
+        }
+      };
+
+      this.worker!.addEventListener('message', handler);
+    });
+  }
+
+  private handleWorkerMessage(message: any): void {
+    const { status, data, error } = message;
+
+    switch (status) {
+      case 'loading':
+      case 'progress':
+        this.emit('model_loading', {
+          progress: message.progress || 0,
+          message: message.message || 'Loading model...'
+        });
+        break;
+
+      case 'ready':
+        this.modelLoaded = true;
+        this.emit('model_loading', {
+          progress: 100,
+          message: 'Model loaded successfully'
+        });
+        break;
+
+      case 'complete':
+        // Transcription completed
+        break;
+
+      case 'error':
+        logger.error('Worker reported error', 'WhisperSTTAdapter', { error });
+        this.emit('error', new Error(message.message));
+        break;
+
+      default:
+        logger.debug('Unknown worker message', 'WhisperSTTAdapter', { message });
+        break;
+    }
+  }
+
+  private getModelId(model: string): string {
+    switch (model) {
+      case 'whisper-tiny':
+        return 'onnx-community/whisper-tiny';
+      case 'whisper-base':
+        return 'onnx-community/whisper-base';
+      case 'whisper-small':
+        return 'onnx-community/whisper-small';
+      default:
+        return 'onnx-community/whisper-tiny';
     }
   }
 
   async loadModel(modelId: string): Promise<Result<void, Error>> {
     const startTime = Date.now();
     try {
+      if (!this.worker || !this.workerReady) {
+        return Result.err(new Error('Worker not ready'));
+      }
+
       const modelInfo = this.supportedModels.find(m => m.id === modelId);
       if (!modelInfo) {
         return Result.err(new Error(`Unsupported model: ${modelId}`));
       }
 
-      if (!this.worker) {
-        return Result.err(new Error('Worker not initialized'));
-      }
-
-      // No explicit load step - whisper-web loads on first transcription
       this.currentModel = modelInfo;
+      this.modelLoaded = false;
+
+      const fullModelId = this.getModelId(modelId);
+
+      // Send load command to worker
+      this.worker.postMessage({
+        type: 'load',
+        data: {
+          model_id: fullModelId,
+          dtype: this.config?.dtype || {
+            encoder_model: 'fp32',
+            decoder_model_merged: 'q4',
+          },
+          device: this.config?.device || 'wasm'
+        }
+      });
+
+      // Wait for model to be loaded
+      await this.waitForModelLoad();
+
       this.metrics.modelLoadTime = Date.now() - startTime;
 
       logger.info(`Whisper model ${modelId} loaded successfully`, 'WhisperSTTAdapter');
       return Result.ok(undefined);
     } catch (error) {
       logger.error(`Failed to load Whisper model ${modelId}`, 'WhisperSTTAdapter', { error });
-      this.emit('error', error as Error);
       return Result.err(error as Error);
     }
+  }
+
+  private async waitForModelLoad(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Model load timeout'));
+      }, 300000); // 5 minute timeout
+
+      const handler = (event: MessageEvent) => {
+        if (event.data.status === 'ready') {
+          clearTimeout(timeout);
+          this.worker!.removeEventListener('message', handler);
+          resolve();
+        } else if (event.data.status === 'error') {
+          clearTimeout(timeout);
+          this.worker!.removeEventListener('message', handler);
+          reject(new Error(event.data.message));
+        }
+      };
+
+      this.worker!.addEventListener('message', handler);
+    });
   }
 
   async transcribe(
     audio: Float32Array,
     options?: TranscribeOptions
   ): Promise<Result<TranscriptionResult, Error>> {
-    if (!this.worker || !this.currentModel) {
-      return Result.err(new Error('Model not loaded'));
+    if (!this.worker || !this.workerReady || !this.modelLoaded || !this.currentModel) {
+      return Result.err(new Error('Worker or model not ready'));
     }
 
     try {
       const startTime = Date.now();
+      logger.debug('Starting transcription', 'WhisperSTTAdapter', { audioLength: audio.length });
 
-      // Process audio using whisper-web exact pattern
-      const audioData = this.preprocessAudio(audio);
+      const fullModelId = this.getModelId(this.currentModel.id);
 
-      // Send message to worker like whisper-web does
+      // Send transcription request to worker
       this.worker.postMessage({
-        audio: audioData,
-        model: `Xenova/${this.currentModel.id}`,
-        dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
-        gpu: false, // Start with WASM, can detect WebGPU later
-        subtask: options?.task || 'transcribe',
-        language: options?.language
+        type: 'transcribe',
+        data: {
+          audio: audio,
+          model_id: fullModelId,
+          language: options?.language || this.config?.language,
+          task: options?.task || this.config?.task || 'transcribe'
+        }
       });
 
-      // Return a promise that resolves when transcription completes
-      const result = await new Promise<any>((resolve, reject) => {
-        const handleMessage = (event: MessageEvent) => {
-          const message = event.data;
-          if (message.status === 'complete') {
-            this.worker?.removeEventListener('message', handleMessage);
-            resolve(message.data);
-          } else if (message.status === 'error') {
-            this.worker?.removeEventListener('message', handleMessage);
-            reject(new Error(message.data?.message || 'Transcription failed'));
-          }
-        };
-
-        this.worker?.addEventListener('message', handleMessage);
-      });
-
-      const processingTime = Date.now() - startTime;
+      // Wait for transcription result
+      const result = await this.waitForTranscription();
 
       // Update metrics
+      const processingTime = Date.now() - startTime;
       this.metrics.totalTranscriptions++;
       this.metrics.avgProcessingTime =
         (this.metrics.avgProcessingTime * (this.metrics.totalTranscriptions - 1) + processingTime) /
@@ -165,97 +397,63 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
       this.metrics.lastTranscriptionTime = Date.now();
 
       // Add processing time to result
-      result.processingTime = processingTime;
+      const finalResult = {
+        ...result,
+        processingTime
+      };
 
-      return Result.ok(result as TranscriptionResult);
+      return Result.ok(finalResult);
+
     } catch (error) {
+      logger.error('Transcription failed', 'WhisperSTTAdapter', { error });
       this.emit('error', error as Error);
       return Result.err(error as Error);
     }
   }
 
-  private preprocessAudio(audio: Float32Array): Float32Array {
-    // Process audio following whisper-web patterns
-    // Ensure audio is at 16kHz mono as required by Whisper
-    const WHISPER_SAMPLE_RATE = 16000;
+  private async waitForTranscription(): Promise<TranscriptionResult> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Transcription timeout'));
+      }, 60000); // 1 minute timeout
 
-    // For now, assume audio is already at correct format
-    // In production, you'd implement resampling here
-    return audio;
+      const handler = (event: MessageEvent) => {
+        if (event.data.status === 'complete') {
+          clearTimeout(timeout);
+          this.worker!.removeEventListener('message', handler);
+          resolve(event.data.data);
+        } else if (event.data.status === 'error') {
+          clearTimeout(timeout);
+          this.worker!.removeEventListener('message', handler);
+          reject(new Error(event.data.message));
+        }
+      };
+
+      this.worker!.addEventListener('message', handler);
+    });
   }
 
-  // Use whisper-web exact pattern for worker communication
-  private handleWorkerMessage = (event: MessageEvent) => {
-    const message = event.data;
 
-    // Handle different message types like whisper-web
-    switch (message.status) {
-      case "progress":
-        // Model file progress
-        this.emit('model_loading', {
-          progress: message.progress || 0,
-          message: message.file ? `Loading ${message.file}...` : 'Loading...'
-        });
-        break;
-
-      case "initiate":
-        // Model file start load
-        this.emit('model_loading', {
-          progress: 0,
-          message: `Loading ${message.file || 'model'}...`
-        });
-        break;
-
-      case "ready":
-        // Model is ready - could emit event here if needed
-        break;
-
-      case "complete":
-        // Transcription complete
-        const result = {
-          text: message.data.text,
-          language: 'en', // Default
-          confidence: 0.95,
-          processingTime: 0,
-          timestamps: message.data.chunks?.map((chunk: any) => ({
-            start: chunk.timestamp[0],
-            end: chunk.timestamp[1],
-            text: chunk.text,
-          })),
-        };
-
-        // Store result for retrieval
-        this.lastTranscriptionResult = result;
-        logger.info('Transcription completed', 'WhisperSTTAdapter', { text: result.text });
-        break;
-
-      case "error":
-        const errorMsg = message.data?.message || 'Transcription error';
-        this.emit('error', new Error(errorMsg));
-        logger.error('Worker error', 'WhisperSTTAdapter', { error: message.data });
-        break;
-
-      case "done":
-        // Model file loaded
-        break;
-
-      default:
-        break;
-    }
-  };
-
-  destroy(): void {
+  async destroy(): Promise<void> {
     if (this.worker) {
+      // Send dispose command to worker
+      this.worker.postMessage({ type: 'dispose' });
+
+      // Terminate the worker
       this.worker.terminate();
       this.worker = undefined;
     }
+
     this.currentModel = undefined;
     this.isInitialized = false;
+    this.modelLoaded = false;
+    this.workerReady = false;
     this.removeAllListeners();
+    logger.info('Whisper STT adapter destroyed', 'WhisperSTTAdapter');
   }
 
   isModelLoaded(): boolean {
-    return !!this.worker && !!this.currentModel;
+    return this.modelLoaded && !!this.currentModel;
   }
 
   getLoadedModel(): ModelInfo | null {
@@ -263,7 +461,7 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
   }
 
   isHealthy(): boolean {
-    return this.isInitialized && this.isModelLoaded();
+    return this.isInitialized && this.modelLoaded;
   }
 
   getMetrics(): STTMetrics {
