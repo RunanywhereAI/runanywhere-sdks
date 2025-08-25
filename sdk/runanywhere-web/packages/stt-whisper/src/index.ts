@@ -78,121 +78,10 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
     try {
       this.config = config;
 
-      // Create and initialize the worker inline
-      const workerCode = `
-        // Whisper STT Worker - Inline Implementation
-        import { AutoTokenizer, AutoProcessor, WhisperForConditionalGeneration } from '@xenova/transformers';
-
-        class AutomaticSpeechRecognitionPipeline {
-          static task = 'automatic-speech-recognition';
-          static model = null;
-          static tokenizer = null;
-          static processor = null;
-
-          static async getInstance(progress_callback = null) {
-            if (this.model === null) {
-              this.tokenizer = AutoTokenizer.from_pretrained(this.model_id, { progress_callback });
-              this.processor = AutoProcessor.from_pretrained(this.model_id, { progress_callback });
-              this.model = WhisperForConditionalGeneration.from_pretrained(this.model_id, {
-                dtype: {
-                  encoder_model: 'fp32',
-                  decoder_model_merged: 'q4',
-                },
-                device: 'wasm',
-                progress_callback,
-              });
-            }
-            return this;
-          }
-
-          static async process(audio) {
-            const inputs = await this.processor(audio);
-            const outputs = await this.model.generate(inputs);
-            const transcription = await this.tokenizer.batch_decode(outputs, { skip_special_tokens: true });
-            return transcription[0];
-          }
-        }
-
-        let isModelLoaded = false;
-
-        self.addEventListener('message', async (event) => {
-          const { type, data } = event.data;
-
-          try {
-            switch (type) {
-              case 'load':
-                if (isModelLoaded) {
-                  self.postMessage({ status: 'ready' });
-                  return;
-                }
-
-                AutomaticSpeechRecognitionPipeline.model_id = data.model_id;
-
-                self.postMessage({
-                  status: 'loading',
-                  message: 'Loading Whisper model...',
-                  progress: 0
-                });
-
-                await AutomaticSpeechRecognitionPipeline.getInstance((progress) => {
-                  self.postMessage({
-                    status: 'progress',
-                    message: 'Loading model components...',
-                    progress: Math.round(progress.progress || 0)
-                  });
-                });
-
-                isModelLoaded = true;
-                self.postMessage({
-                  status: 'ready',
-                  message: 'Model loaded successfully'
-                });
-                break;
-
-              case 'transcribe':
-                if (!isModelLoaded) {
-                  throw new Error('Model not loaded');
-                }
-
-                const text = await AutomaticSpeechRecognitionPipeline.process(data.audio);
-
-                self.postMessage({
-                  status: 'complete',
-                  data: {
-                    text,
-                    confidence: 1.0,
-                    segments: [{
-                      start: 0,
-                      end: data.audio.length / 16000,
-                      text,
-                      confidence: 1.0
-                    }],
-                    language: data.language || 'en'
-                  }
-                });
-                break;
-
-              case 'dispose':
-                AutomaticSpeechRecognitionPipeline.model = null;
-                AutomaticSpeechRecognitionPipeline.tokenizer = null;
-                AutomaticSpeechRecognitionPipeline.processor = null;
-                isModelLoaded = false;
-                break;
-            }
-          } catch (error) {
-            self.postMessage({
-              status: 'error',
-              message: error.message
-            });
-          }
-        });
-
-        // Signal that worker is ready
-        self.postMessage({ status: 'worker_ready' });
-      `;
-
-      const blob = new Blob([workerCode], { type: 'application/javascript' });
-      this.worker = new Worker(URL.createObjectURL(blob), {
+      // Create worker from public URL that Next.js can serve
+      // In production, this would need to be configured based on the app's public path
+      const workerUrl = '/stt-worker.js';
+      this.worker = new Worker(workerUrl, {
         type: 'module',
         name: 'whisper-worker'
       });
@@ -313,14 +202,12 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
       const fullModelId = this.getModelId(modelId);
 
       // Send load command to worker
+      // Use simple dtype string like whisper-web does
       this.worker.postMessage({
         type: 'load',
         data: {
           model_id: fullModelId,
-          dtype: this.config?.dtype || {
-            encoder_model: 'fp32',
-            decoder_model_merged: 'q4',
-          },
+          dtype: this.config?.dtype || 'q8',  // Use simple string dtype
           device: this.config?.device || 'wasm'
         }
       });
@@ -375,6 +262,7 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
       const fullModelId = this.getModelId(this.currentModel.id);
 
       // Send transcription request to worker
+      // Pass Float32Array directly - it will be cloned automatically
       this.worker.postMessage({
         type: 'transcribe',
         data: {

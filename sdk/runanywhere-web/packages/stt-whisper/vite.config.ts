@@ -12,32 +12,27 @@ export default defineConfig({
     rollupOptions: {
       external: [
         '@runanywhere/core',
-        '@xenova/transformers',
         'eventemitter3'
       ],
       output: {
         globals: {
           '@runanywhere/core': 'RunAnywhereCore',
-          '@xenova/transformers': 'Transformers',
           'eventemitter3': 'EventEmitter3'
-        },
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name === 'worker.js') {
-            return 'worker.js';
-          }
-          return '[name].[ext]';
         }
       }
     },
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: false,
     sourcemap: true,
-    minify: 'terser'
+    minify: false // Disable minification for better debugging
   },
   worker: {
     format: 'es',
     rollupOptions: {
-      external: ['@xenova/transformers']
+      external: []
     }
+  },
+  optimizeDeps: {
+    include: ['@huggingface/transformers']
   }
 });

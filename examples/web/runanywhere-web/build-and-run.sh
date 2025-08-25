@@ -82,7 +82,7 @@ show_help() {
     echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo ""
     echo "Commands:"
-    echo "  build-sdk           Build only the SDK packages"
+    echo "  build-sdk           Build only the SDK packages (includes workers)"
     echo "  build-app           Build only the web application"
     echo "  run                 Build SDK + app and run (default)"
     echo "  dev                 Start development server without building"
@@ -98,12 +98,22 @@ show_help() {
     echo "  --install-deps      Install missing web app dependencies"
     echo "  --help              Show this help message"
     echo ""
+    echo "Build Process:"
+    echo "  1. Cleans dist directories when --clean is used"
+    echo "  2. Builds all SDK packages with TypeScript declarations"
+    echo "  3. Special handling for stt-whisper:"
+    echo "     - Builds main package with TypeScript"
+    echo "     - Builds stt.worker.ts separately with Vite"
+    echo "     - Bundles transformers.js (~57MB) into worker"
+    echo "     - Copies worker to public/stt-worker.js"
+    echo "  4. Verifies critical files are created"
+    echo ""
     echo "Examples:"
-    echo "  $0                  # Full fast build and run"
-    echo "  $0 build-sdk        # Build only SDK"
-    echo "  $0 run --test-stt   # Build and run with STT test"
-    echo "  $0 dev --test-vad   # Just start dev server with VAD test"
-    echo "  $0 --detailed       # Detailed build and run"
+    echo "  $0                      # Full fast build and run"
+    echo "  $0 build-sdk --clean    # Clean and rebuild SDK only"
+    echo "  $0 run --test-stt       # Build and run with STT test"
+    echo "  $0 dev --test-vad       # Just start dev server with VAD test"
+    echo "  $0 --detailed --clean   # Clean build with detailed output"
     echo ""
 }
 
@@ -159,6 +169,7 @@ done
 # Get the script directory and SDK root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_ROOT="$(cd "$SCRIPT_DIR/../../../sdk/runanywhere-web" && pwd)"
+APP_ROOT="$SCRIPT_DIR"
 
 # Function to run command with output control
 run_command() {
@@ -289,16 +300,47 @@ fast_build_sdk() {
         # Build adapter packages with proper TypeScript declarations
         for pkg in vad-silero stt-whisper llm-openai tts-webspeech; do
             if [ -d "packages/$pkg" ]; then
-                cd "packages/$pkg"
-                # Always generate TypeScript declarations first
-                npx tsc --emitDeclarationOnly || true
-                npm run build:bundle || true
-                cd "$SDK_ROOT"
+                echo "Building declarations and bundle for $pkg..."
+
+                # Special handling for stt-whisper - clean and build with worker
+                if [ "$pkg" = "stt-whisper" ]; then
+                    cd "packages/$pkg"
+                    echo "Cleaning STT build directory..."
+                    rm -rf dist
+
+                    # Build the main package
+                    pnpm build
+
+                    # Build the worker separately using Vite
+                    echo "Building STT worker with Vite..."
+                    npx vite build --config vite.config.worker.ts
+
+                    # Find and copy the built worker
+                    WORKER_FILE="dist/stt.worker.js"
+                    if [ -f "$WORKER_FILE" ]; then
+                        cp "$WORKER_FILE" "${APP_ROOT}/public/stt-worker.js"
+                        echo "STT worker copied to public directory"
+                    else
+                        echo "Warning: STT worker build failed"
+                    fi
+                    cd "$SDK_ROOT"
+                else
+                    pnpm --filter "@runanywhere/$pkg" build
+                fi
             fi
         done
 
-        # Build remaining packages
-        pnpm build:packages
+        # Build remaining packages (excluding adapter packages and react which comes last)
+        pnpm --filter '@runanywhere/cache' build
+        pnpm --filter '@runanywhere/workers' build
+        pnpm --filter '@runanywhere/monitoring' build
+        pnpm --filter '@runanywhere/llm' build
+        pnpm --filter '@runanywhere/transcription' build
+        pnpm --filter '@runanywhere/tts' build
+        pnpm --filter '@runanywhere/voice' build
+
+        # Build react package last after adapter packages have declarations
+        pnpm --filter '@runanywhere/react' build
     else
         # Build core packages first
         pnpm build:core > /dev/null 2>&1
@@ -306,16 +348,41 @@ fast_build_sdk() {
         # Build adapter packages with proper TypeScript declarations
         for pkg in vad-silero stt-whisper llm-openai tts-webspeech; do
             if [ -d "packages/$pkg" ]; then
-                cd "packages/$pkg"
-                # Always generate TypeScript declarations first
-                npx tsc --emitDeclarationOnly > /dev/null 2>&1 || true
-                npm run build:bundle > /dev/null 2>&1 || true
-                cd "$SDK_ROOT"
+                echo "Building $pkg..." >&2
+
+                # Special handling for stt-whisper - clean and build with worker
+                if [ "$pkg" = "stt-whisper" ]; then
+                    cd "packages/$pkg"
+                    rm -rf dist > /dev/null 2>&1
+                    pnpm build > /dev/null 2>&1
+
+                    # Build the worker
+                    npx vite build --config vite.config.worker.ts > /dev/null 2>&1
+
+                    # Copy the built worker
+                    WORKER_FILE="dist/stt.worker.js"
+                    if [ -f "$WORKER_FILE" ]; then
+                        cp "$WORKER_FILE" "$APP_ROOT/public/stt-worker.js" > /dev/null 2>&1
+                        echo "STT worker built and deployed" >&2
+                    fi
+                    cd "$SDK_ROOT"
+                else
+                    pnpm --filter "@runanywhere/$pkg" build > /dev/null 2>&1
+                fi
             fi
         done
 
-        # Build remaining packages
-        pnpm build:packages > /dev/null 2>&1
+        # Build remaining packages (excluding adapter packages and react which comes last)
+        pnpm --filter '@runanywhere/cache' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/workers' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/monitoring' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/llm' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/transcription' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/tts' build > /dev/null 2>&1
+        pnpm --filter '@runanywhere/voice' build > /dev/null 2>&1
+
+        # Build react package last after adapter packages have declarations
+        pnpm --filter '@runanywhere/react' build > /dev/null 2>&1
     fi
 
     print_success "Fast build completed"
@@ -378,6 +445,17 @@ build_sdk_packages() {
     print_status "Building RunAnywhere Web SDK..."
     cd "$SDK_ROOT"
 
+    # Clean build directories if requested
+    if [ "$CLEAN" = true ]; then
+        print_status "Cleaning build directories..."
+        # Clean all dist directories in SDK packages
+        find packages -type d -name "dist" -exec rm -rf {} + 2>/dev/null || true
+        # Clean worker files from public directory
+        rm -f "$APP_ROOT/public/stt-worker.js" 2>/dev/null || true
+        rm -f "$APP_ROOT/public/vad-worker.js" 2>/dev/null || true
+        print_success "Build directories cleaned"
+    fi
+
     # Install dependencies first
     run_command "pnpm install" "Installing SDK dependencies"
 
@@ -394,6 +472,13 @@ build_sdk_packages() {
             exit 1
             ;;
     esac
+
+    # Verify critical files were built
+    if [ ! -f "$APP_ROOT/public/stt-worker.js" ]; then
+        print_warning "STT worker not found. Speech-to-text may not work."
+    else
+        print_success "STT worker built and deployed successfully"
+    fi
 
     print_success "SDK packages built successfully!"
 }
