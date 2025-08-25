@@ -10,8 +10,14 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
-    }
+    },
+    "./worker": "./dist/vad.worker.js",
+    "./assets/*": "./dist/assets/*"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "npm run build:types && npm run build:bundle",
     "build:types": "tsc --emitDeclarationOnly",

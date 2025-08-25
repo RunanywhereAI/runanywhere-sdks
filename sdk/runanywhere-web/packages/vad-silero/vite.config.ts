@@ -24,7 +24,7 @@ export default defineConfig({
       }
     },
     outDir: 'dist',
-    emptyOutDir: true,
+    emptyOutDir: false, // Don't empty since we have assets
     sourcemap: true,
     minify: 'terser'
   }

@@ -1,9 +1,8 @@
 /**
  * Silero VAD Adapter Implementation
- * Wraps @ricky0123/vad-web for voice activity detection
+ * Uses @ricky0123/vad-web library directly
  */
 
-import type { MicVAD } from '@ricky0123/vad-web';
 import {
   BaseAdapter,
   type VADAdapter,
@@ -16,12 +15,22 @@ import {
   ServiceRegistry
 } from '@runanywhere/core';
 
+// Import the actual VAD library
+import { MicVAD, type RealTimeVADOptions } from '@ricky0123/vad-web';
+
+export interface SileroVADConfig extends VADConfig {
+  // Extended config for Silero VAD
+  model?: 'v5' | 'legacy';
+  baseAssetPath?: string;
+  onnxWASMBasePath?: string;
+}
+
 export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapter {
   readonly id = 'silero';
   readonly name = 'Silero VAD';
   readonly version = '1.0.0';
 
-  private vad?: MicVAD;
+  private micVAD?: MicVAD;
   private isRunning = false;
   private isPaused = false;
   private metrics: VADMetrics = {
@@ -36,20 +45,27 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
   };
   private lastActivityStart = 0;
 
-  async initialize(config?: VADConfig): Promise<Result<void, Error>> {
+  async initialize(config?: SileroVADConfig): Promise<Result<void, Error>> {
     try {
-      // Dynamically import to avoid bundling if not used
-      const vadModule = await import('@ricky0123/vad-web');
+      logger.info('Initializing Silero VAD with @ricky0123/vad-web', 'SileroVADAdapter');
 
-      this.vad = await vadModule.MicVAD.new({
+      // Configure VAD options
+      const vadOptions: Partial<RealTimeVADOptions> = {
         positiveSpeechThreshold: config?.positiveSpeechThreshold ?? 0.9,
         negativeSpeechThreshold: config?.negativeSpeechThreshold ?? 0.75,
         minSpeechFrames: config?.minSpeechDuration ? Math.floor(config.minSpeechDuration / 32) : 3,
         preSpeechPadFrames: config?.preSpeechPadding ? Math.floor(config.preSpeechPadding / 32) : 10,
+        model: config?.model ?? 'v5',
 
+        // Use CDN for assets if not specified
+        baseAssetPath: config?.baseAssetPath ?? 'https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.24/dist/',
+        onnxWASMBasePath: config?.onnxWASMBasePath ?? 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/',
+
+        // Set up callbacks
         onSpeechStart: () => {
           if (!this.isPaused) {
             this.lastActivityStart = Date.now();
+            logger.debug('Speech started', 'SileroVADAdapter');
             this.emit('speech_start');
           }
         },
@@ -58,17 +74,28 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
           if (!this.isPaused) {
             const duration = Date.now() - this.lastActivityStart;
             this.updateMetrics(duration);
+            logger.debug('Speech ended', 'SileroVADAdapter', { audioLength: audio.length });
             this.emit('speech_end', audio);
           }
         },
 
         onVADMisfire: () => {
+          logger.debug('VAD misfire', 'SileroVADAdapter');
           this.emit('vad_misfire');
         },
-      });
 
-      logger.info(`Silero VAD initialized successfully`, 'SileroVADAdapter');
+        onFrameProcessed: (probabilities) => {
+          // Can emit frame probabilities if needed
+          // logger.trace('Frame processed', 'SileroVADAdapter', { probabilities });
+        }
+      };
+
+      // Create MicVAD instance
+      this.micVAD = await MicVAD.new(vadOptions);
+
+      logger.info('Silero VAD initialized successfully', 'SileroVADAdapter');
       return Result.ok(undefined);
+
     } catch (error) {
       logger.error('Failed to initialize Silero VAD', 'SileroVADAdapter', { error });
       return Result.err(error as Error);
@@ -76,7 +103,7 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
   }
 
   async start(): Promise<Result<void, Error>> {
-    if (!this.vad) {
+    if (!this.micVAD) {
       return Result.err(new Error('VAD not initialized'));
     }
 
@@ -85,7 +112,7 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
     }
 
     try {
-      await this.vad.start();
+      this.micVAD.start();
       this.isRunning = true;
       this.isPaused = false;
       logger.info('Silero VAD started', 'SileroVADAdapter');
@@ -97,12 +124,12 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
   }
 
   stop(): void {
-    if (!this.vad || !this.isRunning) {
+    if (!this.micVAD || !this.isRunning) {
       return;
     }
 
     try {
-      this.vad.pause();
+      this.micVAD.pause();
       this.isRunning = false;
       this.isPaused = false;
       logger.info('Silero VAD stopped', 'SileroVADAdapter');
@@ -112,18 +139,23 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
   }
 
   pause(): void {
-    if (this.vad && this.isRunning) {
-      this.vad.pause();
+    if (this.micVAD && this.isRunning) {
+      this.micVAD.pause();
       this.isPaused = true;
       logger.debug('VAD paused', 'SileroVADAdapter');
     }
   }
 
   resume(): void {
-    if (this.vad && this.isRunning && this.isPaused) {
-      this.vad.start();
-      this.isPaused = false;
-      logger.debug('VAD resumed', 'SileroVADAdapter');
+    if (this.micVAD && this.isRunning && this.isPaused) {
+      // MicVAD.resume() is async
+      (this.micVAD as any).resume().then(() => {
+        this.micVAD?.start();
+        this.isPaused = false;
+        logger.debug('VAD resumed', 'SileroVADAdapter');
+      }).catch((error: Error) => {
+        logger.error('Failed to resume VAD', 'SileroVADAdapter', { error });
+      });
     }
   }
 
@@ -144,13 +176,13 @@ export class SileroVADAdapter extends BaseAdapter<VADEvents> implements VADAdapt
   }
 
   isHealthy(): boolean {
-    return this.vad !== undefined && this.isRunning;
+    return this.micVAD !== undefined && this.isRunning;
   }
 
   destroy(): void {
-    if (this.vad) {
-      this.vad.destroy();
-      this.vad = undefined;
+    if (this.micVAD) {
+      this.micVAD.destroy();
+      this.micVAD = undefined;
     }
     this.isRunning = false;
     this.isPaused = false;

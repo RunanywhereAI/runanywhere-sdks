@@ -12,9 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import {
   Mic, MicOff, Settings, Volume2, Zap, Brain, Shield, DollarSign,
   AlertCircle, Download, Play, Pause, FileAudio, MessageSquare, Sparkles,
-  Sun, Moon, Loader2
+  Sun, Moon, Loader2, Check, X
 } from 'lucide-react';
-import { useSDKPipeline } from '@/hooks/useSDKPipeline';
+import { useVoicePipeline } from '@/hooks/useVoicePipeline';
 
 export default function Home() {
   const [apiKey, setApiKey] = useState('');
@@ -27,28 +27,22 @@ export default function Home() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [sttModel, setSttModel] = useState('whisper-tiny');
 
-  // Use the SDK pipeline hook
-  const {
-    isListening,
-    isProcessing,
-    transcript,
-    response,
-    error,
-    modelStatus,
-    downloadProgress,
-    initializePipeline,
-    toggleListening,
-    initializeVAD,
-    initializeSTT,
-    initializeTTS,
-    initializeLLM,
-    testTTS,
-    testLLM,
-  } = useSDKPipeline({
+  // Use the voice pipeline hook with real Silero VAD
+  const pipeline = useVoicePipeline({
+    sttModel,
     apiKey,
-    useLocalModels,
-    volume: volume[0],
-    speed: speed[0],
+    enableVAD: true,
+    vadConfig: {
+      positiveSpeechThreshold: 0.9,
+      negativeSpeechThreshold: 0.75,
+      minSpeechDuration: 96,
+      preSpeechPadding: 320,
+      model: 'v5' // Use Silero VAD v5
+    },
+    enableLLM: !!apiKey,
+    enableTTS: true,
+    autoPlayTTS: true,
+    ttsRate: speed[0],
   });
 
   useEffect(() => {
@@ -73,37 +67,37 @@ export default function Home() {
   const handleSaveApiKey = () => {
     if (apiKey.trim()) {
       localStorage.setItem('openai_api_key', apiKey);
-      // Re-initialize LLM with new key
-      initializeLLM();
+      // Re-initialize pipeline with new key
+      pipeline.initialize();
     }
   };
 
   const handleDownloadVAD = async () => {
-    await initializeVAD();
+    await pipeline.initialize();
   };
 
   const handleDownloadSTT = async () => {
-    await initializeSTT(sttModel);
+    await pipeline.initialize();
   };
 
   const handleDownloadTTS = async () => {
-    await initializeTTS();
+    await pipeline.initialize();
   };
 
   const handleInitializePipeline = async () => {
-    await initializePipeline();
+    await pipeline.initialize();
   };
 
   const handleTTS = async () => {
     if (!ttsText.trim()) return;
     setIsSpeaking(true);
-    await testTTS(ttsText);
+    await pipeline.testTTS(ttsText);
     setIsSpeaking(false);
   };
 
   const handleLLMSubmit = async () => {
     if (!llmMessage.trim() || !apiKey) return;
-    await testLLM(llmMessage);
+    await pipeline.testLLM(llmMessage);
   };
 
   const getStatusBadge = (status: string) => {
@@ -218,13 +212,13 @@ export default function Home() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {/* Initialize Pipeline Button */}
-                    {modelStatus.vad !== 'ready' || modelStatus.stt !== 'ready' || modelStatus.tts !== 'ready' ? (
+                    {!pipeline.isInitialized ? (
                       <Button
                         onClick={handleInitializePipeline}
                         className="w-full"
-                        disabled={isProcessing}
+                        disabled={pipeline.isProcessing}
                       >
-                        {isProcessing ? (
+                        {pipeline.isProcessing ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                             Initializing Pipeline...
@@ -238,7 +232,7 @@ export default function Home() {
                       </Button>
                     ) : (
                       <div className="flex justify-center py-8 relative">
-                        {isListening && (
+                        {pipeline.isListening && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="h-40 w-40 bg-primary/20 rounded-full animate-ping"></div>
                           </div>
@@ -246,13 +240,13 @@ export default function Home() {
                         <Button
                           size="lg"
                           className={`h-28 w-28 sm:h-32 sm:w-32 rounded-full transition-all transform hover:scale-105 relative z-10 ${
-                            isListening
+                            pipeline.isListening
                               ? 'bg-destructive hover:bg-destructive/90'
                               : 'bg-primary hover:bg-primary/90'
                           }`}
-                          onClick={toggleListening}
+                          onClick={pipeline.isListening ? pipeline.stopListening : pipeline.startListening}
                         >
-                          {isListening ? (
+                          {pipeline.isListening ? (
                             <MicOff className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
                           ) : (
                             <Mic className="h-10 w-10 sm:h-12 sm:w-12 text-primary-foreground" />
@@ -261,26 +255,26 @@ export default function Home() {
                       </div>
                     )}
 
-                    {error && (
+                    {pipeline.error && (
                       <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
-                        <p className="text-sm text-destructive">{error}</p>
+                        <p className="text-sm text-destructive">{pipeline.error}</p>
                       </div>
                     )}
 
-                    {transcript && (
+                    {pipeline.transcript && (
                       <div className="space-y-2">
                         <Label className="text-card-foreground">Transcript:</Label>
                         <div className="p-4 bg-muted rounded-lg">
-                          <p className="text-card-foreground">{transcript}</p>
+                          <p className="text-card-foreground">{pipeline.transcript}</p>
                         </div>
                       </div>
                     )}
 
-                    {response && (
+                    {pipeline.llmResponse && (
                       <div className="space-y-2">
                         <Label className="text-card-foreground">AI Response:</Label>
                         <div className="p-4 bg-primary/10 rounded-lg">
-                          <p className="text-card-foreground">{response}</p>
+                          <p className="text-card-foreground">{pipeline.llmResponse}</p>
                         </div>
                       </div>
                     )}
@@ -296,19 +290,19 @@ export default function Home() {
                   <CardContent className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">VAD (Silero)</span>
-                      {getStatusBadge(modelStatus.vad)}
+                      {getStatusBadge(pipeline.vad.isInitialized ? 'ready' : 'idle')}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">STT (Whisper)</span>
-                      {getStatusBadge(modelStatus.stt)}
+                      {getStatusBadge(pipeline.stt.modelStatus)}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">LLM (OpenAI)</span>
-                      {getStatusBadge(modelStatus.llm)}
+                      {getStatusBadge(pipeline.llm.isInitialized ? 'ready' : apiKey ? 'idle' : 'idle')}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">TTS (Web Speech)</span>
-                      {getStatusBadge(modelStatus.tts)}
+                      {getStatusBadge(pipeline.tts.isInitialized ? 'ready' : 'idle')}
                     </div>
                   </CardContent>
                 </Card>
@@ -320,27 +314,26 @@ export default function Home() {
                   <CardContent className="space-y-3">
                     <Button
                       onClick={handleDownloadVAD}
-                      disabled={modelStatus.vad === 'ready' || modelStatus.vad === 'downloading'}
+                      disabled={pipeline.vad.isInitialized}
                       className="w-full"
                       variant="outline"
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      {modelStatus.vad === 'ready' ? "VAD Ready" :
-                       modelStatus.vad === 'downloading' ? "Downloading..." : "Initialize VAD"}
+                      {pipeline.vad.isInitialized ? "VAD Ready" : "Initialize VAD"}
                     </Button>
                     <Button
                       onClick={handleDownloadSTT}
-                      disabled={modelStatus.stt === 'ready' || modelStatus.stt === 'downloading'}
+                      disabled={pipeline.stt.modelStatus === 'ready' || pipeline.stt.modelStatus === 'downloading'}
                       className="w-full"
                       variant="outline"
                     >
                       <Download className="h-4 w-4 mr-2" />
-                      {modelStatus.stt === 'ready' ? "Whisper Ready" :
-                       modelStatus.stt === 'downloading' ?
-                       `Downloading... ${downloadProgress.stt ? Math.round(downloadProgress.stt) : 0}%` :
+                      {pipeline.stt.modelStatus === 'ready' ? "Whisper Ready" :
+                       pipeline.stt.modelStatus === 'downloading' ?
+                       `Downloading... ${pipeline.stt.downloadProgress ? Math.round(pipeline.stt.downloadProgress) : 0}%` :
                        "Download Whisper"}
                     </Button>
-                    {modelStatus.stt === 'idle' && (
+                    {pipeline.stt.modelStatus === 'idle' && (
                       <select
                         value={sttModel}
                         onChange={(e) => setSttModel(e.target.value)}
@@ -368,25 +361,24 @@ export default function Home() {
                 <div className="grid grid-cols-2 gap-4">
                   <Button
                     onClick={handleDownloadVAD}
-                    disabled={modelStatus.vad === 'ready' || modelStatus.vad === 'downloading'}
+                    disabled={pipeline.vad.isInitialized}
                     variant="outline"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {modelStatus.vad === 'ready' ? "VAD Ready" :
-                     modelStatus.vad === 'downloading' ? "Loading..." : "Initialize VAD"}
+                    {pipeline.vad.isInitialized ? "VAD Ready" : "Initialize VAD"}
                   </Button>
                   <Button
                     onClick={handleDownloadSTT}
-                    disabled={modelStatus.stt === 'ready' || modelStatus.stt === 'downloading'}
+                    disabled={pipeline.stt.modelStatus === 'ready' || pipeline.stt.modelStatus === 'downloading'}
                     variant="outline"
                   >
                     <Download className="h-4 w-4 mr-2" />
-                    {modelStatus.stt === 'ready' ? "Whisper Ready" :
-                     modelStatus.stt === 'downloading' ? "Loading..." : "Download Whisper"}
+                    {pipeline.stt.modelStatus === 'ready' ? "Whisper Ready" :
+                     pipeline.stt.modelStatus === 'downloading' ? "Loading..." : "Download Whisper"}
                   </Button>
                 </div>
 
-                {modelStatus.stt === 'idle' && (
+                {pipeline.stt.modelStatus === 'idle' && (
                   <select
                     value={sttModel}
                     onChange={(e) => setSttModel(e.target.value)}
@@ -402,14 +394,14 @@ export default function Home() {
                   <Button
                     size="lg"
                     className={`h-24 w-24 rounded-full ${
-                      isListening
+                      pipeline.isListening
                         ? 'bg-destructive hover:bg-destructive/90'
                         : 'bg-primary hover:bg-primary/90'
                     }`}
-                    onClick={toggleListening}
-                    disabled={modelStatus.vad !== 'ready' || modelStatus.stt !== 'ready'}
+                    onClick={pipeline.isListening ? pipeline.stopListening : pipeline.startListening}
+                    disabled={!pipeline.vad.isInitialized || pipeline.stt.modelStatus !== 'ready'}
                   >
-                    {isListening ? (
+                    {pipeline.isListening ? (
                       <MicOff className="h-8 w-8 text-primary-foreground" />
                     ) : (
                       <Mic className="h-8 w-8 text-primary-foreground" />
@@ -417,11 +409,11 @@ export default function Home() {
                   </Button>
                 </div>
 
-                {transcript && (
+                {pipeline.stt.transcript && (
                   <div className="space-y-2">
                     <Label className="text-card-foreground">Transcribed Text:</Label>
                     <div className="p-6 bg-muted rounded-lg border border-border">
-                      <p className="text-lg text-card-foreground">{transcript}</p>
+                      <p className="text-lg text-card-foreground">{pipeline.stt.transcript}</p>
                     </div>
                   </div>
                 )}
@@ -437,7 +429,7 @@ export default function Home() {
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.stt}</p>
+                    <p className="font-medium text-card-foreground">{pipeline.stt.modelStatus}</p>
                   </div>
                 </div>
               </CardContent>
@@ -454,13 +446,12 @@ export default function Home() {
               <CardContent className="space-y-6">
                 <Button
                   onClick={handleDownloadTTS}
-                  disabled={modelStatus.tts === 'ready' || modelStatus.tts === 'downloading'}
+                  disabled={pipeline.tts.isInitialized}
                   className="w-full"
                   variant="outline"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  {modelStatus.tts === 'ready' ? "TTS Ready" :
-                   modelStatus.tts === 'downloading' ? "Initializing..." : "Initialize TTS"}
+                  {pipeline.tts.isInitialized ? "TTS Ready" : "Initialize TTS"}
                 </Button>
 
                 <div className="space-y-2">
@@ -471,14 +462,14 @@ export default function Home() {
                     placeholder="Type something here..."
                     value={ttsText}
                     onChange={(e) => setTtsText(e.target.value)}
-                    disabled={modelStatus.tts !== 'ready'}
+                    disabled={!pipeline.tts.isInitialized}
                   />
                 </div>
 
                 <div className="flex gap-4">
                   <Button
                     onClick={handleTTS}
-                    disabled={!ttsText.trim() || isSpeaking || modelStatus.tts !== 'ready'}
+                    disabled={!ttsText.trim() || isSpeaking || !pipeline.tts.isInitialized}
                     className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
                   >
                     <Play className="h-4 w-4 mr-2" />
@@ -542,7 +533,7 @@ export default function Home() {
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.tts}</p>
+                    <p className="font-medium text-card-foreground">{pipeline.tts.isInitialized ? 'ready' : 'idle'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -577,11 +568,11 @@ export default function Home() {
                 </div>
 
                 <Button
-                  disabled={!apiKey || !llmMessage.trim() || isProcessing}
+                  disabled={!apiKey || !llmMessage.trim() || pipeline.llm.isProcessing}
                   className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                   onClick={handleLLMSubmit}
                 >
-                  {isProcessing ? (
+                  {pipeline.llm.isProcessing ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       Processing...
@@ -598,7 +589,7 @@ export default function Home() {
                   <Label className="text-card-foreground">Response:</Label>
                   <div className="min-h-[100px] p-4 bg-muted rounded-lg border border-border">
                     <p className="text-card-foreground">
-                      {response || (apiKey ? "Response will appear here..." : "API key required")}
+                      {pipeline.llm.response || (apiKey ? "Response will appear here..." : "API key required")}
                     </p>
                   </div>
                 </div>
@@ -610,7 +601,7 @@ export default function Home() {
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Status</p>
-                    <p className="font-medium text-card-foreground">{modelStatus.llm}</p>
+                    <p className="font-medium text-card-foreground">{pipeline.llm.isInitialized ? 'ready' : 'idle'}</p>
                   </div>
                   <div className="text-center p-3 bg-muted rounded-lg">
                     <p className="text-xs text-muted-foreground">Provider</p>
