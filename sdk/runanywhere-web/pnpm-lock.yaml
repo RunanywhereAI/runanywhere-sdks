@@ -211,6 +211,9 @@ importers:
       '@runanywhere/stt-whisper':
         specifier: file:../../../sdk/runanywhere-web/packages/stt-whisper
         version: file:packages/stt-whisper(@runanywhere/core@file:packages/core)
+      '@runanywhere/stt-whisper-web':
+        specifier: file:../../../sdk/runanywhere-web/packages/stt-whisper-web
+        version: file:packages/stt-whisper-web
       '@runanywhere/transcription':
         specifier: file:../../../sdk/runanywhere-web/packages/transcription
         version: file:packages/transcription
@@ -493,8 +496,8 @@ importers:
   packages/stt-whisper:
     dependencies:
       '@huggingface/transformers':
-        specifier: 3.7.2
-        version: 3.7.2
+        specifier: 3.7.0
+        version: 3.7.0
       '@runanywhere/core':
         specifier: workspace:*
         version: link:../core
@@ -508,6 +511,22 @@ importers:
       vite:
         specifier: ^6.0.6
         version: 6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
+
+  packages/stt-whisper-web:
+    dependencies:
+      '@huggingface/transformers':
+        specifier: 3.7.0
+        version: 3.7.0
+      '@runanywhere/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.2
+      vite:
+        specifier: ^7.0.6
+        version: 7.1.3(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1)
 
   packages/transcription:
     dependencies:
@@ -1840,6 +1859,9 @@ packages:
     resolution: {integrity: sha512-yUZLld4lrM9iFxHCwFQ7D1HW2MWMwSbeB7WzWqFYDWK+rEb+WldkLdAJxUPOmgICMHZLzZGVcVjFh3w/YGubng==}
     engines: {node: '>=18'}
 
+  '@huggingface/transformers@3.7.0':
+    resolution: {integrity: sha512-3VXzzTKtMtaD6b6L2Y3a3T+iiqE76YMJ9OVW4fiodYbNNvnd6U9y09AMoKyPgIquo9oU2+aKTkzy7g6TqIoYyw==}
+
   '@huggingface/transformers@3.7.2':
     resolution: {integrity: sha512-6SOxo6XziupnQ5Vs5vbbs74CNB6ViHLHGQJjY6zj88JeiDtJ2d/ADKxaay688Sf2KcjtdF3dyBL11C5pJS2NxQ==}
 
@@ -2669,6 +2691,9 @@ packages:
     peerDependencies:
       react: '>=16.8.0'
       react-dom: '>=16.8.0'
+
+  '@runanywhere/stt-whisper-web@file:packages/stt-whisper-web':
+    resolution: {directory: packages/stt-whisper-web, type: directory}
 
   '@runanywhere/stt-whisper@file:packages/stt-whisper':
     resolution: {directory: packages/stt-whisper, type: directory}
@@ -7025,6 +7050,46 @@ packages:
       yaml:
         optional: true
 
+  vite@7.1.3:
+    resolution: {integrity: sha512-OOUi5zjkDxYrKhTV3V7iKsoS37VUM7v40+HuwEmcrsf11Cdx9y3DIr2Px6liIcZFwt3XSRpQvFpL3WVy7ApkGw==}
+    engines: {node: ^20.19.0 || >=22.12.0}
+    hasBin: true
+    peerDependencies:
+      '@types/node': ^20.19.0 || >=22.12.0
+      jiti: '>=1.21.0'
+      less: ^4.0.0
+      lightningcss: ^1.21.0
+      sass: ^1.70.0
+      sass-embedded: ^1.70.0
+      stylus: '>=0.54.8'
+      sugarss: ^5.0.0
+      terser: ^5.16.0
+      tsx: ^4.8.1
+      yaml: ^2.4.2
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+      jiti:
+        optional: true
+      less:
+        optional: true
+      lightningcss:
+        optional: true
+      sass:
+        optional: true
+      sass-embedded:
+        optional: true
+      stylus:
+        optional: true
+      sugarss:
+        optional: true
+      terser:
+        optional: true
+      tsx:
+        optional: true
+      yaml:
+        optional: true
+
   vitest@2.1.9:
     resolution: {integrity: sha512-MSmPM9REYqDGBI8439mA4mWhV5sKmDlBKWIYbA3lRb2PTHACE0mgKwA8yQ2xq9vxDTuk4iPrECBAEW2aoFXY0Q==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -8507,6 +8572,13 @@ snapshots:
 
   '@huggingface/jinja@0.5.1': {}
 
+  '@huggingface/transformers@3.7.0':
+    dependencies:
+      '@huggingface/jinja': 0.5.1
+      onnxruntime-node: 1.21.0
+      onnxruntime-web: 1.22.0-dev.20250409-89f8206ba4
+      sharp: 0.34.3
+
   '@huggingface/transformers@3.7.2':
     dependencies:
       '@huggingface/jinja': 0.5.1
@@ -9250,9 +9322,14 @@ snapshots:
       '@runanywhere/tts-webspeech': link:packages/tts-webspeech
       '@runanywhere/vad-silero': link:packages/vad-silero
 
+  '@runanywhere/stt-whisper-web@file:packages/stt-whisper-web':
+    dependencies:
+      '@huggingface/transformers': 3.7.0
+      '@runanywhere/core': link:packages/core
+
   '@runanywhere/stt-whisper@file:packages/stt-whisper(@runanywhere/core@file:packages/core)':
     dependencies:
-      '@huggingface/transformers': 3.7.2
+      '@huggingface/transformers': 3.7.0
       '@runanywhere/core': file:packages/core
 
   '@runanywhere/transcription@file:packages/transcription':
@@ -14318,6 +14395,23 @@ snapshots:
       yaml: 2.8.1
 
   vite@6.3.5(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1):
+    dependencies:
+      esbuild: 0.25.9
+      fdir: 6.5.0(picomatch@4.0.3)
+      picomatch: 4.0.3
+      postcss: 8.5.6
+      rollup: 4.47.1
+      tinyglobby: 0.2.14
+    optionalDependencies:
+      '@types/node': 22.17.2
+      fsevents: 2.3.3
+      jiti: 1.21.7
+      less: 4.2.0
+      sass: 1.71.1
+      terser: 5.43.1
+      yaml: 2.8.1
+
+  vite@7.1.3(@types/node@22.17.2)(jiti@1.21.7)(less@4.2.0)(sass@1.71.1)(terser@5.43.1)(yaml@2.8.1):
     dependencies:
       esbuild: 0.25.9
       fdir: 6.5.0(picomatch@4.0.3)

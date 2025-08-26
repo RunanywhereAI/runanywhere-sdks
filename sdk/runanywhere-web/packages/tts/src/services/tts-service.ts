@@ -91,7 +91,7 @@ export class TTSService extends EventEmitter<TTSEvents> {
         }));
 
         if (this.availableVoices.length > 0) {
-          this.emit('voicesChanged');
+          this.emit('voicesChanged', this.availableVoices);
           resolve();
         } else {
           // Retry after a short delay

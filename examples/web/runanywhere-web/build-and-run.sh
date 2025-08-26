@@ -94,6 +94,8 @@ show_help() {
     echo "  --clean             Clean all build artifacts before building"
     echo "  --test-stt          Open STT test page after launch"
     echo "  --test-vad          Open VAD test page after launch"
+    echo "  --test-llm          Open LLM test page after launch"
+    echo "  --test-stt-whisper-web  Open Whisper-Web fork test page after launch"
     echo "  --verbose           Show detailed build output"
     echo "  --install-deps      Install missing web app dependencies"
     echo "  --help              Show this help message"
@@ -106,7 +108,12 @@ show_help() {
     echo "     - Builds stt.worker.ts separately with Vite"
     echo "     - Bundles transformers.js (~57MB) into worker"
     echo "     - Copies worker to public/stt-worker.js"
-    echo "  4. Verifies critical files are created"
+    echo "  4. Special handling for stt-whisper-web (fork implementation):"
+    echo "     - Builds TypeScript files first (main module exports)"
+    echo "     - Builds Vite worker to separate directory (avoids conflicts)"
+    echo "     - Bundles transformers.js@3.7.0 (~59MB) into worker"
+    echo "     - Copies worker to public/stt-whisper-web-worker.js"
+    echo "  5. Verifies critical files are created"
     echo ""
     echo "Examples:"
     echo "  $0                      # Full fast build and run"
@@ -144,6 +151,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --test-vad)
             TEST_PAGE="test-vad"
+            shift
+            ;;
+        --test-stt-whisper-web)
+            TEST_PAGE="test-stt-whisper-web"
+            shift
+            ;;
+        --test-llm)
+            TEST_PAGE="test-llm"
             shift
             ;;
         --verbose)
@@ -298,7 +313,7 @@ fast_build_sdk() {
         pnpm build:core
 
         # Build adapter packages with proper TypeScript declarations
-        for pkg in vad-silero stt-whisper llm-openai tts-webspeech; do
+        for pkg in vad-silero stt-whisper stt-whisper-web llm-openai tts-webspeech; do
             if [ -d "packages/$pkg" ]; then
                 echo "Building declarations and bundle for $pkg..."
 
@@ -324,6 +339,32 @@ fast_build_sdk() {
                         echo "Warning: STT worker build failed"
                     fi
                     cd "$SDK_ROOT"
+                # Special handling for stt-whisper-web - build with fork implementation
+                elif [ "$pkg" = "stt-whisper-web" ]; then
+                    cd "packages/$pkg"
+                    echo "Cleaning Whisper-Web fork build directory..."
+                    rm -rf dist dist-worker
+
+                    # Step 1: Build TypeScript files first (main module exports)
+                    echo "Building TypeScript files for Whisper-Web fork..."
+                    pnpm build
+
+                    # Step 2: Build Vite worker to separate directory (avoids overwriting TS files)
+                    echo "Building Whisper-Web fork worker with Vite (59MB bundle)..."
+                    npx vite build --config vite.config.worker.ts
+
+                    # Step 3: Deploy the proper worker bundle to public directory
+                    WORKER_FILE="dist-worker/worker.js"
+                    if [ -f "$WORKER_FILE" ]; then
+                        cp "$WORKER_FILE" "${APP_ROOT}/public/stt-whisper-web-worker.js"
+                        echo "Whisper-Web fork worker ($(du -h "$WORKER_FILE" | cut -f1)) deployed to public directory"
+
+                        # Clean up temporary worker build directory
+                        rm -rf dist-worker
+                    else
+                        echo "Warning: Whisper-Web fork worker build failed"
+                    fi
+                    cd "$SDK_ROOT"
                 else
                     pnpm --filter "@runanywhere/$pkg" build
                 fi
@@ -346,7 +387,7 @@ fast_build_sdk() {
         pnpm build:core > /dev/null 2>&1
 
         # Build adapter packages with proper TypeScript declarations
-        for pkg in vad-silero stt-whisper llm-openai tts-webspeech; do
+        for pkg in vad-silero stt-whisper stt-whisper-web llm-openai tts-webspeech; do
             if [ -d "packages/$pkg" ]; then
                 echo "Building $pkg..." >&2
 
@@ -364,6 +405,25 @@ fast_build_sdk() {
                     if [ -f "$WORKER_FILE" ]; then
                         cp "$WORKER_FILE" "$APP_ROOT/public/stt-worker.js" > /dev/null 2>&1
                         echo "STT worker built and deployed" >&2
+                    fi
+                    cd "$SDK_ROOT"
+                # Special handling for stt-whisper-web - build fork implementation
+                elif [ "$pkg" = "stt-whisper-web" ]; then
+                    cd "packages/$pkg"
+                    rm -rf dist dist-worker > /dev/null 2>&1
+
+                    # Step 1: Build TypeScript files first (main module exports)
+                    pnpm build > /dev/null 2>&1
+
+                    # Step 2: Build Vite worker to separate directory (avoids conflict)
+                    npx vite build --config vite.config.worker.ts > /dev/null 2>&1
+
+                    # Step 3: Deploy the proper worker bundle
+                    WORKER_FILE="dist-worker/worker.js"
+                    if [ -f "$WORKER_FILE" ]; then
+                        cp "$WORKER_FILE" "$APP_ROOT/public/stt-whisper-web-worker.js" > /dev/null 2>&1
+                        rm -rf dist-worker > /dev/null 2>&1
+                        echo "Whisper-Web fork worker built and deployed (59MB bundle)" >&2
                     fi
                     cd "$SDK_ROOT"
                 else
@@ -478,6 +538,12 @@ build_sdk_packages() {
         print_warning "STT worker not found. Speech-to-text may not work."
     else
         print_success "STT worker built and deployed successfully"
+    fi
+
+    if [ ! -f "$APP_ROOT/public/stt-whisper-web-worker.js" ]; then
+        print_warning "Whisper-Web fork worker not found. Fork implementation may not work."
+    else
+        print_success "Whisper-Web fork worker built and deployed successfully"
     fi
 
     print_success "SDK packages built successfully!"
@@ -608,7 +674,7 @@ case $COMMAND in
         print_success "🎊 SDK Build Complete!"
         echo "  - Core packages: ✅"
         echo "  - Service packages: ✅"
-        echo "  - Adapter packages: ✅ (VAD, STT, LLM, TTS with TypeScript declarations)"
+        echo "  - Adapter packages: ✅ (VAD, STT, STT-Whisper-Web, LLM, TTS with TypeScript declarations)"
         echo "  - Framework packages: ✅"
         ;;
     "build-app")
@@ -629,7 +695,7 @@ case $COMMAND in
         print_success "🎊 SDK Build Complete!"
         echo "  - Core packages: ✅"
         echo "  - Service packages: ✅"
-        echo "  - Adapter packages: ✅ (VAD, STT, LLM, TTS with TypeScript declarations)"
+        echo "  - Adapter packages: ✅ (VAD, STT, STT-Whisper-Web, LLM, TTS with TypeScript declarations)"
         echo "  - Framework packages: ✅"
         echo ""
         run_webapp

@@ -55,15 +55,15 @@ export interface StreamingOptions extends TTSOptions {
 }
 
 // Events
-export interface TTSEvents {
-  'ready': void;
-  'loading': void;
-  'error': Error;
-  'synthesisStart': { text: string };
-  'synthesisProgress': SynthesisProgress;
-  'synthesisChunk': SynthesisChunk;
-  'synthesisComplete': SynthesisResult;
-  'playbackStart': void;
-  'playbackEnd': void;
-  'voicesChanged': VoiceInfo[];
+export interface TTSEvents extends Record<string, (...args: any[]) => void> {
+  'ready': () => void;
+  'loading': () => void;
+  'error': (error: Error) => void;
+  'synthesisStart': (data: { text: string }) => void;
+  'synthesisProgress': (progress: SynthesisProgress) => void;
+  'synthesisChunk': (chunk: SynthesisChunk) => void;
+  'synthesisComplete': (result: SynthesisResult) => void;
+  'playbackStart': () => void;
+  'playbackEnd': () => void;
+  'voicesChanged': (voices: VoiceInfo[]) => void;
 }

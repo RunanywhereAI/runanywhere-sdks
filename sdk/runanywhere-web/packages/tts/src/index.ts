@@ -1,6 +1,9 @@
 // Main TTS Service
 export { TTSService } from './services/tts-service';
 
+// TTS Adapter
+export { TTSAdapter, type TTSAdapterConfig } from './adapters/tts-adapter';
+
 // Types
 export type {
   TTSConfig,

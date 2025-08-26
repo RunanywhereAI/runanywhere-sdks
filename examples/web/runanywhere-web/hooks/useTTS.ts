@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { TTSAdapter } from '@runanywhere/tts';
+import type { TTSAdapterConfig, VoiceInfo, SynthesisResult } from '@runanywhere/tts';
 
 interface TTSConfig {
   voice?: string;
@@ -8,20 +10,22 @@ interface TTSConfig {
   pitch?: number;
   volume?: number;
   language?: string;
+  autoPlay?: boolean;
+  engine?: 'web-speech';
 }
 
 interface TTSState {
   isInitialized: boolean;
   isSpeaking: boolean;
   error: string | null;
-  availableVoices: SpeechSynthesisVoice[];
-  selectedVoice: SpeechSynthesisVoice | null;
+  availableVoices: VoiceInfo[];
+  selectedVoice: VoiceInfo | null;
+  lastSynthesis: SynthesisResult | null;
 }
 
 /**
- * Hook for Text-to-Speech using Web Speech API
- * Single responsibility: Convert text to speech
- * IMPORTANT: Does NOT import SDK packages to avoid bundle issues
+ * Hook that uses the @runanywhere/tts package
+ * This is an example of how to consume the SDK adapter in a React app
  */
 export function useTTS(config: TTSConfig = {}) {
   const [state, setState] = useState<TTSState>({
@@ -30,64 +34,132 @@ export function useTTS(config: TTSConfig = {}) {
     error: null,
     availableVoices: [],
     selectedVoice: null,
+    lastSynthesis: null,
   });
 
-  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const adapterRef = useRef<TTSAdapter | null>(null);
 
   // Initialize TTS
   const initialize = useCallback(async () => {
     if (state.isInitialized) return;
 
     try {
-      if (!('speechSynthesis' in window)) {
-        throw new Error('Web Speech API not supported');
+      console.log('[TTS Adapter] Initializing...');
+
+      // Create adapter instance
+      const adapter = new TTSAdapter({
+        voice: config.voice || 'default',
+        rate: config.rate || 1.0,
+        pitch: config.pitch || 1.0,
+        volume: config.volume || 1.0,
+        language: config.language || 'en-US',
+        autoPlay: config.autoPlay !== false, // Default to true
+        engine: config.engine || 'web-speech'
+      });
+
+      // Set up event listeners
+      adapter.on('ready', () => {
+        console.log('[TTS Adapter] Ready');
+        setState(prev => ({
+          ...prev,
+          isInitialized: true,
+          error: null
+        }));
+      });
+
+      adapter.on('synthesisStart', ({ text }) => {
+        console.log('[TTS Adapter] Synthesis started for text:', text);
+      });
+
+      adapter.on('synthesisComplete', (result: SynthesisResult) => {
+        console.log('[TTS Adapter] Synthesis completed:', result);
+        setState(prev => ({
+          ...prev,
+          lastSynthesis: result
+        }));
+      });
+
+      adapter.on('playbackStart', () => {
+        console.log('[TTS Adapter] Playback started');
+        setState(prev => ({ ...prev, isSpeaking: true }));
+      });
+
+      adapter.on('playbackEnd', () => {
+        console.log('[TTS Adapter] Playback ended');
+        setState(prev => ({ ...prev, isSpeaking: false }));
+      });
+
+      adapter.on('voicesChanged', (voices: VoiceInfo[]) => {
+        console.log('[TTS Adapter] Voices changed:', voices.length);
+
+        // Find preferred voice or use default
+        let selectedVoice = voices[0] || null;
+
+        if (config.voice && config.voice !== 'default') {
+          const found = voices.find(v => v.name === config.voice);
+          if (found) selectedVoice = found;
+        } else if (config.language) {
+          const found = voices.find(v => v.language.startsWith(config.language));
+          if (found) selectedVoice = found;
+        } else {
+          // Try to find English voice
+          const englishVoice = voices.find(v => v.language.startsWith('en-'));
+          if (englishVoice) selectedVoice = englishVoice;
+        }
+
+        setState(prev => ({
+          ...prev,
+          availableVoices: voices,
+          selectedVoice
+        }));
+      });
+
+      adapter.on('error', (error: Error) => {
+        console.error('[TTS Adapter] Error:', error);
+        setState(prev => ({ ...prev, error: error.message }));
+      });
+
+      // Initialize adapter
+      const result = await adapter.initialize();
+
+      if (!result.success) {
+        throw new Error('Failed to initialize TTS adapter');
       }
+
+      adapterRef.current = adapter;
 
       // Load voices
-      const loadVoices = () => {
-        const voices = window.speechSynthesis.getVoices();
-        if (voices.length > 0) {
-          // Find preferred voice or use default
-          let selectedVoice = voices[0];
+      const voices = adapter.getAvailableVoices();
+      if (voices.length > 0) {
+        // Find preferred voice
+        let selectedVoice = voices[0];
 
-          if (config.voice) {
-            const found = voices.find(v => v.name === config.voice);
-            if (found) selectedVoice = found;
-          } else if (config.language) {
-            const found = voices.find(v => v.lang.startsWith(config.language));
-            if (found) selectedVoice = found;
-          } else {
-            // Try to find English voice
-            const englishVoice = voices.find(v => v.lang.startsWith('en-'));
-            if (englishVoice) selectedVoice = englishVoice;
-          }
-
-          setState(prev => ({
-            ...prev,
-            isInitialized: true,
-            availableVoices: voices,
-            selectedVoice,
-            error: null
-          }));
-
-          console.log(`[TTS] Initialized with ${voices.length} voices`);
-          console.log('[TTS] Selected voice:', selectedVoice.name);
+        if (config.voice && config.voice !== 'default') {
+          const found = voices.find(v => v.name === config.voice);
+          if (found) selectedVoice = found;
+        } else if (config.language) {
+          const found = voices.find(v => v.language.startsWith(config.language));
+          if (found) selectedVoice = found;
+        } else {
+          const englishVoice = voices.find(v => v.language.startsWith('en-'));
+          if (englishVoice) selectedVoice = englishVoice;
         }
-      };
 
-      if (window.speechSynthesis.getVoices().length > 0) {
-        loadVoices();
-      } else {
-        window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+        setState(prev => ({
+          ...prev,
+          availableVoices: voices,
+          selectedVoice,
+          isInitialized: true
+        }));
       }
+
+      console.log('[TTS Adapter] Initialized successfully');
     } catch (err) {
-      setState(prev => ({
-        ...prev,
-        error: `TTS initialization error: ${err}`
-      }));
-      console.error('[TTS]', err);
+      const error = `TTS initialization error: ${err}`;
+      setState(prev => ({ ...prev, error }));
+      console.error('[TTS Adapter]', error);
     }
-  }, [state.isInitialized, config.voice, config.language]);
+  }, [state.isInitialized, config]);
 
   // Speak text
   const speak = useCallback(async (text: string) => {
@@ -97,101 +169,100 @@ export function useTTS(config: TTSConfig = {}) {
       await initialize();
     }
 
-    if (!('speechSynthesis' in window)) {
-      setState(prev => ({
-        ...prev,
-        error: 'TTS not available'
-      }));
-      return;
-    }
+    if (!adapterRef.current) return;
 
     try {
-      // Cancel any ongoing speech
-      window.speechSynthesis.cancel();
+      console.log('[TTS Adapter] Speaking:', text);
+      const result = await adapterRef.current.speak(text, {
+        voice: state.selectedVoice?.name || config.voice || 'default',
+        rate: config.rate,
+        pitch: config.pitch,
+        volume: config.volume,
+        language: config.language
+      });
 
-      const utterance = new SpeechSynthesisUtterance(text);
-
-      // Apply configuration
-      if (state.selectedVoice) {
-        utterance.voice = state.selectedVoice;
+      if (!result.success) {
+        throw result.error;
       }
-      utterance.rate = config.rate || 1.0;
-      utterance.pitch = config.pitch || 1.0;
-      utterance.volume = config.volume || 1.0;
 
-      // Set up event listeners
-      utterance.onstart = () => {
-        setState(prev => ({ ...prev, isSpeaking: true }));
-        console.log('[TTS] Started speaking');
-      };
-
-      utterance.onend = () => {
-        setState(prev => ({ ...prev, isSpeaking: false }));
-        console.log('[TTS] Finished speaking');
-      };
-
-      utterance.onerror = (event) => {
-        setState(prev => ({
-          ...prev,
-          isSpeaking: false,
-          error: `TTS error: ${event.error}`
-        }));
-        console.error('[TTS] Speech error:', event.error);
-      };
-
-      utteranceRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-
-      console.log('[TTS] Speaking:', text);
+      console.log('[TTS Adapter] Speech completed');
     } catch (err) {
-      setState(prev => ({
-        ...prev,
-        isSpeaking: false,
-        error: `TTS speak error: ${err}`
-      }));
-      console.error('[TTS]', err);
+      const error = `Failed to speak: ${err}`;
+      setState(prev => ({ ...prev, error }));
+      console.error('[TTS Adapter]', error);
     }
   }, [state.isInitialized, state.selectedVoice, config, initialize]);
 
   // Stop speaking
   const stop = useCallback(() => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
+    if (adapterRef.current) {
+      adapterRef.current.cancel();
       setState(prev => ({ ...prev, isSpeaking: false }));
-      console.log('[TTS] Stopped speaking');
+      console.log('[TTS Adapter] Stopped speaking');
     }
   }, []);
 
   // Pause speaking
   const pause = useCallback(() => {
-    if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
-      window.speechSynthesis.pause();
-      console.log('[TTS] Paused speaking');
+    if (adapterRef.current) {
+      adapterRef.current.pause();
+      console.log('[TTS Adapter] Paused speaking');
     }
   }, []);
 
   // Resume speaking
   const resume = useCallback(() => {
-    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
-      window.speechSynthesis.resume();
-      console.log('[TTS] Resumed speaking');
+    if (adapterRef.current) {
+      adapterRef.current.resume();
+      console.log('[TTS Adapter] Resumed speaking');
     }
   }, []);
 
   // Set voice
   const setVoice = useCallback((voiceName: string) => {
     const voice = state.availableVoices.find(v => v.name === voiceName);
-    if (voice) {
+    if (voice && adapterRef.current) {
       setState(prev => ({ ...prev, selectedVoice: voice }));
-      console.log('[TTS] Voice changed to:', voiceName);
+      adapterRef.current.setVoice(voiceName);
+      console.log('[TTS Adapter] Voice changed to:', voiceName);
     }
   }, [state.availableVoices]);
+
+  // Set rate
+  const setRate = useCallback((rate: number) => {
+    if (adapterRef.current) {
+      adapterRef.current.setRate(rate);
+      console.log('[TTS Adapter] Rate changed to:', rate);
+    }
+  }, []);
+
+  // Set pitch
+  const setPitch = useCallback((pitch: number) => {
+    if (adapterRef.current) {
+      adapterRef.current.setPitch(pitch);
+      console.log('[TTS Adapter] Pitch changed to:', pitch);
+    }
+  }, []);
+
+  // Set volume
+  const setVolume = useCallback((volume: number) => {
+    if (adapterRef.current) {
+      adapterRef.current.setVolume(volume);
+      console.log('[TTS Adapter] Volume changed to:', volume);
+    }
+  }, []);
+
+  // Clear error
+  const clearError = useCallback(() => {
+    setState(prev => ({ ...prev, error: null }));
+  }, []);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+      if (adapterRef.current) {
+        adapterRef.current.destroy();
+        adapterRef.current = null;
       }
     };
   }, []);
@@ -204,5 +275,9 @@ export function useTTS(config: TTSConfig = {}) {
     pause,
     resume,
     setVoice,
+    setRate,
+    setPitch,
+    setVolume,
+    clearError,
   };
 }

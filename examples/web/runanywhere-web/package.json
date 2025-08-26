@@ -22,6 +22,7 @@
     "@runanywhere/llm-openai": "file:../../../sdk/runanywhere-web/packages/llm-openai",
     "@runanywhere/react": "file:../../../sdk/runanywhere-web/packages/react",
     "@runanywhere/stt-whisper": "file:../../../sdk/runanywhere-web/packages/stt-whisper",
+    "@runanywhere/stt-whisper-web": "file:../../../sdk/runanywhere-web/packages/stt-whisper-web",
     "@runanywhere/transcription": "file:../../../sdk/runanywhere-web/packages/transcription",
     "@runanywhere/tts": "file:../../../sdk/runanywhere-web/packages/tts",
     "@runanywhere/tts-webspeech": "file:../../../sdk/runanywhere-web/packages/tts-webspeech",
