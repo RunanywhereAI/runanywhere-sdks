@@ -22,10 +22,7 @@ import {
 export interface WhisperSTTConfig extends STTConfig {
   model?: 'whisper-tiny' | 'whisper-base' | 'whisper-small';
   device?: 'wasm' | 'webgpu';
-  dtype?: {
-    encoder_model?: string;
-    decoder_model_merged?: string;
-  };
+  dtype?: string;  // Simple string dtype like whisper-web
   language?: string;
   task?: 'transcribe' | 'translate';
 }
@@ -202,13 +199,18 @@ export class WhisperSTTAdapter extends BaseAdapter<STTEvents> implements STTAdap
       const fullModelId = this.getModelId(modelId);
 
       // Send load command to worker
-      // Use simple dtype string like whisper-web does
+      // Use simple dtype like whisper-web
+      const dtype = this.config?.dtype || 'q8';  // Simple string like whisper-web
+
+      // Use WASM by default like whisper-web for better stability
+      const device = this.config?.device || 'wasm';  // Default to WASM
+
       this.worker.postMessage({
         type: 'load',
         data: {
           model_id: fullModelId,
-          dtype: this.config?.dtype || 'q8',  // Use simple string dtype
-          device: this.config?.device || 'wasm'
+          dtype,
+          device  // Use WebGPU by default
         }
       });
 

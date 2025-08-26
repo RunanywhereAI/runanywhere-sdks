@@ -66,10 +66,7 @@ export function useSTT(config?: Partial<WhisperSTTConfig>) {
         device: config?.device ?? 'wasm',
         language: config?.language ?? 'en',
         task: config?.task ?? 'transcribe',
-        dtype: config?.dtype ?? {
-          encoder_model: 'fp32',
-          decoder_model_merged: 'q4',
-        },
+        dtype: config?.dtype || 'q4',
         ...config
       });
 

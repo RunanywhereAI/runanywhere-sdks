@@ -1,0 +1,19 @@
+{
+  "name": "@runanywhere/stt-whisper-web",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:worker": "vite build --config vite.config.worker.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "3.7.0",
+    "@runanywhere/core": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.0.6",
+    "typescript": "^5.8.3"
+  }
+}

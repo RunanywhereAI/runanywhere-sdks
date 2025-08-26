@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useVADAdapter } from './useVADAdapter';
 import { useSTT } from './useSTT';
-import { useLLM } from './useLLM';
+import { useLLMAdapter } from './useLLM';
 import { useTTS } from './useTTS';
 import type { SileroVADConfig } from '@runanywhere/vad-silero';
 
@@ -62,13 +62,12 @@ export function useVoicePipeline(config: VoicePipelineConfig = {}) {
   });
 
   const stt = useSTT({
-    model: config.sttModel,
+    model: config.sttModel as 'whisper-tiny' | 'whisper-base' | 'whisper-small' | undefined,
     language: config.sttLanguage,
   });
 
-  const llm = useLLM({
-    apiKey: config.apiKey,
-    model: config.llmModel,
+  const llm = useLLMAdapter({
+    defaultModel: config.llmModel,
     systemPrompt: config.systemPrompt,
   });
 
@@ -94,7 +93,7 @@ export function useVoicePipeline(config: VoicePipelineConfig = {}) {
       initPromises.push(stt.initialize());
 
       if (config.enableLLM && config.apiKey) {
-        initPromises.push(llm.initialize());
+        initPromises.push(llm.initialize(config.apiKey));
       }
 
       if (config.enableTTS !== false) {
@@ -212,12 +211,12 @@ export function useVoicePipeline(config: VoicePipelineConfig = {}) {
     }
   }, [vad.speechAudio, vad.clearSpeechAudio]);
 
-  // Watch for transcript changes
+  // Watch for transcription changes
   useEffect(() => {
-    if (stt.transcript) {
-      processTranscript(stt.transcript);
+    if (stt.lastTranscription?.text) {
+      processTranscript(stt.lastTranscription.text);
     }
-  }, [stt.transcript, processTranscript]);
+  }, [stt.lastTranscription, processTranscript]);
 
   // Update error state from components
   useEffect(() => {
@@ -258,9 +257,9 @@ export function useVoicePipeline(config: VoicePipelineConfig = {}) {
     stt: {
       isInitialized: stt.isInitialized,
       isTranscribing: stt.isTranscribing,
-      modelStatus: stt.modelStatus,
-      downloadProgress: stt.downloadProgress,
-      transcript: stt.transcript,
+      isModelLoaded: stt.isModelLoaded,
+      modelLoadProgress: stt.modelLoadProgress,
+      transcript: stt.lastTranscription?.text || '',
       error: stt.error,
     },
     llm: {
@@ -287,7 +286,7 @@ export function useVoicePipeline(config: VoicePipelineConfig = {}) {
     testSTT: stt.transcribe,
     testLLM: llm.sendMessage,
     testTTS: tts.speak,
-    clearTranscript: stt.clearTranscript,
+    clearTranscript: stt.clearTranscription,
     clearLLMHistory: llm.clearHistory,
     stopTTS: tts.stop,
   };
