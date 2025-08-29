@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSTTWhisperWeb } from '@/hooks/useSTTWhisperWeb';
 import { convertStereoToMono, createAudioContext } from '@runanywhere/stt-whisper-web';
+// @ts-ignore - BlobFix from fork uses older TypeScript syntax
+import { webmFixDuration } from '@/utils/BlobFix';
 
 export default function TestSTTWhisperWebPage() {
   const [recordedAudio, setRecordedAudio] = useState<Float32Array | null>(null);
@@ -10,6 +12,7 @@ export default function TestSTTWhisperWebPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordingTime, setRecordingTime] = useState(0);
+  const recordingStartTime = useRef<number>(0);
 
   const {
     isInitialized,
@@ -58,7 +61,14 @@ export default function TestSTTWhisperWebPage() {
       const arrayBuffer = await file.arrayBuffer();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      const audio = convertStereoToMono(audioBuffer);
+      // CRITICAL: Match fork's audio handling
+      let audio: Float32Array;
+      if (audioBuffer.numberOfChannels === 2) {
+        audio = convertStereoToMono(audioBuffer);
+      } else {
+        // Use getChannelData(0) directly for mono
+        audio = audioBuffer.getChannelData(0);
+      }
       setRecordedAudio(audio);
 
       if (isInitialized && isWorkerReady) {
@@ -92,6 +102,7 @@ export default function TestSTTWhisperWebPage() {
       });
 
       const chunks: Blob[] = [];
+      recordingStartTime.current = Date.now(); // Track actual start time
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -100,8 +111,10 @@ export default function TestSTTWhisperWebPage() {
       };
 
       recorder.onstop = async () => {
+        const actualDuration = Math.max(1, Math.floor((Date.now() - recordingStartTime.current) / 1000));
+        console.log('[DEBUG] Recording stopped, actual duration:', actualDuration, 'seconds');
         const blob = new Blob(chunks, { type: 'audio/webm;codecs=opus' });
-        await processRecordedAudio(blob);
+        await processRecordedAudioWithDuration(blob, actualDuration);
 
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
@@ -127,21 +140,100 @@ export default function TestSTTWhisperWebPage() {
     }
   };
 
-  const processRecordedAudio = async (blob: Blob) => {
+  const processRecordedAudioWithDuration = async (blob: Blob, duration: number) => {
     try {
-      const audioContext = createAudioContext();
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log('[DEBUG] processRecordedAudio START', {
+        blobSize: blob.size,
+        blobType: blob.type,
+        duration: duration
+      });
 
-      const audio = convertStereoToMono(audioBuffer);
+      // Apply WebM duration fix if needed (critical for Chrome)
+      let fixedBlob = blob;
+      if (blob.type === 'audio/webm' || blob.type === 'audio/webm;codecs=opus') {
+        console.log('[DEBUG] Applying WebM duration fix', {
+          originalSize: blob.size,
+          duration: duration * 1000,
+          type: blob.type
+        });
+
+        try {
+          fixedBlob = await webmFixDuration(blob, duration * 1000, blob.type);
+          console.log('[DEBUG] WebM fix applied successfully', {
+            fixedSize: fixedBlob.size,
+            sizeChange: fixedBlob.size - blob.size
+          });
+        } catch (fixError) {
+          console.error('[DEBUG] WebM fix failed:', fixError);
+          // Continue with original blob
+          fixedBlob = blob;
+        }
+      }
+
+      console.log('[DEBUG] Creating audio context...');
+      const audioContext = createAudioContext();
+      console.log('[DEBUG] Audio context created', {
+        sampleRate: audioContext.sampleRate,
+        state: audioContext.state
+      });
+
+      console.log('[DEBUG] Converting blob to ArrayBuffer...');
+      const arrayBuffer = await fixedBlob.arrayBuffer();
+      console.log('[DEBUG] ArrayBuffer created', {
+        byteLength: arrayBuffer.byteLength,
+        isValid: arrayBuffer instanceof ArrayBuffer
+      });
+
+      console.log('[DEBUG] Decoding audio data...');
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      console.log('[DEBUG] Audio decoded successfully', {
+        duration: audioBuffer.duration,
+        length: audioBuffer.length,
+        numberOfChannels: audioBuffer.numberOfChannels,
+        sampleRate: audioBuffer.sampleRate
+      });
+
+      // CRITICAL FIX: Match fork's audio handling exactly
+      let audio: Float32Array;
+      if (audioBuffer.numberOfChannels === 2) {
+        console.log('[DEBUG] Converting stereo to mono...');
+        audio = convertStereoToMono(audioBuffer);
+      } else {
+        // CRITICAL: Use getChannelData(0) directly for mono audio (like fork does)
+        console.log('[DEBUG] Using mono audio directly (no copy)...');
+        audio = audioBuffer.getChannelData(0);
+      }
+
+      console.log('[DEBUG] Audio data ready', {
+        audioLength: audio.length,
+        audioType: audio.constructor.name,
+        numberOfChannels: audioBuffer.numberOfChannels,
+        isDirectReference: audioBuffer.numberOfChannels === 1,
+        firstSamples: Array.from(audio.slice(0, 5)),
+        lastSamples: Array.from(audio.slice(-5)),
+        minValue: Math.min(...Array.from(audio.slice(0, Math.min(1000, audio.length)))),
+        maxValue: Math.max(...Array.from(audio.slice(0, Math.min(1000, audio.length))))
+      });
+
       setRecordedAudio(audio);
-      setAudioFileName(`Recording (${recordingTime}s)`);
+      setAudioFileName(`Recording (${duration}s)`);
 
       if (isInitialized && isWorkerReady) {
+        console.log('[DEBUG] Sending to transcribe...', {
+          audioLength: audio.length,
+          isInitialized,
+          isWorkerReady
+        });
         await transcribe(audio);
+      } else {
+        console.warn('[DEBUG] Not ready to transcribe', {
+          isInitialized,
+          isWorkerReady
+        });
       }
     } catch (error) {
-      console.error('Error processing recorded audio:', error);
+      console.error('[DEBUG] Error in processRecordedAudio:', error);
+      console.error('[DEBUG] Error stack:', (error as Error).stack);
       reset();
       alert('Error processing recording. Please try again.');
     }
@@ -310,7 +402,7 @@ export default function TestSTTWhisperWebPage() {
                   View Timestamps ({lastTranscription.timestamps.length} segments)
                 </summary>
                 <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
-                  {lastTranscription.timestamps.map((segment, index) => (
+                  {lastTranscription.timestamps.map((segment: any, index: number) => (
                     <div key={index} className="flex text-sm">
                       <span className="text-green-600 w-20 flex-shrink-0">
                         {segment.start.toFixed(1)}s-{segment.end.toFixed(1)}s

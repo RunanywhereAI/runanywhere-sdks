@@ -3,7 +3,7 @@ export interface WorkerMessage {
   model: string;
   dtype: string;
   gpu: boolean;
-  subtask: string;
+  subtask: string | null;
   language: string | null;
 }
 

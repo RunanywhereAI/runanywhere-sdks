@@ -64,8 +64,9 @@ export class WhisperWebSTTAdapter extends BaseAdapter<STTEvents> implements STTA
         this.emit('error', error as any);
       };
 
-      await this.waitForWorkerReady();
+      // Fork doesn't wait for worker ready - just mark as initialized
       this.isInitialized = true;
+      this.workerReady = true;
       logger.info('WhisperWebSTTAdapter initialized successfully', 'WhisperWebSTTAdapter');
 
       return Result.ok(undefined);
@@ -85,22 +86,7 @@ export class WhisperWebSTTAdapter extends BaseAdapter<STTEvents> implements STTA
     return Result.ok(undefined);
   }
 
-  private async waitForWorkerReady(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error('Worker timeout')), 30000);
-
-      const handler = (event: MessageEvent) => {
-        if (event.data.status === 'worker_ready') {
-          clearTimeout(timeout);
-          this.worker!.removeEventListener('message', handler);
-          this.workerReady = true;
-          resolve();
-        }
-      };
-
-      this.worker!.addEventListener('message', handler);
-    });
-  }
+  // Removed waitForWorkerReady - fork doesn't have this pattern
 
   private handleWorkerMessage(message: WorkerResponse): void {
     const { status, data } = message;
@@ -153,15 +139,50 @@ export class WhisperWebSTTAdapter extends BaseAdapter<STTEvents> implements STTA
       const dtype = this.config?.dtype || WHISPER_WEB_CONSTANTS.DEFAULT_DTYPE;
       const gpu = this.config?.device === 'webgpu';
 
+      // CRITICAL: Make sure we have a proper Float32Array
+      // Some browsers might need a fresh array to ensure proper transfer
+      let audioToSend: Float32Array;
+
+      // Check if the audio buffer is detached or needs refresh
+      if (!audio.buffer || audio.buffer.byteLength === 0) {
+        logger.error('Audio buffer is detached or empty!', 'WhisperWebSTTAdapter');
+        return Result.err(new Error('Audio buffer is invalid'));
+      }
+
+      // Use the audio directly without copying (like fork)
+      audioToSend = audio;
+
       // Send transcription request (EXACT pattern from fork)
       const workerMessage: WorkerMessage = {
-        audio,
+        audio: audioToSend,
         model,
         dtype,
         gpu,
-        subtask: options?.task || this.config?.task || 'transcribe',
-        language: options?.language || this.config?.language || null
+        subtask: !model.endsWith(".en") ? (options?.task || this.config?.task || 'transcribe') : null,
+        language: !model.endsWith(".en") && (options?.language || this.config?.language || null) !== "auto"
+                 ? (options?.language || this.config?.language || null)
+                 : null
       };
+
+      // DEBUG: Log audio data details
+      logger.info(`Sending to worker - Audio length: ${audioToSend.length}, Model: ${model}, Subtask: ${workerMessage.subtask}, Language: ${workerMessage.language}`, 'WhisperWebSTTAdapter');
+
+      // More detailed audio logging
+      const audioSample = audio.slice(0, 10);
+      const hasNonZero = audio.some(v => v !== 0);
+      const firstNonZeroIndex = audio.findIndex(v => v !== 0);
+      const audioStats = {
+        firstSamples: Array.from(audioSample),
+        hasNonZero,
+        firstNonZeroIndex,
+        minValue: Math.min(...Array.from(audio.slice(0, Math.min(1000, audio.length)))),
+        maxValue: Math.max(...Array.from(audio.slice(0, Math.min(1000, audio.length)))),
+        isFloat32Array: audio instanceof Float32Array,
+        audioBuffer: audio.buffer,
+        byteLength: audio.buffer.byteLength
+      };
+
+      logger.info(`Audio data details: ${JSON.stringify(audioStats)}`, 'WhisperWebSTTAdapter');
 
       this.worker.postMessage(workerMessage);
 
@@ -247,6 +268,7 @@ export class WhisperWebSTTAdapter extends BaseAdapter<STTEvents> implements STTA
 
 // Export utilities for use in React components
 export { convertStereoToMono, createAudioContext } from './utils/audio.js';
+export { webmFixDuration } from './utils/BlobFix.js';
 export { WHISPER_WEB_CONSTANTS, MODELS } from './constants.js';
 export type { WorkerMessage, WorkerResponse, TranscriptionOutput } from './types.js';
 
