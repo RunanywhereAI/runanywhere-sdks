@@ -77,6 +77,16 @@ export function useSTTWhisperWeb(config?: Partial<WhisperWebSTTConfig>) {
   }, [config]); // FIXED: Removed state.isInitialized from dependencies
 
   const transcribe = useCallback(async (audio: Float32Array, options?: { language?: string; task?: 'transcribe' | 'translate' }) => {
+    console.log('[Hook] transcribe called with audio:', {
+      audioLength: audio?.length,
+      audioType: audio?.constructor?.name,
+      firstSamples: audio ? Array.from(audio.slice(0, 10)) : null,
+      lastSamples: audio ? Array.from(audio.slice(-10)) : null,
+      hasNonZero: audio ? audio.some(v => v !== 0) : false,
+      minValue: audio ? Math.min(...Array.from(audio.slice(0, 1000))) : null,
+      maxValue: audio ? Math.max(...Array.from(audio.slice(0, 1000))) : null
+    });
+
     if (!adapterRef.current || !state.isWorkerReady) {
       setState(prev => ({ ...prev, error: 'Adapter not ready' }));
       return null;

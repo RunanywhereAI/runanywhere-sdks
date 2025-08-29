@@ -27,6 +27,29 @@ class AutomaticSpeechRecognitionPipelineFactory extends PipelineFactory {
 
 // Transcription function (EXACT pattern from fork)
 const transcribe = async ({ audio, model, dtype, gpu, subtask, language }: any) => {
+  // DEBUG: Log transcribe function inputs
+  console.log('[Worker transcribe] Input params:', {
+    hasAudio: !!audio,
+    audioType: audio?.constructor?.name,
+    audioLength: audio?.length,
+    audioSample: audio ? audio.slice(0, 5) : undefined,
+    model,
+    dtype,
+    gpu,
+    subtask,
+    language
+  });
+
+  // CRITICAL: Check if audio is actually defined
+  if (!audio || !(audio instanceof Float32Array)) {
+    console.error('[Worker] CRITICAL ERROR: Audio is not a Float32Array!', {
+      audio,
+      audioType: typeof audio,
+      audioConstructor: audio?.constructor?.name
+    });
+    throw new Error('Audio data is invalid or missing');
+  }
+
   const p = AutomaticSpeechRecognitionPipelineFactory;
 
   // Model lifecycle management (EXACT from fork)
@@ -111,6 +134,44 @@ const transcribe = async ({ audio, model, dtype, gpu, subtask, language }: any) 
     },
   });
 
+  // CRITICAL DEBUG: Final validation before transcriber
+  const audioValidation = {
+    isFloat32Array: audio instanceof Float32Array,
+    length: audio?.length || 0,
+    first10: Array.from(audio?.slice(0, 10) || []),
+    last10: Array.from(audio?.slice(-10) || []),
+    hasRealData: audio?.some((v: number) => v !== 0 && !isNaN(v)) || false,
+    nanCount: audio?.filter((v: number) => isNaN(v)).length || 0,
+    infinityCount: audio?.filter((v: number) => !isFinite(v)).length || 0,
+    bufferValid: audio?.buffer instanceof ArrayBuffer,
+    byteLength: audio?.buffer?.byteLength || 0,
+    expectedBytes: (audio?.length || 0) * 4,
+    bytesMatch: audio?.buffer?.byteLength === (audio?.length || 0) * 4
+  };
+
+  console.log('[Worker] CRITICAL: Final audio validation:', audioValidation);
+
+  if (!audioValidation.bytesMatch) {
+    console.error('[Worker] WARNING: Buffer size mismatch!');
+  }
+
+  if (!audioValidation.hasRealData) {
+    console.error('[Worker] WARNING: Audio appears to be silent/corrupted!');
+  }
+
+  // Log the exact audio being sent
+  console.log('[Worker] FINAL CHECK - Audio to transcriber:', {
+    type: Object.prototype.toString.call(audio),
+    constructor: audio?.constructor?.name,
+    isFloat32: audio instanceof Float32Array,
+    length: audio?.length,
+    byteLength: audio?.byteLength,
+    buffer: audio?.buffer,
+    bufferByteLength: audio?.buffer?.byteLength,
+    BYTES_PER_ELEMENT: audio?.BYTES_PER_ELEMENT,
+    sample: Array.from(audio?.slice(100, 120) || []) // Get samples after the silence
+  });
+
   // Actually run transcription (EXACT from fork)
   const output = await transcriber(audio, {
     // Greedy decoding
@@ -150,6 +211,48 @@ const transcribe = async ({ audio, model, dtype, gpu, subtask, language }: any) 
 self.addEventListener("message", async (event) => {
   const message = event.data;
 
+  // COMPREHENSIVE DEBUG: Analyze audio data thoroughly
+  let audioDebugInfo: any = { hasAudio: false };
+  if (message?.audio) {
+    try {
+      const audio = message.audio;
+      const first100 = audio.slice(0, Math.min(100, audio.length));
+      const nonZeroSamples = first100.filter((v: number) => v !== 0);
+
+      audioDebugInfo = {
+        hasAudio: true,
+        audioType: audio.constructor.name,
+        audioLength: audio.length,
+        // Sample analysis
+        first10Samples: Array.from(audio.slice(0, 10)),
+        last10Samples: Array.from(audio.slice(-10)),
+        middle10Samples: Array.from(audio.slice(Math.floor(audio.length/2), Math.floor(audio.length/2) + 10)),
+        // Zero analysis
+        nonZeroCount: nonZeroSamples.length,
+        percentNonZero: ((nonZeroSamples.length / first100.length) * 100).toFixed(1) + '%',
+        firstNonZeroIdx: audio.findIndex((v: number) => v !== 0),
+        // Range analysis
+        minValue: Math.min(...Array.from(audio.slice(0, Math.min(1000, audio.length)) as Float32Array)),
+        maxValue: Math.max(...Array.from(audio.slice(0, Math.min(1000, audio.length)) as Float32Array)),
+        // Type checks
+        isFloat32: audio instanceof Float32Array,
+        bufferBytes: audio.buffer?.byteLength || 0,
+        bytesPerElement: audio.BYTES_PER_ELEMENT
+      };
+    } catch (err) {
+      audioDebugInfo = { hasAudio: true, analysisError: String(err) };
+    }
+  }
+
+  console.log('[Worker] Audio analysis:', audioDebugInfo);
+  console.log('[Worker] Model config:', {
+    model: message?.model,
+    dtype: message?.dtype,
+    gpu: message?.gpu,
+    subtask: message?.subtask,
+    language: message?.language
+  });
+
   try {
     const transcript = await transcribe(message);
     if (transcript === null) return;
@@ -167,5 +270,5 @@ self.addEventListener("message", async (event) => {
   }
 });
 
-// Worker ready signal
-self.postMessage({ status: "worker_ready" });
+// Don't send worker_ready - fork doesn't have this
+// self.postMessage({ status: "worker_ready" });
