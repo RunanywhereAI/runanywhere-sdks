@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Repository for managing model metadata - minimal implementation
+/// Repository for managing model metadata using DataSource pattern
 public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
     public typealias Entity = ModelMetadataData
 
@@ -9,71 +9,59 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
     private let apiClient: APIClient?
     private let logger = SDKLogger(category: "ModelMetadataRepository")
 
+    // Data sources for model metadata operations
+    private let localDataSource: LocalModelMetadataDataSource
+    private let remoteDataSource: RemoteModelMetadataDataSource
+
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
+        self.localDataSource = LocalModelMetadataDataSource(databaseManager: databaseManager)
+        self.remoteDataSource = RemoteModelMetadataDataSource(apiClient: apiClient)
     }
 
     // MARK: - Repository Implementation
 
     public func save(_ entity: ModelMetadataData) async throws {
-        var entityToSave = entity
-        _ = entityToSave.markUpdated()
-
-        try databaseManager.write { db in
-            try entityToSave.save(db)
-        }
-
+        try await localDataSource.store(entity)
         logger.info("Model metadata saved: \(entity.id)")
     }
 
     public func fetch(id: String) async throws -> ModelMetadataData? {
-        return try databaseManager.read { db in
-            try ModelMetadataData.fetchOne(db, key: id)
+        // Try local first
+        if let local = try await localDataSource.load(id: id) {
+            return local
         }
+
+        // Try remote if not found locally
+        if let remote = try await remoteDataSource.fetch(id: id) {
+            // Cache it locally
+            try await localDataSource.store(remote)
+            return remote
+        }
+
+        return nil
     }
 
     public func fetchAll() async throws -> [ModelMetadataData] {
-        let data = try databaseManager.read { db in
-            try ModelMetadataData
-                .order(Column("updatedAt").desc)
-                .fetchAll(db)
-        }
-
-        logger.info("Found \(data.count) model metadata in database")
-        return data
+        return try await localDataSource.loadAll()
     }
 
     public func delete(id: String) async throws {
-        try databaseManager.write { db in
-            _ = try ModelMetadataData.deleteOne(db, key: id)
-        }
-
+        try await localDataSource.remove(id: id)
         logger.info("Model metadata deleted: \(id)")
     }
 
     // MARK: - Sync Support (for Repository protocol)
 
     public func fetchPendingSync() async throws -> [ModelMetadataData] {
-        return try databaseManager.read { db in
-            try ModelMetadataData
-                .filter(Column("syncPending") == true)
-                .fetchAll(db)
-        }
+        return try await localDataSource.loadPendingSync()
     }
 
     private func markSynced(_ ids: [String]) async throws {
-        try databaseManager.write { db in
-            for id in ids {
-                if var data = try ModelMetadataData.fetchOne(db, key: id) {
-                    _ = data.markSynced()
-                    try data.update(db)
-                }
-            }
-        }
-
+        try await localDataSource.markSynced(ids)
         logger.info("Marked \(ids.count) model metadata as synced")
     }
 
