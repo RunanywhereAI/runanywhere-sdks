@@ -48,10 +48,6 @@ Data/
 │   └── RemoteLogger.swift            # Remote logging API calls
 │
 ├── Storage/              # Storage implementations
-│   ├── Cache/            # Data caching
-│   │   ├── MetadataCache.swift
-│   │   ├── RegistryCache.swift
-│   │   └── RegistryStorage.swift
 │   ├── Database/         # GRDB database layer
 │   │   ├── Manager/
 │   │   ├── Migrations/
