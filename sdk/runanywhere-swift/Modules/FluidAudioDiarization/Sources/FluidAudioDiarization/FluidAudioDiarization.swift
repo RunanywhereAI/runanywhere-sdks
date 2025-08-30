@@ -1,5 +1,5 @@
 import Foundation
-@preconcurrency import RunAnywhereSDK
+@preconcurrency import RunAnywhere
 import FluidAudio
 import os
 

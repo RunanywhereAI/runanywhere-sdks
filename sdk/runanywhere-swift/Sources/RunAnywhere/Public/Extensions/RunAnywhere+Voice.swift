@@ -71,7 +71,7 @@ public extension RunAnywhere {
                 do {
                     // Create pipeline and process voice stream
                     let pipeline = RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(config: config)
-                    let eventStream = pipeline.processAudioStream(audioStream)
+                    let eventStream = pipeline.process(audioStream: audioStream)
 
                     for try await event in eventStream {
                         // Publish to event bus for transparency

@@ -126,8 +126,8 @@ public enum RunAnywhere {
                         throw SDKError.notInitialized
                     }
 
-                    let internalOptions = options?.toInternalOptions()
-                    let stream = serviceContainer.generationService.generateStream(
+                    let internalOptions = options?.toInternalOptions() ?? RunAnywhereGenerationOptions()
+                    let stream = serviceContainer.streamingService.generateStream(
                         prompt: prompt,
                         options: internalOptions
                     )
@@ -171,19 +171,9 @@ public enum RunAnywhere {
                 throw SDKError.notInitialized
             }
 
-            let result = try await serviceContainer.generationService.generateStructured(
-                type,
-                prompt: prompt,
-                options: nil
-            )
-
-            await EventBus.shared.publish(SDKGenerationEvent.completed(
-                response: "Structured output generated",
-                tokensUsed: 0,
-                latencyMs: 0
-            ))
-
-            return result
+            // For now, structured output generation is not fully implemented
+            // This would need proper JSON schema generation and parsing
+            throw SDKError.notImplemented("Structured output generation not yet implemented")
         } catch {
             await EventBus.shared.publish(SDKGenerationEvent.failed(error))
             throw error
@@ -205,11 +195,13 @@ public enum RunAnywhere {
             }
 
             // Use voice capability service directly
-            let result = try await serviceContainer.voiceCapabilityService.transcribe(
-                audio: audioData,
-                modelId: "whisper-base",
-                options: STTOptions()
-            )
+            // Find voice service and transcribe
+            guard let voiceService = serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base") else {
+                throw STTError.noVoiceServiceAvailable
+            }
+
+            try await voiceService.initialize(modelPath: "whisper-base")
+            let result = try await voiceService.transcribe(audio: audioData, options: STTOptions())
 
             await EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
             return result.text
@@ -247,7 +239,9 @@ public enum RunAnywhere {
             throw SDKError.notInitialized
         }
 
-        return try await serviceContainer.modelLoadingService.listAvailableModels()
+        // Use model registry to get available models
+        let models = await serviceContainer.modelRegistry.discoverModels()
+        return models
     }
 
     /// Get currently loaded model

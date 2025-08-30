@@ -26,7 +26,7 @@ let package = Package(
             name: "LLMSwift",
             dependencies: [
                 .product(name: "LLM", package: "LLM.swift"),
-                .product(name: "RunAnywhereSDK", package: "runanywhere-swift")
+                .product(name: "RunAnywhere", package: "runanywhere-swift")
             ]
         ),
         .testTarget(

@@ -9,7 +9,22 @@ public extension RunAnywhere {
     static func getStorageInfo() async -> StorageInfo {
         await events.publish(SDKStorageEvent.infoRequested)
 
-        let storageInfo = await RunAnywhereSDK.shared.getStorageInfo()
+        // Build storage info using fileManager
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+
+        // Get model storage size
+        let modelStorageSize = fileManager.getModelStorageSize()
+        let totalStorageSize = fileManager.getTotalStorageSize()
+
+        // Create basic storage info (simplified implementation)
+        let storageInfo = StorageInfo(
+            appStorage: AppStorageInfo(documentsSize: totalStorageSize, cacheSize: 0, appSupportSize: 0, totalSize: totalStorageSize),
+            deviceStorage: DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0), // Would need system calls
+            modelStorage: ModelStorageInfo(totalSize: modelStorageSize, modelCount: 0, modelsByFramework: [:], largestModel: nil),
+            cacheSize: 0,
+            storedModels: [],
+            lastUpdated: Date()
+        )
 
         await events.publish(SDKStorageEvent.infoRetrieved(info: storageInfo))
         return storageInfo
@@ -20,7 +35,8 @@ public extension RunAnywhere {
     static func getStoredModels() async -> [StoredModel] {
         await events.publish(SDKStorageEvent.modelsRequested)
 
-        let models = await RunAnywhereSDK.shared.getStoredModels()
+        // For now, return empty array - would need to scan Models folder
+        let models: [StoredModel] = []
 
         await events.publish(SDKStorageEvent.modelsRetrieved(models: models))
         return models
@@ -31,7 +47,8 @@ public extension RunAnywhere {
         await events.publish(SDKStorageEvent.clearCacheStarted)
 
         do {
-            try await RunAnywhereSDK.shared.clearCache()
+            let fileManager = RunAnywhere.serviceContainer.fileManager
+            try fileManager.clearCache()
             await events.publish(SDKStorageEvent.clearCacheCompleted)
         } catch {
             await events.publish(SDKStorageEvent.clearCacheFailed(error))
@@ -44,7 +61,8 @@ public extension RunAnywhere {
         await events.publish(SDKStorageEvent.cleanTempStarted)
 
         do {
-            try await RunAnywhereSDK.shared.cleanTempFiles()
+            let fileManager = RunAnywhere.serviceContainer.fileManager
+            try fileManager.cleanTempFiles()
             await events.publish(SDKStorageEvent.cleanTempCompleted)
         } catch {
             await events.publish(SDKStorageEvent.cleanTempFailed(error))
@@ -58,7 +76,8 @@ public extension RunAnywhere {
         await events.publish(SDKStorageEvent.deleteModelStarted(modelId: modelId))
 
         do {
-            try await RunAnywhereSDK.shared.deleteStoredModel(modelId)
+            let fileManager = RunAnywhere.serviceContainer.fileManager
+            try fileManager.deleteModel(modelId: modelId)
             await events.publish(SDKStorageEvent.deleteModelCompleted(modelId: modelId))
         } catch {
             await events.publish(SDKStorageEvent.deleteModelFailed(modelId: modelId, error: error))
@@ -69,6 +88,7 @@ public extension RunAnywhere {
     /// Get base directory URL
     /// - Returns: Base directory URL
     static func getBaseDirectoryURL() -> URL {
-        return RunAnywhereSDK.shared.getBaseDirectoryURL()
+        let fileManager = RunAnywhere.serviceContainer.fileManager
+        return fileManager.getBaseFolder().url
     }
 }

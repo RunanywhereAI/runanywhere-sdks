@@ -51,7 +51,7 @@ extension RunAnywhereSDK {
         }
 
         // Create pipeline with selected diarization
-        return createVoicePipeline(
+        return RunAnywhere.createVoicePipeline(
             config: config,
             speakerDiarization: diarizationService
         )

@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import os
 
 /// Custom download strategy for WhisperKit models that require multiple files

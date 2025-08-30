@@ -29,7 +29,7 @@ public extension RunAnywhere {
 
         do {
             // For now, we'll need to track which model is currently active
-            // This is a simplified implementation
+            // This is a simplified implementation - would need to call actual unload
             await events.publish(SDKModelEvent.unloadCompleted)
         } catch {
             await events.publish(SDKModelEvent.unloadFailed(error))
@@ -43,7 +43,8 @@ public extension RunAnywhere {
         await events.publish(SDKModelEvent.listRequested)
 
         do {
-            let models: [ModelInfo] = [] // Simplified for now
+            // Use model registry to discover models
+            let models = await RunAnywhere.serviceContainer.modelRegistry.discoverModels()
             await events.publish(SDKModelEvent.listCompleted(models: models))
             return models
         } catch {
@@ -52,41 +53,30 @@ public extension RunAnywhere {
         }
     }
 
-
-    /// Download a model
+    /// Download a model (placeholder implementation)
     /// - Parameter modelIdentifier: The model to download
-    /// - Returns: Download task for monitoring progress
-    static func downloadModel(_ modelIdentifier: String) async throws -> DownloadTask {
+    static func downloadModel(_ modelIdentifier: String) async throws {
         await events.publish(SDKModelEvent.downloadStarted(modelId: modelIdentifier))
 
         do {
-            let downloadTask = try await RunAnywhereSDK.shared.downloadModel(modelIdentifier)
-
-            // Monitor download progress
-            Task {
-                for try await progress in downloadTask.progressStream {
-                    await events.publish(SDKModelEvent.downloadProgress(
-                        modelId: modelIdentifier,
-                        progress: progress.fractionCompleted
-                    ))
-                }
-                await events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
-            }
-
-            return downloadTask
+            // This would need actual download implementation
+            // For now, just simulate completion
+            await events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
         } catch {
             await events.publish(SDKModelEvent.downloadFailed(modelId: modelIdentifier, error: error))
             throw error
         }
     }
 
-    /// Delete a downloaded model
+    /// Delete a model
     /// - Parameter modelIdentifier: The model to delete
     static func deleteModel(_ modelIdentifier: String) async throws {
         await events.publish(SDKModelEvent.deleteStarted(modelId: modelIdentifier))
 
         do {
-            try await RunAnywhereSDK.shared.deleteModel(modelIdentifier)
+            // Use file manager to delete model
+            let fileManager = RunAnywhere.serviceContainer.fileManager
+            try fileManager.deleteModel(id: modelIdentifier)
             await events.publish(SDKModelEvent.deleteCompleted(modelId: modelIdentifier))
         } catch {
             await events.publish(SDKModelEvent.deleteFailed(modelId: modelIdentifier, error: error))
@@ -94,37 +84,52 @@ public extension RunAnywhere {
         }
     }
 
-    /// Add a custom model from URL
+    /// Add a custom model from URL (simplified implementation)
     /// - Parameters:
-    ///   - url: URL to the model file
-    ///   - name: Custom name for the model
+    ///   - url: URL to the model
+    ///   - name: Display name for the model
     ///   - type: Model type
     /// - Returns: Model information
     static func addModelFromURL(
         _ url: URL,
         name: String,
-        type: ModelType
-    ) -> ModelInfo {
+        type: String
+    ) async -> ModelInfo {
         await events.publish(SDKModelEvent.customModelAdded(name: name, url: url.absoluteString))
 
-        let modelInfo = RunAnywhereSDK.shared.addModelFromURL(
-            url,
+        // Create basic model info (this would need proper implementation)
+        let modelInfo = ModelInfo(
+            id: UUID().uuidString,
             name: name,
-            type: type,
-            subType: nil,
-            frameworkHint: nil
+            format: ModelFormat.gguf, // Default
+            downloadURL: url,
+            localPath: nil,
+            estimatedMemory: 1_000_000_000, // 1GB default
+            contextLength: 4096,
+            downloadSize: nil,
+            checksum: nil,
+            compatibleFrameworks: [.llamaCpp],
+            preferredFramework: .llamaCpp,
+            hardwareRequirements: [],
+            tokenizerFormat: nil,
+            metadata: nil,
+            alternativeDownloadURLs: nil,
+            supportsThinking: false,
+            thinkingTagPattern: nil
         )
+
+        // Register the model
+        RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo)
 
         return modelInfo
     }
 
     /// Register a built-in model
     /// - Parameter model: The model to register
-    static func registerBuiltInModel(_ model: ModelInfo) {
-        RunAnywhereSDK.shared.registerBuiltInModel(model)
+    static func registerBuiltInModel(_ model: ModelInfo) async {
+        // Register the model in the model registry
+        RunAnywhere.serviceContainer.modelRegistry.registerModel(model)
 
-        Task {
-            await events.publish(SDKModelEvent.builtInModelRegistered(modelId: model.id))
-        }
+        await events.publish(SDKModelEvent.builtInModelRegistered(modelId: model.id))
     }
 }
