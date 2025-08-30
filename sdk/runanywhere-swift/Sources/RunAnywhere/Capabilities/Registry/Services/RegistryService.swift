@@ -37,17 +37,6 @@ public class RegistryService: ModelRegistry {
         logger.info("Registry initialization complete")
     }
 
-    private func getModelMetadataRepository() async -> (any ModelMetadataRepository)? {
-        // Access through DataSyncService
-        guard let dataSyncService = await ServiceContainer.shared.dataSyncService else {
-            return nil
-        }
-
-        // Return the repository directly if we have access to it
-        // For now, we'll need to go through DataSyncService methods
-        return nil
-    }
-
     public func discoverModels() async -> [ModelInfo] {
         // Discover local models from disk and register them
         let localModels = await modelDiscovery.discoverLocalModels()
@@ -239,28 +228,27 @@ public class RegistryService: ModelRegistry {
         let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
         logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
 
-        // Load stored models from repository
-        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
-            do {
-                // Load all stored models and filter later
-                var storedModels = try await dataSyncService.loadStoredModels()
+        // Load stored models from service
+        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+        do {
+            // Load all stored models and filter later
+            var storedModels = try await modelMetadataService.loadStoredModels()
 
-                if !availableFrameworks.isEmpty {
+            if !availableFrameworks.isEmpty {
                     // Filter for available frameworks
                     storedModels = storedModels.filter { model in
                         model.compatibleFrameworks.contains { availableFrameworks.contains($0) }
                     }
-                    logger.info("Loading \(storedModels.count) models for available frameworks")
-                } else {
-                    logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
-                }
-
-                for model in storedModels {
-                    registerModel(model)
-                }
-            } catch {
-                logger.error("Failed to load stored models: \(error)")
+                logger.info("Loading \(storedModels.count) models for available frameworks")
+            } else {
+                logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
             }
+
+            for model in storedModels {
+                registerModel(model)
+            }
+        } catch {
+            logger.error("Failed to load stored models: \(error)")
         }
     }
 

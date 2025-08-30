@@ -104,9 +104,8 @@ public class SimplifiedFileManager {
 
                     // Remove metadata
                     Task {
-                        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
-                            try? await dataSyncService.removeModelMetadata(modelId)
-                        }
+                        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+                        try? await modelMetadataService.removeModel(modelId)
                     }
 
                     logger.info("Deleted model: \(modelId) from framework: \(frameworkFolder.name)")
@@ -122,9 +121,8 @@ public class SimplifiedFileManager {
 
             // Remove metadata
             Task {
-                if let dataSyncService = await ServiceContainer.shared.dataSyncService {
-                    try? await dataSyncService.removeModelMetadata(modelId)
-                }
+                let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+                try? await modelMetadataService.removeModel(modelId)
             }
 
             logger.info("Deleted model: \(modelId)")

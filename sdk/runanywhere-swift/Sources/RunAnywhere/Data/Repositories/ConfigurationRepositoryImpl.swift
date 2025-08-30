@@ -9,7 +9,6 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     // Core dependencies
     private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
-    private let syncManager: SyncManager?
     private let logger = SDKLogger(category: "ConfigurationRepository")
 
     // Data sources for configuration-specific operations
@@ -21,7 +20,6 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
-        self.syncManager = apiClient != nil ? SyncManager(apiClient: apiClient) : nil
         self.remoteDataSource = RemoteConfigurationDataSource(apiClient: apiClient)
         self.localDataSource = LocalConfigurationDataSource(databaseManager: databaseManager)
     }
@@ -44,7 +42,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public func fetchAll() async throws -> [ConfigurationData] {
         return try databaseManager.read { db in
             try ConfigurationData
-                .order(ConfigurationData.Columns.updatedAt.desc)
+                .order(Column("updatedAt").desc)
                 .fetchAll(db)
         }
     }
@@ -56,13 +54,24 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
         logger.debug("Deleted configuration: \(id)")
     }
 
-    // Override sync to use sync manager
-    public func syncIfNeeded() async throws {
-        guard let syncManager = syncManager else { return }
+    // MARK: - Sync Support (for Repository protocol)
 
-        let pending = try await fetchPendingSync()
-        for entity in pending {
-            await syncManager.queueForSync(entityId: entity.id)
+    public func fetchPendingSync() async throws -> [ConfigurationData] {
+        return try databaseManager.read { db in
+            try ConfigurationData
+                .filter(Column("syncPending") == true)
+                .fetchAll(db)
+        }
+    }
+
+    public func markSynced(_ ids: [String]) async throws {
+        try databaseManager.write { db in
+            for id in ids {
+                if var data = try ConfigurationData.fetchOne(db, key: id) {
+                    _ = data.markSynced()
+                    try data.update(db)
+                }
+            }
         }
     }
 
