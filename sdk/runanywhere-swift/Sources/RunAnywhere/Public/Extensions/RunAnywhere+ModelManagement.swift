@@ -76,7 +76,7 @@ public extension RunAnywhere {
         do {
             // Use file manager to delete model
             let fileManager = RunAnywhere.serviceContainer.fileManager
-            try fileManager.deleteModel(id: modelIdentifier)
+            try fileManager.deleteModel(modelId: modelIdentifier)
             await events.publish(SDKModelEvent.deleteCompleted(modelId: modelIdentifier))
         } catch {
             await events.publish(SDKModelEvent.deleteFailed(modelId: modelIdentifier, error: error))

@@ -173,7 +173,7 @@ public enum RunAnywhere {
 
             // For now, structured output generation is not fully implemented
             // This would need proper JSON schema generation and parsing
-            throw SDKError.notImplemented("Structured output generation not yet implemented")
+            throw SDKError.notImplemented
         } catch {
             await EventBus.shared.publish(SDKGenerationEvent.failed(error))
             throw error

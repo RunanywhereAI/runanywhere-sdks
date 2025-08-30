@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "RunAnywhereSDK",
+    name: "RunAnywhere",
     platforms: [
         .iOS(.v14),
         .macOS(.v12),
@@ -11,8 +11,8 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "RunAnywhereSDK",
-            targets: ["RunAnywhereSDK"]
+            name: "RunAnywhere",
+            targets: ["RunAnywhere"]
         )
     ],
     dependencies: [
@@ -27,7 +27,7 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "RunAnywhereSDK",
+            name: "RunAnywhere",
             dependencies: [
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Alamofire", package: "Alamofire"),
@@ -47,8 +47,8 @@ let package = Package(
             // ]
         ),
         .testTarget(
-            name: "RunAnywhereSDKTests",
-            dependencies: ["RunAnywhereSDK"],
+            name: "RunAnywhereTests",
+            dependencies: ["RunAnywhere"],
             path: "Tests/RunAnywhereTests"
         )
     ]
