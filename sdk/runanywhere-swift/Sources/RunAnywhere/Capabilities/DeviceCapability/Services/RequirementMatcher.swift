@@ -75,8 +75,8 @@ public class RequirementMatcher {
     /// Get resource requirements for a model
     public func getResourceRequirements(for model: ModelInfo) -> ModelResourceRequirements {
         return ModelResourceRequirements(
-            minimumMemory: model.estimatedMemory,
-            recommendedMemory: model.estimatedMemory * 2,
+            minimumMemory: model.memoryRequired,
+            recommendedMemory: model.memoryRequired * 2,
             minimumStorage: estimateStorageRequirement(for: model),
             recommendedAccelerators: getRecommendedAccelerators(for: model),
             supportedFormats: getSupportedFormats(for: model)
@@ -96,7 +96,7 @@ public class RequirementMatcher {
                    (model.format == .mlmodel || model.format == .mlpackage)
 
         case .gpu, .metal:
-            return capabilities.hasGPU && model.estimatedMemory <= capabilities.availableMemory
+            return capabilities.hasGPU && model.memoryRequired <= capabilities.availableMemory
 
         case .coreML:
             return capabilities.hasNeuralEngine || capabilities.hasGPU
@@ -116,7 +116,7 @@ public class RequirementMatcher {
         capabilities: DeviceCapabilities
     ) -> RequirementCheck {
 
-        let required = model.estimatedMemory
+        let required = model.memoryRequired
         let available = capabilities.availableMemory
 
         if available < required {
@@ -233,7 +233,7 @@ public class RequirementMatcher {
             recommendations.append("Convert model to Core ML format for Neural Engine acceleration")
         }
 
-        if capabilities.hasGPU && model.estimatedMemory > 1_000_000_000 {
+        if capabilities.hasGPU && model.memoryRequired > 1_000_000_000 {
             recommendations.append("Use GPU acceleration for better performance")
         }
 
@@ -262,7 +262,7 @@ public class RequirementMatcher {
 
     private func estimateStorageRequirement(for model: ModelInfo) -> Int64 {
         // Estimate 2x model size for temporary files during loading
-        let modelSize = model.downloadSize ?? model.estimatedMemory
+        let modelSize = model.downloadSize ?? model.memoryRequired
         return modelSize * 2
     }
 

@@ -27,7 +27,9 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - UnifiedFrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
-        let canHandle = model.compatibleFrameworks.contains(.whisperKit)
+        // Check if model is for speech recognition and compatible with WhisperKit
+        let canHandle = model.category == .speechRecognition &&
+                       model.compatibleFrameworks.contains(.whisperKit)
         logger.debug("canHandle(\(model.name, privacy: .public)): \(canHandle)")
         return canHandle
     }
@@ -92,7 +94,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
-        return model.estimatedMemory
+        return model.memoryRequired ?? 0
     }
 
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
@@ -110,112 +112,26 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
 
     // MARK: - Model Registration
 
-    // Store available models and download strategy
-    private var availableWhisperKitModels: [ModelInfo] = []
+    // Store download strategy only (models come from configuration)
     private lazy var downloadStrategy = WhisperKitDownloadStrategy()
 
     /// Called when adapter is registered with the SDK
     /// This method will be called automatically by the SDK when the adapter is registered
     public func onRegistration() {
-        logger.info("📚 WhisperKitAdapter registered - initializing WhisperKit models...")
-
-        // Initialize all WhisperKit models
-        self.availableWhisperKitModels = getAvailableModels()
-
-        logger.info("✅ WhisperKit setup complete with \(self.availableWhisperKitModels.count) models")
+        logger.info("✅ WhisperKitAdapter registered")
+        // Models will come from remote configuration or be added by users
+        // We only provide the download strategy for WhisperKit models
     }
 
     /// Get models provided by this adapter
+    /// Returns empty array since models come from configuration
     public func getProvidedModels() -> [ModelInfo] {
-        return availableWhisperKitModels
+        return []
     }
 
     /// Get download strategy for WhisperKit models
     public func getDownloadStrategy() -> DownloadStrategy? {
         return downloadStrategy
-    }
-
-    /// Get all available WhisperKit models
-    private func getAvailableModels() -> [ModelInfo] {
-        return [
-            // Tiny model
-            ModelInfo(
-                id: "whisperkit-tiny",
-                name: "Whisper Tiny",
-                format: .mlmodel,
-                downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-tiny/"),
-                localPath: nil,
-                estimatedMemory: 39_000_000, // ~39MB
-                contextLength: 1500,
-                downloadSize: 66_000_000, // ~66MB total
-                checksum: nil,
-                compatibleFrameworks: [.whisperKit],
-                preferredFramework: .whisperKit,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: ModelInfoMetadata(
-                    author: "OpenAI via ArgmaxInc",
-                    license: "MIT",
-                    tags: ["voice", "transcription", "tiny", "fast"],
-                    description: "Smallest and fastest Whisper model, good for quick transcriptions"
-                ),
-                alternativeDownloadURLs: nil,
-                supportsThinking: false,
-                thinkingTagPattern: nil
-            ),
-
-            // Base model
-            ModelInfo(
-                id: "whisperkit-base",
-                name: "Whisper Base",
-                format: .mlmodel,
-                downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-base/"),
-                localPath: nil,
-                estimatedMemory: 74_000_000, // ~74MB
-                contextLength: 1500,
-                downloadSize: 145_000_000, // ~145MB total
-                checksum: nil,
-                compatibleFrameworks: [.whisperKit],
-                preferredFramework: .whisperKit,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: ModelInfoMetadata(
-                    author: "OpenAI via ArgmaxInc",
-                    license: "MIT",
-                    tags: ["voice", "transcription", "base", "balanced"],
-                    description: "Balanced model for general transcription tasks"
-                ),
-                alternativeDownloadURLs: nil,
-                supportsThinking: false,
-                thinkingTagPattern: nil
-            ),
-
-            // Small model
-            ModelInfo(
-                id: "whisperkit-small",
-                name: "Whisper Small",
-                format: .mlmodel,
-                downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-small/"),
-                localPath: nil,
-                estimatedMemory: 244_000_000, // ~244MB
-                contextLength: 1500,
-                downloadSize: 483_000_000, // ~483MB total
-                checksum: nil,
-                compatibleFrameworks: [.whisperKit],
-                preferredFramework: .whisperKit,
-                hardwareRequirements: [],
-                tokenizerFormat: nil,
-                metadata: ModelInfoMetadata(
-                    author: "OpenAI via ArgmaxInc",
-                    license: "MIT",
-                    tags: ["voice", "transcription", "small", "accurate"],
-                    description: "Higher accuracy model for better transcription quality"
-                ),
-                alternativeDownloadURLs: nil,
-                supportsThinking: false,
-                thinkingTagPattern: nil
-            )
-        ]
     }
 
     // MARK: - Cache Management
