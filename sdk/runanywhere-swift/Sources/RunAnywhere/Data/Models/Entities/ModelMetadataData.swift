@@ -1,7 +1,8 @@
 import Foundation
+import GRDB
 
 /// Persisted model metadata data
-public struct ModelMetadataData: RepositoryEntity {
+public struct ModelMetadataData: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
     public let id: String
     public let name: String
     public let format: String
@@ -15,14 +16,15 @@ public struct ModelMetadataData: RepositoryEntity {
     public let license: String?
     public let description: String?
     public let tags: [String]
+    public let createdAt: Date
     public let downloadedAt: Date
     public let lastUsed: Date?
     public let usageCount: Int
     public let supportsThinking: Bool
     public let thinkingOpenTag: String?
     public let thinkingCloseTag: String?
-    public let updatedAt: Date
-    public let syncPending: Bool
+    public var updatedAt: Date
+    public var syncPending: Bool
 
     public init(
         id: String,
@@ -38,6 +40,7 @@ public struct ModelMetadataData: RepositoryEntity {
         license: String? = nil,
         description: String? = nil,
         tags: [String] = [],
+        createdAt: Date = Date(),
         downloadedAt: Date = Date(),
         lastUsed: Date? = nil,
         usageCount: Int = 0,
@@ -60,6 +63,7 @@ public struct ModelMetadataData: RepositoryEntity {
         self.license = license
         self.description = description
         self.tags = tags
+        self.createdAt = createdAt
         self.downloadedAt = downloadedAt
         self.lastUsed = lastUsed
         self.usageCount = usageCount
@@ -85,6 +89,7 @@ public struct ModelMetadataData: RepositoryEntity {
         self.license = model.metadata?.license
         self.description = model.metadata?.description
         self.tags = model.metadata?.tags ?? []
+        self.createdAt = Date()
         self.downloadedAt = Date()
         self.lastUsed = nil
         self.usageCount = 0
@@ -94,4 +99,21 @@ public struct ModelMetadataData: RepositoryEntity {
         self.updatedAt = Date()
         self.syncPending = true
     }
+
+    // MARK: - Syncable
+
+    public mutating func markUpdated() -> Self {
+        self.updatedAt = Date()
+        self.syncPending = true
+        return self
+    }
+
+    public mutating func markSynced() -> Self {
+        self.syncPending = false
+        return self
+    }
+
+    // MARK: - GRDB
+
+    public static var databaseTableName: String { "model_metadata" }
 }

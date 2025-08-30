@@ -4,13 +4,15 @@ import Foundation
 public actor ConfigurationService: ConfigurationServiceProtocol {
     private let logger = SDKLogger(category: "ConfigurationService")
     private let configRepository: ConfigurationRepositoryImpl
+    private let syncCoordinator: SyncCoordinator?
 
     private var currentConfig: ConfigurationData?
 
     // MARK: - Initialization
 
-    public init(configRepository: ConfigurationRepositoryImpl, apiClient: APIClient? = nil) {
+    public init(configRepository: ConfigurationRepositoryImpl, syncCoordinator: SyncCoordinator?) {
         self.configRepository = configRepository
+        self.syncCoordinator = syncCoordinator
         logger.info("ConfigurationService created")
     }
 
@@ -77,9 +79,11 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
             _ = updated.markUpdated()
             try await configRepository.save(updated)
 
-            // Trigger sync in background
-            Task {
-                try? await configRepository.syncIfNeeded()
+            // Trigger sync in background through coordinator
+            if let syncCoordinator = syncCoordinator {
+                Task {
+                    try? await syncCoordinator.sync(configRepository)
+                }
             }
 
             currentConfig = updated
@@ -90,8 +94,10 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
     }
 
     public func syncToCloud() async throws {
-        // Sync is now handled automatically
-        try await configRepository.syncIfNeeded()
+        // Sync through coordinator
+        if let syncCoordinator = syncCoordinator {
+            try await syncCoordinator.sync(configRepository)
+        }
     }
 
     // MARK: - Required protocol methods (simplified)

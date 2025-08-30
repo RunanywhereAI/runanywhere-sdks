@@ -150,14 +150,7 @@ public class ServiceContainer {
         SDKLogger()
     }()
 
-    /// Configuration service
-    private var _configurationService: ConfigurationServiceProtocol?
-    public var configurationService: ConfigurationServiceProtocol {
-        guard let service = _configurationService else {
-            fatalError("ConfigurationService must be initialized via bootstrap")
-        }
-        return service
-    }
+    // Configuration service is defined below in Data Services section
 
     /// Database manager
     private lazy var databaseManager: DatabaseManager = {
@@ -167,34 +160,73 @@ public class ServiceContainer {
     /// API client for sync operations
     private var apiClient: APIClient?
 
-    /// Data sync service
-    private var _dataSyncService: DataSyncService?
-
-    public var dataSyncService: DataSyncService? {
+    /// Sync coordinator for centralized sync management
+    private var _syncCoordinator: SyncCoordinator?
+    public var syncCoordinator: SyncCoordinator? {
         get async {
-            if _dataSyncService == nil {
-                // Create repositories for data sync
+            if _syncCoordinator == nil {
+                _syncCoordinator = SyncCoordinator(
+                    apiClient: apiClient,
+                    enableAutoSync: false // Disabled: No backend currently available
+                )
+            }
+            return _syncCoordinator
+        }
+    }
+
+    // MARK: - Data Services
+
+    /// Configuration service
+    private var _configurationService: ConfigurationService?
+    public var configurationService: ConfigurationServiceProtocol {
+        get async {
+            if _configurationService == nil {
                 let configRepo = ConfigurationRepositoryImpl(
                     databaseManager: databaseManager,
                     apiClient: apiClient
                 )
-                let modelRepo = ModelMetadataRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
+                _configurationService = ConfigurationService(
+                    configRepository: configRepo,
+                    syncCoordinator: await syncCoordinator
                 )
+            }
+            return _configurationService!
+        }
+    }
+
+    /// Telemetry service
+    private var _telemetryService: TelemetryService?
+    public var telemetryService: TelemetryService {
+        get async {
+            if _telemetryService == nil {
                 let telemetryRepo = TelemetryRepositoryImpl(
                     databaseManager: databaseManager,
                     apiClient: apiClient
                 )
-
-                _dataSyncService = DataSyncService(
-                    configurationRepository: configRepo,
-                    modelMetadataRepository: modelRepo,
+                _telemetryService = TelemetryService(
                     telemetryRepository: telemetryRepo,
-                    enableAutoSync: false // Disabled: No backend currently available
+                    syncCoordinator: await syncCoordinator
                 )
             }
-            return _dataSyncService
+            return _telemetryService!
+        }
+    }
+
+    /// Model metadata service
+    private var _modelMetadataService: ModelMetadataService?
+    public var modelMetadataService: ModelMetadataService {
+        get async {
+            if _modelMetadataService == nil {
+                let modelRepo = ModelMetadataRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                _modelMetadataService = ModelMetadataService(
+                    modelMetadataRepository: modelRepo,
+                    syncCoordinator: await syncCoordinator
+                )
+            }
+            return _modelMetadataService!
         }
     }
 
@@ -313,7 +345,7 @@ public class ServiceContainer {
         )
         _configurationService = ConfigurationService(
             configRepository: configRepository,
-            apiClient: apiClient
+            syncCoordinator: await syncCoordinator
         )
 
         // Load configuration on launch with simple fallback

@@ -1,11 +1,11 @@
 import Foundation
 
 /// Base repository protocol for data persistence
-/// Automatically handles sync for Syncable entities
+/// Minimal interface - sync handled by SyncCoordinator
 public protocol Repository {
     associatedtype Entity: Codable
 
-    // MARK: - Core Operations
+    // MARK: - Core CRUD Operations
 
     func save(_ entity: Entity) async throws
     func fetch(id: String) async throws -> Entity?
@@ -14,19 +14,8 @@ public protocol Repository {
 }
 
 /// Extension for repositories with Syncable entities
+/// Provides minimal sync support - actual sync logic in SyncCoordinator
 public extension Repository where Entity: Syncable {
-
-    /// Save and mark for sync
-    func saveAndSync(_ entity: Entity) async throws {
-        var updated = entity
-        _ = updated.markUpdated()
-        try await save(updated)
-
-        // Trigger background sync if possible
-        Task {
-            try? await syncIfNeeded()
-        }
-    }
 
     /// Fetch entities pending sync
     func fetchPendingSync() async throws -> [Entity] {
@@ -42,10 +31,5 @@ public extension Repository where Entity: Syncable {
                 try await save(entity)
             }
         }
-    }
-
-    /// Override this to implement actual network sync
-    func syncIfNeeded() async throws {
-        // Default: no-op, subclasses can override
     }
 }

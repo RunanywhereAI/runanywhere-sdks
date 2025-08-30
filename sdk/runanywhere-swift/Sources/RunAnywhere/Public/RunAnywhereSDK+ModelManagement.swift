@@ -23,9 +23,8 @@ extension RunAnywhereSDK {
         serviceContainer.generationService.setCurrentModel(loadedModel)
 
         // Update last used date in metadata
-        if let dataSyncService = await serviceContainer.dataSyncService {
-            try? await dataSyncService.updateModelLastUsed(for: modelIdentifier)
-        }
+        let modelMetadataService = await serviceContainer.modelMetadataService
+        try? await modelMetadataService.updateLastUsed(for: modelIdentifier)
 
         return loadedModel.model
     }
@@ -62,12 +61,8 @@ extension RunAnywhereSDK {
         let discoveredModels = await serviceContainer.modelRegistry.discoverModels()
 
         // Also check repository for any persisted models
-        let storedModels: [ModelInfo]
-        if let dataSyncService = await serviceContainer.dataSyncService {
-            storedModels = (try? await dataSyncService.loadStoredModels()) ?? []
-        } else {
-            storedModels = []
-        }
+        let modelMetadataService = await serviceContainer.modelMetadataService
+        let storedModels = (try? await modelMetadataService.loadStoredModels()) ?? []
 
         // Merge and deduplicate
         var allModels = discoveredModels
@@ -157,13 +152,12 @@ extension RunAnywhereSDK {
         thinkingTagPattern: ThinkingTagPattern? = nil
     ) async {
         // Update in repository
-        if let dataSyncService = await serviceContainer.dataSyncService {
-            try? await dataSyncService.updateThinkingSupport(
-                for: modelId,
-                supportsThinking: supportsThinking,
-                thinkingTagPattern: thinkingTagPattern
-            )
-        }
+        let modelMetadataService = await serviceContainer.modelMetadataService
+        try? await modelMetadataService.updateThinkingSupport(
+            for: modelId,
+            supportsThinking: supportsThinking,
+            thinkingTagPattern: thinkingTagPattern
+        )
 
         // Also update the model in the registry if it exists
         if let existingModel = serviceContainer.modelRegistry.getModel(by: modelId) {
