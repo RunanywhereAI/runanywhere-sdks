@@ -1,14 +1,15 @@
 import Foundation
 
-/// Simple service for managing SDK configuration using repository pattern
+/// Simple configuration service with fallback system: DB → Consumer → SDK Defaults
 public actor ConfigurationService: ConfigurationServiceProtocol {
     private let logger = SDKLogger(category: "ConfigurationService")
-    private let configRepository: any ConfigurationRepository
+    private let configRepository: ConfigurationRepositoryImpl
+
     private var currentConfig: ConfigurationData?
 
     // MARK: - Initialization
 
-    public init(configRepository: any ConfigurationRepository) {
+    public init(configRepository: ConfigurationRepositoryImpl, apiClient: APIClient? = nil) {
         self.configRepository = configRepository
         logger.info("ConfigurationService created")
     }
@@ -19,11 +20,49 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
         return currentConfig
     }
 
-    /// Ensure configuration is loaded from database
+    /// Load configuration on app launch with simple fallback: Remote → DB → Consumer → Defaults
+    public func loadConfigurationOnLaunch(apiKey: String) async -> ConfigurationData {
+        // Step 1: Try to fetch remote configuration
+        if let remoteConfig = try? await configRepository.fetchRemoteConfiguration(apiKey: apiKey) {
+            logger.info("Remote configuration loaded, saving to DB")
+            // Save to DB and use as current config
+            try? await configRepository.save(remoteConfig)
+            currentConfig = remoteConfig
+            return remoteConfig
+        }
+
+        // Step 2: Try to load from DB
+        if let dbConfig = try? await configRepository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId) {
+            logger.info("Using DB configuration")
+            currentConfig = dbConfig
+            return dbConfig
+        }
+
+        // Step 3: Try consumer configuration
+        if let consumerConfig = try? await configRepository.getConsumerConfiguration() {
+            logger.info("Using consumer configuration fallback")
+            currentConfig = consumerConfig
+            return consumerConfig
+        }
+
+        // Step 4: Use SDK defaults
+        logger.info("Using SDK default configuration")
+        let defaultConfig = configRepository.getSDKDefaultConfiguration()
+        currentConfig = defaultConfig
+        return defaultConfig
+    }
+
+    /// Ensure configuration is loaded
     public func ensureConfigurationLoaded() async {
         if currentConfig == nil {
-            await loadConfiguration()
+            currentConfig = await loadConfigurationOnLaunch(apiKey: "")
         }
+    }
+
+    /// Set consumer configuration override
+    public func setConsumerConfiguration(_ config: ConfigurationData) async throws {
+        try await configRepository.setConsumerConfiguration(config)
+        logger.info("Consumer configuration saved")
     }
 
     public func updateConfiguration(_ updates: (ConfigurationData) -> ConfigurationData) async {
@@ -32,45 +71,40 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
             return
         }
 
-        let updated = updates(config)
-        await saveConfiguration(updated)
-    }
-
-
-    public func syncToCloud() async throws {
-        try await configRepository.sync()
-    }
-
-    // MARK: - Private Methods
-
-    private func loadConfiguration() async {
+        var updated = updates(config)
         do {
-            // Try to load existing configuration
-            if let config = try await configRepository.fetch(id: SDKConstants.ConfigurationDefaults.configurationId) {
-                self.currentConfig = config
-                logger.info("Loaded configuration from database - maxTokens: \(config.generation.defaults.maxTokens), temperature: \(config.generation.defaults.temperature)")
-            } else {
-                // Create default configuration
-                let defaultConfig = ConfigurationData()
-                try await configRepository.save(defaultConfig)
-                self.currentConfig = defaultConfig
-                logger.info("Created default configuration - maxTokens: \(defaultConfig.generation.defaults.maxTokens)")
+            // Mark as updated and save
+            _ = updated.markUpdated()
+            try await configRepository.save(updated)
+
+            // Trigger sync in background
+            Task {
+                try? await configRepository.syncIfNeeded()
             }
-        } catch {
-            logger.error("Failed to load configuration: \(error)")
-            // Use in-memory defaults
-            self.currentConfig = ConfigurationData()
-        }
-    }
 
-    private func saveConfiguration(_ config: ConfigurationData) async {
-        do {
-            try await configRepository.save(config)
-            self.currentConfig = config
-            logger.info("Configuration saved - maxTokens: \(config.generation.defaults.maxTokens), temperature: \(config.generation.defaults.temperature)")
+            currentConfig = updated
+            logger.info("Configuration updated, saved to DB and queued for sync")
         } catch {
             logger.error("Failed to save configuration: \(error)")
         }
     }
 
+    public func syncToCloud() async throws {
+        // Sync is now handled automatically
+        try await configRepository.syncIfNeeded()
+    }
+
+    // MARK: - Required protocol methods (simplified)
+
+    public func loadConfigurationWithFallback(apiKey: String) async -> ConfigurationData {
+        return await loadConfigurationOnLaunch(apiKey: apiKey)
+    }
+
+    public func clearCache() async throws {
+        // No cache to clear
+    }
+
+    public func startBackgroundSync(apiKey: String) async {
+        // No background sync
+    }
 }

@@ -84,9 +84,9 @@ public class RunAnywhereSDK {
             do {
                 self.configuration = configuration
 
-                // Validate configuration
-                try await serviceContainer.configurationValidator.validate(configuration)
-                logger.info("✅ Configuration validated")
+                // Validate configuration - to be implemented when validator is added
+                // try await serviceContainer.configurationValidator.validate(configuration)
+                logger.info("✅ Configuration accepted")
 
                 // Bootstrap all services with configuration
                 try await serviceContainer.bootstrap(with: configuration)
