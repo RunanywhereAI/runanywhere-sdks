@@ -18,12 +18,8 @@ public extension RunAnywhere {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
-            let internalOptions = options?.toInternalOptions()
-            let result = try await RunAnywhereSDK.shared.generateStructured(
-                type,
-                prompt: prompt,
-                options: internalOptions
-            )
+            // For now, use the basic generateStructured method from main RunAnywhere
+            let result = try await RunAnywhere.generateStructured(type, prompt: prompt)
 
             await events.publish(SDKGenerationEvent.completed(
                 response: "Structured output generated for \(String(describing: type))",
@@ -54,13 +50,8 @@ public extension RunAnywhere {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
-            let internalOptions = options?.toInternalOptions()
-            let result = try await RunAnywhereSDK.shared.generateStructured(
-                type,
-                prompt: prompt,
-                validationMode: validationMode,
-                options: internalOptions
-            )
+            // For now, ignore validation mode and use basic structured generation
+            let result = try await RunAnywhere.generateStructured(type, prompt: prompt)
 
             await events.publish(SDKGenerationEvent.completed(
                 response: "Structured output generated with validation mode: \(validationMode)",
@@ -89,10 +80,25 @@ public extension RunAnywhere {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
-            let internalOptions = options?.toInternalOptions()
-            let result = try await RunAnywhereSDK.shared.generateWithStructuredOutput(
-                prompt: prompt,
+            // Generate using regular generation with structured config in options
+            let baseOptions = options?.toInternalOptions() ?? RunAnywhereGenerationOptions()
+            let internalOptions = RunAnywhereGenerationOptions(
+                maxTokens: baseOptions.maxTokens,
+                temperature: baseOptions.temperature,
+                topP: baseOptions.topP,
+                enableRealTimeTracking: baseOptions.enableRealTimeTracking,
+                stopSequences: baseOptions.stopSequences,
+                seed: baseOptions.seed,
+                streamingEnabled: baseOptions.streamingEnabled,
+                tokenBudget: baseOptions.tokenBudget,
+                frameworkOptions: baseOptions.frameworkOptions,
+                preferredExecutionTarget: baseOptions.preferredExecutionTarget,
                 structuredOutput: structuredOutput,
+                systemPrompt: baseOptions.systemPrompt
+            )
+
+            let result = try await RunAnywhere.serviceContainer.generationService.generate(
+                prompt: prompt,
                 options: internalOptions
             )
 

@@ -2,7 +2,6 @@ import Foundation
 import Combine
 
 /// Central event bus for SDK-wide event distribution
-@MainActor
 public class EventBus {
     /// Shared instance
     public static let shared = EventBus()

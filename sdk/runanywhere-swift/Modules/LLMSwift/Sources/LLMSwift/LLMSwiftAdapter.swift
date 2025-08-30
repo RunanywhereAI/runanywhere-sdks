@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import LLM
 
 public class LLMSwiftAdapter: UnifiedFrameworkAdapter {

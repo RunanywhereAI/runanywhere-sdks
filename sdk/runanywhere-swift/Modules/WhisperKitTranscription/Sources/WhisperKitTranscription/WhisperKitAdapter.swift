@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import os
 
 /// WhisperKit adapter for voice transcription
