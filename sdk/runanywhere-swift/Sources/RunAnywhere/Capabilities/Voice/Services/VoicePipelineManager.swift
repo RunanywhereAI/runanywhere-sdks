@@ -532,7 +532,7 @@ public class VoicePipelineManager {
                 } else if useGenerationService || llmService == nil {
                     // Use the SDK's generation service directly
                     logger.debug("Using GenerationService directly for LLM processing")
-                    let generationService = RunAnywhereSDK.shared.serviceContainer.generationService
+                    let generationService = RunAnywhere.serviceContainer.generationService
                     let result = try await generationService.generate(
                         prompt: transcript,
                         options: options

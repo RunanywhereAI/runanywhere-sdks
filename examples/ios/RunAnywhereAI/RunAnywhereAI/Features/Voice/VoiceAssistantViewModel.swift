@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import AVFoundation
 import Combine
 import os
@@ -7,8 +7,8 @@ import os
 @MainActor
 class VoiceAssistantViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
-    private let sdk = RunAnywhereSDK.shared
     private let audioCapture = AudioCapture()
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties
     @Published var currentTranscript: String = ""
@@ -149,7 +149,7 @@ class VoiceAssistantViewModel: ObservableObject {
         )
 
         // Create the pipeline
-        voicePipeline = sdk.createVoicePipeline(config: config)
+        voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
         voicePipeline?.delegate = self
 
         // Initialize components first

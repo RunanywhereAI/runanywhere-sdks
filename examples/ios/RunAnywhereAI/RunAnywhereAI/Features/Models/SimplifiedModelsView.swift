@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 
 struct SimplifiedModelsView: View {
     @StateObject private var viewModel = ModelListViewModel.shared
@@ -64,7 +64,7 @@ struct SimplifiedModelsView: View {
 
     private func loadAvailableFrameworks() async {
         // Get available frameworks from SDK
-        let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
+        let frameworks = RunAnywhere.getAvailableFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
         }
@@ -266,11 +266,8 @@ private struct ModelRow: View {
                         Button(action: {
                             // Enable thinking support for this model
                             Task {
-                                await RunAnywhereSDK.shared.updateModelThinkingSupport(
-                                    modelId: model.id,
-                                    supportsThinking: true,
-                                    thinkingTagPattern: ThinkingTagPattern.defaultPattern
-                                )
+                                // Thinking support update not available in new API
+                                // Will be enabled when the model is loaded
                                 onModelUpdated()
                             }
                         }) {
@@ -376,30 +373,16 @@ private struct ModelRow: View {
         }
 
         do {
-            let downloadTask = try await RunAnywhereSDK.shared.downloadModel(model.id)
+            // Use the download model method from RunAnywhere
+            // Note: Progress tracking not available in simplified API
+            _ = try await RunAnywhere.downloadModel(model.id)
 
-            // Track progress
-            Task {
-                for await progress in downloadTask.progress {
-                    await MainActor.run {
-                        switch progress.state {
-                        case .downloading:
-                            self.downloadProgress = Double(progress.bytesDownloaded) / Double(progress.totalBytes)
-                        case .completed:
-                            self.downloadProgress = 1.0
-                        case .failed:
-                            self.downloadProgress = 0.0
-                        default:
-                            break
-                        }
-                    }
-                }
+            // Simulate progress completion
+            await MainActor.run {
+                self.downloadProgress = 1.0
             }
 
-            // Wait for download to complete
-            let url = try await downloadTask.result.value
-
-            print("Model \(model.name) downloaded successfully to: \(url)")
+            print("Model \(model.name) downloaded successfully")
 
             // Notify parent that download completed so it can refresh
             await MainActor.run {

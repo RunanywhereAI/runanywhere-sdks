@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 import os.log
 #if canImport(UIKit)
 import UIKit
@@ -52,22 +52,22 @@ struct ChatInterfaceView: View {
                         Label("Conversations", systemImage: "list.bullet")
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Spacer()
-                    
+
                     Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
                         .font(.headline)
-                    
+
                     Spacer()
-                    
+
                     toolbarButtons
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(NSColor.windowBackgroundColor))
-                
+
                 Divider()
-                
+
                 chatMessagesView
                 inputArea
             }

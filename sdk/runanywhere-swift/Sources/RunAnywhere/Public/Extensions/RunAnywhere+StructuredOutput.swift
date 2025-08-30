@@ -13,7 +13,7 @@ public extension RunAnywhere {
     static func generateStructured<T: Generatable>(
         _ type: T.Type,
         prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
@@ -45,7 +45,7 @@ public extension RunAnywhere {
         _ type: T.Type,
         prompt: String,
         validationMode: SchemaValidationMode,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
@@ -75,13 +75,13 @@ public extension RunAnywhere {
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: StructuredOutputConfig,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> GenerationResult {
         await events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Generate using regular generation with structured config in options
-            let baseOptions = options?.toInternalOptions() ?? RunAnywhereGenerationOptions()
+            let baseOptions = options ?? RunAnywhereGenerationOptions()
             let internalOptions = RunAnywhereGenerationOptions(
                 maxTokens: baseOptions.maxTokens,
                 temperature: baseOptions.temperature,

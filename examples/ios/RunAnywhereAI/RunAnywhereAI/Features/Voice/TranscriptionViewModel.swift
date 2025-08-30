@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import AVFoundation
 import Combine
 import os
@@ -12,8 +12,8 @@ import AppKit
 @MainActor
 class TranscriptionViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "TranscriptionViewModel")
-    private let sdk = RunAnywhereSDK.shared
     private let audioCapture = AudioCapture()
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties
     @Published var transcriptionText: String = ""
@@ -118,21 +118,27 @@ class TranscriptionViewModel: ObservableObject {
         if enableSpeakerDiarization {
             logger.info("Using FluidAudioDiarization for speaker detection")
             voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(
-                sdk: sdk,
                 config: config
             )
             voicePipeline?.enableSpeakerDiarization(true)
             voicePipeline?.enableContinuousMode(true)
         } else {
             // Create standard pipeline
-            voicePipeline = sdk.createVoicePipeline(config: config)
-            voicePipeline?.delegate = self
+            do {
+                voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
+                voicePipeline?.delegate = self
 
-            // Enable speaker diarization with default implementation
-            if enableSpeakerDiarization {
-                voicePipeline?.enableSpeakerDiarization(true)
-                voicePipeline?.enableContinuousMode(true)
-                logger.info("Enabled speaker diarization with default implementation")
+                // Enable speaker diarization with default implementation
+                if enableSpeakerDiarization {
+                    voicePipeline?.enableSpeakerDiarization(true)
+                    voicePipeline?.enableContinuousMode(true)
+                    logger.info("Enabled speaker diarization with default implementation")
+                }
+            } catch {
+                errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
+                currentStatus = "Error"
+                logger.error("Failed to create voice pipeline: \(error)")
+                return
             }
         }
 

@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import OSLog
 
 // Import FoundationModels with conditional compilation
