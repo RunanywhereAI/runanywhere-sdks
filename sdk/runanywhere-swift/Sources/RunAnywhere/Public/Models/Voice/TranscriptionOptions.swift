@@ -1,7 +1,7 @@
 import Foundation
 
 /// Options for transcription
-public struct VoiceTranscriptionOptions {
+public struct STTOptions {
     /// Language for transcription
     public enum Language: String {
         case auto = "auto"

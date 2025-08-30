@@ -6,7 +6,7 @@ import os
 /// FluidAudio-based implementation of speaker diarization
 /// Provides production-ready speaker diarization with 17.7% DER
 @available(iOS 16.0, macOS 13.0, *)
-public class FluidAudioDiarization: SpeakerDiarizationProtocol {
+public class FluidAudioDiarization: SpeakerDiarizationService {
 
     private let diarizerManager: DiarizerManager
     private var speakers: [String: SpeakerInfo] = [:]
@@ -48,7 +48,7 @@ public class FluidAudioDiarization: SpeakerDiarizationProtocol {
         logger.info("FluidAudio diarization ready")
     }
 
-    // MARK: - SpeakerDiarizationProtocol Implementation
+    // MARK: - SpeakerDiarizationService Implementation
 
     public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
         return diarizationQueue.sync {

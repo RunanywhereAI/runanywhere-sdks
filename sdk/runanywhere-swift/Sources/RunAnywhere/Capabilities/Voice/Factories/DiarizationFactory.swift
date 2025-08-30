@@ -11,7 +11,7 @@ public enum DiarizationType {
     case fluidAudio
 
     /// Custom implementation
-    case custom(SpeakerDiarizationProtocol)
+    case custom(SpeakerDiarizationService)
 }
 
 // MARK: - SDK Extension for Diarization
@@ -32,7 +32,7 @@ extension RunAnywhereSDK {
         diarizationType: DiarizationType = .default
     ) async throws -> VoicePipelineManager {
 
-        let diarizationService: SpeakerDiarizationProtocol?
+        let diarizationService: SpeakerDiarizationService?
 
         switch diarizationType {
         case .default:
@@ -59,7 +59,7 @@ extension RunAnywhereSDK {
 
     /// Attempt to create FluidAudio diarization service
     /// Falls back to default if module not available
-    private func createFluidAudioDiarization() async throws -> SpeakerDiarizationProtocol {
+    private func createFluidAudioDiarization() async throws -> SpeakerDiarizationService {
         // Try to dynamically load FluidAudio module
         let className = "FluidAudioDiarization.FluidAudioDiarization"
 
@@ -92,7 +92,7 @@ public struct SpeakerDiarizationFactory {
 
     /// Create a diarization service based on availability
     /// - Returns: Best available diarization service
-    public static func createBestAvailable() async -> SpeakerDiarizationProtocol {
+    public static func createBestAvailable() async -> SpeakerDiarizationService {
         // Check if FluidAudio is available
         if NSClassFromString("FluidAudioDiarization.FluidAudioDiarization") != nil {
             // FluidAudio is available but requires async init
@@ -106,7 +106,7 @@ public struct SpeakerDiarizationFactory {
     }
 
     /// Create default diarization service
-    public static func createDefault() -> SpeakerDiarizationProtocol {
+    public static func createDefault() -> SpeakerDiarizationService {
         return DefaultSpeakerDiarization()
     }
 }

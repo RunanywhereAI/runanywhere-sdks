@@ -9,7 +9,7 @@ class FluidAudioIntegration {
     private static let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FluidAudioIntegration")
 
     /// Create FluidAudioDiarization service
-    static func createDiarizationService() async -> SpeakerDiarizationProtocol? {
+    static func createDiarizationService() async -> SpeakerDiarizationService? {
         do {
             // Use a threshold between standard (0.65) and measured distance (0.26)
             // 0.45 provides good balance for similar speakers while avoiding over-segmentation

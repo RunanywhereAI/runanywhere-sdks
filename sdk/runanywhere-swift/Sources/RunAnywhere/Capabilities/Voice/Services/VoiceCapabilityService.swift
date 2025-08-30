@@ -94,7 +94,7 @@ public class VoiceCapabilityService {
     // MARK: - Service Discovery
 
     /// Find voice service for the given model ID
-    public func findVoiceService(for modelId: String?) -> VoiceService? {
+    public func findVoiceService(for modelId: String?) -> STTService? {
         guard let modelId = modelId else { return nil }
 
         logger.debug("Finding voice service for model: \(modelId)")
@@ -108,7 +108,7 @@ public class VoiceCapabilityService {
             if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
                unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
                 // Create a voice service from the unified adapter
-                if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
+                if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? STTService {
                     return voiceService
                 }
             }
@@ -118,7 +118,7 @@ public class VoiceCapabilityService {
         let voiceFrameworks = container.adapterRegistry.getFrameworks(for: FrameworkModality.voiceToText)
         if let firstVoiceFramework = voiceFrameworks.first,
            let adapter = container.adapterRegistry.getAdapter(for: firstVoiceFramework) {
-            if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
+            if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? STTService {
                 return voiceService
             }
         }

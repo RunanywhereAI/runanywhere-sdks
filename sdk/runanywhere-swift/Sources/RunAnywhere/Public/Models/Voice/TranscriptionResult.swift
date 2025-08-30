@@ -19,7 +19,7 @@ public struct SpeakerInfo: Codable, Equatable {
 }
 
 /// Result from speech-to-text transcription
-public struct VoiceTranscriptionResult {
+public struct STTResult {
     /// The transcribed text
     public let text: String
 
