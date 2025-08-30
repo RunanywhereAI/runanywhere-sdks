@@ -7,7 +7,7 @@ public class RunAnywhereSDK {
     public static let shared: RunAnywhereSDK = RunAnywhereSDK()
 
     /// Current configuration
-    private var configuration: Configuration?
+    internal var configuration: Configuration?
     internal var _isInitialized = false
 
     /// Task that tracks SDK initialization - allows other code to await completion
