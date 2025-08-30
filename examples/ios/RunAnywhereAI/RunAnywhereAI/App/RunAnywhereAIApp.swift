@@ -76,10 +76,10 @@ struct RunAnywhereAIApp: App {
                 RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
             }
 
-            // Register voice framework adapter (now uses unified adapter with singleton)
-            logger.info("🎤 Registering WhisperKitAdapter...")
+            // Register voice framework adapter (self-contained with models and download strategy)
+            logger.info("🎤 Registering self-contained WhisperKitAdapter...")
             RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKitAdapter registered")
+            logger.info("✅ WhisperKitAdapter registered with models and download strategy")
 
             // Initialize the SDK with just API key
             let startTime = Date()
@@ -92,7 +92,7 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ SDK successfully initialized!")
             logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
             logger.info("📊 SDK Status: Ready for on-device AI inference")
-            logger.info("🔧 Registered frameworks: LLMSwift, FoundationModels, WhisperKit")
+            logger.info("🔧 Registered frameworks: LLMSwift, FoundationModels, WhisperKit (self-contained)")
 
             // Note: User settings are now applied per-request, not globally
 

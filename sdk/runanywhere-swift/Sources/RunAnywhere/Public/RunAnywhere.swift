@@ -222,7 +222,11 @@ public enum RunAnywhere {
                 throw SDKError.notInitialized
             }
 
-            _ = try await serviceContainer.modelLoadingService.loadModel(modelId)
+            let loadedModel = try await serviceContainer.modelLoadingService.loadModel(modelId)
+
+            // IMPORTANT: Set the loaded model in the generation service
+            serviceContainer.generationService.setCurrentModel(loadedModel)
+
             await EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
             await EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
@@ -249,8 +253,8 @@ public enum RunAnywhere {
             return nil
         }
 
-        // TODO: Implement getting current model from service
-        return nil
+        // Get the current model from the generation service
+        return serviceContainer.generationService.getCurrentModel()?.model
     }
 }
 

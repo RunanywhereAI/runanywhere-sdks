@@ -11,6 +11,20 @@ public final class AdapterRegistry {
     func register(_ adapter: UnifiedFrameworkAdapter) {
         queue.async(flags: .barrier) {
             self.adapters[adapter.framework] = adapter
+
+            // Call the adapter's onRegistration method
+            adapter.onRegistration()
+
+            // Register models provided by the adapter
+            let models = adapter.getProvidedModels()
+            for model in models {
+                ServiceContainer.shared.modelRegistry.registerModel(model)
+            }
+
+            // Register download strategy if provided
+            if let downloadStrategy = adapter.getDownloadStrategy() {
+                ServiceContainer.shared.downloadService.registerStrategy(downloadStrategy)
+            }
         }
     }
 

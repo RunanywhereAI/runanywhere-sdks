@@ -56,7 +56,8 @@ cd sdk/runanywhere-android/
 ```
 
 ### iOS SDK Development
-
+## While implementing:
+- Always use the latest Swift syntax - Swift 6 version is the latest right now. Use the latest concurrency etc patterns and try to implement CLEAN architecture unless explicitly mentioned otherwise.
 ```bash
 # Navigate to iOS SDK
 cd sdk/runanywhere-swift/

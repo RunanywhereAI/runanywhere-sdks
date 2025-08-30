@@ -15,6 +15,9 @@ public extension RunAnywhere {
             // Use existing service logic directly
             let loadedModel = try await RunAnywhere.serviceContainer.modelLoadingService.loadModel(modelIdentifier)
 
+            // IMPORTANT: Set the loaded model in the generation service
+            RunAnywhere.serviceContainer.generationService.setCurrentModel(loadedModel)
+
             await events.publish(SDKModelEvent.loadCompleted(modelId: modelIdentifier))
             return loadedModel.model
         } catch {
@@ -28,8 +31,17 @@ public extension RunAnywhere {
         await events.publish(SDKModelEvent.unloadStarted)
 
         do {
-            // For now, we'll need to track which model is currently active
-            // This is a simplified implementation - would need to call actual unload
+            // Get the current model ID from generation service
+            if let currentModel = RunAnywhere.serviceContainer.generationService.getCurrentModel() {
+                let modelId = currentModel.model.id
+
+                // Unload through model loading service
+                try await RunAnywhere.serviceContainer.modelLoadingService.unloadModel(modelId)
+
+                // Clear from generation service
+                RunAnywhere.serviceContainer.generationService.setCurrentModel(nil)
+            }
+
             await events.publish(SDKModelEvent.unloadCompleted)
         } catch {
             await events.publish(SDKModelEvent.unloadFailed(error))
