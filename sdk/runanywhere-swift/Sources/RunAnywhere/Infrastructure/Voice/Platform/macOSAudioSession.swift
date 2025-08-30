@@ -33,7 +33,7 @@ public class macOSAudioSession {
         )
 
         guard let audioFormat = format else {
-            throw VoiceError.audioSessionActivationFailed
+            throw STTError.audioSessionActivationFailed
         }
 
         // Configure based on mode
@@ -55,7 +55,7 @@ public class macOSAudioSession {
     /// Start the audio engine
     public func start() throws {
         guard isConfigured else {
-            throw VoiceError.audioSessionNotConfigured
+            throw STTError.audioSessionNotConfigured
         }
 
         // Prepare the engine
@@ -127,7 +127,7 @@ public class macOSAudioSession {
     /// Set the audio input device
     public func setInputDevice(_ deviceID: String) throws {
         guard let device = AVCaptureDevice(uniqueID: deviceID) else {
-            throw VoiceError.audioSessionActivationFailed
+            throw STTError.audioSessionActivationFailed
         }
 
         // In a real implementation, we'd configure the audio engine's input

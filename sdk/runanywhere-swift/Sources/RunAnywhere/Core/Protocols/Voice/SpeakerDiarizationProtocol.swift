@@ -2,7 +2,7 @@ import Foundation
 
 /// Protocol for speaker diarization implementations
 /// Allows for default SDK implementation, FluidAudio module, or custom implementations
-public protocol SpeakerDiarizationProtocol: AnyObject {
+public protocol SpeakerDiarizationService: AnyObject {
     // Core methods that all implementations must provide
     func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo
     func updateSpeakerName(speakerId: String, name: String)
@@ -16,7 +16,7 @@ public protocol SpeakerDiarizationProtocol: AnyObject {
 }
 
 // Default implementation for optional methods
-public extension SpeakerDiarizationProtocol {
+public extension SpeakerDiarizationService {
     func performDetailedDiarization(audioBuffer: [Float]) async throws -> SpeakerDiarizationResult? {
         return nil // Default returns nil, advanced implementations can override
     }

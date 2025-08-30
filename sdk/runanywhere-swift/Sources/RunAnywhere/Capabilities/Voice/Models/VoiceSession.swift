@@ -25,7 +25,7 @@ public struct VoiceSession {
     public let id: String
     public let configuration: VoiceSessionConfig
     public var state: VoiceSessionState
-    public var transcripts: [VoiceTranscriptionResult]
+    public var transcripts: [STTResult]
     public var startTime: Date?
     public var endTime: Date?
 

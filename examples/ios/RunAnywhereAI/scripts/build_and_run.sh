@@ -356,9 +356,9 @@ else
 fi
 
 if eval "$BUILD_CMD" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -destination "$DESTINATION" \
+    -scheme \"$SCHEME\" \
+    -configuration \"$CONFIGURATION\" \
+    -destination \"$DESTINATION\" \
     -allowProvisioningUpdates \
     build > /tmp/xcodebuild.log 2>&1; then
     print_status "Build succeeded!"

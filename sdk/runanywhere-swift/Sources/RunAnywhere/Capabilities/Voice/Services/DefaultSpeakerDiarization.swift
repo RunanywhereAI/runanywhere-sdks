@@ -3,7 +3,7 @@ import Accelerate
 
 /// Default implementation of speaker diarization using simple audio features
 /// This provides basic speaker tracking functionality without external dependencies
-public class DefaultSpeakerDiarization: SpeakerDiarizationProtocol {
+public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     /// Manages detected speakers and their profiles
     private var speakers: [String: SpeakerInfo] = [:]

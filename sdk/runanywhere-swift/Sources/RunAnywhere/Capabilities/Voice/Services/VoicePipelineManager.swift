@@ -32,7 +32,7 @@ public class VoicePipelineManager {
 
     // Component instances (created based on config)
     private var vadComponent: VADService?
-    private var sttService: VoiceService?
+    private var sttService: STTService?
     private var llmService: LLMService?
     private var ttsService: TextToSpeechService?
     private var useGenerationService: Bool = false
@@ -60,7 +60,7 @@ public class VoicePipelineManager {
     private var streamingTTSHandler: StreamingTTSHandler?
 
     // Speaker diarization
-    private var speakerDiarizationService: SpeakerDiarizationProtocol?
+    private var speakerDiarizationService: SpeakerDiarizationService?
     private var enableSpeakerDiarization: Bool = false
     private var continuousMode: Bool = false
     private var sessionStartTime: Date?
@@ -70,10 +70,10 @@ public class VoicePipelineManager {
     public init(
         config: ModularPipelineConfig,
         vadService: VADService? = nil,
-        voiceService: VoiceService? = nil,
+        voiceService: STTService? = nil,
         llmService: LLMService? = nil,
         ttsService: TextToSpeechService? = nil,
-        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        speakerDiarization: SpeakerDiarizationService? = nil,
         segmentationStrategy: AudioSegmentationStrategy? = nil,
         voiceAnalytics: VoiceAnalyticsService? = nil,
         sttAnalytics: STTAnalyticsService? = nil
@@ -373,8 +373,8 @@ public class VoicePipelineManager {
         if let stt = sttService, config.components.contains(.stt), let sttConfig = config.stt {
             let sttStageStart = Date()
 
-            let options = VoiceTranscriptionOptions(
-                language: VoiceTranscriptionOptions.Language(rawValue: sttConfig.language) ?? .english,
+            let options = STTOptions(
+                language: STTOptions.Language(rawValue: sttConfig.language) ?? .english,
                 enableSpeakerDiarization: enableSpeakerDiarization,
                 continuousMode: continuousMode
             )
@@ -384,7 +384,7 @@ public class VoicePipelineManager {
             // logger.debug("STT service prefers \(preferredFormat) format")
 
             do {
-                let result: VoiceTranscriptionResult
+                let result: STTResult
 
                 if preferredFormat == .floatArray {
                     // Service prefers Float arrays - pass directly

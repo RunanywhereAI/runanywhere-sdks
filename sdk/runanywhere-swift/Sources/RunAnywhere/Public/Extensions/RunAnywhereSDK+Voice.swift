@@ -12,13 +12,13 @@ public extension RunAnywhereSDK {
     func transcribe(
         audio: Data,
         modelId: String = "whisper-base",
-        options: VoiceTranscriptionOptions = VoiceTranscriptionOptions()
-    ) async throws -> VoiceTranscriptionResult {
+        options: STTOptions = STTOptions()
+    ) async throws -> STTResult {
         try await ensureInitialized()
 
         // Find appropriate voice service
         guard let voiceService = findVoiceService(for: modelId) else {
-            throw VoiceError.noVoiceServiceAvailable
+            throw STTError.noVoiceServiceAvailable
         }
 
         // Initialize the service
@@ -40,7 +40,7 @@ public extension RunAnywhereSDK {
     /// - Returns: Configured voice pipeline
     public func createVoicePipeline(
         config: ModularPipelineConfig,
-        speakerDiarization: SpeakerDiarizationProtocol? = nil,
+        speakerDiarization: SpeakerDiarizationService? = nil,
         segmentationStrategy: AudioSegmentationStrategy? = nil
     ) -> VoicePipelineManager {
         // Delegate to voice capability service
@@ -67,7 +67,7 @@ public extension RunAnywhereSDK {
     // MARK: - Service Discovery (Delegated to VoiceCapabilityService)
 
     /// Find appropriate voice service for model
-    func findVoiceService(for modelId: String) -> VoiceService? {
+    func findVoiceService(for modelId: String) -> STTService? {
         // Delegate to voice capability service
         return serviceContainer.voiceCapabilityService.findVoiceService(for: modelId)
     }

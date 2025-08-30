@@ -15,7 +15,7 @@ public class SpeakerDiarizationHandler {
     /// - Returns: Detected speaker information
     public func detectSpeaker(
         from samples: [Float],
-        service: SpeakerDiarizationProtocol,
+        service: SpeakerDiarizationService,
         sampleRate: Int = 16000
     ) -> SpeakerInfo {
         return service.detectSpeaker(

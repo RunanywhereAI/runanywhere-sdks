@@ -1,30 +1,30 @@
 import Foundation
 
 /// Enum to specify preferred audio format for the service
-public enum VoiceServiceAudioFormat {
+public enum STTServiceAudioFormat {
     case data       // Service prefers raw Data
     case floatArray // Service prefers Float array samples
 }
 
 /// Protocol for voice transcription services
-public protocol VoiceService: AnyObject {
-    /// Initialize the voice service with an optional model path
+public protocol STTService: AnyObject {
+    /// Initialize the STT service with an optional model path
     func initialize(modelPath: String?) async throws
 
     /// Transcribe audio data to text
     func transcribe(
         audio: Data,
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult
+        options: STTOptions
+    ) async throws -> STTResult
 
     /// Transcribe audio samples to text (optional - implement if preferred format is floatArray)
     func transcribe(
         samples: [Float],
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult
+        options: STTOptions
+    ) async throws -> STTResult
 
     /// Preferred audio format for this service
-    var preferredAudioFormat: VoiceServiceAudioFormat { get }
+    var preferredAudioFormat: STTServiceAudioFormat { get }
 
     /// Check if service is ready
     var isReady: Bool { get }
@@ -42,8 +42,8 @@ public protocol VoiceService: AnyObject {
     /// - Returns: Stream of transcription segments
     func transcribeStream(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        options: VoiceTranscriptionOptions
-    ) -> AsyncThrowingStream<VoiceTranscriptionSegment, Error>
+        options: STTOptions
+    ) -> AsyncThrowingStream<STTSegment, Error>
 
     /// Check if streaming is supported
     var supportsStreaming: Bool { get }
@@ -53,12 +53,12 @@ public protocol VoiceService: AnyObject {
 }
 
 // MARK: - Default implementations for optional methods
-public extension VoiceService {
+public extension STTService {
     /// Default implementation for Float array transcription - converts to Data
     func transcribe(
         samples: [Float],
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
+        options: STTOptions
+    ) async throws -> STTResult {
         // Default implementation converts Float array to Data
         let data = samples.withUnsafeBytes { bytes in
             Data(bytes)
@@ -67,15 +67,15 @@ public extension VoiceService {
     }
 
     /// Default preferred format is Data for backward compatibility
-    var preferredAudioFormat: VoiceServiceAudioFormat { .data }
+    var preferredAudioFormat: STTServiceAudioFormat { .data }
 
     /// Default implementation returns unsupported stream
     func transcribeStream(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        options: VoiceTranscriptionOptions
-    ) -> AsyncThrowingStream<VoiceTranscriptionSegment, Error> {
+        options: STTOptions
+    ) -> AsyncThrowingStream<STTSegment, Error> {
         AsyncThrowingStream { continuation in
-            continuation.finish(throwing: VoiceError.streamingNotSupported)
+            continuation.finish(throwing: STTError.streamingNotSupported)
         }
     }
 
@@ -88,8 +88,8 @@ public extension VoiceService {
     }
 }
 
-/// Errors for voice services
-public enum VoiceError: LocalizedError {
+/// Errors for STT services
+public enum STTError: LocalizedError {
     case serviceNotInitialized
     case transcriptionFailed(Error)
     case streamingNotSupported
@@ -105,7 +105,7 @@ public enum VoiceError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .serviceNotInitialized:
-            return "Voice service is not initialized"
+            return "STT service is not initialized"
         case .transcriptionFailed(let error):
             return "Transcription failed: \(error.localizedDescription)"
         case .streamingNotSupported:
@@ -119,7 +119,7 @@ public enum VoiceError: LocalizedError {
         case .insufficientAudioData:
             return "Insufficient audio data for transcription"
         case .noVoiceServiceAvailable:
-            return "No voice service available for transcription"
+            return "No STT service available for transcription"
         case .audioSessionNotConfigured:
             return "Audio session is not configured"
         case .audioSessionActivationFailed:

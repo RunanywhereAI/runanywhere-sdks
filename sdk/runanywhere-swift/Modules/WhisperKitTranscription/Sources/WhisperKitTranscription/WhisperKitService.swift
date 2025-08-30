@@ -4,8 +4,8 @@ import AVFoundation
 import WhisperKit
 import os
 
-/// WhisperKit implementation of VoiceService
-public class WhisperKitService: VoiceService {
+/// WhisperKit implementation of STTService
+public class WhisperKitService: STTService {
     private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitService")
 
     // MARK: - Properties
@@ -75,8 +75,8 @@ public class WhisperKitService: VoiceService {
 
     public func transcribe(
         audio: Data,
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
+        options: STTOptions
+    ) async throws -> STTResult {
         // Convert Data to Float array
         let audioSamples = audio.withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
@@ -87,8 +87,8 @@ public class WhisperKitService: VoiceService {
     /// Direct transcription with Float samples
     public func transcribe(
         samples: [Float],
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
+        options: STTOptions
+    ) async throws -> STTResult {
         logger.info("transcribe() called with \(samples.count) samples")
         logger.debug("Options - Language: \(options.language.rawValue, privacy: .public), Task: \(String(describing: options.task), privacy: .public)")
 
@@ -113,7 +113,7 @@ public class WhisperKitService: VoiceService {
 
         if samples.allSatisfy({ $0 == 0 }) {
             logger.warning("All samples are zero - returning empty result")
-            return VoiceTranscriptionResult(
+            return STTResult(
                 text: "",
                 language: options.language.rawValue,
                 confidence: 0.0,
@@ -140,9 +140,9 @@ public class WhisperKitService: VoiceService {
 
     private func transcribeWithSamples(
         _ audioSamples: [Float],
-        options: VoiceTranscriptionOptions,
+        options: STTOptions,
         originalDuration: Double
-    ) async throws -> VoiceTranscriptionResult {
+    ) async throws -> STTResult {
         guard let whisperKit = whisperKit else {
             throw VoiceError.serviceNotInitialized
         }
@@ -246,7 +246,7 @@ public class WhisperKitService: VoiceService {
         }
 
         // Return the result (even if empty)
-        let result = VoiceTranscriptionResult(
+        let result = STTResult(
             text: transcribedText,
             language: transcriptionResults.first?.language ?? options.language.rawValue,
             confidence: transcribedText.isEmpty ? 0.0 : 0.95,
@@ -309,8 +309,8 @@ public class WhisperKitService: VoiceService {
     /// Transcribe audio stream in real-time
     public func transcribeStream(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        options: VoiceTranscriptionOptions
-    ) -> AsyncThrowingStream<VoiceTranscriptionSegment, Error> {
+        options: STTOptions
+    ) -> AsyncThrowingStream<STTSegment, Error> {
         AsyncThrowingStream { continuation in
             self.streamingTask = Task {
                 do {
@@ -367,7 +367,7 @@ public class WhisperKitService: VoiceService {
 
                                 // Only yield if there's new content
                                 if !newText.isEmpty && newText != lastTranscript {
-                                    let segment = VoiceTranscriptionSegment(
+                                    let segment = STTSegment(
                                         text: newText,
                                         startTime: chunk.timestamp - 0.5,
                                         endTime: chunk.timestamp,
@@ -409,7 +409,7 @@ public class WhisperKitService: VoiceService {
                         )
 
                         if let result = results.first {
-                            let segment = VoiceTranscriptionSegment(
+                            let segment = STTSegment(
                                 text: result.text,
                                 startTime: Date().timeIntervalSince1970 - 0.1,
                                 endTime: Date().timeIntervalSince1970,

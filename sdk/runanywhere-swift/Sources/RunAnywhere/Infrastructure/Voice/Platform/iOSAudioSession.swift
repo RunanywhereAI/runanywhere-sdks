@@ -53,7 +53,7 @@ public class iOSAudioSession {
     /// Activate the audio session
     public func activate() throws {
         guard isConfigured else {
-            throw VoiceError.audioSessionNotConfigured
+            throw STTError.audioSessionNotConfigured
         }
 
         try audioSession.setActive(true)

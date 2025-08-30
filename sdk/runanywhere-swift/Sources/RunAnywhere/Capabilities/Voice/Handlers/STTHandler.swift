@@ -18,16 +18,16 @@ public class STTHandler {
     /// Transcribe audio samples to text
     /// - Parameters:
     ///   - samples: Audio samples to transcribe
-    ///   - service: Voice service to use for transcription
+    ///   - service: STT service to use for transcription
     ///   - options: Transcription options
     ///   - speakerDiarization: Optional speaker diarization service
     ///   - continuation: Event stream continuation
     /// - Returns: Transcription result
     public func transcribeAudio(
         samples: [Float],
-        service: VoiceService,
-        options: VoiceTranscriptionOptions,
-        speakerDiarization: SpeakerDiarizationProtocol?,
+        service: STTService,
+        options: STTOptions,
+        speakerDiarization: SpeakerDiarizationService?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 
@@ -116,9 +116,9 @@ public class STTHandler {
 
     private func performTranscription(
         samples: [Float],
-        service: VoiceService,
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
+        service: STTService,
+        options: STTOptions
+    ) async throws -> STTResult {
 
         let preferredFormat = service.preferredAudioFormat
         logger.debug("STT service prefers \(preferredFormat) format")
@@ -151,7 +151,7 @@ public class STTHandler {
     private func handleSpeakerDiarization(
         samples: [Float],
         transcript: String,
-        service: SpeakerDiarizationProtocol,
+        service: SpeakerDiarizationService,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) {
         // Detect speaker from audio features

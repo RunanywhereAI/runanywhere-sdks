@@ -340,7 +340,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         // Return a mock result for compatibility
         return VoicePipelineResult(
-            transcription: VoiceTranscriptionResult(
+            transcription: STTResult(
                 text: currentTranscript,
                 language: "en",
                 confidence: 0.95,

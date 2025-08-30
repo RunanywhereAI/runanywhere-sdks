@@ -1,7 +1,7 @@
 import Foundation
 
 /// A segment of transcribed text from streaming audio
-public struct VoiceTranscriptionSegment {
+public struct STTSegment {
     /// The transcribed text
     public let text: String
 
