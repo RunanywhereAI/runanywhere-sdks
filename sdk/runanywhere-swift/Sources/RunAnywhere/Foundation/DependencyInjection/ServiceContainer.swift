@@ -130,11 +130,6 @@ public class ServiceContainer {
         )
     }()
 
-    /// Error recovery service
-    private(set) lazy var errorRecoveryService: ErrorRecoveryService = {
-        ErrorRecoveryService()
-    }()
-
     /// Compatibility service
     private(set) lazy var compatibilityService: CompatibilityService = {
         CompatibilityService()
@@ -255,11 +250,6 @@ public class ServiceContainer {
     }
 
     // MARK: - Public Service Access
-
-    /// Get error recovery service
-    public var errorRecovery: ErrorRecoveryService {
-        return errorRecoveryService
-    }
 
     /// Get compatibility service
     public var compatibility: CompatibilityService {
