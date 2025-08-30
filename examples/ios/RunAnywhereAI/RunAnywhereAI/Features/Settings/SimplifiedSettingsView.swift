@@ -6,7 +6,8 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
+import Combine
 
 struct SimplifiedSettingsView: View {
     @State private var routingPolicy = RoutingPolicy.automatic
@@ -134,11 +135,9 @@ struct SimplifiedSettingsView: View {
 
                             Toggle("", isOn: $analyticsLogToLocal)
                                 .onChange(of: analyticsLogToLocal) { _, newValue in
-                                    Task {
-                                        await RunAnywhereSDK.shared.setAnalyticsLogToLocal(enabled: newValue)
-                                        // Save to keychain for persistence
-                                        KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
-                                    }
+                                    // Save to keychain for persistence
+                                    KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
+                                    // Note: Analytics settings are now applied per-request in the new architecture
                                 }
 
                             Spacer()
@@ -243,11 +242,9 @@ struct SimplifiedSettingsView: View {
             Section("Logging Configuration") {
                 Toggle("Log Analytics Locally", isOn: $analyticsLogToLocal)
                     .onChange(of: analyticsLogToLocal) { _, newValue in
-                        Task {
-                            await RunAnywhereSDK.shared.setAnalyticsLogToLocal(enabled: newValue)
-                            // Save to keychain for persistence
-                            KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
-                        }
+                        // Save to keychain for persistence
+                        KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
+                        // Note: Analytics settings are now applied per-request in the new architecture
                     }
 
                 Text("When enabled, analytics events will be logged locally for debugging purposes.")
@@ -350,18 +347,13 @@ struct SimplifiedSettingsView: View {
     }
 
     private func updateSDKConfiguration() {
-        Task {
-            // Update SDK generation settings
-            await RunAnywhereSDK.shared.setTemperature(Float(defaultTemperature))
-            await RunAnywhereSDK.shared.setMaxTokens(defaultMaxTokens)
-
-            // Save to UserDefaults for persistence
+        // Note: In the new architecture, settings are applied per-request
+        // Save to UserDefaults for persistence
             UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
             UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
             UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
 
-            print("SDK Configuration updated - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
-        }
+            print("Configuration saved - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
     }
 
     private func loadCurrentConfiguration() {
@@ -389,19 +381,9 @@ struct SimplifiedSettingsView: View {
     }
 
     private func syncWithSDKSettings() {
-        Task {
-            // Get current settings from SDK to ensure UI shows actual values
-            let currentSettings = await RunAnywhereSDK.shared.getGenerationSettings()
-
-            await MainActor.run {
-                // Update UI with current SDK values
-                self.defaultTemperature = currentSettings.temperature
-                self.defaultMaxTokens = currentSettings.maxTokens
-            }
-
-            // Apply loaded analytics setting to SDK
-            await RunAnywhereSDK.shared.setAnalyticsLogToLocal(enabled: analyticsLogToLocal)
-        }
+        // Load settings from UserDefaults
+        // In the new architecture, these settings are applied per-request
+        // No need to get them from SDK anymore
     }
 
     private func saveApiKey() {

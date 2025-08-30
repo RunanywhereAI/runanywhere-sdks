@@ -16,9 +16,9 @@ public enum DiarizationType {
 
 // MARK: - SDK Extension for Diarization
 
-extension RunAnywhereSDK {
+extension RunAnywhere {
 
-    private var diarizationLogger: Logger {
+    private static var diarizationLogger: Logger {
         Logger(subsystem: "com.runanywhere.sdk", category: "DiarizationFactory")
     }
 
@@ -27,7 +27,7 @@ extension RunAnywhereSDK {
     ///   - config: Pipeline configuration
     ///   - diarizationType: Type of diarization to use (default, fluidAudio, or custom)
     /// - Returns: Configured voice pipeline
-    public func createVoicePipelineWithDiarization(
+    public static func createVoicePipelineWithDiarization(
         config: ModularPipelineConfig,
         diarizationType: DiarizationType = .default
     ) async throws -> VoicePipelineManager {
@@ -59,7 +59,7 @@ extension RunAnywhereSDK {
 
     /// Attempt to create FluidAudio diarization service
     /// Falls back to default if module not available
-    private func createFluidAudioDiarization() async throws -> SpeakerDiarizationService {
+    private static func createFluidAudioDiarization() async throws -> SpeakerDiarizationService {
         // Try to dynamically load FluidAudio module
         let className = "FluidAudioDiarization.FluidAudioDiarization"
 
@@ -80,7 +80,7 @@ extension RunAnywhereSDK {
     }
 
     /// Check if FluidAudio module is available
-    public var isFluidAudioAvailable: Bool {
+    public static var isFluidAudioAvailable: Bool {
         return NSClassFromString("FluidAudioDiarization.FluidAudioDiarization") != nil
     }
 }

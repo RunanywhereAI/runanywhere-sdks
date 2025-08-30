@@ -4,11 +4,11 @@ import Foundation
 
 public extension RunAnywhere {
 
-    /// Load a model by identifier with comprehensive event reporting
+    /// Load a model by identifier and return model info
     /// - Parameter modelIdentifier: The model to load
     /// - Returns: Information about the loaded model
     @discardableResult
-    static func loadModel(_ modelIdentifier: String) async throws -> ModelInfo {
+    static func loadModelWithInfo(_ modelIdentifier: String) async throws -> ModelInfo {
         await events.publish(SDKModelEvent.loadStarted(modelId: modelIdentifier))
 
         do {

@@ -117,7 +117,7 @@ public enum RunAnywhereError: LocalizedError {
     public var recoverySuggestion: String? {
         switch self {
         case .notInitialized:
-            return "Call RunAnywhereSDK.shared.initialize() before using the SDK."
+            return "Call RunAnywhere.initialize() before using the SDK."
         case .alreadyInitialized:
             return "The SDK is already initialized. You can use it directly."
         case .invalidConfiguration:

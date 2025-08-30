@@ -70,7 +70,7 @@ public enum RunAnywhere {
     /// - Returns: Generated response
     public static func generate(
         _ prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) async throws -> String {
         await EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
@@ -80,11 +80,10 @@ public enum RunAnywhere {
                 throw SDKError.notInitialized
             }
 
-            // Convert clean options to internal format
-            let internalOptions = options?.toInternalOptions()
+            // Use options directly or defaults
             let result = try await serviceContainer.generationService.generate(
                 prompt: prompt,
-                options: internalOptions ?? RunAnywhereGenerationOptions()
+                options: options ?? RunAnywhereGenerationOptions()
             )
 
             await EventBus.shared.publish(SDKGenerationEvent.completed(
@@ -114,7 +113,7 @@ public enum RunAnywhere {
     /// - Returns: AsyncStream of generated tokens
     public static func generateStream(
         _ prompt: String,
-        options: GenerationOptions? = nil
+        options: RunAnywhereGenerationOptions? = nil
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -126,10 +125,9 @@ public enum RunAnywhere {
                         throw SDKError.notInitialized
                     }
 
-                    let internalOptions = options?.toInternalOptions() ?? RunAnywhereGenerationOptions()
                     let stream = serviceContainer.streamingService.generateStream(
                         prompt: prompt,
-                        options: internalOptions
+                        options: options ?? RunAnywhereGenerationOptions()
                     )
 
                     var fullResponse = ""
@@ -256,74 +254,6 @@ public enum RunAnywhere {
     }
 }
 
-// MARK: - Clean Generation Options
-
-/// Clean, simple generation options
-public struct GenerationOptions {
-    /// Maximum tokens to generate
-    public var maxTokens: Int?
-
-    /// Temperature (0.0 - 2.0)
-    public var temperature: Float?
-
-    /// Top-p sampling
-    public var topP: Float?
-
-    /// Stop sequences
-    public var stopSequences: [String]?
-
-    /// System prompt
-    public var systemPrompt: String?
-
-    /// Random seed
-    public var seed: Int?
-
-    /// Initialize with defaults
-    public init() {}
-
-    /// Convert to internal options format
-    internal func toInternalOptions() -> RunAnywhereGenerationOptions {
-        RunAnywhereGenerationOptions(
-            maxTokens: maxTokens ?? 100,
-            temperature: temperature ?? 0.7,
-            topP: topP ?? 1.0,
-            enableRealTimeTracking: true,
-            stopSequences: stopSequences ?? [],
-            seed: seed,
-            streamingEnabled: false,
-            tokenBudget: nil,
-            frameworkOptions: nil,
-            preferredExecutionTarget: nil,
-            structuredOutput: nil,
-            systemPrompt: systemPrompt
-        )
-    }
-}
-
-// MARK: - Convenience Builder Pattern
-
-extension GenerationOptions {
-    /// Set maximum tokens
-    public func maxTokens(_ tokens: Int) -> GenerationOptions {
-        var options = self
-        options.maxTokens = tokens
-        return options
-    }
-
-    /// Set temperature
-    public func temperature(_ temp: Float) -> GenerationOptions {
-        var options = self
-        options.temperature = temp
-        return options
-    }
-
-    /// Set system prompt
-    public func systemPrompt(_ prompt: String) -> GenerationOptions {
-        var options = self
-        options.systemPrompt = prompt
-        return options
-    }
-}
 
 // MARK: - Conversation Management
 

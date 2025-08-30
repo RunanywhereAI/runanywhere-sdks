@@ -7,7 +7,8 @@
 
 import Foundation
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
+import Combine
 
 @MainActor
 class ModelListViewModel: ObservableObject {
@@ -18,7 +19,7 @@ class ModelListViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    private let sdk = RunAnywhereSDK.shared
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Predefined Models
     private let predefinedModels: [ModelInfo] = [
@@ -238,7 +239,7 @@ class ModelListViewModel: ObservableObject {
 
         do {
             // Get all models from SDK (includes registered predefined models)
-            let sdkModels = try await sdk.listAvailableModels()
+            let sdkModels = try await RunAnywhere.availableModels()
             availableModels = sdkModels
         } catch {
             print("Failed to load models from SDK: \(error)")
@@ -261,7 +262,7 @@ class ModelListViewModel: ObservableObject {
             if model.preferredFramework == .foundationModels {
                 do {
                     // Check if model is already registered
-                    let existingModels = try await sdk.listAvailableModels()
+                    let existingModels = try await RunAnywhere.availableModels()
                     let alreadyRegistered = existingModels.contains { $0.id == model.id }
 
                     if !alreadyRegistered {
@@ -273,7 +274,7 @@ class ModelListViewModel: ObservableObject {
                         foundationModel.localPath = URL(string: "builtin://foundation-models")
 
                         // Register using the SDK's public API
-                        sdk.registerBuiltInModel(foundationModel)
+                        try await RunAnywhere.registerBuiltInModel(foundationModel)
                         print("Successfully registered Foundation Model: \(model.name)")
                     } else {
                         print("Foundation Model already registered")
@@ -289,17 +290,15 @@ class ModelListViewModel: ObservableObject {
 
             do {
                 // Check if model is already registered by trying to get it
-                let existingModels = try await sdk.listAvailableModels()
+                let existingModels = try await RunAnywhere.availableModels()
                 let alreadyRegistered = existingModels.contains { $0.id == model.id }
 
                 if !alreadyRegistered {
                     // Register the model with SDK
-                    let _ = sdk.addModelFromURL(
+                    _ = await RunAnywhere.addModelFromURL(
+                        downloadURL,
                         name: model.name,
-                        url: downloadURL,
-                        framework: model.preferredFramework ?? .llamaCpp,
-                        estimatedSize: model.downloadSize,
-                        supportsThinking: model.supportsThinking
+                        type: (model.preferredFramework ?? .llamaCpp).rawValue
                     )
                     print("Registered predefined model: \(model.name)")
                 } else {
@@ -317,8 +316,8 @@ class ModelListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            // Direct SDK usage
-            try await sdk.loadModel(model.id)
+            // Direct SDK usage - use the void version
+            try await RunAnywhere.loadModel(model.id)
             currentModel = model
 
             // Post notification that model was loaded
@@ -356,7 +355,7 @@ class ModelListViewModel: ObservableObject {
 
             // Use the SDK's downloadModel with strategy support
             // The SDK will automatically use the registered WhisperKit strategy for whisper models
-            _ = try await sdk.downloadModel(modelId)
+            try await RunAnywhere.downloadModel(modelId)
 
             // Wait a moment for filesystem to settle
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
@@ -375,7 +374,7 @@ class ModelListViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            try await sdk.deleteModel(modelId)
+            try await RunAnywhere.deleteModel(modelId)
             // Refresh models to update list
             await loadModels()
             return true

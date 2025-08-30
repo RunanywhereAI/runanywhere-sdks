@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 import os
-import RunAnywhereSDK
+import RunAnywhere
 
 /// Simplified Audio Capture that provides audio stream for processing
 /// VAD is handled externally by VoiceSessionManager
