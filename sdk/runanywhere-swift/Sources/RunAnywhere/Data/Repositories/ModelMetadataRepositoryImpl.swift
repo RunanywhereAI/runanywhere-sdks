@@ -87,10 +87,9 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             format: metadata.format,
             framework: metadata.framework,
             localPath: metadata.localPath,
-            estimatedMemory: metadata.estimatedMemory,
+            memoryRequired: metadata.memoryRequired,
             contextLength: metadata.contextLength,
             downloadSize: metadata.downloadSize,
-            checksum: metadata.checksum,
             author: metadata.author,
             license: metadata.license,
             description: metadata.description,
@@ -100,8 +99,6 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             lastUsed: Date(),
             usageCount: metadata.usageCount + 1,
             supportsThinking: metadata.supportsThinking,
-            thinkingOpenTag: metadata.thinkingOpenTag,
-            thinkingCloseTag: metadata.thinkingCloseTag,
             updatedAt: Date(),
             syncPending: true
         )
@@ -112,8 +109,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
     /// Update thinking support
     public func updateThinkingSupport(
         for modelId: String,
-        supportsThinking: Bool,
-        thinkingTagPattern: ThinkingTagPattern?
+        supportsThinking: Bool
     ) async throws {
         guard var metadata = try await fetch(id: modelId) else {
             logger.warning("Model metadata not found: \(modelId)")
@@ -127,10 +123,9 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             format: metadata.format,
             framework: metadata.framework,
             localPath: metadata.localPath,
-            estimatedMemory: metadata.estimatedMemory,
+            memoryRequired: metadata.memoryRequired,
             contextLength: metadata.contextLength,
             downloadSize: metadata.downloadSize,
-            checksum: metadata.checksum,
             author: metadata.author,
             license: metadata.license,
             description: metadata.description,
@@ -140,8 +135,6 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             lastUsed: metadata.lastUsed,
             usageCount: metadata.usageCount,
             supportsThinking: supportsThinking,
-            thinkingOpenTag: thinkingTagPattern?.openingTag,
-            thinkingCloseTag: thinkingTagPattern?.closingTag,
             updatedAt: Date(),
             syncPending: true
         )
@@ -164,25 +157,18 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             let format = ModelFormat(rawValue: metadata.format) ?? .unknown
             let framework = LLMFramework(rawValue: metadata.framework)
 
-            // Reconstruct thinking tag pattern
-            let thinkingTagPattern: ThinkingTagPattern? = {
-                if metadata.supportsThinking,
-                   let openTag = metadata.thinkingOpenTag,
-                   let closeTag = metadata.thinkingCloseTag {
-                    return ThinkingTagPattern(openingTag: openTag, closingTag: closeTag)
-                }
-                return metadata.supportsThinking ? ThinkingTagPattern.defaultPattern : nil
-            }()
+            // Determine category based on framework
+            let category = framework != nil ? ModelCategory.from(framework: framework!) : .language
 
             return ModelInfo(
                 id: metadata.id,
                 name: metadata.name,
+                category: category,
                 format: format,
                 localPath: modelURL,
-                estimatedMemory: metadata.estimatedMemory,
+                memoryRequired: metadata.memoryRequired,
                 contextLength: metadata.contextLength,
                 downloadSize: metadata.downloadSize,
-                checksum: metadata.checksum,
                 compatibleFrameworks: framework != nil ? [framework!] : [],
                 preferredFramework: framework,
                 metadata: ModelInfoMetadata(
@@ -191,8 +177,7 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
                     tags: metadata.tags,
                     description: metadata.description
                 ),
-                supportsThinking: metadata.supportsThinking,
-                thinkingTagPattern: thinkingTagPattern
+                supportsThinking: metadata.supportsThinking
             )
         }
     }
@@ -249,10 +234,9 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             format: metadata.format,
             framework: metadata.framework,
             localPath: isDownloaded ? metadata.localPath : "",
-            estimatedMemory: metadata.estimatedMemory,
+            memoryRequired: metadata.memoryRequired,
             contextLength: metadata.contextLength,
             downloadSize: metadata.downloadSize,
-            checksum: metadata.checksum,
             author: metadata.author,
             license: metadata.license,
             description: metadata.description,
@@ -262,8 +246,6 @@ public actor ModelMetadataRepositoryImpl: Repository, ModelMetadataRepository {
             lastUsed: metadata.lastUsed,
             usageCount: metadata.usageCount,
             supportsThinking: metadata.supportsThinking,
-            thinkingOpenTag: metadata.thinkingOpenTag,
-            thinkingCloseTag: metadata.thinkingCloseTag,
             updatedAt: Date(),
             syncPending: true
         )

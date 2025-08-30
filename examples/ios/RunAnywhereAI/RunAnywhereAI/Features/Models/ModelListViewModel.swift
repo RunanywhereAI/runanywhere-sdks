@@ -2,7 +2,7 @@
 //  ModelListViewModel.swift
 //  RunAnywhereAI
 //
-//  Simplified version that uses SDK directly
+//  Simplified version that uses SDK registry directly
 //
 
 import Foundation
@@ -21,367 +21,85 @@ class ModelListViewModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    // MARK: - Predefined Models
-    private let predefinedModels: [ModelInfo] = [
-        // Apple Foundation Models (iOS 26+)
-        ModelInfo(
-            id: "foundation-models-default",
-            name: "Apple Foundation Model",
-            format: .mlmodel,
-            downloadURL: nil, // Built-in, no download needed
-            estimatedMemory: 500_000_000, // 500MB
-            contextLength: 8192,
-            downloadSize: 0, // Built-in
-            compatibleFrameworks: [.foundationModels],
-            preferredFramework: .foundationModels,
-            supportsThinking: false
-        ),
-
-        // Llama-3.2 1B Q6_K
-        ModelInfo(
-            id: "llama-3.2-1b-instruct-q6-k",
-            name: "Llama 3.2 1B Instruct Q6_K",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf"),
-            estimatedMemory: 1_200_000_000, // 1.2GB
-            contextLength: 131072,
-            downloadSize: 1_100_000_000, // ~1.1GB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: true
-        ),
-
-        // SmolLM2 1.7B Instruct Q6_K_L
-        ModelInfo(
-            id: "smollm2-1.7b-instruct-q6-k-l",
-            name: "SmolLM2 1.7B Instruct Q6_K_L",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf"),
-            estimatedMemory: 1_800_000_000, // 1.8GB
-            contextLength: 8192,
-            downloadSize: 1_700_000_000, // ~1.7GB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: true
-        ),
-
-        // Qwen-2.5 0.5B Q6_K
-        ModelInfo(
-            id: "qwen-2.5-0.5b-instruct-q6-k",
-            name: "Qwen 2.5 0.5B Instruct Q6_K",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf"),
-            estimatedMemory: 600_000_000, // 600MB
-            contextLength: 32768,
-            downloadSize: 650_000_000, // ~650MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: true
-        ),
-
-        // SmolLM2 360M Q8_0
-        ModelInfo(
-            id: "smollm2-360m-q8-0",
-            name: "SmolLM2 360M Q8_0",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf"),
-            estimatedMemory: 500_000_000, // 500MB
-            contextLength: 8192,
-            downloadSize: 385_000_000, // ~385MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: false
-        ),
-
-        // Qwen-2.5 1.5B Q6_K
-        ModelInfo(
-            id: "qwen-2.5-1.5b-instruct-q6-k",
-            name: "Qwen 2.5 1.5B Instruct Q6_K",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf"),
-            estimatedMemory: 1_600_000_000, // 1.6GB
-            contextLength: 32768,
-            downloadSize: 1_400_000_000, // ~1.4GB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: true
-        ),
-
-        // Qwen3 600M Q8_0
-        ModelInfo(
-            id: "qwen3-600m-instruct-q8-0",
-            name: "Qwen3 600M Instruct Q8_0",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/Cactus-Compute/Qwen3-600m-Instruct-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf"),
-            estimatedMemory: 800_000_000, // 800MB
-            contextLength: 32768,
-            downloadSize: 656_000_000, // ~656MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: true
-        ),
-
-        // MARK: - Voice Models (WhisperKit)
-        // Note: URLs provide the base path for the custom download strategy to extract model info
-
-        // Whisper Tiny
-        ModelInfo(
-            id: "whisper-tiny",
-            name: "Whisper Tiny",
-            format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en"), // Base URL for strategy
-            estimatedMemory: 39_000_000, // 39MB
-            contextLength: 0, // Not applicable for voice models
-            downloadSize: 39_000_000, // ~39MB
-            compatibleFrameworks: [.whisperKit],
-            preferredFramework: .whisperKit,
-            supportsThinking: false
-        ),
-
-        // Whisper Base
-        ModelInfo(
-            id: "whisper-base",
-            name: "Whisper Base",
-            format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base"), // Base URL for strategy
-            estimatedMemory: 74_000_000, // 74MB
-            contextLength: 0, // Not applicable for voice models
-            downloadSize: 74_000_000, // ~74MB
-            compatibleFrameworks: [.whisperKit],
-            preferredFramework: .whisperKit,
-            supportsThinking: false
-        ),
-
-        // Whisper Small
-        ModelInfo(
-            id: "whisper-small",
-            name: "Whisper Small",
-            format: .mlmodel,
-            downloadURL: URL(string: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-small"), // Base URL for strategy
-            estimatedMemory: 244_000_000, // 244MB
-            contextLength: 0, // Not applicable for voice models
-            downloadSize: 244_000_000, // ~244MB
-            compatibleFrameworks: [.whisperKit],
-            preferredFramework: .whisperKit,
-            supportsThinking: false
-        ),
-
-        // MARK: - LiquidAI Models
-
-        // LiquidAI LFM2 350M Q4_K_M (Smallest, fastest)
-        ModelInfo(
-            id: "lfm2-350m-q4-k-m",
-            name: "LiquidAI LFM2 350M Q4_K_M",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf"),
-            estimatedMemory: 250_000_000, // 250MB
-            contextLength: 32768,
-            downloadSize: 218_690_000, // ~219MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: false
-        ),
-
-        // LiquidAI LFM2 350M Q6_K (Best balance)
-        ModelInfo(
-            id: "lfm2-350m-q6-k",
-            name: "LiquidAI LFM2 350M Q6_K",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q6_K.gguf"),
-            estimatedMemory: 350_000_000, // 350MB
-            contextLength: 32768,
-            downloadSize: 279_790_000, // ~280MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: false
-        ),
-
-        // LiquidAI LFM2 350M Q8_0 (Highest quality)
-        ModelInfo(
-            id: "lfm2-350m-q8-0",
-            name: "LiquidAI LFM2 350M Q8_0",
-            format: .gguf,
-            downloadURL: URL(string: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf"),
-            estimatedMemory: 400_000_000, // 400MB
-            contextLength: 32768,
-            downloadSize: 361_650_000, // ~362MB
-            compatibleFrameworks: [.llamaCpp],
-            preferredFramework: .llamaCpp,
-            supportsThinking: false
-        )
-    ]
+    // MARK: - Initialization
 
     init() {
         Task {
-            await loadModels()
+            await loadModelsFromRegistry()
         }
     }
 
-    func loadModels() async {
+    // MARK: - Methods
+
+    /// Load models from SDK registry (no more hard-coded models)
+    func loadModelsFromRegistry() async {
         isLoading = true
         errorMessage = nil
 
-        // First, register predefined models with SDK if they have download URLs
-        await registerPredefinedModels()
-
-        // Start with predefined models - filter based on iOS version
-        var allModels: [ModelInfo] = []
-
-        // Add Foundation Model only if iOS 26+ is available
-        if #available(iOS 26.0, *) {
-            allModels = predefinedModels
-            print("iOS 26+ detected - Foundation Models available")
-        } else {
-            // Filter out Foundation Models for older iOS versions
-            allModels = predefinedModels.filter { $0.preferredFramework != .foundationModels }
-            print("iOS < 18 - Foundation Models not available")
-        }
-
         do {
-            // Get all models from SDK (includes registered predefined models)
-            let sdkModels = try await RunAnywhere.availableModels()
-            availableModels = sdkModels
+            // Get all models from SDK registry
+            // This now includes:
+            // 1. Models from remote configuration (if available)
+            // 2. Models from framework adapters (like WhisperKit)
+            // 3. Models from local storage
+            // 4. User-added models
+            let allModels = try await RunAnywhere.availableModels()
+
+            // Filter based on iOS version if needed
+            var filteredModels = allModels
+
+            // Filter out Foundation Models for older iOS versions
+            if #unavailable(iOS 26.0) {
+                filteredModels = allModels.filter { $0.preferredFramework != .foundationModels }
+                print("iOS < 18 - Foundation Models not available")
+            }
+
+            availableModels = filteredModels
+            print("Loaded \(availableModels.count) models from registry")
+
+            for model in availableModels {
+                print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
+            }
         } catch {
             print("Failed to load models from SDK: \(error)")
-            // Fall back to predefined models if SDK fails
-            availableModels = predefinedModels
+            errorMessage = "Failed to load models: \(error.localizedDescription)"
+            availableModels = []
         }
 
         currentModel = nil
         isLoading = false
-
-        print("Available models count: \(availableModels.count)")
-        for model in availableModels {
-            print("  - \(model.name) (\(model.preferredFramework?.displayName ?? "Unknown"))")
-        }
     }
 
-    private func registerPredefinedModels() async {
-        for model in predefinedModels {
-            // Handle Foundation Models separately (no download URL needed)
-            if model.preferredFramework == .foundationModels {
-                do {
-                    // Check if model is already registered
-                    let existingModels = try await RunAnywhere.availableModels()
-                    let alreadyRegistered = existingModels.contains { $0.id == model.id }
-
-                    if !alreadyRegistered {
-                        // Register Foundation Model directly with the SDK's registry
-                        print("Registering Foundation Model: \(model.name)")
-
-                        // Create a model info with a "built-in" path indicator
-                        var foundationModel = model
-                        foundationModel.localPath = URL(string: "builtin://foundation-models")
-
-                        // Register using the SDK's public API
-                        try await RunAnywhere.registerBuiltInModel(foundationModel)
-                        print("Successfully registered Foundation Model: \(model.name)")
-                    } else {
-                        print("Foundation Model already registered")
-                    }
-                } catch {
-                    print("Failed to check Foundation Model: \(error)")
-                }
-                continue
-            }
-
-            // For models that need downloading
-            guard let downloadURL = model.downloadURL else { continue }
-
-            do {
-                // Check if model is already registered by trying to get it
-                let existingModels = try await RunAnywhere.availableModels()
-                let alreadyRegistered = existingModels.contains { $0.id == model.id }
-
-                if !alreadyRegistered {
-                    // Register the model with SDK
-                    _ = await RunAnywhere.addModelFromURL(
-                        downloadURL,
-                        name: model.name,
-                        type: (model.preferredFramework ?? .llamaCpp).rawValue
-                    )
-                    print("Registered predefined model: \(model.name)")
-                } else {
-                    print("Model \(model.name) already registered, skipping")
-                }
-            } catch {
-                print("Failed to register predefined model \(model.name): \(error)")
-                // Continue with other models even if one fails
-            }
-        }
-    }
-
-    func selectModel(_ model: ModelInfo) async {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            // Direct SDK usage - use the void version
-            try await RunAnywhere.loadModel(model.id)
-            currentModel = model
-
-            // Post notification that model was loaded
-            await MainActor.run {
-                NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
-            }
-        } catch {
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
-        }
-
-        isLoading = false
-    }
-
-    func refreshModels() async {
-        await loadModels()
-    }
-
-    func addImportedModel(_ model: ModelInfo) async {
-        availableModels.append(model)
-    }
-
-    func setCurrentModel(_ model: ModelInfo) async {
+    func setCurrentModel(_ model: ModelInfo?) {
         currentModel = model
     }
 
-    func downloadModel(_ modelId: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
-
-        do {
-            // Get the model info
-            guard let model = availableModels.first(where: { $0.id == modelId }) else {
-                throw SDKError.modelNotFound(modelId)
-            }
-
-            // Use the SDK's downloadModel with strategy support
-            // The SDK will automatically use the registered WhisperKit strategy for whisper models
-            try await RunAnywhere.downloadModel(modelId)
-
-            // Wait a moment for filesystem to settle
-            try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
-            // Refresh models to update download status
-            await loadModels()
-            return true
-        } catch {
-            errorMessage = "Failed to download model: \(error.localizedDescription)"
-            isLoading = false
-            return false
-        }
+    func downloadModel(_ model: ModelInfo, progressHandler: @escaping (Double) -> Void) async throws -> URL {
+        return try await RunAnywhere.downloadModel(model.id, progressHandler: progressHandler)
     }
 
-    func deleteModel(_ modelId: String) async -> Bool {
-        isLoading = true
-        errorMessage = nil
+    func deleteModel(_ model: ModelInfo) async throws {
+        try await RunAnywhere.deleteModel(model.id)
+        // Reload models after deletion
+        await loadModelsFromRegistry()
+    }
 
-        do {
-            try await RunAnywhere.deleteModel(modelId)
-            // Refresh models to update list
-            await loadModels()
-            return true
-        } catch {
-            errorMessage = "Failed to delete model: \(error.localizedDescription)"
-            isLoading = false
-            return false
-        }
+    func loadModel(_ model: ModelInfo) async throws {
+        try await RunAnywhere.loadModel(model.id)
+        currentModel = model
+    }
+
+    /// Add a custom model from URL
+    func addModelFromURL(name: String, url: URL, framework: LLMFramework, estimatedSize: Int64?) async throws {
+        // Use SDK's addModelFromURL method
+        let model = try await RunAnywhere.addModelFromURL(
+            name: name,
+            url: url,
+            framework: framework,
+            estimatedSize: estimatedSize
+        )
+
+        // Reload models to include the new one
+        await loadModelsFromRegistry()
     }
 }

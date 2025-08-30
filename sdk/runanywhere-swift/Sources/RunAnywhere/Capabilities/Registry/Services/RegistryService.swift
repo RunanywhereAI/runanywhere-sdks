@@ -92,14 +92,16 @@ public class RegistryService: ModelRegistry {
                 return false
             }
 
-            // Context length filters
+            // Context length filters (only for models that have context length)
             if let minContext = criteria.minContextLength,
-               model.contextLength < minContext {
+               let modelContext = model.contextLength,
+               modelContext < minContext {
                 return false
             }
 
             if let maxContext = criteria.maxContextLength,
-               model.contextLength > maxContext {
+               let modelContext = model.contextLength,
+               modelContext > maxContext {
                 return false
             }
 
@@ -183,35 +185,33 @@ public class RegistryService: ModelRegistry {
         url: URL,
         framework: LLMFramework,
         estimatedSize: Int64? = nil,
-        supportsThinking: Bool = false,
-        thinkingTagPattern: ThinkingTagPattern? = nil
+        supportsThinking: Bool = false
     ) -> ModelInfo {
         let modelId = generateModelId(from: url)
 
         // Detect format from URL
         let format = detectFormatFromURL(url)
 
+        // Determine category based on framework
+        let category = ModelCategory.from(framework: framework)
+
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
+            category: category,
             format: format,
             downloadURL: url,
             localPath: nil,
-            estimatedMemory: estimatedSize ?? estimateMemoryFromURL(url),
-            contextLength: 2048, // Default context length
             downloadSize: nil, // Will be determined during download
-            checksum: nil,
+            memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             compatibleFrameworks: [framework],
             preferredFramework: framework,
-            hardwareRequirements: [],
-            tokenizerFormat: nil,
+            contextLength: category == .language ? 2048 : nil, // Only for language models
+            supportsThinking: supportsThinking,
             metadata: ModelInfoMetadata(
                 tags: ["user-added", framework.rawValue.lowercased()],
                 description: "User-added model"
-            ),
-            alternativeDownloadURLs: [],
-            supportsThinking: supportsThinking,
-            thinkingTagPattern: thinkingTagPattern
+            )
         )
 
         registerModel(modelInfo)
@@ -223,32 +223,44 @@ public class RegistryService: ModelRegistry {
     private func loadPreconfiguredModels() async {
         logger.debug("Loading pre-configured models")
 
-        // Load models from repository
-        // Only load models for frameworks that have registered adapters
-        let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
-        logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+        // First, try to load models from configuration (remote or cached)
+        let config = await ServiceContainer.shared.configurationService.getConfiguration()
 
-        // Load stored models from service
-        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
-        do {
-            // Load all stored models and filter later
-            var storedModels = try await modelMetadataService.loadStoredModels()
+        if let modelCatalog = config?.modelCatalog, !modelCatalog.isEmpty {
+            logger.info("Loading \(modelCatalog.count) models from configuration")
+            for model in modelCatalog {
+                registerModel(model)
+            }
+        } else {
+            logger.debug("No models in configuration, falling back to stored models")
 
-            if !availableFrameworks.isEmpty {
+            // Fallback: Load models from repository
+            // Only load models for frameworks that have registered adapters
+            let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
+            logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+
+            // Load stored models from service
+            let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+            do {
+                // Load all stored models and filter later
+                var storedModels = try await modelMetadataService.loadStoredModels()
+
+                if !availableFrameworks.isEmpty {
                     // Filter for available frameworks
                     storedModels = storedModels.filter { model in
                         model.compatibleFrameworks.contains { availableFrameworks.contains($0) }
                     }
-                logger.info("Loading \(storedModels.count) models for available frameworks")
-            } else {
-                logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
-            }
+                    logger.info("Loading \(storedModels.count) models for available frameworks")
+                } else {
+                    logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
+                }
 
-            for model in storedModels {
-                registerModel(model)
+                for model in storedModels {
+                    registerModel(model)
+                }
+            } catch {
+                logger.error("Failed to load stored models: \(error)")
             }
-        } catch {
-            logger.error("Failed to load stored models: \(error)")
         }
     }
 

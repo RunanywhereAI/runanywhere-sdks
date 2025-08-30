@@ -113,21 +113,17 @@ public extension RunAnywhere {
         let modelInfo = ModelInfo(
             id: UUID().uuidString,
             name: name,
+            category: .language, // Default to language model
             format: ModelFormat.gguf, // Default
             downloadURL: url,
             localPath: nil,
-            estimatedMemory: 1_000_000_000, // 1GB default
+            memoryRequired: estimatedSize,
             contextLength: 4096,
             downloadSize: nil,
-            checksum: nil,
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
-            hardwareRequirements: [],
-            tokenizerFormat: nil,
             metadata: nil,
-            alternativeDownloadURLs: nil,
-            supportsThinking: false,
-            thinkingTagPattern: nil
+            supportsThinking: false
         )
 
         // Register the model

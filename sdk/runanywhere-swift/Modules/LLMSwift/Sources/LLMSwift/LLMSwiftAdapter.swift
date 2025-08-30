@@ -24,7 +24,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
         // Check memory requirements
         let availableMemory = ProcessInfo.processInfo.physicalMemory
-        return model.estimatedMemory < Int64(Double(availableMemory) * 0.7)
+        return model.memoryRequired ?? 0 < Int64(Double(availableMemory) * 0.7)
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
@@ -64,7 +64,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         // GGUF models use approximately their file size in memory
         // Add 20% overhead for context and processing
-        let baseSize = model.estimatedMemory
+        let baseSize = model.memoryRequired ?? 0
         let overhead = Int64(Double(baseSize) * 0.2)
         return baseSize + overhead
     }
@@ -72,7 +72,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         // Determine optimal configuration based on model size
         let hasGPU = HardwareCapabilityManager.shared.isAcceleratorAvailable(.gpu)
-        let modelSize = model.estimatedMemory
+        let modelSize = model.memoryRequired ?? 0
 
         let preferredAccelerator: HardwareAcceleration = {
             if hasGPU && modelSize < 4_000_000_000 { // 4GB

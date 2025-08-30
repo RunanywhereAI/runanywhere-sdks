@@ -42,9 +42,10 @@ public class WhisperKitDownloadStrategy: DownloadStrategy {
     }
 
     public func canHandle(model: ModelInfo) -> Bool {
-        // Handle models marked as WhisperKit
-        model.preferredFramework == .whisperKit ||
-        model.compatibleFrameworks.contains(.whisperKit)
+        // Handle speech recognition models compatible with WhisperKit
+        return model.category == .speechRecognition &&
+               (model.preferredFramework == .whisperKit ||
+                model.compatibleFrameworks.contains(.whisperKit))
     }
 
     public func download(

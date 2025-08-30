@@ -169,14 +169,14 @@ public class CapabilityAnalyzer {
         capabilities: DeviceCapabilities
     ) -> HardwareAcceleration {
         // Large models with Neural Engine support
-        if model.estimatedMemory > 3_000_000_000 && capabilities.hasNeuralEngine {
+        if model.memoryRequired ?? 0 > 3_000_000_000 && capabilities.hasNeuralEngine {
             if model.format == .mlmodel || model.format == .mlpackage {
                 return .neuralEngine
             }
         }
 
         // GPU for medium to large models
-        if capabilities.hasGPU && model.estimatedMemory > 1_000_000_000 {
+        if capabilities.hasGPU && model.memoryRequired ?? 0 > 1_000_000_000 {
             return .gpu
         }
 
@@ -220,7 +220,7 @@ public class CapabilityAnalyzer {
         capabilities: DeviceCapabilities
     ) -> HardwareConfiguration.MemoryMode {
         let availableMemory = capabilities.availableMemory
-        let modelMemory = model.estimatedMemory
+        let modelMemory = model.memoryRequired ?? 0
 
         if availableMemory < modelMemory * 2 {
             return .conservative
@@ -239,11 +239,11 @@ public class CapabilityAnalyzer {
     ) -> Int {
         let processorCount = capabilities.processorCount
 
-        if model.estimatedMemory > 2_000_000_000 {
+        if model.memoryRequired ?? 0 > 2_000_000_000 {
             return processorCount
         }
 
-        if model.estimatedMemory < 500_000_000 {
+        if model.memoryRequired ?? 0 < 500_000_000 {
             return max(1, processorCount / 2)
         }
 
@@ -283,7 +283,7 @@ public class CapabilityAnalyzer {
             return (true, 4)
         }
 
-        if capabilities.totalMemory < 8_000_000_000 && model.estimatedMemory > 1_000_000_000 {
+        if capabilities.totalMemory < 8_000_000_000 && model.memoryRequired ?? 0 > 1_000_000_000 {
             return (true, 8)
         }
 

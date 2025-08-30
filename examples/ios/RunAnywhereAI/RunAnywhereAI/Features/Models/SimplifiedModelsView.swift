@@ -230,7 +230,7 @@ private struct ModelRow: View {
                     .fontWeight(isSelected ? .semibold : .regular)
 
                 HStack(spacing: 8) {
-                    let size = model.estimatedMemory
+                    let size = model.memoryRequired ?? 0
                     if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),

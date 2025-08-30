@@ -28,7 +28,6 @@ public class ServiceContainer {
         ModelLoadingService(
             registry: modelRegistry,
             adapterRegistry: adapterRegistry,
-            validationService: validationService,
             memoryService: memoryService
         )
     }()
@@ -52,11 +51,6 @@ public class ServiceContainer {
         VoiceCapabilityService()
     }()
 
-
-/// Validation service
-    private(set) lazy var validationService: ValidationService = {
-        ValidationService()
-    }()
 
     /// Download service
     private(set) lazy var downloadService: AlamofireDownloadService = {
@@ -138,16 +132,6 @@ public class ServiceContainer {
     /// Compatibility service
     private(set) lazy var compatibilityService: CompatibilityService = {
         CompatibilityService()
-    }()
-
-    /// Format detector for model validation
-    private(set) lazy var formatDetector: FormatDetector = {
-        FormatDetectorImpl()
-    }()
-
-    /// Metadata extractor for model validation
-    private(set) lazy var metadataExtractor: MetadataExtractor = {
-        MetadataExtractorImpl()
     }()
 
     /// Logger

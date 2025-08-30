@@ -1,7 +1,7 @@
 import Foundation
 
 /// Pattern for extracting thinking/reasoning content from model output
-public struct ThinkingTagPattern {
+public struct ThinkingTagPattern: Codable {
     public let openingTag: String
     public let closingTag: String
 

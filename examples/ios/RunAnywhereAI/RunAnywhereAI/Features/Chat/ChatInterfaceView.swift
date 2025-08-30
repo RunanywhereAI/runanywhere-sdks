@@ -467,7 +467,7 @@ struct ChatInterfaceView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "internaldrive")
                             .font(.system(size: 8))
-                        Text(formatModelSize(currentModel.estimatedMemory))
+                        Text(formatModelSize(currentModel.memoryRequired ?? 0))
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                     }
                     .foregroundColor(.secondary)

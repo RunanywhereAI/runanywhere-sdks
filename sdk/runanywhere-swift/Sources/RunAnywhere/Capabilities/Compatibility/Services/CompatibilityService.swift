@@ -21,10 +21,10 @@ public class CompatibilityService {
 
         // Check size limits
         if let capability = FrameworkCapabilities.getCapability(for: framework) {
-            if model.estimatedMemory > capability.maxModelSize {
+            if model.memoryRequired ?? 0 > capability.maxModelSize {
                 return CompatibilityResult(
                     isCompatible: false,
-                    reason: "Model size (\(model.estimatedMemory)) exceeds maximum (\(capability.maxModelSize))",
+                    reason: "Model size (\(model.memoryRequired ?? 0)) exceeds maximum (\(capability.maxModelSize))",
                     confidence: .high
                 )
             }
@@ -71,28 +71,6 @@ public class CompatibilityService {
         return true // Simple implementation for now
     }
 
-    func detectHardwareRequirements(format: ModelFormat, metadata: ModelMetadata) -> [HardwareRequirement] {
-        var requirements: [HardwareRequirement] = []
-
-        // Memory requirements
-        if let minMemory = metadata.requirements?.minMemory {
-            requirements.append(.minimumMemory(minMemory))
-        }
-
-        // Accelerator requirements based on format
-        switch format {
-        case .mlmodel, .mlpackage:
-            requirements.append(.requiresNeuralEngine)
-        case .tflite:
-            requirements.append(.requiresGPU)
-        case .safetensors:
-            requirements.append(.specificChip("A17"))
-        default:
-            break
-        }
-
-        return requirements
-    }
 
     private func isFormatSupported(_ format: ModelFormat, framework: LLMFramework) -> Bool {
         guard let capability = FrameworkCapabilities.getCapability(for: framework) else {

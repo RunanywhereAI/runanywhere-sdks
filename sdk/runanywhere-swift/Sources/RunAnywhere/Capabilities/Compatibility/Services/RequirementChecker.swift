@@ -58,10 +58,10 @@ class RequirementChecker {
         }
 
         // Check memory requirements
-        let memoryResult = checkMemoryRequirements(modelSize: model.estimatedMemory)
+        let memoryResult = checkMemoryRequirements(modelSize: model.memoryRequired ?? 0)
         if !memoryResult.sufficient {
             if memoryResult.critical {
-                issues.append("Insufficient memory: requires \(ByteCountFormatter.string(fromByteCount: model.estimatedMemory, countStyle: .binary))")
+                issues.append("Insufficient memory: requires \(ByteCountFormatter.string(fromByteCount: model.memoryRequired ?? 0, countStyle: .binary))")
             } else {
                 warnings.append("Limited memory: performance may be affected")
             }

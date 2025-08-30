@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tokenizer formats supported
-public enum TokenizerFormat: String, CaseIterable {
+public enum TokenizerFormat: String, CaseIterable, Codable {
     case huggingFace = "huggingface"
     case sentencePiece = "sentencepiece"
     case wordPiece = "wordpiece"

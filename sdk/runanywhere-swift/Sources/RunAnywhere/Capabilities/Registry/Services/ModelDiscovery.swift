@@ -2,17 +2,10 @@ import Foundation
 
 /// Service responsible for discovering models from various sources
 class ModelDiscovery {
-    private let formatDetector: FormatDetector
-    private let metadataExtractor: MetadataExtractor
     private var registeredProviders: [ModelProvider] = []
     private let logger = SDKLogger(category: "ModelDiscovery")
 
-    init(
-        formatDetector: FormatDetector = ServiceContainer.shared.formatDetector,
-        metadataExtractor: MetadataExtractor = ServiceContainer.shared.metadataExtractor
-    ) {
-        self.formatDetector = formatDetector
-        self.metadataExtractor = metadataExtractor
+    init() {
     }
 
     func registerProvider(_ provider: ModelProvider) {
@@ -96,53 +89,37 @@ class ModelDiscovery {
             return nil
         }
 
-        // Detect format
-        guard let format = formatDetector.detectFormat(at: url) else {
+        // Detect format from file extension
+        guard let format = detectFormatFromExtension(url.pathExtension) else {
             return nil
         }
 
-        // Extract metadata
-        let metadata: ModelMetadata
-        do {
-            metadata = await metadataExtractor.extractMetadata(from: url, format: format)
-        } catch {
-            // Create minimal metadata if extraction fails
-            metadata = ModelMetadata(
-                author: nil,
-                description: url.deletingPathExtension().lastPathComponent,
-                version: nil,
-                modelType: nil,
-                architecture: nil,
-                quantization: nil,
-                contextLength: nil,
-                inputShapes: nil,
-                outputShapes: nil
-            )
-        }
-
         // Determine compatible frameworks
-        let frameworks = detectCompatibleFrameworks(format: format, metadata: metadata)
+        let frameworks = detectCompatibleFrameworks(format: format)
 
         // Get file size
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
 
         // Create model info
         let modelId = generateModelId(from: url)
-        let modelName = generateModelName(from: url, metadata: metadata)
+        let modelName = generateModelName(from: url)
+
+        // Determine category based on format and frameworks
+        let category = ModelCategory.from(format: format, frameworks: frameworks)
 
         return ModelInfo(
             id: modelId,
             name: modelName,
+            category: category,
             format: format,
             localPath: url,
-            estimatedMemory: estimateMemoryUsage(fileSize: fileSize, format: format),
-            contextLength: metadata.contextLength ?? 2048,
             downloadSize: fileSize,
+            memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
             compatibleFrameworks: frameworks,
             preferredFramework: frameworks.first,
-            hardwareRequirements: detectHardwareRequirements(format: format, metadata: metadata),
-            tokenizerFormat: detectTokenizerFormat(at: url),
-            metadata: convertToModelInfoMetadata(metadata)
+            contextLength: category == .language ? 2048 : nil,
+            supportsThinking: false,
+            metadata: nil
         )
     }
 
@@ -186,7 +163,7 @@ class ModelDiscovery {
         return models.isEmpty ? nil : models
     }
 
-    private func detectCompatibleFrameworks(format: ModelFormat, metadata: ModelMetadata) -> [LLMFramework] {
+    private func detectCompatibleFrameworks(format: ModelFormat) -> [LLMFramework] {
         var frameworks: [LLMFramework] = []
 
         switch format {
@@ -209,26 +186,6 @@ class ModelDiscovery {
         return frameworks
     }
 
-    private func detectHardwareRequirements(format: ModelFormat, metadata: ModelMetadata) -> [HardwareRequirement] {
-        var requirements: [HardwareRequirement] = []
-
-        if let minMemory = metadata.requirements?.minMemory {
-            requirements.append(.minimumMemory(minMemory))
-        }
-
-        switch format {
-        case .mlmodel, .mlpackage:
-            requirements.append(.requiresNeuralEngine)
-        case .tflite:
-            requirements.append(.requiresGPU)
-        case .safetensors:
-            requirements.append(.specificChip("A17"))
-        default:
-            break
-        }
-
-        return requirements
-    }
 
     private func detectTokenizerFormat(at url: URL) -> TokenizerFormat? {
         let directory = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
@@ -285,11 +242,7 @@ class ModelDiscovery {
         return filename
     }
 
-    private func generateModelName(from url: URL, metadata: ModelMetadata) -> String {
-        if let name = metadata.description {
-            return name
-        }
-
+    private func generateModelName(from url: URL) -> String {
         return url.deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
@@ -310,20 +263,20 @@ class ModelDiscovery {
         }
     }
 
-    private func convertToModelInfoMetadata(_ metadata: ModelMetadata) -> ModelInfoMetadata {
-        let quantLevel: QuantizationLevel? = {
-            guard let q = metadata.quantization else { return nil }
-            return QuantizationLevel(rawValue: q)
-        }()
-
-        return ModelInfoMetadata(
-            author: metadata.author,
-            license: nil,
-            tags: [],
-            description: metadata.description,
-            trainingDataset: nil,
-            baseModel: nil,
-            quantizationLevel: quantLevel
-        )
+    private func detectFormatFromExtension(_ ext: String) -> ModelFormat? {
+        switch ext.lowercased() {
+        case "mlmodel": return .mlmodel
+        case "mlmodelc": return .mlmodel
+        case "mlpackage": return .mlpackage
+        case "tflite": return .tflite
+        case "onnx": return .onnx
+        case "ort": return .ort
+        case "gguf": return .gguf
+        case "ggml": return .ggml
+        case "mlx": return .mlx
+        case "pte": return .pte
+        case "safetensors": return .safetensors
+        default: return nil
+        }
     }
 }
