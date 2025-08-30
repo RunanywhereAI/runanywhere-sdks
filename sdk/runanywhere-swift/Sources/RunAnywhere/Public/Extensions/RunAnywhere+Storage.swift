@@ -9,22 +9,9 @@ public extension RunAnywhere {
     static func getStorageInfo() async -> StorageInfo {
         await events.publish(SDKStorageEvent.infoRequested)
 
-        // Build storage info using fileManager
-        let fileManager = RunAnywhere.serviceContainer.fileManager
-
-        // Get model storage size
-        let modelStorageSize = fileManager.getModelStorageSize()
-        let totalStorageSize = fileManager.getTotalStorageSize()
-
-        // Create basic storage info (simplified implementation)
-        let storageInfo = StorageInfo(
-            appStorage: AppStorageInfo(documentsSize: totalStorageSize, cacheSize: 0, appSupportSize: 0, totalSize: totalStorageSize),
-            deviceStorage: DeviceStorageInfo(totalSpace: 0, freeSpace: 0, usedSpace: 0), // Would need system calls
-            modelStorage: ModelStorageInfo(totalSize: modelStorageSize, modelCount: 0, modelsByFramework: [:], largestModel: nil),
-            cacheSize: 0,
-            storedModels: [],
-            lastUpdated: Date()
-        )
+        // Use the storage analyzer service
+        let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
+        let storageInfo = await storageAnalyzer.analyzeStorage()
 
         await events.publish(SDKStorageEvent.infoRetrieved(info: storageInfo))
         return storageInfo
@@ -35,8 +22,10 @@ public extension RunAnywhere {
     static func getStoredModels() async -> [StoredModel] {
         await events.publish(SDKStorageEvent.modelsRequested)
 
-        // For now, return empty array - would need to scan Models folder
-        let models: [StoredModel] = []
+        // Get storage info which includes stored models
+        let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
+        let storageInfo = await storageAnalyzer.analyzeStorage()
+        let models = storageInfo.storedModels
 
         await events.publish(SDKStorageEvent.modelsRetrieved(models: models))
         return models

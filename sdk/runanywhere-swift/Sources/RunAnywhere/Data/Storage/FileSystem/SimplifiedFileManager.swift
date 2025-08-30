@@ -296,7 +296,7 @@ public class SimplifiedFileManager {
     }
 
     /// Calculate the total size of a directory including all subdirectories and files
-    private func calculateDirectorySize(at url: URL) -> Int64 {
+    public func calculateDirectorySize(at url: URL) -> Int64 {
         var totalSize: Int64 = 0
 
         if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: []) {
@@ -320,6 +320,53 @@ public class SimplifiedFileManager {
         } catch {
             logger.error("Failed to get available space: \(error)")
             return 0
+        }
+    }
+
+    /// Get device storage information (total, free, used space)
+    public func getDeviceStorageInfo() -> (totalSpace: Int64, freeSpace: Int64, usedSpace: Int64) {
+        do {
+            let homeURL = URL(fileURLWithPath: NSHomeDirectory())
+            let attributes = try FileManager.default.attributesOfFileSystem(forPath: homeURL.path)
+
+            let totalSpace = (attributes[.systemSize] as? Int64) ?? 0
+            let freeSpace = (attributes[.systemFreeSize] as? Int64) ?? 0
+            let usedSpace = totalSpace - freeSpace
+
+            return (totalSpace: totalSpace, freeSpace: freeSpace, usedSpace: usedSpace)
+        } catch {
+            logger.error("Failed to get device storage info: \(error)")
+            return (totalSpace: 0, freeSpace: 0, usedSpace: 0)
+        }
+    }
+
+    /// Get file creation date
+    public func getFileCreationDate(at url: URL) -> Date? {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            return attributes[.creationDate] as? Date
+        } catch {
+            return nil
+        }
+    }
+
+    /// Get file last access/modification date
+    public func getFileAccessDate(at url: URL) -> Date? {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            return attributes[.modificationDate] as? Date
+        } catch {
+            return nil
+        }
+    }
+
+    /// Get file size
+    public func getFileSize(at url: URL) -> Int64? {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            return attributes[.size] as? Int64
+        } catch {
+            return nil
         }
     }
 

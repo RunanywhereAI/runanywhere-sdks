@@ -85,6 +85,11 @@ public class ServiceContainer {
         }
     }()
 
+    /// Storage analyzer for storage operations
+    private(set) lazy var storageAnalyzer: StorageAnalyzer = {
+        DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
+    }()
+
     /// Routing service
     private(set) lazy var routingService: RoutingService = {
         RoutingService(
