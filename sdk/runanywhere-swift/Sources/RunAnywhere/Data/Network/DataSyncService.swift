@@ -5,7 +5,7 @@ public actor DataSyncService {
     private let logger = SDKLogger(category: "DataSyncService")
 
     // Repositories
-    private let configRepository: any ConfigurationRepository
+    private let configRepository: ConfigurationRepositoryImpl
     public let telemetryRepository: any TelemetryRepository
     private let modelMetadataRepository: any ModelMetadataRepository
 
@@ -15,7 +15,7 @@ public actor DataSyncService {
     // MARK: - Initialization
 
     public init(
-        configurationRepository: any ConfigurationRepository,
+        configurationRepository: ConfigurationRepositoryImpl,
         modelMetadataRepository: any ModelMetadataRepository,
         telemetryRepository: any TelemetryRepository,
         enableAutoSync: Bool = true
@@ -111,14 +111,15 @@ public actor DataSyncService {
         do {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
-                    try await self.configRepository.sync()
+                    try await self.configRepository.syncIfNeeded()
                 }
-                group.addTask {
-                    try await self.telemetryRepository.sync()
-                }
-                group.addTask {
-                    try await self.modelMetadataRepository.sync()
-                }
+                // TODO: Update these repositories to follow the same pattern
+                // group.addTask {
+                //     try await self.telemetryRepository.sync()
+                // }
+                // group.addTask {
+                //     try await self.modelMetadataRepository.sync()
+                // }
 
                 try await group.waitForAll()
             }

@@ -12,7 +12,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.generation.defaults.temperature = Double(value)
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Temperature updated")
     }
@@ -23,7 +23,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.generation.defaults.maxTokens = value
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ MaxTokens updated")
     }
@@ -34,7 +34,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.generation.defaults.topP = Double(value)
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ TopP updated")
     }
@@ -45,7 +45,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.generation.defaults.topK = value
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ TopK updated")
     }
@@ -115,7 +115,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.routing.cloudEnabled = enabled
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Cloud routing setting updated")
     }
@@ -136,7 +136,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.routing.privacyMode = mode
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Privacy mode setting updated")
     }
@@ -157,7 +157,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.routing.policy = policy
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Routing policy updated")
     }
@@ -180,7 +180,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.apiKey = apiKey
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ API key updated")
     }
@@ -210,7 +210,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.enabled = enabled
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Analytics enabled setting updated")
     }
@@ -247,7 +247,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.level = level
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Analytics level updated")
     }
@@ -284,7 +284,7 @@ extension RunAnywhereSDK {
         await serviceContainer.configurationService.updateConfiguration { config in
             var updated = config
             updated.analytics.liveMetricsEnabled = enabled
-            return updated.markUpdated()
+            return updated
         }
         logger.info("✅ Enable live metrics setting updated")
     }

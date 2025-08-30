@@ -6,55 +6,34 @@ struct Migration001_InitialSchema {
 
     static func migrate(_ db: Database) throws {
         // MARK: - Configuration Table
+        // Using GRDB's built-in Codable support for nested structures
+        // Complex objects (routing, analytics, generation, storage) are stored as JSON
 
         try db.create(table: "configuration") { t in
             t.primaryKey("id", .text)
-            t.column("api_key", .text)
-            t.column("base_url", .text).notNull().defaults(to: SDKConstants.DatabaseDefaults.apiBaseURL)
-            t.column("model_cache_size", .integer).notNull().defaults(to: SDKConstants.ModelDefaults.defaultModelCacheSize)
-            t.column("max_memory_usage_mb", .integer).notNull().defaults(to: SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB)
-            t.column("privacy_mode", .text).notNull().defaults(to: SDKConstants.PrivacyDefaults.defaultPrivacyMode)
-            t.column("telemetry_consent", .text).notNull().defaults(to: SDKConstants.TelemetryDefaults.consentAnonymous)
-            t.column("created_at", .datetime).notNull()
-            t.column("updated_at", .datetime).notNull()
-            t.column("sync_pending", .boolean).notNull().defaults(to: true)
+
+            // Complex nested structures stored as JSON blobs via Codable
+            t.column("routing", .blob).notNull()     // RoutingConfiguration as JSON
+            t.column("analytics", .blob).notNull()   // AnalyticsConfiguration as JSON
+            t.column("generation", .blob).notNull()  // GenerationConfiguration as JSON
+            t.column("storage", .blob).notNull()     // StorageConfiguration as JSON
+
+            // Simple fields
+            t.column("apiKey", .text)
+            t.column("allowUserOverride", .boolean).notNull().defaults(to: true)
+            t.column("source", .text).notNull().defaults(to: "defaults")
+
+            // Metadata
+            t.column("createdAt", .datetime).notNull()
+            t.column("updatedAt", .datetime).notNull()
+            t.column("syncPending", .boolean).notNull().defaults(to: false)
         }
 
-        // MARK: - Routing Policies Table
+        // Create index for source to quickly find consumer overrides
+        try db.create(index: "idx_configuration_source",
+                     on: "configuration",
+                     columns: ["source"])
 
-        try db.create(table: "routing_policies") { t in
-            t.primaryKey("id", .text)
-            t.belongsTo("configuration", onDelete: .cascade).notNull()
-            t.column("policy_type", .text).notNull() // costOptimized, latencyOptimized, privacyFirst, balanced
-            t.column("on_device_threshold", .double).notNull().defaults(to: SDKConstants.RoutingDefaults.defaultOnDeviceThreshold)
-            t.column("max_cloud_cost_per_request", .double)
-            t.column("prefer_on_device", .boolean).notNull().defaults(to: true)
-            t.column("created_at", .datetime).notNull()
-        }
-
-        // MARK: - Analytics Configuration Table
-
-        try db.create(table: "analytics_config") { t in
-            t.primaryKey("id", .text)
-            t.belongsTo("configuration", onDelete: .cascade).notNull()
-            t.column("analytics_level", .text).notNull().defaults(to: SDKConstants.AnalyticsDefaults.defaultLevel) // basic, detailed, debug
-            t.column("metrics_enabled", .boolean).notNull().defaults(to: true)
-            t.column("error_reporting_enabled", .boolean).notNull().defaults(to: true)
-            t.column("performance_tracking_enabled", .boolean).notNull().defaults(to: true)
-            t.column("created_at", .datetime).notNull()
-        }
-
-        // MARK: - Storage Configuration Table
-
-        try db.create(table: "storage_config") { t in
-            t.primaryKey("id", .text)
-            t.belongsTo("configuration", onDelete: .cascade).notNull()
-            t.column("max_cache_size_mb", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultMaxCacheSizeMB)
-            t.column("auto_cleanup_enabled", .boolean).notNull().defaults(to: true)
-            t.column("cleanup_threshold_percentage", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultCleanupThresholdPercentage)
-            t.column("model_retention_days", .integer).notNull().defaults(to: SDKConstants.StorageDefaults.defaultModelRetentionDays)
-            t.column("created_at", .datetime).notNull()
-        }
 
         // MARK: - Model Metadata Table
 

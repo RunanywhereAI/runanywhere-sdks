@@ -13,6 +13,7 @@
 - Read files FULLY to understand the FULL context. Only use tools when the file is large and you are short on context.
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 - When fixing issues focus on SIMPLICITY, and following Clean SOLID principles, do not add complicated logic unless necessary!
+- When looking up something: It's September 2025 FYI
 
 ## Swift specific rules:
 - Use the latest Swift 6 APIs always.
@@ -111,6 +112,7 @@ IMPORTANT!! - Always use build and run to run the project with correct device or
 # Build and run on simulator (handles dependencies automatically)
 ./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 
+NOTE: When running the app always check for running on the REAL device that's connected!
 # Build and run on connected device
 ./scripts/build_and_run.sh device
 

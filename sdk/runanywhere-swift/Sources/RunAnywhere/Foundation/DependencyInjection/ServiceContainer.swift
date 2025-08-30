@@ -7,10 +7,10 @@ public class ServiceContainer {
     public static let shared: ServiceContainer = ServiceContainer()
     // MARK: - Core Services
 
-    /// Configuration validator
-    private(set) lazy var configurationValidator: ConfigurationValidator = {
-        ConfigurationValidator()
-    }()
+    // Configuration validator - to be implemented when needed
+    // private(set) lazy var configurationValidator: ConfigurationValidator = {
+    //     ConfigurationValidator()
+    // }()
 
     /// Model registry
     private(set) lazy var modelRegistry: ModelRegistry = {
@@ -298,27 +298,28 @@ public class ServiceContainer {
 
         // Logger is pre-configured through LoggingManager
 
-        // Initialize configuration service with repository
-        let configRepository = ConfigurationRepositoryImpl(
-            databaseManager: databaseManager,
-            apiClient: apiClient
-        )
-        _configurationService = ConfigurationService(
-            configRepository: configRepository
-        )
-
-        // Ensure configuration is loaded immediately
-        if let configService = _configurationService {
-            await configService.ensureConfigurationLoaded()
-            logger.info("Configuration loaded during SDK initialization")
-        }
-
         // Initialize API client if API key is provided
         if !configuration.apiKey.isEmpty {
             apiClient = APIClient(
                 baseURL: "https://api.runanywhere.ai",
                 apiKey: configuration.apiKey
             )
+        }
+
+        // Initialize configuration service with repository
+        let configRepository = ConfigurationRepositoryImpl(
+            databaseManager: databaseManager,
+            apiClient: apiClient
+        )
+        _configurationService = ConfigurationService(
+            configRepository: configRepository,
+            apiClient: apiClient
+        )
+
+        // Load configuration on launch with simple fallback
+        if let configService = _configurationService {
+            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: configuration.apiKey)
+            logger.info("Configuration loaded during SDK initialization (source: \(effectiveConfig.source))")
         }
 
         // Initialize core services
