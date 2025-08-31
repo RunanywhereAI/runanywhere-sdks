@@ -17,20 +17,6 @@ public extension RunAnywhere {
         return storageInfo
     }
 
-    /// Get stored models with event reporting
-    /// - Returns: Array of stored models
-    static func getStoredModels() async -> [StoredModel] {
-        events.publish(SDKStorageEvent.modelsRequested)
-
-        // Get storage info which includes stored models
-        let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
-        let storageInfo = await storageAnalyzer.analyzeStorage()
-        let models = storageInfo.storedModels
-
-        events.publish(SDKStorageEvent.modelsRetrieved(models: models))
-        return models
-    }
-
     /// Clear cache with event reporting
     static func clearCache() async throws {
         events.publish(SDKStorageEvent.clearCacheStarted)

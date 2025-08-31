@@ -39,7 +39,6 @@ public class ServiceFactory {
     private func createGenerationService() -> GenerationService {
         GenerationService(
             routingService: container.routingService,
-            performanceMonitor: container.performanceMonitor
         )
     }
 

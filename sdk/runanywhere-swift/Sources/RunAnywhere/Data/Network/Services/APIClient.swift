@@ -28,6 +28,9 @@ public actor APIClient {
             delegate: URLSessionProxyDelegate(),
             delegateQueue: nil
         )
+
+        // Log initialization without exposing API key
+        logger.infoSensitive("APIClient initialized with baseURL: \(baseURL)", category: .apiKey)
     }
 
     // MARK: - Public Methods

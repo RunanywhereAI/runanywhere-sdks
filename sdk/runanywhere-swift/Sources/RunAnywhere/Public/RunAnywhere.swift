@@ -75,6 +75,7 @@ public enum RunAnywhere {
 
     /// Initialize device information collection during SDK startup
     private static func initializeDeviceInfo() async {
+        let logger = SDKLogger(category: "RunAnywhere")
         let deviceInfoService = await serviceContainer.deviceInfoService
 
         // Load current device information
@@ -83,9 +84,9 @@ public enum RunAnywhere {
 
             // Log device summary for debugging
             let summary = await deviceInfoService.getDeviceInfoSummary()
-            print("RunAnywhere SDK - Device Info:\n\(summary)")
+            logger.info("Device Info:\n\(summary)")
         } else {
-            print("RunAnywhere SDK - Warning: Could not collect device information")
+            logger.warning("Could not collect device information")
         }
     }
 
