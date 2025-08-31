@@ -186,33 +186,6 @@ class ModelDiscovery {
         return frameworks
     }
 
-
-    private func detectTokenizerFormat(at url: URL) -> TokenizerFormat? {
-        let directory = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
-
-        do {
-            let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
-
-            for file in contents {
-                let filename = file.lastPathComponent
-
-                if filename == "tokenizer.json" {
-                    return .huggingFace
-                } else if filename.contains("sentencepiece") {
-                    return .sentencePiece
-                } else if filename == "vocab.txt" {
-                    return .wordPiece
-                } else if file.pathExtension == "bpe" {
-                    return .bpe
-                }
-            }
-        } catch {
-            // Ignore errors
-        }
-
-        return nil
-    }
-
     private func generateModelId(from url: URL) -> String {
         // For models in our storage structure, use the parent folder name as ID
         // This ensures consistency with how models are stored

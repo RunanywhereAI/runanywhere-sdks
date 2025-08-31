@@ -91,7 +91,6 @@ public extension RunAnywhere {
                 seed: baseOptions.seed,
                 streamingEnabled: baseOptions.streamingEnabled,
                 tokenBudget: baseOptions.tokenBudget,
-                frameworkOptions: baseOptions.frameworkOptions,
                 preferredExecutionTarget: baseOptions.preferredExecutionTarget,
                 structuredOutput: structuredOutput,
                 systemPrompt: baseOptions.systemPrompt

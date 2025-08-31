@@ -32,9 +32,6 @@ public struct GenerationResult {
     /// Memory used during generation (in bytes)
     public let memoryUsed: Int64
 
-    /// Tokenizer format used
-    public let tokenizerFormat: TokenizerFormat?
-
     /// Detailed performance metrics
     public let performanceMetrics: PerformanceMetrics
 
@@ -56,7 +53,6 @@ public struct GenerationResult {
         framework: LLMFramework? = nil,
         hardwareUsed: HardwareAcceleration = .cpu,
         memoryUsed: Int64 = 0,
-        tokenizerFormat: TokenizerFormat? = nil,
         performanceMetrics: PerformanceMetrics,
         metadata: ResultMetadata? = nil,
         structuredOutputValidation: StructuredOutputValidation? = nil
@@ -71,7 +67,6 @@ public struct GenerationResult {
         self.framework = framework
         self.hardwareUsed = hardwareUsed
         self.memoryUsed = memoryUsed
-        self.tokenizerFormat = tokenizerFormat
         self.performanceMetrics = performanceMetrics
         self.metadata = metadata
         self.structuredOutputValidation = structuredOutputValidation

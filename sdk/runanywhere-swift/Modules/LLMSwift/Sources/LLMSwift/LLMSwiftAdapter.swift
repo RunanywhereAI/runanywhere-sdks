@@ -10,6 +10,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
     public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
 
     private var hardwareConfig: HardwareConfiguration?
+    private let logger = SDKLogger(category: "LLMSwiftAdapter")
 
     public init() {}
 
@@ -36,10 +37,10 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
         guard modality == .textToText else {
             throw SDKError.unsupportedModality(modality.rawValue)
         }
-        print("🚀 [LLMSwiftAdapter] Loading model: \(model.name) (ID: \(model.id))")
+        logger.info("Loading model: \(model.name) (ID: \(model.id))")
 
         guard let localPath = model.localPath else {
-            print("❌ [LLMSwiftAdapter] Model has no local path - not downloaded")
+            logger.error("Model has no local path - not downloaded")
             throw FrameworkError(
                 framework: framework,
                 underlying: LLMServiceError.modelNotLoaded,
@@ -47,13 +48,13 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
             )
         }
 
-        print("📝 [LLMSwiftAdapter] Model local path: \(localPath.path)")
-        print("🚀 [LLMSwiftAdapter] Creating LLMSwiftService")
+        logger.debugSensitive("Model local path: \(localPath.path)", category: .modelPath)
+        logger.info("Creating LLMSwiftService")
 
         let service = LLMSwiftService(hardwareConfig: hardwareConfig)
-        print("🚀 [LLMSwiftAdapter] Initializing service with model path")
+        logger.info("Initializing service with model path")
         try await service.initialize(modelPath: localPath.path)
-        print("✅ [LLMSwiftAdapter] Service initialized successfully")
+        logger.info("Service initialized successfully")
         return service
     }
 

@@ -46,7 +46,7 @@ public actor AnalyticsQueueManager {
         eventQueue.append(event)
 
         if eventQueue.count >= batchSize {
-            await flush()
+            await flushBatch()
         }
     }
 
@@ -54,8 +54,13 @@ public actor AnalyticsQueueManager {
         eventQueue.append(contentsOf: events)
 
         if eventQueue.count >= batchSize {
-            await flush()
+            await flushBatch()
         }
+    }
+
+    /// Force flush all pending events
+    public func flush() async {
+        await flushBatch()
     }
 
     // MARK: - Private Methods
@@ -64,12 +69,12 @@ public actor AnalyticsQueueManager {
         flushTask = Task {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: UInt64(flushInterval * 1_000_000_000))
-                await flush()
+                await flushBatch()
             }
         }
     }
 
-    private func flush() async {
+    private func flushBatch() async {
         guard !eventQueue.isEmpty else { return }
 
         let batch = Array(eventQueue.prefix(batchSize))
@@ -77,22 +82,12 @@ public actor AnalyticsQueueManager {
     }
 
     private func processBatch(_ batch: [any AnalyticsEvent]) async {
-        // Check if analytics logging is enabled - if yes, log locally instead of sending to network
-        if AnalyticsLoggingConfig.shared.logToLocal {
-            // Log analytics events locally instead of sending to network
-            for event in batch {
-                do {
-                    let jsonData = try JSONEncoder().encode(event.eventData)
-                    let jsonString = String(data: jsonData, encoding: .utf8) ?? "Failed to encode"
-                    logger.info("📊 Analytics: \(event.type) - \(jsonString)")
-                } catch {
-                    logger.info("📊 Analytics: \(event.type) - Failed to serialize event data")
-                }
-            }
-            // Remove from queue since we've "processed" them by logging
-            eventQueue.removeFirst(min(batch.count, eventQueue.count))
-            return
+        // For debugging: log analytics events locally if in debug mode
+        #if DEBUG
+        for event in batch {
+            logger.debug("📊 Analytics Event: \(event.type)")
         }
+        #endif
 
         guard let telemetryRepository = telemetryRepository else {
             logger.error("No telemetry repository configured")

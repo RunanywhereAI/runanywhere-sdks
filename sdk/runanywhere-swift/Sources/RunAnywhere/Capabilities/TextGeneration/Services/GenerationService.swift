@@ -3,7 +3,6 @@ import Foundation
 /// Main service for text generation
 public class GenerationService {
     private let routingService: RoutingService
-    private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
     private let structuredOutputHandler: StructuredOutputHandler
     private let logger: SDKLogger = SDKLogger(category: "GenerationService")
@@ -13,12 +12,10 @@ public class GenerationService {
 
     public init(
         routingService: RoutingService,
-        performanceMonitor: PerformanceMonitor,
         modelLoadingService: ModelLoadingService? = nil,
         structuredOutputHandler: StructuredOutputHandler? = nil
     ) {
         self.routingService = routingService
-        self.performanceMonitor = performanceMonitor
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
         self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }

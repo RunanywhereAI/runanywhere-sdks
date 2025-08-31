@@ -36,7 +36,6 @@ public class ServiceContainer {
     private(set) lazy var generationService: GenerationService = {
         GenerationService(
             routingService: routingService,
-            performanceMonitor: performanceMonitor,
             modelLoadingService: modelLoadingService
         )
     }()
@@ -85,20 +84,7 @@ public class ServiceContainer {
         )
     }()
 
-    // Memory service and monitor placeholders removed - using unifiedMemoryManager instead
-
-    // MARK: - Monitoring Services
-
-    /// Performance monitor
-    private(set) lazy var performanceMonitor: PerformanceMonitor = {
-        MonitoringService()
-    }()
-
-    // Storage monitor removed - storage monitoring handled by SimplifiedFileManager
-
-
     // MARK: - Infrastructure
-
     /// Hardware manager
     private(set) lazy var hardwareManager: HardwareCapabilityManager = {
         HardwareCapabilityManager.shared
@@ -271,21 +257,7 @@ public class ServiceContainer {
         }
     }
 
-    /// Monitoring Analytics Service - using unified pattern
-    private var _monitoringAnalytics: MonitoringAnalyticsService?
-    public var monitoringAnalytics: MonitoringAnalyticsService {
-        get async {
-            if let service = _monitoringAnalytics {
-                return service
-            }
-            let service = MonitoringAnalyticsService(queueManager: analyticsQueueManager)
-            _monitoringAnalytics = service
-            return service
-        }
-    }
-
     // MARK: - Public Service Access
-
 
     /// Get memory service
     public var memory: MemoryManager {
@@ -375,12 +347,6 @@ public class ServiceContainer {
 
         // Configure download settings
         // Download service is configured via its initializer
-
-        // Initialize monitoring if enabled
-        if configuration.enableRealTimeDashboard {
-            performanceMonitor.startMonitoring()
-            // Storage monitoring is now handled by SimplifiedFileManager
-        }
 
         // Initialize voice capability service
         do {

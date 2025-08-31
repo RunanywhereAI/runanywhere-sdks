@@ -26,9 +26,6 @@ public struct RunAnywhereGenerationOptions {
     /// Token budget constraint (for cost control)
     public let tokenBudget: TokenBudget?
 
-    /// Framework-specific options
-    public let frameworkOptions: FrameworkOptions?
-
     /// Preferred execution target
     public let preferredExecutionTarget: ExecutionTarget?
 
@@ -48,7 +45,6 @@ public struct RunAnywhereGenerationOptions {
     ///   - seed: Optional seed for reproducibility
     ///   - streamingEnabled: Enable streaming mode (default: false)
     ///   - tokenBudget: Token budget constraints
-    ///   - frameworkOptions: Framework-specific options
     ///   - preferredExecutionTarget: Preferred execution target
     ///   - structuredOutput: Structured output configuration (optional)
     ///   - systemPrompt: System prompt for AI behavior (optional)
@@ -61,7 +57,6 @@ enableRealTimeTracking: Bool = true,
         seed: Int? = nil,
         streamingEnabled: Bool = false,
         tokenBudget: TokenBudget? = nil,
-        frameworkOptions: FrameworkOptions? = nil,
         preferredExecutionTarget: ExecutionTarget? = nil,
         structuredOutput: StructuredOutputConfig? = nil,
         systemPrompt: String? = nil
@@ -74,7 +69,6 @@ self.enableRealTimeTracking = enableRealTimeTracking
         self.seed = seed
         self.streamingEnabled = streamingEnabled
         self.tokenBudget = tokenBudget
-        self.frameworkOptions = frameworkOptions
         self.preferredExecutionTarget = preferredExecutionTarget
         self.structuredOutput = structuredOutput
         self.systemPrompt = systemPrompt
