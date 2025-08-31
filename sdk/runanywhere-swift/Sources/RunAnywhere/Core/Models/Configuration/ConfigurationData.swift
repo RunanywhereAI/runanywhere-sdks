@@ -10,7 +10,7 @@ public enum ConfigurationSource: String, Codable {
 
 /// Main configuration data structure using composed configurations
 /// Works for both network API and database storage
-public struct ConfigurationData: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
     /// Unique identifier for this configuration
     public let id: String
 

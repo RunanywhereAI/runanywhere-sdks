@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Persisted telemetry event data
-public struct TelemetryData: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct TelemetryData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
     public let id: String
     public let eventType: String
     public let properties: [String: String]

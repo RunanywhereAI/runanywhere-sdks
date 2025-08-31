@@ -13,9 +13,9 @@ public protocol Repository {
     func delete(id: String) async throws
 }
 
-/// Extension for repositories with Syncable entities
+/// Extension for repositories with RepositoryEntity entities
 /// Provides minimal sync support - actual sync logic in SyncCoordinator
-public extension Repository where Entity: Syncable {
+public extension Repository where Entity: RepositoryEntity {
 
     /// Fetch entities pending sync
     func fetchPendingSync() async throws -> [Entity] {
@@ -27,7 +27,7 @@ public extension Repository where Entity: Syncable {
     func markSynced(_ ids: [String]) async throws {
         for id in ids {
             if var entity = try await fetch(id: id) {
-                _ = entity.markSynced()
+                entity.markSynced()
                 try await save(entity)
             }
         }
