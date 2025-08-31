@@ -11,6 +11,19 @@ public enum SDKConstants {
     /// User agent string
     public static let userAgent = "\(name)/\(version) (Swift)"
 
+    /// Platform identifier
+    #if os(iOS)
+    public static let platform = "iOS"
+    #elseif os(macOS)
+    public static let platform = "macOS"
+    #elseif os(tvOS)
+    public static let platform = "tvOS"
+    #elseif os(watchOS)
+    public static let platform = "watchOS"
+    #else
+    public static let platform = "Unknown"
+    #endif
+
     /// Default API timeout in seconds
     public static let defaultAPITimeout: TimeInterval = 60
 

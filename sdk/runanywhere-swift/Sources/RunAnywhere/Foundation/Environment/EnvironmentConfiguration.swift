@@ -219,14 +219,14 @@ public extension EnvironmentConfiguration {
     private static var testOverride: EnvironmentConfiguration?
 
     /// Set a test configuration (only works in DEBUG)
-    public static func setTestConfiguration(_ config: EnvironmentConfiguration?) {
+    static func setTestConfiguration(_ config: EnvironmentConfiguration?) {
         #if DEBUG
         testOverride = config
         #endif
     }
 
     /// Get the current active configuration
-    public static var current: EnvironmentConfiguration {
+    static var current: EnvironmentConfiguration {
         #if DEBUG
         if let override = testOverride {
             return override
