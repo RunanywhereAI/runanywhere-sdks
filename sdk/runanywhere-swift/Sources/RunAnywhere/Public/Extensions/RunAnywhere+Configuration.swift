@@ -1,58 +1,16 @@
 import Foundation
 
-// MARK: - Configuration Extensions (Event-Based)
-// Note: Most configuration is now handled via per-request options
-// These methods provide event-driven access to runtime configuration
+// MARK: - Configuration Extensions
+// These methods provide read-only access to current SDK configuration
 
 public extension RunAnywhere {
-
-    /// Configuration Request Structure
-    struct ConfigurationRequest {
-        let temperature: Float?
-        let maxTokens: Int?
-        let topP: Float?
-        let topK: Int?
-        let routingPolicy: RoutingPolicy?
-        let privacyMode: PrivacyMode?
-        let analyticsEnabled: Bool?
-
-        init(
-            temperature: Float? = nil,
-            maxTokens: Int? = nil,
-            topP: Float? = nil,
-            topK: Int? = nil,
-            routingPolicy: RoutingPolicy? = nil,
-            privacyMode: PrivacyMode? = nil,
-            analyticsEnabled: Bool? = nil
-        ) {
-            self.temperature = temperature
-            self.maxTokens = maxTokens
-            self.topP = topP
-            self.topK = topK
-            self.routingPolicy = routingPolicy
-            self.privacyMode = privacyMode
-            self.analyticsEnabled = analyticsEnabled
-        }
-    }
-
-    /// Request configuration updates (per-session configuration)
-    /// - Parameter request: Configuration request with desired settings
-    /// Note: This is event-driven - settings apply to the current session only
-    static func requestConfiguration(_ request: ConfigurationRequest) async {
-        events.publish(SDKConfigurationEvent.updateRequested(request: request))
-
-        // Apply configuration to current session
-        // This would typically update session-level defaults used by generation options
-
-        events.publish(SDKConfigurationEvent.updateCompleted)
-    }
 
     /// Get current generation settings (read-only access via configuration)
     /// - Returns: Current generation settings
     static func getCurrentGenerationSettings() async -> DefaultGenerationSettings? {
         events.publish(SDKConfigurationEvent.settingsRequested)
 
-        let settings = RunAnywhere._configuration?.defaultGenerationSettings
+        let settings = RunAnywhere._configurationData?.generation.defaults
 
         if let settings = settings {
             events.publish(SDKConfigurationEvent.settingsRetrieved(settings: settings))
@@ -65,7 +23,7 @@ public extension RunAnywhere {
     static func getCurrentRoutingPolicy() async -> RoutingPolicy {
         events.publish(SDKConfigurationEvent.routingPolicyRequested)
 
-        let policy = RunAnywhere._configuration?.routingPolicy ?? .automatic
+        let policy = RunAnywhere._configurationData?.routing.policy ?? .automatic
 
         events.publish(SDKConfigurationEvent.routingPolicyRetrieved(policy: policy))
         return policy
@@ -76,7 +34,7 @@ public extension RunAnywhere {
     static func getCurrentPrivacyMode() async -> PrivacyMode {
         events.publish(SDKConfigurationEvent.privacyModeRequested)
 
-        let mode = RunAnywhere._configuration?.privacyMode ?? .standard
+        let mode = RunAnywhere._configurationData?.routing.privacyMode ?? .standard
 
         events.publish(SDKConfigurationEvent.privacyModeRetrieved(mode: mode))
         return mode
@@ -87,7 +45,7 @@ public extension RunAnywhere {
     static func isAnalyticsEnabled() async -> Bool {
         events.publish(SDKConfigurationEvent.analyticsStatusRequested)
 
-        let enabled = RunAnywhere._configuration?.telemetryConsent != .denied
+        let enabled = RunAnywhere._configurationData?.telemetry.consent != .denied
 
         events.publish(SDKConfigurationEvent.analyticsStatusRetrieved(enabled: enabled))
         return enabled
@@ -105,37 +63,5 @@ public extension RunAnywhere {
             events.publish(SDKConfigurationEvent.syncFailed(error))
             throw error
         }
-    }
-}
-
-// MARK: - Convenience Configuration Extensions
-
-public extension RunAnywhere.ConfigurationRequest {
-
-    /// Create a performance-optimized configuration
-    static func performanceOptimized() -> RunAnywhere.ConfigurationRequest {
-        RunAnywhere.ConfigurationRequest(
-            temperature: 0.1,
-            maxTokens: 200,
-            routingPolicy: .preferDevice
-        )
-    }
-
-    /// Create a creativity-focused configuration
-    static func creative() -> RunAnywhere.ConfigurationRequest {
-        RunAnywhere.ConfigurationRequest(
-            temperature: 0.9,
-            topP: 0.95,
-            routingPolicy: .preferCloud
-        )
-    }
-
-    /// Create a privacy-focused configuration
-    static func privacyFocused() -> RunAnywhere.ConfigurationRequest {
-        RunAnywhere.ConfigurationRequest(
-            routingPolicy: .deviceOnly,
-            privacyMode: .strict,
-            analyticsEnabled: false
-        )
     }
 }

@@ -44,9 +44,7 @@ public enum SDKConfigurationEvent: SDKEvent {
     case syncCompleted
     case syncFailed(Error)
 
-    // New configuration events
-    case updateRequested(request: RunAnywhere.ConfigurationRequest)
-    case updateCompleted
+    // Configuration read events
     case settingsRequested
     case settingsRetrieved(settings: DefaultGenerationSettings)
     case routingPolicyRequested

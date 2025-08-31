@@ -14,7 +14,7 @@ public class RegistryService: ModelRegistry {
     }
 
     /// Initialize registry with configuration
-    public func initialize(with configuration: Configuration) async {
+    public func initialize(with apiKey: String) async {
         logger.info("Initializing registry with configuration")
 
         // Load pre-configured models
@@ -28,11 +28,9 @@ public class RegistryService: ModelRegistry {
             registerModel(model)
         }
 
-        // Discover models from providers
-        for provider in configuration.modelProviders where provider.enabled {
-            logger.debug("Discovering models from provider")
-            await discoverModelsFromProvider(provider)
-        }
+        // Model provider discovery will be handled via configuration service
+        // once the configuration is loaded from the network
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
         logger.info("Registry initialization complete")
     }
@@ -235,10 +233,7 @@ public class RegistryService: ModelRegistry {
         }
     }
 
-    private func discoverModelsFromProvider(_ provider: ModelProviderConfig) async {
-        // Placeholder for provider-specific discovery
-        // Would connect to HuggingFace, Kaggle, etc.
-    }
+    // Provider discovery removed - no longer needed
 
     // MARK: - URL Helper Methods
 

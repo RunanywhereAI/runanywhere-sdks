@@ -61,13 +61,13 @@ extension RunAnywhere {
     /// Update telemetry consent preference
     /// - Parameter consent: New consent level
     public static func updateTelemetryConsent(_ consent: TelemetryConsent) {
-        guard var config = _configuration else {
+        guard var config = _configurationData else {
             SDKLogger(category: "RunAnywhere").warning("Cannot update telemetry consent - SDK not initialized")
             return
         }
 
-        config.telemetryConsent = consent
-        _configuration = config
+        config.telemetry.consent = consent
+        _configurationData = config
 
         // Apply consent to both logging and analytics
         switch consent {
@@ -88,13 +88,13 @@ extension RunAnywhere {
     /// Enable verbose debugging mode
     /// - Parameter enabled: Whether to enable verbose mode
     public static func setDebugMode(_ enabled: Bool) {
-        guard var config = _configuration else {
+        guard var config = _configurationData else {
             SDKLogger(category: "RunAnywhere").warning("Cannot set debug mode - SDK not initialized")
             return
         }
 
         config.debugMode = enabled
-        _configuration = config
+        _configurationData = config
 
         // Update log level based on debug mode
         setLogLevel(enabled ? .debug : .info)

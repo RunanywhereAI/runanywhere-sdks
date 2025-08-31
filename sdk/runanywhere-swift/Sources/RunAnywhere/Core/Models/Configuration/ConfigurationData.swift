@@ -20,10 +20,25 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     /// Generation configuration
     public var generation: GenerationConfiguration
 
-    /// Storage configuration
+    /// Storage configuration (includes memory threshold)
     public var storage: StorageConfiguration
 
-    /// API configuration
+    /// API configuration (baseURL, timeouts, etc)
+    public var api: APIConfiguration
+
+    /// Telemetry configuration (consent, analytics settings)
+    public var telemetry: TelemetryConfiguration
+
+    /// Download configuration
+    public var download: ModelDownloadConfiguration
+
+    /// Hardware preferences (optional)
+    public var hardware: HardwareConfiguration?
+
+    /// Debug mode flag
+    public var debugMode: Bool
+
+    /// API key for authentication (optional - can be provided separately)
     public var apiKey: String?
 
     /// Whether user can override configuration
@@ -42,6 +57,11 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         routing: RoutingConfiguration = RoutingConfiguration(),
         generation: GenerationConfiguration = GenerationConfiguration(),
         storage: StorageConfiguration = StorageConfiguration(),
+        api: APIConfiguration = APIConfiguration(),
+        telemetry: TelemetryConfiguration = TelemetryConfiguration(),
+        download: ModelDownloadConfiguration = ModelDownloadConfiguration(),
+        hardware: HardwareConfiguration? = nil,
+        debugMode: Bool = false,
         apiKey: String? = nil,
         allowUserOverride: Bool = true,
         source: ConfigurationSource = .defaults,
@@ -53,6 +73,11 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         self.routing = routing
         self.generation = generation
         self.storage = storage
+        self.api = api
+        self.telemetry = telemetry
+        self.download = download
+        self.hardware = hardware
+        self.debugMode = debugMode
         self.apiKey = apiKey
         self.allowUserOverride = allowUserOverride
         self.source = source

@@ -103,6 +103,7 @@ internal struct SDKLogger {
         )
     }
 
+    /* Commented out until GenerationPerformance type is defined
     /// Log generation performance
     func logGenerationPerformance(_ performance: GenerationPerformance) {
         var metadata: [String: Any] = [
@@ -127,7 +128,9 @@ internal struct SDKLogger {
             metadata: metadata
         )
     }
+    */
 
+    /* Commented out until PerformanceAlert type is defined
     /// Log performance alert
     func logPerformanceAlert(_ alert: PerformanceAlert) {
         let metadata: [String: Any] = [
@@ -145,6 +148,7 @@ internal struct SDKLogger {
             metadata: metadata
         )
     }
+    */
 
     // MARK: - Helper Methods
 

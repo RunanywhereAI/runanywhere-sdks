@@ -56,9 +56,7 @@ class RegistryUpdater {
         return uniqueModels
     }
 
-    func registerProvider(_ provider: ModelProvider) {
-        discovery.registerProvider(provider)
-    }
+    // Provider registration removed - no longer needed
 
     private func deduplicateModels(_ models: [ModelInfo]) -> [ModelInfo] {
         var seen = Set<String>()

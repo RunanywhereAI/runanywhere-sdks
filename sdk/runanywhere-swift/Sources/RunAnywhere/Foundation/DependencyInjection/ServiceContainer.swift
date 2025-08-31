@@ -271,8 +271,8 @@ public class ServiceContainer {
         // Container is ready for lazy initialization
     }
 
-    /// Bootstrap all services with configuration
-    public func bootstrap(with configuration: Configuration) async throws {
+    /// Bootstrap all services with SDK initialization parameters
+    public func bootstrap(with params: SDKInitParams) async throws {
         // Initialize database first
         do {
             try databaseManager.setup()
@@ -297,11 +297,11 @@ public class ServiceContainer {
 
         // Logger is pre-configured through LoggingManager
 
-        // Initialize API client if API key is provided
-        if !configuration.apiKey.isEmpty {
+        // Initialize API client with provided parameters
+        if !params.apiKey.isEmpty {
             apiClient = APIClient(
-                baseURL: RunAnywhereConstants.apiURLs.current,
-                apiKey: configuration.apiKey
+                baseURL: params.baseURL.absoluteString,
+                apiKey: params.apiKey
             )
         }
 
@@ -317,13 +317,15 @@ public class ServiceContainer {
 
         // Load configuration on launch with simple fallback
         if let configService = _configurationService {
-            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: configuration.apiKey)
+            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
             logger.info("Configuration loaded during SDK initialization (source: \(effectiveConfig.source))")
         }
 
         // Initialize core services
         // Initialize model registry with configuration
-        await (modelRegistry as? RegistryService)?.initialize(with: configuration)
+        // Initialize model registry
+        // Note: Registry will use the loaded configuration from ConfigurationService
+        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
 
         // Populate mock data in debug mode
         if EnvironmentConfiguration.current.environment.isDebug {
@@ -343,7 +345,8 @@ public class ServiceContainer {
         // Hardware manager is self-configuring
 
         // Set memory threshold
-        memoryService.setMemoryThreshold(configuration.memoryThreshold)
+        // Set default memory threshold (will be overridden by network config)
+        memoryService.setMemoryThreshold(500_000_000) // 500MB default
 
         // Configure download settings
         // Download service is configured via its initializer

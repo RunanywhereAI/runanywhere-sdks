@@ -1,5 +1,4 @@
 import Foundation
-import Security
 #if os(iOS) || os(tvOS)
 import UIKit
 #endif
@@ -9,11 +8,7 @@ import UIKit
 public class PersistentDeviceIdentity {
 
     private static let logger = SDKLogger(category: "PersistentDeviceIdentity")
-
-    // Keychain configuration for persistent storage
-    private static let keychainService = "com.runanywhere.sdk.device"
-    private static let deviceUUIDKey = "persistent_device_uuid"
-    private static let accessGroup = "$(AppIdentifierPrefix)com.runanywhere.shared" // Requires entitlements
+    private static let keychainManager = KeychainManager.shared
 
     /// Get a persistent device UUID that survives app reinstalls
     /// Uses a multi-layered approach for maximum persistence
@@ -21,7 +16,7 @@ public class PersistentDeviceIdentity {
         logger.debug("Attempting to retrieve persistent device UUID")
 
         // Strategy 1: Try to get from persistent keychain (survives app reinstalls)
-        if let persistentUUID = getPersistentKeychainUUID() {
+        if let persistentUUID = keychainManager.retrieveDeviceUUID() {
             logger.info("Retrieved device UUID from persistent keychain")
             return persistentUUID
         }
@@ -30,7 +25,7 @@ public class PersistentDeviceIdentity {
         if let vendorUUID = getVendorBasedUUID() {
             logger.info("Retrieved device UUID from vendor identifier")
             // Store this in persistent keychain for future use
-            storePersistentKeychainUUID(vendorUUID)
+            try? keychainManager.storeDeviceUUID(vendorUUID)
             return vendorUUID
         }
 
@@ -69,7 +64,12 @@ public class PersistentDeviceIdentity {
 
         // Create fingerprint hash
         let fingerprintString = components.joined(separator:"|")
-        return sha256(fingerprintString)
+        let fingerprint = sha256(fingerprintString)
+
+        // Store fingerprint for future validation
+        try? keychainManager.storeDeviceFingerprint(fingerprint)
+
+        return fingerprint
     }
 
     /// Validate if a device UUID still represents the same physical device
@@ -81,62 +81,9 @@ public class PersistentDeviceIdentity {
 
     // MARK: - Private Methods
 
-    /// Get UUID from persistent keychain (survives app reinstalls)
-    private static func getPersistentKeychainUUID() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: deviceUUIDKey,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-            // Key setting for persistence across app reinstalls
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        guard status == errSecSuccess,
-              let data = result as? Data,
-              let uuid = String(data: data, encoding: .utf8) else {
-            logger.debug("No persistent keychain UUID found")
-            return nil
-        }
-
-        return uuid
-    }
-
-    /// Store UUID in persistent keychain
-    private static func storePersistentKeychainUUID(_ uuid: String) {
-        guard let data = uuid.data(using: .utf8) else { return }
-
-        // First, delete any existing entry
-        let deleteQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: deviceUUIDKey
-        ]
-        SecItemDelete(deleteQuery as CFDictionary)
-
-        // Add new entry with persistent settings
-        let addQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: deviceUUIDKey,
-            kSecValueData as String: data,
-            // Critical: This setting allows keychain item to survive app uninstalls
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
-            // Optional: Use access group for sharing across apps (requires entitlements)
-            // kSecAttrAccessGroup as String: accessGroup
-        ]
-
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
-        if status == errSecSuccess {
-            logger.debug("Successfully stored device UUID in persistent keychain")
-        } else {
-            logger.warning("Failed to store device UUID in keychain: \(status)")
-        }
-    }
+    // Note: The keychain storage/retrieval is now handled by KeychainManager
+    // KeychainManager uses kSecAttrAccessibleWhenUnlockedThisDeviceOnly for security
+    // which provides good persistence across app launches
 
     /// Get vendor-based UUID (Apple's recommended approach)
     private static func getVendorBasedUUID() -> String? {
@@ -160,7 +107,7 @@ public class PersistentDeviceIdentity {
     /// Generate and store a completely new UUID
     private static func generateAndStoreNewUUID() -> String {
         let newUUID = UUID().uuidString
-        storePersistentKeychainUUID(newUUID)
+        try? keychainManager.storeDeviceUUID(newUUID)
         return newUUID
     }
 
