@@ -9,9 +9,13 @@ public final class AdapterRegistry {
 
     /// Register a unified framework adapter
     func register(_ adapter: UnifiedFrameworkAdapter) {
+        // First, register the adapter in the concurrent queue
         queue.async(flags: .barrier) {
             self.adapters[adapter.framework] = adapter
+        }
 
+        // Then call external services outside of the queue to prevent deadlocks
+        Task {
             // Call the adapter's onRegistration method
             adapter.onRegistration()
 

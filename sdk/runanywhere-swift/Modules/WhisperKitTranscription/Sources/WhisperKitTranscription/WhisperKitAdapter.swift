@@ -104,16 +104,18 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - Initialization
 
     public init() {
+        // Initialize download strategy
+        self.downloadStrategy = WhisperKitDownloadStrategy()
+
         logger.info("WhisperKitAdapter initialized")
         logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
         logger.info("Supported formats: \(self.supportedFormats.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
-        // No initialization needed for basic adapter
     }
 
     // MARK: - Model Registration
 
     // Store download strategy only (models come from configuration)
-    private lazy var downloadStrategy = WhisperKitDownloadStrategy()
+    private let downloadStrategy: DownloadStrategy
 
     /// Called when adapter is registered with the SDK
     /// This method will be called automatically by the SDK when the adapter is registered
