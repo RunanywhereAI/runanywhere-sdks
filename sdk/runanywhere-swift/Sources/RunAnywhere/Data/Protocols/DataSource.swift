@@ -13,7 +13,7 @@ public protocol DataSource: Actor {
 }
 
 /// Helper for remote operations with timeout
-public struct RemoteOperationHelper {
+public struct RemoteOperationHelper: Sendable {
     private let timeout: TimeInterval
 
     public init(timeout: TimeInterval = 10.0) {
@@ -86,7 +86,7 @@ public protocol LocalDataSource: DataSource {
 }
 
 /// Information about local storage status
-public struct DataSourceStorageInfo: Codable {
+public struct DataSourceStorageInfo: Codable, Sendable {
     public let totalSpace: Int64?
     public let availableSpace: Int64?
     public let usedSpace: Int64?

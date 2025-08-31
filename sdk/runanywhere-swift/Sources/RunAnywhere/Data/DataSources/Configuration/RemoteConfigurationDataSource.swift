@@ -37,7 +37,7 @@ public actor RemoteConfigurationDataSource: RemoteDataSource {
     // MARK: - RemoteDataSource Protocol
 
     public func fetch(id: String) async throws -> ConfigurationData? {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 
@@ -75,7 +75,7 @@ public actor RemoteConfigurationDataSource: RemoteDataSource {
     }
 
     public func testConnection() async throws -> Bool {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             return false
         }
 

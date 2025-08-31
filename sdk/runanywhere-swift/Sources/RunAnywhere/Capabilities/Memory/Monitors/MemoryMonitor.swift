@@ -7,11 +7,11 @@ import AppKit
 
 /// Monitors system memory usage and provides real-time statistics
 class MemoryMonitor {
-    private let logger = SDKLogger(category: "MemoryMonitor")
+    private let logger: SDKLogger = SDKLogger(category: "MemoryMonitor")
     private var monitoringTimer: Timer?
     private var thresholdWatcher: ThresholdWatcher?
-    private var isMonitoring = false
-    private var config = MemoryService.Config()
+    private var isMonitoring: Bool = false
+    private var config: MemoryService.Config = MemoryService.Config()
 
     // Monitoring callbacks
     private var statisticsCallback: ((MemoryMonitoringStats) -> Void)?
@@ -145,7 +145,7 @@ class MemoryMonitor {
     // MARK: - Memory Trends
 
     private var memoryHistory: [MemoryMonitoringStats] = []
-    private let maxHistoryEntries = 100
+    private let maxHistoryEntries: Int = 100
 
     func getMemoryTrend(duration: TimeInterval) -> MemoryUsageTrend? {
         let cutoffTime = Date().addingTimeInterval(-duration)

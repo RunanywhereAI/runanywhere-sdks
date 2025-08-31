@@ -43,7 +43,7 @@ public struct StorageConfiguration: Codable, Sendable {
 }
 
 /// Cache eviction policy
-public enum CacheEvictionPolicy: String, Codable, CaseIterable {
+public enum CacheEvictionPolicy: String, Codable, CaseIterable, Sendable {
     /// Least recently used items are evicted first
     case leastRecentlyUsed = "lru"
 

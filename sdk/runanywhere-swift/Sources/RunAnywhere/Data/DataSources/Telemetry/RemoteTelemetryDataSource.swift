@@ -48,7 +48,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
     }
 
     public func save(_ entity: TelemetryData) async throws -> TelemetryData {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 
@@ -79,7 +79,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
     }
 
     public func testConnection() async throws -> Bool {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             return false
         }
 
@@ -95,7 +95,7 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
     /// Send batch of telemetry events
     public func sendBatch(_ events: [TelemetryData]) async throws {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 

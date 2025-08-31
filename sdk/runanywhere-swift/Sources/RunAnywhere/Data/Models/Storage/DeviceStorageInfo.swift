@@ -1,7 +1,7 @@
 import Foundation
 
 /// Device storage information
-public struct DeviceStorageInfo {
+public struct DeviceStorageInfo: Sendable {
     public let totalSpace: Int64
     public let freeSpace: Int64
     public let usedSpace: Int64

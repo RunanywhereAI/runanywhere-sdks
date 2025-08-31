@@ -46,7 +46,7 @@ class ModelDiscovery {
             return
         }
 
-        for case let fileURL as URL in enumerator {
+        while let fileURL = enumerator.nextObject() as? URL {
             // Check if it's a file with a model extension
             let fileExtension = fileURL.pathExtension.lowercased()
             if modelExtensions.contains(fileExtension) {

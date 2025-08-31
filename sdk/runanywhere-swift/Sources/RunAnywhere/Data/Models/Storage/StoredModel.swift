@@ -1,7 +1,7 @@
 import Foundation
 
 /// Stored model information
-public struct StoredModel {
+public struct StoredModel: Sendable {
     public let id: String  // Model ID used for operations like deletion
     public let name: String
     public let path: URL

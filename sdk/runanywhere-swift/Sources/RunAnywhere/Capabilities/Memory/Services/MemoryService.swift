@@ -11,7 +11,7 @@ class MemoryService: MemoryManager {
     private let pressureHandler: PressureHandler
     private let cacheEviction: CacheEviction
     private let memoryMonitor: MemoryMonitor
-    private let logger = SDKLogger(category: "MemoryService")
+    private let logger: SDKLogger = SDKLogger(category: "MemoryService")
 
     init(
         allocationManager: AllocationManager = AllocationManager(),
@@ -42,7 +42,7 @@ class MemoryService: MemoryManager {
         }
     }
 
-    private var config = Config()
+    private var config: Config = Config()
 
     func configure(_ config: Config) {
         self.config = config

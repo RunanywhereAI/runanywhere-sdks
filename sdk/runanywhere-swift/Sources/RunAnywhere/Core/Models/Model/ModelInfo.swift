@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Information about a model - database entity with sync support
-public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     // Essential identifiers
     public let id: String
     public let name: String
@@ -38,8 +38,8 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public var lastUsed: Date?
     public var usageCount: Int
 
-    // Non-Codable runtime properties
-    public var additionalProperties: [String: Any] = [:]
+    // Non-Codable runtime properties (Sendable-compatible)
+    public var additionalProperties: [String: String] = [:]
 
     // MARK: - Computed Properties
 
@@ -84,7 +84,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         syncPending: Bool = false,
         lastUsed: Date? = nil,
         usageCount: Int = 0,
-        additionalProperties: [String: Any] = [:]
+        additionalProperties: [String: String] = [:]
     ) {
         self.id = id
         self.name = name

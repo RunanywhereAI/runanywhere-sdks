@@ -110,6 +110,30 @@ public struct TTSOptions {
 }
 
 /// Information about a TTS voice
+/// Simple voice attributes - just the essentials
+public struct VoiceAttributes {
+    /// Provider type
+    public let provider: VoiceProvider
+
+    /// Supports SSML markup
+    public let supportsSSML: Bool
+
+    public init(
+        provider: VoiceProvider = .system,
+        supportsSSML: Bool = false
+    ) {
+        self.provider = provider
+        self.supportsSSML = supportsSSML
+    }
+}
+
+/// Voice provider types
+public enum VoiceProvider: String, CaseIterable, Sendable {
+    case system
+    case neural
+    case cloud
+}
+
 public struct VoiceInfo {
     /// Unique identifier for the voice
     public let id: String
@@ -133,7 +157,7 @@ public struct VoiceInfo {
     public let isNeural: Bool
 
     /// Custom attributes
-    public let attributes: [String: Any]
+    public let attributes: VoiceAttributes
 
     public init(
         id: String,
@@ -143,7 +167,7 @@ public struct VoiceInfo {
         ageGroup: VoiceAgeGroup = .adult,
         quality: VoiceQuality = .standard,
         isNeural: Bool = false,
-        attributes: [String: Any] = [:]
+        attributes: VoiceAttributes = VoiceAttributes()
     ) {
         self.id = id
         self.name = name

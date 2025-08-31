@@ -141,7 +141,7 @@ public actor LocalConfigurationDataSource: LocalDataSource {
 
     /// Delete consumer override configuration
     public func deleteConsumerOverride() async throws {
-        try databaseManager.write { db in
+        _ = try databaseManager.write { db in
             try ConfigurationData
                 .filter(ConfigurationData.Columns.source == ConfigurationSource.consumer.rawValue)
                 .deleteAll(db)
