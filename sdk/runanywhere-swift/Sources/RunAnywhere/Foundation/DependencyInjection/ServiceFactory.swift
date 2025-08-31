@@ -18,9 +18,6 @@ public class ServiceFactory {
         case is GenerationService.Type:
             return createGenerationService() as? T
 
-        case is ValidationService.Type:
-            return createValidationService() as? T
-
         case is RegistryService.Type:
             return createRegistryService() as? T
 
@@ -44,10 +41,6 @@ public class ServiceFactory {
             routingService: container.routingService,
             performanceMonitor: container.performanceMonitor
         )
-    }
-
-    private func createValidationService() -> ValidationService {
-        ValidationService()
     }
 
     private func createRegistryService() -> RegistryService {

@@ -89,18 +89,13 @@ public protocol MetadataExtractorProtocol {
     /// Supported model formats
     var supportedFormats: [ModelFormat] { get }
 
-    /// Extract metadata from a model file
+    /// Extract basic model info from file
     /// - Parameter url: URL to the model file
-    /// - Returns: Extracted metadata
-    func extractMetadata(from url: URL) async throws -> ModelMetadata
+    /// - Returns: Basic model information
+    func extractModelInfo(from url: URL) async throws -> (name: String, size: Int64)
 
     /// Validate model file
     /// - Parameter url: URL to the model file
     /// - Returns: Whether the model is valid
     func validateModel(at url: URL) async throws -> Bool
-
-    /// Get model requirements
-    /// - Parameter url: URL to the model file
-    /// - Returns: Model requirements
-    func getRequirements(for url: URL) async throws -> [HardwareRequirement]
 }

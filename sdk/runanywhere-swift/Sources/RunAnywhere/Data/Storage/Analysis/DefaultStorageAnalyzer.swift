@@ -213,7 +213,6 @@ public class DefaultStorageAnalyzer: StorageAnalyzer {
                 lastUsed: fileManager.getFileAccessDate(at: modelURL),
                 metadata: registeredModel?.metadata,
                 contextLength: registeredModel?.contextLength,
-                checksum: registeredModel?.checksum
             )
 
             storedModels.append(storedModel)

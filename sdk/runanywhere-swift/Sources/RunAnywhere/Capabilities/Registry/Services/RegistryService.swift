@@ -105,32 +105,7 @@ public class RegistryService: ModelRegistry {
                 return false
             }
 
-            // Hardware requirements
-            if let requiresNeuralEngine = criteria.requiresNeuralEngine,
-               requiresNeuralEngine {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresNeuralEngine = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
-
-            if let requiresGPU = criteria.requiresGPU,
-               requiresGPU {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresGPU = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
+            // Hardware requirements removed for simplicity
 
             // Tag filter
             if !criteria.tags.isEmpty {
@@ -226,12 +201,8 @@ public class RegistryService: ModelRegistry {
         // First, try to load models from configuration (remote or cached)
         let config = await ServiceContainer.shared.configurationService.getConfiguration()
 
-        if let modelCatalog = config?.modelCatalog, !modelCatalog.isEmpty {
-            logger.info("Loading \(modelCatalog.count) models from configuration")
-            for model in modelCatalog {
-                registerModel(model)
-            }
-        } else {
+        // Model catalog removed from configuration for simplicity
+        do {
             logger.debug("No models in configuration, falling back to stored models")
 
             // Fallback: Load models from repository
@@ -240,10 +211,10 @@ public class RegistryService: ModelRegistry {
             logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
 
             // Load stored models from service
-            let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+            let modelInfoService = await ServiceContainer.shared.modelInfoService
             do {
                 // Load all stored models and filter later
-                var storedModels = try await modelMetadataService.loadStoredModels()
+                var storedModels = try await modelInfoService.loadStoredModels()
 
                 if !availableFrameworks.isEmpty {
                     // Filter for available frameworks

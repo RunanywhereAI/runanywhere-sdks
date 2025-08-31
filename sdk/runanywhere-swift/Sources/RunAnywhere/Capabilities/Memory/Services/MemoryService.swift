@@ -138,6 +138,7 @@ class MemoryService: MemoryManager {
                 let modelInfo = ModelInfo(
                     id: memModelInfo.model.id,
                     name: memModelInfo.model.name,
+                    category: .language, // Default category - ideally this should be determined from the model
                     format: .gguf, // Default format - ideally this should be stored in MemoryLoadedModel
                     compatibleFrameworks: [memModelInfo.model.framework]
                 )

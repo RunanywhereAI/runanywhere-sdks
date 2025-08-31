@@ -50,7 +50,8 @@ public class ModelLoadingService {
         }
 
         // Check memory availability
-        let canAllocate = try await memoryService.canAllocate(modelInfo.memoryRequired)
+        let memoryRequired = modelInfo.memoryRequired ?? 1024 * 1024 * 1024 // Default 1GB if not specified
+        let canAllocate = try await memoryService.canAllocate(memoryRequired)
         if !canAllocate {
             throw SDKError.loadingFailed("Insufficient memory")
         }
@@ -87,7 +88,7 @@ public class ModelLoadingService {
         // Register loaded model
         memoryService.registerLoadedModel(
             loaded,
-            size: modelInfo.memoryRequired,
+            size: modelInfo.memoryRequired ?? memoryRequired,
             service: llmService
         )
         loadedModels[modelId] = loaded
