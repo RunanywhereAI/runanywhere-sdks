@@ -116,4 +116,10 @@ class ModelListViewModel: ObservableObject {
         // Reload models to include the new one
         await loadModelsFromRegistry()
     }
+
+    /// Add an imported model to the list
+    func addImportedModel(_ model: ModelInfo) async {
+        // Just reload the models - the SDK registry will pick up the new model
+        await loadModelsFromRegistry()
+    }
 }
