@@ -104,8 +104,8 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - Initialization
 
     public init() {
-        // Initialize download strategy
-        self.downloadStrategy = WhisperKitDownloadStrategy()
+        // Initialize storage strategy (handles both download and file management)
+        self.storageStrategy = WhisperKitStorageStrategy()
 
         logger.info("WhisperKitAdapter initialized")
         logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
@@ -114,8 +114,8 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
 
     // MARK: - Model Registration
 
-    // Store download strategy only (models come from configuration)
-    private let downloadStrategy: DownloadStrategy
+    // Store storage strategy (handles download and file management)
+    private let storageStrategy: ModelStorageStrategy
 
     /// Called when adapter is registered with the SDK
     /// This method will be called automatically by the SDK when the adapter is registered
@@ -131,9 +131,14 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         return []
     }
 
-    /// Get download strategy for WhisperKit models
+    /// Get storage strategy for WhisperKit models
     public func getDownloadStrategy() -> DownloadStrategy? {
-        return downloadStrategy
+        return storageStrategy
+    }
+
+    /// Get storage strategy for WhisperKit models
+    public func getStorageStrategy() -> ModelStorageStrategy? {
+        return storageStrategy
     }
 
     // MARK: - Cache Management

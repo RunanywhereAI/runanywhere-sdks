@@ -2,8 +2,8 @@ import Foundation
 import RunAnywhere
 import os
 
-/// Custom download strategy for WhisperKit models that require multiple files
-public class WhisperKitDownloadStrategy: DownloadStrategy {
+/// Custom storage strategy for WhisperKit models that handles downloading and file management
+public class WhisperKitStorageStrategy: ModelStorageStrategy {
     // WhisperKit model structure: mlmodelc directories contain multiple files
     // Note: Not all models have all files, we'll check existence before downloading
     private let mlmodelcFiles = [
@@ -39,6 +39,99 @@ public class WhisperKitDownloadStrategy: DownloadStrategy {
 
     public init() {
         // Public initializer for use outside the module
+    }
+
+    // MARK: - ModelStorageStrategy Implementation
+
+    public func findModelPath(modelId: String, in modelFolder: URL) -> URL? {
+        // WhisperKit models are directory-based, return the folder itself
+        let fileManager = FileManager.default
+
+        // Check if the required .mlmodelc directories exist
+        let audioEncoderPath = modelFolder.appendingPathComponent("AudioEncoder.mlmodelc")
+        let textDecoderPath = modelFolder.appendingPathComponent("TextDecoder.mlmodelc")
+
+        // If core components exist, return the folder as the model path
+        if fileManager.fileExists(atPath: audioEncoderPath.path) &&
+           fileManager.fileExists(atPath: textDecoderPath.path) {
+            logger.debug("Found WhisperKit model at: \(modelFolder.path)")
+            return modelFolder
+        }
+
+        return nil
+    }
+
+    public func detectModel(in modelFolder: URL) -> (format: ModelFormat, size: Int64)? {
+        // Check if this is a valid WhisperKit model folder
+        let fileManager = FileManager.default
+
+        // Required components for a WhisperKit model
+        let requiredComponents = [
+            "AudioEncoder.mlmodelc",
+            "TextDecoder.mlmodelc"
+        ]
+
+        // Check if required components exist
+        for component in requiredComponents {
+            let componentPath = modelFolder.appendingPathComponent(component)
+            if !fileManager.fileExists(atPath: componentPath.path) {
+                return nil
+            }
+        }
+
+        // Calculate total size of all files
+        let totalSize = calculateDirectorySize(at: modelFolder)
+
+        // WhisperKit models are Core ML models
+        return (.mlmodel, totalSize)
+    }
+
+    public func isValidModelStorage(at modelFolder: URL) -> Bool {
+        // Check if all required WhisperKit components are present
+        let fileManager = FileManager.default
+
+        // At minimum, we need AudioEncoder and TextDecoder
+        let audioEncoderPath = modelFolder.appendingPathComponent("AudioEncoder.mlmodelc")
+        let textDecoderPath = modelFolder.appendingPathComponent("TextDecoder.mlmodelc")
+
+        return fileManager.fileExists(atPath: audioEncoderPath.path) &&
+               fileManager.fileExists(atPath: textDecoderPath.path)
+    }
+
+    public func getModelStorageInfo(at modelFolder: URL) -> ModelStorageDetails? {
+        guard let modelInfo = detectModel(in: modelFolder) else { return nil }
+
+        // Count all files in the model folder
+        let fileManager = FileManager.default
+        var fileCount = 0
+
+        if let enumerator = fileManager.enumerator(at: modelFolder, includingPropertiesForKeys: nil) {
+            for _ in enumerator {
+                fileCount += 1
+            }
+        }
+
+        return ModelStorageDetails(
+            format: modelInfo.format,
+            totalSize: modelInfo.size,
+            fileCount: fileCount,
+            primaryFile: nil, // WhisperKit is multi-file
+            isDirectoryBased: true
+        )
+    }
+
+    private func calculateDirectorySize(at url: URL) -> Int64 {
+        var totalSize: Int64 = 0
+
+        if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: []) {
+            for case let fileURL as URL in enumerator {
+                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                    totalSize += Int64(fileSize)
+                }
+            }
+        }
+
+        return totalSize
     }
 
     public func canHandle(model: ModelInfo) -> Bool {

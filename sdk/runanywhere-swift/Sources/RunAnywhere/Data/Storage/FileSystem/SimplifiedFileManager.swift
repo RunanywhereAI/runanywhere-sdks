@@ -259,10 +259,18 @@ public class SimplifiedFileManager {
 
             for modelFolder in frameworkFolder.subfolders {
                 let modelId = modelFolder.name
+                let folderURL = URL(fileURLWithPath: modelFolder.path)
 
-                // Generic handling for all model types
-                if let modelInfo = detectModelInFolder(modelFolder) {
+                // Try to use framework-specific storage strategy if available
+                if let storageStrategy = getStorageStrategy(for: frameworkType),
+                   let modelInfo = storageStrategy.detectModel(in: folderURL) {
                     models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                    logger.debug("Detected \(frameworkType.rawValue) model \(modelId) using storage strategy")
+                } else {
+                    // Fallback to generic detection for frameworks without storage strategies
+                    if let modelInfo = detectModelInFolder(modelFolder) {
+                        models.append((modelId, modelInfo.format, modelInfo.size, frameworkType))
+                    }
                 }
             }
         }
@@ -392,16 +400,33 @@ public class SimplifiedFileManager {
 
         // Search in framework-specific folders first
         for frameworkFolder in modelsFolder.subfolders {
-            if LLMFramework.allCases.contains(where: { $0.rawValue == frameworkFolder.name }) {
+            if let frameworkType = LLMFramework.allCases.first(where: { $0.rawValue == frameworkFolder.name }) {
                 if frameworkFolder.containsSubfolder(named: modelId) {
                     if let modelFolder = try? frameworkFolder.subfolder(named: modelId) {
-                        // Look for any model file in the folder
+                        let folderURL = URL(fileURLWithPath: modelFolder.path)
+
+                        // Try to use framework-specific storage strategy if available
+                        if let storageStrategy = getStorageStrategy(for: frameworkType) {
+                            if let modelPath = storageStrategy.findModelPath(modelId: modelId, in: folderURL) {
+                                logger.info("Found model \(modelId) using \(frameworkType.rawValue) storage strategy at: \(modelPath.path)")
+                                return modelPath
+                            }
+                        }
+
+                        // Fallback to generic search for single files
                         for file in modelFolder.files {
                             if ModelFormat(from: file.extension ?? "") != nil,
                                file.nameExcludingExtension == modelId || file.name.contains(modelId) {
                                 logger.info("Found model \(modelId) at: \(file.path)")
                                 return URL(fileURLWithPath: file.path)
                             }
+                        }
+
+                        // If no single file found, check if it's a directory-based model
+                        // Return the folder path itself for directory-based models
+                        if FileManager.default.fileExists(atPath: folderURL.path) {
+                            logger.info("Found directory-based model \(modelId) at: \(folderURL.path)")
+                            return folderURL
                         }
                     }
                 }
@@ -422,6 +447,19 @@ public class SimplifiedFileManager {
         }
 
         logger.warning("Model file not found for: \(modelId)")
+        return nil
+    }
+
+    /// Get storage strategy for a framework
+    private func getStorageStrategy(for framework: LLMFramework) -> ModelStorageStrategy? {
+        // Access the adapter registry to get storage strategies
+        let adapterRegistry = ServiceContainer.shared.adapterRegistry
+        if let adapter = adapterRegistry.getAdapter(for: framework) {
+            // Try to get storage strategy from adapter
+            if let strategy = adapter.getDownloadStrategy() as? ModelStorageStrategy {
+                return strategy
+            }
+        }
         return nil
     }
 
