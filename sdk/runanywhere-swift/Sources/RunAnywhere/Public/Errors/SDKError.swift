@@ -10,7 +10,7 @@ public enum SDKError: LocalizedError {
     case generationTimeout(String)
     case frameworkNotAvailable(LLMFramework)
     case downloadFailed(Error)
-    case validationFailed(ValidationError)
+    case validationFailed(String)
     case routingFailed(String)
     case databaseInitializationFailed(Error)
     case unsupportedModality(String)

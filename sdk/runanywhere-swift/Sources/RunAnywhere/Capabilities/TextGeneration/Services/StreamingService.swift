@@ -44,7 +44,7 @@ public class StreamingService {
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
                     let shouldParseThinking = modelInfo.supportsThinking
-                    let thinkingPattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+                    let thinkingPattern = ThinkingTagPattern.defaultPattern
 
                     // Buffers for thinking parsing
                     var buffer = ""
@@ -116,7 +116,7 @@ public class StreamingService {
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
                     let shouldParseThinking = modelInfo.supportsThinking
-                    let thinkingPattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+                    let thinkingPattern = ThinkingTagPattern.defaultPattern
 
                     // Buffers for thinking parsing
                     var buffer = ""

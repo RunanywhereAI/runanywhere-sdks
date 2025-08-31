@@ -59,13 +59,6 @@ public class ServiceContainer {
 
     // Download queue removed - handled by AlamofireDownloadService
 
-    /// Progress service (implements ProgressTracker protocol)
-    private(set) lazy var progressService: ProgressTracker = {
-        ProgressService(
-            stageManager: StageManager(),
-            progressAggregator: ProgressAggregator()
-        )
-    }()
 
     // Storage service removed - replaced by SimplifiedFileManager
     // Model storage manager removed - replaced by SimplifiedFileManager
@@ -103,15 +96,6 @@ public class ServiceContainer {
 
     // Storage monitor removed - storage monitoring handled by SimplifiedFileManager
 
-    /// Benchmark runner
-    private(set) lazy var benchmarkRunner: BenchmarkRunner = {
-        BenchmarkService()
-    }()
-
-    /// A/B test runner
-    private(set) lazy var abTestRunner: ABTestRunner = {
-        ABTestService()
-    }()
 
     // MARK: - Infrastructure
 
@@ -282,10 +266,6 @@ public class ServiceContainer {
         return memoryService
     }
 
-    /// Get progress service
-    public var progress: ProgressTracker {
-        return progressService
-    }
 
     // MARK: - Initialization
 

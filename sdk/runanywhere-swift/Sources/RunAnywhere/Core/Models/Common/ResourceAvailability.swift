@@ -27,8 +27,9 @@ public struct ResourceAvailability {
 
     public func canLoad(model: ModelInfo) -> (canLoad: Bool, reason: String?) {
         // Check memory
-        if model.memoryRequired > memoryAvailable {
-            let needed = ByteCountFormatter.string(fromByteCount: model.memoryRequired, countStyle: .memory)
+        let memoryNeeded = model.memoryRequired ?? 0
+        if memoryNeeded > memoryAvailable {
+            let needed = ByteCountFormatter.string(fromByteCount: memoryNeeded, countStyle: .memory)
             let available = ByteCountFormatter.string(fromByteCount: memoryAvailable, countStyle: .memory)
             return (false, "Insufficient memory: need \(needed), have \(available)")
         }
