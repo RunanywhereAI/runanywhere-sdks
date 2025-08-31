@@ -86,7 +86,7 @@ public enum SDKConstants {
         public static let modelVersion = "1.0"
 
         /// Default base URL for API
-        public static let apiBaseURL = "https://api.runanywhere.ai"
+        public static let apiBaseURL = RunAnywhereConstants.apiURLs.current
     }
 
     // MARK: - Telemetry Constants

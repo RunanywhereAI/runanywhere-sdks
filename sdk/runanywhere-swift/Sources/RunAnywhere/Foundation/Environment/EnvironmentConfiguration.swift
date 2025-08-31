@@ -98,7 +98,7 @@ public struct EnvironmentConfiguration {
             logRetentionDays: 7
         ),
         api: APIConfig(
-            baseURL: "https://api-dev.runanywhere.ai",
+            baseURL: RunAnywhereConstants.apiURLs.development,
             timeoutSeconds: 30,
             enableRequestLogging: true
         ),
@@ -119,7 +119,7 @@ public struct EnvironmentConfiguration {
             logRetentionDays: 30
         ),
         api: APIConfig(
-            baseURL: "https://api-staging.runanywhere.ai",
+            baseURL: RunAnywhereConstants.apiURLs.staging,
             timeoutSeconds: 20,
             enableRequestLogging: false
         ),
@@ -140,7 +140,7 @@ public struct EnvironmentConfiguration {
             logRetentionDays: 90
         ),
         api: APIConfig(
-            baseURL: "https://api.runanywhere.ai",
+            baseURL: RunAnywhereConstants.apiURLs.production,
             timeoutSeconds: 15,
             enableRequestLogging: false
         ),
@@ -176,7 +176,7 @@ public struct EnvironmentConfiguration {
         // Parse API config
         let apiDict = dict["api"] as? [String: Any] ?? [:]
         let api = APIConfig(
-            baseURL: apiDict["baseURL"] as? String ?? "https://api.runanywhere.ai",
+            baseURL: apiDict["baseURL"] as? String ?? RunAnywhereConstants.apiURLs.production,
             timeoutSeconds: apiDict["timeoutSeconds"] as? TimeInterval ?? 15,
             enableRequestLogging: apiDict["enableRequestLogging"] as? Bool ?? false
         )
