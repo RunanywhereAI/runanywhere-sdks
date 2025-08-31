@@ -320,7 +320,7 @@ private struct ModelRow: View {
 
             // Action buttons based on model state
             HStack(spacing: 8) {
-                if let downloadURL = model.downloadURL, model.localPath == nil {
+                if let _ = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
                         VStack(spacing: 4) {

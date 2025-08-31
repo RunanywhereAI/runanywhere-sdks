@@ -40,36 +40,27 @@ struct ModelSelectionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    #if os(iOS)
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isLoadingModel)
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add Model") {
-                        showingAddModelSheet = true
-                    }
-                    .disabled(isLoadingModel)
-                }
-                #else
-                ToolbarItem(placement: .cancellationAction) {
+                    #else
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isLoadingModel)
                     .keyboardShortcut(.escape)
+                    #endif
                 }
 
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Add Model") {
                         showingAddModelSheet = true
                     }
                     .disabled(isLoadingModel)
                 }
-                #endif
             }
         }
         #if os(macOS)
