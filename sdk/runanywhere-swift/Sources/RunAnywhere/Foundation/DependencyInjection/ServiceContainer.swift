@@ -312,7 +312,7 @@ public class ServiceContainer {
         // Initialize API client if API key is provided
         if !configuration.apiKey.isEmpty {
             apiClient = APIClient(
-                baseURL: "https://api.runanywhere.ai",
+                baseURL: RunAnywhereConstants.apiURLs.current,
                 apiKey: configuration.apiKey
             )
         }

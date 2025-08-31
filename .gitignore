@@ -142,3 +142,14 @@ hs_err_pid*
 EXTERNAL/
 thoughts
 local/
+examples/web/
+sdk/runanywhere-web/
+
+# Configuration files with real values
+Configuration/RunAnywhereConfig.staging.json
+Configuration/RunAnywhereConfig.prod.json
+Configuration/*.private.json
+Configuration/Private/
+
+# Keep example files
+!Configuration/RunAnywhereConfig.example.json

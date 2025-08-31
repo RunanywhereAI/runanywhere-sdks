@@ -48,12 +48,12 @@ public struct Configuration {
     ///   - telemetryConsent: Telemetry consent preference (default: .granted)
     public init(
         apiKey: String,
-        baseURL: URL = URL(string: "https://api.runanywhere.ai") ?? URL(fileURLWithPath: "/"),
+        baseURL: URL = URL(string: RunAnywhereConstants.apiURLs.current) ?? URL(fileURLWithPath: "/"),
         enableRealTimeDashboard: Bool = true,
         telemetryConsent: TelemetryConsent = .granted
     ) {
         self.apiKey = apiKey
-        self.baseURL = URL(string: "https://api.runanywhere.ai") ?? URL(fileURLWithPath: "/")
+        self.baseURL = URL(string: RunAnywhereConstants.apiURLs.current) ?? URL(fileURLWithPath: "/")
         self.enableRealTimeDashboard = enableRealTimeDashboard
         self.routingPolicy = .deviceOnly  // FORCE DEVICE-ONLY ROUTING - NEVER USE CLOUD
         self.telemetryConsent = telemetryConsent
