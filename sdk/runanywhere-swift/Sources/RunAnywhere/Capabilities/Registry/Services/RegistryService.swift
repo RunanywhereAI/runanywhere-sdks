@@ -199,7 +199,7 @@ public class RegistryService: ModelRegistry {
         logger.debug("Loading pre-configured models")
 
         // First, try to load models from configuration (remote or cached)
-        let config = await ServiceContainer.shared.configurationService.getConfiguration()
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
         // Model catalog removed from configuration for simplicity
         do {

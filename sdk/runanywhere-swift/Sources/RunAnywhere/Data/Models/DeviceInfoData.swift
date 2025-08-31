@@ -10,7 +10,7 @@ import WatchKit
 // MARK: - Strongly Typed Enums
 
 /// Device architecture types
-public enum DeviceArchitecture: String, Codable, CaseIterable {
+public enum DeviceArchitecture: String, Codable, CaseIterable, Sendable {
     case arm64 = "arm64"
     case x86_64 = "x86_64"
     case unknown = "unknown"
@@ -25,7 +25,7 @@ public enum DeviceArchitecture: String, Codable, CaseIterable {
 }
 
 /// GPU family types for Apple devices
-public enum GPUFamily: String, Codable, CaseIterable {
+public enum GPUFamily: String, Codable, CaseIterable, Sendable {
     case appleGPU = "apple_gpu"
     case intel = "intel"
     case amd = "amd"
@@ -55,7 +55,7 @@ extension BatteryState {
 }
 
 /// Device form factor types
-public enum DeviceFormFactor: String, Codable, CaseIterable {
+public enum DeviceFormFactor: String, Codable, CaseIterable, Sendable {
     case phone = "phone"
     case tablet = "tablet"
     case desktop = "desktop"
@@ -79,7 +79,7 @@ public enum DeviceFormFactor: String, Codable, CaseIterable {
 
 /// Device information data structure for sync and storage
 /// Leverages existing DeviceKitAdapter for comprehensive device detection
-public struct DeviceInfoData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct DeviceInfoData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     /// Unique identifier for this device (persistent UUID)
     public let id: String
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Model information metadata
-public struct ModelInfoMetadata: Codable {
+public struct ModelInfoMetadata: Codable, Sendable {
     public let author: String?
     public let license: String?
     public let tags: [String]

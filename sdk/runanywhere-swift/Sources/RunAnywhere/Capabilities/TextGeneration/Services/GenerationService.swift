@@ -6,7 +6,7 @@ public class GenerationService {
     private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
     private let structuredOutputHandler: StructuredOutputHandler
-    private let logger = SDKLogger(category: "GenerationService")
+    private let logger: SDKLogger = SDKLogger(category: "GenerationService")
 
     // Current loaded model
     private var currentLoadedModel: LoadedModel?

@@ -37,7 +37,7 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
     // MARK: - RemoteDataSource Protocol
 
     public func fetch(id: String) async throws -> DeviceInfoData? {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 
@@ -56,7 +56,7 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
     }
 
     public func save(_ entity: DeviceInfoData) async throws -> DeviceInfoData {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 
@@ -75,7 +75,7 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
     }
 
     public func delete(id: String) async throws {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             throw DataSourceError.notAvailable
         }
 
@@ -88,7 +88,7 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
     }
 
     public func testConnection() async throws -> Bool {
-        guard let apiClient = apiClient else {
+        guard apiClient != nil else {
             return false
         }
 

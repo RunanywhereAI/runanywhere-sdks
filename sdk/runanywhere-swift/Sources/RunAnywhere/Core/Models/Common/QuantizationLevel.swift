@@ -1,7 +1,7 @@
 import Foundation
 
 /// Quantization level
-public enum QuantizationLevel: String, Codable {
+public enum QuantizationLevel: String, Codable, Sendable {
     case full = "fp32"
     case f32 = "f32"
     case half = "fp16"

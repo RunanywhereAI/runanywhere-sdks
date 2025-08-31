@@ -38,7 +38,7 @@ public struct GenerationConfiguration: Codable, Sendable {
 }
 
 /// Default settings for text generation
-public struct DefaultGenerationSettings: Codable {
+public struct DefaultGenerationSettings: Codable, Sendable {
     /// Default temperature for generation
     public var temperature: Double
 
@@ -75,7 +75,7 @@ public struct DefaultGenerationSettings: Codable {
 }
 
 /// Token budget configuration for managing usage
-public struct TokenBudgetConfiguration: Codable {
+public struct TokenBudgetConfiguration: Codable, Sendable {
     /// Maximum tokens per request
     public var maxTokensPerRequest: Int?
 

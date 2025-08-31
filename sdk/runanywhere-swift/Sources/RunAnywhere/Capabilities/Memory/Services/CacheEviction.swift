@@ -2,8 +2,8 @@ import Foundation
 
 /// Manages cache eviction strategies and model selection for memory cleanup
 class CacheEviction {
-    private let logger = SDKLogger(category: "CacheEviction")
-    private var config = MemoryService.Config()
+    private let logger: SDKLogger = SDKLogger(category: "CacheEviction")
+    private var config: MemoryService.Config = MemoryService.Config()
 
     func configure(_ config: MemoryService.Config) {
         self.config = config

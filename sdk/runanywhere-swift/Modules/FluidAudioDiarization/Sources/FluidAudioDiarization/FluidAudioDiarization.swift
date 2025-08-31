@@ -11,8 +11,8 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     private let diarizerManager: DiarizerManager
     private var speakers: [String: SpeakerInfo] = [:]
     private var currentSpeaker: SpeakerInfo?
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
-    private let diarizationQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
+    private let logger: Logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
+    private let diarizationQueue: DispatchQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
 
     // Audio buffering for minimum chunk size (3 seconds recommended)
     private var audioAccumulator: [Float] = []

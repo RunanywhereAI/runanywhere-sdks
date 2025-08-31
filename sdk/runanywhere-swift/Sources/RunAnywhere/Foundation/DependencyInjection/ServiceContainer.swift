@@ -149,17 +149,19 @@ public class ServiceContainer {
     private var _configurationService: ConfigurationService?
     public var configurationService: ConfigurationServiceProtocol {
         get async {
-            if _configurationService == nil {
-                let configRepo = ConfigurationRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _configurationService = ConfigurationService(
-                    configRepository: configRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _configurationService {
+                return service
             }
-            return _configurationService!
+            let configRepo = ConfigurationRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = ConfigurationService(
+                configRepository: configRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _configurationService = service
+            return service
         }
     }
 
@@ -167,17 +169,19 @@ public class ServiceContainer {
     private var _telemetryService: TelemetryService?
     public var telemetryService: TelemetryService {
         get async {
-            if _telemetryService == nil {
-                let telemetryRepo = TelemetryRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _telemetryService = TelemetryService(
-                    telemetryRepository: telemetryRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _telemetryService {
+                return service
             }
-            return _telemetryService!
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = TelemetryService(
+                telemetryRepository: telemetryRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _telemetryService = service
+            return service
         }
     }
 
@@ -185,17 +189,19 @@ public class ServiceContainer {
     private var _modelInfoService: ModelInfoService?
     public var modelInfoService: ModelInfoService {
         get async {
-            if _modelInfoService == nil {
-                let modelRepo = ModelInfoRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _modelInfoService = ModelInfoService(
-                    modelInfoRepository: modelRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _modelInfoService {
+                return service
             }
-            return _modelInfoService!
+            let modelRepo = ModelInfoRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = ModelInfoService(
+                modelInfoRepository: modelRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _modelInfoService = service
+            return service
         }
     }
 
@@ -203,17 +209,19 @@ public class ServiceContainer {
     private var _deviceInfoService: DeviceInfoService?
     public var deviceInfoService: DeviceInfoService {
         get async {
-            if _deviceInfoService == nil {
-                let deviceRepo = DeviceInfoRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _deviceInfoService = DeviceInfoService(
-                    deviceInfoRepository: deviceRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _deviceInfoService {
+                return service
             }
-            return _deviceInfoService!
+            let deviceRepo = DeviceInfoRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = DeviceInfoService(
+                deviceInfoRepository: deviceRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _deviceInfoService = service
+            return service
         }
     }
 
@@ -221,10 +229,12 @@ public class ServiceContainer {
     private var _generationAnalytics: GenerationAnalyticsService?
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
-            if _generationAnalytics == nil {
-                _generationAnalytics = GenerationAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _generationAnalytics {
+                return service
             }
-            return _generationAnalytics!
+            let service = GenerationAnalyticsService(queueManager: analyticsQueueManager)
+            _generationAnalytics = service
+            return service
         }
     }
 
@@ -239,10 +249,12 @@ public class ServiceContainer {
     private var _sttAnalytics: STTAnalyticsService?
     public var sttAnalytics: STTAnalyticsService {
         get async {
-            if _sttAnalytics == nil {
-                _sttAnalytics = STTAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _sttAnalytics {
+                return service
             }
-            return _sttAnalytics!
+            let service = STTAnalyticsService(queueManager: analyticsQueueManager)
+            _sttAnalytics = service
+            return service
         }
     }
 
@@ -250,10 +262,12 @@ public class ServiceContainer {
     private var _voiceAnalytics: VoiceAnalyticsService?
     public var voiceAnalytics: VoiceAnalyticsService {
         get async {
-            if _voiceAnalytics == nil {
-                _voiceAnalytics = VoiceAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _voiceAnalytics {
+                return service
             }
-            return _voiceAnalytics!
+            let service = VoiceAnalyticsService(queueManager: analyticsQueueManager)
+            _voiceAnalytics = service
+            return service
         }
     }
 
@@ -261,10 +275,12 @@ public class ServiceContainer {
     private var _monitoringAnalytics: MonitoringAnalyticsService?
     public var monitoringAnalytics: MonitoringAnalyticsService {
         get async {
-            if _monitoringAnalytics == nil {
-                _monitoringAnalytics = MonitoringAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _monitoringAnalytics {
+                return service
             }
-            return _monitoringAnalytics!
+            let service = MonitoringAnalyticsService(queueManager: analyticsQueueManager)
+            _monitoringAnalytics = service
+            return service
         }
     }
 

@@ -59,7 +59,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
         logger.debug("Storing model: \(entity.id)")
 
         var entityToSave = entity
-        _ = entityToSave.markUpdated()
+        entityToSave.markUpdated()
 
         try databaseManager.write { db in
             try entityToSave.save(db)
@@ -149,7 +149,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
         try databaseManager.write { db in
             for id in ids {
                 if var data = try ModelInfo.fetchOne(db, key: id) {
-                    _ = data.markSynced()
+                    data.markSynced()
                     try data.update(db)
                 }
             }
@@ -161,7 +161,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
         try databaseManager.write { db in
             if var model = try ModelInfo.fetchOne(db, key: modelId) {
                 model.localPath = localPath
-                _ = model.markUpdated()
+                model.markUpdated()
                 try model.update(db)
             }
         }
@@ -173,7 +173,7 @@ public actor LocalModelInfoDataSource: LocalDataSource {
             if var model = try ModelInfo.fetchOne(db, key: modelId) {
                 model.lastUsed = Date()
                 model.usageCount += 1
-                _ = model.markUpdated()
+                model.markUpdated()
                 try model.update(db)
             }
         }

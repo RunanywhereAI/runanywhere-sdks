@@ -72,10 +72,10 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
 
 extension ConfigurationData: TableRecord {
     /// The table name for ConfigurationData in the database
-    public static let databaseTableName = "configuration"
+    public static let databaseTableName: String = "configuration"
 
     /// Define how to handle conflicts during persistence
-    public static let persistenceConflictPolicy = PersistenceConflictPolicy(
+    public static let persistenceConflictPolicy: PersistenceConflictPolicy = PersistenceConflictPolicy(
         insert: .replace,
         update: .replace
     )

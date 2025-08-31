@@ -2,7 +2,7 @@ import Foundation
 
 /// Defines the category/type of a model based on its input/output modality
 /// This aligns with FrameworkModality for consistency across the SDK
-public enum ModelCategory: String, CaseIterable, Codable {
+public enum ModelCategory: String, CaseIterable, Codable, Sendable {
     case language = "language"              // Text-to-text models (LLMs)
     case speechRecognition = "speech-recognition"  // Voice-to-text models (ASR)
     case speechSynthesis = "speech-synthesis"      // Text-to-voice models (TTS)

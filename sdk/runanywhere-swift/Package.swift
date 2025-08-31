@@ -38,6 +38,10 @@ let package = Package(
                 .product(name: "Pulse", package: "Pulse"),
             ],
             path: "Sources/RunAnywhere",
+            exclude: [
+                "Data/README.md",
+                "Data/Storage/Database/README.md"
+            ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ],

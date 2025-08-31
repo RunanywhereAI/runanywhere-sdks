@@ -1,7 +1,7 @@
 import Foundation
 
 /// Storage information
-public struct StorageInfo {
+public struct StorageInfo: Sendable {
     public let appStorage: AppStorageInfo
     public let deviceStorage: DeviceStorageInfo
     public let modelStorage: ModelStorageInfo
