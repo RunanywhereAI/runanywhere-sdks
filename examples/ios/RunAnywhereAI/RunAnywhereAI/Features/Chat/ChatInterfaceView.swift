@@ -476,7 +476,7 @@ struct ChatInterfaceView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "text.alignleft")
                             .font(.system(size: 8))
-                        Text("\(formatNumber(currentModel.contextLength))")
+                        Text("\(formatNumber(currentModel.contextLength ?? 0))")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                     }
                     .foregroundColor(.secondary)

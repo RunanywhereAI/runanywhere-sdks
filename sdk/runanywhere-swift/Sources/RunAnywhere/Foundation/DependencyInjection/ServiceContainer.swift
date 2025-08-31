@@ -199,6 +199,24 @@ public class ServiceContainer {
         }
     }
 
+    /// Device info service
+    private var _deviceInfoService: DeviceInfoService?
+    public var deviceInfoService: DeviceInfoService {
+        get async {
+            if _deviceInfoService == nil {
+                let deviceRepo = DeviceInfoRepositoryImpl(
+                    databaseManager: databaseManager,
+                    apiClient: apiClient
+                )
+                _deviceInfoService = DeviceInfoService(
+                    deviceInfoRepository: deviceRepo,
+                    syncCoordinator: await syncCoordinator
+                )
+            }
+            return _deviceInfoService!
+        }
+    }
+
     /// Generation analytics service - using unified pattern
     private var _generationAnalytics: GenerationAnalyticsService?
     public var generationAnalytics: GenerationAnalyticsService {
