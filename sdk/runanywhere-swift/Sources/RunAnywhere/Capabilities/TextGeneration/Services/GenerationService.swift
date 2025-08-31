@@ -4,7 +4,7 @@ import Foundation
 public class GenerationService {
     private let routingService: RoutingService
     private let modelLoadingService: ModelLoadingService
-    private let structuredOutputHandler: StructuredOutputHandler
+    private let optionsResolver = GenerationOptionsResolver()
     private let logger: SDKLogger = SDKLogger(category: "GenerationService")
 
     // Current loaded model
@@ -12,12 +12,10 @@ public class GenerationService {
 
     public init(
         routingService: RoutingService,
-        modelLoadingService: ModelLoadingService? = nil,
-        structuredOutputHandler: StructuredOutputHandler? = nil
+        modelLoadingService: ModelLoadingService? = nil
     ) {
         self.routingService = routingService
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
-        self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }
 
     /// Set the current loaded model for generation
@@ -31,6 +29,11 @@ public class GenerationService {
     }
 
     /// Generate text using the loaded model
+    ///
+    /// Priority for settings resolution:
+    /// 1. Runtime Options (highest priority) - User knows best for their specific request
+    /// 2. Remote Configuration - Organization-wide defaults from console
+    /// 3. SDK Defaults (lowest priority) - Fallback values when nothing else is specified
     public func generate(
         prompt: String,
         options: RunAnywhereGenerationOptions
@@ -38,22 +41,23 @@ public class GenerationService {
         // Start performance tracking
         _ = Date() // Will be used for performance metrics in future
 
-        // Prepare prompt with structured output if needed
-        let effectivePrompt: String
-        if let structuredConfig = options.structuredOutput {
-            effectivePrompt = structuredOutputHandler.preparePrompt(
-                originalPrompt: prompt,
-                config: structuredConfig
-            )
-        } else {
-            effectivePrompt = prompt
-        }
+        // Get remote configuration
+        let remoteConfig = RunAnywhere._configurationData?.generation
+
+        // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
+        let resolvedOptions = optionsResolver.resolve(
+            options: options,
+            remoteConfig: remoteConfig
+        )
+
+        // Prepare prompt with system prompt and structured output formatting
+        let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
 
         // Get routing decision
         let routingDecision = try await routingService.determineRouting(
             prompt: effectivePrompt,
             context: nil,
-            options: options
+            options: resolvedOptions
         )
 
         // Generate based on routing decision
@@ -63,29 +67,29 @@ public class GenerationService {
         case .onDevice(let framework, _):
             result = try await generateOnDevice(
                 prompt: effectivePrompt,
-                options: options,
+                options: resolvedOptions,
                 framework: framework
             )
 
         case .cloud(let provider, _):
             result = try await generateInCloud(
                 prompt: effectivePrompt,
-                options: options,
+                options: resolvedOptions,
                 provider: provider
             )
 
         case .hybrid(let devicePortion, let framework, _):
             result = try await generateHybrid(
                 prompt: effectivePrompt,
-                options: options,
+                options: resolvedOptions,
                 devicePortion: devicePortion,
                 framework: framework
             )
         }
 
         // Validate structured output if configured
-        if let structuredConfig = options.structuredOutput {
-            let validation = structuredOutputHandler.validateStructuredOutput(
+        if let structuredConfig = resolvedOptions.structuredOutput {
+            let validation = StructuredOutputHandler().validateStructuredOutput(
                 text: result.text,
                 config: structuredConfig
             )
