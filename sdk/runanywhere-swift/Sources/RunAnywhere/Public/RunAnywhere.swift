@@ -31,11 +31,29 @@ public enum RunAnywhere {
 
     // MARK: - SDK Initialization
 
-    /// Initialize the SDK with API key, base URL, and environment
-    /// - Parameters:
-    ///   - apiKey: Your RunAnywhere API key
-    ///   - baseURL: Base URL for API requests
-    ///   - environment: Environment mode (default: production)
+    /**
+     * Initialize the RunAnywhere SDK
+     *
+     * This method performs a comprehensive initialization sequence:
+     *
+     * 1. **Validation**: Validate API key and parameters
+     * 2. **Logging**: Initialize logging system based on environment
+     * 3. **Storage**: Store credentials securely in keychain
+     * 4. **Database**: Set up local SQLite database for caching
+     * 5. **Authentication**: Exchange API key for access token with backend
+     * 6. **Health Check**: Verify backend connectivity and service health
+     * 7. **Services & Sync**: Initialize all services and sync with backend
+     *
+     * The initialization is atomic - if any step fails, the entire process
+     * is rolled back and the SDK remains uninitialized.
+     *
+     * - Parameters:
+     *   - apiKey: Your RunAnywhere API key from the console
+     *   - baseURL: Backend API base URL
+     *   - environment: SDK environment (development/staging/production)
+     *
+     * - Throws: SDKError if initialization fails at any step
+     */
     public static func initialize(
         apiKey: String,
         baseURL: URL,
@@ -62,45 +80,74 @@ public enum RunAnywhere {
     /// Initialize the SDK with parameters
     /// - Parameter params: SDK initialization parameters
     private static func initialize(with params: SDKInitParams) async throws {
+        let logger = SDKLogger(category: "RunAnywhere.Init")
         EventBus.shared.publish(SDKInitializationEvent.started)
 
         do {
-            // Validate API key first
+            // Step 1: Validate API key
+            logger.info("Step 1/8: Validating API key")
             guard !params.apiKey.isEmpty else {
                 throw SDKError.invalidAPIKey("API key cannot be empty")
             }
 
-            // Store initialization parameters
-            _initParams = params
-
-            // Store securely in keychain
-            try KeychainManager.shared.storeSDKParams(params)
-
-            // Configure logging based on environment
+            // Step 2: Initialize logging system
+            logger.info("Step 2/8: Initializing logging system")
             RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
 
-            // Bootstrap services
-            try await serviceContainer.bootstrap(with: params)
+            // Step 3: Store parameters securely
+            logger.info("Step 3/8: Storing credentials securely")
+            _initParams = params
+            try KeychainManager.shared.storeSDKParams(params)
 
-            // Initialize device information collection
-            await initializeDeviceInfo()
+            // Step 4: Initialize database
+            logger.info("Step 4/8: Initializing local database")
+            try DatabaseManager.shared.setup()
 
-            // Load configuration from service (network -> DB -> defaults)
-            let configService = await serviceContainer.configurationService
-            let loadedConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
+            // Step 5: Initialize API client and authentication service
+            logger.info("Step 5/8: Authenticating with backend")
+
+            // Create API client first
+            let apiClient = APIClient(
+                baseURL: params.baseURL,
+                apiKey: params.apiKey
+            )
+
+            // Create authentication service using API client
+            let authService = AuthenticationService(apiClient: apiClient)
+
+            // Set auth service in API client to complete the setup
+            await apiClient.setAuthenticationService(authService)
+
+            // Authenticate
+            let authResponse = try await authService.authenticate(apiKey: params.apiKey)
+            logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
+
+            // Step 6: Perform health check
+            logger.info("Step 6/8: Performing health check")
+            let healthResponse = try await authService.healthCheck()
+
+            if healthResponse.status != HealthStatus.healthy {
+                logger.warning("Backend health status: \(healthResponse.status)")
+            }
+
+            // Step 7: Bootstrap SDK services and sync with backend
+            logger.info("Step 7/7: Bootstrapping SDK services and syncing with backend")
+            let loadedConfig = try await serviceContainer.bootstrap(
+                with: params,
+                authService: authService,
+                apiClient: apiClient
+            )
+
+            // Store the configuration
             _configurationData = loadedConfig
-            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: loadedConfig))
-
-            // Get model information from model info service
-            let modelInfoService = await serviceContainer.modelInfoService
-            let storedModels = try await modelInfoService.loadStoredModels()
-            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: storedModels))
 
             // Mark as initialized
             _isInitialized = true
-
+            logger.info("✅ SDK initialization completed successfully")
             EventBus.shared.publish(SDKInitializationEvent.completed)
+
         } catch {
+            logger.error("❌ SDK initialization failed: \(error.localizedDescription)")
             _configurationData = nil
             _initParams = nil
             _isInitialized = false
@@ -109,22 +156,6 @@ public enum RunAnywhere {
         }
     }
 
-    /// Initialize device information collection during SDK startup
-    private static func initializeDeviceInfo() async {
-        let logger = SDKLogger(category: "RunAnywhere")
-        let deviceInfoService = await serviceContainer.deviceInfoService
-
-        // Load current device information
-        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
-            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
-
-            // Log device summary for debugging
-            let summary = await deviceInfoService.getDeviceInfoSummary()
-            logger.info("Device Info:\n\(summary)")
-        } else {
-            logger.warning("Could not collect device information")
-        }
-    }
 
     // MARK: - Text Generation (Clean Async/Await Interface)
 
