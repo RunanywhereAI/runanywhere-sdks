@@ -117,13 +117,13 @@ public extension RunAnywhere {
             format: ModelFormat.gguf, // Default
             downloadURL: url,
             localPath: nil,
-            memoryRequired: estimatedSize,
-            contextLength: 4096,
             downloadSize: nil,
+            memoryRequired: Int64(1024 * 1024 * 1024), // Default 1GB
             compatibleFrameworks: [.llamaCpp],
             preferredFramework: .llamaCpp,
-            metadata: nil,
-            supportsThinking: false
+            contextLength: 4096,
+            supportsThinking: false,
+            metadata: nil
         )
 
         // Register the model

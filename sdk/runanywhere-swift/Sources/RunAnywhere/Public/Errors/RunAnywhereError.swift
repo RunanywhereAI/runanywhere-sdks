@@ -60,7 +60,7 @@ public enum RunAnywhereError: LocalizedError {
             }
             return "Failed to load model '\(identifier)'"
         case .modelValidationFailed(let identifier, let errors):
-            let errorList = errors.map { $0.localizedDescription }.joined(separator: ", ")
+            let errorList = errors.joined(separator: ", ")
             return "Model '\(identifier)' validation failed: \(errorList)"
         case .modelIncompatible(let identifier, let reason):
             return "Model '\(identifier)' is incompatible: \(reason)"

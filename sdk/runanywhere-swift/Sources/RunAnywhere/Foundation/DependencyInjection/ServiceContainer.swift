@@ -113,10 +113,6 @@ public class ServiceContainer {
         )
     }()
 
-    /// Compatibility service
-    private(set) lazy var compatibilityService: CompatibilityService = {
-        CompatibilityService()
-    }()
 
     /// Logger
     private(set) lazy var logger: SDKLogger = {
@@ -185,21 +181,21 @@ public class ServiceContainer {
         }
     }
 
-    /// Model metadata service
-    private var _modelMetadataService: ModelMetadataService?
-    public var modelMetadataService: ModelMetadataService {
+    /// Model info service
+    private var _modelInfoService: ModelInfoService?
+    public var modelInfoService: ModelInfoService {
         get async {
-            if _modelMetadataService == nil {
-                let modelRepo = ModelMetadataRepositoryImpl(
+            if _modelInfoService == nil {
+                let modelRepo = ModelInfoRepositoryImpl(
                     databaseManager: databaseManager,
                     apiClient: apiClient
                 )
-                _modelMetadataService = ModelMetadataService(
-                    modelMetadataRepository: modelRepo,
+                _modelInfoService = ModelInfoService(
+                    modelInfoRepository: modelRepo,
                     syncCoordinator: await syncCoordinator
                 )
             }
-            return _modelMetadataService!
+            return _modelInfoService!
         }
     }
 
@@ -256,10 +252,6 @@ public class ServiceContainer {
 
     // MARK: - Public Service Access
 
-    /// Get compatibility service
-    public var compatibility: CompatibilityService {
-        return compatibilityService
-    }
 
     /// Get memory service
     public var memory: MemoryManager {
@@ -372,8 +364,6 @@ public class ServiceContainer {
         health["memory"] = await checkMemoryServiceHealth()
         health["download"] = await checkDownloadServiceHealth()
         health["storage"] = await checkStorageServiceHealth()
-        health["validation"] = await checkValidationServiceHealth()
-        health["compatibility"] = await checkCompatibilityServiceHealth()
         health["voice"] = await voiceCapabilityService.isHealthy()
         // Removed tokenizer health check
 
@@ -411,14 +401,5 @@ public class ServiceContainer {
         return true // SimplifiedFileManager doesn't need health checks
     }
 
-    private func checkValidationServiceHealth() async -> Bool {
-        // Check validation service
-        return validationService.isHealthy()
-    }
-
-    private func checkCompatibilityServiceHealth() async -> Bool {
-        // Check compatibility service
-        return compatibilityService.isHealthy()
-    }
 
 }

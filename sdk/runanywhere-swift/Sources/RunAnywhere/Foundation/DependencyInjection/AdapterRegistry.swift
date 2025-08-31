@@ -90,15 +90,12 @@ public final class AdapterRegistry {
             return LLMFramework.allCases.map { framework in
                 let isAvailable = registeredFrameworks.contains(framework)
                 let adapter = adapters[framework]
-                let capability = FrameworkCapabilities.getCapability(for: framework)
-
                 return FrameworkAvailability(
                     framework: framework,
                     isAvailable: isAvailable,
                     unavailabilityReason: isAvailable ? nil : "Framework adapter not registered",
-                    requirements: getFrameworkRequirements(framework),
                     recommendedFor: getRecommendedUseCases(framework, adapter: adapter),
-                    supportedFormats: capability?.supportedFormats.map { $0 } ?? []
+                    supportedFormats: adapter?.supportedFormats ?? []
                 )
             }
         }
@@ -106,20 +103,6 @@ public final class AdapterRegistry {
 
     // MARK: - Private Helper Methods
 
-    private func getFrameworkRequirements(_ framework: LLMFramework) -> [HardwareRequirement] {
-        switch framework {
-        case .coreML, .foundationModels:
-            return [.requiresNeuralEngine]
-        case .tensorFlowLite, .mediaPipe:
-            return [.requiresGPU]
-        case .mlx:
-            return [.requiresGPU, .requiresAppleSilicon]
-        case .whisperKit:
-            return [.requiresNeuralEngine]
-        default:
-            return []
-        }
-    }
 
     private func getRecommendedUseCases(_ framework: LLMFramework, adapter: UnifiedFrameworkAdapter?) -> [String] {
         var useCases: [String] = []

@@ -74,8 +74,8 @@ class ModelListViewModel: ObservableObject {
         currentModel = model
     }
 
-    func downloadModel(_ model: ModelInfo, progressHandler: @escaping (Double) -> Void) async throws -> URL {
-        return try await RunAnywhere.downloadModel(model.id, progressHandler: progressHandler)
+    func downloadModel(_ model: ModelInfo, progressHandler: @escaping (Double) -> Void) async throws {
+        try await RunAnywhere.downloadModel(model.id)
     }
 
     func deleteModel(_ model: ModelInfo) async throws {
@@ -85,18 +85,17 @@ class ModelListViewModel: ObservableObject {
     }
 
     func loadModel(_ model: ModelInfo) async throws {
-        try await RunAnywhere.loadModel(model.id)
-        currentModel = model
+        let loadedModel = try await RunAnywhere.loadModelWithInfo(model.id)
+        currentModel = loadedModel
     }
 
     /// Add a custom model from URL
     func addModelFromURL(name: String, url: URL, framework: LLMFramework, estimatedSize: Int64?) async throws {
         // Use SDK's addModelFromURL method
-        let model = try await RunAnywhere.addModelFromURL(
+        let model = await RunAnywhere.addModelFromURL(
+            url,
             name: name,
-            url: url,
-            framework: framework,
-            estimatedSize: estimatedSize
+            type: "gguf"
         )
 
         // Reload models to include the new one

@@ -381,7 +381,7 @@ public enum DeviceSpecifications {
         // Determine recommendations based on TOPS performance
         let maxBatchSize: Int
         let maxContextLength: Int
-        let recommendedQuantization: QuantizationType
+        let recommendedQuantization: QuantizationLevel
         let maxTokensPerSecond: Int
 
         switch spec.estimatedTops {
@@ -389,7 +389,7 @@ public enum DeviceSpecifications {
             // High-performance chips (A17 Pro, A18, M4)
             maxBatchSize = 8
             maxContextLength = 4096
-            recommendedQuantization = .none
+            recommendedQuantization = .full
             maxTokensPerSecond = 50
 
         case 15...:
@@ -444,7 +444,7 @@ public enum DeviceSpecifications {
 public struct OptimizationRecommendations {
     public let maxBatchSize: Int
     public let maxContextLength: Int
-    public let recommendedQuantization: QuantizationType
+    public let recommendedQuantization: QuantizationLevel
     public let maxTokensPerSecond: Int
     public let useNeuralEngine: Bool
     public let useGPU: Bool

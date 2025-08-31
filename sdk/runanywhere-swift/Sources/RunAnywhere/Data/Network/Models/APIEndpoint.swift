@@ -4,7 +4,7 @@ import Foundation
 public enum APIEndpoint {
     case syncConfiguration
     case syncTelemetry
-    case syncModelMetadata
+    case syncModelInfo
     case syncGenerationHistory
     case syncUserPreferences
 
@@ -14,7 +14,7 @@ public enum APIEndpoint {
             return "/v1/sync/configuration"
         case .syncTelemetry:
             return "/v1/sync/telemetry"
-        case .syncModelMetadata:
+        case .syncModelInfo:
             return "/v1/sync/models"
         case .syncGenerationHistory:
             return "/v1/sync/history"

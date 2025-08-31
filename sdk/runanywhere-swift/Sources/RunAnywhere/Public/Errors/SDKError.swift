@@ -34,7 +34,7 @@ public enum SDKError: LocalizedError {
         case .downloadFailed(let error):
             return "Download failed: \(error.localizedDescription)"
         case .validationFailed(let error):
-            return "Validation failed: \(error.localizedDescription)"
+            return "Validation failed: \(error)"
         case .routingFailed(let reason):
             return "Routing failed: \(reason)"
         case .databaseInitializationFailed(let error):

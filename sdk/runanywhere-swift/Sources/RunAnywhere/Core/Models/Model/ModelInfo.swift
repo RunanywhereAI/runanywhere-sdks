@@ -1,11 +1,12 @@
 import Foundation
+import GRDB
 
-/// Information about a model
-public struct ModelInfo: Codable {
+/// Information about a model - database entity with sync support
+public struct ModelInfo: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
     // Essential identifiers
     public let id: String
     public let name: String
-    public let category: ModelCategory  // NEW: Type of model (language, speech, vision, etc.)
+    public let category: ModelCategory  // Type of model (language, speech, vision, etc.)
 
     // Format and location
     public let format: ModelFormat
@@ -27,8 +28,31 @@ public struct ModelInfo: Codable {
     // Optional metadata
     public let metadata: ModelInfoMetadata?
 
+    // Tracking fields for sync and database
+    public let source: ConfigurationSource
+    public let createdAt: Date
+    public var updatedAt: Date
+    public var syncPending: Bool
+
+    // Usage tracking
+    public var lastUsed: Date?
+    public var usageCount: Int
+
     // Non-Codable runtime properties
     public var additionalProperties: [String: Any] = [:]
+
+    // MARK: - Computed Properties
+
+    /// Whether this model is downloaded and available locally
+    public var isDownloaded: Bool {
+        guard let localPath = localPath else { return false }
+        return FileManager.default.fileExists(atPath: localPath.path)
+    }
+
+    /// Whether this model is available for use (downloaded and locally accessible)
+    public var isAvailable: Bool {
+        return isDownloaded
+    }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, category, format, downloadURL, localPath
@@ -36,6 +60,8 @@ public struct ModelInfo: Codable {
         case compatibleFrameworks, preferredFramework
         case contextLength, supportsThinking
         case metadata
+        case source, createdAt, updatedAt, syncPending
+        case lastUsed, usageCount
     }
 
     public init(
@@ -52,6 +78,12 @@ public struct ModelInfo: Codable {
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
         metadata: ModelInfoMetadata? = nil,
+        source: ConfigurationSource = .remote,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        syncPending: Bool = false,
+        lastUsed: Date? = nil,
+        usageCount: Int = 0,
         additionalProperties: [String: Any] = [:]
     ) {
         self.id = id
@@ -76,6 +108,55 @@ public struct ModelInfo: Codable {
         self.supportsThinking = category.supportsThinking ? supportsThinking : false
 
         self.metadata = metadata
+        self.source = source
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.syncPending = syncPending
+        self.lastUsed = lastUsed
+        self.usageCount = usageCount
         self.additionalProperties = additionalProperties
+    }
+
+    // MARK: - Syncable
+
+    public mutating func markUpdated() -> Self {
+        self.updatedAt = Date()
+        self.syncPending = true
+        return self
+    }
+
+    public mutating func markSynced() -> Self {
+        self.syncPending = false
+        return self
+    }
+
+    // MARK: - GRDB
+
+    public static var databaseTableName: String { "models" }
+}
+
+// MARK: - Database Columns
+
+extension ModelInfo {
+    public enum Columns: String, ColumnExpression {
+        case id
+        case name
+        case category
+        case format
+        case downloadURL
+        case localPath
+        case downloadSize
+        case memoryRequired
+        case compatibleFrameworks
+        case preferredFramework
+        case contextLength
+        case supportsThinking
+        case metadata
+        case source
+        case createdAt
+        case updatedAt
+        case syncPending
+        case lastUsed
+        case usageCount
     }
 }

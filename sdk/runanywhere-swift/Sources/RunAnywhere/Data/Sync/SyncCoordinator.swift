@@ -114,8 +114,8 @@ public actor SyncCoordinator {
             return .syncConfiguration
         case is TelemetryData.Type:
             return .syncTelemetry
-        case is ModelMetadataData.Type:
-            return .syncModelMetadata
+        case is ModelInfo.Type:
+            return .syncModelInfo
         default:
             // Fallback - should not happen in practice
             return .syncConfiguration
