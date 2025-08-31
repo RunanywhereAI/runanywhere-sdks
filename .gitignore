@@ -146,10 +146,10 @@ examples/web/
 sdk/runanywhere-web/
 
 # Configuration files with real values
-Configuration/RunAnywhereConfig.staging.json
-Configuration/RunAnywhereConfig.prod.json
-Configuration/*.private.json
-Configuration/Private/
+sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
+sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
+sdk/runanywhere-swift/Configuration/*.private.json
+sdk/runanywhere-swift/Configuration/Private/
 
 # Keep example files
-!Configuration/RunAnywhereConfig.example.json
+!sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json
