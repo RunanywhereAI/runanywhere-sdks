@@ -1,7 +1,7 @@
 import Foundation
 
 /// Hardware configuration for framework adapters
-public struct HardwareConfiguration {
+public struct HardwareConfiguration: Codable, Sendable {
     public var primaryAccelerator: HardwareAcceleration = .auto
     public var fallbackAccelerator: HardwareAcceleration? = .cpu
     public var memoryMode: MemoryMode = .balanced
@@ -9,10 +9,10 @@ public struct HardwareConfiguration {
     public var useQuantization: Bool = false
     public var quantizationBits: Int = 8
 
-    public enum MemoryMode {
-        case conservative
-        case balanced
-        case aggressive
+    public enum MemoryMode: String, Codable, Sendable {
+        case conservative = "conservative"
+        case balanced = "balanced"
+        case aggressive = "aggressive"
     }
 
     public init(

@@ -2,15 +2,13 @@ import Foundation
 
 /// Service responsible for discovering models from various sources
 class ModelDiscovery {
-    private var registeredProviders: [ModelProvider] = []
+    // Provider registration removed - no longer needed
     private let logger = SDKLogger(category: "ModelDiscovery")
 
     init() {
     }
 
-    func registerProvider(_ provider: ModelProvider) {
-        registeredProviders.append(provider)
-    }
+    // Provider registration removed - no longer needed
 
     func discoverLocalModels() async -> [ModelInfo] {
         var models: [ModelInfo] = []
@@ -57,30 +55,6 @@ class ModelDiscovery {
                 }
             }
         }
-    }
-
-    func discoverOnlineModels() async -> [ModelInfo] {
-        var models: [ModelInfo] = []
-
-        // Query each registered provider
-        await withTaskGroup(of: [ModelInfo].self) { group in
-            for provider in registeredProviders {
-                group.addTask { [weak self] in
-                    do {
-                        return try await provider.listAvailableModels(limit: 100)
-                    } catch {
-                        self?.logger.error("Failed to query provider \(provider.name): \(error)")
-                        return []
-                    }
-                }
-            }
-
-            for await providerModels in group {
-                models.append(contentsOf: providerModels)
-            }
-        }
-
-        return models
     }
 
     private func detectModel(at url: URL) async -> ModelInfo? {

@@ -65,7 +65,6 @@ public enum SDKConstants {
 
         // Analytics configuration - hardcoded to be fully enabled
         public static let analyticsEnabled: Bool = true
-        public static let analyticsLevel = AnalyticsLevel.verbose  // Changed to verbose for complete analytics
         public static let enableLiveMetrics: Bool = true   // Enable live metrics for better real-time tracking
 
         // Configuration ID

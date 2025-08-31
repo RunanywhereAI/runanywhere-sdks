@@ -8,7 +8,8 @@ public enum RunAnywhere {
     // MARK: - Internal State Management
 
     /// Internal configuration storage
-    internal static var _configuration: Configuration?
+    internal static var _configurationData: ConfigurationData?
+    internal static var _initParams: SDKInitParams?
     private static var _isInitialized = false
 
     /// Access to service container (through the shared instance for now)
@@ -28,33 +29,67 @@ public enum RunAnywhere {
         EventBus.shared
     }
 
-    // MARK: - Simple Initialization
+    // MARK: - SDK Initialization
 
-    /// Initialize the SDK with just an API key
-    /// - Parameter apiKey: Your RunAnywhere API key
-    public static func initialize(apiKey: String) async throws {
+    /// Initialize the SDK with API key, base URL, and environment
+    /// - Parameters:
+    ///   - apiKey: Your RunAnywhere API key
+    ///   - baseURL: Base URL for API requests
+    ///   - environment: Environment mode (default: production)
+    public static func initialize(
+        apiKey: String,
+        baseURL: URL,
+        environment: SDKEnvironment = .production
+    ) async throws {
+        let params = SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
+        try await initialize(with: params)
+    }
+
+    /// Initialize the SDK with string URL
+    /// - Parameters:
+    ///   - apiKey: Your RunAnywhere API key
+    ///   - baseURL: Base URL string for API requests
+    ///   - environment: Environment mode (default: production)
+    public static func initialize(
+        apiKey: String,
+        baseURL: String,
+        environment: SDKEnvironment = .production
+    ) async throws {
+        let params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
+        try await initialize(with: params)
+    }
+
+    /// Initialize the SDK with parameters
+    /// - Parameter params: SDK initialization parameters
+    private static func initialize(with params: SDKInitParams) async throws {
         EventBus.shared.publish(SDKInitializationEvent.started)
 
         do {
             // Validate API key first
-            guard !apiKey.isEmpty else {
+            guard !params.apiKey.isEmpty else {
                 throw SDKError.invalidAPIKey("API key cannot be empty")
             }
 
-            // Create configuration
-            let config = Configuration(apiKey: apiKey)
-            _configuration = config
+            // Store initialization parameters
+            _initParams = params
 
-            // Bootstrap services directly
-            try await serviceContainer.bootstrap(with: config)
+            // Store securely in keychain
+            try KeychainManager.shared.storeSDKParams(params)
+
+            // Configure logging based on environment
+            RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
+
+            // Bootstrap services
+            try await serviceContainer.bootstrap(with: params)
 
             // Initialize device information collection
             await initializeDeviceInfo()
 
-            // Get current configuration from configuration service
+            // Load configuration from service (network -> DB -> defaults)
             let configService = await serviceContainer.configurationService
-            let currentConfig = await configService.getConfiguration()
-            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: currentConfig))
+            let loadedConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
+            _configurationData = loadedConfig
+            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: loadedConfig))
 
             // Get model information from model info service
             let modelInfoService = await serviceContainer.modelInfoService
@@ -66,7 +101,8 @@ public enum RunAnywhere {
 
             EventBus.shared.publish(SDKInitializationEvent.completed)
         } catch {
-            _configuration = nil
+            _configurationData = nil
+            _initParams = nil
             _isInitialized = false
             EventBus.shared.publish(SDKInitializationEvent.failed(error))
             throw error
@@ -153,7 +189,7 @@ public enum RunAnywhere {
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                await EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+                EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
                 do {
                     // Ensure initialized
@@ -168,12 +204,12 @@ public enum RunAnywhere {
 
                     var fullResponse = ""
                     for try await token in stream {
-                        await EventBus.shared.publish(SDKGenerationEvent.tokenGenerated(token: token))
+                        EventBus.shared.publish(SDKGenerationEvent.tokenGenerated(token: token))
                         fullResponse += token
                         continuation.yield(token)
                     }
 
-                    await EventBus.shared.publish(SDKGenerationEvent.completed(
+                    EventBus.shared.publish(SDKGenerationEvent.completed(
                         response: fullResponse,
                         tokensUsed: fullResponse.count / 4, // Rough estimate
                         latencyMs: 0 // Would need to track properly
@@ -181,7 +217,7 @@ public enum RunAnywhere {
 
                     continuation.finish()
                 } catch {
-                    await EventBus.shared.publish(SDKGenerationEvent.failed(error))
+                    EventBus.shared.publish(SDKGenerationEvent.failed(error))
                     continuation.finish(throwing: error)
                 }
             }
@@ -197,7 +233,7 @@ public enum RunAnywhere {
         _ type: T.Type,
         prompt: String
     ) async throws -> T {
-        await EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Ensure initialized
@@ -209,7 +245,7 @@ public enum RunAnywhere {
             // This would need proper JSON schema generation and parsing
             throw SDKError.notImplemented
         } catch {
-            await EventBus.shared.publish(SDKGenerationEvent.failed(error))
+            EventBus.shared.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
