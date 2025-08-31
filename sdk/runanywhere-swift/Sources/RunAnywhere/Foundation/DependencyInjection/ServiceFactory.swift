@@ -35,7 +35,6 @@ public class ServiceFactory {
         ModelLoadingService(
             registry: container.modelRegistry,
             adapterRegistry: container.adapterRegistry,
-            validationService: container.validationService,
             memoryService: container.memoryService
         )
     }

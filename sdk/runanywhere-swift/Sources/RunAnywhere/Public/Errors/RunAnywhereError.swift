@@ -11,7 +11,7 @@ public enum RunAnywhereError: LocalizedError {
     // Model errors
     case modelNotFound(String)
     case modelLoadFailed(String, Error?)
-    case modelValidationFailed(String, [ValidationError])
+    case modelValidationFailed(String, [String])
     case modelIncompatible(String, String) // model, reason
 
     // Generation errors

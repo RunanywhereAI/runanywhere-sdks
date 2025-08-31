@@ -154,7 +154,7 @@ public class GenerationService {
 
         logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
         if modelInfo.supportsThinking {
-            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+            let pattern = ThinkingTagPattern.defaultPattern
             logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
             logger.debug("Raw generated text: \(generatedText)")
 
@@ -249,7 +249,7 @@ public class GenerationService {
         let (finalText, thinkingContent): (String, String?)
 
         if modelInfo.supportsThinking {
-            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+            let pattern = ThinkingTagPattern.defaultPattern
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent
