@@ -65,14 +65,28 @@ public extension RunAnywhere {
         }
     }
 
-    /// Download a model (placeholder implementation)
+    /// Download a model
     /// - Parameter modelIdentifier: The model to download
     static func downloadModel(_ modelIdentifier: String) async throws {
         await events.publish(SDKModelEvent.downloadStarted(modelId: modelIdentifier))
 
         do {
-            // This would need actual download implementation
-            // For now, just simulate completion
+            // Get the model info first
+            let modelService = await serviceContainer.modelInfoService
+            guard let modelInfo = try await modelService.getModel(by: modelIdentifier) else {
+                throw SDKError.modelNotFound(modelIdentifier)
+            }
+
+            // Use the download service to download the model
+            let downloadService = serviceContainer.downloadService
+            let downloadTask = try await downloadService.downloadModel(modelInfo)
+
+            // Wait for download completion
+            _ = try await downloadTask.result.value
+
+            // Update model info with local path after successful download
+            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true)
+
             await events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
         } catch {
             await events.publish(SDKModelEvent.downloadFailed(modelId: modelIdentifier, error: error))

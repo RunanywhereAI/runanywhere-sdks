@@ -337,6 +337,20 @@ public class ServiceContainer {
         // Initialize model registry with configuration
         await (modelRegistry as? RegistryService)?.initialize(with: configuration)
 
+        // Populate mock data in debug mode
+        if EnvironmentConfiguration.current.environment.isDebug {
+            do {
+                let modelService = await self.modelInfoService
+                if let modelRepo = await modelService.repository as? ModelInfoRepositoryImpl {
+                    try await modelRepo.checkAndPopulateMockDataIfNeeded()
+                    logger.info("Mock model data population check completed")
+                }
+            } catch {
+                logger.warning("Failed to populate mock model data: \(error)")
+                // Don't fail initialization if mock population fails
+            }
+        }
+
         // Configure hardware preferences
         // Hardware manager is self-configuring
 
