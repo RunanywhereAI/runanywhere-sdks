@@ -39,23 +39,23 @@ public extension RunAnywhere {
     /// - Parameter request: Configuration request with desired settings
     /// Note: This is event-driven - settings apply to the current session only
     static func requestConfiguration(_ request: ConfigurationRequest) async {
-        await events.publish(SDKConfigurationEvent.updateRequested(request: request))
+        events.publish(SDKConfigurationEvent.updateRequested(request: request))
 
         // Apply configuration to current session
         // This would typically update session-level defaults used by generation options
 
-        await events.publish(SDKConfigurationEvent.updateCompleted)
+        events.publish(SDKConfigurationEvent.updateCompleted)
     }
 
     /// Get current generation settings (read-only access via configuration)
     /// - Returns: Current generation settings
     static func getCurrentGenerationSettings() async -> DefaultGenerationSettings? {
-        await events.publish(SDKConfigurationEvent.settingsRequested)
+        events.publish(SDKConfigurationEvent.settingsRequested)
 
         let settings = RunAnywhere._configuration?.defaultGenerationSettings
 
         if let settings = settings {
-            await events.publish(SDKConfigurationEvent.settingsRetrieved(settings: settings))
+            events.publish(SDKConfigurationEvent.settingsRetrieved(settings: settings))
         }
         return settings
     }
@@ -63,46 +63,46 @@ public extension RunAnywhere {
     /// Get current routing policy
     /// - Returns: Current routing policy
     static func getCurrentRoutingPolicy() async -> RoutingPolicy {
-        await events.publish(SDKConfigurationEvent.routingPolicyRequested)
+        events.publish(SDKConfigurationEvent.routingPolicyRequested)
 
         let policy = RunAnywhere._configuration?.routingPolicy ?? .automatic
 
-        await events.publish(SDKConfigurationEvent.routingPolicyRetrieved(policy: policy))
+        events.publish(SDKConfigurationEvent.routingPolicyRetrieved(policy: policy))
         return policy
     }
 
     /// Get current privacy mode
     /// - Returns: Current privacy mode
     static func getCurrentPrivacyMode() async -> PrivacyMode {
-        await events.publish(SDKConfigurationEvent.privacyModeRequested)
+        events.publish(SDKConfigurationEvent.privacyModeRequested)
 
         let mode = RunAnywhere._configuration?.privacyMode ?? .standard
 
-        await events.publish(SDKConfigurationEvent.privacyModeRetrieved(mode: mode))
+        events.publish(SDKConfigurationEvent.privacyModeRetrieved(mode: mode))
         return mode
     }
 
     /// Check if analytics is enabled
     /// - Returns: True if analytics is enabled
     static func isAnalyticsEnabled() async -> Bool {
-        await events.publish(SDKConfigurationEvent.analyticsStatusRequested)
+        events.publish(SDKConfigurationEvent.analyticsStatusRequested)
 
         let enabled = RunAnywhere._configuration?.telemetryConsent != .denied
 
-        await events.publish(SDKConfigurationEvent.analyticsStatusRetrieved(enabled: enabled))
+        events.publish(SDKConfigurationEvent.analyticsStatusRetrieved(enabled: enabled))
         return enabled
     }
 
     /// Sync user preferences (placeholder - would sync with remote configuration)
     static func syncUserPreferences() async throws {
-        await events.publish(SDKConfigurationEvent.syncRequested)
+        events.publish(SDKConfigurationEvent.syncRequested)
 
         do {
             // Use the configuration service for syncing
             try await RunAnywhere.serviceContainer.configurationService.syncToCloud()
-            await events.publish(SDKConfigurationEvent.syncCompleted)
+            events.publish(SDKConfigurationEvent.syncCompleted)
         } catch {
-            await events.publish(SDKConfigurationEvent.syncFailed(error))
+            events.publish(SDKConfigurationEvent.syncFailed(error))
             throw error
         }
     }

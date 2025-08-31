@@ -3,7 +3,7 @@ import AVFoundation
 import os
 
 /// System TTS Service implementation for SDK
-public final class SystemTextToSpeechService: NSObject, TextToSpeechService {
+public final class SystemTextToSpeechService: NSObject, TextToSpeechService, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
     private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "SystemTTS")
     private var completionHandler: (() -> Void)?

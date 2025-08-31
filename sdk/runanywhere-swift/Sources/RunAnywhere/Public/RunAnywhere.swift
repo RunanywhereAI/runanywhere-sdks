@@ -33,7 +33,7 @@ public enum RunAnywhere {
     /// Initialize the SDK with just an API key
     /// - Parameter apiKey: Your RunAnywhere API key
     public static func initialize(apiKey: String) async throws {
-        await EventBus.shared.publish(SDKInitializationEvent.started)
+        EventBus.shared.publish(SDKInitializationEvent.started)
 
         do {
             // Validate API key first
@@ -54,43 +54,38 @@ public enum RunAnywhere {
             // Get current configuration from configuration service
             let configService = await serviceContainer.configurationService
             let currentConfig = await configService.getConfiguration()
-            await EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: currentConfig))
+            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: currentConfig))
 
             // Get model information from model info service
             let modelInfoService = await serviceContainer.modelInfoService
             let storedModels = try await modelInfoService.loadStoredModels()
-            await EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: storedModels))
+            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: storedModels))
 
             // Mark as initialized
             _isInitialized = true
 
-            await EventBus.shared.publish(SDKInitializationEvent.completed)
+            EventBus.shared.publish(SDKInitializationEvent.completed)
         } catch {
             _configuration = nil
             _isInitialized = false
-            await EventBus.shared.publish(SDKInitializationEvent.failed(error))
+            EventBus.shared.publish(SDKInitializationEvent.failed(error))
             throw error
         }
     }
 
     /// Initialize device information collection during SDK startup
     private static func initializeDeviceInfo() async {
-        do {
-            let deviceInfoService = await serviceContainer.deviceInfoService
+        let deviceInfoService = await serviceContainer.deviceInfoService
 
-            // Load current device information
-            if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
-                await EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
+        // Load current device information
+        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
+            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
 
-                // Log device summary for debugging
-                let summary = await deviceInfoService.getDeviceInfoSummary()
-                print("RunAnywhere SDK - Device Info:\n\(summary)")
-            } else {
-                print("RunAnywhere SDK - Warning: Could not collect device information")
-            }
-        } catch {
-            // Device info collection is not critical for SDK operation
-            print("RunAnywhere SDK - Warning: Device info collection failed: \(error)")
+            // Log device summary for debugging
+            let summary = await deviceInfoService.getDeviceInfoSummary()
+            print("RunAnywhere SDK - Device Info:\n\(summary)")
+        } else {
+            print("RunAnywhere SDK - Warning: Could not collect device information")
         }
     }
 

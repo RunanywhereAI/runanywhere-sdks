@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for routing behavior
-public struct RoutingConfiguration: Codable {
+public struct RoutingConfiguration: Codable, Sendable {
     /// The routing policy to use
     public var policy: RoutingPolicy
 
@@ -12,7 +12,8 @@ public struct RoutingConfiguration: Codable {
     public var privacyMode: PrivacyMode
 
     /// Custom routing rules (only used when policy is .custom)
-    public var customRules: [String: Any]?
+    /// Note: Using a dictionary of strings for Sendable conformance
+    public var customRules: [String: String]?
 
     /// Maximum latency threshold for routing decisions (milliseconds)
     public var maxLatencyThreshold: Int?
@@ -24,7 +25,7 @@ public struct RoutingConfiguration: Codable {
         policy: RoutingPolicy = .deviceOnly,
         cloudEnabled: Bool = false,
         privacyMode: PrivacyMode = .standard,
-        customRules: [String: Any]? = nil,
+        customRules: [String: String]? = nil,
         maxLatencyThreshold: Int? = nil,
         minConfidenceScore: Double? = nil
     ) {
@@ -50,10 +51,8 @@ public struct RoutingConfiguration: Codable {
         maxLatencyThreshold = try container.decodeIfPresent(Int.self, forKey: .maxLatencyThreshold)
         minConfidenceScore = try container.decodeIfPresent(Double.self, forKey: .minConfidenceScore)
 
-        // Handle custom rules as JSON
-        if let customRulesData = try container.decodeIfPresent(Data.self, forKey: .customRules) {
-            customRules = try JSONSerialization.jsonObject(with: customRulesData) as? [String: Any]
-        }
+        // Handle custom rules as JSON string dictionary
+        customRules = try container.decodeIfPresent([String: String].self, forKey: .customRules)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -64,10 +63,7 @@ public struct RoutingConfiguration: Codable {
         try container.encodeIfPresent(maxLatencyThreshold, forKey: .maxLatencyThreshold)
         try container.encodeIfPresent(minConfidenceScore, forKey: .minConfidenceScore)
 
-        // Handle custom rules as JSON
-        if let customRules = customRules {
-            let customRulesData = try JSONSerialization.data(withJSONObject: customRules)
-            try container.encode(customRulesData, forKey: .customRules)
-        }
+        // Handle custom rules as JSON string dictionary
+        try container.encodeIfPresent(customRules, forKey: .customRules)
     }
 }

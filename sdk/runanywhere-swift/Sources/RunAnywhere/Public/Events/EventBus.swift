@@ -2,8 +2,9 @@ import Foundation
 import Combine
 
 /// Central event bus for SDK-wide event distribution
-public class EventBus {
-    /// Shared instance
+/// Thread-safe event bus using Combine's built-in thread safety
+public final class EventBus: @unchecked Sendable {
+    /// Shared instance - thread-safe singleton
     public static let shared = EventBus()
 
     /// Event publishers for each event type
@@ -119,6 +120,12 @@ public class EventBus {
         allEventsSubject.send(event)
     }
 
+    /// Publish a device event
+    public func publish(_ event: SDKDeviceEvent) {
+        // Since we don't have a device subject yet, just send to all events
+        allEventsSubject.send(event)
+    }
+
     /// Generic event publisher
     public func publish(_ event: any SDKEvent) {
         switch event {
@@ -135,6 +142,12 @@ public class EventBus {
         case let e as SDKPerformanceEvent:
             publish(e)
         case let e as SDKNetworkEvent:
+            publish(e)
+        case let e as SDKStorageEvent:
+            publish(e)
+        case let e as SDKFrameworkEvent:
+            publish(e)
+        case let e as SDKDeviceEvent:
             publish(e)
         default:
             allEventsSubject.send(event)

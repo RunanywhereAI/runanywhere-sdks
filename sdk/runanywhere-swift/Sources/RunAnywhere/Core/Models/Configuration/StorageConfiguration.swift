@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for storage behavior
-public struct StorageConfiguration: Codable {
+public struct StorageConfiguration: Codable, Sendable {
     /// Maximum cache size in bytes
     public var maxCacheSize: Int64
 

@@ -15,13 +15,13 @@ public extension RunAnywhere {
         prompt: String,
         options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
-        await events.publish(SDKGenerationEvent.started(prompt: prompt))
+        events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // For now, use the basic generateStructured method from main RunAnywhere
             let result = try await RunAnywhere.generateStructured(type, prompt: prompt)
 
-            await events.publish(SDKGenerationEvent.completed(
+            events.publish(SDKGenerationEvent.completed(
                 response: "Structured output generated for \(String(describing: type))",
                 tokensUsed: 0, // Would need to be tracked properly
                 latencyMs: 0    // Would need to be tracked properly
@@ -29,7 +29,7 @@ public extension RunAnywhere {
 
             return result
         } catch {
-            await events.publish(SDKGenerationEvent.failed(error))
+            events.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
@@ -47,13 +47,13 @@ public extension RunAnywhere {
         validationMode: SchemaValidationMode,
         options: RunAnywhereGenerationOptions? = nil
     ) async throws -> T {
-        await events.publish(SDKGenerationEvent.started(prompt: prompt))
+        events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // For now, ignore validation mode and use basic structured generation
             let result = try await RunAnywhere.generateStructured(type, prompt: prompt)
 
-            await events.publish(SDKGenerationEvent.completed(
+            events.publish(SDKGenerationEvent.completed(
                 response: "Structured output generated with validation mode: \(validationMode)",
                 tokensUsed: 0,
                 latencyMs: 0
@@ -61,7 +61,7 @@ public extension RunAnywhere {
 
             return result
         } catch {
-            await events.publish(SDKGenerationEvent.failed(error))
+            events.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
@@ -77,7 +77,7 @@ public extension RunAnywhere {
         structuredOutput: StructuredOutputConfig,
         options: RunAnywhereGenerationOptions? = nil
     ) async throws -> GenerationResult {
-        await events.publish(SDKGenerationEvent.started(prompt: prompt))
+        events.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Generate using regular generation with structured config in options
@@ -102,14 +102,14 @@ public extension RunAnywhere {
                 options: internalOptions
             )
 
-            await events.publish(SDKGenerationEvent.completed(
+            events.publish(SDKGenerationEvent.completed(
                 response: result.text,
                 tokensUsed: result.tokensUsed,
                 latencyMs: result.latencyMs
             ))
 
             if result.savedAmount > 0 {
-                await events.publish(SDKGenerationEvent.costCalculated(
+                events.publish(SDKGenerationEvent.costCalculated(
                     amount: 0,
                     savedAmount: result.savedAmount
                 ))
@@ -117,7 +117,7 @@ public extension RunAnywhere {
 
             return result
         } catch {
-            await events.publish(SDKGenerationEvent.failed(error))
+            events.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
