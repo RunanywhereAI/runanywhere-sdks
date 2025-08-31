@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Information about a model - database entity with sync support
-public struct ModelInfo: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
     // Essential identifiers
     public let id: String
     public let name: String
@@ -117,18 +117,7 @@ public struct ModelInfo: Codable, Syncable, RepositoryEntity, FetchableRecord, P
         self.additionalProperties = additionalProperties
     }
 
-    // MARK: - Syncable
-
-    public mutating func markUpdated() -> Self {
-        self.updatedAt = Date()
-        self.syncPending = true
-        return self
-    }
-
-    public mutating func markSynced() -> Self {
-        self.syncPending = false
-        return self
-    }
+    // MARK: - Sync methods provided by RepositoryEntity protocol extension
 
     // MARK: - GRDB
 

@@ -40,8 +40,8 @@ public actor SyncCoordinator {
 
     // MARK: - Generic Sync Methods
 
-    /// Sync any repository with Syncable entities
-    public func sync<R: Repository>(_ repository: R, endpoint: APIEndpoint? = nil) async throws where R.Entity: Syncable {
+    /// Sync any repository with RepositoryEntity entities
+    public func sync<R: Repository>(_ repository: R, endpoint: APIEndpoint? = nil) async throws where R.Entity: RepositoryEntity {
         let typeName = String(describing: R.Entity.self)
 
         guard !activeSyncs.contains(typeName) else {
@@ -77,7 +77,7 @@ public actor SyncCoordinator {
         _ batch: [R.Entity],
         repository: R,
         endpoint: APIEndpoint?
-    ) async throws where R.Entity: Syncable {
+    ) async throws where R.Entity: RepositoryEntity {
 
         guard let apiClient = apiClient else {
             throw SyncError.noAPIClient
@@ -108,7 +108,7 @@ public actor SyncCoordinator {
 
     // MARK: - Endpoint Resolution
 
-    private func getDefaultEndpoint<T: Syncable>(for type: T.Type) -> APIEndpoint {
+    private func getDefaultEndpoint<T: RepositoryEntity>(for type: T.Type) -> APIEndpoint {
         switch type {
         case is ConfigurationData.Type:
             return .syncConfiguration
@@ -147,7 +147,7 @@ public actor SyncCoordinator {
     // MARK: - Manual Sync Control
 
     /// Check if sync is in progress for a given type
-    public func isSyncing<T: Syncable>(type: T.Type) -> Bool {
+    public func isSyncing<T: RepositoryEntity>(type: T.Type) -> Bool {
         let typeName = String(describing: type)
         return activeSyncs.contains(typeName)
     }

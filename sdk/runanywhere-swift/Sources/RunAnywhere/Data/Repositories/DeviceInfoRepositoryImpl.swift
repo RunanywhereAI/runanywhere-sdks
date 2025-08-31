@@ -68,7 +68,7 @@ public actor DeviceInfoRepositoryImpl: Repository, DeviceInfoRepository {
         try databaseManager.write { db in
             for id in ids {
                 if var data = try DeviceInfoData.fetchOne(db, key: id) {
-                    _ = data.markSynced()
+                    data.markSynced()
                     try data.update(db)
                 }
             }
