@@ -74,6 +74,21 @@ class ModelListViewModel: ObservableObject {
         currentModel = model
     }
 
+    /// Alias for loadModelsFromRegistry to match view calls
+    func loadModels() async {
+        await loadModelsFromRegistry()
+    }
+
+    /// Select and load a model
+    func selectModel(_ model: ModelInfo) async {
+        do {
+            try await loadModel(model)
+            setCurrentModel(model)
+        } catch {
+            errorMessage = "Failed to load model: \(error.localizedDescription)"
+        }
+    }
+
     func downloadModel(_ model: ModelInfo, progressHandler: @escaping (Double) -> Void) async throws {
         try await RunAnywhere.downloadModel(model.id)
     }

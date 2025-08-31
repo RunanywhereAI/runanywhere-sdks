@@ -4,6 +4,7 @@ import Foundation
 public enum SDKError: LocalizedError {
     case notInitialized
     case notImplemented
+    case invalidAPIKey(String)
     case modelNotFound(String)
     case loadingFailed(String)
     case generationFailed(String)
@@ -21,6 +22,8 @@ public enum SDKError: LocalizedError {
             return "SDK not initialized. Call initialize(with:) first."
         case .notImplemented:
             return "This feature is not yet implemented."
+        case .invalidAPIKey(let reason):
+            return "Invalid API key: \(reason)"
         case .modelNotFound(let model):
             return "Model '\(model)' not found."
         case .loadingFailed(let reason):

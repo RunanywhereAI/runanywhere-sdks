@@ -475,7 +475,7 @@ private struct SelectableModelRow: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
-                } else if let downloadURL = model.downloadURL, model.localPath == nil {
+                } else if let _ = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
                         VStack(spacing: 4) {

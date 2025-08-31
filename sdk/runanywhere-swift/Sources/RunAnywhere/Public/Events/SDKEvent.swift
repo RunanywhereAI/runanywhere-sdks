@@ -15,6 +15,7 @@ public enum SDKEventType {
     case voice
     case storage
     case framework
+    case device
     case error
     case performance
     case network
@@ -37,6 +38,7 @@ public enum SDKConfigurationEvent: SDKEvent {
     case fetchStarted
     case fetchCompleted(source: String)
     case fetchFailed(Error)
+    case loaded(configuration: ConfigurationData?)
     case updated(changes: [String])
     case syncStarted
     case syncCompleted
@@ -101,6 +103,7 @@ public enum SDKModelEvent: SDKEvent {
     case listRequested
     case listCompleted(models: [ModelInfo])
     case listFailed(Error)
+    case catalogLoaded(models: [ModelInfo])
     case deleteStarted(modelId: String)
     case deleteCompleted(modelId: String)
     case deleteFailed(modelId: String, error: Error)
@@ -191,4 +194,18 @@ public enum SDKFrameworkEvent: SDKEvent {
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .framework }
+}
+
+/// SDK Device Events for public API
+public enum SDKDeviceEvent: SDKEvent {
+    case deviceInfoCollected(deviceInfo: DeviceInfoData)
+    case deviceInfoCollectionFailed(Error)
+    case deviceInfoRefreshed(deviceInfo: DeviceInfoData)
+    case deviceInfoSyncStarted
+    case deviceInfoSyncCompleted
+    case deviceInfoSyncFailed(Error)
+    case deviceStateChanged(property: String, newValue: String)
+
+    public var timestamp: Date { Date() }
+    public var eventType: SDKEventType { .device }
 }

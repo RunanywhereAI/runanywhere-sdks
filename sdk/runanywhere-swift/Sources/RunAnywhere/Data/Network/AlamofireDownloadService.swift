@@ -146,8 +146,8 @@ public class AlamofireDownloadService: DownloadManager {
 
                                     // Save metadata persistently
                                     Task {
-                                        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
-                                        try? await modelMetadataService.saveModel(updatedModel)
+                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                        try? await modelInfoService.saveModel(updatedModel)
                                     }
 
                                     self.logger.info("Download completed", metadata: [
@@ -450,8 +450,8 @@ extension AlamofireDownloadService {
 
                                     // Save metadata persistently
                                     Task {
-                                        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
-                                        try? await modelMetadataService.saveModel(updatedModel)
+                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                        try? await modelInfoService.saveModel(updatedModel)
                                     }
 
                                     continuation.resume(returning: url)
