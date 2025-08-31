@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// Configuration source
-public enum ConfigurationSource: String, Codable {
+public enum ConfigurationSource: String, Codable, Sendable {
     case remote = "remote"
     case consumer = "consumer"
     case defaults = "defaults"
@@ -10,7 +10,7 @@ public enum ConfigurationSource: String, Codable {
 
 /// Main configuration data structure using composed configurations
 /// Works for both network API and database storage
-public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     /// Unique identifier for this configuration
     public let id: String
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Supported LLM frameworks
-public enum LLMFramework: String, CaseIterable, Codable {
+public enum LLMFramework: String, CaseIterable, Codable, Sendable {
     case coreML = "CoreML"
     case tensorFlowLite = "TFLite"
     case mlx = "MLX"

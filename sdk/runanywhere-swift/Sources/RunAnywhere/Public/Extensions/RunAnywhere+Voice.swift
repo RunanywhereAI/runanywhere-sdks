@@ -15,7 +15,7 @@ public extension RunAnywhere {
         modelId: String = "whisper-base",
         options: STTOptions = STTOptions()
     ) async throws -> STTResult {
-        await events.publish(SDKVoiceEvent.transcriptionStarted)
+        events.publish(SDKVoiceEvent.transcriptionStarted)
 
         do {
             // Find appropriate voice service
@@ -29,10 +29,10 @@ public extension RunAnywhere {
             // Transcribe audio
             let result = try await voiceService.transcribe(audio: audio, options: options)
 
-            await events.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
+            events.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
             return result
         } catch {
-            await events.publish(SDKVoiceEvent.pipelineError(error))
+            events.publish(SDKVoiceEvent.pipelineError(error))
             throw error
         }
     }
@@ -49,7 +49,7 @@ public extension RunAnywhere {
         segmentationStrategy: AudioSegmentationStrategy? = nil
     ) -> VoicePipelineManager {
         Task {
-            await events.publish(SDKVoiceEvent.pipelineCreated(config: config))
+            events.publish(SDKVoiceEvent.pipelineCreated(config: config))
         }
 
         return RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(config: config)
@@ -66,7 +66,7 @@ public extension RunAnywhere {
     ) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                await events.publish(SDKVoiceEvent.pipelineStarted(config: config))
+                events.publish(SDKVoiceEvent.pipelineStarted(config: config))
 
                 do {
                     // Create pipeline and process voice stream
@@ -75,16 +75,16 @@ public extension RunAnywhere {
 
                     for try await event in eventStream {
                         // Publish to event bus for transparency
-                        await events.publish(SDKVoiceEvent.pipelineEvent(event))
+                        events.publish(SDKVoiceEvent.pipelineEvent(event))
 
                         // Forward to caller
                         continuation.yield(event)
                     }
 
-                    await events.publish(SDKVoiceEvent.pipelineCompleted)
+                    events.publish(SDKVoiceEvent.pipelineCompleted)
                     continuation.finish()
                 } catch {
-                    await events.publish(SDKVoiceEvent.pipelineError(error))
+                    events.publish(SDKVoiceEvent.pipelineError(error))
                     continuation.finish(throwing: error)
                 }
             }

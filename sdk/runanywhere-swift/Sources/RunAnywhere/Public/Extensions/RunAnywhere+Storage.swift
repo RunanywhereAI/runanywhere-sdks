@@ -7,54 +7,54 @@ public extension RunAnywhere {
     /// Get storage information with event reporting
     /// - Returns: Storage information
     static func getStorageInfo() async -> StorageInfo {
-        await events.publish(SDKStorageEvent.infoRequested)
+        events.publish(SDKStorageEvent.infoRequested)
 
         // Use the storage analyzer service
         let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
         let storageInfo = await storageAnalyzer.analyzeStorage()
 
-        await events.publish(SDKStorageEvent.infoRetrieved(info: storageInfo))
+        events.publish(SDKStorageEvent.infoRetrieved(info: storageInfo))
         return storageInfo
     }
 
     /// Get stored models with event reporting
     /// - Returns: Array of stored models
     static func getStoredModels() async -> [StoredModel] {
-        await events.publish(SDKStorageEvent.modelsRequested)
+        events.publish(SDKStorageEvent.modelsRequested)
 
         // Get storage info which includes stored models
         let storageAnalyzer = RunAnywhere.serviceContainer.storageAnalyzer
         let storageInfo = await storageAnalyzer.analyzeStorage()
         let models = storageInfo.storedModels
 
-        await events.publish(SDKStorageEvent.modelsRetrieved(models: models))
+        events.publish(SDKStorageEvent.modelsRetrieved(models: models))
         return models
     }
 
     /// Clear cache with event reporting
     static func clearCache() async throws {
-        await events.publish(SDKStorageEvent.clearCacheStarted)
+        events.publish(SDKStorageEvent.clearCacheStarted)
 
         do {
             let fileManager = RunAnywhere.serviceContainer.fileManager
             try fileManager.clearCache()
-            await events.publish(SDKStorageEvent.clearCacheCompleted)
+            events.publish(SDKStorageEvent.clearCacheCompleted)
         } catch {
-            await events.publish(SDKStorageEvent.clearCacheFailed(error))
+            events.publish(SDKStorageEvent.clearCacheFailed(error))
             throw error
         }
     }
 
     /// Clean temporary files with event reporting
     static func cleanTempFiles() async throws {
-        await events.publish(SDKStorageEvent.cleanTempStarted)
+        events.publish(SDKStorageEvent.cleanTempStarted)
 
         do {
             let fileManager = RunAnywhere.serviceContainer.fileManager
             try fileManager.cleanTempFiles()
-            await events.publish(SDKStorageEvent.cleanTempCompleted)
+            events.publish(SDKStorageEvent.cleanTempCompleted)
         } catch {
-            await events.publish(SDKStorageEvent.cleanTempFailed(error))
+            events.publish(SDKStorageEvent.cleanTempFailed(error))
             throw error
         }
     }
@@ -62,14 +62,14 @@ public extension RunAnywhere {
     /// Delete stored model with event reporting
     /// - Parameter modelId: The model ID to delete
     static func deleteStoredModel(_ modelId: String) async throws {
-        await events.publish(SDKStorageEvent.deleteModelStarted(modelId: modelId))
+        events.publish(SDKStorageEvent.deleteModelStarted(modelId: modelId))
 
         do {
             let fileManager = RunAnywhere.serviceContainer.fileManager
             try fileManager.deleteModel(modelId: modelId)
-            await events.publish(SDKStorageEvent.deleteModelCompleted(modelId: modelId))
+            events.publish(SDKStorageEvent.deleteModelCompleted(modelId: modelId))
         } catch {
-            await events.publish(SDKStorageEvent.deleteModelFailed(modelId: modelId, error: error))
+            events.publish(SDKStorageEvent.deleteModelFailed(modelId: modelId, error: error))
             throw error
         }
     }

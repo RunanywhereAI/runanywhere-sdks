@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for analytics and telemetry
-public struct AnalyticsConfiguration: Codable {
+public struct AnalyticsConfiguration: Codable, Sendable {
     /// Whether analytics is enabled
     public var enabled: Bool
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Defines the level of analytics data collection
-public enum AnalyticsLevel: String, Codable, CaseIterable {
+public enum AnalyticsLevel: String, Codable, CaseIterable, Sendable {
     /// No analytics collection
     case none = "none"
 

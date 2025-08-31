@@ -8,7 +8,7 @@
 import Foundation
 
 /// Base protocol for all structured event data
-public protocol AnalyticsEventData: Codable {}
+public protocol AnalyticsEventData: Codable, Sendable {}
 
 // MARK: - Voice Event Data Models
 

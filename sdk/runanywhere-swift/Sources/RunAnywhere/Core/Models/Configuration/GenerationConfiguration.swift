@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for text generation behavior
-public struct GenerationConfiguration: Codable {
+public struct GenerationConfiguration: Codable, Sendable {
     /// Default generation settings
     public var defaults: DefaultGenerationSettings
 

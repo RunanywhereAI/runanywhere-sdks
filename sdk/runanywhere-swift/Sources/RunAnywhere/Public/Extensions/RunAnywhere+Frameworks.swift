@@ -11,7 +11,7 @@ public extension RunAnywhere {
         RunAnywhere.serviceContainer.adapterRegistry.register(adapter)
 
         Task {
-            await events.publish(SDKFrameworkEvent.adapterRegistered(
+            events.publish(SDKFrameworkEvent.adapterRegistered(
                 framework: adapter.framework,
                 name: String(describing: adapter)
             ))
@@ -22,13 +22,13 @@ public extension RunAnywhere {
     /// - Returns: Dictionary of registered adapters
     static func getRegisteredAdapters() -> [LLMFramework: UnifiedFrameworkAdapter] {
         Task {
-            await events.publish(SDKFrameworkEvent.adaptersRequested)
+            events.publish(SDKFrameworkEvent.adaptersRequested)
         }
 
         let adapters = RunAnywhere.serviceContainer.adapterRegistry.getRegisteredAdapters()
 
         Task {
-            await events.publish(SDKFrameworkEvent.adaptersRetrieved(count: adapters.count))
+            events.publish(SDKFrameworkEvent.adaptersRetrieved(count: adapters.count))
         }
 
         return adapters
@@ -38,13 +38,13 @@ public extension RunAnywhere {
     /// - Returns: Array of available frameworks
     static func getAvailableFrameworks() -> [LLMFramework] {
         Task {
-            await events.publish(SDKFrameworkEvent.frameworksRequested)
+            events.publish(SDKFrameworkEvent.frameworksRequested)
         }
 
         let frameworks = RunAnywhere.serviceContainer.adapterRegistry.getAvailableFrameworks()
 
         Task {
-            await events.publish(SDKFrameworkEvent.frameworksRetrieved(frameworks: frameworks))
+            events.publish(SDKFrameworkEvent.frameworksRetrieved(frameworks: frameworks))
         }
 
         return frameworks
@@ -54,13 +54,13 @@ public extension RunAnywhere {
     /// - Returns: Array of framework availability info
     static func getFrameworkAvailability() -> [FrameworkAvailability] {
         Task {
-            await events.publish(SDKFrameworkEvent.availabilityRequested)
+            events.publish(SDKFrameworkEvent.availabilityRequested)
         }
 
         let availability = RunAnywhere.serviceContainer.adapterRegistry.getFrameworkAvailability()
 
         Task {
-            await events.publish(SDKFrameworkEvent.availabilityRetrieved(availability: availability))
+            events.publish(SDKFrameworkEvent.availabilityRetrieved(availability: availability))
         }
 
         return availability
@@ -71,13 +71,13 @@ public extension RunAnywhere {
     /// - Returns: Array of models for the framework
     static func getModelsForFramework(_ framework: LLMFramework) -> [ModelInfo] {
         Task {
-            await events.publish(SDKFrameworkEvent.modelsForFrameworkRequested(framework: framework))
+            events.publish(SDKFrameworkEvent.modelsForFrameworkRequested(framework: framework))
         }
 
         let models = RunAnywhere.serviceContainer.modelRegistry.filterModels(by: ModelCriteria(framework: framework))
 
         Task {
-            await events.publish(SDKFrameworkEvent.modelsForFrameworkRetrieved(
+            events.publish(SDKFrameworkEvent.modelsForFrameworkRetrieved(
                 framework: framework,
                 models: models
             ))
@@ -91,13 +91,13 @@ public extension RunAnywhere {
     /// - Returns: Array of frameworks supporting the modality
     static func getFrameworks(for modality: FrameworkModality) -> [LLMFramework] {
         Task {
-            await events.publish(SDKFrameworkEvent.frameworksForModalityRequested(modality: modality))
+            events.publish(SDKFrameworkEvent.frameworksForModalityRequested(modality: modality))
         }
 
         let frameworks = RunAnywhere.serviceContainer.adapterRegistry.getFrameworks(for: modality)
 
         Task {
-            await events.publish(SDKFrameworkEvent.frameworksForModalityRetrieved(
+            events.publish(SDKFrameworkEvent.frameworksForModalityRetrieved(
                 modality: modality,
                 frameworks: frameworks
             ))
