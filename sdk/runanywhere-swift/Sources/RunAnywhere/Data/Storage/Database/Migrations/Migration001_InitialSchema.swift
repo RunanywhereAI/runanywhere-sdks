@@ -179,16 +179,12 @@ struct Migration001_InitialSchema {
 
         try db.create(table: "telemetry") { t in
             t.primaryKey("id", .text)
-            t.column("event_type", .text).notNull()
-            t.column("event_name", .text).notNull()
-            t.column("properties", .blob) // JSON: event properties
-            t.column("user_id", .text) // Anonymous user ID
-            t.column("session_id", .text)
-            t.column("device_info", .blob) // JSON: device model, OS version, etc.
-            t.column("sdk_version", .text).notNull()
+            t.column("eventType", .text).notNull()
+            t.column("properties", .blob).notNull() // JSON: event properties stored as Data
             t.column("timestamp", .datetime).notNull()
-            t.column("created_at", .datetime).notNull()
-            t.column("sync_pending", .boolean).notNull().defaults(to: true)
+            t.column("createdAt", .datetime).notNull()
+            t.column("updatedAt", .datetime).notNull()
+            t.column("syncPending", .boolean).notNull().defaults(to: true)
         }
 
         // MARK: - User Preferences Table
