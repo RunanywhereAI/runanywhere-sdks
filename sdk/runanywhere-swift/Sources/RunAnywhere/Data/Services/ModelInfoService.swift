@@ -13,6 +13,11 @@ public actor ModelInfoService {
     private let modelInfoRepository: any ModelInfoRepository
     private let syncCoordinator: SyncCoordinator?
 
+    /// Public access to the repository for advanced operations (like mock data population)
+    public var repository: any ModelInfoRepository {
+        return modelInfoRepository
+    }
+
     // MARK: - Initialization
 
     public init(modelInfoRepository: any ModelInfoRepository, syncCoordinator: SyncCoordinator?) {

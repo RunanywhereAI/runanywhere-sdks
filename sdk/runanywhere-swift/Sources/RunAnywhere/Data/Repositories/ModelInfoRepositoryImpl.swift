@@ -14,6 +14,7 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     // Data sources for model-specific operations
     private let remoteDataSource: RemoteModelInfoDataSource
     private let localDataSource: LocalModelInfoDataSource
+    private let mockDataSource: MockModelInfoDataSource
 
     // MARK: - Initialization
 
@@ -22,6 +23,7 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
         self.apiClient = apiClient
         self.remoteDataSource = RemoteModelInfoDataSource(apiClient: apiClient)
         self.localDataSource = LocalModelInfoDataSource(databaseManager: databaseManager)
+        self.mockDataSource = MockModelInfoDataSource()
     }
 
     // MARK: - Repository Protocol Implementation
@@ -76,6 +78,45 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     public func updateLastUsed(for modelId: String) async throws {
         try await localDataSource.updateLastUsed(modelId)
         logger.debug("Updated last used for model: \(modelId)")
+    }
+
+    // MARK: - Debug Support
+
+    /// Populate local database with mock models (debug only)
+    public func populateWithMockData() async throws {
+        guard EnvironmentConfiguration.current.environment.isDebug else {
+            logger.warning("Attempted to populate mock data in non-debug environment")
+            return
+        }
+
+        logger.info("Populating database with mock models...")
+
+        // Fetch mock models from mock data source
+        let mockModels = try await mockDataSource.fetchAll()
+
+        // Save each mock model to local storage
+        for model in mockModels {
+            try await save(model)
+        }
+
+        logger.info("Successfully populated database with \(mockModels.count) mock models")
+    }
+
+    /// Check if database needs to be populated with mock data
+    public func checkAndPopulateMockDataIfNeeded() async throws {
+        guard EnvironmentConfiguration.current.environment.isDebug else {
+            return
+        }
+
+        // Check if we already have models in the database
+        let existingModels = try await fetchAll()
+
+        if existingModels.isEmpty {
+            logger.info("No models found in database, populating with mock data...")
+            try await populateWithMockData()
+        } else {
+            logger.debug("Database already contains \(existingModels.count) models")
+        }
     }
 
 }
