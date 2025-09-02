@@ -18,7 +18,6 @@ class MemoryMonitor {
     func configure(memoryThreshold: Int64, criticalThreshold: Int64) {
         self.memoryThreshold = memoryThreshold
         self.criticalThreshold = criticalThreshold
-        thresholdWatcher?.configure(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
     }
 
     // MARK: - Configuration
