@@ -109,7 +109,6 @@ public class ServiceContainer {
         get async {
             if _syncCoordinator == nil {
                 _syncCoordinator = SyncCoordinator(
-                    apiClient: apiClient,
                     enableAutoSync: false // Disabled: No backend currently available
                 )
             }
@@ -373,5 +372,89 @@ public class ServiceContainer {
             )
             return defaultConfig
         }
+    }
+
+    /**
+     * Initialize SDK services for development mode (no API authentication)
+     *
+     * This method performs local-only SDK service initialization:
+     *
+     * 1. **Device Information**: Collect local device info
+     * 2. **Configuration Service**: Load configuration from defaults only
+     * 3. **Model Catalog**: Use mock model data
+     * 4. **Model Registry**: Initialize for model discovery and management
+     * 5. **Memory Management**: Configure memory thresholds
+     * 6. **Voice Services**: Initialize voice capability (optional)
+     * 7. **Analytics**: Setup with local-only tracking
+     *
+     * - Parameters:
+     *   - params: SDK initialization parameters
+     *
+     * - Returns: Loaded configuration data
+     * - Throws: SDKError if critical service initialization fails
+     */
+    public func bootstrapDevelopmentMode(with params: SDKInitParams) async throws -> ConfigurationData {
+        logger.info("🚀 Bootstrapping SDK in DEVELOPMENT mode")
+
+        // Step 1: Collect device information (local only)
+        logger.debug("Collecting device information")
+        let deviceInfoService = await self.deviceInfoService
+        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
+            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
+
+            // Log device summary for debugging
+            let summary = await deviceInfoService.getDeviceInfoSummary()
+            logger.info("Device Info:\n\(summary)")
+        }
+
+        // Step 2: Create default configuration (no API needed)
+        let defaultConfig = ConfigurationData(
+            id: "dev-\(UUID().uuidString)",
+            apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
+            source: .defaults
+        )
+
+        _configurationService = ConfigurationService(
+            configRepository: nil, // No repository in dev mode
+            syncCoordinator: nil // No sync in dev mode
+        )
+
+        EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
+        logger.info("Configuration loaded (source: defaults for development)")
+
+        // Step 3: Load mock model catalog
+        logger.debug("Loading mock model catalog")
+        let modelInfoService = await self.modelInfoService
+
+        // MockModelInfoDataSource will provide models in development mode
+        let storedModels = try? await modelInfoService.loadStoredModels()
+        if let models = storedModels {
+            logger.info("Mock model catalog loaded: \(models.count) models available")
+            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: models))
+        }
+
+        // Step 4: Initialize model registry
+        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+        logger.debug("Model registry initialized")
+
+        // Step 5: Configure memory management
+        memoryService.setMemoryThreshold(500_000_000) // 500MB default
+        logger.debug("Memory threshold configured")
+
+        // Step 6: Initialize optional voice services
+        do {
+            try await voiceCapabilityService.initialize()
+            logger.info("Voice capability service initialized")
+        } catch {
+            logger.warning("Voice service initialization failed (optional): \(error)")
+        }
+
+        // Step 7: Skip analytics initialization in development mode
+        logger.info("Analytics disabled in development mode")
+
+        logger.info("✅ Development mode bootstrap completed")
+
+        // Return the default configuration
+        return defaultConfig
     }
 }

@@ -4,11 +4,21 @@
 //
 //  Central logging coordination service
 //
+//  Current Implementation:
+//  - Uses Pulse for local debugging and development
+//  - Remote logging temporarily disabled pending service selection
+//
+//  Remote Logging Strategy:
+//  - Recommended: Sentry for production error tracking
+//  - Alternative: DataDog for enterprise integration
+//  - See RemoteLoggingService.swift for detailed recommendations
+//
 
 import Foundation
 import Pulse
 
 /// Centralized logging manager for the SDK
+/// Uses Pulse for local logging and prepares for remote service integration
 public class LoggingManager {
 
     // MARK: - Singleton
@@ -20,27 +30,26 @@ public class LoggingManager {
     /// Current logging configuration
     public private(set) var configuration = LoggingConfiguration()
 
-    /// Environment configuration
-    private let envConfig = EnvironmentConfiguration.current
+    /// SDK Environment
+    private let environment: SDKEnvironment
 
-    /// Pulse logger for local debugging
+    /// Pulse logger for local debugging and development
     private let pulseLogger = LoggerStore.shared
-
-    /// Remote logger for telemetry
-    private let remoteLogger = RemoteLogger()
-
-    /// Log batcher for efficient remote submission
-    private var logBatcher: LogBatcher?
 
     /// Lock for thread-safe configuration updates
     private let configLock = NSLock()
 
+    /// Logger for internal use
+    private let logger = SDKLogger(category: "LoggingManager")
+
     // MARK: - Initialization
 
     private init() {
+        // Get environment from RunAnywhere initialization
+        self.environment = RunAnywhere._currentEnvironment ?? .production
+
         // Apply environment-based configuration
         applyEnvironmentConfiguration()
-        setupBatcher()
     }
 
     // MARK: - Public Methods
@@ -52,12 +61,8 @@ public class LoggingManager {
 
         self.configuration = config
 
-        if config.enableRemoteLogging {
-            setupBatcher()
-            logBatcher?.updateConfiguration(config)
-        } else {
-            logBatcher = nil
-        }
+        // Remote logging configuration will be handled by external service
+        // when implemented (e.g., Sentry, DataDog, etc.)
     }
 
     /// Configure SDK logging endpoint (for SDK team debugging)
@@ -68,21 +73,24 @@ public class LoggingManager {
         configuration.remoteEndpoint = endpoint
         configuration.enableRemoteLogging = enabled && endpoint != nil
 
-        if configuration.enableRemoteLogging {
-            setupBatcher()
-        } else {
-            logBatcher = nil
-        }
+        // This will be replaced with external service configuration
+        // e.g., Sentry.configure(dsn: endpoint)
 
-        logger.info("SDK logging configured: \(enabled ? "enabled" : "disabled")")
+        // Log configuration change
+        let entry = LogEntry(
+            timestamp: Date(),
+            level: .info,
+            category: "LoggingManager",
+            message: "SDK logging configured: \(enabled ? "enabled" : "disabled")",
+            metadata: nil,
+            deviceInfo: nil
+        )
+        logToPulse(entry, isSensitive: false)
     }
 
     /// Log a message with the specified level and metadata
     internal func log(level: LogLevel, category: String, message: String, metadata: [String: Any]? = nil) {
-        // Check against environment minimum log level first
-        guard level >= envConfig.logging.minimumLogLevel else { return }
-
-        // Then check against SDK configuration
+        // Check against SDK configuration minimum log level
         guard level >= configuration.minLogLevel else { return }
 
         // Check if this contains sensitive data
@@ -104,31 +112,20 @@ public class LoggingManager {
         }
 
         // Remote logging - ONLY if not sensitive
-        if configuration.enableRemoteLogging && envConfig.logging.enableRemoteLogging && !isSensitive {
-            let sanitizedEntry = sanitizeForRemote(entry)
-            logBatcher?.add(sanitizedEntry)
+        // TODO: Integrate with external logging service (Sentry/DataDog/etc)
+        if configuration.enableRemoteLogging && !isSensitive {
+            // Will be implemented with external service
+            // e.g., Sentry.capture(event: entry)
         }
     }
 
     /// Force flush all pending logs
     public func flush() {
-        logBatcher?.flush()
+        // Will flush external service when implemented
+        // e.g., Sentry.flush()
     }
 
     // MARK: - Private Methods
-
-    private func setupBatcher() {
-        guard configuration.enableRemoteLogging else { return }
-
-        logBatcher = LogBatcher(configuration: configuration) { [weak self] logs in
-            guard let self = self,
-                  let endpoint = self.configuration.remoteEndpoint else { return }
-
-            Task {
-                await self.remoteLogger.submitLogs(logs, endpoint: endpoint)
-            }
-        }
-    }
 
     private func logToPulse(_ entry: LogEntry, isSensitive: Bool) {
         var pulseMetadata: [String: LoggerStore.MetadataValue] = [:]
@@ -228,14 +225,24 @@ public class LoggingManager {
         // Update SDK configuration based on environment
         var config = configuration
 
-        // Set minimum log level from environment
-        config.minLogLevel = envConfig.logging.minimumLogLevel
-
-        // Enable/disable remote logging based on environment
-        config.enableRemoteLogging = envConfig.logging.enableRemoteLogging
-
-        // Enable local logging based on environment console logging
-        config.enableLocalLogging = envConfig.logging.enableConsoleLogging || envConfig.logging.enableFileLogging
+        // Set defaults based on environment
+        switch environment {
+        case .development:
+            config.enableLocalLogging = true
+            config.enableRemoteLogging = false
+            config.minLogLevel = .debug
+            config.includeDeviceMetadata = false
+        case .staging:
+            config.enableLocalLogging = false
+            config.enableRemoteLogging = true
+            config.minLogLevel = .info
+            config.includeDeviceMetadata = true
+        case .production:
+            config.enableLocalLogging = false
+            config.enableRemoteLogging = true
+            config.minLogLevel = .warning
+            config.includeDeviceMetadata = true
+        }
 
         // Update configuration
         self.configuration = config
@@ -244,12 +251,12 @@ public class LoggingManager {
         configurePulse()
 
         // Log current environment for debugging
-        if envConfig.environment.isDebug {
+        if environment == .development {
             let entry = LogEntry(
                 timestamp: Date(),
                 level: .info,
                 category: "LoggingManager",
-                message: "🚀 Running in \(envConfig.environment.rawValue) environment - Remote: \(envConfig.logging.enableRemoteLogging), MinLevel: \(envConfig.logging.minimumLogLevel)",
+                message: "🚀 Running in \(environment.rawValue) environment - Remote: \(config.enableRemoteLogging), MinLevel: \(config.minLogLevel)",
                 metadata: nil,
                 deviceInfo: nil
             )

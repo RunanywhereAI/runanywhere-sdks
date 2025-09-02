@@ -5,6 +5,7 @@ import GRDB
 /// Implements both Repository for basic CRUD and ModelInfoRepository for model-specific operations
 public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     public typealias Entity = ModelInfo
+    public typealias RemoteDS = RemoteModelInfoDataSource
 
     // Core dependencies
     private let databaseManager: DatabaseManager
@@ -12,16 +13,21 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
     private let logger = SDKLogger(category: "ModelInfoRepository")
 
     // Data sources for model-specific operations
-    private let remoteDataSource: RemoteModelInfoDataSource
+    private let _remoteDataSource: RemoteModelInfoDataSource
     private let localDataSource: LocalModelInfoDataSource
     private let mockDataSource: MockModelInfoDataSource
+
+    // Expose remote data source for sync coordinator
+    public nonisolated var remoteDataSource: RemoteModelInfoDataSource? {
+        return _remoteDataSource
+    }
 
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
-        self.remoteDataSource = RemoteModelInfoDataSource(apiClient: apiClient)
+        self._remoteDataSource = RemoteModelInfoDataSource(apiClient: apiClient)
         self.localDataSource = LocalModelInfoDataSource(databaseManager: databaseManager)
         self.mockDataSource = MockModelInfoDataSource()
     }
@@ -84,7 +90,8 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
 
     /// Populate local database with mock models (debug only)
     public func populateWithMockData() async throws {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             logger.warning("Attempted to populate mock data in non-debug environment")
             return
         }
@@ -104,7 +111,8 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
 
     /// Check if database needs to be populated with mock data
     public func checkAndPopulateMockDataIfNeeded() async throws {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             return
         }
 

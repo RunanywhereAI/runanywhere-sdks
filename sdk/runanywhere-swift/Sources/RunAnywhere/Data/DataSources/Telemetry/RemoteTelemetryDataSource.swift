@@ -78,6 +78,47 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
         )
     }
 
+    // MARK: - Sync Support
+
+    public func syncBatch(_ batch: [TelemetryData]) async throws -> [String] {
+        guard let apiClient = apiClient else {
+            throw DataSourceError.notAvailable
+        }
+
+        logger.info("Syncing \(batch.count) telemetry items")
+
+        var syncedIds: [String] = []
+
+        // For telemetry, we can batch sync using POST to the regular endpoint
+        // Since telemetry is typically high-volume, we send in batches
+        struct TelemetryBatch: Encodable {
+            let events: [TelemetryData]
+            let deviceId: String
+            let timestamp: Date
+        }
+
+        let telemetryBatch = TelemetryBatch(
+            events: batch,
+            deviceId: PersistentDeviceIdentity.getPersistentDeviceUUID(),
+            timestamp: Date()
+        )
+
+        do {
+            // Use regular POST to telemetry endpoint with batch
+            let _: [String: Bool] = try await apiClient.post(
+                .telemetry,
+                telemetryBatch,
+                requiresAuth: true
+            )
+            syncedIds = batch.map { $0.id }
+            logger.info("Successfully synced batch of \(batch.count) telemetry items")
+        } catch {
+            logger.error("Failed to sync telemetry batch: \(error)")
+        }
+
+        return syncedIds
+    }
+
     public func testConnection() async throws -> Bool {
         guard apiClient != nil else {
             return false

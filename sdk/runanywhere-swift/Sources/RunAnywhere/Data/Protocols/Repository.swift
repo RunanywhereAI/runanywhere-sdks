@@ -4,6 +4,7 @@ import Foundation
 /// Minimal interface - sync handled by SyncCoordinator
 public protocol Repository {
     associatedtype Entity: Codable
+    associatedtype RemoteDS: RemoteDataSource where RemoteDS.Entity == Entity
 
     // MARK: - Core CRUD Operations
 
@@ -11,6 +12,11 @@ public protocol Repository {
     func fetch(id: String) async throws -> Entity?
     func fetchAll() async throws -> [Entity]
     func delete(id: String) async throws
+
+    // MARK: - Sync Support
+
+    /// Get the remote data source for syncing
+    var remoteDataSource: RemoteDS? { get }
 }
 
 /// Extension for repositories with RepositoryEntity entities

@@ -86,7 +86,11 @@ struct RunAnywhereAIApp: App {
             logger.info("🚀 Starting SDK initialization...")
             logger.debug("📋 Configuration: API Key: demo-api-key...")
 
-            try await RunAnywhere.initialize(apiKey: "demo-api-key")
+            try await RunAnywhere.initialize(
+                apiKey: "demo-api-key",
+                baseURL: "https://api.runanywhere.ai",
+                environment: .development
+            )
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized!")

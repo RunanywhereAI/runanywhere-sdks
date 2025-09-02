@@ -8,42 +8,42 @@
 import Foundation
 
 /// Centralized logging utility with sensitive data protection
-internal struct SDKLogger {
+public struct SDKLogger {
     private let category: String
 
-    init(category: String = "SDK") {
+    public init(category: String = "SDK") {
         self.category = category
     }
 
     // MARK: - Standard Logging Methods
 
     /// Log a debug message
-    func debug(_ message: String, metadata: [String: Any]? = nil) {
+    public func debug(_ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: .debug, category: category, message: message, metadata: metadata)
     }
 
     /// Log an info message
-    func info(_ message: String, metadata: [String: Any]? = nil) {
+    public func info(_ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: .info, category: category, message: message, metadata: metadata)
     }
 
     /// Log a warning message
-    func warning(_ message: String, metadata: [String: Any]? = nil) {
+    public func warning(_ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: .warning, category: category, message: message, metadata: metadata)
     }
 
     /// Log an error message
-    func error(_ message: String, metadata: [String: Any]? = nil) {
+    public func error(_ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: .error, category: category, message: message, metadata: metadata)
     }
 
     /// Log a fault message
-    func fault(_ message: String, metadata: [String: Any]? = nil) {
+    public func fault(_ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: .fault, category: category, message: message, metadata: metadata)
     }
 
     /// Log a message with a specific level
-    func log(level: LogLevel, _ message: String, metadata: [String: Any]? = nil) {
+    public func log(level: LogLevel, _ message: String, metadata: [String: Any]? = nil) {
         LoggingManager.shared.log(level: level, category: category, message: message, metadata: metadata)
     }
 
@@ -102,55 +102,6 @@ internal struct SDKLogger {
             metadata: enrichedMetadata
         )
     }
-
-    /* Commented out until GenerationPerformance type is defined
-    /// Log generation performance
-    func logGenerationPerformance(_ performance: GenerationPerformance) {
-        var metadata: [String: Any] = [
-            "timeToFirstToken": performance.timeToFirstToken,
-            "totalGenerationTime": performance.totalGenerationTime,
-            "inputTokens": performance.inputTokens,
-            "outputTokens": performance.outputTokens,
-            "tokensPerSecond": performance.tokensPerSecond,
-            "modelId": performance.modelId,
-            "executionTarget": performance.executionTarget.rawValue,
-            "type": "generation_performance"
-        ]
-
-        if !performance.routingFramework.isEmpty {
-            metadata["routingFramework"] = performance.routingFramework
-        }
-
-        LoggingManager.shared.log(
-            level: .info,
-            category: "\(category).Performance",
-            message: "Generation: TTFT=\(performance.timeToFirstToken)s Total=\(performance.totalGenerationTime)s TPS=\(performance.tokensPerSecond)",
-            metadata: metadata
-        )
-    }
-    */
-
-    /* Commented out until PerformanceAlert type is defined
-    /// Log performance alert
-    func logPerformanceAlert(_ alert: PerformanceAlert) {
-        let metadata: [String: Any] = [
-            "alertId": alert.id.uuidString,
-            "alertType": String(describing: alert.type),
-            "severity": String(describing: alert.severity),
-            "message": alert.message,
-            "type": "performance_alert"
-        ]
-
-        LoggingManager.shared.log(
-            level: .warning,
-            category: "\(category).Alert",
-            message: "Performance Alert: \(alert.message)",
-            metadata: metadata
-        )
-    }
-    */
-
-    // MARK: - Helper Methods
 
     private func sanitizeMessage(_ message: String, category: SensitiveDataCategory) -> String {
         let policy = category.defaultPolicy

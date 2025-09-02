@@ -1,13 +1,15 @@
 import Foundation
 
-/// Hardware configuration for framework adapters
+/// Simplified hardware configuration for framework adapters
 public struct HardwareConfiguration: Codable, Sendable {
+    /// Primary hardware accelerator to use (auto will select best available)
     public var primaryAccelerator: HardwareAcceleration = .auto
-    public var fallbackAccelerator: HardwareAcceleration? = .cpu
+
+    /// Memory management mode
     public var memoryMode: MemoryMode = .balanced
+
+    /// Number of CPU threads to use for processing
     public var threadCount: Int = ProcessInfo.processInfo.processorCount
-    public var useQuantization: Bool = false
-    public var quantizationBits: Int = 8
 
     public enum MemoryMode: String, Codable, Sendable {
         case conservative = "conservative"
@@ -17,17 +19,11 @@ public struct HardwareConfiguration: Codable, Sendable {
 
     public init(
         primaryAccelerator: HardwareAcceleration = .auto,
-        fallbackAccelerator: HardwareAcceleration? = .cpu,
         memoryMode: MemoryMode = .balanced,
-        threadCount: Int = ProcessInfo.processInfo.processorCount,
-        useQuantization: Bool = false,
-        quantizationBits: Int = 8
+        threadCount: Int = ProcessInfo.processInfo.processorCount
     ) {
         self.primaryAccelerator = primaryAccelerator
-        self.fallbackAccelerator = fallbackAccelerator
         self.memoryMode = memoryMode
         self.threadCount = threadCount
-        self.useQuantization = useQuantization
-        self.quantizationBits = quantizationBits
     }
 }

@@ -62,6 +62,10 @@ public protocol RemoteDataSource: DataSource {
 
     /// Test network connectivity and authentication
     func testConnection() async throws -> Bool
+
+    /// Sync a batch of entities to the remote source
+    /// Returns successfully synced entity IDs
+    func syncBatch(_ batch: [Entity]) async throws -> [String]
 }
 
 /// Protocol for local data sources that store data locally (database, file system, etc.)

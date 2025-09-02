@@ -3,7 +3,8 @@ import Foundation
 /// Watches memory thresholds and triggers callbacks when crossed
 class ThresholdWatcher {
     private let logger: SDKLogger = SDKLogger(category: "ThresholdWatcher")
-    private var config: MemoryService.Config = MemoryService.Config()
+    private var memoryThreshold: Int64 = 500_000_000 // 500MB
+    private var criticalThreshold: Int64 = 200_000_000 // 200MB
     private weak var memoryMonitor: MemoryMonitor?
 
     // Threshold state tracking
@@ -22,8 +23,9 @@ class ThresholdWatcher {
         }
     }
 
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
+    func configure(memoryThreshold: Int64, criticalThreshold: Int64) {
+        self.memoryThreshold = memoryThreshold
+        self.criticalThreshold = criticalThreshold
     }
 
     func setMemoryMonitor(_ monitor: MemoryMonitor) {
@@ -78,7 +80,7 @@ class ThresholdWatcher {
     }
 
     func checkThreshold(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(for: config)
+        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
         let currentState = thresholdStates[threshold] ?? false
         let hysteresisBuffer = Int64(Double(thresholdValue) * thresholdHysteresis)
 
@@ -106,7 +108,7 @@ class ThresholdWatcher {
     // MARK: - Threshold Events
 
     private func handleThresholdCrossed(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(for: config)
+        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
         let availableString = ByteCountFormatter.string(fromByteCount: stats.availableMemory, countStyle: .memory)
         let thresholdString = ByteCountFormatter.string(fromByteCount: thresholdValue, countStyle: .memory)
 
@@ -128,7 +130,7 @@ class ThresholdWatcher {
     }
 
     private func handleThresholdUncrossed(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(for: config)
+        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
         let availableString = ByteCountFormatter.string(fromByteCount: stats.availableMemory, countStyle: .memory)
         let thresholdString = ByteCountFormatter.string(fromByteCount: thresholdValue, countStyle: .memory)
 
@@ -161,7 +163,7 @@ class ThresholdWatcher {
     func getThresholdMargin(_ threshold: MemoryThreshold) -> Int64? {
         guard let monitor = memoryMonitor else { return nil }
 
-        let thresholdValue = threshold.threshold(for: config)
+        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
         let availableMemory = monitor.getAvailableMemory()
 
         return availableMemory - thresholdValue

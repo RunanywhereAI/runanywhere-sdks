@@ -5,70 +5,23 @@ import UIKit
 import AppKit
 #endif
 
-/// Monitors system memory usage and provides real-time statistics
+/// Provides memory usage statistics on-demand
 class MemoryMonitor {
     private let logger: SDKLogger = SDKLogger(category: "MemoryMonitor")
-    private var monitoringTimer: Timer?
-    private var thresholdWatcher: ThresholdWatcher?
-    private var isMonitoring: Bool = false
-    private var config: MemoryService.Config = MemoryService.Config()
-
-    // Monitoring callbacks
-    private var statisticsCallback: ((MemoryMonitoringStats) -> Void)?
-    private var thresholdCallbacks: [MemoryThreshold: () -> Void] = [:]
+    private var memoryThreshold: Int64 = 500_000_000 // 500MB
+    private var criticalThreshold: Int64 = 200_000_000 // 200MB
 
     init() {
-        thresholdWatcher = ThresholdWatcher()
-        setupThresholdWatcher()
+        // Simple init - no monitoring tasks
     }
 
-    deinit {
-        stopMonitoring()
+    func configure(memoryThreshold: Int64, criticalThreshold: Int64) {
+        self.memoryThreshold = memoryThreshold
+        self.criticalThreshold = criticalThreshold
+        thresholdWatcher?.configure(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
     }
 
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
-        thresholdWatcher?.configure(config)
-    }
-
-    // MARK: - Monitoring Control
-
-    func startMonitoring(callback: @escaping (MemoryMonitoringStats) -> Void) {
-        guard !isMonitoring else {
-            logger.warning("Memory monitoring already active")
-            return
-        }
-
-        statisticsCallback = callback
-        isMonitoring = true
-
-        logger.info("Starting memory monitoring with \(config.monitoringInterval)s interval")
-
-        monitoringTimer = Timer.scheduledTimer(withTimeInterval: config.monitoringInterval, repeats: true) { [weak self] _ in
-            self?.performMonitoringCheck()
-        }
-
-        thresholdWatcher?.startWatching()
-
-        // Perform initial check
-        performMonitoringCheck()
-    }
-
-    func stopMonitoring() {
-        guard isMonitoring else { return }
-
-        isMonitoring = false
-        monitoringTimer?.invalidate()
-        monitoringTimer = nil
-        thresholdWatcher?.stopWatching()
-
-        logger.info("Stopped memory monitoring")
-    }
-
-    func setThresholdCallback(threshold: MemoryThreshold, callback: @escaping () -> Void) {
-        thresholdCallbacks[threshold] = callback
-        thresholdWatcher?.setThresholdCallback(threshold: threshold, callback: callback)
-    }
+    // MARK: - Configuration
 
     // MARK: - Memory Information
 
@@ -118,9 +71,9 @@ class MemoryMonitor {
     func getMemoryPressureLevel() -> MemoryPressureLevel? {
         let available = getAvailableMemory()
 
-        if available < config.criticalThreshold {
+        if available < criticalThreshold {
             return .critical
-        } else if available < config.memoryThreshold {
+        } else if available < memoryThreshold {
             return .warning
         }
 
@@ -133,13 +86,18 @@ class MemoryMonitor {
         let usedMemory = getUsedMemory()
         let pressureLevel = getMemoryPressureLevel()
 
-        return MemoryMonitoringStats(
+        let stats = MemoryMonitoringStats(
             totalMemory: totalMemory,
             availableMemory: availableMemory,
             usedMemory: usedMemory,
             pressureLevel: pressureLevel,
             timestamp: Date()
         )
+
+        // Record stats for history/trends
+        recordStats(stats)
+
+        return stats
     }
 
     // MARK: - Memory Trends
@@ -182,27 +140,17 @@ class MemoryMonitor {
 
     // MARK: - Private Implementation
 
-    private func performMonitoringCheck() {
-        let stats = getCurrentStats()
-
-        // Store in history
+    private func recordStats(_ stats: MemoryMonitoringStats) {
+        // Store in history for trend analysis
         memoryHistory.append(stats)
         if memoryHistory.count > maxHistoryEntries {
             memoryHistory.removeFirst()
         }
 
-        // Log memory status
-        logMemoryStatus(stats)
-
-        // Notify callback
-        statisticsCallback?(stats)
-
-        // Check thresholds
-        thresholdWatcher?.checkThresholds(stats: stats)
-    }
-
-    private func setupThresholdWatcher() {
-        thresholdWatcher?.setMemoryMonitor(self)
+        // Log if there's memory pressure
+        if stats.pressureLevel != nil {
+            logMemoryStatus(stats)
+        }
     }
 
     private func logMemoryStatus(_ stats: MemoryMonitoringStats) {
@@ -283,16 +231,16 @@ enum MemoryThreshold: CaseIterable {
     case low
     case veryLow
 
-    func threshold(for config: MemoryService.Config) -> Int64 {
+    func threshold(memoryThreshold: Int64, criticalThreshold: Int64) -> Int64 {
         switch self {
         case .warning:
-            return config.memoryThreshold
+            return memoryThreshold
         case .critical:
-            return config.criticalThreshold
+            return criticalThreshold
         case .low:
-            return config.memoryThreshold / 2
+            return memoryThreshold / 2
         case .veryLow:
-            return config.criticalThreshold / 2
+            return criticalThreshold / 2
         }
     }
 }

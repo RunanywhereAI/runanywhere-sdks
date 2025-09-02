@@ -10,7 +10,7 @@ class PressureHandler {
     private let logger: SDKLogger = SDKLogger(category: "PressureHandler")
     private var evictionHandler: CacheEviction?
     private var memoryPressureObserver: NSObjectProtocol?
-    private var config: MemoryService.Config = MemoryService.Config()
+    private var memoryThreshold: Int64 = 500_000_000 // 500MB
 
     init() {
         setupSystemPressureHandling()
@@ -22,8 +22,8 @@ class PressureHandler {
         }
     }
 
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
+    func configure(memoryThreshold: Int64) {
+        self.memoryThreshold = memoryThreshold
     }
 
     func setEvictionHandler(_ handler: CacheEviction) {
@@ -176,11 +176,11 @@ class PressureHandler {
         case .low, .medium:
             return 0
         case .high:
-            return config.memoryThreshold / 2
+            return memoryThreshold / 2
         case .warning:
-            return config.memoryThreshold
+            return memoryThreshold
         case .critical:
-            return config.memoryThreshold * 2
+            return memoryThreshold * 2
         }
     }
 

@@ -233,11 +233,13 @@ public actor MockModelInfoDataSource: RemoteDataSource {
     // MARK: - DataSource Protocol
 
     public func isAvailable() async -> Bool {
-        return EnvironmentConfiguration.current.environment.isDebug
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        return environment == .development
     }
 
     public func validateConfiguration() async throws {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             throw DataSourceError.networkUnavailable
         }
     }
@@ -245,7 +247,8 @@ public actor MockModelInfoDataSource: RemoteDataSource {
     // MARK: - RemoteDataSource Protocol
 
     public func fetch(id: String) async throws -> ModelInfo? {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             throw DataSourceError.networkUnavailable
         }
 
@@ -259,7 +262,8 @@ public actor MockModelInfoDataSource: RemoteDataSource {
     }
 
     public func fetchAll(filter: [String: Any]? = nil) async throws -> [ModelInfo] {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             throw DataSourceError.networkUnavailable
         }
 
@@ -272,7 +276,8 @@ public actor MockModelInfoDataSource: RemoteDataSource {
     }
 
     public func save(_ entity: ModelInfo) async throws -> ModelInfo {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             throw DataSourceError.networkUnavailable
         }
 
@@ -285,7 +290,8 @@ public actor MockModelInfoDataSource: RemoteDataSource {
     }
 
     public func delete(id: String) async throws {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             throw DataSourceError.networkUnavailable
         }
 
@@ -296,8 +302,17 @@ public actor MockModelInfoDataSource: RemoteDataSource {
         }
     }
 
+    // MARK: - Sync Support
+
+    public func syncBatch(_ batch: [ModelInfo]) async throws -> [String] {
+        // Mock implementation - just return all IDs as successfully synced
+        logger.debug("Mock sync for \(batch.count) model info items")
+        return batch.map { $0.id }
+    }
+
     public func testConnection() async throws -> Bool {
-        guard EnvironmentConfiguration.current.environment.isDebug else {
+        let environment = RunAnywhere._currentEnvironment ?? .production
+        guard environment == .development else {
             return false
         }
 

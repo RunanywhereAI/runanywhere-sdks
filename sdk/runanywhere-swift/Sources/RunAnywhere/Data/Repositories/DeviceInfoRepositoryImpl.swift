@@ -5,6 +5,7 @@ import GRDB
 /// Implements both Repository for basic CRUD and DeviceInfoRepository for device-specific operations
 public actor DeviceInfoRepositoryImpl: Repository, DeviceInfoRepository {
     public typealias Entity = DeviceInfoData
+    public typealias RemoteDS = RemoteDeviceInfoDataSource
 
     // Core dependencies
     private let databaseManager: DatabaseManager
@@ -12,15 +13,20 @@ public actor DeviceInfoRepositoryImpl: Repository, DeviceInfoRepository {
     private let logger = SDKLogger(category: "DeviceInfoRepository")
 
     // Data sources for device-specific operations
-    private let remoteDataSource: RemoteDeviceInfoDataSource
+    private let _remoteDataSource: RemoteDeviceInfoDataSource
     private let localDataSource: LocalDeviceInfoDataSource
+
+    // Expose remote data source for sync coordinator
+    public nonisolated var remoteDataSource: RemoteDeviceInfoDataSource? {
+        return _remoteDataSource
+    }
 
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
-        self.remoteDataSource = RemoteDeviceInfoDataSource(apiClient: apiClient)
+        self._remoteDataSource = RemoteDeviceInfoDataSource(apiClient: apiClient)
         self.localDataSource = LocalDeviceInfoDataSource(databaseManager: databaseManager)
     }
 

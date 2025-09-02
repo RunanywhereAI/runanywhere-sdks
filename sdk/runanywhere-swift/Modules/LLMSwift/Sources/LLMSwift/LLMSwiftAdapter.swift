@@ -37,7 +37,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
         guard modality == .textToText else {
             throw SDKError.unsupportedModality(modality.rawValue)
         }
-        logger.info("Loading model: \(model.name) (ID: \(model.id))")
+        logger.info("Loading model: \(model.name)")
 
         guard let localPath = model.localPath else {
             logger.error("Model has no local path - not downloaded")
@@ -48,11 +48,10 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
             )
         }
 
-        logger.debugSensitive("Model local path: \(localPath.path)", category: .modelPath)
-        logger.info("Creating LLMSwiftService")
+        logger.debug("Creating LLMSwiftService with model path")
 
         let service = LLMSwiftService(hardwareConfig: hardwareConfig)
-        logger.info("Initializing service with model path")
+        logger.debug("Initializing service with model")
         try await service.initialize(modelPath: localPath.path)
         logger.info("Service initialized successfully")
         return service
@@ -85,11 +84,8 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
         return HardwareConfiguration(
             primaryAccelerator: preferredAccelerator,
-            fallbackAccelerator: .cpu,
             memoryMode: .balanced,
-            threadCount: 4,
-            useQuantization: true,
-            quantizationBits: 4
+            threadCount: 4
         )
     }
 
