@@ -50,6 +50,21 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
         // Only send telemetry in production
         self == .production
     }
+
+    /// Should use mock data sources
+    public var useMockData: Bool {
+        self == .development
+    }
+
+    /// Should sync with backend
+    public var shouldSyncWithBackend: Bool {
+        self != .development
+    }
+
+    /// Requires API authentication
+    public var requiresAuthentication: Bool {
+        self != .development
+    }
 }
 
 /// SDK initialization parameters
@@ -57,20 +72,20 @@ public struct SDKInitParams {
     /// API key for authentication
     public let apiKey: String
 
-    /// Base URL for API requests
-    public let baseURL: URL
+    /// Base URL for API requests (optional for development mode)
+    public let baseURL: URL?
 
     /// Environment mode (development/staging/production)
     public let environment: SDKEnvironment
 
     /// Create initialization parameters
     /// - Parameters:
-    ///   - apiKey: Your RunAnywhere API key
-    ///   - baseURL: Base URL for API requests
+    ///   - apiKey: Your RunAnywhere API key (can be empty for development)
+    ///   - baseURL: Base URL for API requests (optional for development)
     ///   - environment: Environment mode (default: production)
     public init(
         apiKey: String,
-        baseURL: URL,
+        baseURL: URL? = nil,
         environment: SDKEnvironment = .production
     ) {
         self.apiKey = apiKey
@@ -93,5 +108,11 @@ public struct SDKInitParams {
             throw SDKError.validationFailed("Invalid base URL: \(baseURL)")
         }
         self.init(apiKey: apiKey, baseURL: url, environment: environment)
+    }
+
+    /// Development mode initializer (no URL required)
+    /// - Parameter apiKey: Optional API key for development
+    public static func development(apiKey: String = "dev-mode") -> SDKInitParams {
+        SDKInitParams(apiKey: apiKey, baseURL: nil, environment: .development)
     }
 }

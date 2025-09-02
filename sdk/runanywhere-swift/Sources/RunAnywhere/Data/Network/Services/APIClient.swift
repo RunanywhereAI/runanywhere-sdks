@@ -1,8 +1,9 @@
 import Foundation
 import Pulse
 
-/// Simple API client for backend operations
-public actor APIClient {
+/// Production API client for backend operations
+/// Implements NetworkService protocol for real network calls
+public actor APIClient: NetworkService {
     private let baseURL: URL
     private let apiKey: String
     private var authService: AuthenticationService?
@@ -42,12 +43,14 @@ public actor APIClient {
         self.authService = authService
     }
 
-    /// Perform a POST request
-    public func post<T: Encodable, R: Decodable>(
+    // MARK: - NetworkService Protocol Implementation
+
+    /// Perform a raw POST request
+    public func postRaw(
         _ endpoint: APIEndpoint,
-        _ payload: T,
-        requiresAuth: Bool = true
-    ) async throws -> R {
+        _ payload: Data,
+        requiresAuth: Bool
+    ) async throws -> Data {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
@@ -61,7 +64,7 @@ public actor APIClient {
         let url = baseURL.appendingPathComponent(endpoint.path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.httpBody = try JSONEncoder().encode(payload)
+        request.httpBody = payload
 
         // Set authorization header
         if let token = token {
@@ -89,14 +92,14 @@ public actor APIClient {
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
-        return try JSONDecoder().decode(R.self, from: data)
+        return data
     }
 
-    /// Perform a GET request
-    public func get<R: Decodable>(
+    /// Perform a raw GET request
+    public func getRaw(
         _ endpoint: APIEndpoint,
-        requiresAuth: Bool = true
-    ) async throws -> R {
+        requiresAuth: Bool
+    ) async throws -> Data {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
@@ -134,6 +137,6 @@ public actor APIClient {
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
-        return try JSONDecoder().decode(R.self, from: data)
+        return data
     }
 }
