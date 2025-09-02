@@ -56,33 +56,6 @@ extension RunAnywhere {
         // We could make them configurable if needed
     }
 
-    // MARK: - Telemetry Consent
-
-    /// Update telemetry consent preference
-    /// - Parameter consent: New consent level
-    public static func updateTelemetryConsent(_ consent: TelemetryConsent) {
-        guard var config = _configurationData else {
-            SDKLogger(category: "RunAnywhere").warning("Cannot update telemetry consent - SDK not initialized")
-            return
-        }
-
-        config.telemetry.consent = consent
-        _configurationData = config
-
-        // Apply consent to both logging and analytics
-        switch consent {
-        case .denied:
-            // Disable all remote data collection
-            LoggingManager.shared.configureSDKLogging(endpoint: nil, enabled: false)
-        case .limited:
-            // Only errors and critical events
-            setLogLevel(.error)
-        case .granted:
-            // Full telemetry
-            setLogLevel(.info)
-        }
-    }
-
     // MARK: - Debugging Helpers
 
     /// Enable verbose debugging mode

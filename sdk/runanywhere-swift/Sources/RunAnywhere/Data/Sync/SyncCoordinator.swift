@@ -9,7 +9,6 @@ import Foundation
 
 /// Centralized coordinator for syncing data between local storage and remote API
 public actor SyncCoordinator {
-    private let apiClient: APIClient?
     private let logger = SDKLogger(category: "SyncCoordinator")
 
     // Configuration
@@ -22,16 +21,14 @@ public actor SyncCoordinator {
 
     // MARK: - Initialization
 
-    public init(apiClient: APIClient?, enableAutoSync: Bool = false) {
-        self.apiClient = apiClient
-
-        if enableAutoSync && apiClient != nil {
+    public init(enableAutoSync: Bool = false) {
+        if enableAutoSync {
             Task {
                 await startAutoSync()
             }
         }
 
-        logger.info("SyncCoordinator initialized")
+        // SyncCoordinator initialized
     }
 
     deinit {
@@ -41,7 +38,8 @@ public actor SyncCoordinator {
     // MARK: - Generic Sync Methods
 
     /// Sync any repository with RepositoryEntity entities
-    public func sync<R: Repository>(_ repository: R, endpoint: APIEndpoint? = nil) async throws where R.Entity: RepositoryEntity {
+    /// Uses the repository's remote data source to handle the actual sync
+    public func sync<R: Repository>(_ repository: R) async throws where R.Entity: RepositoryEntity {
         let typeName = String(describing: R.Entity.self)
 
         guard !activeSyncs.contains(typeName) else {
@@ -49,15 +47,16 @@ public actor SyncCoordinator {
             return
         }
 
-        guard apiClient != nil else {
-            logger.debug("No API client available for sync")
+        // Check if remote data source is available
+        guard let remoteDataSource = repository.remoteDataSource else {
+            logger.debug("No remote data source available for \(typeName)")
             return
         }
 
         activeSyncs.insert(typeName)
         defer { activeSyncs.remove(typeName) }
 
-        // Fetch pending items
+        // Fetch pending items from repository
         let pending = try await repository.fetchPendingSync()
         guard !pending.isEmpty else {
             logger.debug("No pending items to sync for \(typeName)")
@@ -66,61 +65,38 @@ public actor SyncCoordinator {
 
         logger.info("Syncing \(pending.count) \(typeName) items")
 
+        var successCount = 0
+        var failedIds: [String] = []
+
         // Process in batches
         for batch in pending.chunked(into: batchSize) {
-            try await syncBatch(batch, repository: repository, endpoint: endpoint)
+            do {
+                // Use the remote data source to sync
+                let syncedIds = try await remoteDataSource.syncBatch(batch)
+
+                // Mark successfully synced items
+                if !syncedIds.isEmpty {
+                    try await repository.markSynced(syncedIds)
+                    successCount += syncedIds.count
+                }
+
+                // Track any that didn't sync
+                let batchIds = Set(batch.map { $0.id })
+                let failedInBatch = batchIds.subtracting(syncedIds)
+                failedIds.append(contentsOf: failedInBatch)
+
+            } catch {
+                logger.error("Failed to sync batch: \(error)")
+                failedIds.append(contentsOf: batch.map { $0.id })
+            }
         }
-    }
 
-    /// Sync a specific batch of entities
-    private func syncBatch<R: Repository>(
-        _ batch: [R.Entity],
-        repository: R,
-        endpoint: APIEndpoint?
-    ) async throws where R.Entity: RepositoryEntity {
-
-        guard let apiClient = apiClient else {
-            throw SyncError.noAPIClient
+        if successCount > 0 {
+            logger.info("Successfully synced \(successCount) \(typeName) items")
         }
 
-        // Determine endpoint based on entity type
-        let syncEndpoint = endpoint ?? getDefaultEndpoint(for: R.Entity.self)
-
-        do {
-            // Create generic sync request
-            let requestData = try JSONEncoder().encode(batch)
-            let requestDict: [String: Any] = [
-                "items": try JSONSerialization.jsonObject(with: requestData),
-                "timestamp": Date().timeIntervalSince1970
-            ]
-
-            // For now, just mark as synced since we don't have real API
-            // In production, this would make the actual API call
-            let ids = batch.map { $0.id }
-            try await repository.markSynced(ids)
-            logger.debug("Synced \(ids.count) items to endpoint: \(syncEndpoint)")
-
-        } catch {
-            logger.error("Sync batch failed: \(error)")
-            throw SyncError.batchSyncFailed(error)
-        }
-    }
-
-    // MARK: - Endpoint Resolution
-
-    private func getDefaultEndpoint<T: RepositoryEntity>(for type: T.Type) -> APIEndpoint {
-        switch type {
-        case is ConfigurationData.Type:
-            return .syncConfiguration
-        case is TelemetryData.Type:
-            return .syncTelemetry
-        case is ModelInfo.Type:
-            return .syncModelInfo
-        case is DeviceInfoData.Type:
-            return .syncDeviceInfo
-        default:
-            // Fallback - should not happen in practice
-            return .syncConfiguration
+        if !failedIds.isEmpty {
+            logger.warning("Failed to sync \(failedIds.count) \(typeName) items")
         }
     }
 
@@ -163,16 +139,10 @@ public actor SyncCoordinator {
 // MARK: - Error Types
 
 enum SyncError: LocalizedError {
-    case batchSyncFailed(Error)
-    case noAPIClient
     case syncInProgress
 
     var errorDescription: String? {
         switch self {
-        case .batchSyncFailed(let error):
-            return "Batch sync failed: \(error.localizedDescription)"
-        case .noAPIClient:
-            return "No API client available for sync"
         case .syncInProgress:
             return "Sync already in progress"
         }

@@ -26,9 +26,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
     /// API configuration (baseURL, timeouts, etc)
     public var api: APIConfiguration
 
-    /// Telemetry configuration (consent, analytics settings)
-    public var telemetry: TelemetryConfiguration
-
     /// Download configuration
     public var download: ModelDownloadConfiguration
 
@@ -58,7 +55,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         generation: GenerationConfiguration = GenerationConfiguration(),
         storage: StorageConfiguration = StorageConfiguration(),
         api: APIConfiguration = APIConfiguration(),
-        telemetry: TelemetryConfiguration = TelemetryConfiguration(),
         download: ModelDownloadConfiguration = ModelDownloadConfiguration(),
         hardware: HardwareConfiguration? = nil,
         debugMode: Bool = false,
@@ -74,7 +70,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         self.generation = generation
         self.storage = storage
         self.api = api
-        self.telemetry = telemetry
         self.download = download
         self.hardware = hardware
         self.debugMode = debugMode
@@ -115,5 +110,18 @@ extension ConfigurationData {
         case createdAt
         case updatedAt
         case syncPending
+    }
+}
+
+// MARK: - Factory Methods
+
+extension ConfigurationData {
+    /// Create SDK default configuration
+    public static func sdkDefaults(apiKey: String) -> ConfigurationData {
+        return ConfigurationData(
+            id: "default-\(UUID().uuidString)",
+            apiKey: apiKey.isEmpty ? "dev-mode" : apiKey,
+            source: .defaults
+        )
     }
 }

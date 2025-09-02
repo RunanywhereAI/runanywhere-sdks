@@ -27,30 +27,9 @@ class MemoryService: MemoryManager {
         setupIntegration()
     }
 
-    /// Configuration for memory service
-    struct Config {
-        var memoryThreshold: Int64 = 500_000_000 // 500MB
-        var criticalThreshold: Int64 = 200_000_000 // 200MB
-        var monitoringInterval: TimeInterval = 5.0
-        var unloadStrategy: UnloadStrategy = .leastRecentlyUsed
-
-        enum UnloadStrategy {
-            case leastRecentlyUsed
-            case largestFirst
-            case oldestFirst
-            case priorityBased
-        }
-    }
-
-    private var config: Config = Config()
-
-    func configure(_ config: Config) {
-        self.config = config
-        allocationManager.configure(config)
-        pressureHandler.configure(config)
-        cacheEviction.configure(config)
-        memoryMonitor.configure(config)
-    }
+    // Memory thresholds
+    private var memoryThreshold: Int64 = 500_000_000 // 500MB
+    private var criticalThreshold: Int64 = 200_000_000 // 200MB
 
     // MARK: - Model Memory Management
 
@@ -124,7 +103,7 @@ class MemoryService: MemoryManager {
     }
 
     func setMemoryThreshold(_ threshold: Int64) {
-        config.memoryThreshold = threshold
+        self.memoryThreshold = threshold
     }
 
     func getLoadedModels() -> [LoadedModel] {
@@ -159,7 +138,7 @@ class MemoryService: MemoryManager {
         let availableMemory = memoryMonitor.getAvailableMemory()
         let modelMemory = allocationManager.getTotalModelMemory()
         let loadedModelCount = allocationManager.getLoadedModelCount()
-        let memoryPressure = availableMemory < config.memoryThreshold
+        let memoryPressure = availableMemory < memoryThreshold
 
         return MemoryStatistics(
             totalMemory: totalMemory,
@@ -184,21 +163,14 @@ class MemoryService: MemoryManager {
 
     // MARK: - Memory Monitoring
 
-    func startMonitoring() {
-        memoryMonitor.startMonitoring { [weak self] stats in
-            Task {
-                await self?.handleMonitoringUpdate(stats)
-            }
-        }
-    }
-
-    func stopMonitoring() {
-        memoryMonitor.stopMonitoring()
-    }
+    // Monitoring removed - memory checks are now on-demand only
 
     // MARK: - Private Implementation
 
     private func setupIntegration() {
+        // Connect cache eviction with allocation manager
+        cacheEviction.setAllocationManager(allocationManager)
+
         // Connect pressure handler with cache eviction
         pressureHandler.setEvictionHandler(cacheEviction)
 
@@ -213,9 +185,9 @@ class MemoryService: MemoryManager {
     private func checkMemoryConditions() async {
         let availableMemory = memoryMonitor.getAvailableMemory()
 
-        if availableMemory < config.criticalThreshold {
+        if availableMemory < criticalThreshold {
             await handleMemoryPressure(level: .critical)
-        } else if availableMemory < config.memoryThreshold {
+        } else if availableMemory < memoryThreshold {
             await handleMemoryPressure(level: .warning)
         }
     }
@@ -223,23 +195,16 @@ class MemoryService: MemoryManager {
     private func calculateTargetMemory(for level: MemoryPressureLevel) -> Int64 {
         switch level {
         case .low, .medium:
-            return config.memoryThreshold
+            return memoryThreshold
         case .high:
-            return Int64(Double(config.memoryThreshold) * 1.5)
+            return Int64(Double(memoryThreshold) * 1.5)
         case .warning:
-            return config.memoryThreshold * 2
+            return memoryThreshold * 2
         case .critical:
-            return config.memoryThreshold * 3
+            return memoryThreshold * 3
         }
     }
 
-    private func handleMonitoringUpdate(_ stats: MemoryMonitoringStats) async {
-        if stats.availableMemory < config.criticalThreshold {
-            await handleMemoryPressure(level: .critical)
-        } else if stats.availableMemory < config.memoryThreshold {
-            await handleMemoryPressure(level: .warning)
-        }
-    }
 }
 
 

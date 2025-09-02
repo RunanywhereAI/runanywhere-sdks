@@ -75,11 +75,8 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         return HardwareConfiguration(
             primaryAccelerator: .neuralEngine,
-            fallbackAccelerator: .gpu,
             memoryMode: .balanced,
-            threadCount: 2,
-            useQuantization: true,
-            quantizationBits: 8
+            threadCount: 2
         )
     }
 }

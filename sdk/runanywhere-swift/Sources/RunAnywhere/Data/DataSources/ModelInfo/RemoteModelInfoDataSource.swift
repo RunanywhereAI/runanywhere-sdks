@@ -82,6 +82,38 @@ public actor RemoteModelInfoDataSource: RemoteDataSource {
         }
     }
 
+    // MARK: - Sync Support
+
+    public func syncBatch(_ batch: [ModelInfo]) async throws -> [String] {
+        guard let apiClient = apiClient else {
+            throw DataSourceError.notAvailable
+        }
+
+        logger.info("Syncing \(batch.count) model info items")
+
+        var syncedIds: [String] = []
+
+        // For model info, we typically sync one at a time using POST to the regular endpoint
+        for modelInfo in batch {
+            do {
+                // Use regular POST to models endpoint
+                let _: ModelInfo = try await apiClient.post(
+                    .models,
+                    modelInfo,
+                    requiresAuth: true
+                )
+                syncedIds.append(modelInfo.id)
+                logger.debug("Synced model info: \(modelInfo.id)")
+            } catch {
+                logger.error("Failed to sync model info \(modelInfo.id): \(error)")
+                // Continue with next item
+            }
+        }
+
+        logger.info("Successfully synced \(syncedIds.count) of \(batch.count) model info items")
+        return syncedIds
+    }
+
     public func testConnection() async throws -> Bool {
         guard apiClient != nil else {
             return false

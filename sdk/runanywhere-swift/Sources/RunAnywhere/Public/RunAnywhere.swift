@@ -10,6 +10,7 @@ public enum RunAnywhere {
     /// Internal configuration storage
     internal static var _configurationData: ConfigurationData?
     internal static var _initParams: SDKInitParams?
+    internal static var _currentEnvironment: SDKEnvironment?
     private static var _isInitialized = false
 
     /// Access to service container (through the shared instance for now)
@@ -84,10 +85,14 @@ public enum RunAnywhere {
         EventBus.shared.publish(SDKInitializationEvent.started)
 
         do {
-            // Step 1: Validate API key
-            logger.info("Step 1/8: Validating API key")
-            guard !params.apiKey.isEmpty else {
-                throw SDKError.invalidAPIKey("API key cannot be empty")
+            // Step 1: Validate API key (skip in development mode)
+            if params.environment != .development {
+                logger.info("Step 1/8: Validating API key")
+                guard !params.apiKey.isEmpty else {
+                    throw SDKError.invalidAPIKey("API key cannot be empty")
+                }
+            } else {
+                logger.info("Step 1/8: Skipping API key validation in development mode")
             }
 
             // Step 2: Initialize logging system
@@ -97,54 +102,81 @@ public enum RunAnywhere {
             // Step 3: Store parameters securely
             logger.info("Step 3/8: Storing credentials securely")
             _initParams = params
-            try KeychainManager.shared.storeSDKParams(params)
+            _currentEnvironment = params.environment
+
+            // Only store in keychain for non-development environments
+            if params.environment != .development {
+                try KeychainManager.shared.storeSDKParams(params)
+            }
 
             // Step 4: Initialize database
             logger.info("Step 4/8: Initializing local database")
             try DatabaseManager.shared.setup()
 
-            // Step 5: Initialize API client and authentication service
-            logger.info("Step 5/8: Authenticating with backend")
+            // Development mode: Skip API authentication and use local/mock services
+            if params.environment == .development {
+                logger.info("🚀 Running in DEVELOPMENT mode - using local/mock services")
+                logger.info("Step 5/8: Skipping API authentication in development mode")
+                logger.info("Step 6/8: Skipping health check in development mode")
+                logger.info("Step 7/7: Bootstrapping SDK services with local data")
 
-            // Create API client first
-            let apiClient = APIClient(
-                baseURL: params.baseURL,
-                apiKey: params.apiKey
-            )
+                // Bootstrap without API client for development mode
+                let loadedConfig = try await serviceContainer.bootstrapDevelopmentMode(with: params)
 
-            // Create authentication service using API client
-            let authService = AuthenticationService(apiClient: apiClient)
+                // Store the configuration
+                _configurationData = loadedConfig
 
-            // Set auth service in API client to complete the setup
-            await apiClient.setAuthenticationService(authService)
+                // Mark as initialized
+                _isInitialized = true
+                logger.info("✅ SDK initialization completed successfully (Development Mode)")
+                EventBus.shared.publish(SDKInitializationEvent.completed)
 
-            // Authenticate
-            let authResponse = try await authService.authenticate(apiKey: params.apiKey)
-            logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
+            } else {
+                // Production/Staging mode: Full API authentication flow
 
-            // Step 6: Perform health check
-            logger.info("Step 6/8: Performing health check")
-            let healthResponse = try await authService.healthCheck()
+                // Step 5: Initialize API client and authentication service
+                logger.info("Step 5/8: Authenticating with backend")
 
-            if healthResponse.status != HealthStatus.healthy {
-                logger.warning("Backend health status: \(healthResponse.status)")
+                // Create API client first
+                let apiClient = APIClient(
+                    baseURL: params.baseURL,
+                    apiKey: params.apiKey
+                )
+
+                // Create authentication service using API client
+                let authService = AuthenticationService(apiClient: apiClient)
+
+                // Set auth service in API client to complete the setup
+                await apiClient.setAuthenticationService(authService)
+
+                // Authenticate
+                let authResponse = try await authService.authenticate(apiKey: params.apiKey)
+                logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
+
+                // Step 6: Perform health check
+                logger.info("Step 6/8: Performing health check")
+                let healthResponse = try await authService.healthCheck()
+
+                if healthResponse.status != HealthStatus.healthy {
+                    logger.warning("Backend health status: \(healthResponse.status)")
+                }
+
+                // Step 7: Bootstrap SDK services and sync with backend
+                logger.info("Step 7/7: Bootstrapping SDK services and syncing with backend")
+                let loadedConfig = try await serviceContainer.bootstrap(
+                    with: params,
+                    authService: authService,
+                    apiClient: apiClient
+                )
+
+                // Store the configuration
+                _configurationData = loadedConfig
+
+                // Mark as initialized
+                _isInitialized = true
+                logger.info("✅ SDK initialization completed successfully")
+                EventBus.shared.publish(SDKInitializationEvent.completed)
             }
-
-            // Step 7: Bootstrap SDK services and sync with backend
-            logger.info("Step 7/7: Bootstrapping SDK services and syncing with backend")
-            let loadedConfig = try await serviceContainer.bootstrap(
-                with: params,
-                authService: authService,
-                apiClient: apiClient
-            )
-
-            // Store the configuration
-            _configurationData = loadedConfig
-
-            // Mark as initialized
-            _isInitialized = true
-            logger.info("✅ SDK initialization completed successfully")
-            EventBus.shared.publish(SDKInitializationEvent.completed)
 
         } catch {
             logger.error("❌ SDK initialization failed: \(error.localizedDescription)")

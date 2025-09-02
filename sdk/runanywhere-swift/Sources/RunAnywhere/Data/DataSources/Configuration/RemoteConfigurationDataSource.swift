@@ -87,6 +87,38 @@ public actor RemoteConfigurationDataSource: RemoteDataSource {
         }
     }
 
+    // MARK: - Sync Support
+
+    public func syncBatch(_ batch: [ConfigurationData]) async throws -> [String] {
+        guard let apiClient = apiClient else {
+            throw DataSourceError.notAvailable
+        }
+
+        logger.info("Syncing \(batch.count) configuration items")
+
+        var syncedIds: [String] = []
+
+        // For configuration, we typically sync one at a time using POST to the regular endpoint
+        for config in batch {
+            do {
+                // Use regular POST to configuration endpoint
+                let _: ConfigurationData = try await apiClient.post(
+                    .configuration,
+                    config,
+                    requiresAuth: true
+                )
+                syncedIds.append(config.id)
+                logger.debug("Synced configuration: \(config.id)")
+            } catch {
+                logger.error("Failed to sync configuration \(config.id): \(error)")
+                // Continue with next item
+            }
+        }
+
+        logger.info("Successfully synced \(syncedIds.count) of \(batch.count) configuration items")
+        return syncedIds
+    }
+
     // MARK: - Configuration-specific methods
 
     /// Fetch configuration by API key

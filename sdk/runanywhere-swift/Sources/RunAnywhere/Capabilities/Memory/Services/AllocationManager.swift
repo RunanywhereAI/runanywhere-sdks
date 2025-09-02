@@ -7,12 +7,6 @@ class AllocationManager {
     private var pressureCallback: (() -> Void)?
     private let logger: SDKLogger = SDKLogger(category: "AllocationManager")
 
-    private var config: MemoryService.Config = MemoryService.Config()
-
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
-    }
-
     func setPressureCallback(_ callback: @escaping () -> Void) {
         pressureCallback = callback
     }

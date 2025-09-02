@@ -79,12 +79,6 @@ public class CapabilityAnalyzer {
             capabilities: capabilities
         )
 
-        // Set fallback accelerator
-        config.fallbackAccelerator = selectFallbackAccelerator(
-            primary: config.primaryAccelerator,
-            capabilities: capabilities
-        )
-
         // Configure memory mode
         config.memoryMode = selectMemoryMode(
             for: model,
@@ -96,14 +90,6 @@ public class CapabilityAnalyzer {
             for: model,
             capabilities: capabilities
         )
-
-        // Determine quantization settings
-        let quantizationSettings = selectQuantizationSettings(
-            for: model,
-            capabilities: capabilities
-        )
-        config.useQuantization = quantizationSettings.use
-        config.quantizationBits = quantizationSettings.bits
 
         return config
     }

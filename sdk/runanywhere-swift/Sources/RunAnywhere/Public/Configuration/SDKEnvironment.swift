@@ -90,7 +90,7 @@ public struct SDKInitParams {
         environment: SDKEnvironment = .production
     ) throws {
         guard let url = URL(string: baseURL) else {
-            throw SDKError.invalidConfiguration("Invalid base URL: \(baseURL)")
+            throw SDKError.validationFailed("Invalid base URL: \(baseURL)")
         }
         self.init(apiKey: apiKey, baseURL: url, environment: environment)
     }

@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 
+//TODO: how do we set this?
 /// Configuration options for the GRDB database
 public struct DatabaseConfiguration {
 

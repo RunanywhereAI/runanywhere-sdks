@@ -7,7 +7,7 @@
 
 import Foundation
 
-/// Logging configuration
+/// Simplified logging configuration
 public struct LoggingConfiguration {
     /// Enable local logging (console/os_log)
     public var enableLocalLogging: Bool = true
@@ -15,16 +15,10 @@ public struct LoggingConfiguration {
     /// Enable remote logging (telemetry)
     public var enableRemoteLogging: Bool = false
 
-    /// Enable analytics event logging
-    public var enableAnalyticsLogging: Bool = false
-
-    /// Enable verbose/debug logging
-    public var enableVerboseLogging: Bool = false
-
     /// Remote logging endpoint
     public var remoteEndpoint: URL?
 
-    /// Log level filter
+    /// Minimum log level filter
     public var minLogLevel: LogLevel = .info
 
     /// Include device metadata in remote logs

@@ -29,28 +29,6 @@ public extension RunAnywhere {
         return policy
     }
 
-    /// Get current privacy mode
-    /// - Returns: Current privacy mode
-    static func getCurrentPrivacyMode() async -> PrivacyMode {
-        events.publish(SDKConfigurationEvent.privacyModeRequested)
-
-        let mode = RunAnywhere._configurationData?.routing.privacyMode ?? .standard
-
-        events.publish(SDKConfigurationEvent.privacyModeRetrieved(mode: mode))
-        return mode
-    }
-
-    /// Check if analytics is enabled
-    /// - Returns: True if analytics is enabled
-    static func isAnalyticsEnabled() async -> Bool {
-        events.publish(SDKConfigurationEvent.analyticsStatusRequested)
-
-        let enabled = RunAnywhere._configurationData?.telemetry.consent != .denied
-
-        events.publish(SDKConfigurationEvent.analyticsStatusRetrieved(enabled: enabled))
-        return enabled
-    }
-
     /// Sync user preferences (placeholder - would sync with remote configuration)
     static func syncUserPreferences() async throws {
         events.publish(SDKConfigurationEvent.syncRequested)

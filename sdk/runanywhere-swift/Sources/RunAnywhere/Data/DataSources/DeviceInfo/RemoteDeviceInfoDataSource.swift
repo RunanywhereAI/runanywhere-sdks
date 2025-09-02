@@ -87,6 +87,38 @@ public actor RemoteDeviceInfoDataSource: RemoteDataSource {
         }
     }
 
+    // MARK: - Sync Support
+
+    public func syncBatch(_ batch: [DeviceInfoData]) async throws -> [String] {
+        guard let apiClient = apiClient else {
+            throw DataSourceError.notAvailable
+        }
+
+        logger.info("Syncing \(batch.count) device info items")
+
+        var syncedIds: [String] = []
+
+        // For device info, we typically sync one at a time using POST to the regular endpoint
+        for deviceInfo in batch {
+            do {
+                // Use regular POST to deviceInfo endpoint
+                let _: DeviceInfoData = try await apiClient.post(
+                    .deviceInfo,
+                    deviceInfo,
+                    requiresAuth: true
+                )
+                syncedIds.append(deviceInfo.id)
+                logger.debug("Synced device info: \(deviceInfo.id)")
+            } catch {
+                logger.error("Failed to sync device info \(deviceInfo.id): \(error)")
+                // Continue with next item
+            }
+        }
+
+        logger.info("Successfully synced \(syncedIds.count) of \(batch.count) device info items")
+        return syncedIds
+    }
+
     public func testConnection() async throws -> Bool {
         guard apiClient != nil else {
             return false
