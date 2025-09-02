@@ -84,8 +84,7 @@ public class StructuredOutputHandler {
     /// Parse and validate structured output from generated text
     public func parseStructuredOutput<T: Generatable>(
         from text: String,
-        type: T.Type,
-        validationMode: SchemaValidationMode
+        type: T.Type
     ) throws -> T {
         // Extract JSON from the response
         let jsonString = try extractJSON(from: text)
@@ -95,15 +94,8 @@ public class StructuredOutputHandler {
             throw StructuredOutputError.invalidJSON("Failed to convert string to data")
         }
 
-        // Decode based on validation mode
-        switch validationMode {
-        case .strict:
-            return try strictDecode(jsonData, type: type)
-        case .lenient:
-            return try lenientDecode(jsonData, type: type)
-        case .bestEffort:
-            return try bestEffortDecode(jsonData, type: type)
-        }
+        // Always use strict validation
+        return try strictDecode(jsonData, type: type)
     }
 
     /// Extract JSON from potentially mixed text
@@ -267,30 +259,6 @@ public class StructuredOutputHandler {
         }
     }
 
-    /// Lenient JSON decoding - allows extra fields
-    private func lenientDecode<T: Generatable>(_ data: Data, type: T.Type) throws -> T {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        // Note: JSONDecoder already ignores extra fields by default
-
-        do {
-            return try decoder.decode(type, from: data)
-        } catch {
-            throw StructuredOutputError.validationFailed("Lenient validation failed: \(error.localizedDescription)")
-        }
-    }
-
-    /// Best effort decoding - tries to extract what's possible
-    private func bestEffortDecode<T: Generatable>(_ data: Data, type: T.Type) throws -> T {
-        // First try normal decoding
-        do {
-            return try lenientDecode(data, type: type)
-        } catch {
-            // If that fails, we could implement more sophisticated extraction
-            // For now, just throw the error
-            throw StructuredOutputError.validationFailed("Best effort validation failed: \(error.localizedDescription)")
-        }
-    }
 
     /// Validate that generated text contains valid structured output
     public func validateStructuredOutput(
