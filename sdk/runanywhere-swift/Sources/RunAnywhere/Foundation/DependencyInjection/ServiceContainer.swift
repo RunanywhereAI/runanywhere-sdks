@@ -97,6 +97,9 @@ public class ServiceContainer {
         DatabaseManager.shared
     }()
 
+    /// Network service (environment-based: mock or real)
+    public private(set) var networkService: (any NetworkService)?
+
     /// Authentication service
     private var authenticationService: AuthenticationService?
 
@@ -281,10 +284,17 @@ public class ServiceContainer {
      * - Throws: SDKError if critical service initialization fails
      */
     public func bootstrap(with params: SDKInitParams, authService: AuthenticationService, apiClient: APIClient) async throws -> ConfigurationData {
-        // Step 1: Store network services
+        // Step 1: Create and store network service based on environment
+        self.networkService = NetworkServiceFactory.createNetworkService(
+            for: params.environment,
+            params: params
+        )
+
+        // Store auth service and API client if provided
         self.authenticationService = authService
         self.apiClient = apiClient
-        logger.debug("Network services configured")
+
+        logger.debug("Network services configured for \(params.environment.description)")
 
         // Step 2: Initialize and sync device information
         logger.debug("Collecting device information")
@@ -396,6 +406,13 @@ public class ServiceContainer {
     public func bootstrapDevelopmentMode(with params: SDKInitParams) async throws -> ConfigurationData {
         logger.info("🚀 Bootstrapping SDK in DEVELOPMENT mode")
 
+        // Create mock network service for development
+        self.networkService = NetworkServiceFactory.createNetworkService(
+            for: .development,
+            params: params
+        )
+        logger.info("🔧 Mock network service initialized")
+
         // Step 1: Collect device information (local only)
         logger.debug("Collecting device information")
         let deviceInfoService = await self.deviceInfoService
@@ -422,16 +439,8 @@ public class ServiceContainer {
         EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
         logger.info("Configuration loaded (source: defaults for development)")
 
-        // Step 3: Load mock model catalog
-        logger.debug("Loading mock model catalog")
-        let modelInfoService = await self.modelInfoService
-
-        // MockModelInfoDataSource will provide models in development mode
-        let storedModels = try? await modelInfoService.loadStoredModels()
-        if let models = storedModels {
-            logger.info("Mock model catalog loaded: \(models.count) models available")
-            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: models))
-        }
+        // Step 3: Mock model catalog
+        logger.debug("Mock models will be provided by MockNetworkService")
 
         // Step 4: Initialize model registry
         await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)

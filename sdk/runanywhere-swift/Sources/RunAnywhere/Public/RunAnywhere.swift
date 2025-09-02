@@ -138,8 +138,12 @@ public enum RunAnywhere {
                 logger.info("Step 5/8: Authenticating with backend")
 
                 // Create API client first
+                guard let baseURL = params.baseURL else {
+                    throw SDKError.validationFailed("Base URL is required for \(params.environment.description)")
+                }
+
                 let apiClient = APIClient(
-                    baseURL: params.baseURL,
+                    baseURL: baseURL,
                     apiKey: params.apiKey
                 )
 
