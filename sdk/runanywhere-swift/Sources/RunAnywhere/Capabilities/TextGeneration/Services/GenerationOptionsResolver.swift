@@ -76,9 +76,7 @@ public struct GenerationOptionsResolver {
                 runtime: baseOptions.stopSequences,
                 remote: remote.defaults.stopSequences
             ),
-            seed: baseOptions.seed,
             streamingEnabled: baseOptions.streamingEnabled,
-            tokenBudget: baseOptions.tokenBudget,
             preferredExecutionTarget: baseOptions.preferredExecutionTarget,
             structuredOutput: baseOptions.structuredOutput,
             systemPrompt: baseOptions.systemPrompt

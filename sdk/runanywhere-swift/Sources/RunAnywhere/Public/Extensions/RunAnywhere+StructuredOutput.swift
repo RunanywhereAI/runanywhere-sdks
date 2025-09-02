@@ -34,37 +34,6 @@ public extension RunAnywhere {
         }
     }
 
-    /// Generate structured output with validation mode
-    /// - Parameters:
-    ///   - type: The type to generate
-    ///   - prompt: The prompt to generate from
-    ///   - validationMode: Schema validation mode
-    ///   - options: Generation options
-    /// - Returns: The generated object of the specified type
-    static func generateStructured<T: Generatable>(
-        _ type: T.Type,
-        prompt: String,
-        validationMode: SchemaValidationMode,
-        options: RunAnywhereGenerationOptions? = nil
-    ) async throws -> T {
-        events.publish(SDKGenerationEvent.started(prompt: prompt))
-
-        do {
-            // For now, ignore validation mode and use basic structured generation
-            let result = try await RunAnywhere.generateStructured(type, prompt: prompt)
-
-            events.publish(SDKGenerationEvent.completed(
-                response: "Structured output generated with validation mode: \(validationMode)",
-                tokensUsed: 0,
-                latencyMs: 0
-            ))
-
-            return result
-        } catch {
-            events.publish(SDKGenerationEvent.failed(error))
-            throw error
-        }
-    }
 
     /// Generate with structured output configuration
     /// - Parameters:
@@ -88,9 +57,7 @@ public extension RunAnywhere {
                 topP: baseOptions.topP,
                 enableRealTimeTracking: baseOptions.enableRealTimeTracking,
                 stopSequences: baseOptions.stopSequences,
-                seed: baseOptions.seed,
                 streamingEnabled: baseOptions.streamingEnabled,
-                tokenBudget: baseOptions.tokenBudget,
                 preferredExecutionTarget: baseOptions.preferredExecutionTarget,
                 structuredOutput: structuredOutput,
                 systemPrompt: baseOptions.systemPrompt

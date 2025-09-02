@@ -23,7 +23,6 @@ final class RunAnywhereSDKTests: XCTestCase {
         XCTAssertTrue(options.enableRealTimeTracking)
         XCTAssertNil(options.context)
         XCTAssertTrue(options.stopSequences.isEmpty)
-        XCTAssertNil(options.seed)
     }
 
     func testSDKSingleton() {

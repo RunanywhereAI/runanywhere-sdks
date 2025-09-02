@@ -17,14 +17,8 @@ public struct RunAnywhereGenerationOptions {
     /// Stop sequences
     public let stopSequences: [String]
 
-    /// Seed for reproducible generation
-    public let seed: Int?
-
     /// Enable streaming mode
     public let streamingEnabled: Bool
-
-    /// Token budget constraint (for cost control)
-    public let tokenBudget: TokenBudget?
 
     /// Preferred execution target
     public let preferredExecutionTarget: ExecutionTarget?
@@ -42,9 +36,7 @@ public struct RunAnywhereGenerationOptions {
     ///   - topP: Top-p sampling (default: 1.0)
 ///   - enableRealTimeTracking: Enable real-time cost tracking (default: true)
     ///   - stopSequences: Stop generation at these sequences (default: empty)
-    ///   - seed: Optional seed for reproducibility
     ///   - streamingEnabled: Enable streaming mode (default: false)
-    ///   - tokenBudget: Token budget constraints
     ///   - preferredExecutionTarget: Preferred execution target
     ///   - structuredOutput: Structured output configuration (optional)
     ///   - systemPrompt: System prompt for AI behavior (optional)
@@ -54,9 +46,7 @@ public struct RunAnywhereGenerationOptions {
         topP: Float = 1.0,
 enableRealTimeTracking: Bool = true,
         stopSequences: [String] = [],
-        seed: Int? = nil,
         streamingEnabled: Bool = false,
-        tokenBudget: TokenBudget? = nil,
         preferredExecutionTarget: ExecutionTarget? = nil,
         structuredOutput: StructuredOutputConfig? = nil,
         systemPrompt: String? = nil
@@ -66,9 +56,7 @@ enableRealTimeTracking: Bool = true,
         self.topP = topP
 self.enableRealTimeTracking = enableRealTimeTracking
         self.stopSequences = stopSequences
-        self.seed = seed
         self.streamingEnabled = streamingEnabled
-        self.tokenBudget = tokenBudget
         self.preferredExecutionTarget = preferredExecutionTarget
         self.structuredOutput = structuredOutput
         self.systemPrompt = systemPrompt
