@@ -139,7 +139,7 @@ public class GenerationService {
                 logger.warning("🔄 Framework error detected: \(frameworkError)")
 
                 // For timeout errors, check the error message for timeout indicators
-                let errorMessage = frameworkError.underlying.localizedDescription.lowercased()
+                let errorMessage = frameworkError.localizedDescription.lowercased()
                 if errorMessage.contains("timeout") || errorMessage.contains("timed out") {
                     throw SDKError.generationTimeout("Text generation timed out. The model may be too large for this device or the prompt too complex. Try using a smaller model or simpler prompt.")
                 }
@@ -175,8 +175,8 @@ public class GenerationService {
         let estimatedTokens = finalText.split(separator: " ").count
         let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
-        // Get memory usage from the service
-        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
+        // Get memory usage (placeholder - actual implementation depends on service)
+        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
 
         return GenerationResult(
             text: finalText,
@@ -242,8 +242,8 @@ public class GenerationService {
         let estimatedTokens = generatedText.split(separator: " ").count
         let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
-        // Get memory usage from the service
-        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
+        // Get memory usage (placeholder - actual implementation depends on service)
+        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model

@@ -36,12 +36,12 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     // MARK: - SpeakerDiarizationProtocol Implementation
 
-    public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
+    public func processAudio(_ samples: [Float]) -> SpeakerInfo {
         lock.lock()
         defer { lock.unlock() }
 
         // Create a simple embedding from audio features
-        let embedding = createSimpleEmbedding(from: audioBuffer)
+        let embedding = createSimpleEmbedding(from: samples)
 
         // Try to match with existing speakers
         if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
@@ -74,11 +74,20 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
         return Array(speakers.values)
     }
 
-    public func getCurrentSpeaker() -> SpeakerInfo? {
+    public func getAllSpeakers() -> [SpeakerInfo] {
         lock.lock()
         defer { lock.unlock() }
+        return Array(speakers.values)
+    }
 
-        return currentSpeaker
+    public func initialize() async throws {
+        // No initialization needed for default implementation
+    }
+
+    public var isReady: Bool { true }
+
+    public func cleanup() async {
+        reset()
     }
 
     public func reset() {

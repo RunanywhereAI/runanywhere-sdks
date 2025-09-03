@@ -277,11 +277,11 @@ public actor VoiceAnalyticsService: AnalyticsService {
 
     /// Track stage execution
     public func trackStageExecution(
-        stage: VoiceComponent,
+        stage: String,
         duration: TimeInterval
     ) async {
         let eventData = StageExecutionData(
-            stageName: stage.rawValue,
+            stageName: stage,
             durationMs: duration * 1000
         )
         let event = VoiceEvent(

@@ -128,6 +128,8 @@ public actor UnifiedComponentInitializer {
             component = try await createEmbeddingComponent(config, container: container)
         case .speakerDiarization:
             component = try await createSpeakerDiarizationComponent(config, container: container)
+        case .wakeWord:
+            throw SDKError.componentNotInitialized("Wake word component not yet implemented")
         }
 
         // Store component
@@ -145,7 +147,7 @@ public actor UnifiedComponentInitializer {
         }
 
         // Use existing LLMComponent
-        return LLMComponent(parameters: params, serviceContainer: container)
+        return LLMComponent(configuration: params, serviceContainer: container)
     }
 
     private func createSTTComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
@@ -154,7 +156,7 @@ public actor UnifiedComponentInitializer {
         }
 
         // Create simple STT component that uses adapter
-        return STTComponent(parameters: params, serviceContainer: container)
+        return STTComponent(configuration: params, serviceContainer: container)
     }
 
     private func createTTSComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
@@ -163,7 +165,7 @@ public actor UnifiedComponentInitializer {
         }
 
         // Create simple TTS component
-        return TTSComponent(parameters: params, serviceContainer: container)
+        return TTSComponent(configuration: params, serviceContainer: container)
     }
 
     private func createVADComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
@@ -171,8 +173,8 @@ public actor UnifiedComponentInitializer {
             throw SDKError.validationFailed("Invalid VAD parameters")
         }
 
-        // VAD uses SimpleEnergyVAD directly
-        return VADComponent(parameters: params, serviceContainer: container)
+        // VAD uses SimpleEnergyVAD directly - params is already VADConfiguration which VADComponent expects
+        return VADComponent(configuration: params, serviceContainer: container)
     }
 
     private func createVLMComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
@@ -198,7 +200,7 @@ public actor UnifiedComponentInitializer {
             throw SDKError.validationFailed("Invalid Speaker Diarization parameters")
         }
 
-        return SpeakerDiarizationComponent(parameters: params, serviceContainer: container)
+        return SpeakerDiarizationComponent(configuration: params, serviceContainer: container)
     }
 
     // MARK: - Helper Methods

@@ -21,56 +21,6 @@ public protocol ComponentInitParameters: Sendable {
 // - VADInitParameters: Components/VAD/VADInitParameters.swift
 // - SpeakerDiarizationInitParameters: Components/SpeakerDiarization/SpeakerDiarizationComponent.swift
 
-// MARK: - VLM Component Parameters
-
-/// Initialization parameters for Vision Language Model component
-public struct VLMInitParameters: ComponentInitParameters {
-    public let componentType = SDKComponent.vlm
-    public let modelId: String?
-
-    // VLM-specific parameters
-    public let imageSize: Int // Square image size (e.g., 224, 384, 512)
-    public let maxImageTokens: Int
-    public let contextLength: Int
-    public let useGPUIfAvailable: Bool
-    public let imagePreprocessing: ImagePreprocessing
-
-    public enum ImagePreprocessing: String, Sendable {
-        case none = "none"
-        case normalize = "normalize"
-        case centerCrop = "center_crop"
-        case resize = "resize"
-    }
-
-    public init(
-        modelId: String? = nil,
-        imageSize: Int = 384,
-        maxImageTokens: Int = 576,
-        contextLength: Int = 2048,
-        useGPUIfAvailable: Bool = true,
-        imagePreprocessing: ImagePreprocessing = .normalize
-    ) {
-        self.modelId = modelId
-        self.imageSize = imageSize
-        self.maxImageTokens = maxImageTokens
-        self.contextLength = contextLength
-        self.useGPUIfAvailable = useGPUIfAvailable
-        self.imagePreprocessing = imagePreprocessing
-    }
-
-    public func validate() throws {
-        let validImageSizes = [224, 256, 384, 512, 768, 1024]
-        guard validImageSizes.contains(imageSize) else {
-            throw SDKError.validationFailed("Image size must be one of: \(validImageSizes)")
-        }
-        guard maxImageTokens > 0 && maxImageTokens <= 2048 else {
-            throw SDKError.validationFailed("Max image tokens must be between 1 and 2048")
-        }
-        guard contextLength > 0 && contextLength <= 32768 else {
-            throw SDKError.validationFailed("Context length must be between 1 and 32768")
-        }
-    }
-}
 
 // MARK: - Embedding Component Parameters
 
