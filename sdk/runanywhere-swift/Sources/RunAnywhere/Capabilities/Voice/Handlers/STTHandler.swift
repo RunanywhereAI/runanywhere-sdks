@@ -85,7 +85,7 @@ public class STTHandler {
                 )
                 // Handle speaker diarization if available
                 if let diarizationService = speakerDiarization,
-                   options.enableSpeakerDiarization {
+                   options.enableDiarization {
                     handleSpeakerDiarization(
                         samples: samples,
                         transcript: transcript,

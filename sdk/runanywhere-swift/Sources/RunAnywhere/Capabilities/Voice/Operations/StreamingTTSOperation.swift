@@ -170,13 +170,13 @@ extension StreamingTTSHandler {
     /// Process streaming text with default TTS options from config
     public func processStreamingText(
         _ text: String,
-        config: VoiceTTSConfig?,
+        config: TTSInitParameters?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation? = nil
     ) async {
         let options = TTSOptions(
             voice: config?.voice,
-            language: "en",
-            rate: config?.rate ?? 1.0,
+            language: config?.language ?? "en",
+            rate: config?.speakingRate ?? 1.0,
             pitch: config?.pitch ?? 1.0,
             volume: config?.volume ?? 1.0
         )

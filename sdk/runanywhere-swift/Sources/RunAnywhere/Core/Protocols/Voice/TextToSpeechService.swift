@@ -1,5 +1,103 @@
 import Foundation
 
+// MARK: - TTS Initialization Parameters
+
+/// Initialization parameters specific to TTS component
+public struct TTSInitParameters: ComponentInitParameters {
+    public let componentType = SDKComponent.tts
+    public let modelId: String? = nil // TTS typically uses system voices
+
+    // TTS-specific parameters
+    public let voice: String
+    public let language: String
+    public let speakingRate: Float // 0.5 to 2.0
+    public let pitch: Float // 0.5 to 2.0
+    public let volume: Float // 0.0 to 1.0
+    public let audioFormat: AudioFormat
+    public let useNeuralVoice: Bool
+
+    public init(
+        voice: String = "com.apple.ttsbundle.siri_female_en-US_compact",
+        language: String = "en-US",
+        speakingRate: Float = 1.0,
+        pitch: Float = 1.0,
+        volume: Float = 1.0,
+        audioFormat: AudioFormat = .pcm,
+        useNeuralVoice: Bool = true
+    ) {
+        self.voice = voice
+        self.language = language
+        self.speakingRate = speakingRate
+        self.pitch = pitch
+        self.volume = volume
+        self.audioFormat = audioFormat
+        self.useNeuralVoice = useNeuralVoice
+    }
+
+    public func validate() throws {
+        guard speakingRate >= 0.5 && speakingRate <= 2.0 else {
+            throw SDKError.validationFailed("Speaking rate must be between 0.5 and 2.0")
+        }
+        guard pitch >= 0.5 && pitch <= 2.0 else {
+            throw SDKError.validationFailed("Pitch must be between 0.5 and 2.0")
+        }
+        guard volume >= 0.0 && volume <= 1.0 else {
+            throw SDKError.validationFailed("Volume must be between 0.0 and 1.0")
+        }
+    }
+}
+
+// MARK: - TTS Options
+
+/// Options for text-to-speech synthesis
+public struct TTSOptions {
+    /// Voice to use for synthesis
+    public let voice: String?
+
+    /// Language for synthesis
+    public let language: String
+
+    /// Speech rate (0.0 to 2.0, 1.0 is normal)
+    public let rate: Float
+
+    /// Speech pitch (0.0 to 2.0, 1.0 is normal)
+    public let pitch: Float
+
+    /// Speech volume (0.0 to 1.0)
+    public let volume: Float
+
+    /// Audio format for output
+    public let audioFormat: AudioFormat
+
+    /// Sample rate for output audio
+    public let sampleRate: Int
+
+    /// Whether to use SSML markup
+    public let useSSML: Bool
+
+    public init(
+        voice: String? = nil,
+        language: String = "en-US",
+        rate: Float = 1.0,
+        pitch: Float = 1.0,
+        volume: Float = 1.0,
+        audioFormat: AudioFormat = .pcm,
+        sampleRate: Int = 16000,
+        useSSML: Bool = false
+    ) {
+        self.voice = voice
+        self.language = language
+        self.rate = rate
+        self.pitch = pitch
+        self.volume = volume
+        self.audioFormat = audioFormat
+        self.sampleRate = sampleRate
+        self.useSSML = useSSML
+    }
+}
+
+// MARK: - TTS Service Protocol
+
 /// Protocol for text-to-speech services
 public protocol TextToSpeechService: AnyObject {
     /// Initialize the TTS service
@@ -60,53 +158,6 @@ public protocol TextToSpeechService: AnyObject {
 
     /// Cleanup resources
     func cleanup() async
-}
-
-/// Options for text-to-speech synthesis
-public struct TTSOptions {
-    /// Voice to use for synthesis
-    public let voice: String?
-
-    /// Language for synthesis
-    public let language: String
-
-    /// Speech rate (0.0 to 2.0, 1.0 is normal)
-    public let rate: Float
-
-    /// Speech pitch (0.0 to 2.0, 1.0 is normal)
-    public let pitch: Float
-
-    /// Speech volume (0.0 to 1.0)
-    public let volume: Float
-
-    /// Audio format for output
-    public let audioFormat: AudioFormat
-
-    /// Sample rate for output audio
-    public let sampleRate: Int
-
-    /// Whether to use SSML markup
-    public let useSSML: Bool
-
-    public init(
-        voice: String? = nil,
-        language: String = "en-US",
-        rate: Float = 1.0,
-        pitch: Float = 1.0,
-        volume: Float = 1.0,
-        audioFormat: AudioFormat = .pcm,
-        sampleRate: Int = 16000,
-        useSSML: Bool = false
-    ) {
-        self.voice = voice
-        self.language = language
-        self.rate = rate
-        self.pitch = pitch
-        self.volume = volume
-        self.audioFormat = audioFormat
-        self.sampleRate = sampleRate
-        self.useSSML = useSSML
-    }
 }
 
 /// Information about a TTS voice
@@ -204,7 +255,7 @@ public enum VoiceQuality: String, CaseIterable {
 }
 
 /// Audio format for TTS output
-public enum AudioFormat: String, CaseIterable {
+public enum AudioFormat: String, CaseIterable, Sendable {
     case pcm
     case wav
     case mp3

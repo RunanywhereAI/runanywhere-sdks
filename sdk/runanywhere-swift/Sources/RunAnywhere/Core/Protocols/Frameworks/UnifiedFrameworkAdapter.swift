@@ -53,6 +53,13 @@ public protocol UnifiedFrameworkAdapter {
     /// Get download strategy provided by this adapter (if any)
     /// - Returns: Download strategy or nil if none
     func getDownloadStrategy() -> DownloadStrategy?
+
+    /// Initialize adapter with component parameters
+    /// - Parameters:
+    ///   - parameters: Component initialization parameters
+    ///   - modality: The modality to initialize for
+    /// - Returns: Initialized service ready for use
+    func initializeComponent(with parameters: any ComponentInitParameters, for modality: FrameworkModality) async throws -> Any?
 }
 
 /// Extension to provide default implementations
@@ -75,5 +82,21 @@ public extension UnifiedFrameworkAdapter {
     /// Default implementation - returns nil
     func getDownloadStrategy() -> DownloadStrategy? {
         return nil
+    }
+
+    /// Default implementation - creates service and initializes with parameters
+    func initializeComponent(with parameters: any ComponentInitParameters, for modality: FrameworkModality) async throws -> Any? {
+        // Default implementation: create service and initialize if model is specified
+        guard let service = createService(for: modality) else {
+            return nil
+        }
+
+        // If there's a model ID, try to load it
+        if let modelId = parameters.modelId,
+           let modelRegistry = ServiceContainer.shared.modelRegistry.getModel(by: modelId) {
+            return try await loadModel(modelRegistry, for: modality)
+        }
+
+        return service
     }
 }

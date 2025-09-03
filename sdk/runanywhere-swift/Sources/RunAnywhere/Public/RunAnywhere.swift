@@ -211,7 +211,7 @@ public enum RunAnywhere {
         _ prompt: String,
         options: RunAnywhereGenerationOptions? = nil
     ) async throws -> String {
-        await EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
             // Ensure initialized
@@ -225,14 +225,14 @@ public enum RunAnywhere {
                 options: options ?? RunAnywhereGenerationOptions()
             )
 
-            await EventBus.shared.publish(SDKGenerationEvent.completed(
+            EventBus.shared.publish(SDKGenerationEvent.completed(
                 response: result.text,
                 tokensUsed: result.tokensUsed,
                 latencyMs: result.latencyMs
             ))
 
             if result.savedAmount > 0 {
-                await EventBus.shared.publish(SDKGenerationEvent.costCalculated(
+                EventBus.shared.publish(SDKGenerationEvent.costCalculated(
                     amount: 0,
                     savedAmount: result.savedAmount
                 ))
@@ -240,7 +240,7 @@ public enum RunAnywhere {
 
             return result.text
         } catch {
-            await EventBus.shared.publish(SDKGenerationEvent.failed(error))
+            EventBus.shared.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
@@ -323,7 +323,7 @@ public enum RunAnywhere {
     /// - Parameter audioData: Audio data to transcribe
     /// - Returns: Transcribed text
     public static func transcribe(_ audioData: Data) async throws -> String {
-        await EventBus.shared.publish(SDKVoiceEvent.transcriptionStarted)
+        EventBus.shared.publish(SDKVoiceEvent.transcriptionStarted)
 
         do {
             // Ensure initialized
@@ -333,17 +333,17 @@ public enum RunAnywhere {
 
             // Use voice capability service directly
             // Find voice service and transcribe
-            guard let voiceService = serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base") else {
+            guard let voiceService = await serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base") else {
                 throw STTError.noVoiceServiceAvailable
             }
 
             try await voiceService.initialize(modelPath: "whisper-base")
             let result = try await voiceService.transcribe(audio: audioData, options: STTOptions())
 
-            await EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
+            EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
             return result.text
         } catch {
-            await EventBus.shared.publish(SDKVoiceEvent.pipelineError(error))
+            EventBus.shared.publish(SDKVoiceEvent.pipelineError(error))
             throw error
         }
     }
@@ -353,7 +353,7 @@ public enum RunAnywhere {
     /// Load a model by ID
     /// - Parameter modelId: The model identifier
     public static func loadModel(_ modelId: String) async throws {
-        await EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
         do {
             // Ensure initialized
@@ -366,9 +366,9 @@ public enum RunAnywhere {
             // IMPORTANT: Set the loaded model in the generation service
             serviceContainer.generationService.setCurrentModel(loadedModel)
 
-            await EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
+            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
-            await EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
+            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
             throw error
         }
     }

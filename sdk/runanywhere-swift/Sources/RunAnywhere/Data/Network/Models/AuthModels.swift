@@ -39,13 +39,11 @@ public struct HealthCheckResponse: Codable {
     let status: HealthStatus
     let version: String
     let timestamp: Date
-    let services: [ServiceHealth]?
 
     enum CodingKeys: String, CodingKey {
         case status
         case version
         case timestamp
-        case services
     }
 }
 
@@ -54,11 +52,4 @@ public enum HealthStatus: String, Codable {
     case healthy
     case degraded
     case unhealthy
-}
-
-/// Individual service health
-public struct ServiceHealth: Codable {
-    let name: String
-    let status: HealthStatus
-    let message: String?
 }

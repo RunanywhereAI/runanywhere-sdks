@@ -19,7 +19,7 @@ public extension RunAnywhere {
 
         do {
             // Find appropriate voice service
-            guard let voiceService = RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId) else {
+            guard let voiceService = await RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId) else {
                 throw STTError.noVoiceServiceAvailable
             }
 
@@ -39,44 +39,87 @@ public extension RunAnywhere {
 
     /// Create a modular voice pipeline with event tracking
     /// - Parameters:
-    ///   - config: Pipeline configuration
+    ///   - vadParams: VAD initialization parameters
+    ///   - sttParams: STT initialization parameters
+    ///   - llmParams: LLM initialization parameters
+    ///   - ttsParams: TTS initialization parameters
+    /// - Returns: Configured voice pipeline
+    static func createVoicePipeline(
+        vadParams: VADInitParameters? = nil,
+        sttParams: STTInitParameters? = nil,
+        llmParams: LLMInitParameters? = nil,
+        ttsParams: TTSInitParameters? = nil
+    ) -> VoicePipelineManager {
+        Task {
+            events.publish(SDKVoiceEvent.pipelineStarted)
+        }
+
+        return RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(
+            vadParams: vadParams,
+            sttParams: sttParams,
+            llmParams: llmParams,
+            ttsParams: ttsParams
+        )
+    }
+
+    /// Create a voice pipeline with ModularPipelineConfig
+    /// - Parameters:
+    ///   - config: Modular pipeline configuration
     ///   - speakerDiarization: Optional speaker diarization service
-    ///   - segmentationStrategy: Optional audio segmentation strategy
     /// - Returns: Configured voice pipeline
     static func createVoicePipeline(
         config: ModularPipelineConfig,
-        speakerDiarization: SpeakerDiarizationService? = nil,
-        segmentationStrategy: AudioSegmentationStrategy? = nil
+        speakerDiarization: SpeakerDiarizationService? = nil
     ) -> VoicePipelineManager {
         Task {
-            events.publish(SDKVoiceEvent.pipelineCreated(config: config))
+            events.publish(SDKVoiceEvent.pipelineStarted)
         }
 
-        return RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(config: config)
+        // Create pipeline using config parameters
+        return VoicePipelineManager(
+            config: config,
+            vadService: nil,
+            voiceService: nil,
+            llmService: nil,
+            ttsService: nil,
+            speakerDiarization: speakerDiarization
+        )
     }
 
     /// Process voice input through the complete pipeline with real-time events
     /// - Parameters:
     ///   - audioStream: Stream of audio chunks
-    ///   - config: Pipeline configuration
-    /// - Returns: Stream of pipeline events
+    ///   - vadParams: VAD initialization parameters
+    ///   - sttParams: STT initialization parameters
+    ///   - llmParams: LLM initialization parameters
+    ///   - ttsParams: TTS initialization parameters
+    /// - Returns: Stream of voice events
     static func processVoice(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        config: ModularPipelineConfig
-    ) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
+        vadParams: VADInitParameters? = nil,
+        sttParams: STTInitParameters? = nil,
+        llmParams: LLMInitParameters? = nil,
+        ttsParams: TTSInitParameters? = nil
+    ) -> AsyncThrowingStream<SDKVoiceEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                events.publish(SDKVoiceEvent.pipelineStarted(config: config))
+                events.publish(SDKVoiceEvent.pipelineStarted)
 
                 do {
                     // Create pipeline and process voice stream
-                    let pipeline = RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(config: config)
+                    let pipeline = RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(
+                        vadParams: vadParams,
+                        sttParams: sttParams,
+                        llmParams: llmParams,
+                        ttsParams: ttsParams
+                    )
                     let eventStream = pipeline.process(audioStream: audioStream)
 
                     for try await event in eventStream {
-                        // Publish to event bus for transparency
-                        events.publish(SDKVoiceEvent.pipelineEvent(event))
-
+                        // Convert and publish SDK events
+                        if let sdkEvent = convertToSDKEvent(event) {
+                            events.publish(sdkEvent)
+                        }
                         // Forward to caller
                         continuation.yield(event)
                     }
@@ -94,13 +137,42 @@ public extension RunAnywhere {
     /// Find voice service for a specific model
     /// - Parameter modelId: The model identifier
     /// - Returns: Voice service if available
-    static func findVoiceService(for modelId: String) -> STTService? {
-        return RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId)
+    static func findVoiceService(for modelId: String) async -> STTService? {
+        return await RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId)
     }
 
     /// Find text-to-speech service
     /// - Returns: TTS service if available
-    static func findTTSService() -> TextToSpeechService? {
-        return RunAnywhere.serviceContainer.voiceCapabilityService.findTTSService()
+    static func findTTSService() async -> TextToSpeechService? {
+        return await RunAnywhere.serviceContainer.voiceCapabilityService.findTTSService()
+    }
+
+    // MARK: - Private Helper
+
+    private static func convertToSDKEvent(_ event: ModularPipelineEvent) -> SDKVoiceEvent? {
+        switch event {
+        case .vadSpeechStart:
+            return .vadDetected
+        case .vadSpeechEnd:
+            return .vadEnded
+        case .sttPartialTranscript(let text):
+            return .transcriptionPartial(text: text)
+        case .sttFinalTranscript(let text):
+            return .transcriptionFinal(text: text)
+        case .llmThinking:
+            return .llmProcessing
+        case .llmFinalResponse(let text):
+            return .responseGenerated(text: text)
+        case .ttsStarted:
+            return .synthesisStarted
+        case .ttsComplete:
+            return .synthesisCompleted
+        case .ttsAudioChunk(let chunk):
+            // Convert audio chunk to Data
+            let data = chunk.samples.withUnsafeBytes { Data($0) }
+            return .audioGenerated(data: data)
+        default:
+            return nil
+        }
     }
 }

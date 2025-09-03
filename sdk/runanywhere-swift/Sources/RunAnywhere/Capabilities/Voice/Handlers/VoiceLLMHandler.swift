@@ -19,9 +19,10 @@ public class VoiceLLMHandler {
     public func processWithLLM(
         transcript: String,
         llmService: LLMService?,
-        config: VoiceLLMConfig?,
+        config: LLMInitParameters?,
         streamingTTSHandler: StreamingTTSHandler?,
         ttsEnabled: Bool,
+        ttsConfig: TTSInitParameters?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 
@@ -29,12 +30,12 @@ public class VoiceLLMHandler {
 
         let options = RunAnywhereGenerationOptions(
             maxTokens: config?.maxTokens ?? 100,
-            temperature: config?.temperature ?? 0.7,
+            temperature: Float(config?.temperature ?? 0.7),
             systemPrompt: config?.systemPrompt
         )
 
         // Check if streaming is enabled (prefer streaming for voice pipelines)
-        let useStreaming = config?.useStreaming ?? true
+        let useStreaming = config?.streamingEnabled ?? true
 
         if useStreaming && llmService != nil && llmService!.isReady {
             // Use streaming for real-time responses
@@ -44,7 +45,7 @@ public class VoiceLLMHandler {
                 options: options,
                 streamingTTSHandler: streamingTTSHandler,
                 ttsEnabled: ttsEnabled,
-                ttsConfig: nil,
+                ttsConfig: ttsConfig,
                 continuation: continuation
             )
         } else {
@@ -66,7 +67,7 @@ public class VoiceLLMHandler {
         options: RunAnywhereGenerationOptions,
         streamingTTSHandler: StreamingTTSHandler?,
         ttsEnabled: Bool,
-        ttsConfig: VoiceTTSConfig?,
+        ttsConfig: TTSInitParameters?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 
@@ -92,11 +93,14 @@ public class VoiceLLMHandler {
                 // Process token for streaming TTS if enabled
                 if ttsEnabled, let handler = streamingTTSHandler {
                     Task {
-                        await handler.processStreamingText(
-                            token,
-                            config: ttsConfig,
-                            continuation: continuation
+                        let ttsOptions = TTSOptions(
+                            voice: ttsConfig?.voice,
+                            language: "en",
+                            rate: ttsConfig?.speakingRate ?? 1.0,
+                            pitch: ttsConfig?.pitch ?? 1.0,
+                            volume: ttsConfig?.volume ?? 1.0
                         )
+                        await handler.processToken(token, options: ttsOptions, continuation: continuation)
                     }
                 }
             }
@@ -107,7 +111,7 @@ public class VoiceLLMHandler {
             let ttsOptions = TTSOptions(
                 voice: ttsConfig?.voice,
                 language: "en",
-                rate: ttsConfig?.rate ?? 1.0,
+                rate: ttsConfig?.speakingRate ?? 1.0,
                 pitch: ttsConfig?.pitch ?? 1.0,
                 volume: ttsConfig?.volume ?? 1.0
             )

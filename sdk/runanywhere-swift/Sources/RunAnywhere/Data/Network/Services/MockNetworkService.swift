@@ -99,7 +99,6 @@ public actor MockNetworkService: NetworkService {
                 status: .healthy,
                 version: SDKConstants.version,
                 timestamp: Date(),
-                services: [] // Empty services array for mock
             )
             return try encoder.encode(response)
 
