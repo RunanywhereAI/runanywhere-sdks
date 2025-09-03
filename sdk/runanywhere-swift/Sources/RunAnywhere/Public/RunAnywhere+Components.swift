@@ -62,7 +62,7 @@ extension RunAnywhere {
         let params = STTInitParameters(
             modelId: modelId,
             language: language,
-            enableSpeakerDiarization: enableSpeakerDiarization
+            enableDiarization: enableSpeakerDiarization
         )
         let config = UnifiedComponentConfig.stt(params, priority: priority)
         return await componentInitializer.initialize([config])
@@ -95,8 +95,7 @@ extension RunAnywhere {
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
         let params = VADInitParameters(
-            energyThreshold: energyThreshold,
-            silenceTimeout: silenceTimeout
+            energyThreshold: energyThreshold
         )
         let config = UnifiedComponentConfig.vad(params, priority: priority)
         return await componentInitializer.initialize([config])
@@ -144,7 +143,7 @@ extension RunAnywhere {
     public static func preloadVision(modelId: String? = nil) async -> InitializationResult {
         let config = UnifiedComponentConfig.vlm(
             VLMInitParameters(modelId: modelId),
-            priority: .critical
+            priority: InitializationPriority.critical
         )
         return await componentInitializer.initialize([config])
     }

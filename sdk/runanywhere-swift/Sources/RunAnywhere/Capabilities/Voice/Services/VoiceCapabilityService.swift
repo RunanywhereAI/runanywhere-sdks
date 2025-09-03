@@ -179,7 +179,7 @@ public class VoiceCapabilityService {
 
     /// Find TTS service
     @MainActor
-    public func findTTSService() async -> TextToSpeechService? {
+    public func findTTSService() async -> TTSService? {
         // Check if any active agent has TTS
         let agents = agentQueue.sync { Array(activeAgents.values) }
         for agent in agents {
