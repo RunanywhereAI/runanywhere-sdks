@@ -20,3 +20,8 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "RunAnywhereSDK"
+
+// Include SDK modules
+include(":core")
+include(":jni")
+include(":plugin")
