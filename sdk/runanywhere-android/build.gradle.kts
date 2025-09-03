@@ -1,4 +1,6 @@
 plugins {
+    kotlin("jvm") version "1.9.22" apply false
+    id("org.jetbrains.intellij") version "1.17.4" apply false
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.detekt)
