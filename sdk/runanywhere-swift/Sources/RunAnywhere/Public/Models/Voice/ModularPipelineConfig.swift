@@ -1,88 +1,52 @@
 import Foundation
 
-/// Configuration for modular voice pipeline with flexible component selection
-public struct ModularPipelineConfig {
-    /// Which components to include in the pipeline
+/// Configuration for the modular voice pipeline
+/// This bridges between the old pipeline system and new component system
+public struct ModularPipelineConfig: Sendable {
     public let components: Set<VoiceComponent>
 
-    /// VAD configuration (if VAD component is included)
-    public let vad: VADConfig?
+    // Component parameters (using the new init parameters)
+    public let vad: VADInitParameters?
+    public let stt: STTInitParameters?
+    public let llm: LLMInitParameters?
+    public let tts: TTSInitParameters?
 
-    /// STT configuration (if STT component is included)
-    public let stt: VoiceSTTConfig?
-
-    /// LLM configuration (if LLM component is included)
-    public let llm: VoiceLLMConfig?
-
-    /// TTS configuration (if TTS component is included)
-    public let tts: VoiceTTSConfig?
-
-    /// Whether to enable streaming for all components
-    public let streamingEnabled: Bool
+    // Pipeline settings
+    public let enableSpeakerDiarization: Bool
+    public let continuousMode: Bool
 
     public init(
-        components: Set<VoiceComponent>,
-        vad: VADConfig? = nil,
-        stt: VoiceSTTConfig? = nil,
-        llm: VoiceLLMConfig? = nil,
-        tts: VoiceTTSConfig? = nil,
-        streamingEnabled: Bool = true
+        components: Set<VoiceComponent> = [.vad, .stt, .llm, .tts],
+        vad: VADInitParameters? = nil,
+        stt: STTInitParameters? = nil,
+        llm: LLMInitParameters? = nil,
+        tts: TTSInitParameters? = nil,
+        enableSpeakerDiarization: Bool = false,
+        continuousMode: Bool = false
     ) {
         self.components = components
         self.vad = vad
         self.stt = stt
         self.llm = llm
         self.tts = tts
-        self.streamingEnabled = streamingEnabled
+        self.enableSpeakerDiarization = enableSpeakerDiarization
+        self.continuousMode = continuousMode
     }
 
-    // MARK: - Convenience Builders
-
-    /// Just transcription (STT only)
-    public static func transcriptionOnly(model: String = "whisper-base", language: String = "en") -> ModularPipelineConfig {
-        return ModularPipelineConfig(
-            components: [.stt],
-            stt: VoiceSTTConfig(modelId: model, language: language, streamingEnabled: true)
-        )
-    }
-
-    /// Transcription with VAD (VAD -> STT)
-    public static func transcriptionWithVAD(
-        sttModel: String = "whisper-base",
-        vadThreshold: Float = 0.02
-    ) -> ModularPipelineConfig {
-        return ModularPipelineConfig(
-            components: [.vad, .stt],
-            vad: VADConfig(energyThreshold: vadThreshold),
-            stt: VoiceSTTConfig(modelId: sttModel, streamingEnabled: true)
-        )
-    }
-
-    /// Conversational without TTS (VAD -> STT -> LLM)
-    public static func conversationalNoTTS(
-        sttModel: String = "whisper-base",
-        llmModel: String? = nil
-    ) -> ModularPipelineConfig {
-        return ModularPipelineConfig(
-            components: [.vad, .stt, .llm],
-            vad: VADConfig(),
-            stt: VoiceSTTConfig(modelId: sttModel, streamingEnabled: true),
-            llm: VoiceLLMConfig(modelId: llmModel)
-        )
-    }
-
-    /// Full conversational pipeline (VAD -> STT -> LLM -> TTS)
-    public static func fullPipeline(
-        sttModel: String = "whisper-base",
-        llmModel: String? = nil,
-        ttsVoice: String = "system"
-    ) -> ModularPipelineConfig {
-        return ModularPipelineConfig(
-            components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(),
-            stt: VoiceSTTConfig(modelId: sttModel, streamingEnabled: true),
-            llm: VoiceLLMConfig(modelId: llmModel),
-            tts: VoiceTTSConfig(voice: ttsVoice)
-        )
+    /// Create from VoiceAgentInitParameters
+    public init(from agentParams: VoiceAgentInitParameters) {
+        self.components = [.vad, .stt, .llm, .tts]
+        self.vad = agentParams.vadParameters
+        self.stt = agentParams.sttParameters
+        self.llm = agentParams.llmParameters
+        self.tts = agentParams.ttsParameters
+        self.enableSpeakerDiarization = false
+        self.continuousMode = false
     }
 }
+
+/// Bridge types for backward compatibility
+public typealias VADConfig = VADInitParameters
+public typealias VoiceSTTConfig = STTInitParameters
+public typealias VoiceLLMConfig = LLMInitParameters
+public typealias VoiceTTSConfig = TTSInitParameters

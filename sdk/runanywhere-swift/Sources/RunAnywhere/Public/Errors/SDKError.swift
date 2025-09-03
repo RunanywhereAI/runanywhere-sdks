@@ -18,6 +18,8 @@ public enum SDKError: LocalizedError {
     case invalidResponse(String)
     case authenticationFailed(String)
     case networkError(String)
+    case invalidState(String)
+    case componentNotInitialized(String)
 
     public var errorDescription: String? {
         switch self {
@@ -53,6 +55,10 @@ public enum SDKError: LocalizedError {
             return "Authentication failed: \(reason)"
         case .networkError(let reason):
             return "Network error: \(reason)"
+        case .invalidState(let reason):
+            return "Invalid state: \(reason)"
+        case .componentNotInitialized(let component):
+            return "Component not initialized: \(component)"
         }
     }
 }

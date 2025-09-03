@@ -16,7 +16,7 @@ public class TTSHandler {
     public func speakText(
         text: String,
         service: TextToSpeechService,
-        config: VoiceTTSConfig?,
+        config: TTSInitParameters?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
 
@@ -42,11 +42,11 @@ public class TTSHandler {
     /// Create TTS options from configuration
     /// - Parameter config: TTS configuration
     /// - Returns: TTS options
-    public func createTTSOptions(config: VoiceTTSConfig?) -> TTSOptions {
+    public func createTTSOptions(config: TTSInitParameters?) -> TTSOptions {
         return TTSOptions(
             voice: config?.voice,
-            language: "en",
-            rate: config?.rate ?? 1.0,
+            language: config?.language ?? "en",
+            rate: config?.speakingRate ?? 1.0,
             pitch: config?.pitch ?? 1.0,
             volume: config?.volume ?? 1.0
         )

@@ -72,7 +72,7 @@ class MemoryService: MemoryManager {
     // MARK: - MemoryManager Protocol
 
     func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
-        let framework = service.modelInfo?.framework ?? model.model.preferredFramework ?? .coreML
+        let framework = model.model.preferredFramework ?? .coreML
         let memoryModel = MemoryLoadedModel(
             id: model.model.id,
             name: model.model.name,

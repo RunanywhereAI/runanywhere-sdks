@@ -12,7 +12,7 @@ public enum ModularPipelineError: Error {
 
 // MARK: - Component Types
 
-public enum VoiceComponent: String, CaseIterable {
+public enum VoiceComponent: String, CaseIterable, Codable, Sendable {
     case vad = "VAD"
     case stt = "STT"
     case llm = "LLM"
@@ -374,9 +374,8 @@ public class VoicePipelineManager {
             let sttStageStart = Date()
 
             let options = STTOptions(
-                language: STTOptions.Language(rawValue: sttConfig.language) ?? .english,
-                enableSpeakerDiarization: enableSpeakerDiarization,
-                continuousMode: continuousMode
+                language: sttConfig.language,
+                enableDiarization: enableSpeakerDiarization
             )
 
             // Check the service's preferred audio format
@@ -464,12 +463,12 @@ public class VoicePipelineManager {
 
             let options = RunAnywhereGenerationOptions(
                 maxTokens: config.llm?.maxTokens ?? 100,
-                temperature: config.llm?.temperature ?? 0.7,
+                temperature: Float(config.llm?.temperature ?? 0.7),
                 systemPrompt: config.llm?.systemPrompt
             )
 
             // Check if streaming is enabled (prefer streaming for voice pipelines)
-            let useStreaming = config.llm?.useStreaming ?? true
+            let useStreaming = config.llm?.streamingEnabled ?? true
 
             if useStreaming && llmService != nil && llmService!.isReady {
                 // Use streaming for real-time responses
@@ -592,8 +591,8 @@ public class VoicePipelineManager {
     private func createTTSOptions() -> TTSOptions {
         return TTSOptions(
             voice: config.tts?.voice,
-            language: "en",
-            rate: config.tts?.rate ?? 1.0,
+            language: config.tts?.language ?? "en",
+            rate: config.tts?.speakingRate ?? 1.0,
             pitch: config.tts?.pitch ?? 1.0,
             volume: config.tts?.volume ?? 1.0
         )

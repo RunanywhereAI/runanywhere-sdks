@@ -17,6 +17,7 @@ public final class EventBus: @unchecked Sendable {
     private let networkSubject = PassthroughSubject<SDKNetworkEvent, Never>()
     private let storageSubject = PassthroughSubject<SDKStorageEvent, Never>()
     private let frameworkSubject = PassthroughSubject<SDKFrameworkEvent, Never>()
+    private let componentSubject = PassthroughSubject<ComponentInitializationEvent, Never>()
 
     /// All events publisher
     private let allEventsSubject = PassthroughSubject<any SDKEvent, Never>()
@@ -56,6 +57,10 @@ public final class EventBus: @unchecked Sendable {
 
     public var frameworkEvents: AnyPublisher<SDKFrameworkEvent, Never> {
         frameworkSubject.eraseToAnyPublisher()
+    }
+
+    public var componentEvents: AnyPublisher<ComponentInitializationEvent, Never> {
+        componentSubject.eraseToAnyPublisher()
     }
 
     public var allEvents: AnyPublisher<any SDKEvent, Never> {
@@ -126,6 +131,12 @@ public final class EventBus: @unchecked Sendable {
         allEventsSubject.send(event)
     }
 
+    /// Publish a component initialization event
+    public func publish(_ event: ComponentInitializationEvent) {
+        componentSubject.send(event)
+        allEventsSubject.send(event)
+    }
+
     /// Generic event publisher
     public func publish(_ event: any SDKEvent) {
         switch event {
@@ -148,6 +159,8 @@ public final class EventBus: @unchecked Sendable {
         case let e as SDKFrameworkEvent:
             publish(e)
         case let e as SDKDeviceEvent:
+            publish(e)
+        case let e as ComponentInitializationEvent:
             publish(e)
         default:
             allEventsSubject.send(event)
@@ -193,5 +206,26 @@ extension EventBus {
         voiceEvents.sink { event in
             handler(event)
         }
+    }
+
+    /// Subscribe to component initialization events
+    public func onComponentInitialization(
+        handler: @escaping (ComponentInitializationEvent) -> Void
+    ) -> AnyCancellable {
+        componentEvents.sink { event in
+            handler(event)
+        }
+    }
+
+    /// Subscribe to specific component events
+    public func onComponent(
+        _ component: SDKComponent,
+        handler: @escaping (ComponentInitializationEvent) -> Void
+    ) -> AnyCancellable {
+        componentEvents
+            .filter { $0.component == component }
+            .sink { event in
+                handler(event)
+            }
     }
 }

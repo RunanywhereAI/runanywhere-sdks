@@ -1,5 +1,34 @@
 import Foundation
 
+/// Information about a detected speaker
+public struct SpeakerInfo {
+    public let id: String
+    public var name: String?
+    public let confidence: Float
+    public let firstDetectedAt: TimeInterval
+    public let lastDetectedAt: TimeInterval
+    public let totalSpeakingTime: TimeInterval
+    public let embedding: [Float]?
+
+    public init(
+        id: String,
+        name: String? = nil,
+        confidence: Float = 1.0,
+        firstDetectedAt: TimeInterval = 0,
+        lastDetectedAt: TimeInterval = 0,
+        totalSpeakingTime: TimeInterval = 0,
+        embedding: [Float]? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.confidence = confidence
+        self.firstDetectedAt = firstDetectedAt
+        self.lastDetectedAt = lastDetectedAt
+        self.totalSpeakingTime = totalSpeakingTime
+        self.embedding = embedding
+    }
+}
+
 /// Protocol for speaker diarization implementations
 /// Allows for default SDK implementation, FluidAudio module, or custom implementations
 public protocol SpeakerDiarizationService: AnyObject {
