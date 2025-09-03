@@ -1,10 +1,10 @@
 import Foundation
 
-// MARK: - Voice Extensions (Event-Based)
+// MARK: - Voice Extensions (Component-Based)
 
 public extension RunAnywhere {
 
-    /// Transcribe audio to text with comprehensive event reporting
+    /// Transcribe audio to text using the new component architecture
     /// - Parameters:
     ///   - audio: Audio data to transcribe
     ///   - modelId: Model identifier to use (defaults to whisper model)
@@ -18,161 +18,144 @@ public extension RunAnywhere {
         events.publish(SDKVoiceEvent.transcriptionStarted)
 
         do {
-            // Find appropriate voice service
-            guard let voiceService = await RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId) else {
-                throw STTError.noVoiceServiceAvailable
-            }
+            // Create and initialize STT component
+            let sttConfig = STTConfiguration(
+                modelId: modelId,
+                language: options.language,
+                enablePunctuation: options.enablePunctuation,
+                enableDiarization: options.enableDiarization
+            )
 
-            // Initialize the service
-            try await voiceService.initialize(modelPath: modelId)
+            let sttComponent = await STTComponent(configuration: sttConfig)
+            try await sttComponent.initialize()
 
             // Transcribe audio
-            let result = try await voiceService.transcribe(audio: audio, options: options)
+            let result = try await sttComponent.transcribe(audio, format: options.audioFormat)
+
+            // Convert STTOutput to STTResult for compatibility
+            let sttResult = STTResult(
+                text: result.text,
+                segments: result.wordTimestamps?.map { timestamp in
+                    STTSegment(
+                        text: timestamp.word,
+                        startTime: timestamp.startTime,
+                        endTime: timestamp.endTime,
+                        confidence: timestamp.confidence
+                    )
+                } ?? [],
+                language: result.detectedLanguage,
+                confidence: result.confidence,
+                duration: result.metadata.audioLength,
+                alternatives: result.alternatives?.map { alt in
+                    STTAlternative(
+                        text: alt.text,
+                        confidence: alt.confidence
+                    )
+                } ?? []
+            )
 
             events.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
-            return result
+
+            // Cleanup
+            try await sttComponent.cleanup()
+
+            return sttResult
         } catch {
             events.publish(SDKVoiceEvent.pipelineError(error))
             throw error
         }
     }
 
-    /// Create a modular voice pipeline with event tracking
+    /// Create a voice conversation using components
     /// - Parameters:
-    ///   - vadParams: VAD initialization parameters
-    ///   - sttParams: STT initialization parameters
-    ///   - llmParams: LLM initialization parameters
-    ///   - ttsParams: TTS initialization parameters
-    /// - Returns: Configured voice pipeline
-    static func createVoicePipeline(
-        vadParams: VADInitParameters? = nil,
-        sttParams: STTInitParameters? = nil,
-        llmParams: LLMInitParameters? = nil,
-        ttsParams: TTSInitParameters? = nil
-    ) -> VoicePipelineManager {
-        Task {
-            events.publish(SDKVoiceEvent.pipelineStarted)
-        }
-
-        return RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(
-            vadParams: vadParams,
-            sttParams: sttParams,
-            llmParams: llmParams,
-            ttsParams: ttsParams
-        )
-    }
-
-    /// Create a voice pipeline with ModularPipelineConfig
-    /// - Parameters:
-    ///   - config: Modular pipeline configuration
-    ///   - speakerDiarization: Optional speaker diarization service
-    /// - Returns: Configured voice pipeline
-    static func createVoicePipeline(
-        config: ModularPipelineConfig,
-        speakerDiarization: SpeakerDiarizationService? = nil
-    ) -> VoicePipelineManager {
-        Task {
-            events.publish(SDKVoiceEvent.pipelineStarted)
-        }
-
-        // Create pipeline using config parameters
-        return VoicePipelineManager(
-            config: config,
-            vadService: nil,
-            voiceService: nil,
-            llmService: nil,
-            ttsService: nil,
-            speakerDiarization: speakerDiarization
-        )
-    }
-
-    /// Process voice input through the complete pipeline with real-time events
-    /// - Parameters:
-    ///   - audioStream: Stream of audio chunks
-    ///   - vadParams: VAD initialization parameters
-    ///   - sttParams: STT initialization parameters
-    ///   - llmParams: LLM initialization parameters
-    ///   - ttsParams: TTS initialization parameters
-    /// - Returns: Stream of voice events
-    static func processVoice(
-        audioStream: AsyncStream<VoiceAudioChunk>,
-        vadParams: VADInitParameters? = nil,
-        sttParams: STTInitParameters? = nil,
-        llmParams: LLMInitParameters? = nil,
-        ttsParams: TTSInitParameters? = nil
-    ) -> AsyncThrowingStream<SDKVoiceEvent, Error> {
+    ///   - sttModelId: STT model to use
+    ///   - llmModelId: LLM model to use
+    ///   - ttsVoice: TTS voice to use
+    /// - Returns: AsyncThrowingStream of conversation events
+    static func createVoiceConversation(
+        sttModelId: String = "whisper-base",
+        llmModelId: String = "llama-3.2-1b",
+        ttsVoice: String = "alloy"
+    ) -> AsyncThrowingStream<VoiceConversationEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
-                events.publish(SDKVoiceEvent.pipelineStarted)
-
                 do {
-                    // Create pipeline and process voice stream
-                    let pipeline = RunAnywhere.serviceContainer.voiceCapabilityService.createPipeline(
-                        vadParams: vadParams,
-                        sttParams: sttParams,
-                        llmParams: llmParams,
-                        ttsParams: ttsParams
-                    )
-                    let eventStream = pipeline.process(audioStream: audioStream)
+                    // Create components (these are @MainActor so need await)
+                    let sttComponent = await STTComponent(configuration: STTConfiguration(modelId: sttModelId))
+                    let llmComponent = await LLMComponent(configuration: LLMConfiguration(modelId: llmModelId))
+                    let ttsComponent = await TTSComponent(configuration: TTSConfiguration(voice: ttsVoice))
 
-                    for try await event in eventStream {
-                        // Convert and publish SDK events
-                        if let sdkEvent = convertToSDKEvent(event) {
-                            events.publish(sdkEvent)
-                        }
-                        // Forward to caller
-                        continuation.yield(event)
-                    }
+                    // Initialize all components
+                    try await sttComponent.initialize()
+                    try await llmComponent.initialize()
+                    try await ttsComponent.initialize()
 
-                    events.publish(SDKVoiceEvent.pipelineCompleted)
-                    continuation.finish()
+                    continuation.yield(.initialized)
+
+                    // Components are ready for use
+                    // The actual conversation loop would be implemented here
+
                 } catch {
-                    events.publish(SDKVoiceEvent.pipelineError(error))
                     continuation.finish(throwing: error)
                 }
             }
         }
     }
 
-    /// Find voice service for a specific model
-    /// - Parameter modelId: The model identifier
-    /// - Returns: Voice service if available
-    static func findVoiceService(for modelId: String) async -> STTService? {
-        return await RunAnywhere.serviceContainer.voiceCapabilityService.findVoiceService(for: modelId)
-    }
+    /// Process audio through the voice pipeline
+    /// - Parameters:
+    ///   - audio: Audio data to process
+    ///   - sttModelId: STT model to use
+    ///   - llmModelId: LLM model to use
+    ///   - ttsVoice: TTS voice to use
+    /// - Returns: The final audio response
+    static func processVoiceTurn(
+        audio: Data,
+        sttModelId: String = "whisper-base",
+        llmModelId: String = "llama-3.2-1b",
+        ttsVoice: String = "alloy"
+    ) async throws -> Data {
+        // Create components (these are @MainActor so need await)
+        let sttComponent = await STTComponent(configuration: STTConfiguration(modelId: sttModelId))
+        let llmComponent = await LLMComponent(configuration: LLMConfiguration(modelId: llmModelId))
+        let ttsComponent = await TTSComponent(configuration: TTSConfiguration(voice: ttsVoice))
 
-    /// Find text-to-speech service
-    /// - Returns: TTS service if available
-    static func findTTSService() async -> TextToSpeechService? {
-        return await RunAnywhere.serviceContainer.voiceCapabilityService.findTTSService()
-    }
+        // Initialize all components
+        try await sttComponent.initialize()
+        try await llmComponent.initialize()
+        try await ttsComponent.initialize()
 
-    // MARK: - Private Helper
+        // Process through pipeline
+        // 1. Transcribe audio
+        let transcript = try await sttComponent.transcribe(audio)
+        events.publish(SDKVoiceEvent.transcriptionFinal(text: transcript.text))
 
-    private static func convertToSDKEvent(_ event: ModularPipelineEvent) -> SDKVoiceEvent? {
-        switch event {
-        case .vadSpeechStart:
-            return .vadDetected
-        case .vadSpeechEnd:
-            return .vadEnded
-        case .sttPartialTranscript(let text):
-            return .transcriptionPartial(text: text)
-        case .sttFinalTranscript(let text):
-            return .transcriptionFinal(text: text)
-        case .llmThinking:
-            return .llmProcessing
-        case .llmFinalResponse(let text):
-            return .responseGenerated(text: text)
-        case .ttsStarted:
-            return .synthesisStarted
-        case .ttsComplete:
-            return .synthesisCompleted
-        case .ttsAudioChunk(let chunk):
-            // Convert audio chunk to Data
-            let data = chunk.samples.withUnsafeBytes { Data($0) }
-            return .audioGenerated(data: data)
-        default:
-            return nil
-        }
+        // 2. Generate response
+        let response = try await llmComponent.generate(prompt: transcript.text)
+        events.publish(SDKVoiceEvent.responseGenerated(text: response.text))
+
+        // 3. Synthesize speech
+        let audioResponse = try await ttsComponent.synthesize(response.text)
+        events.publish(SDKVoiceEvent.audioGenerated(data: audioResponse.audioData))
+
+        // Cleanup
+        try await sttComponent.cleanup()
+        try await llmComponent.cleanup()
+        try await ttsComponent.cleanup()
+
+        return audioResponse.audioData
     }
+}
+
+// MARK: - Voice Conversation Events
+
+public enum VoiceConversationEvent {
+    case initialized
+    case transcribing
+    case transcribed(String)
+    case generating
+    case generated(String)
+    case synthesizing
+    case synthesized(Data)
+    case error(Error)
 }

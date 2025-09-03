@@ -338,10 +338,10 @@ public enum RunAnywhere {
             }
 
             try await voiceService.initialize(modelPath: "whisper-base")
-            let result = try await voiceService.transcribe(audio: audioData, options: STTOptions())
+            let result = try await voiceService.transcribe(audioData: audioData, options: STTOptions())
 
-            EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.text))
-            return result.text
+            EventBus.shared.publish(SDKVoiceEvent.transcriptionFinal(text: result.transcript))
+            return result.transcript
         } catch {
             EventBus.shared.publish(SDKVoiceEvent.pipelineError(error))
             throw error

@@ -38,10 +38,10 @@ extension RunAnywhere {
         modelId: String? = nil,
         contextLength: Int = 2048,
         useGPU: Bool = true,
-        quantization: LLMInitParameters.QuantizationLevel? = nil,
+        quantization: LLMConfiguration.QuantizationLevel? = nil,
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
-        let params = LLMInitParameters(
+        let params = LLMConfiguration(
             modelId: modelId,
             contextLength: contextLength,
             useGPUIfAvailable: useGPU,
@@ -59,7 +59,7 @@ extension RunAnywhere {
         enableSpeakerDiarization: Bool = false,
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
-        let params = STTInitParameters(
+        let params = STTConfiguration(
             modelId: modelId,
             language: language,
             enableDiarization: enableSpeakerDiarization
@@ -77,7 +77,7 @@ extension RunAnywhere {
         pitch: Float = 1.0,
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
-        let params = TTSInitParameters(
+        let params = TTSConfiguration(
             voice: voice,
             language: language,
             speakingRate: rate,
@@ -94,7 +94,7 @@ extension RunAnywhere {
         silenceTimeout: TimeInterval = 1.0,
         priority: InitializationPriority = .normal
     ) async -> InitializationResult {
-        let params = VADInitParameters(
+        let params = VADConfiguration(
             energyThreshold: energyThreshold
         )
         let config = UnifiedComponentConfig.vad(params, priority: priority)
@@ -120,10 +120,10 @@ extension RunAnywhere {
         llmModelId: String? = nil
     ) async -> InitializationResult {
         let configs = [
-            UnifiedComponentConfig.vad(VADInitParameters(), priority: .high),
-            UnifiedComponentConfig.stt(STTInitParameters(modelId: sttModelId), priority: .critical),
-            UnifiedComponentConfig.llm(LLMInitParameters(modelId: llmModelId), priority: .high),
-            UnifiedComponentConfig.tts(TTSInitParameters(), priority: .normal)
+            UnifiedComponentConfig.vad(VADConfiguration(), priority: .high),
+            UnifiedComponentConfig.stt(STTConfiguration(modelId: sttModelId), priority: .critical),
+            UnifiedComponentConfig.llm(LLMConfiguration(modelId: llmModelId), priority: .high),
+            UnifiedComponentConfig.tts(TTSConfiguration(), priority: .normal)
         ]
         return await componentInitializer.initialize(configs)
     }
@@ -132,7 +132,7 @@ extension RunAnywhere {
     @discardableResult
     public static func preloadTextGeneration(modelId: String? = nil) async -> InitializationResult {
         let config = UnifiedComponentConfig.llm(
-            LLMInitParameters(modelId: modelId),
+            LLMConfiguration(modelId: modelId),
             priority: .critical
         )
         return await componentInitializer.initialize([config])
@@ -142,7 +142,7 @@ extension RunAnywhere {
     @discardableResult
     public static func preloadVision(modelId: String? = nil) async -> InitializationResult {
         let config = UnifiedComponentConfig.vlm(
-            VLMInitParameters(modelId: modelId),
+            VLMConfiguration(modelId: modelId),
             priority: InitializationPriority.critical
         )
         return await componentInitializer.initialize([config])
@@ -157,7 +157,7 @@ extension RunAnywhere {
         /// Add LLM with parameters
         @discardableResult
         public func withLLM(
-            _ params: LLMInitParameters = LLMInitParameters(),
+            _ params: LLMConfiguration = LLMConfiguration(),
             priority: InitializationPriority = .normal,
             downloadPolicy: DownloadPolicy = .automatic
         ) -> Self {
@@ -168,7 +168,7 @@ extension RunAnywhere {
         /// Add STT with parameters
         @discardableResult
         public func withSTT(
-            _ params: STTInitParameters = STTInitParameters(),
+            _ params: STTConfiguration = STTConfiguration(),
             priority: InitializationPriority = .normal,
             downloadPolicy: DownloadPolicy = .automatic
         ) -> Self {
@@ -179,7 +179,7 @@ extension RunAnywhere {
         /// Add TTS with parameters
         @discardableResult
         public func withTTS(
-            _ params: TTSInitParameters = TTSInitParameters(),
+            _ params: TTSConfiguration = TTSConfiguration(),
             priority: InitializationPriority = .normal
         ) -> Self {
             configs.append(UnifiedComponentConfig.tts(params, priority: priority))
@@ -189,7 +189,7 @@ extension RunAnywhere {
         /// Add VAD with parameters
         @discardableResult
         public func withVAD(
-            _ params: VADInitParameters = VADInitParameters(),
+            _ params: VADConfiguration = VADConfiguration(),
             priority: InitializationPriority = .normal
         ) -> Self {
             configs.append(UnifiedComponentConfig.vad(params, priority: priority))
@@ -199,7 +199,7 @@ extension RunAnywhere {
         /// Add VLM with parameters
         @discardableResult
         public func withVLM(
-            _ params: VLMInitParameters,
+            _ params: VLMConfiguration,
             priority: InitializationPriority = .normal,
             downloadPolicy: DownloadPolicy = .automatic
         ) -> Self {
@@ -207,21 +207,11 @@ extension RunAnywhere {
             return self
         }
 
-        /// Add Embedding with parameters
-        @discardableResult
-        public func withEmbedding(
-            _ params: EmbeddingInitParameters,
-            priority: InitializationPriority = .normal,
-            downloadPolicy: DownloadPolicy = .automatic
-        ) -> Self {
-            configs.append(UnifiedComponentConfig.embedding(params, priority: priority, downloadPolicy: downloadPolicy))
-            return self
-        }
 
         /// Add Speaker Diarization with parameters
         @discardableResult
         public func withSpeakerDiarization(
-            _ params: SpeakerDiarizationInitParameters = SpeakerDiarizationInitParameters(),
+            _ params: SpeakerDiarizationConfiguration = SpeakerDiarizationConfiguration(),
             priority: InitializationPriority = .normal
         ) -> Self {
             configs.append(UnifiedComponentConfig.speakerDiarization(params, priority: priority))
@@ -322,61 +312,27 @@ extension RunAnywhere {
     private static func defaultParameters(for component: SDKComponent) -> any ComponentInitParameters {
         switch component {
         case .llm:
-            return LLMInitParameters()
+            return LLMConfiguration()
         case .stt:
-            return STTInitParameters()
+            return STTConfiguration()
         case .tts:
-            return TTSInitParameters()
+            return TTSConfiguration()
         case .vad:
-            return VADInitParameters()
+            return VADConfiguration()
         case .vlm:
-            return VLMInitParameters()
-        case .embedding:
-            return EmbeddingInitParameters()
+            return VLMConfiguration()
         case .speakerDiarization:
-            return SpeakerDiarizationInitParameters()
+            return SpeakerDiarizationConfiguration()
+        case .embedding:
+            return LLMConfiguration() // Use LLM config as default for embedding
+        case .voiceAgent:
+            // Voice agent is a composite component, use default configs
+            return VoiceAgentConfiguration(
+                vadConfig: VADConfiguration(),
+                sttConfig: STTConfiguration(),
+                llmConfig: LLMConfiguration(),
+                ttsConfig: TTSConfiguration()
+            )
         }
     }
 }
-
-// MARK: - Usage Examples
-
-/*
- // Example 1: Simple initialization with defaults
- await RunAnywhere.initializeComponents([.llm, .stt, .tts])
-
- // Example 2: Initialize LLM with specific parameters
- await RunAnywhere.initializeLLM(
-     modelId: "llama-3.2-1b",
-     contextLength: 4096,
-     useGPU: true,
-     quantization: .q4_k_m
- )
-
- // Example 3: Initialize STT with speaker diarization
- await RunAnywhere.initializeSTT(
-     modelId: "whisper-large",
-     language: "en",
-     enableSpeakerDiarization: true
- )
-
- // Example 4: Builder pattern
- let result = await RunAnywhere.componentBuilder()
-     .withLLM(LLMInitParameters(modelId: "llama-3.2-7b", contextLength: 8192))
-     .withSTT(STTInitParameters(modelId: "whisper-large"))
-     .withTTS()
-     .withVAD()
-     .initialize()
-
- // Example 5: Preload voice assistant
- await RunAnywhere.preloadVoiceAssistant(
-     sttModelId: "whisper-base",
-     llmModelId: "llama-3.2-1b"
- )
-
- // Example 6: Get status with parameters
- let (status, params) = await RunAnywhere.getComponentStatusWithParameters(.llm)
- if let llmParams = params as? LLMInitParameters {
-     print("LLM initialized with context: \(llmParams.contextLength)")
- }
- */

@@ -51,7 +51,7 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var isSpeechDetected: Bool = false
 
     // MARK: - Pipeline State
-    private var voicePipeline: VoicePipelineManager?
+    private var voicePipeline: ModularVoicePipeline?
     private var pipelineTask: Task<Void, Never>?
     private let whisperModelName: String = "whisper-base"
 
@@ -149,8 +149,16 @@ class VoiceAssistantViewModel: ObservableObject {
         )
 
         // Create the pipeline
-        voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
-        voicePipeline?.delegate = self
+        do {
+            voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
+        } catch {
+            sessionState = .error("Failed to create pipeline: \(error.localizedDescription)")
+            currentStatus = "Error"
+            errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
+            logger.error("Failed to create voice pipeline: \(error)")
+            return
+        }
+        // ModularVoicePipeline uses events, not delegates
 
         // Initialize components first
         guard let pipeline = voicePipeline else {
@@ -163,7 +171,7 @@ class VoiceAssistantViewModel: ObservableObject {
         // Initialize all components
         do {
             for try await event in pipeline.initializeComponents() {
-                await handleInitializationEvent(event)
+                handleInitializationEvent(event)
             }
         } catch {
             sessionState = .error("Initialization failed: \(error.localizedDescription)")
@@ -361,14 +369,16 @@ class VoiceAssistantViewModel: ObservableObject {
 
 // MARK: - VoicePipelineManagerDelegate
 
-extension VoiceAssistantViewModel: @preconcurrency VoicePipelineManagerDelegate {
-    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
+// Delegate no longer needed - ModularVoicePipeline uses events
+/*
+extension VoiceAssistantViewModel: @preconcurrency ModularPipelineDelegate {
+    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didReceiveEvent event: ModularPipelineEvent) {
         Task { @MainActor in
             await handlePipelineEvent(event)
         }
     }
 
-    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error) {
+    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
         Task { @MainActor in
             errorMessage = error.localizedDescription
             sessionState = .error(error.localizedDescription)
@@ -378,3 +388,4 @@ extension VoiceAssistantViewModel: @preconcurrency VoicePipelineManagerDelegate 
         }
     }
 }
+*/

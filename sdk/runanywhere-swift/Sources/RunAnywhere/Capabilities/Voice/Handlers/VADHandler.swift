@@ -36,16 +36,6 @@ public final class VADHandler {
         return output.isSpeechDetected
     }
 
-    /// Process audio chunk (legacy method for VoicePipelineManager compatibility)
-    public func processAudioChunk(_ buffer: AVAudioPCMBuffer, vadService: VADService?) async throws -> Bool {
-        return try await processAudioBuffer(buffer, vadService: vadService)
-    }
-
-    /// Process without VAD (legacy method for VoicePipelineManager compatibility)
-    public func processWithoutVAD(_ buffer: AVAudioPCMBuffer) async throws -> Bool {
-        // When VAD is disabled, always return true (speech detected)
-        return true
-    }
 
     /// Reset the handler
     public func reset() {

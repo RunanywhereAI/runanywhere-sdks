@@ -1,11 +1,18 @@
 import Foundation
 
+// MARK: - Voice Agent Service
+
+/// Service wrapper for voice agent since it doesn't have an external service
+public final class VoiceAgentService: @unchecked Sendable {
+    public init() {}
+}
+
 // MARK: - Voice Agent Component
 
 /// Voice Agent component that orchestrates VAD, STT, LLM, and TTS components
 /// Can be used as a complete pipeline or with individual components
 @MainActor
-public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
+public final class VoiceAgentComponent: BaseComponent<VoiceAgentService> {
 
     // MARK: - Properties
 
@@ -18,7 +25,7 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
     public private(set) var ttsComponent: TTSComponent?
 
     // Configuration
-    private let agentParams: VoiceAgentInitParameters
+    private let agentParams: VoiceAgentConfiguration
 
     // State
     private var isProcessing = false
@@ -26,50 +33,40 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
 
     // MARK: - Initialization
 
-    public required init(parameters: any ComponentInitParameters, serviceContainer: ServiceContainer? = nil) {
-        guard let voiceParams = parameters as? VoiceAgentInitParameters else {
-            fatalError("VoiceAgentComponent requires VoiceAgentInitParameters")
-        }
-        self.agentParams = voiceParams
-        super.init(parameters: parameters, serviceContainer: serviceContainer)
+    public init(configuration: VoiceAgentConfiguration, serviceContainer: ServiceContainer? = nil) {
+        self.agentParams = configuration
+        super.init(configuration: configuration, serviceContainer: serviceContainer)
     }
 
-    // MARK: - Component Lifecycle
+    // MARK: - Service Creation
 
-    public override func initialize(with parameters: any ComponentInitParameters) async throws {
-        guard let params = parameters as? VoiceAgentInitParameters else {
-            throw SDKError.validationFailed("Invalid parameters for VoiceAgentComponent")
-        }
+    public override func createService() async throws -> VoiceAgentService {
+        // Voice agent doesn't need an external service, it orchestrates other components
+        return VoiceAgentService()
+    }
 
-        try await super.initialize(with: parameters)
-
-        // Initialize all components (all are required for voice agent)
-        try await initializeComponents(params)
-
-        await transitionTo(state: .ready)
+    public override func initializeService() async throws {
+        // Initialize all components
+        try await initializeComponents()
         eventBus.publish(SDKVoiceEvent.pipelineStarted)
     }
 
-    private func initializeComponents(_ params: VoiceAgentInitParameters) async throws {
+    private func initializeComponents() async throws {
         // Initialize VAD (required)
-        vadComponent = VADComponent(parameters: params.vadParameters, serviceContainer: serviceContainer)
-        try await vadComponent?.initialize(with: params.vadParameters)
-        logger.info("VAD component initialized")
+        vadComponent = VADComponent(configuration: agentParams.vadConfig)
+        try await vadComponent?.initialize()
 
         // Initialize STT (required)
-        sttComponent = STTComponent(parameters: params.sttParameters, serviceContainer: serviceContainer)
-        try await sttComponent?.initialize(with: params.sttParameters)
-        logger.info("STT component initialized")
+        sttComponent = STTComponent(configuration: agentParams.sttConfig)
+        try await sttComponent?.initialize()
 
         // Initialize LLM (required)
-        llmComponent = LLMComponent(parameters: params.llmParameters, serviceContainer: serviceContainer)
-        try await llmComponent?.initialize(with: params.llmParameters)
-        logger.info("LLM component initialized")
+        llmComponent = LLMComponent(configuration: agentParams.llmConfig)
+        try await llmComponent?.initialize()
 
         // Initialize TTS (required)
-        ttsComponent = TTSComponent(parameters: params.ttsParameters, serviceContainer: serviceContainer)
-        try await ttsComponent?.initialize(with: params.ttsParameters)
-        logger.info("TTS component initialized")
+        ttsComponent = TTSComponent(configuration: agentParams.ttsConfig)
+        try await ttsComponent?.initialize()
     }
 
     // MARK: - Pipeline Processing
@@ -101,11 +98,11 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
         // STT Processing
         if let stt = sttComponent?.getService() {
             let transcription = try await stt.transcribe(
-                audio: audioData,
+                audioData: audioData,
                 options: STTOptions()
             )
-            result.transcription = transcription.text
-            eventBus.publish(SDKVoiceEvent.transcriptionFinal(text: transcription.text))
+            result.transcription = transcription.transcript
+            eventBus.publish(SDKVoiceEvent.transcriptionFinal(text: transcription.transcript))
         }
 
         // LLM Processing
@@ -113,7 +110,10 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
            let transcript = result.transcription {
             let response = try await llm.generate(
                 prompt: transcript,
-                options: agentParams.generationOptions
+                options: RunAnywhereGenerationOptions(
+                    maxTokens: agentParams.llmConfig.maxTokens,
+                    temperature: Float(agentParams.llmConfig.temperature)
+                )
             )
             result.response = response
             eventBus.publish(SDKVoiceEvent.responseGenerated(text: response))
@@ -162,14 +162,20 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
     /// Process only through STT
     public func transcribe(_ audioData: Data) async throws -> String? {
         guard let stt = sttComponent?.getService() else { return nil }
-        let result = try await stt.transcribe(audio: audioData, options: STTOptions())
-        return result.text
+        let result = try await stt.transcribe(audioData: audioData, options: STTOptions())
+        return result.transcript
     }
 
     /// Process only through LLM
     public func generateResponse(_ prompt: String) async throws -> String? {
         guard let llm = llmComponent?.getService() else { return nil }
-        let result = try await llm.generate(prompt: prompt, options: agentParams.generationOptions)
+        let result = try await llm.generate(
+            prompt: prompt,
+            options: RunAnywhereGenerationOptions(
+                maxTokens: agentParams.llmConfig.maxTokens,
+                temperature: Float(agentParams.llmConfig.temperature)
+            )
+        )
         return result
     }
 
@@ -181,64 +187,23 @@ public final class VoiceAgentComponent: BaseComponent, @unchecked Sendable {
 
     // MARK: - Cleanup
 
-    public override func cleanup() async throws {
+    public override func performCleanup() async throws {
         isProcessing = false
 
-        try await vadComponent?.cleanup()
-        try await sttComponent?.cleanup()
-        try await llmComponent?.cleanup()
-        try await ttsComponent?.cleanup()
+        try? await vadComponent?.cleanup()
+        try? await sttComponent?.cleanup()
+        try? await llmComponent?.cleanup()
+        try? await ttsComponent?.cleanup()
 
         vadComponent = nil
         sttComponent = nil
         llmComponent = nil
         ttsComponent = nil
-
-        try await super.cleanup()
     }
 }
 
-// MARK: - Voice Agent Initialization Parameters
-
-/// Parameters for initializing the Voice Agent (all components are required)
-public struct VoiceAgentInitParameters: ComponentInitParameters {
-    public let componentType = SDKComponent.voiceAgent
-    public let modelId: String? = nil // Voice agent doesn't have a single model
-
-    // All components are required for voice agent
-    public let vadParameters: VADInitParameters
-    public let sttParameters: STTInitParameters
-    public let llmParameters: LLMInitParameters
-    public let ttsParameters: TTSInitParameters
-
-    // Pipeline configuration
-    public let generationOptions: RunAnywhereGenerationOptions
-    public let streamingEnabled: Bool
-
-    public init(
-        vadParameters: VADInitParameters = VADInitParameters(),
-        sttParameters: STTInitParameters = STTInitParameters(),
-        llmParameters: LLMInitParameters = LLMInitParameters(),
-        ttsParameters: TTSInitParameters = TTSInitParameters(),
-        generationOptions: RunAnywhereGenerationOptions = RunAnywhereGenerationOptions(),
-        streamingEnabled: Bool = false
-    ) {
-        self.vadParameters = vadParameters
-        self.sttParameters = sttParameters
-        self.llmParameters = llmParameters
-        self.ttsParameters = ttsParameters
-        self.generationOptions = generationOptions
-        self.streamingEnabled = streamingEnabled
-    }
-
-    public func validate() throws {
-        // Validate all component parameters
-        try vadParameters.validate()
-        try sttParameters.validate()
-        try llmParameters.validate()
-        try ttsParameters.validate()
-    }
-}
+// VoiceAgentInitParameters has been replaced by VoiceAgentConfiguration
+// which is defined in ComponentInitializationParameters.swift
 
 // MARK: - Voice Agent Result
 

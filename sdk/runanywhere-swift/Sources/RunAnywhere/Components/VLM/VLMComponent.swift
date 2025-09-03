@@ -620,6 +620,3 @@ public final class VLMComponent: BaseComponent<UnavailableVLMService>, @unchecke
 import CoreGraphics
 
 // MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias VLMInitParameters = VLMConfiguration

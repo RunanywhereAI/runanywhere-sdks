@@ -342,11 +342,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
             }
         }
 
-        // Try to get adapter from registry
-        if let adapterRegistry = serviceContainer?.getService(AdapterRegistry.self),
-           let adapter = adapterRegistry.getAdapter(for: .speakerDiarization) as? DefaultSpeakerDiarizationAdapter {
-            return try await adapter.createDiarizationService(configuration: diarizationConfiguration)
-        }
+        // For now, we don't have an adapter registry
 
         // Fallback to default adapter
         let defaultAdapter = DefaultSpeakerDiarizationAdapter()
@@ -354,7 +350,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
     }
 
     public override func initializeService() async throws {
-        currentStage = "service_initialization"
+        // Track initialization
         eventBus.publish(ComponentInitializationEvent.componentInitializing(
             component: Self.componentType,
             modelId: diarizationConfiguration.modelId
@@ -432,10 +428,7 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
         let audioSamples = convertDataToFloatArray(input.audioData)
 
         // Process audio to detect speakers
-        let speakerInfo = diarizationService.detectSpeaker(
-            from: audioSamples,
-            sampleRate: 16000 // Default sample rate
-        )
+        let speakerInfo = diarizationService.processAudio(audioSamples)
 
         // Build segments from speaker info
         var segments: [SpeakerSegment] = []
@@ -588,6 +581,3 @@ public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiar
 }
 
 // MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias SpeakerDiarizationInitParameters = SpeakerDiarizationConfiguration

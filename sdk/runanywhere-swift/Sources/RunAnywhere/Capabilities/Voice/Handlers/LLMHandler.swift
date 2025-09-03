@@ -19,10 +19,10 @@ public class VoiceLLMHandler {
     public func processWithLLM(
         transcript: String,
         llmService: LLMService?,
-        config: LLMInitParameters?,
+        config: LLMConfiguration?,
         streamingTTSHandler: StreamingTTSHandler?,
         ttsEnabled: Bool,
-        ttsConfig: TTSInitParameters?,
+        ttsConfig: TTSConfiguration?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 
@@ -67,7 +67,7 @@ public class VoiceLLMHandler {
         options: RunAnywhereGenerationOptions,
         streamingTTSHandler: StreamingTTSHandler?,
         ttsEnabled: Bool,
-        ttsConfig: TTSInitParameters?,
+        ttsConfig: TTSConfiguration?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 

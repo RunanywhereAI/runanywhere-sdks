@@ -260,11 +260,23 @@ public protocol LLMServiceProvider {
     var name: String { get }
 }
 
+// MARK: - LLM Service Wrapper
+
+/// Wrapper class to allow protocol-based LLM service to work with BaseComponent
+public final class LLMServiceWrapper: ServiceWrapper {
+    public typealias ServiceProtocol = any LLMService
+    public var wrappedService: (any LLMService)?
+
+    public init(_ service: (any LLMService)? = nil) {
+        self.wrappedService = service
+    }
+}
+
 // MARK: - LLM Component
 
 /// Language Model component following the clean architecture
 @MainActor
-public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable {
+public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
 
     // MARK: - Properties
 
@@ -280,25 +292,20 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
 
     // MARK: - Initialization
 
-    public init(configuration: LLMConfiguration, serviceContainer: ServiceContainer? = nil) {
+    public init(configuration: LLMConfiguration) {
         self.llmConfiguration = configuration
-        super.init(configuration: configuration, serviceContainer: serviceContainer)
 
         // Preload context if provided
         if let preloadContext = configuration.preloadContext {
             self.conversationContext = Context(systemPrompt: preloadContext)
         }
+
+        super.init(configuration: configuration)
     }
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> LLMService {
-        // Emit model checking event
-        eventBus.publish(ComponentInitializationEvent.componentChecking(
-            component: Self.componentType,
-            modelId: llmConfiguration.modelId
-        ))
-
+    public override func createService() async throws -> LLMServiceWrapper {
         // Check if model needs downloading
         if let modelId = llmConfiguration.modelId {
             modelPath = modelId // In real implementation, check if model exists
@@ -327,21 +334,21 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
         }
 
         // Create service through provider
-        return try await provider.createLLMService(configuration: llmConfiguration)
+        let llmService = try await provider.createLLMService(configuration: llmConfiguration)
+
+        // Initialize the service
+        try await llmService.initialize(modelPath: modelPath)
+        isModelLoaded = true
+
+        // Wrap and return the service
+        return LLMServiceWrapper(llmService)
     }
 
-    public override func initializeService() async throws {
-        guard let service = service else { return }
-
-        // Track model loading state
-        currentStage = "model_loading"
-        eventBus.publish(ComponentInitializationEvent.componentInitializing(
-            component: Self.componentType,
-            modelId: llmConfiguration.modelId
-        ))
-
-        try await service.initialize(modelPath: modelPath)
-        isModelLoaded = true
+    public override func performCleanup() async throws {
+        await service?.wrappedService?.cleanup()
+        isModelLoaded = false
+        modelPath = nil
+        conversationContext = nil
     }
 
     // MARK: - Model Management
@@ -371,6 +378,12 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
         ))
     }
 
+    // MARK: - Helper Properties
+
+    private var llmService: (any LLMService)? {
+        return service?.wrappedService
+    }
+
     // MARK: - Public API
 
     /// Generate text from a simple prompt
@@ -382,6 +395,11 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
             systemPrompt: systemPrompt
         )
         return try await process(input)
+    }
+
+    /// Generate text from prompt (overload for compatibility)
+    public func generate(prompt: String) async throws -> LLMOutput {
+        return try await generate(prompt, systemPrompt: nil)
     }
 
     /// Generate with conversation history
@@ -396,7 +414,7 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
     public func process(_ input: LLMInput) async throws -> LLMOutput {
         try ensureReady()
 
-        guard let llmService = service else {
+        guard let llmService = llmService else {
             throw SDKError.componentNotReady("LLM service not available")
         }
 
@@ -405,8 +423,8 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
 
         // Use provided options or create from configuration
         let options = input.options ?? RunAnywhereGenerationOptions(
-            temperature: Float(llmConfiguration.temperature),
             maxTokens: llmConfiguration.maxTokens,
+            temperature: Float(llmConfiguration.temperature),
             streamingEnabled: llmConfiguration.streamingEnabled
         )
 
@@ -453,14 +471,14 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
                 do {
                     try ensureReady()
 
-                    guard let llmService = service else {
+                    guard let llmService = llmService else {
                         continuation.finish(throwing: SDKError.componentNotReady("LLM service not available"))
                         return
                     }
 
                     let options = RunAnywhereGenerationOptions(
-                        temperature: Float(llmConfiguration.temperature),
                         maxTokens: llmConfiguration.maxTokens,
+                        temperature: Float(llmConfiguration.temperature),
                         streamingEnabled: true
                     )
 
@@ -486,16 +504,7 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
 
     /// Get service for compatibility
     public func getService() -> LLMService? {
-        return service
-    }
-
-    // MARK: - Cleanup
-
-    public override func performCleanup() async throws {
-        await service?.cleanup()
-        isModelLoaded = false
-        modelPath = nil
-        conversationContext = nil
+        return llmService
     }
 
     // MARK: - Private Helpers
@@ -522,8 +531,3 @@ public final class LLMComponent: BaseComponent<LLMService>, @unchecked Sendable 
         return prompt
     }
 }
-
-// MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias LLMInitParameters = LLMConfiguration
