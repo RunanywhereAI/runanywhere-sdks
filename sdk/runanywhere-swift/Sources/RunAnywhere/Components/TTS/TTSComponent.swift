@@ -427,12 +427,6 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
             modelId: nil // TTS typically doesn't use model files
         ))
 
-        // Try to get adapter from registry
-        if let adapterRegistry = serviceContainer?.getService(AdapterRegistry.self),
-           let adapter = adapterRegistry.getAdapter(for: .tts) as? DefaultTTSAdapter {
-            return try await adapter.createTTSService(configuration: ttsConfiguration)
-        }
-
         // Fallback to default adapter (system TTS)
         let defaultAdapter = DefaultTTSAdapter()
         return try await defaultAdapter.createTTSService(configuration: ttsConfiguration)
@@ -442,7 +436,7 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
         guard let service = service else { return }
 
         // Track initialization
-        currentStage = "voice_loading"
+        // Track voice loading
         eventBus.publish(ComponentInitializationEvent.componentInitializing(
             component: Self.componentType,
             modelId: nil
@@ -620,6 +614,3 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
 }
 
 // MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias TTSInitParameters = TTSConfiguration

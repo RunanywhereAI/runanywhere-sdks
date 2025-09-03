@@ -130,6 +130,8 @@ public actor UnifiedComponentInitializer {
             component = try await createSpeakerDiarizationComponent(config, container: container)
         case .wakeWord:
             throw SDKError.componentNotInitialized("Wake word component not yet implemented")
+        case .voiceAgent:
+            throw SDKError.componentNotInitialized("Voice agent should be created through createVoiceAgent method")
         }
 
         // Store component
@@ -142,43 +144,43 @@ public actor UnifiedComponentInitializer {
     // MARK: - Component Creation Using Existing Adapters
 
     private func createLLMComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? LLMInitParameters else {
+        guard let params = config.parameters as? LLMConfiguration else {
             throw SDKError.validationFailed("Invalid LLM parameters")
         }
 
         // Use existing LLMComponent
-        return LLMComponent(configuration: params, serviceContainer: container)
+        return await LLMComponent(configuration: params)
     }
 
     private func createSTTComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? STTInitParameters else {
+        guard let params = config.parameters as? STTConfiguration else {
             throw SDKError.validationFailed("Invalid STT parameters")
         }
 
         // Create simple STT component that uses adapter
-        return STTComponent(configuration: params, serviceContainer: container)
+        return await STTComponent(configuration: params)
     }
 
     private func createTTSComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? TTSInitParameters else {
+        guard let params = config.parameters as? TTSConfiguration else {
             throw SDKError.validationFailed("Invalid TTS parameters")
         }
 
         // Create simple TTS component
-        return TTSComponent(configuration: params, serviceContainer: container)
+        return await TTSComponent(configuration: params)
     }
 
     private func createVADComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? VADInitParameters else {
+        guard let params = config.parameters as? VADConfiguration else {
             throw SDKError.validationFailed("Invalid VAD parameters")
         }
 
         // VAD uses SimpleEnergyVAD directly - params is already VADConfiguration which VADComponent expects
-        return VADComponent(configuration: params, serviceContainer: container)
+        return await VADComponent(configuration: params)
     }
 
     private func createVLMComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? VLMInitParameters else {
+        guard let params = config.parameters as? VLMConfiguration else {
             throw SDKError.validationFailed("Invalid VLM parameters")
         }
 
@@ -187,20 +189,16 @@ public actor UnifiedComponentInitializer {
     }
 
     private func createEmbeddingComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? EmbeddingInitParameters else {
-            throw SDKError.validationFailed("Invalid Embedding parameters")
-        }
-
-        // For now, Embedding is not implemented - would need adapter support
+        // For now, Embedding is not implemented
         throw SDKError.validationFailed("Embedding component not yet implemented")
     }
 
     private func createSpeakerDiarizationComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? SpeakerDiarizationInitParameters else {
+        guard let params = config.parameters as? SpeakerDiarizationConfiguration else {
             throw SDKError.validationFailed("Invalid Speaker Diarization parameters")
         }
 
-        return SpeakerDiarizationComponent(configuration: params, serviceContainer: container)
+        return await SpeakerDiarizationComponent(configuration: params)
     }
 
     // MARK: - Helper Methods

@@ -92,7 +92,7 @@ public struct UnifiedComponentConfig: Sendable {
 
     /// Convenience initializers for each component type
     public static func llm(
-        _ params: LLMInitParameters,
+        _ params: LLMConfiguration,
         priority: InitializationPriority = .normal,
         downloadPolicy: DownloadPolicy = .automatic
     ) -> UnifiedComponentConfig {
@@ -100,7 +100,7 @@ public struct UnifiedComponentConfig: Sendable {
     }
 
     public static func stt(
-        _ params: STTInitParameters,
+        _ params: STTConfiguration,
         priority: InitializationPriority = .normal,
         downloadPolicy: DownloadPolicy = .automatic
     ) -> UnifiedComponentConfig {
@@ -108,39 +108,65 @@ public struct UnifiedComponentConfig: Sendable {
     }
 
     public static func tts(
-        _ params: TTSInitParameters,
+        _ params: TTSConfiguration,
         priority: InitializationPriority = .normal
     ) -> UnifiedComponentConfig {
         UnifiedComponentConfig(parameters: params, priority: priority)
     }
 
     public static func vad(
-        _ params: VADInitParameters,
+        _ params: VADConfiguration,
         priority: InitializationPriority = .normal
     ) -> UnifiedComponentConfig {
         UnifiedComponentConfig(parameters: params, priority: priority)
     }
 
     public static func vlm(
-        _ params: VLMInitParameters,
+        _ params: VLMConfiguration,
         priority: InitializationPriority = .normal,
         downloadPolicy: DownloadPolicy = .automatic
     ) -> UnifiedComponentConfig {
         UnifiedComponentConfig(parameters: params, priority: priority, downloadPolicy: downloadPolicy)
     }
 
-    public static func embedding(
-        _ params: EmbeddingInitParameters,
-        priority: InitializationPriority = .normal,
-        downloadPolicy: DownloadPolicy = .automatic
-    ) -> UnifiedComponentConfig {
-        UnifiedComponentConfig(parameters: params, priority: priority, downloadPolicy: downloadPolicy)
-    }
 
     public static func speakerDiarization(
-        _ params: SpeakerDiarizationInitParameters,
+        _ params: SpeakerDiarizationConfiguration,
         priority: InitializationPriority = .normal
     ) -> UnifiedComponentConfig {
         UnifiedComponentConfig(parameters: params, priority: priority)
+    }
+}
+
+// MARK: - Voice Agent Configuration
+
+/// Configuration for the Voice Agent composite component
+public struct VoiceAgentConfiguration: ComponentConfiguration, ComponentInitParameters {
+    public let componentType = SDKComponent.voiceAgent
+    public let modelId: String? = nil // Voice agent doesn't have its own model
+
+    // Sub-component configurations
+    public let vadConfig: VADConfiguration
+    public let sttConfig: STTConfiguration
+    public let llmConfig: LLMConfiguration
+    public let ttsConfig: TTSConfiguration
+
+    public init(
+        vadConfig: VADConfiguration = VADConfiguration(),
+        sttConfig: STTConfiguration = STTConfiguration(),
+        llmConfig: LLMConfiguration = LLMConfiguration(),
+        ttsConfig: TTSConfiguration = TTSConfiguration()
+    ) {
+        self.vadConfig = vadConfig
+        self.sttConfig = sttConfig
+        self.llmConfig = llmConfig
+        self.ttsConfig = ttsConfig
+    }
+
+    public func validate() throws {
+        try vadConfig.validate()
+        try sttConfig.validate()
+        try llmConfig.validate()
+        try ttsConfig.validate()
     }
 }

@@ -48,7 +48,7 @@ public actor ComponentInitializer {
     }
 
     /// Get all component statuses with parameters
-    public func getAllStatusesWithParameters() -> [(status: ComponentStatus, parameters: (any ComponentInitParameters)?)] {
+    public func getAllStatusesWithParameters() async -> [(status: ComponentStatus, parameters: (any ComponentInitParameters)?)] {
         // For now, return statuses without parameters
         // This can be enhanced if needed
         let statuses = await unifiedInitializer.getAllStatuses()

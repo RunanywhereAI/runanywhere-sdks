@@ -29,7 +29,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var enableSpeakerDiarization: Bool = true
 
     // MARK: - Transcription State
-    private var voicePipeline: VoicePipelineManager?
+    private var voicePipeline: ModularVoicePipeline?
     private let whisperModelName: String = "whisper-base"
     private var audioStreamContinuation: AsyncStream<VoiceAudioChunk>.Continuation?
     private var pipelineTask: Task<Void, Never>?
@@ -114,26 +114,27 @@ class TranscriptionViewModel: ObservableObject {
             vadThreshold: 0.01  // Lowered for more sensitive voice detection
         )
 
-        // Create the pipeline with FluidAudio diarization if enabled
+        // Create the pipeline with optional diarization
         if enableSpeakerDiarization {
-            logger.info("Using FluidAudioDiarization for speaker detection")
-            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(
-                config: config
-            )
-            voicePipeline?.enableSpeakerDiarization(true)
-            voicePipeline?.enableContinuousMode(true)
+            logger.info("Creating pipeline with FluidAudio diarization")
+            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(config: config)
+            if voicePipeline == nil {
+                // Fallback to standard pipeline if diarization fails
+                do {
+                    voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
+                    logger.info("Created standard voice pipeline (diarization unavailable)")
+                } catch {
+                    errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
+                    currentStatus = "Error"
+                    logger.error("Failed to create voice pipeline: \(error)")
+                    return
+                }
+            }
         } else {
-            // Create standard pipeline
+            // Create standard pipeline without diarization
             do {
                 voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
-                voicePipeline?.delegate = self
-
-                // Enable speaker diarization with default implementation
-                if enableSpeakerDiarization {
-                    voicePipeline?.enableSpeakerDiarization(true)
-                    voicePipeline?.enableContinuousMode(true)
-                    logger.info("Enabled speaker diarization with default implementation")
-                }
+                logger.info("Created voice pipeline without diarization")
             } catch {
                 errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
                 currentStatus = "Error"
@@ -142,7 +143,7 @@ class TranscriptionViewModel: ObservableObject {
             }
         }
 
-        voicePipeline?.delegate = self
+        // ModularVoicePipeline uses events, not delegates
 
         // Initialize components first (VAD and STT only for transcription)
         guard let pipeline = voicePipeline else {
@@ -355,21 +356,4 @@ class TranscriptionViewModel: ObservableObject {
     }
 }
 
-// MARK: - VoicePipelineManagerDelegate
-
-extension TranscriptionViewModel: @preconcurrency VoicePipelineManagerDelegate {
-    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
-        Task { @MainActor in
-            await handlePipelineEvent(event)
-        }
-    }
-
-    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error) {
-        Task { @MainActor in
-            errorMessage = error.localizedDescription
-            isTranscribing = false
-            currentStatus = "Error"
-        }
-        logger.error("Pipeline error: \(error)")
-    }
-}
+// Delegate no longer needed - ModularVoicePipeline uses events

@@ -378,16 +378,42 @@ public struct STTTranscriptionResult: Sendable {
     public let language: String?
     public let alternatives: [AlternativeTranscription]?
 
+    public init(
+        transcript: String,
+        confidence: Float? = nil,
+        timestamps: [TimestampInfo]? = nil,
+        language: String? = nil,
+        alternatives: [AlternativeTranscription]? = nil
+    ) {
+        self.transcript = transcript
+        self.confidence = confidence
+        self.timestamps = timestamps
+        self.language = language
+        self.alternatives = alternatives
+    }
+
     public struct TimestampInfo: Sendable {
         public let word: String
         public let startTime: TimeInterval
         public let endTime: TimeInterval
         public let confidence: Float?
+
+        public init(word: String, startTime: TimeInterval, endTime: TimeInterval, confidence: Float? = nil) {
+            self.word = word
+            self.startTime = startTime
+            self.endTime = endTime
+            self.confidence = confidence
+        }
     }
 
     public struct AlternativeTranscription: Sendable {
         public let transcript: String
         public let confidence: Float
+
+        public init(transcript: String, confidence: Float) {
+            self.transcript = transcript
+            self.confidence = confidence
+        }
     }
 }
 
@@ -413,11 +439,23 @@ public protocol STTServiceProvider {
     var name: String { get }
 }
 
+// MARK: - STT Service Wrapper
+
+/// Wrapper class to allow protocol-based STT service to work with BaseComponent
+public final class STTServiceWrapper: ServiceWrapper {
+    public typealias ServiceProtocol = any STTService
+    public var wrappedService: (any STTService)?
+
+    public init(_ service: (any STTService)? = nil) {
+        self.wrappedService = service
+    }
+}
+
 // MARK: - STT Component
 
 /// Speech-to-Text component following the clean architecture
 @MainActor
-public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable {
+public final class STTComponent: BaseComponent<STTServiceWrapper> {
 
     // MARK: - Properties
 
@@ -429,24 +467,18 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
 
     // MARK: - Initialization
 
-    public init(configuration: STTConfiguration, serviceContainer: ServiceContainer? = nil) {
+    public init(configuration: STTConfiguration) {
         self.sttConfiguration = configuration
-        super.init(configuration: configuration, serviceContainer: serviceContainer)
+        super.init(configuration: configuration)
     }
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> STTService {
-        // Emit model checking event
-        eventBus.publish(ComponentInitializationEvent.componentChecking(
-            component: Self.componentType,
-            modelId: sttConfiguration.modelId
-        ))
-
+    public override func createService() async throws -> STTServiceWrapper {
         // Try to get a registered STT provider from central registry
         guard let provider = ModuleRegistry.shared.sttProvider(for: sttConfiguration.modelId) else {
             throw SDKError.componentNotInitialized(
-                "No STT service provider registered. Please add WhisperCPP or another STT implementation as a dependency and register it with ModuleRegistry.shared.registerSTT(provider)."
+                "No STT service provider registered. Please register WhisperKitServiceProvider.register()"
             )
         }
 
@@ -457,21 +489,21 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
         }
 
         // Create service through provider
-        return try await provider.createSTTService(configuration: sttConfiguration)
+        let sttService = try await provider.createSTTService(configuration: sttConfiguration)
+
+        // Wrap the service
+        let wrapper = STTServiceWrapper(sttService)
+
+        // Service is already initialized by the provider
+        isModelLoaded = true
+
+        return wrapper
     }
 
-    public override func initializeService() async throws {
-        guard let service = service else { return }
-
-        // Track model loading state
-        currentStage = "model_loading"
-        eventBus.publish(ComponentInitializationEvent.componentInitializing(
-            component: Self.componentType,
-            modelId: sttConfiguration.modelId
-        ))
-
-        try await service.initialize(modelPath: modelPath)
-        isModelLoaded = true
+    public override func performCleanup() async throws {
+        await service?.wrappedService?.cleanup()
+        isModelLoaded = false
+        modelPath = nil
     }
 
     // MARK: - Model Management
@@ -498,6 +530,12 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
             component: Self.componentType,
             modelId: modelId
         ))
+    }
+
+    // MARK: - Helper Methods
+
+    private var sttService: (any STTService)? {
+        return service?.wrappedService
     }
 
     // MARK: - Public API
@@ -542,7 +580,7 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
     public func process(_ input: STTInput) async throws -> STTOutput {
         try ensureReady()
 
-        guard let sttService = service else {
+        guard let service = sttService else {
             throw SDKError.componentNotReady("STT service not available")
         }
 
@@ -575,7 +613,7 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
         let startTime = Date()
 
         // Perform transcription
-        let result = try await sttService.transcribe(audioData: audioData, options: options)
+        let result = try await service.transcribe(audioData: audioData, options: options)
 
         let processingTime = Date().timeIntervalSince(startTime)
 
@@ -600,7 +638,7 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
         let audioLength = estimateAudioLength(dataSize: audioData.count, format: input.format, sampleRate: sttConfiguration.sampleRate)
 
         let metadata = TranscriptionMetadata(
-            modelId: sttService.currentModel ?? "unknown",
+            modelId: service.currentModel ?? "unknown",
             processingTime: processingTime,
             audioLength: audioLength
         )
@@ -625,7 +663,7 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
                 do {
                     try ensureReady()
 
-                    guard let sttService = service else {
+                    guard let service = sttService else {
                         continuation.finish(throwing: SDKError.componentNotReady("STT service not available"))
                         return
                     }
@@ -640,7 +678,7 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
                         audioFormat: .pcm
                     )
 
-                    let result = try await sttService.streamTranscribe(
+                    let result = try await service.streamTranscribe(
                         audioStream: audioStream,
                         options: options
                     ) { partial in
@@ -658,16 +696,8 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
     }
 
     /// Get service for compatibility
-    public func getService() -> STTService? {
-        return service
-    }
-
-    // MARK: - Cleanup
-
-    public override func performCleanup() async throws {
-        await service?.cleanup()
-        isModelLoaded = false
-        modelPath = nil
+    public func getService() -> (any STTService)? {
+        return sttService
     }
 
     // MARK: - Private Helpers
@@ -706,6 +736,3 @@ public final class STTComponent: BaseComponent<STTService>, @unchecked Sendable 
 }
 
 // MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias STTInitParameters = STTConfiguration

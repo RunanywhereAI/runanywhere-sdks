@@ -52,7 +52,6 @@ public enum SpeechActivityEvent: String, Sendable {
 // MARK: - VAD Initialization Parameters
 
 /// Initialization parameters for VAD component (alias for VADConfiguration)
-public typealias VADInitParameters = VADConfiguration
 
 // MARK: - VAD Configuration
 

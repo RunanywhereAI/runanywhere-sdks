@@ -25,6 +25,21 @@ public protocol ComponentAdapter {
 
 // MARK: - Simplified Base Component
 
+/// Service wrapper protocol that allows protocol types to be used with BaseComponent
+public protocol ServiceWrapper: AnyObject {
+    associatedtype ServiceProtocol
+    var wrappedService: ServiceProtocol? { get set }
+}
+
+/// Generic service wrapper for any protocol
+public final class AnyServiceWrapper<T>: ServiceWrapper {
+    public var wrappedService: T?
+
+    public init(_ service: T? = nil) {
+        self.wrappedService = service
+    }
+}
+
 /// Simplified base component for all SDK components
 /// Using @unchecked Sendable as we manage thread safety with @MainActor
 @MainActor
@@ -117,7 +132,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
                 modelId: nil
             ))
         } catch {
-            updateState(.error)
+            updateState(.failed)
             eventBus.publish(ComponentInitializationEvent.componentFailed(
                 component: Self.componentType,
                 error: error
@@ -141,7 +156,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     public func cleanup() async throws {
         guard state != .notInitialized else { return }
 
-        state = .terminating
+        state = .notInitialized
 
         // Allow subclass to perform cleanup
         try await performCleanup()

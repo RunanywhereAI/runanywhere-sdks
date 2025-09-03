@@ -140,7 +140,11 @@ public final class ModuleRegistry {
 
 // MARK: - Service Provider Protocols
 
-/// These protocols should be implemented by external modules
+// Service provider protocols are defined in their respective component files:
+// - STTServiceProvider in STTComponent.swift
+// - LLMServiceProvider in LLMComponent.swift
+// - WakeWordServiceProvider in WakeWordComponent.swift
+// - VLMServiceProvider and SpeakerDiarizationServiceProvider defined below
 
 /// Provider for Vision Language Model services
 public protocol VLMServiceProvider {

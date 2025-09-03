@@ -50,28 +50,28 @@ public class VoiceCapabilityService {
     /// - Returns: Configured voice agent component
     @MainActor
     public func createVoiceAgent(
-        vadParams: VADInitParameters? = nil,
-        sttParams: STTInitParameters? = nil,
-        llmParams: LLMInitParameters? = nil,
-        ttsParams: TTSInitParameters? = nil
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
     ) async throws -> VoiceAgentComponent {
         logger.debug("Creating voice agent with custom parameters")
 
-        // Create agent parameters (all components are required, use defaults if not provided)
-        let agentParams = VoiceAgentInitParameters(
-            vadParameters: vadParams ?? VADInitParameters(),
-            sttParameters: sttParams ?? STTInitParameters(),
-            llmParameters: llmParams ?? LLMInitParameters(),
-            ttsParameters: ttsParams ?? TTSInitParameters()
+        // Create agent configuration (all components are required, use defaults if not provided)
+        let agentConfig = VoiceAgentConfiguration(
+            vadConfig: vadParams ?? VADConfiguration(),
+            sttConfig: sttParams ?? STTConfiguration(),
+            llmConfig: llmParams ?? LLMConfiguration(),
+            ttsConfig: ttsParams ?? TTSConfiguration()
         )
 
         // Create and initialize agent
-        let agent = VoiceAgentComponent(
-            parameters: agentParams,
+        let agent = await VoiceAgentComponent(
+            configuration: agentConfig,
             serviceContainer: ServiceContainer.shared
         )
 
-        try await agent.initialize(with: agentParams)
+        try await agent.initialize()
 
         // Track agent
         let agentId = UUID()
@@ -100,20 +100,20 @@ public class VoiceCapabilityService {
         llmModelId: String? = nil
     ) async throws -> VoiceAgentComponent {
         return try await createVoiceAgent(
-            vadParams: VADInitParameters(),
-            sttParams: STTInitParameters(modelId: sttModelId),
-            llmParams: LLMInitParameters(modelId: llmModelId),
-            ttsParams: TTSInitParameters()
+            vadParams: VADConfiguration(),
+            sttParams: STTConfiguration(modelId: sttModelId),
+            llmParams: LLMConfiguration(modelId: llmModelId),
+            ttsParams: TTSConfiguration()
         )
     }
 
     /// Process voice with a custom pipeline configuration
     public func processVoice(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        vadParams: VADInitParameters? = nil,
-        sttParams: STTInitParameters? = nil,
-        llmParams: LLMInitParameters? = nil,
-        ttsParams: TTSInitParameters? = nil
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
     ) -> AsyncThrowingStream<VoiceAgentEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
@@ -137,7 +137,7 @@ public class VoiceCapabilityService {
                     }
 
                     // Process through agent
-                    let eventStream = agent.processStream(dataStream)
+                    let eventStream = await agent.processStream(dataStream)
 
                     for try await event in eventStream {
                         continuation.yield(event)
@@ -207,38 +207,19 @@ public class VoiceCapabilityService {
 // MARK: - Backward Compatibility
 
 extension VoiceCapabilityService {
-    /// Legacy method for backward compatibility
+    /// Create a voice pipeline using the new architecture
     public func createPipeline(
-        vadParams: VADInitParameters? = nil,
-        sttParams: STTInitParameters? = nil,
-        llmParams: LLMInitParameters? = nil,
-        ttsParams: TTSInitParameters? = nil
-    ) -> VoicePipelineManager {
-        // Create a legacy wrapper around the new voice agent
-        Task {
-            let agent = try? await createVoiceAgent(
-                vadParams: vadParams,
-                sttParams: sttParams,
-                llmParams: llmParams,
-                ttsParams: ttsParams
-            )
-
-            // Store reference for later use
-            if let agent = agent {
-                logger.debug("Created legacy pipeline wrapper for voice agent")
-            }
-        }
-
-        // Create a ModularPipelineConfig from the provided parameters
-        let config = ModularPipelineConfig(
-            components: [.vad, .stt, .llm, .tts],
-            vad: vadParams,
-            stt: sttParams,
-            llm: llmParams,
-            tts: ttsParams
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
+    ) async throws -> VoiceAgentComponent {
+        // Use the new VoiceAgent component which is the modern pipeline
+        return try await createVoiceAgent(
+            vadParams: vadParams,
+            sttParams: sttParams,
+            llmParams: llmParams,
+            ttsParams: ttsParams
         )
-
-        // Return a pipeline manager with the config
-        return VoicePipelineManager(config: config)
     }
 }

@@ -9,6 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LLMSwift
 import WhisperKitTranscription
+// import FluidAudioDiarization  // Uncomment when you add this dependency
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -68,18 +69,28 @@ struct RunAnywhereAIApp: App {
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
-            // Register framework adapters before initializing SDK
-            RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
+            // SUPER SIMPLE MODULE REGISTRATION
+            // Just import the modules and call register() - that's it!
+
+            logger.info("🎯 Registering AI modules with the SDK...")
+
+            // Register WhisperKit for Speech-to-Text
+            WhisperKitServiceProvider.register()
+            logger.info("✅ WhisperKit registered for Speech-to-Text")
+
+            // Register LLMSwift for Language Models (llama.cpp)
+            LLMSwiftServiceProvider.register()
+            logger.info("✅ LLMSwift registered for Language Models")
+
+            // Register FluidAudioDiarization if available
+            // FluidAudioDiarizationProvider.register()
+            // logger.info("✅ FluidAudioDiarization registered for Speaker Diarization")
 
             // Register Foundation Models adapter for iOS 26+ and macOS 26+
             if #available(iOS 26.0, macOS 26.0, *) {
                 RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
+                logger.info("✅ Foundation Models registered")
             }
-
-            // Register voice framework adapter (self-contained with models and download strategy)
-            logger.info("🎤 Registering self-contained WhisperKitAdapter...")
-            RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKitAdapter registered with models and download strategy")
 
             // Initialize the SDK with just API key
             let startTime = Date()
@@ -96,7 +107,7 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ SDK successfully initialized!")
             logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
             logger.info("📊 SDK Status: Ready for on-device AI inference")
-            logger.info("🔧 Registered frameworks: LLMSwift, FoundationModels, WhisperKit (self-contained)")
+            logger.info("🔧 Registered modules: WhisperKit, LLMSwift, FoundationModels")
 
             // Note: User settings are now applied per-request, not globally
 

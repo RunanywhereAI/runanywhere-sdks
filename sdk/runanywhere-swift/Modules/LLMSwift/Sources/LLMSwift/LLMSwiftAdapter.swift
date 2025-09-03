@@ -9,7 +9,6 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
     public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
 
-    private var hardwareConfig: HardwareConfiguration?
     private let logger = SDKLogger(category: "LLMSwiftAdapter")
 
     public init() {}
@@ -30,7 +29,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
     public func createService(for modality: FrameworkModality) -> Any? {
         guard modality == .textToText else { return nil }
-        return LLMSwiftService(hardwareConfig: hardwareConfig)
+        return LLMSwiftService()
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
@@ -41,25 +40,18 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
         guard let localPath = model.localPath else {
             logger.error("Model has no local path - not downloaded")
-            throw FrameworkError(
-                framework: framework,
-                underlying: LLMServiceError.modelNotLoaded,
-                context: "Model not downloaded at expected path"
-            )
+            throw LLMServiceError.modelNotFound("Model not downloaded at expected path")
         }
 
         logger.debug("Creating LLMSwiftService with model path")
 
-        let service = LLMSwiftService(hardwareConfig: hardwareConfig)
+        let service = LLMSwiftService()
         logger.debug("Initializing service with model")
         try await service.initialize(modelPath: localPath.path)
         logger.info("Service initialized successfully")
         return service
     }
 
-    public func configure(with hardware: HardwareConfiguration) async {
-        self.hardwareConfig = hardware
-    }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         // GGUF models use approximately their file size in memory
@@ -69,23 +61,15 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
         return baseSize + overhead
     }
 
+    public func configure(with hardware: HardwareConfiguration) async {
+        // Configuration handled internally by LLMSwift
+    }
+
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        // Determine optimal configuration based on model size
-        let hasGPU = HardwareCapabilityManager.shared.isAcceleratorAvailable(.gpu)
-        let modelSize = model.memoryRequired ?? 0
-
-        let preferredAccelerator: HardwareAcceleration = {
-            if hasGPU && modelSize < 4_000_000_000 { // 4GB
-                return .gpu
-            } else {
-                return .cpu
-            }
-        }()
-
+        // Return default configuration - LLMSwift handles optimization internally
         return HardwareConfiguration(
-            primaryAccelerator: preferredAccelerator,
-            memoryMode: .balanced,
-            threadCount: 4
+            primaryAccelerator: .cpu,
+            memoryMode: .balanced
         )
     }
 

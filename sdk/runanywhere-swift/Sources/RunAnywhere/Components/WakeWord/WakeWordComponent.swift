@@ -312,6 +312,3 @@ public final class WakeWordComponent: BaseComponent<DefaultWakeWordService>, @un
 }
 
 // MARK: - Compatibility Typealias
-
-/// Compatibility alias for migration
-public typealias WakeWordInitParameters = WakeWordConfiguration

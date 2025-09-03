@@ -74,11 +74,6 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
         return Array(speakers.values)
     }
 
-    public func getAllSpeakers() -> [SpeakerInfo] {
-        lock.lock()
-        defer { lock.unlock() }
-        return Array(speakers.values)
-    }
 
     public func initialize() async throws {
         // No initialization needed for default implementation
