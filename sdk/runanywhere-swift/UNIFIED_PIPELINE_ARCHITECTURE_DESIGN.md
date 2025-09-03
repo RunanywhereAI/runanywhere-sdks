@@ -2,11 +2,13 @@
 
 ## Core Design Principles
 
-1. **Single Abstraction**: All components inherit from `PipelineComponent` base class
+1. **Single Abstraction**: All components inherit from `BasePipelineComponent` base class
 2. **Consistent Lifecycle**: Every component follows the same lifecycle stages
 3. **Clear I/O Contract**: Each component has well-defined input/output types
 4. **Composable Pipelines**: Components can be chained together dynamically
 5. **Configuration Presets**: Out-of-the-box configurations for common use cases
+6. **Complete Coverage**: ALL components (VAD, STT, TTS, LLM, Diarization, VLM, Embedding) follow the same pattern
+7. **Zero Duplication**: Single source of truth for each component's configuration
 
 ---
 
@@ -111,7 +113,18 @@ open class BasePipelineComponent<Input, Output, Config: ComponentConfiguration>:
 
 ---
 
-## 2. Component Implementations
+## 2. Complete Component Implementations
+
+### Component Coverage
+This design covers ALL components from the SDK:
+- **VADComponent** - Voice Activity Detection
+- **STTComponent** - Speech-to-Text
+- **TTSComponent** - Text-to-Speech
+- **LLMComponent** - Language Model
+- **SpeakerDiarizationComponent** - Speaker Identification
+- **VLMComponent** - Vision Language Model (NEW)
+- **EmbeddingComponent** - Text/Audio Embeddings (NEW)
+- **VoiceAgentComponent** - Composite orchestrator (REFACTORED)
 
 ### VAD Component
 ```swift
@@ -312,11 +325,11 @@ public struct LLMOutput: Sendable {
 public final class TTSComponent: BasePipelineComponent<TTSInput, AudioOutput, TTSConfig> {
     public override var componentType: ComponentType { .tts }
 
-    private var ttsService: TTSService?
+    private var ttsService: TextToSpeechService?
 
     override func performInitialization(_ config: TTSConfig) async throws {
         let adapter = try await AdapterRegistry.shared.getAdapter(for: .tts)
-        self.ttsService = try await adapter.createService(config: config) as? TTSService
+        self.ttsService = try await adapter.createService(config: config) as? TextToSpeechService
     }
 
     override func performProcessing(_ input: TTSInput) async throws -> AudioOutput {
@@ -324,10 +337,17 @@ public final class TTSComponent: BasePipelineComponent<TTSInput, AudioOutput, TT
             throw PipelineError.serviceNotInitialized
         }
 
+        let options = TTSOptions(
+            voice: input.voice,
+            language: input.language,
+            rate: input.rate,
+            pitch: input.pitch,
+            volume: input.volume
+        )
+
         let audioData = try await service.synthesize(
             text: input.text,
-            voice: input.voice,
-            rate: input.rate
+            options: options
         )
 
         return AudioOutput(
@@ -337,6 +357,169 @@ public final class TTSComponent: BasePipelineComponent<TTSInput, AudioOutput, TT
             duration: calculateDuration(audioData)
         )
     }
+}
+
+// Input/Output Types
+public struct TTSInput: Sendable {
+    public let text: String
+    public let voice: String
+    public let language: String
+    public let rate: Float
+    public let pitch: Float
+    public let volume: Float
+}
+
+public struct AudioOutput: Sendable {
+    public let data: Data
+    public let format: AudioFormat
+    public let sampleRate: Int
+    public let duration: TimeInterval
+}
+```
+
+### VLM Component (Vision Language Model)
+```swift
+public final class VLMComponent: BasePipelineComponent<VLMInput, VLMOutput, VLMConfig> {
+    public override var componentType: ComponentType { .vlm }
+
+    private var vlmService: VLMService?
+
+    override func performInitialization(_ config: VLMConfig) async throws {
+        let adapter = try await AdapterRegistry.shared.getAdapter(for: .vlm)
+        self.vlmService = try await adapter.createService(config: config) as? VLMService
+    }
+
+    override func performProcessing(_ input: VLMInput) async throws -> VLMOutput {
+        guard let service = vlmService else {
+            throw PipelineError.serviceNotInitialized
+        }
+
+        let result = try await service.analyze(
+            images: input.images,
+            prompt: input.prompt,
+            options: VLMOptions(
+                temperature: input.temperature,
+                maxTokens: input.maxTokens
+            )
+        )
+
+        return VLMOutput(
+            text: result.text,
+            detections: result.detections,
+            confidence: result.confidence
+        )
+    }
+}
+
+// Configuration
+public struct VLMConfig: ComponentConfiguration {
+    public let modelId: String?
+    public let imageSize: CGSize
+    public let maxImageCount: Int
+    public let contextLength: Int
+    public let useGPUIfAvailable: Bool
+    public let enableMetrics: Bool
+    public let enableLogging: Bool
+    public let timeout: TimeInterval
+
+    public func validate() throws {
+        guard maxImageCount > 0 && maxImageCount <= 10 else {
+            throw ValidationError.outOfRange("maxImageCount", 1...10)
+        }
+        guard contextLength > 0 && contextLength <= 32768 else {
+            throw ValidationError.outOfRange("contextLength", 1...32768)
+        }
+    }
+}
+
+// Input/Output Types
+public struct VLMInput: Sendable {
+    public let images: [Data]
+    public let prompt: String
+    public let temperature: Float
+    public let maxTokens: Int
+}
+
+public struct VLMOutput: Sendable {
+    public let text: String
+    public let detections: [ObjectDetection]
+    public let confidence: Float
+}
+
+public struct ObjectDetection: Sendable {
+    public let label: String
+    public let boundingBox: CGRect
+    public let confidence: Float
+}
+```
+
+### Embedding Component
+```swift
+public final class EmbeddingComponent: BasePipelineComponent<EmbeddingInput, EmbeddingOutput, EmbeddingConfig> {
+    public override var componentType: ComponentType { .embedding }
+
+    private var embeddingService: EmbeddingService?
+
+    override func performInitialization(_ config: EmbeddingConfig) async throws {
+        let adapter = try await AdapterRegistry.shared.getAdapter(for: .embedding)
+        self.embeddingService = try await adapter.createService(config: config) as? EmbeddingService
+    }
+
+    override func performProcessing(_ input: EmbeddingInput) async throws -> EmbeddingOutput {
+        guard let service = embeddingService else {
+            throw PipelineError.serviceNotInitialized
+        }
+
+        let embeddings = try await service.embed(
+            texts: input.texts,
+            options: EmbeddingOptions(
+                normalize: input.normalize,
+                poolingStrategy: input.poolingStrategy
+            )
+        )
+
+        return EmbeddingOutput(
+            embeddings: embeddings,
+            dimensions: embeddings.first?.count ?? 0
+        )
+    }
+}
+
+// Configuration
+public struct EmbeddingConfig: ComponentConfiguration {
+    public let modelId: String?
+    public let dimensions: Int
+    public let normalizeEmbeddings: Bool
+    public let poolingStrategy: PoolingStrategy
+    public let maxSequenceLength: Int
+    public let enableMetrics: Bool
+    public let enableLogging: Bool
+    public let timeout: TimeInterval
+
+    public enum PoolingStrategy: String, Sendable {
+        case mean, max, cls
+    }
+
+    public func validate() throws {
+        guard dimensions > 0 && dimensions <= 4096 else {
+            throw ValidationError.outOfRange("dimensions", 1...4096)
+        }
+        guard maxSequenceLength > 0 && maxSequenceLength <= 8192 else {
+            throw ValidationError.outOfRange("maxSequenceLength", 1...8192)
+        }
+    }
+}
+
+// Input/Output Types
+public struct EmbeddingInput: Sendable {
+    public let texts: [String]
+    public let normalize: Bool
+    public let poolingStrategy: EmbeddingConfig.PoolingStrategy
+}
+
+public struct EmbeddingOutput: Sendable {
+    public let embeddings: [[Float]]
+    public let dimensions: Int
 }
 ```
 
@@ -534,6 +717,21 @@ public extension Pipeline {
 
 ## 5. Unified Adapter System
 
+### Extended Modality Support
+```swift
+public enum FrameworkModality: String, CaseIterable, Sendable {
+    case textToText = "text_to_text"
+    case voiceToText = "voice_to_text"
+    case textToSpeech = "text_to_speech"
+    case imageToText = "image_to_text"
+    case textToImage = "text_to_image"
+    case voiceActivityDetection = "voice_activity_detection"  // NEW
+    case speakerDiarization = "speaker_diarization"  // NEW
+    case textEmbedding = "text_embedding"  // NEW
+    case audioEmbedding = "audio_embedding"  // NEW
+}
+```
+
 ### Adapter Registry
 ```swift
 public final class AdapterRegistry {
@@ -697,32 +895,233 @@ if let sttComponent = pipeline.getComponent(ofType: STTComponent.self) {
 
 ---
 
-## 8. Migration Plan
+## 8. Comprehensive Migration & Cleanup Plan
 
-### Phase 1: Core Infrastructure
-1. Implement `BasePipelineComponent` class
-2. Create `ComponentConfiguration` protocol
-3. Set up `AdapterRegistry` system
-4. Implement `Pipeline` and `PipelineBuilder`
+### Phase 1: Core Infrastructure (Week 1)
+1. **Create New Base Classes**
+   - [ ] Implement `BasePipelineComponent<Input, Output, Config>` class
+   - [ ] Create `ComponentConfiguration` protocol with validation
+   - [ ] Set up `PipelineError` enum with all error cases
+   - [ ] Implement `ComponentMetrics` for observability
 
-### Phase 2: Component Migration
-1. **VADComponent**: Migrate to new base class
-2. **STTComponent**: Update to use consistent pattern
-3. **DiarizationComponent**: Convert to adapter system
-4. **LLMComponent**: Already correct, just inherit new base
-5. **TTSComponent**: Update to new pattern
+2. **Adapter Registry Updates**
+   - [ ] Add missing modalities to `FrameworkModality` enum
+   - [ ] Extend `AdapterRegistry` to support all component types
+   - [ ] Create default adapters for VAD and SpeakerDiarization
+   - [ ] Update `UnifiedFrameworkAdapter` protocol
 
-### Phase 3: Cleanup
-1. Remove old component implementations
-2. Delete duplicate configuration types
-3. Update all pipelines to use new system
-4. Deprecate old APIs
+3. **Pipeline Infrastructure**
+   - [ ] Implement `Pipeline<Input, Output>` class
+   - [ ] Create `PipelineBuilder` with fluent API
+   - [ ] Add `PipelineState` management
+   - [ ] Implement event streaming support
 
-### Phase 4: Testing & Documentation
-1. Unit tests for each component
-2. Integration tests for pipelines
-3. Update documentation
-4. Migration guide for users
+### Phase 2: Component Migration (Week 2)
+
+#### VADComponent (MAJOR REFACTOR)
+**Current Issues**: Direct service creation, no adapter pattern
+**Migration Steps**:
+1. [ ] Create `VADAdapter` implementing `ComponentAdapter`
+2. [ ] Refactor `VADComponent` to inherit from `BasePipelineComponent`
+3. [ ] Move `VADInitParameters` validation to `VADConfig`
+4. [ ] Update to use adapter registry pattern
+5. [ ] **DELETE**: Direct `SimpleEnergyVAD()` instantiation code
+6. [ ] **DELETE**: Old `VADComponent` implementation
+7. [ ] **UPDATE**: All references in pipelines
+
+#### STTComponent (MINOR UPDATE)
+**Current Status**: Already uses adapter pattern correctly
+**Migration Steps**:
+1. [ ] Inherit from `BasePipelineComponent<AudioBuffer, Transcript, STTConfig>`
+2. [ ] Move initialization logic to `performInitialization`
+3. [ ] Move processing logic to `performProcessing`
+4. [ ] **DELETE**: Old `initialize` and `cleanup` methods
+5. [ ] **KEEP**: Adapter registry usage
+
+#### TTSComponent (MINOR UPDATE)
+**Current Status**: Uses adapter with fallback
+**Migration Steps**:
+1. [ ] Inherit from `BasePipelineComponent<TTSInput, AudioOutput, TTSConfig>`
+2. [ ] Keep fallback to `SystemTextToSpeechService`
+3. [ ] **DELETE**: Old lifecycle methods
+4. [ ] **UPDATE**: Use new config structure
+
+#### LLMComponent (MINOR UPDATE)
+**Current Status**: Fixed to use adapter pattern
+**Migration Steps**:
+1. [ ] Inherit from `BasePipelineComponent<LLMInput, LLMOutput, LLMConfig>`
+2. [ ] **DELETE**: Old initialization code
+3. [ ] **KEEP**: Service interface usage
+
+#### SpeakerDiarizationComponent (MAJOR REFACTOR)
+**Current Issues**: Direct service creation
+**Migration Steps**:
+1. [ ] Create `DiarizationAdapter` implementing `ComponentAdapter`
+2. [ ] Refactor to inherit from `BasePipelineComponent`
+3. [ ] **DELETE**: Direct `DefaultSpeakerDiarization()` instantiation
+4. [ ] **DELETE**: Old component implementation
+5. [ ] Update to use adapter registry
+
+#### VLMComponent (NEW IMPLEMENTATION)
+1. [ ] Create `VLMComponent` extending `BasePipelineComponent`
+2. [ ] Create `VLMService` protocol
+3. [ ] Create `VLMAdapter` for model loading
+4. [ ] Implement `VLMConfig` with validation
+
+#### EmbeddingComponent (NEW IMPLEMENTATION)
+1. [ ] Create `EmbeddingComponent` extending `BasePipelineComponent`
+2. [ ] Create `EmbeddingService` protocol
+3. [ ] Create `EmbeddingAdapter` for model loading
+4. [ ] Implement `EmbeddingConfig` with validation
+
+#### VoiceAgentComponent (COMPLETE REFACTOR)
+**Current Status**: Composite component orchestrating others
+**Migration Steps**:
+1. [ ] Refactor as a `Pipeline` instead of component
+2. [ ] Use `PipelineBuilder` to compose sub-components
+3. [ ] **DELETE**: Current `VoiceAgentComponent` class
+4. [ ] **CREATE**: `VoiceAgentPipeline` using new architecture
+5. [ ] Update all usages to new pipeline API
+
+### Phase 3: File Cleanup (Week 3)
+
+#### Files to DELETE
+```
+✗ Sources/RunAnywhere/Components/VAD/VADComponent.swift (old implementation)
+✗ Sources/RunAnywhere/Components/STT/STTComponent.swift (old implementation)
+✗ Sources/RunAnywhere/Components/TTS/TTSComponent.swift (old implementation)
+✗ Sources/RunAnywhere/Components/LLM/LLMComponent.swift (old implementation)
+✗ Sources/RunAnywhere/Components/SpeakerDiarization/SpeakerDiarizationComponent.swift (old)
+✗ Sources/RunAnywhere/Components/VoiceAgent/VoiceAgentComponent.swift (becomes pipeline)
+✗ Sources/RunAnywhere/Core/Components/BaseComponent.swift (replaced by BasePipelineComponent)
+✗ Sources/RunAnywhere/Public/Models/Voice/ModularPipelineConfig.swift (replaced by pipeline configs)
+```
+
+#### Files to UPDATE
+```
+→ Sources/RunAnywhere/Core/Protocols/Voice/VADService.swift
+  - Remove VADInitParameters (moved to VADConfig)
+  - Keep VADService protocol
+
+→ Sources/RunAnywhere/Core/Protocols/Voice/SpeechToTextService.swift
+  - Remove STTInitParameters (moved to STTConfig)
+  - Keep STTService protocol
+
+→ Sources/RunAnywhere/Core/Protocols/Voice/TextToSpeechService.swift
+  - Remove TTSInitParameters (moved to TTSConfig)
+  - Keep TextToSpeechService protocol
+
+→ Sources/RunAnywhere/Core/Protocols/LLM/LLMService.swift
+  - Remove LLMInitParameters (moved to LLMConfig)
+  - Keep LLMService protocol
+
+→ Sources/RunAnywhere/Core/Protocols/Frameworks/UnifiedFrameworkAdapter.swift
+  - Add new modalities
+  - Update initializeComponent signature
+```
+
+#### Files to CREATE
+```
+✓ Sources/RunAnywhere/Core/Pipeline/BasePipelineComponent.swift
+✓ Sources/RunAnywhere/Core/Pipeline/Pipeline.swift
+✓ Sources/RunAnywhere/Core/Pipeline/PipelineBuilder.swift
+✓ Sources/RunAnywhere/Core/Pipeline/PipelineError.swift
+✓ Sources/RunAnywhere/Core/Pipeline/ComponentConfiguration.swift
+✓ Sources/RunAnywhere/Core/Pipeline/ComponentMetrics.swift
+
+✓ Sources/RunAnywhere/Components/Pipeline/VADPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/STTPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/TTSPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/LLMPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/DiarizationPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/VLMPipelineComponent.swift
+✓ Sources/RunAnywhere/Components/Pipeline/EmbeddingPipelineComponent.swift
+
+✓ Sources/RunAnywhere/Adapters/VADAdapter.swift
+✓ Sources/RunAnywhere/Adapters/DiarizationAdapter.swift
+✓ Sources/RunAnywhere/Adapters/VLMAdapter.swift
+✓ Sources/RunAnywhere/Adapters/EmbeddingAdapter.swift
+
+✓ Sources/RunAnywhere/Services/VLMService.swift
+✓ Sources/RunAnywhere/Services/EmbeddingService.swift
+```
+
+### Phase 4: API Migration (Week 3-4)
+
+#### Public API Changes
+**DEPRECATED APIs**:
+```swift
+// OLD
+@available(*, deprecated, message: "Use Pipeline.speechToText() instead")
+public func createTranscriptionPipeline() -> TranscriptionPipeline
+
+@available(*, deprecated, message: "Use Pipeline.voiceAgent() instead")
+public func createVoiceAgent() -> VoiceAgentPipeline
+
+@available(*, deprecated, message: "Use componentBuilder() instead")
+public func initializeComponents([SDKComponent]) -> InitializationResult
+```
+
+**NEW APIs**:
+```swift
+// NEW
+public extension RunAnywhere {
+    func pipeline() -> PipelineBuilder
+    func createPipeline<I, O>(_ config: PipelineConfiguration) -> Pipeline<I, O>
+}
+
+// Usage
+let pipeline = RunAnywhere.shared
+    .pipeline()
+    .addVAD()
+    .addSTT(language: "en-US")
+    .addLLM(temperature: 0.7)
+    .addTTS(voice: "neural-1")
+    .build()
+```
+
+### Phase 5: Testing & Validation (Week 4)
+
+1. **Unit Tests**
+   - [ ] Test each new pipeline component
+   - [ ] Test adapter registry with all modalities
+   - [ ] Test pipeline builder composition
+   - [ ] Test configuration validation
+
+2. **Integration Tests**
+   - [ ] Test complete pipelines (STT, Voice Agent, etc.)
+   - [ ] Test error handling and recovery
+   - [ ] Test streaming operations
+   - [ ] Test component metrics
+
+3. **Migration Tests**
+   - [ ] Ensure old APIs still work with deprecation warnings
+   - [ ] Test migration from old to new components
+   - [ ] Validate no functionality is lost
+
+4. **Performance Tests**
+   - [ ] Benchmark new vs old implementation
+   - [ ] Memory usage comparison
+   - [ ] Latency measurements
+
+### Phase 6: Documentation (Week 4-5)
+
+1. **API Documentation**
+   - [ ] Document all new pipeline components
+   - [ ] Document pipeline builder API
+   - [ ] Document configuration options
+   - [ ] Add code examples
+
+2. **Migration Guide**
+   - [ ] Step-by-step migration instructions
+   - [ ] Common migration patterns
+   - [ ] Troubleshooting guide
+   - [ ] Performance tuning tips
+
+3. **Examples**
+   - [ ] Update all example apps
+   - [ ] Create new pipeline examples
+   - [ ] Add advanced usage patterns
 
 ---
 
@@ -754,19 +1153,108 @@ if let sttComponent = pipeline.getComponent(ofType: STTComponent.self) {
 
 ---
 
-## 10. Next Steps
+## 10. Complete Coverage Checklist
 
-1. **Review & Approve Design**: Ensure this meets all requirements
-2. **Start with VADComponent**: Implement as reference
-3. **Create Tests**: TDD for each component
-4. **Incremental Migration**: One component at a time
-5. **Documentation**: Update as we go
+### Components Covered ✅
+- [x] **VADComponent** - Full refactor to pipeline pattern
+- [x] **STTComponent** - Minor update, keep adapter pattern
+- [x] **TTSComponent** - Minor update with fallback
+- [x] **LLMComponent** - Minor update, already fixed
+- [x] **SpeakerDiarizationComponent** - Full refactor needed
+- [x] **VLMComponent** - New implementation
+- [x] **EmbeddingComponent** - New implementation
+- [x] **VoiceAgentComponent** - Convert to pipeline
 
-This design provides:
-- ✅ Single abstraction (BasePipelineComponent)
-- ✅ Consistent lifecycle management
-- ✅ Clear input/output contracts
-- ✅ Preset configurations (STT, Voice Agent, LLM)
-- ✅ Composable pipelines
-- ✅ Clean public APIs
-- ✅ Extensibility for custom components
+### Use Cases Covered ✅
+- [x] Basic speech-to-text transcription
+- [x] Multi-speaker transcription with diarization
+- [x] Real-time voice conversation (Voice Agent)
+- [x] Text generation with local LLM
+- [x] Vision-language understanding
+- [x] Text/audio embeddings for search
+- [x] Custom pipeline composition
+- [x] Streaming audio processing
+- [x] Batch text processing
+
+### Edge Cases Handled ✅
+- [x] Component initialization failure → Error state with recovery
+- [x] Service not available → Adapter fallback mechanism
+- [x] Pipeline component mismatch → Compile-time type safety
+- [x] Streaming interruption → Graceful cleanup
+- [x] Memory constraints → Component metrics monitoring
+- [x] Invalid configuration → Validation at initialization
+- [x] Concurrent pipeline execution → Thread-safe design
+- [x] Component hot-swapping → State management
+
+### API Consistency ✅
+- [x] All components inherit from `BasePipelineComponent`
+- [x] All use `performInitialization` and `performProcessing`
+- [x] All have typed `Input`, `Output`, and `Config`
+- [x] All support metrics and logging
+- [x] All use adapter registry pattern
+- [x] All have validation in config
+- [x] All support async/await
+- [x] All are `@MainActor` and `Sendable`
+
+### Files to Delete (Complete List) 🗑️
+```
+1. Components/VAD/VADComponent.swift
+2. Components/STT/STTComponent.swift
+3. Components/STT/STTInitParameters.swift
+4. Components/TTS/TTSComponent.swift
+5. Components/TTS/TTSInitParameters.swift
+6. Components/LLM/LLMComponent.swift
+7. Components/SpeakerDiarization/SpeakerDiarizationComponent.swift
+8. Components/VoiceAgent/VoiceAgentComponent.swift
+9. Components/VAD/VADInitParameters.swift
+10. Core/Components/BaseComponent.swift
+11. Core/Components/ComponentFactory.swift
+12. Core/Initialization/ComponentInitializer.swift
+13. Core/Initialization/UnifiedComponentInitializer.swift
+14. Public/Models/Voice/ModularPipelineConfig.swift
+15. Public/Models/Voice/VoiceConfigs.swift (already deleted)
+16. Public/Models/ComponentInitializationParameters.swift (duplicate params)
+```
+
+### Validation Criteria ✅
+- [ ] All old components deleted
+- [ ] No duplicate parameter definitions
+- [ ] All components use adapter registry
+- [ ] All components inherit from BasePipelineComponent
+- [ ] All pipelines use PipelineBuilder
+- [ ] All configs have validation
+- [ ] All services have consistent interfaces
+- [ ] All examples updated
+- [ ] All tests passing
+- [ ] Zero compiler warnings
+
+## 11. Final Architecture Benefits
+
+### For Users
+1. **Simpler API**: One way to build pipelines
+2. **Type Safety**: Compile-time validation
+3. **Better Errors**: Clear error messages
+4. **Performance**: Optimized component chaining
+5. **Flexibility**: Easy custom pipelines
+
+### For Maintainers
+1. **Single Pattern**: All components work the same
+2. **Easy Testing**: Uniform component interface
+3. **Clear Dependencies**: Explicit I/O contracts
+4. **Easy Extensions**: Just inherit base class
+5. **Better Debugging**: Centralized lifecycle
+
+### Risk Mitigation
+1. **Backward Compatibility**: Deprecation warnings, not breaks
+2. **Incremental Migration**: Component by component
+3. **Fallback Support**: Keep working implementations
+4. **Testing Coverage**: Comprehensive test suite
+5. **Documentation**: Complete migration guide
+
+This design ensures:
+- ✅ **100% Component Coverage**: All 8 components included
+- ✅ **Zero Duplication**: Single source of truth
+- ✅ **Complete Consistency**: Same pattern everywhere
+- ✅ **Full Type Safety**: Compile-time validation
+- ✅ **Clean Architecture**: SOLID principles
+- ✅ **Future Proof**: Easy to add new components
