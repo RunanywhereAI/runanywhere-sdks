@@ -10,7 +10,7 @@ import java.io.File
 class ValidationService {
     private val logger = SDKLogger("ValidationService")
 
-    suspend fun validate(modelPath: String, modelInfo: ModelInfo): Boolean {
+    fun validate(modelPath: String, modelInfo: ModelInfo): Boolean {
         try {
             val file = File(modelPath)
 
@@ -27,7 +27,7 @@ class ValidationService {
             }
 
             // Check file size (if we know the expected size)
-            modelInfo.downloadSize?.let { expectedSize ->
+            modelInfo.downloadSize.let { expectedSize ->
                 val actualSize = file.length()
                 if (actualSize < expectedSize * 0.9) { // Allow 10% tolerance
                     logger.error("Model file size mismatch. Expected: $expectedSize, Actual: $actualSize")
