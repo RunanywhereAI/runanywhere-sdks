@@ -1,15 +1,10 @@
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.analytics.AnalyticsTracker
-import com.runanywhere.sdk.components.base.VADComponent
-import com.runanywhere.sdk.components.base.STTComponent
-import com.runanywhere.sdk.components.stt.STTConfig
-import com.runanywhere.sdk.components.stt.WhisperSTTComponent
-import com.runanywhere.sdk.components.vad.VADConfig
-import com.runanywhere.sdk.components.vad.WebRTCVADComponent
-import com.runanywhere.sdk.events.EventBus
-import com.runanywhere.sdk.events.STTEvent
-import com.runanywhere.sdk.events.TranscriptionEvent
+import com.runanywhere.sdk.components.base.*
+import com.runanywhere.sdk.components.stt.*
+import com.runanywhere.sdk.components.vad.*
+import com.runanywhere.sdk.events.*
 import com.runanywhere.sdk.models.ModelManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,21 +15,28 @@ import kotlinx.coroutines.flow.flow
 data class STTSDKConfig(
     val modelId: String = "whisper-base",
     val enableVAD: Boolean = true,
-    val vadConfig: VADConfig = VADConfig(),
+    val vadConfig: VADConfiguration = VADConfiguration(),
     val language: String = "en",
     val enableAnalytics: Boolean = true
 )
 
 /**
  * Main public API for RunAnywhere STT SDK
+ * This is a convenience wrapper around the component architecture
  */
-object RunAnywhereSTT {
+object RunAnywhere {
     private var vadComponent: VADComponent? = null
     private var sttComponent: STTComponent? = null
     private val modelManager = ModelManager()
     private val analytics = AnalyticsTracker()
     private var isInitialized = false
     private var config: STTSDKConfig? = null
+
+    init {
+        // Register default service providers
+        WhisperServiceProvider.register()
+        WebRTCVADServiceProvider.register()
+    }
 
     /**
      * Initialize the SDK
@@ -44,17 +46,17 @@ object RunAnywhereSTT {
 
         // Initialize VAD if enabled
         if (sdkConfig.enableVAD) {
-            vadComponent = WebRTCVADComponent()
-            vadComponent?.initialize(sdkConfig.vadConfig)
+            vadComponent = VADComponent(sdkConfig.vadConfig)
+            vadComponent?.initialize()
         }
 
         // Initialize STT
-        sttComponent = WhisperSTTComponent()
-        val sttConfig = STTConfig(
+        val sttConfig = STTConfiguration(
             modelId = sdkConfig.modelId,
             language = sdkConfig.language
         )
-        sttComponent?.initialize(sttConfig)
+        sttComponent = STTComponent(sttConfig)
+        sttComponent?.initialize()
 
         // Track initialization
         if (sdkConfig.enableAnalytics) {
@@ -191,7 +193,7 @@ object RunAnywhereSTT {
 
     private fun requireInitialized() {
         if (!isInitialized) {
-            throw IllegalStateException("SDK not initialized. Call RunAnywhereSTT.initialize() first")
+            throw IllegalStateException("SDK not initialized. Call RunAnywhere.initialize() first")
         }
     }
 

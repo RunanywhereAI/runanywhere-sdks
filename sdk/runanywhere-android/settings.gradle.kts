@@ -30,5 +30,3 @@ rootProject.name = "RunAnywhereSDK"
 // Include SDK modules
 include(":core")
 include(":jni")
-// Temporarily disabled due to Gradle compatibility issues
-// include(":plugin")

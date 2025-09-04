@@ -2,6 +2,8 @@ package com.runanywhere.sdk.components.vad
 
 import com.runanywhere.sdk.components.base.*
 import com.runanywhere.sdk.jni.WebRTCVadJNI
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * VAD Configuration
@@ -24,7 +26,9 @@ class WebRTCVADComponent : VADComponent {
     override suspend fun initialize(config: ComponentConfig) {
         require(config is VADConfig) { "Invalid config type" }
         this.config = config
-        vadPtr = jni.initialize(config.aggressiveness, config.sampleRate)
+        vadPtr = withContext(Dispatchers.IO) {
+            jni.initialize(config.aggressiveness, config.sampleRate)
+        }
     }
 
     override fun processAudioChunk(audio: FloatArray): VADResult {
@@ -39,7 +43,9 @@ class WebRTCVADComponent : VADComponent {
 
     override suspend fun cleanup() {
         if (vadPtr != 0L) {
-            jni.destroy(vadPtr)
+            withContext(Dispatchers.IO) {
+                jni.destroy(vadPtr)
+            }
             vadPtr = 0
         }
     }
