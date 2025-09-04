@@ -1,28 +1,28 @@
 [versions]
 # Android & Kotlin
-agp = "8.7.2"
+agp = "8.7.3"
 kotlin = "2.0.21"
 
 # AndroidX Core
-coreKtx = "1.13.1"
+coreKtx = "1.15.0"
 appcompat = "1.7.0"
 material = "1.12.0"
-lifecycleRuntimeKtx = "2.8.6"
+lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewModelCompose = "2.8.7"
-activityCompose = "1.9.0"
+activityCompose = "1.9.3"
 
 # Compose
-composeBom = "2024.06.00"
+composeBom = "2024.12.01"
 
 # Coroutines
-coroutines = "1.8.1"
+coroutines = "1.9.0"
 
 # Testing
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-mockito = "5.1.0"
-mockk = "1.13.8"
+mockito = "5.15.0"
+mockk = "1.13.14"
 
 # Logging
 slf4j = "2.0.16"
@@ -31,14 +31,14 @@ timber = "5.0.1"
 
 # Networking
 okhttp = "4.12.0"
-retrofit = "2.9.0"
+retrofit = "2.11.0"
 
 # JSON
 gson = "2.11.0"
-kotlinxSerialization = "1.7.3"
+kotlinxSerialization = "1.8.0"
 
 # Navigation
-navigationCompose = "2.7.7"
+navigationCompose = "2.8.5"
 
 # Code Quality
 detekt = "1.23.7"
@@ -47,14 +47,14 @@ detekt = "1.23.7"
 intellij = "1.17.4"
 
 # Dependency Injection
-hilt = "2.48"
+hilt = "2.52"
 hiltNavigationCompose = "1.2.0"
 
 # Work Manager
-workManager = "2.9.0"
+workManager = "2.10.0"
 
 # File Management
-commonsIo = "2.11.0"
+commonsIo = "2.18.0"
 
 # Speech Recognition
 whisperJni = "1.7.1"
@@ -77,6 +77,9 @@ securityCrypto = "1.1.0-alpha06"
 # Play Core
 playCore = "1.10.3"
 playCoreKtx = "1.8.1"
+
+# Accompanist
+accompanist = "0.36.0"
 
 [libraries]
 # AndroidX Core
@@ -171,6 +174,9 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 # Play Core
 google-play-core = { group = "com.google.android.play", name = "core", version.ref = "playCore" }
 google-play-core-ktx = { group = "com.google.android.play", name = "core-ktx", version.ref = "playCoreKtx" }
+
+# Accompanist
+accompanist-permissions = { group = "com.google.accompanist", name = "accompanist-permissions", version.ref = "accompanist" }
 
 [plugins]
 # Android

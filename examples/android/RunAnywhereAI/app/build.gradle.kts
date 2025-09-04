@@ -192,7 +192,7 @@ android {
 
 dependencies {
     // SDK module
-    implementation(project(":sdk:runanywhere-android:core"))
+    implementation(project(":sdk-core"))
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
@@ -247,6 +247,9 @@ dependencies {
 
     // Security
     implementation(libs.androidx.security.crypto)
+
+    // Permissions
+    implementation(libs.accompanist.permissions)
 
     // Room Database (if needed for model caching)
     implementation(libs.androidx.room.runtime)
