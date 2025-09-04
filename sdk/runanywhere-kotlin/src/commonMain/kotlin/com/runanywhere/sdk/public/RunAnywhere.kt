@@ -2,7 +2,7 @@ package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.ConfigurationData
-import com.runanywhere.sdk.data.models.ModelInfo
+import com.runanywhere.sdk.models.ModelInfo
 import kotlinx.coroutines.flow.Flow
 
 /**

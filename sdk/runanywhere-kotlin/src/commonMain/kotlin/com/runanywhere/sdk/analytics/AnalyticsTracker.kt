@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.analytics
 
+import com.runanywhere.sdk.data.models.generateUUID
 import kotlin.random.Random
 
 /**
@@ -17,8 +18,23 @@ data class AnalyticsEvent(
  */
 class AnalyticsTracker {
     private val events = mutableListOf<AnalyticsEvent>()
-    private val sessionId = generateUUID()
     private val sdkVersion = "1.0.0"
+    private val sessionId: String = run {
+        val chars = "0123456789abcdef"
+        buildString {
+            repeat(8) { append(chars.random()) }
+            append('-')
+            repeat(4) { append(chars.random()) }
+            append('-')
+            append('4') // Version 4 UUID
+            repeat(3) { append(chars.random()) }
+            append('-')
+            append(listOf('8', '9', 'a', 'b').random()) // Variant
+            repeat(3) { append(chars.random()) }
+            append('-')
+            repeat(12) { append(chars.random()) }
+        }
+    }
 
     /**
      * Track an analytics event
@@ -92,20 +108,4 @@ class AnalyticsTracker {
         return "multiplatform"
     }
 
-    private fun generateUUID(): String {
-        val chars = "0123456789abcdef"
-        return buildString {
-            repeat(8) { append(chars.random()) }
-            append('-')
-            repeat(4) { append(chars.random()) }
-            append('-')
-            append('4') // Version 4 UUID
-            repeat(3) { append(chars.random()) }
-            append('-')
-            append(listOf('8', '9', 'a', 'b').random()) // Variant
-            repeat(3) { append(chars.random()) }
-            append('-')
-            repeat(12) { append(chars.random()) }
-        }
-    }
 }

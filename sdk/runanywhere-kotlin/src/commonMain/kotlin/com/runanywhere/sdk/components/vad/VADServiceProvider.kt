@@ -5,22 +5,22 @@ import com.runanywhere.sdk.components.base.VADServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
- * WebRTC VAD Service Provider
+ * Platform VAD Service Provider
  */
-class WebRTCVADServiceProvider : VADServiceProvider {
-    private val logger = SDKLogger("WebRTCVADServiceProvider")
+class PlatformVADServiceProvider : VADServiceProvider {
+    private val logger = SDKLogger("PlatformVADServiceProvider")
 
-    override val name: String = "WebRTCVAD"
+    override val name: String = "PlatformVAD"
 
     override suspend fun createVADService(configuration: VADConfiguration): VADService {
-        logger.info("Creating WebRTC VAD Service")
-        val service = WebRTCVADService()
-        service.initialize(configuration)
-        return service
+        logger.info("Creating Platform VAD Service")
+        return createPlatformVADService().also {
+            it.initialize(configuration)
+        }
     }
 
     override fun canHandle(modelId: String?): Boolean {
-        // WebRTC VAD doesn't use models, so it can handle any request
+        // Platform VAD doesn't use models, so it can handle any request
         return true
     }
 
@@ -29,7 +29,12 @@ class WebRTCVADServiceProvider : VADServiceProvider {
          * Register this provider with the module registry
          */
         fun register() {
-            ModuleRegistry.registerVADProvider(WebRTCVADServiceProvider())
+            ModuleRegistry.registerVADProvider(PlatformVADServiceProvider())
         }
     }
 }
+
+/**
+ * Platform-specific VAD service creation
+ */
+expect fun createPlatformVADService(): VADService

@@ -8,7 +8,8 @@ import com.runanywhere.sdk.data.models.SessionTelemetryData
 import com.runanywhere.sdk.data.models.TelemetryBatch
 import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.TelemetryEventType
-import com.runanywhere.sdk.data.repository.TelemetryRepository
+import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.data.models.TelemetryEventData
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import kotlinx.coroutines.CoroutineScope
@@ -19,7 +20,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.UUID
+import com.runanywhere.sdk.data.models.generateUUID
 
 /**
  * Telemetry Service
@@ -36,7 +37,7 @@ class TelemetryService(
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Session management
-    private val sessionId = UUID.randomUUID().toString()
+    private val sessionId = generateUUID()
     private var currentSession: SessionTelemetryData? = null
 
     // Batching configuration
@@ -61,6 +62,21 @@ class TelemetryService(
     }
 
     /**
+     * Track a telemetry event data
+     * Simple event tracking for components
+     */
+    suspend fun trackEvent(event: TelemetryEventData) = mutex.withLock {
+        logger.debug("Tracking event data: ${event.type}")
+
+        try {
+            telemetryRepository.saveEventData(event)
+            logger.debug("Event data tracked: ${event.type}")
+        } catch (e: Exception) {
+            logger.error("Failed to track event data: ${event.type} - ${e.message}")
+        }
+    }
+
+    /**
      * Track a telemetry event
      * Equivalent to iOS: func trackEvent(_ type: TelemetryEventType, properties: [String: String]) async throws
      */
@@ -76,7 +92,7 @@ class TelemetryService(
                 deviceId = deviceId ?: "unknown",
                 appVersion = appVersion,
                 sdkVersion = sdkVersion,
-                osVersion = android.os.Build.VERSION.RELEASE
+                osVersion = "Android"
             )
 
             // Save to repository
@@ -93,7 +109,7 @@ class TelemetryService(
             logger.debug("Event tracked: $type")
 
         } catch (e: Exception) {
-            logger.error("Failed to track event: $type", e)
+            logger.error("Failed to track event: $type - ${e.message}")
             // Don't throw - telemetry failures shouldn't break the app
         }
     }
@@ -114,7 +130,7 @@ class TelemetryService(
                 deviceId = deviceId ?: "unknown",
                 appVersion = appVersion,
                 sdkVersion = sdkVersion,
-                osVersion = android.os.Build.VERSION.RELEASE
+                osVersion = "Android"
             )
 
             telemetryRepository.saveEvent(event)
@@ -127,7 +143,7 @@ class TelemetryService(
             logger.debug("Custom event tracked: $name")
 
         } catch (e: Exception) {
-            logger.error("Failed to track custom event: $name", e)
+            logger.error("Failed to track custom event: $name - ${e.message}")
         }
     }
 
@@ -141,8 +157,8 @@ class TelemetryService(
         return try {
             telemetryRepository.getAllEvents()
         } catch (e: Exception) {
-            logger.error("Failed to get all events", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to get all events: ${e.message}")
+            throw SDKError.RuntimeError("Failed to get all events: ${e.message}")
         }
     }
 
@@ -158,8 +174,8 @@ class TelemetryService(
             logger.info("${eventIds.size} events marked as sent")
 
         } catch (e: Exception) {
-            logger.error("Failed to mark events as sent", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to mark events as sent: ${e.message}")
+            throw SDKError.RuntimeError("Failed to mark events as sent: ${e.message}")
         }
     }
 
@@ -197,7 +213,7 @@ class TelemetryService(
             logger.info("Telemetry synced successfully")
 
         } catch (e: Exception) {
-            logger.error("Failed to sync telemetry", e)
+            logger.error("Failed to sync telemetry: ${e.message}")
             throw SDKError.NetworkError("Failed to sync telemetry: ${e.message}")
         }
     }
@@ -276,9 +292,9 @@ class TelemetryService(
      */
     suspend fun trackInitialization(apiKey: String, version: String) {
         val properties = mapOf(
-            "api_key_hash" = apiKey.hashCode().toString(),
-            "version" = version,
-            "platform" = "android"
+            "api_key_hash" to apiKey.hashCode().toString(),
+            "version" to version,
+            "platform" to "android"
         )
 
         trackEvent(TelemetryEventType.SDK_INITIALIZATION, properties)
@@ -357,6 +373,22 @@ class TelemetryService(
     }
 
     /**
+     * Initialize telemetry service
+     */
+    suspend fun initialize() {
+        logger.info("Telemetry service initialized")
+    }
+
+    /**
+     * Cleanup telemetry service
+     */
+    suspend fun cleanup() = mutex.withLock {
+        // Send any pending events
+        sendBatch()
+        logger.info("Telemetry service cleaned up")
+    }
+
+    /**
      * Set device and app information
      * Initialize telemetry context
      */
@@ -426,7 +458,7 @@ class TelemetryService(
             logger.debug("Telemetry batch sent with ${batch.size} events")
 
         } catch (e: Exception) {
-            logger.error("Failed to send telemetry batch", e)
+            logger.error("Failed to send telemetry batch: ${e.message}")
             // Keep events in pending list for retry
         }
     }

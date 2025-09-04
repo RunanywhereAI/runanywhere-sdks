@@ -30,7 +30,7 @@ class ModelManager {
     suspend fun ensureModel(modelId: String): String {
         // Check if model exists locally
         storage.getModelPath(modelId)?.let {
-            return it.absolutePath
+            return it
         }
 
         // Download if needed

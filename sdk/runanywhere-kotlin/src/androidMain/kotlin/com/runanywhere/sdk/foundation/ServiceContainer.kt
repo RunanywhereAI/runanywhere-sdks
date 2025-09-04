@@ -6,16 +6,28 @@ import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.models.*
-import com.runanywhere.sdk.services.*
+import com.runanywhere.sdk.services.MemoryService
+import com.runanywhere.sdk.services.AnalyticsService
+import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.services.ValidationService
 import com.runanywhere.sdk.services.auth.AuthenticationService
 import com.runanywhere.sdk.services.configuration.ConfigurationService
-import com.runanywhere.sdk.services.deviceinfo.DeviceInfoService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
 import com.runanywhere.sdk.services.telemetry.TelemetryService
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
-import com.runanywhere.sdk.data.repository.*
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.repositories.ModelInfoRepository
+import com.runanywhere.sdk.data.repositories.ConfigurationRepository
+import com.runanywhere.sdk.data.repositories.ConfigurationRepositoryImpl
+import com.runanywhere.sdk.data.repositories.DeviceInfoRepository
+import com.runanywhere.sdk.data.repositories.DeviceInfoRepositoryImpl
+import com.runanywhere.sdk.data.repositories.TelemetryRepository
+import com.runanywhere.sdk.data.repositories.TelemetryRepositoryImpl
+import com.runanywhere.sdk.data.models.SDKInitParams
+import com.runanywhere.sdk.data.models.ConfigurationData
+import com.runanywhere.sdk.data.models.TelemetryEventData
+import com.runanywhere.sdk.data.models.TelemetryEventType
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.network.*
 import com.runanywhere.sdk.data.network.services.MockNetworkService
 import com.runanywhere.sdk.files.FileManager
@@ -45,8 +57,24 @@ class ServiceContainer {
         com.runanywhere.sdk.services.auth.AuthenticationService(requireContext())
     }
 
+    // Repository implementations
+    val configurationRepository: ConfigurationRepository by lazy {
+        ConfigurationRepositoryImpl(database, networkService)
+    }
+
+    val deviceInfoRepository: DeviceInfoRepository by lazy {
+        DeviceInfoRepositoryImpl(database)
+    }
+
+    val telemetryRepository: TelemetryRepository by lazy {
+        TelemetryRepositoryImpl(database, networkService)
+    }
+
     val configurationService: ConfigurationService by lazy {
-        ConfigurationService()
+        ConfigurationService(
+            configRepository = configurationRepository,
+            syncCoordinator = syncCoordinator
+        )
     }
 
     val modelInfoRepository: ModelInfoRepository by lazy {
@@ -64,12 +92,18 @@ class ServiceContainer {
         )
     }
 
-    val deviceInfoService: DeviceInfoService by lazy {
-        com.runanywhere.sdk.services.deviceinfo.DeviceInfoService(requireContext())
+    val deviceInfoService: com.runanywhere.sdk.services.deviceinfo.DeviceInfoService by lazy {
+        com.runanywhere.sdk.services.deviceinfo.DeviceInfoService(
+            deviceInfoRepository = deviceInfoRepository,
+            syncCoordinator = syncCoordinator
+        )
     }
 
     val telemetryService: TelemetryService by lazy {
-        TelemetryService()
+        TelemetryService(
+            telemetryRepository = telemetryRepository,
+            syncCoordinator = syncCoordinator
+        )
     }
 
     val fileManager: FileManager by lazy {
@@ -155,7 +189,7 @@ class ServiceContainer {
                     try {
                         telemetryService.trackEvent(telemetryEvent)
                     } catch (e: Exception) {
-                        SDKLogger("ServiceContainer").error("Failed to send STT analytics", e)
+                        com.runanywhere.sdk.foundation.SDKLogger("ServiceContainer").error("Failed to send STT analytics: ${e.message}")
                     }
                 }
             }

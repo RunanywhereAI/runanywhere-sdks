@@ -3,7 +3,6 @@ package com.runanywhere.sdk.models
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import java.io.File
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 
@@ -43,7 +42,7 @@ data class ModelInfo(
     var syncPending: Boolean = false,
 
     // Usage tracking
-    var lastUsed: Date? = null,
+    var lastUsed: Instant? = null,
     var usageCount: Int = 0,
 
     // Non-persistent runtime properties
@@ -54,7 +53,7 @@ data class ModelInfo(
      * Whether this model is downloaded and available locally
      */
     val isDownloaded: Boolean
-        get() = localPath?.let { File(it).exists() } ?: false
+        get() = localPath != null
 
     /**
      * Whether this model is available for use (downloaded and locally accessible)

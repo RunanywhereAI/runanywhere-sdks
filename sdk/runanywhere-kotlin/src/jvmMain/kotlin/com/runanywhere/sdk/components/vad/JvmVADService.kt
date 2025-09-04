@@ -5,41 +5,56 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
+ * Platform-specific VAD service creation for JVM
+ */
+actual fun createPlatformVADService(): VADService = JvmVADService()
+
+/**
  * JVM Voice Activity Detection Service
  * Simple energy-based VAD implementation for JVM platforms
  */
 class JvmVADService : VADService {
 
     private val logger = SDKLogger("JvmVADService")
-    private var isInitialized = false
+    private var _isInitialized = false
+    private var _configuration: VADConfiguration? = null
 
     // VAD parameters
-    private val energyThreshold = 0.01f
-    private val minSpeechFrames = 3
-    private val maxSilenceFrames = 10
+    private var energyThreshold = 0.01f
+    private var minSpeechFrames = 3
+    private var maxSilenceFrames = 10
 
     // State tracking
     private var consecutiveSpeechFrames = 0
     private var consecutiveSilenceFrames = 0
     private var currentlyInSpeech = false
 
-    override suspend fun initialize(): Result<Unit> {
-        return try {
-            isInitialized = true
+    override val isReady: Boolean
+        get() = _isInitialized
+
+    override val configuration: VADConfiguration?
+        get() = _configuration
+
+    override suspend fun initialize(configuration: VADConfiguration) {
+        try {
+            // Store configuration
+            _configuration = configuration
+            energyThreshold = configuration.energyThreshold
+
+            _isInitialized = true
             logger.info("JVM VAD service initialized with energy-based detection")
-            Result.success(Unit)
         } catch (e: Exception) {
             logger.error("Failed to initialize JVM VAD service", e)
-            Result.failure(e)
+            throw VADError.ConfigurationError
         }
     }
 
-    override suspend fun processAudioChunk(audioData: FloatArray): VADResult {
-        if (!isInitialized) {
+    override fun processAudioChunk(audioSamples: FloatArray): VADResult {
+        if (!_isInitialized) {
             return VADResult(isSpeech = false, confidence = 0.0f)
         }
 
-        val energy = calculateEnergy(audioData)
+        val energy = calculateEnergy(audioSamples)
         val isSpeechFrame = energy > energyThreshold
 
         // Apply smoothing logic
@@ -74,13 +89,20 @@ class JvmVADService : VADService {
 
         return VADResult(
             isSpeech = currentlyInSpeech,
-            confidence = confidence,
-            speechProbability = minOf(energy / energyThreshold, 1.0f)
+            confidence = confidence
         )
     }
 
+    override fun reset() {
+        consecutiveSpeechFrames = 0
+        consecutiveSilenceFrames = 0
+        currentlyInSpeech = false
+        logger.debug("JVM VAD service reset")
+    }
+
     override suspend fun cleanup() {
-        isInitialized = false
+        _isInitialized = false
+        _configuration = null
         consecutiveSpeechFrames = 0
         consecutiveSilenceFrames = 0
         currentlyInSpeech = false

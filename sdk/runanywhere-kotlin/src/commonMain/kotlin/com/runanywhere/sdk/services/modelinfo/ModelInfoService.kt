@@ -1,11 +1,12 @@
 package com.runanywhere.sdk.services.modelinfo
 
-import com.runanywhere.sdk.data.models.LLMFramework
-import com.runanywhere.sdk.data.models.ModelInfo
-import com.runanywhere.sdk.data.models.ModelRegistryEntry
-import com.runanywhere.sdk.data.models.ModelSearchCriteria
+import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.data.repository.ModelInfoRepository
+import com.runanywhere.sdk.data.models.ModelSearchCriteria
+import com.runanywhere.sdk.data.repositories.ModelInfoRepository
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import kotlinx.coroutines.sync.Mutex
@@ -40,7 +41,7 @@ class ModelInfoService(
             validateModelInfo(model)
 
             // Save to repository
-            modelInfoRepository.saveModel(model)
+            modelInfoRepository.save(model)
 
             // Update cache
             cachedModels[model.id] = model
@@ -48,8 +49,8 @@ class ModelInfoService(
             logger.info("Model saved successfully: ${model.id}")
 
         } catch (e: Exception) {
-            logger.error("Failed to save model: ${model.id}", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to save model: ${model.id} - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -70,7 +71,7 @@ class ModelInfoService(
             }
 
             // Load from repository
-            val model = modelInfoRepository.getModel(modelId)
+            val model = modelInfoRepository.fetch(modelId)
 
             if (model != null) {
                 // Update cache
@@ -83,8 +84,8 @@ class ModelInfoService(
             return model
 
         } catch (e: Exception) {
-            logger.error("Failed to get model: $modelId", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to get model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -96,7 +97,9 @@ class ModelInfoService(
         logger.debug("Loading models for frameworks: $frameworks")
 
         try {
-            val models = modelInfoRepository.getModelsForFrameworks(frameworks)
+            val models = frameworks.flatMap { framework ->
+                modelInfoRepository.fetchByFramework(framework)
+            }.distinct()
 
             // Update cache
             models.forEach { model ->
@@ -107,8 +110,8 @@ class ModelInfoService(
             return models
 
         } catch (e: Exception) {
-            logger.error("Failed to load models for frameworks: $frameworks", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to load models for frameworks: $frameworks - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -126,12 +129,12 @@ class ModelInfoService(
 
             // Update download status
             val updatedModel = currentModel.copy(
-                isDownloaded = isDownloaded,
-                updatedAt = Clock.System.now().toEpochMilliseconds()
+                localPath = if (isDownloaded) "/path/to/model" else null,
+                updatedAt = Clock.System.now()
             )
 
             // Save updated model
-            modelInfoRepository.saveModel(updatedModel)
+            modelInfoRepository.save(updatedModel)
 
             // Update cache
             cachedModels[modelId] = updatedModel
@@ -139,8 +142,8 @@ class ModelInfoService(
             logger.info("Download status updated for model: $modelId")
 
         } catch (e: Exception) {
-            logger.error("Failed to update download status for model: $modelId", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to update download status for model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -156,16 +159,15 @@ class ModelInfoService(
                 ?: throw SDKError.ModelNotFound(modelId)
 
             val updatedModel = currentModel.copy(
-                downloadProgress = progress,
-                updatedAt = Clock.System.now().toEpochMilliseconds()
+                updatedAt = Clock.System.now()
             )
 
-            modelInfoRepository.saveModel(updatedModel)
+            modelInfoRepository.save(updatedModel)
             cachedModels[modelId] = updatedModel
 
         } catch (e: Exception) {
-            logger.error("Failed to update download progress for model: $modelId", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to update download progress for model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -173,6 +175,15 @@ class ModelInfoService(
      * Sync model info with remote
      * Equivalent to iOS: func syncModelInfo() async throws
      */
+    /**
+     * Initialize the service
+     */
+    suspend fun initialize() {
+        logger.info("ModelInfoService initialized")
+        // Load initial models if needed
+        clearCache()
+    }
+
     suspend fun syncModelInfo() = mutex.withLock {
         logger.debug("Syncing model info")
 
@@ -182,10 +193,10 @@ class ModelInfoService(
                 coordinator.syncModelInfo()
             } ?: run {
                 // Direct sync without coordinator
-                val remoteModels = modelInfoRepository.fetchRemoteModels()
+                val remoteModels = modelInfoRepository.fetchAll()
 
                 remoteModels.forEach { model ->
-                    modelInfoRepository.saveModel(model)
+                    modelInfoRepository.save(model)
                     cachedModels[model.id] = model
                 }
             }
@@ -194,7 +205,7 @@ class ModelInfoService(
             logger.info("Model info synced successfully")
 
         } catch (e: Exception) {
-            logger.error("Failed to sync model info", e)
+            logger.error("Failed to sync model info: ${e.message}")
             throw SDKError.NetworkError("Failed to sync model info: ${e.message}")
         }
     }
@@ -207,7 +218,7 @@ class ModelInfoService(
         logger.debug("Getting all models")
 
         try {
-            val models = modelInfoRepository.getAllModels()
+            val models = modelInfoRepository.fetchAll()
 
             // Update cache
             models.forEach { model ->
@@ -217,8 +228,8 @@ class ModelInfoService(
             return models
 
         } catch (e: Exception) {
-            logger.error("Failed to get all models", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to get all models: ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -230,13 +241,21 @@ class ModelInfoService(
         logger.debug("Searching models with criteria: $criteria")
 
         try {
-            val models = modelInfoRepository.searchModels(criteria)
+            // TODO: Implement searchModels in repository
+            // val models = modelInfoRepository.searchModels(criteria)
+            // For now, use getAllModels and filter
+            val allModels = getAllModels()
+            val models = allModels.filter { model ->
+                (criteria.category == null || model.category == criteria.category) &&
+                (criteria.framework == null || model.framework == criteria.framework) &&
+                (criteria.format == null || model.format == criteria.format)
+            }
             logger.info("Found ${models.size} models matching criteria")
             return models
 
         } catch (e: Exception) {
-            logger.error("Failed to search models", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to search models: ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -248,14 +267,14 @@ class ModelInfoService(
         logger.debug("Deleting model: $modelId")
 
         try {
-            modelInfoRepository.deleteModel(modelId)
+            modelInfoRepository.delete(modelId)
             cachedModels.remove(modelId)
 
             logger.info("Model deleted: $modelId")
 
         } catch (e: Exception) {
-            logger.error("Failed to delete model: $modelId", e)
-            throw SDKError.DatabaseInitializationFailed(e)
+            logger.error("Failed to delete model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }
 
@@ -271,15 +290,15 @@ class ModelInfoService(
                 ?: throw SDKError.ModelNotFound(modelId)
 
             val updatedModel = currentModel.copy(
-                lastUsed = Clock.System.now().toEpochMilliseconds(),
-                updatedAt = Clock.System.now().toEpochMilliseconds()
+                lastUsed = Clock.System.now(),
+                updatedAt = Clock.System.now()
             )
 
-            modelInfoRepository.saveModel(updatedModel)
+            modelInfoRepository.save(updatedModel)
             cachedModels[modelId] = updatedModel
 
         } catch (e: Exception) {
-            logger.error("Failed to update last used for model: $modelId", e)
+            logger.error("Failed to update last used for model: $modelId - ${e.message}")
             // Don't throw - this is not critical
         }
     }
@@ -318,15 +337,15 @@ class ModelInfoService(
             throw SDKError.ConfigurationError("Model name cannot be blank")
         }
 
-        if (model.downloadURL.isBlank()) {
+        if (model.downloadURL?.isBlank() == true) {
             throw SDKError.ConfigurationError("Model download URL cannot be blank")
         }
 
-        if (model.downloadSize <= 0) {
+        if ((model.downloadSize ?: 0) <= 0) {
             throw SDKError.ConfigurationError("Model download size must be positive")
         }
 
-        if (model.memoryRequired <= 0) {
+        if ((model.memoryRequired ?: 0) <= 0) {
             throw SDKError.ConfigurationError("Model memory required must be positive")
         }
 

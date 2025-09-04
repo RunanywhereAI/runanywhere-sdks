@@ -2,6 +2,7 @@ package com.runanywhere.sdk.components.stt
 
 import com.runanywhere.sdk.components.base.*
 import com.runanywhere.sdk.components.vad.VADOutput
+import com.runanywhere.sdk.data.models.SDKError
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 

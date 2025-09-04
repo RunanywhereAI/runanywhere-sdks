@@ -4,6 +4,7 @@ import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTService
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
+import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.datetime.Clock
@@ -305,16 +306,7 @@ private class EmptyComponentParameters : ComponentInitParameters {
 
 // MARK: - Component Events moved to events package
 
-// MARK: - SDK Errors
-
-sealed class SDKError : Exception() {
-    data class InvalidState(override val message: String) : SDKError()
-    data class ComponentNotReady(override val message: String) : SDKError()
-    data class ComponentNotInitialized(override val message: String) : SDKError()
-    data class ValidationFailed(override val message: String) : SDKError()
-    data class ServiceNotAvailable(override val message: String) : SDKError()
-    data class ModelNotFound(override val message: String) : SDKError()
-}
+// MARK: - SDK Errors - using the central SDKError from data.models package
 
 // MARK: - Service Container
 

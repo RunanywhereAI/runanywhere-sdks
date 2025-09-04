@@ -13,7 +13,6 @@ kotlin {
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.add("-Xskip-metadata-version-check")
         }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
@@ -24,7 +23,6 @@ kotlin {
     androidTarget {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            freeCompilerArgs.add("-Xskip-metadata-version-check")
         }
     }
 

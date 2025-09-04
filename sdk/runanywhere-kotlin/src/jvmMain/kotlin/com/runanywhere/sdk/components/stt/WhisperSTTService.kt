@@ -15,7 +15,7 @@ import java.nio.file.Paths
  * Whisper STT Service implementation using whisper-jni library
  * Provides high-quality speech-to-text transcription using OpenAI's Whisper model
  */
-class WhisperSTTService : STTService {
+actual class WhisperSTTService : STTService {
     private val logger = SDKLogger("WhisperSTTService")
     private var whisperJNI: WhisperJNI? = null
     private var whisperContext: WhisperContext? = null
@@ -36,7 +36,7 @@ class WhisperSTTService : STTService {
         }
     }
 
-    override suspend fun initialize(modelPath: String?) {
+    actual override suspend fun initialize(modelPath: String?) {
         withContext(Dispatchers.IO) {
             if (modelPath == null) {
                 throw STTError.ModelNotFound("Model path is required")
@@ -78,7 +78,7 @@ class WhisperSTTService : STTService {
         }
     }
 
-    override suspend fun transcribe(
+    actual override suspend fun transcribe(
         audioData: ByteArray,
         options: STTOptions
     ): STTTranscriptionResult {
@@ -144,7 +144,7 @@ class WhisperSTTService : STTService {
         }
     }
 
-    override suspend fun <T> streamTranscribe(
+    actual override suspend fun <T> streamTranscribe(
         audioStream: Flow<ByteArray>,
         options: STTOptions,
         onPartial: (String) -> Unit
@@ -185,10 +185,10 @@ class WhisperSTTService : STTService {
         )
     }
 
-    override val isReady: Boolean
+    actual override val isReady: Boolean
         get() = isInitialized && whisperContext != null
 
-    override val currentModel: String?
+    actual override val currentModel: String?
         get() = modelPath?.substringAfterLast("/")?.substringBeforeLast(".")
 
     override suspend fun cleanup() {
@@ -263,7 +263,7 @@ class WhisperSTTService : STTService {
             printRealtime = false // Don't print realtime
 
             // Performance settings
-            speedUp = false // Don't speed up (better accuracy)
+            // speedUp is not available in whisper-jni
             audioCtx = 0 // Use default audio context
 
             // Temperature for sampling (0 = deterministic)
