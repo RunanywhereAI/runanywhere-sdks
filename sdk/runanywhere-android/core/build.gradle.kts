@@ -19,8 +19,13 @@ dependencies {
     // JSON parsing
     implementation(libs.gson)
 
-    // JNI module dependency
-    implementation(project(":jni"))
+    // JNI module dependency - optional as it contains native implementations
+    // Try to use project if available, otherwise skip
+    if (project.findProject(":jni") != null) {
+        compileOnly(project(":jni"))
+    } else if (project.findProject(":sdk-jni") != null) {
+        compileOnly(project(":sdk-jni"))
+    }
 
     // Testing
     testImplementation(kotlin("test"))
@@ -34,5 +39,5 @@ kotlin {
 }
 
 tasks.test {
-    useJUnit()
+    useJUnitPlatform()
 }

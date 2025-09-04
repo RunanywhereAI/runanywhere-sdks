@@ -9,31 +9,31 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.Cpu
+import androidx.compose.material.icons.filled.Computer
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeviceThermostat
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.RecordVoiceOver
-import androidx.compose.material.icons.filled.Rocket
+import androidx.compose.material.icons.filled.RocketLaunch
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -237,12 +237,12 @@ private fun FrameworkBadge(
         )
         LLMFramework.EXECUTORCH -> Triple(
             Color(0xFFE91E63), // Pink
-            Icons.Filled.Bolt,
+            Icons.Filled.FlashOn,
             "ExecuTorch"
         )
         LLMFramework.MLC_LLM -> Triple(
             Color(0xFF00BCD4), // Cyan
-            Icons.Filled.Rocket,
+            Icons.Filled.RocketLaunch,
             "MLC-LLM"
         )
         LLMFramework.MEDIAPIPE -> Triple(
@@ -347,14 +347,14 @@ private fun HardwareCompatibilityRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         HardwareIndicator(
-            icon = Icons.Filled.Cpu,
+            icon = Icons.Filled.Computer,
             label = "CPU",
             isSupported = requirements.cpuSupported,
             details = requirements.cpuDetails
         )
 
         HardwareIndicator(
-            icon = Icons.Filled.GraphicEq,
+            icon = Icons.Filled.Equalizer,
             label = "GPU",
             isSupported = requirements.gpuSupported,
             details = requirements.gpuDetails
@@ -368,7 +368,7 @@ private fun HardwareCompatibilityRow(
         )
 
         HardwareIndicator(
-            icon = Icons.Filled.DeviceThermostat,
+            icon = Icons.Filled.Thermostat,
             label = "Thermal",
             isSupported = requirements.thermalOptimized,
             details = "Thermal optimized"

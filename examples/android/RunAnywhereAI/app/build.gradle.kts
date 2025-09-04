@@ -199,15 +199,16 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
 
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.8.5")
+    implementation(libs.androidx.navigation.compose)
 
     // ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
 
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation(libs.kotlinx.coroutines.android)
 
     // MediaPipe for LLM inference
     implementation("com.google.mediapipe:tasks-genai:0.10.14")
@@ -225,10 +226,10 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
 
     // OkHttp for model downloads
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.okhttp)
 
     // Gson for JSON parsing
-    implementation("com.google.code.gson:gson:2.11.0")
+    implementation(libs.gson)
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
