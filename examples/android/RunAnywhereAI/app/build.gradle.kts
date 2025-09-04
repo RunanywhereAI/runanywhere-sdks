@@ -118,7 +118,8 @@ android {
                 "**/kotlin/**",
                 "kotlin/**",
                 "META-INF/kotlin/**",
-                "META-INF/*.kotlin_module"
+                "META-INF/*.kotlin_module",
+                "META-INF/INDEX.LIST"
             )
         }
 

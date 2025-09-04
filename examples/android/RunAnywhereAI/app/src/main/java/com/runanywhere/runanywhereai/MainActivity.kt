@@ -5,18 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
-import com.runanywhere.runanywhereai.ui.chat.ChatScreen
-import com.runanywhere.runanywhereai.ui.models.ModelsScreen
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
 import com.runanywhere.sdk.public.RunAnywhereSTT
 import com.runanywhere.sdk.public.STTSDKConfig
@@ -46,7 +40,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             RunAnywhereAITheme {
-                RunAnywhereApp()
+                SimpleDemoApp()
             }
         }
     }
@@ -67,84 +61,18 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RunAnywhereApp() {
-    val navController = rememberNavController()
-    val navBackStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = navBackStackEntry?.destination?.route
+fun SimpleDemoApp() {
+    var isRecording by remember { mutableStateOf(false) }
+    var transcriptionResult by remember { mutableStateOf("Press the button to start recording") }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Email, contentDescription = "Chat") },
-                    label = { Text("Chat") },
-                    selected = currentRoute == "chat",
-                    onClick = {
-                        navController.navigate("chat") {
-                            popUpTo(navController.graph.startDestinationId)
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.List, contentDescription = "Models") },
-                    label = { Text("Models") },
-                    selected = currentRoute == "models",
-                    onClick = {
-                        navController.navigate("models") {
-                            popUpTo(navController.graph.startDestinationId)
-                            launchSingleTop = true
-                        }
-                    }
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Info, contentDescription = "About") },
-                    label = { Text("About") },
-                    selected = currentRoute == "about",
-                    onClick = {
-                        navController.navigate("about") {
-                            popUpTo(navController.graph.startDestinationId)
-                            launchSingleTop = true
-                        }
-                    }
-                )
-            }
-        }
-    ) { paddingValues ->
-        NavHost(
-            navController = navController,
-            startDestination = "chat",
-            modifier = Modifier.padding(paddingValues)
-        ) {
-            composable("chat") {
-                ChatScreen(
-                    onNavigateToModels = {
-                        navController.navigate("models")
-                    }
-                )
-            }
-            composable("models") {
-                ModelsScreen(
-                    onNavigateBack = {
-                        navController.navigateUp()
-                    }
-                )
-            }
-            composable("about") {
-                AboutScreen()
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AboutScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("About") }
+                title = { Text("RunAnywhere AI STT Demo") },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.primary
+                )
             )
         }
     ) { paddingValues ->
@@ -152,65 +80,116 @@ fun AboutScreen() {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            // SDK Status Card
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "RunAnywhere AI STT",
-                        style = MaterialTheme.typography.headlineMedium
+                        text = "SDK Status",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "SDK Version: 1.0.0",
+                        text = " RunAnywhere STT SDK v1.0.0",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "On-device Speech-to-Text demo app showcasing Whisper and WebRTC VAD integration.",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Model: Whisper Base",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
+            // Transcription Result Card
             Card(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                )
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    Text(
+                        text = "Transcription",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = transcriptionResult,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Record Button
+            Button(
+                onClick = {
+                    isRecording = !isRecording
+                    if (isRecording) {
+                        transcriptionResult = "Recording... (Mock implementation)"
+                        // TODO: Implement actual recording
+                    } else {
+                        transcriptionResult =
+                            "Recording stopped. This is a mock transcription result."
+                        // TODO: Stop recording and get actual transcription
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRecording)
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = if (isRecording) "Stop Recording" else "Start Recording",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
+            // Features Info
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
                         text = "Features",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
                     )
-                    Text("• On-device Speech-to-Text")
-                    Text("• Voice Activity Detection (VAD)")
-                    Text("• Multiple Whisper models support")
-                    Text("• Real-time streaming transcription")
-                    Text("• Privacy-focused - no data leaves device")
-                }
-            }
-
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Supported Models",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text("• Whisper Tiny (39MB)")
-                    Text("• Whisper Base (74MB)")
-                    Text("• Whisper Small (244MB)")
-                    Text("• Whisper Medium (769MB)")
+                    Text("• On-device Speech-to-Text", style = MaterialTheme.typography.bodySmall)
+                    Text("• Voice Activity Detection", style = MaterialTheme.typography.bodySmall)
+                    Text("• Real-time transcription", style = MaterialTheme.typography.bodySmall)
+                    Text("• Privacy-focused", style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
