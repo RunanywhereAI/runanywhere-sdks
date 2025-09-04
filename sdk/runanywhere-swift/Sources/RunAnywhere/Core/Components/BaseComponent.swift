@@ -44,7 +44,6 @@ public final class AnyServiceWrapper<T>: ServiceWrapper {
 /// Using @unchecked Sendable as we manage thread safety with @MainActor
 @MainActor
 open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
-
     // MARK: - Core Properties
 
     /// Component type identifier
@@ -71,7 +70,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     public weak var serviceContainer: ServiceContainer?
 
     /// Event bus for publishing events
-    public let eventBus = EventBus.shared
+    public let eventBus: EventBus = EventBus.shared
 
     /// Current processing stage
     public private(set) var currentStage: String?

@@ -3,9 +3,9 @@ import GRDB
 
 /// Configuration source
 public enum ConfigurationSource: String, Codable, Sendable {
-    case remote = "remote"
-    case consumer = "consumer"
-    case defaults = "defaults"
+    case remote
+    case consumer
+    case defaults
 }
 
 /// Main configuration data structure using composed configurations
@@ -80,7 +80,6 @@ public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, Per
         self.updatedAt = updatedAt
         self.syncPending = syncPending
     }
-
 }
 
 // MARK: - GRDB Configuration
@@ -90,7 +89,7 @@ extension ConfigurationData: TableRecord {
     public static let databaseTableName: String = "configuration"
 
     /// Define how to handle conflicts during persistence
-    public static let persistenceConflictPolicy: PersistenceConflictPolicy = PersistenceConflictPolicy(
+    public static let persistenceConflictPolicy = PersistenceConflictPolicy(
         insert: .replace,
         update: .replace
     )

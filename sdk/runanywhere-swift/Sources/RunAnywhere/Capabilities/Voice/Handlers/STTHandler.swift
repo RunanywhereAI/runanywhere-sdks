@@ -64,7 +64,7 @@ public class STTHandler {
             if !transcript.isEmpty {
                 // Track successful transcription completion
                 let wordCount = transcript.split(separator: " ").count
-                let confidence = result.confidence ?? 0.8 // Default confidence if not provided
+                let confidence = result.confidence
 
                 await sttAnalytics?.trackTranscription(
                     text: transcript,

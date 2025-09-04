@@ -97,7 +97,7 @@ public actor ConfigurationService: ConfigurationServiceProtocol {
 
         do {
             // Mark as updated and save
-            _ = updated.markUpdated()
+            updated.markUpdated()
             try await repository.save(updated)
 
             // Trigger sync in background through coordinator

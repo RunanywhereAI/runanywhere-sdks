@@ -20,7 +20,6 @@ import Foundation
 /// ```
 @MainActor
 public final class ModuleRegistry {
-
     // MARK: - Singleton
 
     public static let shared = ModuleRegistry()
