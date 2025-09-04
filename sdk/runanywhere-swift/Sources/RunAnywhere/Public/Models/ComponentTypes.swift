@@ -12,6 +12,7 @@ public enum SDKComponent: String, CaseIterable, Sendable {
     case embedding = "Embedding"
     case speakerDiarization = "SpeakerDiarization"
     case voiceAgent = "VoiceAgent"
+    case wakeWord = "wakeWord"
 
     /// Human-readable display name
     public var displayName: String {
@@ -24,6 +25,7 @@ public enum SDKComponent: String, CaseIterable, Sendable {
         case .embedding: return "Embeddings"
         case .speakerDiarization: return "Speaker Diarization"
         case .voiceAgent: return "Voice Agent"
+        case .wakeWord: return "Wake Word Detection"
         }
     }
 
@@ -31,7 +33,7 @@ public enum SDKComponent: String, CaseIterable, Sendable {
     public var requiresModel: Bool {
         switch self {
         case .llm, .stt, .vlm, .embedding: return true
-        case .tts, .vad, .speakerDiarization, .voiceAgent: return false
+        case .tts, .vad, .speakerDiarization, .voiceAgent, .wakeWord: return false
         }
     }
 }

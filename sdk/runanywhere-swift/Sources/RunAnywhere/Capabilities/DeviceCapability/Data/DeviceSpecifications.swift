@@ -396,21 +396,21 @@ public enum DeviceSpecifications {
             // Mid-range chips (A15, A16, M2, M3)
             maxBatchSize = 4
             maxContextLength = 2048
-            recommendedQuantization = .q8_0
+            recommendedQuantization = .q8v0
             maxTokensPerSecond = 25
 
         case 10...:
             // Entry-level ML chips (A14, M1)
             maxBatchSize = 2
             maxContextLength = 1024
-            recommendedQuantization = .q8_0
+            recommendedQuantization = .q8v0
             maxTokensPerSecond = 15
 
         default:
             // Low-end or unknown chips
             maxBatchSize = 1
             maxContextLength = 512
-            recommendedQuantization = .q4_K_M
+            recommendedQuantization = .q4KM
             maxTokensPerSecond = 10
         }
 

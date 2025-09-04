@@ -8,10 +8,10 @@ public enum RunAnywhere {
     // MARK: - Internal State Management
 
     /// Internal configuration storage
-    internal static var _configurationData: ConfigurationData?
-    internal static var _initParams: SDKInitParams?
-    internal static var _currentEnvironment: SDKEnvironment?
-    private static var _isInitialized = false
+    internal static var configurationData: ConfigurationData?
+    internal static var initParams: SDKInitParams?
+    internal static var currentEnvironment: SDKEnvironment?
+    private static var isInitialized = false
 
     /// Access to service container (through the shared instance for now)
     internal static var serviceContainer: ServiceContainer {
@@ -19,8 +19,8 @@ public enum RunAnywhere {
     }
 
     /// Check if SDK is initialized
-    public static var isInitialized: Bool {
-        _isInitialized
+    public static var isSDKInitialized: Bool {
+        isInitialized
     }
 
     // MARK: - Event Access
@@ -101,8 +101,8 @@ public enum RunAnywhere {
 
             // Step 3: Store parameters securely
             logger.info("Step 3/8: Storing credentials securely")
-            _initParams = params
-            _currentEnvironment = params.environment
+            initParams = params
+            currentEnvironment = params.environment
 
             // Only store in keychain for non-development environments
             if params.environment != .development {
@@ -124,10 +124,10 @@ public enum RunAnywhere {
                 let loadedConfig = try await serviceContainer.bootstrapDevelopmentMode(with: params)
 
                 // Store the configuration
-                _configurationData = loadedConfig
+                configurationData = loadedConfig
 
                 // Mark as initialized
-                _isInitialized = true
+                isInitialized = true
                 logger.info("✅ SDK initialization completed successfully (Development Mode)")
                 EventBus.shared.publish(SDKInitializationEvent.completed)
 
@@ -174,19 +174,19 @@ public enum RunAnywhere {
                 )
 
                 // Store the configuration
-                _configurationData = loadedConfig
+                configurationData = loadedConfig
 
                 // Mark as initialized
-                _isInitialized = true
+                isInitialized = true
                 logger.info("✅ SDK initialization completed successfully")
                 EventBus.shared.publish(SDKInitializationEvent.completed)
             }
 
         } catch {
             logger.error("❌ SDK initialization failed: \(error.localizedDescription)")
-            _configurationData = nil
-            _initParams = nil
-            _isInitialized = false
+            configurationData = nil
+            initParams = nil
+            isInitialized = false
             EventBus.shared.publish(SDKInitializationEvent.failed(error))
             throw error
         }
@@ -215,7 +215,7 @@ public enum RunAnywhere {
 
         do {
             // Ensure initialized
-            guard _isInitialized else {
+            guard isInitialized else {
                 throw SDKError.notInitialized
             }
 
@@ -260,7 +260,7 @@ public enum RunAnywhere {
 
                 do {
                     // Ensure initialized
-                    guard _isInitialized else {
+                    guard isInitialized else {
                         throw SDKError.notInitialized
                     }
 
@@ -304,7 +304,7 @@ public enum RunAnywhere {
 
         do {
             // Ensure initialized
-            guard _isInitialized else {
+            guard isInitialized else {
                 throw SDKError.notInitialized
             }
 
@@ -327,7 +327,7 @@ public enum RunAnywhere {
 
         do {
             // Ensure initialized
-            guard _isInitialized else {
+            guard isInitialized else {
                 throw SDKError.notInitialized
             }
 
@@ -357,7 +357,7 @@ public enum RunAnywhere {
 
         do {
             // Ensure initialized
-            guard _isInitialized else {
+            guard isInitialized else {
                 throw SDKError.notInitialized
             }
 
@@ -376,7 +376,7 @@ public enum RunAnywhere {
     /// Get available models
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
-        guard _isInitialized else {
+        guard isInitialized else {
             throw SDKError.notInitialized
         }
 
@@ -388,7 +388,7 @@ public enum RunAnywhere {
     /// Get currently loaded model
     /// - Returns: Currently loaded model info
     public static var currentModel: ModelInfo? {
-        guard _isInitialized else {
+        guard isInitialized else {
             return nil
         }
 

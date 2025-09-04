@@ -243,21 +243,21 @@ public class CapabilityAnalyzer {
         // Check if model already quantized
         if let quantLevel = model.metadata?.quantizationLevel {
             switch quantLevel {
-            case .int4, .q4_0, .q4_K_S, .q4_K_M:
+            case .int4, .q4v0, .q4KS, .q4KM:
                 return (true, 4)
-            case .int8, .q8_0:
+            case .int8, .q8v0:
                 return (true, 8)
             case .half, .f16:
                 return (true, 16)
             case .full, .f32:
                 return (false, 32)
-            case .int2, .q2_K:
+            case .int2, .q2K:
                 return (true, 2)
-            case .q3_K_S, .q3_K_M, .q3_K_L:
+            case .q3KS, .q3KM, .q3KL:
                 return (true, 3)
-            case .q5_0, .q5_K_S, .q5_K_M:
+            case .q5v0, .q5KS, .q5KM:
                 return (true, 5)
-            case .q6_K:
+            case .q6K:
                 return (true, 6)
             case .mixed:
                 return (true, 8)
