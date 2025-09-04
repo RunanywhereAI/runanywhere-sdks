@@ -1,10 +1,62 @@
 package com.runanywhere.sdk.events
 
-import com.runanywhere.sdk.components.base.ComponentEvent
+import com.runanywhere.sdk.components.base.ComponentState
+import com.runanywhere.sdk.components.base.SDKComponent
+
+// MARK: - Component Events
+
+/**
+ * Base class for all component events
+ */
+sealed class ComponentEvent
+
+sealed class ComponentInitializationEvent : ComponentEvent() {
+    data class ComponentChecking(
+        val component: SDKComponent,
+        val modelId: String?
+    ) : ComponentInitializationEvent()
+
+    data class ComponentInitializing(
+        val component: SDKComponent,
+        val modelId: String?
+    ) : ComponentInitializationEvent()
+
+    data class ComponentDownloadStarted(
+        val component: SDKComponent,
+        val modelId: String
+    ) : ComponentInitializationEvent()
+
+    data class ComponentDownloadProgress(
+        val component: SDKComponent,
+        val modelId: String,
+        val progress: Float
+    ) : ComponentInitializationEvent()
+
+    data class ComponentDownloadCompleted(
+        val component: SDKComponent,
+        val modelId: String
+    ) : ComponentInitializationEvent()
+
+    data class ComponentReady(
+        val component: SDKComponent,
+        val modelId: String?
+    ) : ComponentInitializationEvent()
+
+    data class ComponentFailed(
+        val component: SDKComponent,
+        val error: Throwable
+    ) : ComponentInitializationEvent()
+
+    data class ComponentStateChanged(
+        val component: SDKComponent,
+        val oldState: ComponentState,
+        val newState: ComponentState
+    ) : ComponentInitializationEvent()
+}
 
 // MARK: - STT Events
 
-sealed class STTEvent : ComponentEvent {
+sealed class STTEvent : ComponentEvent() {
     object Initialized : STTEvent()
 
     data class TranscriptionStarted(
@@ -30,7 +82,7 @@ sealed class STTEvent : ComponentEvent {
 
 // MARK: - Transcription Events
 
-sealed class TranscriptionEvent : ComponentEvent {
+sealed class TranscriptionEvent : ComponentEvent() {
     object SpeechStart : TranscriptionEvent()
     object SpeechEnd : TranscriptionEvent()
 
@@ -51,7 +103,7 @@ sealed class TranscriptionEvent : ComponentEvent {
 
 // MARK: - VAD Events
 
-sealed class VADEvent : ComponentEvent {
+sealed class VADEvent : ComponentEvent() {
     object Initialized : VADEvent()
 
     data class SpeechDetected(
@@ -71,7 +123,7 @@ sealed class VADEvent : ComponentEvent {
 
 // MARK: - Model Events
 
-sealed class ModelEvent : ComponentEvent {
+sealed class ModelEvent : ComponentEvent() {
     data class DownloadStarted(
         val modelId: String,
         val modelSize: Long? = null

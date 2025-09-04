@@ -1,15 +1,15 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
 import androidx.lifecycle.ViewModel
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
+// import dagger.hilt.android.lifecycle.HiltViewModel
+// import javax.inject.Inject
 
 /**
  * ViewModel for Settings screen
  * TODO: Implement settings management when SDK configuration features are available
  */
-@HiltViewModel
-class SettingsViewModel @Inject constructor(
+// @HiltViewModel
+class SettingsViewModel(
     // TODO: Inject settings repository when available
     // private val settingsRepository: SettingsRepository
 ) : ViewModel() {

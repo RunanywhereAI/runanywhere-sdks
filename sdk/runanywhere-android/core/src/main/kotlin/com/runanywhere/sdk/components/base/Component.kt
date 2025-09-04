@@ -1,6 +1,14 @@
 package com.runanywhere.sdk.components.base
 
+import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.ComponentEvent
+import com.runanywhere.sdk.components.stt.STTConfiguration
+import com.runanywhere.sdk.components.stt.STTService
+import com.runanywhere.sdk.components.vad.VADConfiguration
+import com.runanywhere.sdk.components.vad.VADService
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.flow
 import java.util.Date
 
 // MARK: - Base Protocols
@@ -180,22 +188,13 @@ abstract class BaseComponent<TService : Any>(
         try {
             // Stage: Validation
             currentStage = "validation"
-            eventBus.emit(
-                ComponentInitializationEvent.ComponentChecking(
-                    component = componentType,
-                    modelId = null
-                )
-            )
+            // Note: Component events need proper EventBus integration
+            // TODO: Add component-specific event publishing when EventBus supports ComponentEvents
             configuration.validate()
 
             // Stage: Service Creation
             currentStage = "service_creation"
-            eventBus.emit(
-                ComponentInitializationEvent.ComponentInitializing(
-                    component = componentType,
-                    modelId = null
-                )
-            )
+            // TODO: Add component initialization event publishing
             service = createService()
 
             // Stage: Service Initialization
@@ -205,20 +204,10 @@ abstract class BaseComponent<TService : Any>(
             // Component ready
             currentStage = null
             updateState(ComponentState.READY)
-            eventBus.emit(
-                ComponentInitializationEvent.ComponentReady(
-                    component = componentType,
-                    modelId = null
-                )
-            )
+            // TODO: Add component ready event publishing
         } catch (e: Exception) {
             updateState(ComponentState.FAILED)
-            eventBus.emit(
-                ComponentInitializationEvent.ComponentFailed(
-                    component = componentType,
-                    error = e
-                )
-            )
+            // TODO: Add component failure event publishing
             throw e
         }
     }
@@ -285,13 +274,7 @@ abstract class BaseComponent<TService : Any>(
     private fun updateState(newState: ComponentState) {
         val oldState = state
         state = newState
-        eventBus.emit(
-            ComponentInitializationEvent.ComponentStateChanged(
-                component = componentType,
-                oldState = oldState,
-                newState = newState
-            )
-        )
+        // TODO: Add component state change event publishing
     }
 
     // MARK: - Component Protocol Requirements
@@ -322,51 +305,7 @@ private class EmptyComponentParameters : ComponentInitParameters {
     override fun validate() {}
 }
 
-// MARK: - Component Events
-
-sealed class ComponentInitializationEvent : ComponentEvent {
-    data class ComponentChecking(
-        val component: SDKComponent,
-        val modelId: String?
-    ) : ComponentInitializationEvent()
-
-    data class ComponentInitializing(
-        val component: SDKComponent,
-        val modelId: String?
-    ) : ComponentInitializationEvent()
-
-    data class ComponentDownloadStarted(
-        val component: SDKComponent,
-        val modelId: String
-    ) : ComponentInitializationEvent()
-
-    data class ComponentDownloadProgress(
-        val component: SDKComponent,
-        val modelId: String,
-        val progress: Float
-    ) : ComponentInitializationEvent()
-
-    data class ComponentDownloadCompleted(
-        val component: SDKComponent,
-        val modelId: String
-    ) : ComponentInitializationEvent()
-
-    data class ComponentReady(
-        val component: SDKComponent,
-        val modelId: String?
-    ) : ComponentInitializationEvent()
-
-    data class ComponentFailed(
-        val component: SDKComponent,
-        val error: Throwable
-    ) : ComponentInitializationEvent()
-
-    data class ComponentStateChanged(
-        val component: SDKComponent,
-        val oldState: ComponentState,
-        val newState: ComponentState
-    ) : ComponentInitializationEvent()
-}
+// MARK: - Component Events moved to events package
 
 // MARK: - SDK Errors
 

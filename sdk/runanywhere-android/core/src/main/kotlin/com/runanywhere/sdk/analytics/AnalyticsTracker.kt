@@ -20,24 +20,26 @@ class AnalyticsTracker {
     private val sessionId = UUID.randomUUID().toString()
 
     companion object {
-        const val SDK_VERSION = "1.0.0"
+        private const val SDK_VERSION = "1.0.0"
     }
 
     /**
      * Track an analytics event
      */
     fun track(eventName: String, properties: Map<String, Any> = emptyMap()) {
-        val enrichedProperties = properties + mapOf(
-            "session_id" to sessionId,
-            "timestamp" to System.currentTimeMillis(),
-            "platform" to "android",
-            "sdk_version" to SDK_VERSION
-        )
+        val currentTime = System.currentTimeMillis()
+        val enrichedProperties = mutableMapOf<String, Any>().apply {
+            putAll(properties)
+            put("session_id", sessionId)
+            put("timestamp", currentTime)
+            put("platform", "android")
+            put("sdk_version", SDK_VERSION)
+        }
 
         val event = AnalyticsEvent(
             name = eventName,
             properties = enrichedProperties,
-            timestamp = System.currentTimeMillis(),
+            timestamp = currentTime,
             sessionId = sessionId
         )
 

@@ -1,15 +1,15 @@
 package com.runanywhere.runanywhereai.presentation.storage
 
 import androidx.lifecycle.ViewModel
-import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
+// import dagger.hilt.android.lifecycle.HiltViewModel
+// import javax.inject.Inject
 
 /**
  * ViewModel for Storage screen
  * TODO: Implement model storage management when SDK features are available
  */
-@HiltViewModel
-class StorageViewModel @Inject constructor(
+// @HiltViewModel
+class StorageViewModel(
     // TODO: Inject model repository when available
     // private val modelRepository: ModelRepository
 ) : ViewModel() {

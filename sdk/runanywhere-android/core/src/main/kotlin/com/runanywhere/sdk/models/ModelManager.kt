@@ -1,20 +1,12 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.events.EventBus
-import com.runanywhere.sdk.events.ModelEvent
+import com.runanywhere.sdk.events.SDKModelEvent
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.models.enums.ModelFormat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-
-/**
- * Model information
- */
-data class ModelInfo(
-    val id: String,
-    val size: String,
-    val description: String,
-    val url: String? = null
-)
 
 /**
  * Model handle for loaded models
@@ -43,7 +35,9 @@ class ModelManager {
 
         // Download if needed
         return downloader.downloadModel(modelId) { progress ->
-            EventBus.emit(ModelEvent.DownloadProgress(modelId, progress))
+            kotlinx.coroutines.runBlocking {
+                EventBus.publish(SDKModelEvent.DownloadProgress(modelId, progress))
+            }
         }
     }
 
@@ -61,28 +55,36 @@ class ModelManager {
     fun getAvailableModels(): List<ModelInfo> {
         return listOf(
             ModelInfo(
-                "whisper-tiny",
-                "39MB",
-                "Fastest, lower accuracy",
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin"
+                id = "whisper-tiny",
+                name = "Whisper Tiny",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                downloadSize = 39L * 1024 * 1024 // 39MB
             ),
             ModelInfo(
-                "whisper-base",
-                "74MB",
-                "Good balance",
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin"
+                id = "whisper-base",
+                name = "Whisper Base",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                downloadSize = 74L * 1024 * 1024 // 74MB
             ),
             ModelInfo(
-                "whisper-small",
-                "244MB",
-                "Better accuracy",
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+                id = "whisper-small",
+                name = "Whisper Small",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                downloadSize = 244L * 1024 * 1024 // 244MB
             ),
             ModelInfo(
-                "whisper-medium",
-                "769MB",
-                "High accuracy",
-                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"
+                id = "whisper-medium",
+                name = "Whisper Medium",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+                downloadSize = 769L * 1024 * 1024 // 769MB
             )
         )
     }

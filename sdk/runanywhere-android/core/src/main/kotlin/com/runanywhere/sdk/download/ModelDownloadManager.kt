@@ -35,8 +35,8 @@ class ModelDownloadManager(
 
         PRDownloader.initialize(context, config)
 
-        // Set maximum concurrent downloads
-        PRDownloader.setMaxConcurrentDownloads(3)
+        // Note: PRDownloader doesn't have setMaxConcurrentDownloads method
+        // Concurrent downloads are managed internally
     }
 
     /**
@@ -58,19 +58,11 @@ class ModelDownloadManager(
             var downloadId: Int = -1
 
             try {
-                // Check if file partially exists for resume
-                val headers = if (destinationFile.exists()) {
-                    mapOf("Range" to "bytes=${destinationFile.length()}-")
-                } else {
-                    emptyMap()
-                }
-
                 downloadId = PRDownloader.download(
                     downloadUrl,
                     destinationDir.absolutePath,
                     destinationFile.name
                 )
-                    .setHeader(headers)
                     .build()
                     .setOnStartOrResumeListener {
                         trySend(
@@ -251,14 +243,20 @@ class ModelDownloadManager(
      * Pause all downloads
      */
     fun pauseAll() {
-        PRDownloader.pauseAll()
+        // Pause each active download individually since PRDownloader doesn't have pauseAll()
+        activeDownloads.values.forEach { downloadId ->
+            PRDownloader.pause(downloadId)
+        }
     }
 
     /**
      * Resume all downloads
      */
     fun resumeAll() {
-        PRDownloader.resumeAll()
+        // Resume each active download individually since PRDownloader doesn't have resumeAll()
+        activeDownloads.values.forEach { downloadId ->
+            PRDownloader.resume(downloadId)
+        }
     }
 
     /**

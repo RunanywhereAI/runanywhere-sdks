@@ -201,7 +201,7 @@ data class STTTranscriptionResult(
 
 sealed class STTError : Exception() {
     object ServiceNotInitialized : STTError()
-    data class TranscriptionFailed(val cause: Throwable) : STTError()
+    data class TranscriptionFailed(override val cause: Throwable) : STTError()
     object StreamingNotSupported : STTError()
     data class LanguageNotSupported(val language: String) : STTError()
     data class ModelNotFound(val model: String) : STTError()

@@ -3,116 +3,124 @@ package com.runanywhere.runanywhereai.presentation.chat
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.runanywhere.runanywhereai.presentation.chat.components.MessageBubble
-import com.runanywhere.runanywhereai.presentation.chat.components.MessageInput
-import kotlinx.coroutines.launch
+// import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.runanywhere.runanywhereai.domain.model.ChatMessage
 
-/**
- * Chat screen for text-based conversation with the AI assistant
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
-    viewModel: ChatViewModel = hiltViewModel()
+    viewModel: ChatViewModel = viewModel()
 ) {
-    val messages by viewModel.messages.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     var messageText by remember { mutableStateOf("") }
 
-    val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Header
+        TopAppBar(
+            title = { Text("Chat with AI") }
+        )
 
-    // Auto-scroll to bottom when new messages arrive
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            scope.launch {
-                listState.animateScrollToItem(messages.size - 1)
-            }
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("RunAnywhere Chat") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
+        // Messages
+        LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Messages list
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                state = listState,
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (messages.isEmpty()) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "Welcome to RunAnywhere AI!",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Start a conversation by typing a message below.",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
-                items(
-                    items = messages,
-                    key = { it.id }
-                ) { message ->
-                    MessageBubble(
-                        message = message,
+            if (uiState.messages.isEmpty()) {
+                item {
+                    Text(
+                        text = "Start a conversation with the AI assistant!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
+            }
 
-                if (isLoading) {
-                    item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(\n                                    text = \"AI is thinking...\",\n                                    style = MaterialTheme.typography.bodyMedium\n                                )\n                            }\n                        }\n                    }\n                }\n            }\n            \n            // Error display\n            error?.let { errorMessage ->\n                Card(\n                    modifier = Modifier\n                        .fillMaxWidth()\n                        .padding(horizontal = 16.dp),\n                    colors = CardDefaults.cardColors(\n                        containerColor = MaterialTheme.colorScheme.errorContainer\n                    )\n                ) {\n                    Row(\n                        modifier = Modifier.padding(12.dp),\n                        horizontalArrangement = Arrangement.SpaceBetween,\n                        verticalAlignment = Alignment.CenterVertically\n                    ) {\n                        Text(\n                            text = errorMessage,\n                            style = MaterialTheme.typography.bodySmall,\n                            color = MaterialTheme.colorScheme.onErrorContainer,\n                            modifier = Modifier.weight(1f)\n                        )\n                        TextButton(\n                            onClick = { viewModel.clearError() }\n                        ) {\n                            Text(\"Dismiss\")\n                        }\n                    }\n                }\n            }\n            \n            // Message input\n            MessageInput(\n                text = messageText,\n                onTextChange = { messageText = it },\n                onSendMessage = {\n                    if (messageText.isNotBlank()) {\n                        viewModel.sendMessage(messageText)\n                        messageText = \"\"\n                    }\n                },\n                enabled = !isLoading,\n                modifier = Modifier\n                    .fillMaxWidth()\n                    .padding(16.dp)\n            )\n        }\n    }\n}
+            items(uiState.messages) { message ->
+                MessageBubble(message = message)
+            }
+
+            if (uiState.isLoading) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+        }
+
+        // Message input
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = messageText,
+                onValueChange = { messageText = it },
+                placeholder = { Text("Type your message...") },
+                modifier = Modifier.weight(1f),
+                enabled = !uiState.isLoading
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Button(
+                onClick = {
+                    if (messageText.isNotBlank()) {
+                        viewModel.sendMessage(messageText)
+                        messageText = ""
+                    }
+                },
+                enabled = !uiState.isLoading && messageText.isNotBlank()
+            ) {
+                Text("Send")
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageBubble(message: ChatMessage) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = if (message.isFromUser) Arrangement.End else Arrangement.Start
+    ) {
+        Card(
+            modifier = Modifier.widthIn(max = 280.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (message.isFromUser) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.surfaceVariant
+                }
+            )
+        ) {
+            Text(
+                text = message.content,
+                modifier = Modifier.padding(12.dp),
+                color = if (message.isFromUser) {
+                    MaterialTheme.colorScheme.onPrimary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
+            )
+        }
+    }
+}

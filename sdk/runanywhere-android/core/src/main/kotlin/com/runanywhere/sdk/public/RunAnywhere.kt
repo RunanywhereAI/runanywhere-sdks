@@ -24,7 +24,7 @@ object RunAnywhere {
     private var _currentEnvironment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
 
     val serviceContainer: ServiceContainer get() = ServiceContainer.shared
-    val eventBus: EventBus get() = EventBus.shared
+    val eventBus: EventBus get() = EventBus
 
     /**
      * Initialize the SDK
