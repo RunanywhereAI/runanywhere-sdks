@@ -117,11 +117,8 @@ class STTComponent(
     }
 
     private fun createSTTService(config: STTConfiguration): STTService {
-        // Return appropriate service based on configuration
-        return when {
-            config.modelId?.contains("whisper") == true -> WhisperSTTService()
-            else -> MockSTTService() // For development
-        }
+        // Create Whisper STT service
+        return WhisperSTTService()
     }
 
     private suspend fun transcribeBuffer(buffer: List<ByteArray>): String {
