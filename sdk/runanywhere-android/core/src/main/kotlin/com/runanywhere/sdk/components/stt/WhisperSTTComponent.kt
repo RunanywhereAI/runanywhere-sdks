@@ -1,36 +1,61 @@
 package com.runanywhere.sdk.components.stt
 
 import com.runanywhere.sdk.components.base.*
-import com.runanywhere.sdk.jni.WhisperJNI
-import com.runanywhere.sdk.models.ModelManager
+import com.runanywhere.sdk.models.WhisperModel
+import io.github.givimad.whisperjni.WhisperJNI
+import io.github.givimad.whisperjni.WhisperContext
+import io.github.givimad.whisperjni.WhisperFullParams
+import io.github.givimad.whisperjni.WhisperSamplingStrategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
- * STT Configuration
+ * STT Configuration for Whisper
  */
-data class STTConfig(
-    val modelId: String = "whisper-base",
-    val language: String = "en",
-    val enableTimestamps: Boolean = false
+data class WhisperSTTConfig(
+    val modelType: WhisperModel.ModelType = WhisperModel.ModelType.TINY,
+    val language: String? = null, // null = auto-detect
+    val translate: Boolean = false, // Translate to English
+    val nThreads: Int = 4,
+    val maxSegmentLength: Int = 0, // 0 = no limit
+    val suppressBlank: Boolean = true,
+    val suppressNonSpeechTokens: Boolean = true,
+    val temperature: Float = 0.0f,
+    val beamSize: Int = 5, // For beam search
+    val patience: Float = -1.0f // For beam search
 ) : ComponentConfig
 
 /**
- * Whisper STT Component implementation
+ * Whisper STT Component implementation using whisper-jni
  */
 class WhisperSTTComponent : STTService {
-    private val jni = WhisperJNI()
-    private var modelPtr: Long = 0
-    private val modelManager = ModelManager()
-    private var config: STTConfig? = null
+    private var whisper: WhisperJNI? = null
+    private var context: WhisperContext? = null
+    private var config: WhisperSTTConfig? = null
+    private var modelPath: String? = null
+
+    companion object {
+        init {
+            try {
+                // Initialize whisper-jni library
+                WhisperJNI.loadLibrary()
+                WhisperJNI.setLibraryLogger(null) // Disable native logging
+            } catch (e: Exception) {
+                println("Failed to load Whisper JNI library: ${e.message}")
+            }
+        }
+    }
 
     override val isReady: Boolean
-        get() = modelPtr != 0L
+        get() = modelPath != null && context != null
 
     override val currentModel: String?
-        get() = config?.modelId
+        get() = config?.modelType?.name
 
     override suspend fun initialize(modelPath: String?) {
         if (modelPath == null) {
@@ -38,38 +63,100 @@ class WhisperSTTComponent : STTService {
         }
 
         // Ensure model is available and load it
-        val actualPath = modelManager.ensureModel(modelPath)
-        modelPtr = withContext(Dispatchers.IO) {
-            jni.loadModel(actualPath)
+        val actualPath = modelPath
+        this.modelPath = actualPath
+
+        withContext(Dispatchers.IO) {
+            whisper = WhisperJNI()
         }
-        config = STTConfig(modelId = modelPath)
+        config = WhisperSTTConfig()
+        loadModel()
+    }
+
+    override suspend fun loadModel() {
+        withContext(Dispatchers.IO) {
+            val path = modelPath ?: throw IllegalStateException("Model path not set")
+            val modelFile = Paths.get(path)
+
+            // Initialize whisper context with the model
+            context = whisper?.init(modelFile)
+                ?: throw IllegalStateException("Failed to initialize Whisper context")
+        }
     }
 
     override suspend fun transcribe(
         audioData: ByteArray,
         options: STTOptions
     ): STTTranscriptionResult {
-        require(modelPtr != 0L) { "Model not loaded" }
+        require(modelPath != null && context != null) { "Model not loaded" }
         val cfg = config ?: throw IllegalStateException("Component not initialized")
 
-        return withContext(Dispatchers.IO) {
-            val text = jni.transcribe(modelPtr, audioData, options.language)
+        val audio = audioData.map { it.toFloat() }.toFloatArray()
+        val result = withContext(Dispatchers.IO) {
+            val ctx = context ?: throw IllegalStateException("Model not loaded")
+            val whisperInstance = whisper ?: throw IllegalStateException("Whisper not initialized")
 
-            // Parse timestamps if enabled
-            val timestamps = if (options.enableTimestamps) {
-                // This would need JNI support for timestamps
-                null // For now, return null
-            } else {
-                null
+            // Create parameters for transcription
+            val params = WhisperFullParams().apply {
+                strategy = WhisperSamplingStrategy.WHISPER_SAMPLING_BEAM_SEARCH
+                nThreads = cfg.nThreads
+                language = cfg.language
+                translate = cfg.translate
+                suppressBlank = cfg.suppressBlank
+                suppressNonSpeechTokens = cfg.suppressNonSpeechTokens
+                temperature = cfg.temperature
+                beamSearchBeamSize = cfg.beamSize
+                beamSearchPatience = cfg.patience
+                noContext = false
+                singleSegment = false
+                printSpecial = false
+                printProgress = false
+                printRealtime = false
+                printTimestamps = false
+            }
+
+            // Run transcription
+            val result = whisperInstance.full(ctx, params, audio, audio.size)
+
+            if (result != 0) {
+                return@withContext STTTranscriptionResult(
+                    transcript = "",
+                    confidence = 0f,
+                    timestamp = System.currentTimeMillis(),
+                    segments = emptyList(),
+                    error = "Transcription failed with code: $result"
+                )
+            }
+
+            // Extract segments
+            val numSegments = whisperInstance.fullNSegments(ctx)
+            val segments = mutableListOf<STTTranscriptionSegment>()
+            var fullText = StringBuilder()
+
+            for (i in 0 until numSegments) {
+                val text = whisperInstance.fullGetSegmentText(ctx, i)
+                val startTime = whisperInstance.fullGetSegmentTimestamp0(ctx, i)
+                val endTime = whisperInstance.fullGetSegmentTimestamp1(ctx, i)
+
+                segments.add(
+                    STTTranscriptionSegment(
+                        text = text,
+                        startTime = startTime * 10, // Convert to milliseconds
+                        endTime = endTime * 10,
+                        confidence = 0.95f // Whisper doesn't provide per-segment confidence
+                    )
+                )
+                fullText.append(text)
             }
 
             STTTranscriptionResult(
-                transcript = text,
-                confidence = 0.95f,
-                timestamps = timestamps,
-                language = options.language
+                transcript = fullText.toString().trim(),
+                confidence = 0.95f, // Whisper doesn't provide overall confidence
+                timestamp = System.currentTimeMillis(),
+                segments = segments
             )
         }
+        return result
     }
 
     override suspend fun <T> streamTranscribe(
@@ -77,13 +164,53 @@ class WhisperSTTComponent : STTService {
         options: STTOptions,
         onPartial: (String) -> Unit
     ): STTTranscriptionResult {
-        require(modelPtr != 0L) { "Model not loaded" }
+        require(modelPath != null && context != null) { "Model not loaded" }
 
         val fullText = StringBuilder()
 
         audioStream.collect { chunk ->
             val partial = withContext(Dispatchers.IO) {
-                jni.transcribePartial(modelPtr, chunk)
+                val audio = chunk.map { it.toFloat() }.toFloatArray()
+                val ctx = context ?: throw IllegalStateException("Model not loaded")
+                val whisperInstance =
+                    whisper ?: throw IllegalStateException("Whisper not initialized")
+
+                // Create parameters for transcription
+                val params = WhisperFullParams().apply {
+                    strategy = WhisperSamplingStrategy.WHISPER_SAMPLING_BEAM_SEARCH
+                    nThreads = 4
+                    language = null
+                    translate = false
+                    suppressBlank = true
+                    suppressNonSpeechTokens = true
+                    temperature = 0.0f
+                    beamSearchBeamSize = 5
+                    beamSearchPatience = -1.0f
+                    noContext = false
+                    singleSegment = false
+                    printSpecial = false
+                    printProgress = false
+                    printRealtime = false
+                    printTimestamps = false
+                }
+
+                // Run transcription
+                val result = whisperInstance.full(ctx, params, audio, audio.size)
+
+                if (result != 0) {
+                    return@withContext ""
+                }
+
+                // Extract segments
+                val numSegments = whisperInstance.fullNSegments(ctx)
+                var partialText = StringBuilder()
+
+                for (i in 0 until numSegments) {
+                    val text = whisperInstance.fullGetSegmentText(ctx, i)
+                    partialText.append(text)
+                }
+
+                partialText.toString().trim()
             }
             onPartial(partial)
             fullText.append(partial).append(" ")
@@ -97,12 +224,18 @@ class WhisperSTTComponent : STTService {
     }
 
     override suspend fun cleanup() {
-        if (modelPtr != 0L) {
-            withContext(Dispatchers.IO) {
-                jni.unloadModel(modelPtr)
+        unloadModel()
+        withContext(Dispatchers.IO) {
+            whisper = null
+        }
+    }
+
+    override suspend fun unloadModel() {
+        withContext(Dispatchers.IO) {
+            context?.let { ctx ->
+                whisper?.free(ctx)
+                context = null
             }
-            modelPtr = 0
-            config = null
         }
     }
 }
