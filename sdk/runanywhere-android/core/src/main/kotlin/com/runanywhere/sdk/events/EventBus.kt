@@ -5,65 +5,74 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * Central event bus for SDK events
+ * Central event bus for SDK-wide event publishing
+ * Mirrors Swift SDK's EventBus
  */
 object EventBus {
-    private val _events = MutableSharedFlow<SDKEvent>(replay = 0)
-    val events: SharedFlow<SDKEvent> = _events.asSharedFlow()
 
-    suspend fun emit(event: SDKEvent) {
-        _events.emit(event)
+    companion object {
+        val shared = EventBus
+    }
+
+    // Event flows for different event types
+    private val _initializationEvents = MutableSharedFlow<SDKInitializationEvent>()
+    val initializationEvents: SharedFlow<SDKInitializationEvent> =
+        _initializationEvents.asSharedFlow()
+
+    private val _modelEvents = MutableSharedFlow<SDKModelEvent>()
+    val modelEvents: SharedFlow<SDKModelEvent> = _modelEvents.asSharedFlow()
+
+    private val _voiceEvents = MutableSharedFlow<SDKVoiceEvent>()
+    val voiceEvents: SharedFlow<SDKVoiceEvent> = _voiceEvents.asSharedFlow()
+
+    private val _configurationEvents = MutableSharedFlow<SDKConfigurationEvent>()
+    val configurationEvents: SharedFlow<SDKConfigurationEvent> = _configurationEvents.asSharedFlow()
+
+    // Publish methods
+    suspend fun publish(event: SDKInitializationEvent) {
+        _initializationEvents.emit(event)
+    }
+
+    suspend fun publish(event: SDKModelEvent) {
+        _modelEvents.emit(event)
+    }
+
+    suspend fun publish(event: SDKVoiceEvent) {
+        _voiceEvents.emit(event)
+    }
+
+    suspend fun publish(event: SDKConfigurationEvent) {
+        _configurationEvents.emit(event)
     }
 }
 
-/**
- * Base interface for all component events
- */
-interface ComponentEvent
-
-/**
- * Base SDK event interface
- */
-sealed interface SDKEvent : ComponentEvent
-
-/**
- * STT related events
- */
-sealed class STTEvent : SDKEvent {
-    object Initialized : STTEvent()
-    data class TranscriptionStarted(val timestamp: Long = System.currentTimeMillis()) : STTEvent()
-    data class TranscriptionCompleted(val text: String, val duration: Long) : STTEvent()
-    data class TranscriptionError(val error: Throwable) : STTEvent()
+// Event definitions
+sealed class SDKInitializationEvent {
+    object Started : SDKInitializationEvent()
+    object Completed : SDKInitializationEvent()
+    data class Failed(val error: Throwable) : SDKInitializationEvent()
 }
 
-/**
- * Model related events
- */
-sealed class ModelEvent : SDKEvent {
-    data class DownloadStarted(val modelId: String) : ModelEvent()
-    data class DownloadProgress(val modelId: String, val progress: Float) : ModelEvent()
-    data class DownloadCompleted(val modelId: String) : ModelEvent()
-    data class DownloadError(val modelId: String, val error: Throwable) : ModelEvent()
-    data class ModelLoaded(val modelId: String) : ModelEvent()
-    data class ModelUnloaded(val modelId: String) : ModelEvent()
+sealed class SDKModelEvent {
+    data class LoadStarted(val modelId: String) : SDKModelEvent()
+    data class LoadCompleted(val modelId: String) : SDKModelEvent()
+    data class LoadFailed(val modelId: String, val error: Throwable) : SDKModelEvent()
+    data class DownloadStarted(val modelId: String) : SDKModelEvent()
+    data class DownloadProgress(val modelId: String, val progress: Float) : SDKModelEvent()
+    data class DownloadCompleted(val modelId: String) : SDKModelEvent()
 }
 
-/**
- * Transcription events for streaming
- */
-sealed class TranscriptionEvent : SDKEvent {
-    object SpeechStart : TranscriptionEvent()
-    object SpeechEnd : TranscriptionEvent()
-    data class PartialTranscription(val text: String) : TranscriptionEvent()
-    data class FinalTranscription(val text: String) : TranscriptionEvent()
-    data class Error(val error: Throwable) : TranscriptionEvent()
+sealed class SDKVoiceEvent {
+    object TranscriptionStarted : SDKVoiceEvent()
+    data class TranscriptionPartial(val text: String) : SDKVoiceEvent()
+    data class TranscriptionFinal(val text: String) : SDKVoiceEvent()
+    data class PipelineError(val error: Throwable) : SDKVoiceEvent()
 }
 
-/**
- * Legacy Event Types (for compatibility)
- */
-sealed class Event {
-    data class Info(val message: String) : Event()
-    data class Warning(val message: String) : Event()
-    data class Error(val message: String, val throwable: Throwable? = null) : Event()
+sealed class SDKConfigurationEvent {
+    data class Loaded(val config: ConfigurationData) : SDKConfigurationEvent()
+    data class Updated(val key: String, val value: Any) : SDKConfigurationEvent()
 }
+
+// Import configuration data for event usage
+typealias ConfigurationData = com.runanywhere.sdk.data.models.ConfigurationData

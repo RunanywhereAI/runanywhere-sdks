@@ -197,24 +197,150 @@ object RunAnywhere {
         }
     }
 
-    // Extension functions
-    private fun ByteArray.toFloatArray(): FloatArray {
-        val floatArray = FloatArray(this.size / 2)
-        for (i in floatArray.indices) {
-            val sample = (this[i * 2].toInt() and 0xFF) or (this[i * 2 + 1].toInt() shl 8)
-            floatArray[i] = sample / 32768.0f
+    // MARK: - Model Management
+
+    /**
+     * Load a model by ID
+     */
+    suspend fun loadModel(modelId: String) {
+        events.publish(SDKModelEvent.LoadStarted(modelId))
+
+        try {
+            requireInitialized()
+
+            val loadedModel = serviceContainer.modelLoadingService.loadModel(modelId)
+
+            // Set the loaded model in appropriate service
+            when (loadedModel.model.category) {
+                ModelCategory.SPEECH_RECOGNITION -> {
+                    serviceContainer.sttComponent.setCurrentModel(loadedModel)
+                }
+
+                ModelCategory.LANGUAGE -> {
+                    // For future LLM component
+                }
+
+                else -> {
+                    // Other model types
+                }
+            }
+
+            events.publish(SDKModelEvent.LoadCompleted(modelId))
+        } catch (e: Exception) {
+            events.publish(SDKModelEvent.LoadFailed(modelId, e))
+            throw e
         }
-        return floatArray
     }
 
-    private fun List<ByteArray>.toByteArray(): ByteArray {
-        val totalSize = sumOf { it.size }
-        val result = ByteArray(totalSize)
-        var offset = 0
-        forEach { chunk ->
-            chunk.copyInto(result, offset)
-            offset += chunk.size
+    /**
+     * Get available models
+     */
+    suspend fun availableModels(): List<ModelInfo> {
+        requireInitialized()
+        return serviceContainer.modelRegistry.discoverModels()
+    }
+
+    /**
+     * Get currently loaded model for STT
+     */
+    val currentSTTModel: ModelInfo?
+        get() = if (_isInitialized) {
+            serviceContainer.sttComponent.getCurrentModel()?.model
+        } else null
+
+    // MARK: - STT Operations
+
+    /**
+     * Simple transcription
+     */
+    suspend fun transcribe(audioData: ByteArray): String {
+        events.publish(SDKVoiceEvent.TranscriptionStarted)
+
+        try {
+            requireInitialized()
+
+            val sttComponent = serviceContainer.sttComponent
+
+            // Ensure STT is initialized
+            if (!sttComponent.isInitialized()) {
+                sttComponent.initialize()
+            }
+
+            val result = sttComponent.transcribe(audioData)
+
+            events.publish(SDKVoiceEvent.TranscriptionFinal(result.text))
+            return result.text
+
+        } catch (e: Exception) {
+            events.publish(SDKVoiceEvent.PipelineError(e))
+            throw e
         }
-        return result
+    }
+
+    /**
+     * Streaming transcription with VAD
+     */
+    fun transcribeStream(audioStream: Flow<ByteArray>): Flow<TranscriptionEvent> {
+        requireInitialized()
+        return serviceContainer.sttComponent.transcribeStream(audioStream)
+    }
+
+    // MARK: - Configuration
+
+    val isInitialized: Boolean
+        get() = _isInitialized
+
+    val currentEnvironment: SDKEnvironment
+        get() = _currentEnvironment
+
+    // MARK: - Private Helpers
+
+    private fun requireInitialized() {
+        if (!_isInitialized) {
+            throw SDKError.NotInitialized
+        }
+    }
+
+    private fun setLogLevel(level: LogLevel) {
+        SDKLogger.setLevel(level)
+    }
+
+    private fun getMockModels(): List<ModelInfo> {
+        // Return mock models matching Swift SDK's MockNetworkService
+        return listOf(
+            ModelInfo(
+                id = "whisper-tiny",
+                name = "Whisper Tiny",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.GGML,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                downloadSize = 39_000_000L,
+                memoryRequired = 39_000_000L,
+                contextLength = 0,
+                supportsThinking = false
+            ),
+            ModelInfo(
+                id = "whisper-base",
+                name = "Whisper Base",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.GGML,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                downloadSize = 74_000_000L,
+                memoryRequired = 74_000_000L,
+                contextLength = 0,
+                supportsThinking = false
+            ),
+            ModelInfo(
+                id = "whisper-small",
+                name = "Whisper Small",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.GGML,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                downloadSize = 244_000_000L,
+                memoryRequired = 244_000_000L,
+                contextLength = 0,
+                supportsThinking = false
+            )
+        )
     }
 }

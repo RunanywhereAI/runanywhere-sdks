@@ -1,84 +1,126 @@
 package com.runanywhere.sdk.files
 
+import android.content.Context
+import com.runanywhere.sdk.foundation.SDKLogger
 import java.io.File
 
 /**
- * Storage information data class
+ * Centralized file management for the SDK
  */
+object FileManager {
+
+    private lateinit var context: Context
+    private val logger = SDKLogger("FileManager")
+    private var isInitialized = false
+
+    fun initialize(appContext: Context) {
+        context = appContext.applicationContext
+        createDirectories()
+        isInitialized = true
+    }
+
+    val baseDirectory: File
+        get() {
+            requireInitialized()
+            return File(context.filesDir, "runanywhere")
+        }
+
+    val modelsDirectory: File
+        get() {
+            requireInitialized()
+            return File(baseDirectory, "models")
+        }
+
+    val cacheDirectory: File
+        get() {
+            requireInitialized()
+            return File(baseDirectory, "cache")
+        }
+
+    val tempDirectory: File
+        get() {
+            requireInitialized()
+            return File(baseDirectory, "temp")
+        }
+
+    private fun createDirectories() {
+        listOf(baseDirectory, modelsDirectory, cacheDirectory, tempDirectory).forEach { dir ->
+            if (!dir.exists()) {
+                dir.mkdirs()
+                logger.info("Created directory: ${dir.path}")
+            }
+        }
+    }
+
+    fun getModelPath(modelId: String): File {
+        requireInitialized()
+        return File(modelsDirectory, "$modelId.bin")
+    }
+
+    fun getCachePath(key: String): File {
+        requireInitialized()
+        return File(cacheDirectory, key.hashCode().toString())
+    }
+
+    fun cleanupOldFiles(maxAge: Long = 7 * 24 * 60 * 60 * 1000) {
+        requireInitialized()
+        val cutoff = System.currentTimeMillis() - maxAge
+
+        tempDirectory.walk().forEach { file ->
+            if (file.isFile && file.lastModified() < cutoff) {
+                file.delete()
+                logger.debug("Deleted old temp file: ${file.name}")
+            }
+        }
+    }
+
+    fun getStorageInfo(): StorageInfo {
+        requireInitialized()
+        val totalSpace = baseDirectory.totalSpace
+        val usedSpace = baseDirectory.walk().sumOf { if (it.isFile) it.length() else 0L }
+        val modelCount = modelsDirectory.listFiles()?.filter { it.isFile }?.size ?: 0
+        val cacheSize = cacheDirectory.walk().sumOf { if (it.isFile) it.length() else 0L }
+
+        return StorageInfo(
+            totalSpace = totalSpace,
+            usedSpace = usedSpace,
+            modelCount = modelCount,
+            cacheSize = cacheSize
+        )
+    }
+
+    fun modelExists(modelId: String): Boolean {
+        requireInitialized()
+        return getModelPath(modelId).exists()
+    }
+
+    fun deleteModel(modelId: String): Boolean {
+        requireInitialized()
+        val modelFile = getModelPath(modelId)
+        return if (modelFile.exists()) {
+            modelFile.delete()
+        } else {
+            false
+        }
+    }
+
+    fun clearCache() {
+        requireInitialized()
+        cacheDirectory.walkTopDown()
+            .filter { it.isFile }
+            .forEach { it.delete() }
+    }
+
+    private fun requireInitialized() {
+        if (!isInitialized) {
+            throw IllegalStateException("FileManager not initialized. Call FileManager.initialize(context) first.")
+        }
+    }
+}
+
 data class StorageInfo(
     val totalSpace: Long,
     val usedSpace: Long,
     val modelCount: Int,
     val cacheSize: Long
 )
-
-/**
- * File manager for SDK file operations
- */
-class FileManager {
-    private val baseDir = File(System.getProperty("user.home"), ".runanywhere")
-    private val modelsDir = File(baseDir, "models")
-    private val cacheDir = File(baseDir, "cache")
-    private val tempDir = File(baseDir, "temp")
-
-    init {
-        modelsDir.mkdirs()
-        cacheDir.mkdirs()
-        tempDir.mkdirs()
-    }
-
-    /**
-     * Get path for a model file
-     */
-    fun getModelPath(modelId: String): File {
-        return File(modelsDir, "$modelId.bin")
-    }
-
-    /**
-     * Get path for a cache file
-     */
-    fun getCachePath(key: String): File {
-        return File(cacheDir, key.hashCode().toString())
-    }
-
-    /**
-     * Create a temporary file
-     */
-    fun createTempFile(prefix: String, suffix: String): File {
-        return File.createTempFile(prefix, suffix, tempDir)
-    }
-
-    /**
-     * Clean up old temporary files
-     */
-    fun cleanupOldFiles(maxAge: Long = 7 * 24 * 60 * 60 * 1000) {
-        val cutoff = System.currentTimeMillis() - maxAge
-
-        tempDir.walkTopDown().forEach { file ->
-            if (file.isFile && file.lastModified() < cutoff) {
-                file.delete()
-            }
-        }
-    }
-
-    /**
-     * Get storage information
-     */
-    fun getStorageInfo(): StorageInfo {
-        return StorageInfo(
-            totalSpace = baseDir.totalSpace,
-            usedSpace = baseDir.walkTopDown().sumOf { if (it.isFile) it.length() else 0L },
-            modelCount = modelsDir.listFiles()?.filter { it.isFile }?.size ?: 0,
-            cacheSize = cacheDir.walkTopDown().sumOf { if (it.isFile) it.length() else 0L }
-        )
-    }
-
-    /**
-     * Clear cache directory
-     */
-    fun clearCache() {
-        cacheDir.walkTopDown()
-            .filter { it.isFile }
-            .forEach { it.delete() }
-    }
-}
