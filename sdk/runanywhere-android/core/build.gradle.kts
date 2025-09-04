@@ -6,8 +6,12 @@ group = "com.runanywhere.sdk"
 version = "1.0.0"
 
 dependencies {
-    implementation(kotlin("stdlib"))
+    implementation(project(":sdk:runanywhere-android:jni"))
+
+    // Kotlin
+    implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
     // Logging
     implementation(libs.slf4j.api)
@@ -19,13 +23,11 @@ dependencies {
     // JSON parsing
     implementation(libs.gson)
 
-    // JNI module dependency - optional as it contains native implementations
-    // Try to use project if available, otherwise skip
-    if (project.findProject(":jni") != null) {
-        compileOnly(project(":jni"))
-    } else if (project.findProject(":sdk-jni") != null) {
-        compileOnly(project(":sdk-jni"))
-    }
+    // Whisper implementation - using whisper-jni from Maven Central
+    implementation("io.github.givimad:whisper-jni:1.7.1")
+
+    // VAD implementation - using WebRTC VAD from android-vad library
+    implementation("com.github.gkonovalov.android-vad:webrtc:2.0.10")
 
     // Testing
     testImplementation(kotlin("test"))
