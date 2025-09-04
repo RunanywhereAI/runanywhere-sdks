@@ -16,6 +16,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
@@ -24,4 +25,5 @@ rootProject.name = "RunAnywhereSDK"
 // Include SDK modules
 include(":core")
 include(":jni")
-include(":plugin")
+// Temporarily disabled due to Gradle compatibility issues
+// include(":plugin")
