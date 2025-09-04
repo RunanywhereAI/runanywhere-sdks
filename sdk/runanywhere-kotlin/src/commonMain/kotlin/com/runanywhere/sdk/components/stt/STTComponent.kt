@@ -23,6 +23,7 @@ class STTComponent(
 
     override val componentType: SDKComponent = SDKComponent.STT
 
+    private val logger = com.runanywhere.sdk.foundation.SDKLogger("STTComponent")
     private var currentModel: LoadedModel? = null
     private lateinit var sttService: STTService
     private var analyticsCallback: ((String, Map<String, Any>) -> Unit)? = null
@@ -215,6 +216,15 @@ class STTComponent(
     fun getCurrentModel(): LoadedModel? = currentModel
 
     fun isInitialized(): Boolean = state == ComponentState.READY
+
+    /**
+     * Load a model into the STT service
+     */
+    suspend fun loadModel(modelPath: String) {
+        requireReady()
+        sttService.initialize(modelPath)
+        logger.info("Loaded STT model from $modelPath")
+    }
 
     /**
      * Set analytics callback for STT events

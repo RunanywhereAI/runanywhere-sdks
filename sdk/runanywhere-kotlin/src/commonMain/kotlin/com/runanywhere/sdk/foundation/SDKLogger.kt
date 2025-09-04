@@ -33,6 +33,16 @@ class SDKLogger(private val tag: String) {
         fun setLevel(level: LogLevel) {
             currentLevel = level
         }
+
+        fun setLogLevel(level: com.runanywhere.sdk.data.models.LogLevel) {
+            currentLevel = when(level) {
+                com.runanywhere.sdk.data.models.LogLevel.DEBUG -> LogLevel.DEBUG
+                com.runanywhere.sdk.data.models.LogLevel.INFO -> LogLevel.INFO
+                com.runanywhere.sdk.data.models.LogLevel.WARNING -> LogLevel.WARNING
+                com.runanywhere.sdk.data.models.LogLevel.ERROR -> LogLevel.ERROR
+                com.runanywhere.sdk.data.models.LogLevel.NONE -> LogLevel.ERROR
+            }
+        }
     }
 
     fun debug(message: String) {
