@@ -78,11 +78,11 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
     public let streamingEnabled: Bool
 
     public enum QuantizationLevel: String, Sendable {
-        case q4_0 = "Q4_0"
-        case q4_k_m = "Q4_K_M"
-        case q5_k_m = "Q5_K_M"
-        case q6_k = "Q6_K"
-        case q8_0 = "Q8_0"
+        case q4v0 = "Q4_0"
+        case q4KM = "Q4_K_M"
+        case q5KM = "Q5_K_M"
+        case q6K = "Q6_K"
+        case q8v0 = "Q8_0"
         case f16 = "F16"
         case f32 = "F32"
     }
