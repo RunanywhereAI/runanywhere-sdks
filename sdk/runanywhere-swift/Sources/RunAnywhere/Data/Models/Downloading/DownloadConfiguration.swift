@@ -1,7 +1,8 @@
 import Foundation
 
+// TODO: do we need this? can be simplified?
 /// Configuration for download behavior
-public struct DownloadConfiguration {
+public struct DownloadConfiguration: Sendable {
     public var maxConcurrentDownloads: Int
     public var retryCount: Int
     public var retryDelay: TimeInterval

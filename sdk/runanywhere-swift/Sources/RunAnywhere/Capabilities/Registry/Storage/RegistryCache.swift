@@ -77,7 +77,7 @@ class RegistryCache {
 
                 // Size filter
                 if let maxSize = criteria.maxSize {
-                    guard model.estimatedMemory <= maxSize else {
+                    guard model.memoryRequired ?? 0 <= maxSize else {
                         return false
                     }
                 }

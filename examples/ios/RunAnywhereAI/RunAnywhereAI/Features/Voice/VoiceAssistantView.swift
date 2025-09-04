@@ -1,5 +1,5 @@
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 import AVFoundation
 #if canImport(UIKit)
 import UIKit

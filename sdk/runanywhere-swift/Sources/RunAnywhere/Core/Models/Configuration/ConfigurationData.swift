@@ -2,31 +2,40 @@ import Foundation
 import GRDB
 
 /// Configuration source
-public enum ConfigurationSource: String, Codable {
-    case remote = "remote"
-    case consumer = "consumer"
-    case defaults = "defaults"
+public enum ConfigurationSource: String, Codable, Sendable {
+    case remote
+    case consumer
+    case defaults
 }
 
 /// Main configuration data structure using composed configurations
 /// Works for both network API and database storage
-public struct ConfigurationData: Codable, Syncable, RepositoryEntity, FetchableRecord, PersistableRecord {
+public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     /// Unique identifier for this configuration
     public let id: String
 
     /// Routing configuration
     public var routing: RoutingConfiguration
 
-    /// Analytics configuration
-    public var analytics: AnalyticsConfiguration
-
     /// Generation configuration
     public var generation: GenerationConfiguration
 
-    /// Storage configuration
+    /// Storage configuration (includes memory threshold)
     public var storage: StorageConfiguration
 
-    /// API configuration
+    /// API configuration (baseURL, timeouts, etc)
+    public var api: APIConfiguration
+
+    /// Download configuration
+    public var download: ModelDownloadConfiguration
+
+    /// Hardware preferences (optional)
+    public var hardware: HardwareConfiguration?
+
+    /// Debug mode flag
+    public var debugMode: Bool
+
+    /// API key for authentication (optional - can be provided separately)
     public var apiKey: String?
 
     /// Whether user can override configuration
@@ -43,9 +52,12 @@ public struct ConfigurationData: Codable, Syncable, RepositoryEntity, FetchableR
     public init(
         id: String = "default",
         routing: RoutingConfiguration = RoutingConfiguration(),
-        analytics: AnalyticsConfiguration = AnalyticsConfiguration(),
         generation: GenerationConfiguration = GenerationConfiguration(),
         storage: StorageConfiguration = StorageConfiguration(),
+        api: APIConfiguration = APIConfiguration(),
+        download: ModelDownloadConfiguration = ModelDownloadConfiguration(),
+        hardware: HardwareConfiguration? = nil,
+        debugMode: Bool = false,
         apiKey: String? = nil,
         allowUserOverride: Bool = true,
         source: ConfigurationSource = .defaults,
@@ -55,9 +67,12 @@ public struct ConfigurationData: Codable, Syncable, RepositoryEntity, FetchableR
     ) {
         self.id = id
         self.routing = routing
-        self.analytics = analytics
         self.generation = generation
         self.storage = storage
+        self.api = api
+        self.download = download
+        self.hardware = hardware
+        self.debugMode = debugMode
         self.apiKey = apiKey
         self.allowUserOverride = allowUserOverride
         self.source = source
@@ -65,14 +80,13 @@ public struct ConfigurationData: Codable, Syncable, RepositoryEntity, FetchableR
         self.updatedAt = updatedAt
         self.syncPending = syncPending
     }
-
 }
 
 // MARK: - GRDB Configuration
 
 extension ConfigurationData: TableRecord {
     /// The table name for ConfigurationData in the database
-    public static let databaseTableName = "configuration"
+    public static let databaseTableName: String = "configuration"
 
     /// Define how to handle conflicts during persistence
     public static let persistenceConflictPolicy = PersistenceConflictPolicy(
@@ -87,7 +101,6 @@ extension ConfigurationData {
     public enum Columns: String, ColumnExpression {
         case id
         case routing
-        case analytics
         case generation
         case storage
         case apiKey
@@ -96,5 +109,18 @@ extension ConfigurationData {
         case createdAt
         case updatedAt
         case syncPending
+    }
+}
+
+// MARK: - Factory Methods
+
+extension ConfigurationData {
+    /// Create SDK default configuration
+    public static func sdkDefaults(apiKey: String) -> ConfigurationData {
+        return ConfigurationData(
+            id: "default-\(UUID().uuidString)",
+            apiKey: apiKey.isEmpty ? "dev-mode" : apiKey,
+            source: .defaults
+        )
     }
 }

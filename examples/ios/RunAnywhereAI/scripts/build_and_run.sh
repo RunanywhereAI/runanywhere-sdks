@@ -147,12 +147,6 @@ BUNDLE_ID="com.runanywhere.RunAnywhereAI"
 # Always use project file now (no CocoaPods workspace)
 USE_PROJECT=true
 
-# Function no longer needed - CocoaPods removed
-fix_pods_script() {
-    # CocoaPods has been removed - using Swift Package Manager only
-    return 0
-}
-
 # Function to get device destination
 get_destination() {
     if [ "$TARGET_TYPE" = "mac" ]; then
@@ -338,9 +332,6 @@ if [ "$ADD_MODELS" = true ]; then
         print_warning "Model addition script not found or not executable"
     fi
 fi
-
-# Fix Pods script
-fix_pods_script
 
 # Get destination
 DESTINATION=$(get_destination)

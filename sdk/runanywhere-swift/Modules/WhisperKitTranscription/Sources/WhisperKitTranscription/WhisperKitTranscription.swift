@@ -2,7 +2,7 @@
 
 // Re-export all public types from this module
 @_exported import WhisperKit
-@_exported import RunAnywhereSDK
+@_exported import RunAnywhere
 
 // All public types are already exported from their respective files:
 // - WhisperKitService: Core transcription service implementation

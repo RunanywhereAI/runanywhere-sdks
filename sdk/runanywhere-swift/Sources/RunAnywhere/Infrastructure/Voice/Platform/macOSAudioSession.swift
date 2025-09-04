@@ -101,13 +101,33 @@ public class macOSAudioSession {
 
     /// Get available audio input devices
     public var availableInputDevices: [AudioDevice] {
-        let devices = AVCaptureDevice.devices(for: .audio)
-        return devices.map { device in
-            AudioDevice(
-                id: device.uniqueID,
-                name: device.localizedName,
-                isDefault: device == AVCaptureDevice.default(for: .audio)
+        if #available(macOS 14.0, *) {
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.microphone, .builtInMicrophone],
+                mediaType: .audio,
+                position: .unspecified
             )
+            return discoverySession.devices.map { device in
+                AudioDevice(
+                    id: device.uniqueID,
+                    name: device.localizedName,
+                    isDefault: device == AVCaptureDevice.default(for: .audio)
+                )
+            }
+        } else {
+            // Fallback for older macOS versions
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInMicrophone],
+                mediaType: .audio,
+                position: .unspecified
+            )
+            return discoverySession.devices.map { device in
+                AudioDevice(
+                    id: device.uniqueID,
+                    name: device.localizedName,
+                    isDefault: device == AVCaptureDevice.default(for: .audio)
+                )
+            }
         }
     }
 
@@ -137,7 +157,7 @@ public class macOSAudioSession {
 
     /// Get current input level (0.0 to 1.0)
     public var inputLevel: Float {
-        guard isRunning, let input = inputNode else { return 0 }
+        guard isRunning, let _ = inputNode else { return 0 }
 
         // Install tap to measure level if needed
         // This is a simplified implementation
@@ -158,7 +178,7 @@ public class macOSAudioSession {
 
     private func configureForPlayback(format: AVAudioFormat) {
         // Configure output node for playback
-        guard let output = outputNode else { return }
+        guard outputNode != nil else { return }
 
         logger.debug("Configured audio engine for playback")
     }

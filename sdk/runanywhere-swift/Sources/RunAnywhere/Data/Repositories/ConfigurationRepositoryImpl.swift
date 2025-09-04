@@ -5,6 +5,7 @@ import GRDB
 /// Implements both Repository for basic CRUD and ConfigurationRepository for config-specific operations
 public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public typealias Entity = ConfigurationData
+    public typealias RemoteDS = RemoteConfigurationDataSource
 
     // Core dependencies
     private let databaseManager: DatabaseManager
@@ -12,15 +13,20 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     private let logger = SDKLogger(category: "ConfigurationRepository")
 
     // Data sources for configuration-specific operations
-    private let remoteDataSource: RemoteConfigurationDataSource
+    private let _remoteDataSource: RemoteConfigurationDataSource
     private let localDataSource: LocalConfigurationDataSource
+
+    // Expose remote data source for sync coordinator
+    public nonisolated var remoteDataSource: RemoteConfigurationDataSource? {
+        return _remoteDataSource
+    }
 
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
-        self.remoteDataSource = RemoteConfigurationDataSource(apiClient: apiClient)
+        self._remoteDataSource = RemoteConfigurationDataSource(apiClient: apiClient)
         self.localDataSource = LocalConfigurationDataSource(databaseManager: databaseManager)
     }
 
@@ -68,7 +74,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
         try databaseManager.write { db in
             for id in ids {
                 if var data = try ConfigurationData.fetchOne(db, key: id) {
-                    _ = data.markSynced()
+                    data.markSynced()
                     try data.update(db)
                 }
             }
@@ -79,7 +85,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
 
     public func fetchRemoteConfiguration(apiKey: String) async throws -> ConfigurationData? {
         do {
-            return try await remoteDataSource.fetchConfiguration(apiKey: apiKey)
+            return try await _remoteDataSource.fetchConfiguration(apiKey: apiKey)
         } catch {
             logger.debug("Remote configuration fetch failed: \(error)")
             return nil

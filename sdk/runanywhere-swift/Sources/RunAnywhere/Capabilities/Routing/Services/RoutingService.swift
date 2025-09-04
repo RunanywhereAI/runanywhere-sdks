@@ -88,7 +88,7 @@ public class RoutingService {
 
     private func analyzeComplexity(prompt: String, options: RunAnywhereGenerationOptions) -> TaskComplexity {
         let promptLength = prompt.count
-        let maxTokens = options.maxTokens ?? 100
+        let maxTokens = options.maxTokens
 
         // Simple heuristic for complexity
         if promptLength < 100 && maxTokens < 50 {

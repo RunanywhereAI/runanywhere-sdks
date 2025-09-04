@@ -381,7 +381,7 @@ public enum DeviceSpecifications {
         // Determine recommendations based on TOPS performance
         let maxBatchSize: Int
         let maxContextLength: Int
-        let recommendedQuantization: QuantizationType
+        let recommendedQuantization: QuantizationLevel
         let maxTokensPerSecond: Int
 
         switch spec.estimatedTops {
@@ -389,28 +389,28 @@ public enum DeviceSpecifications {
             // High-performance chips (A17 Pro, A18, M4)
             maxBatchSize = 8
             maxContextLength = 4096
-            recommendedQuantization = .none
+            recommendedQuantization = .full
             maxTokensPerSecond = 50
 
         case 15...:
             // Mid-range chips (A15, A16, M2, M3)
             maxBatchSize = 4
             maxContextLength = 2048
-            recommendedQuantization = .q8_0
+            recommendedQuantization = .q8v0
             maxTokensPerSecond = 25
 
         case 10...:
             // Entry-level ML chips (A14, M1)
             maxBatchSize = 2
             maxContextLength = 1024
-            recommendedQuantization = .q8_0
+            recommendedQuantization = .q8v0
             maxTokensPerSecond = 15
 
         default:
             // Low-end or unknown chips
             maxBatchSize = 1
             maxContextLength = 512
-            recommendedQuantization = .q4_K_M
+            recommendedQuantization = .q4KM
             maxTokensPerSecond = 10
         }
 
@@ -444,7 +444,7 @@ public enum DeviceSpecifications {
 public struct OptimizationRecommendations {
     public let maxBatchSize: Int
     public let maxContextLength: Int
-    public let recommendedQuantization: QuantizationType
+    public let recommendedQuantization: QuantizationLevel
     public let maxTokensPerSecond: Int
     public let useNeuralEngine: Bool
     public let useGPU: Bool

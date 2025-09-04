@@ -4,7 +4,7 @@ import Files
 import Pulse
 
 /// Simplified download service using Alamofire
-public class AlamofireDownloadService: DownloadManager {
+public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -38,6 +38,9 @@ public class AlamofireDownloadService: DownloadManager {
             configuration: sessionConfiguration,
             interceptor: Interceptor(adapters: [], retriers: [retryPolicy])
         )
+
+        // Auto-discover and register download strategies from adapters
+        autoRegisterStrategies()
     }
 
     // MARK: - DownloadManager Protocol
@@ -143,8 +146,8 @@ public class AlamofireDownloadService: DownloadManager {
 
                                     // Save metadata persistently
                                     Task {
-                                        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
-                                        try? await modelMetadataService.saveModel(updatedModel)
+                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                        try? await modelInfoService.saveModel(updatedModel)
                                     }
 
                                     self.logger.info("Download completed", metadata: [
@@ -212,6 +215,25 @@ public class AlamofireDownloadService: DownloadManager {
     public func registerStrategy(_ strategy: DownloadStrategy) {
         customStrategies.insert(strategy, at: 0) // Custom strategies have priority
         logger.info("Registered custom download strategy")
+    }
+
+    /// Auto-discover and register strategies from framework adapters
+    private func autoRegisterStrategies() {
+        let adapters = ServiceContainer.shared.adapterRegistry.getRegisteredAdapters()
+        var registeredCount = 0
+
+        for (framework, adapter) in adapters {
+            if let strategy = adapter.getDownloadStrategy() {
+                // Auto-discovered strategies go after manually registered ones
+                customStrategies.append(strategy)
+                registeredCount += 1
+                logger.debug("Auto-registered download strategy from \(framework.rawValue) adapter")
+            }
+        }
+
+        if registeredCount > 0 {
+            logger.info("Auto-registered \(registeredCount) download strategies from adapters")
+        }
     }
 
     /// Helper to download using a custom strategy
@@ -428,8 +450,8 @@ extension AlamofireDownloadService {
 
                                     // Save metadata persistently
                                     Task {
-                                        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
-                                        try? await modelMetadataService.saveModel(updatedModel)
+                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                        try? await modelInfoService.saveModel(updatedModel)
                                     }
 
                                     continuation.resume(returning: url)

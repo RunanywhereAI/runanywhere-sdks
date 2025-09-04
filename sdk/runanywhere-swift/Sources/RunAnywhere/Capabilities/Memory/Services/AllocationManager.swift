@@ -3,15 +3,9 @@ import Foundation
 /// Manages memory allocation and model registration
 class AllocationManager {
     private var loadedModels: [String: MemoryLoadedModelInfo] = [:]
-    private let modelLock = NSLock()
+    private let modelLock: NSLock = NSLock()
     private var pressureCallback: (() -> Void)?
-    private let logger = SDKLogger(category: "AllocationManager")
-
-    private var config = MemoryService.Config()
-
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
-    }
+    private let logger: SDKLogger = SDKLogger(category: "AllocationManager")
 
     func setPressureCallback(_ callback: @escaping () -> Void) {
         pressureCallback = callback

@@ -11,7 +11,7 @@ import UIKit
 #endif
 
 /// Analyzes hardware capabilities and makes optimization recommendations
-public class CapabilityAnalyzer {
+public class CapabilityAnalyzer: @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -79,12 +79,6 @@ public class CapabilityAnalyzer {
             capabilities: capabilities
         )
 
-        // Set fallback accelerator
-        config.fallbackAccelerator = selectFallbackAccelerator(
-            primary: config.primaryAccelerator,
-            capabilities: capabilities
-        )
-
         // Configure memory mode
         config.memoryMode = selectMemoryMode(
             for: model,
@@ -96,14 +90,6 @@ public class CapabilityAnalyzer {
             for: model,
             capabilities: capabilities
         )
-
-        // Determine quantization settings
-        let quantizationSettings = selectQuantizationSettings(
-            for: model,
-            capabilities: capabilities
-        )
-        config.useQuantization = quantizationSettings.use
-        config.quantizationBits = quantizationSettings.bits
 
         return config
     }
@@ -169,14 +155,14 @@ public class CapabilityAnalyzer {
         capabilities: DeviceCapabilities
     ) -> HardwareAcceleration {
         // Large models with Neural Engine support
-        if model.estimatedMemory > 3_000_000_000 && capabilities.hasNeuralEngine {
+        if model.memoryRequired ?? 0 > 3_000_000_000 && capabilities.hasNeuralEngine {
             if model.format == .mlmodel || model.format == .mlpackage {
                 return .neuralEngine
             }
         }
 
         // GPU for medium to large models
-        if capabilities.hasGPU && model.estimatedMemory > 1_000_000_000 {
+        if capabilities.hasGPU && model.memoryRequired ?? 0 > 1_000_000_000 {
             return .gpu
         }
 
@@ -220,7 +206,7 @@ public class CapabilityAnalyzer {
         capabilities: DeviceCapabilities
     ) -> HardwareConfiguration.MemoryMode {
         let availableMemory = capabilities.availableMemory
-        let modelMemory = model.estimatedMemory
+        let modelMemory = model.memoryRequired ?? 0
 
         if availableMemory < modelMemory * 2 {
             return .conservative
@@ -239,11 +225,11 @@ public class CapabilityAnalyzer {
     ) -> Int {
         let processorCount = capabilities.processorCount
 
-        if model.estimatedMemory > 2_000_000_000 {
+        if model.memoryRequired ?? 0 > 2_000_000_000 {
             return processorCount
         }
 
-        if model.estimatedMemory < 500_000_000 {
+        if model.memoryRequired ?? 0 < 500_000_000 {
             return max(1, processorCount / 2)
         }
 
@@ -257,21 +243,21 @@ public class CapabilityAnalyzer {
         // Check if model already quantized
         if let quantLevel = model.metadata?.quantizationLevel {
             switch quantLevel {
-            case .int4, .q4_0, .q4_K_S, .q4_K_M:
+            case .int4, .q4v0, .q4KS, .q4KM:
                 return (true, 4)
-            case .int8, .q8_0:
+            case .int8, .q8v0:
                 return (true, 8)
             case .half, .f16:
                 return (true, 16)
             case .full, .f32:
                 return (false, 32)
-            case .int2, .q2_K:
+            case .int2, .q2K:
                 return (true, 2)
-            case .q3_K_S, .q3_K_M, .q3_K_L:
+            case .q3KS, .q3KM, .q3KL:
                 return (true, 3)
-            case .q5_0, .q5_K_S, .q5_K_M:
+            case .q5v0, .q5KS, .q5KM:
                 return (true, 5)
-            case .q6_K:
+            case .q6K:
                 return (true, 6)
             case .mixed:
                 return (true, 8)
@@ -283,7 +269,7 @@ public class CapabilityAnalyzer {
             return (true, 4)
         }
 
-        if capabilities.totalMemory < 8_000_000_000 && model.estimatedMemory > 1_000_000_000 {
+        if capabilities.totalMemory < 8_000_000_000 && model.memoryRequired ?? 0 > 1_000_000_000 {
             return (true, 8)
         }
 

@@ -14,7 +14,7 @@ public class RegistryService: ModelRegistry {
     }
 
     /// Initialize registry with configuration
-    public func initialize(with configuration: Configuration) async {
+    public func initialize(with apiKey: String) async {
         logger.info("Initializing registry with configuration")
 
         // Load pre-configured models
@@ -28,11 +28,9 @@ public class RegistryService: ModelRegistry {
             registerModel(model)
         }
 
-        // Discover models from providers
-        for provider in configuration.modelProviders where provider.enabled {
-            logger.debug("Discovering models from provider")
-            await discoverModelsFromProvider(provider)
-        }
+        // Model provider discovery will be handled via configuration service
+        // once the configuration is loaded from the network
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
         logger.info("Registry initialization complete")
     }
@@ -92,43 +90,20 @@ public class RegistryService: ModelRegistry {
                 return false
             }
 
-            // Context length filters
+            // Context length filters (only for models that have context length)
             if let minContext = criteria.minContextLength,
-               model.contextLength < minContext {
+               let modelContext = model.contextLength,
+               modelContext < minContext {
                 return false
             }
 
             if let maxContext = criteria.maxContextLength,
-               model.contextLength > maxContext {
+               let modelContext = model.contextLength,
+               modelContext > maxContext {
                 return false
             }
 
-            // Hardware requirements
-            if let requiresNeuralEngine = criteria.requiresNeuralEngine,
-               requiresNeuralEngine {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresNeuralEngine = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
-
-            if let requiresGPU = criteria.requiresGPU,
-               requiresGPU {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresGPU = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
+            // Hardware requirements removed for simplicity
 
             // Tag filter
             if !criteria.tags.isEmpty {
@@ -183,35 +158,33 @@ public class RegistryService: ModelRegistry {
         url: URL,
         framework: LLMFramework,
         estimatedSize: Int64? = nil,
-        supportsThinking: Bool = false,
-        thinkingTagPattern: ThinkingTagPattern? = nil
+        supportsThinking: Bool = false
     ) -> ModelInfo {
         let modelId = generateModelId(from: url)
 
         // Detect format from URL
         let format = detectFormatFromURL(url)
 
+        // Determine category based on framework
+        let category = ModelCategory.from(framework: framework)
+
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
+            category: category,
             format: format,
             downloadURL: url,
             localPath: nil,
-            estimatedMemory: estimatedSize ?? estimateMemoryFromURL(url),
-            contextLength: 2048, // Default context length
             downloadSize: nil, // Will be determined during download
-            checksum: nil,
+            memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             compatibleFrameworks: [framework],
             preferredFramework: framework,
-            hardwareRequirements: [],
-            tokenizerFormat: nil,
+            contextLength: category == .language ? 2048 : nil, // Only for language models
+            supportsThinking: supportsThinking,
             metadata: ModelInfoMetadata(
                 tags: ["user-added", framework.rawValue.lowercased()],
                 description: "User-added model"
-            ),
-            alternativeDownloadURLs: [],
-            supportsThinking: supportsThinking,
-            thinkingTagPattern: thinkingTagPattern
+            )
         )
 
         registerModel(modelInfo)
@@ -223,39 +196,44 @@ public class RegistryService: ModelRegistry {
     private func loadPreconfiguredModels() async {
         logger.debug("Loading pre-configured models")
 
-        // Load models from repository
-        // Only load models for frameworks that have registered adapters
-        let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
-        logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+        // First, try to load models from configuration (remote or cached)
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
-        // Load stored models from service
-        let modelMetadataService = await ServiceContainer.shared.modelMetadataService
+        // Model catalog removed from configuration for simplicity
         do {
-            // Load all stored models and filter later
-            var storedModels = try await modelMetadataService.loadStoredModels()
+            logger.debug("No models in configuration, falling back to stored models")
 
-            if !availableFrameworks.isEmpty {
+            // Fallback: Load models from repository
+            // Only load models for frameworks that have registered adapters
+            let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
+            logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+
+            // Load stored models from service
+            let modelInfoService = await ServiceContainer.shared.modelInfoService
+            do {
+                // Load all stored models and filter later
+                var storedModels = try await modelInfoService.loadStoredModels()
+
+                if !availableFrameworks.isEmpty {
                     // Filter for available frameworks
                     storedModels = storedModels.filter { model in
                         model.compatibleFrameworks.contains { availableFrameworks.contains($0) }
                     }
-                logger.info("Loading \(storedModels.count) models for available frameworks")
-            } else {
-                logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
-            }
+                    logger.info("Loading \(storedModels.count) models for available frameworks")
+                } else {
+                    logger.info("No framework adapters registered, loading all \(storedModels.count) stored models")
+                }
 
-            for model in storedModels {
-                registerModel(model)
+                for model in storedModels {
+                    registerModel(model)
+                }
+            } catch {
+                logger.error("Failed to load stored models: \(error)")
             }
-        } catch {
-            logger.error("Failed to load stored models: \(error)")
         }
     }
 
-    private func discoverModelsFromProvider(_ provider: ModelProviderConfig) async {
-        // Placeholder for provider-specific discovery
-        // Would connect to HuggingFace, Kaggle, etc.
-    }
+    // Provider discovery removed - no longer needed
 
     // MARK: - URL Helper Methods
 

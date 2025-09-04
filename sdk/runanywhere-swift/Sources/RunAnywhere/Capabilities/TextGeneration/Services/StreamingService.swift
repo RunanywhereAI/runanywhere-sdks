@@ -4,19 +4,22 @@ import Foundation
 public class StreamingService {
     private let generationService: GenerationService
     private let modelLoadingService: ModelLoadingService
-    private let structuredOutputHandler: StructuredOutputHandler
+    private let optionsResolver = GenerationOptionsResolver()
 
     public init(
         generationService: GenerationService,
-        modelLoadingService: ModelLoadingService? = nil,
-        structuredOutputHandler: StructuredOutputHandler? = nil
+        modelLoadingService: ModelLoadingService? = nil
     ) {
         self.generationService = generationService
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
-        self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }
 
     /// Generate streaming text using the loaded model
+    ///
+    /// Priority for settings resolution:
+    /// 1. Runtime Options (highest priority) - User knows best for their specific request
+    /// 2. Remote Configuration - Organization-wide defaults from console
+    /// 3. SDK Defaults (lowest priority) - Fallback values when nothing else is specified
     public func generateStream(
         prompt: String,
         options: RunAnywhereGenerationOptions
@@ -24,27 +27,28 @@ public class StreamingService {
         return AsyncThrowingStream { continuation in
             Task {
                 do {
+                    // Get remote configuration
+                    let remoteConfig = RunAnywhere.configurationData?.generation
+
+                    // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
+                    let resolvedOptions = optionsResolver.resolve(
+                        options: options,
+                        remoteConfig: remoteConfig
+                    )
+
                     // Get the current loaded model from generation service
                     guard let loadedModel = generationService.getCurrentModel() else {
                         throw SDKError.modelNotFound("No model is currently loaded")
                     }
 
-                    // Prepare prompt with structured output if needed
-                    let effectivePrompt: String
-                    if let structuredConfig = options.structuredOutput {
-                        effectivePrompt = self.structuredOutputHandler.preparePrompt(
-                            originalPrompt: prompt,
-                            config: structuredConfig
-                        )
-                    } else {
-                        effectivePrompt = prompt
-                    }
+                    // Prepare prompt with system prompt and structured output formatting
+                    let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
 
 
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
                     let shouldParseThinking = modelInfo.supportsThinking
-                    let thinkingPattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+                    let thinkingPattern = ThinkingTagPattern.defaultPattern
 
                     // Buffers for thinking parsing
                     var buffer = ""
@@ -53,7 +57,7 @@ public class StreamingService {
                     // Use the actual streaming method from the LLM service
                     try await loadedModel.service.streamGenerate(
                         prompt: effectivePrompt,
-                        options: options,
+                        options: resolvedOptions,
                         onToken: { token in
                             if shouldParseThinking {
                                 // Parse token for thinking content
@@ -96,27 +100,28 @@ public class StreamingService {
         return AsyncThrowingStream { continuation in
             Task {
                 do {
+                    // Get remote configuration
+                    let remoteConfig = RunAnywhere.configurationData?.generation
+
+                    // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
+                    let resolvedOptions = optionsResolver.resolve(
+                        options: options,
+                        remoteConfig: remoteConfig
+                    )
+
                     // Get the current loaded model from generation service
                     guard let loadedModel = generationService.getCurrentModel() else {
                         throw SDKError.modelNotFound("No model is currently loaded")
                     }
 
-                    // Prepare prompt with structured output if needed
-                    let effectivePrompt: String
-                    if let structuredConfig = options.structuredOutput {
-                        effectivePrompt = self.structuredOutputHandler.preparePrompt(
-                            originalPrompt: prompt,
-                            config: structuredConfig
-                        )
-                    } else {
-                        effectivePrompt = prompt
-                    }
+                    // Prepare prompt with system prompt and structured output formatting
+                    let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
 
 
                     // Check if model supports thinking and get pattern
                     let modelInfo = loadedModel.model
                     let shouldParseThinking = modelInfo.supportsThinking
-                    let thinkingPattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
+                    let thinkingPattern = ThinkingTagPattern.defaultPattern
 
                     // Buffers for thinking parsing
                     var buffer = ""
@@ -127,7 +132,7 @@ public class StreamingService {
                     // Use the actual streaming method from the LLM service
                     try await loadedModel.service.streamGenerate(
                         prompt: effectivePrompt,
-                        options: options,
+                        options: resolvedOptions,
                         onToken: { token in
                             if shouldParseThinking {
                                 // Parse token for thinking content

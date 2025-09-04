@@ -7,7 +7,7 @@ final class RunAnywhereSDKTests: XCTestCase {
         let config = Configuration(apiKey: "test-api-key")
 
         XCTAssertEqual(config.apiKey, "test-api-key")
-        XCTAssertEqual(config.baseURL.absoluteString, "https://api.runanywhere.ai")
+        XCTAssertEqual(config.baseURL.absoluteString, RunAnywhereConstants.apiURLs.current)
         XCTAssertTrue(config.enableRealTimeDashboard)
         XCTAssertEqual(config.routingPolicy, .automatic)
         XCTAssertEqual(config.telemetryConsent, .granted)
@@ -23,7 +23,6 @@ final class RunAnywhereSDKTests: XCTestCase {
         XCTAssertTrue(options.enableRealTimeTracking)
         XCTAssertNil(options.context)
         XCTAssertTrue(options.stopSequences.isEmpty)
-        XCTAssertNil(options.seed)
     }
 
     func testSDKSingleton() {
