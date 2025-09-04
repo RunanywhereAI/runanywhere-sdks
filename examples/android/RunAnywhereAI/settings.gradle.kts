@@ -16,6 +16,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") } // For android-vad and other JitPack libraries
     }
     versionCatalogs {
         create("libs") {
