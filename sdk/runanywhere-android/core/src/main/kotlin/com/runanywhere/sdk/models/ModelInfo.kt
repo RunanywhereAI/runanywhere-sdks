@@ -118,7 +118,7 @@ enum class QuantizationLevel(val value: String) {
 
     companion object {
         fun fromValue(value: String): QuantizationLevel? {
-            return values().find { it.value.equals(value, ignoreCase = true) }
+            return entries.find { it.value.equals(value, ignoreCase = true) }
         }
     }
 }

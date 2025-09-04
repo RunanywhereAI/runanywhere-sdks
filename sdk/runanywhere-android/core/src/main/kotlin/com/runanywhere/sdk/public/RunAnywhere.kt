@@ -1,11 +1,7 @@
 package com.runanywhere.sdk.public
 
 import android.content.Context
-import com.runanywhere.sdk.components.stt.STTComponent
-import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.WhisperServiceProvider
-import com.runanywhere.sdk.components.vad.VADComponent
-import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.WebRTCVADServiceProvider
 import com.runanywhere.sdk.data.models.*
 import com.runanywhere.sdk.events.*

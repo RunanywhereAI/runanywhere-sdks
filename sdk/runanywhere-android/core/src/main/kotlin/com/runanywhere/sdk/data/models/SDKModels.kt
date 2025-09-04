@@ -150,7 +150,8 @@ data class HealthCheckResponse(
  * SDK Errors
  */
 sealed class SDKError : Exception() {
-    object NotInitialized : SDKError() {
+    data object NotInitialized : SDKError() {
+        private fun readResolve(): Any = NotInitialized
         override val message = "SDK is not initialized. Call RunAnywhere.initialize() first."
     }
 

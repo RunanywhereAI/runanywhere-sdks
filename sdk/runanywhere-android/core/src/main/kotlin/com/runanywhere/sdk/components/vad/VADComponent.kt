@@ -2,7 +2,6 @@ package com.runanywhere.sdk.components.vad
 
 import com.runanywhere.sdk.components.base.*
 import kotlinx.coroutines.flow.*
-import java.util.Date
 
 // MARK: - VAD Component
 
