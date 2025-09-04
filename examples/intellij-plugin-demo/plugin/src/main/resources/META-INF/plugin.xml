@@ -2,29 +2,33 @@
     <id>com.runanywhere.stt</id>
     <name>RunAnywhere Voice Commands</name>
     <vendor email="support@runanywhere.com" url="https://runanywhere.com">RunAnywhere</vendor>
-    <version>1.0.0</version>
+    <version>0.1.0</version>
 
     <description><![CDATA[
-        Voice commands and dictation for IntelliJ IDEA.
+        Voice commands and dictation for IntelliJ IDEA powered by RunAnywhere SDK.
         <br/><br/>
         <b>Features:</b>
         <ul>
-            <li>Voice-to-code dictation</li>
+            <li>Voice-to-code dictation with Whisper STT</li>
             <li>Voice commands for IDE actions</li>
             <li>On-device Whisper AI models</li>
             <li>Real-time transcription with VAD</li>
+            <li>Model download and management UI</li>
+            <li>Privacy-first: all processing on-device</li>
         </ul>
         <br/>
         Powered by on-device AI models for privacy and performance.
     ]]></description>
 
     <change-notes><![CDATA[
-        <b>Version 1.0.0</b>
+        <b>Version 0.1.0</b>
         <ul>
-            <li>Initial release</li>
-            <li>Voice command support</li>
+            <li>Initial release with RunAnywhere SDK integration</li>
+            <li>Voice command support with STT</li>
             <li>Voice dictation mode</li>
             <li>Whisper-based transcription</li>
+            <li>Model manager for downloading STT models</li>
+            <li>VAD integration for better speech detection</li>
         </ul>
     ]]></change-notes>
 
@@ -37,39 +41,67 @@
 
     <!-- Extensions -->
     <extensions defaultExtensionNs="com.intellij">
-        <!-- Application services -->
-        <applicationService serviceImplementation="com.runanywhere.plugin.services.VoiceService" />
+        <!-- Startup Activity -->
+        <postStartupActivity implementation="com.runanywhere.plugin.RunAnywherePlugin" />
 
-        <!-- Project services -->
-        <projectService
-            serviceImplementation="com.runanywhere.plugin.services.TranscriptionService" />
-
-        <!-- Tool window -->
-        <toolWindow id="RunAnywhere Voice" secondary="false" anchor="bottom" factoryClass="com.runanywhere.plugin.ui.VoiceToolWindowFactory"
-            icon="/icons/microphone.svg" />
+        <!-- Notification Group -->
+        <notificationGroup id="RunAnywhere.Notifications" displayType="BALLOON" />
     </extensions>
 
     <!-- Actions -->
     <actions>
-        <!-- SDK Test Action -->
-        <action id="RunAnywhere.SDKTest" class="com.runanywhere.plugin.actions.SDKTestAction"
-            text="Test RunAnywhere SDK" description="Test RunAnywhere SDK integration">
-            <add-to-group group-id="ToolsMenu" anchor="first" />
-            <keyboard-shortcut first-keystroke="ctrl shift T" keymap="$default" />
-        </action>
-
         <!-- Voice Command Action -->
-        <action id="RunAnywhere.VoiceCommand" class="com.runanywhere.plugin.actions.VoiceCommandAction"
-            text="Voice Command" description="Execute IDE command using voice">
-            <add-to-group group-id="ToolsMenu" anchor="last" />
+        <action id="RunAnywhere.VoiceCommand"
+                class="com.runanywhere.plugin.actions.VoiceCommandAction"
+                text="Voice Command"
+                description="Start/stop voice recording for transcription"
+                icon="AllIcons.Actions.Execute">
+            <add-to-group group-id="ToolsMenu" anchor="first" />
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPaste" />
             <keyboard-shortcut first-keystroke="ctrl shift V" keymap="$default" />
         </action>
 
         <!-- Voice Dictation Toggle -->
-        <action id="RunAnywhere.VoiceDictation" class="com.runanywhere.plugin.actions.VoiceDictationAction"
-            text="Toggle Voice Dictation" description="Toggle voice dictation mode">
+        <action id="RunAnywhere.VoiceDictation"
+                class="com.runanywhere.plugin.actions.VoiceDictationAction"
+                text="Toggle Voice Dictation"
+                description="Toggle continuous voice dictation mode"
+                icon="AllIcons.General.Microphone">
             <add-to-group group-id="EditMenu" anchor="last" />
             <keyboard-shortcut first-keystroke="ctrl shift D" keymap="$default" />
         </action>
+
+        <!-- Model Manager Action -->
+        <action id="RunAnywhere.ModelManager"
+                class="com.runanywhere.plugin.actions.ModelManagerAction"
+                text="Manage RunAnywhere Models"
+                description="Download and manage AI models"
+                icon="AllIcons.Actions.Download">
+            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="RunAnywhere.VoiceCommand" />
+        </action>
+
+        <!-- SDK Test Action -->
+        <action id="RunAnywhere.SDKTest"
+                class="com.runanywhere.plugin.actions.SDKTestAction"
+                text="Test RunAnywhere SDK"
+                description="Test RunAnywhere SDK integration"
+                icon="AllIcons.Actions.Lightning">
+            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="RunAnywhere.ModelManager" />
+            <keyboard-shortcut first-keystroke="ctrl shift T" keymap="$default" />
+        </action>
+
+        <!-- Group all RunAnywhere actions -->
+        <group id="RunAnywhere.ActionGroup"
+               text="RunAnywhere"
+               description="RunAnywhere voice actions"
+               popup="true"
+               icon="AllIcons.General.Microphone">
+            <add-to-group group-id="MainMenu" anchor="after" relative-to-action="ToolsMenu" />
+            <reference ref="RunAnywhere.VoiceCommand" />
+            <reference ref="RunAnywhere.VoiceDictation" />
+            <reference ref="RunAnywhere.ModelManager" />
+            <separator />
+            <reference ref="RunAnywhere.SDKTest" />
+        </group>
     </actions>
 </idea-plugin>
