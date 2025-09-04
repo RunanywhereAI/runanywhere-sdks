@@ -1,62 +1,85 @@
 package com.runanywhere.sdk.utils
 
-// BuildConfig is platform-specific
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.decodeFromString
 
 /**
  * SDK Constants Management
  * Single source of truth for all SDK constants, URLs, and configuration
- * Environment-specific values based on build configuration
+ * Environment-specific values loaded from external config files
  */
 object SDKConstants {
 
-    // MARK: - SDK Information
-    const val VERSION = "1.0.0"
-    const val USER_AGENT = "RunAnywhere-Android-SDK/$VERSION"
-    const val SDK_NAME = "runanywhere-android"
+    // Configuration holder - will be populated from external config
+    private var config: SDKConfig = SDKConfig()
 
-    // MARK: - Environment Configuration
+    // JSON parser for config files
+    private val json = Json {
+        ignoreUnknownKeys = true
+        isLenient = true
+    }
 
     /**
-     * Current environment based on build configuration
-     * Defaults to DEVELOPMENT for debug builds
+     * Initialize constants from configuration string
+     * This should be called during SDK initialization with the appropriate config
      */
-    val ENVIRONMENT: Environment = Environment.DEVELOPMENT // Default to development
+    fun loadConfiguration(configJson: String) {
+        config = json.decodeFromString(configJson)
+    }
 
+    /**
+     * Initialize with default development configuration
+     * Used when no config is provided
+     */
+    fun loadDefaultConfiguration() {
+        config = SDKConfig() // Uses default empty values
+    }
+
+    // MARK: - SDK Information
+    const val VERSION = "0.1.0"
+    val USER_AGENT get() = "RunAnywhere-Kotlin-SDK/${VERSION}"
+    const val SDK_NAME = "runanywhere-kotlin"
+
+    // MARK: - Environment Configuration
     enum class Environment {
         DEVELOPMENT,
+        STAGING,
         PRODUCTION
     }
 
-    // MARK: - Base URLs
+    val ENVIRONMENT: Environment get() = config.environment
 
-    /**
-     * Base API URL based on current environment
-     */
-    const val DEFAULT_BASE_URL: String = "https://dev-api.runanywhere.ai"
+    // MARK: - Base URLs (loaded from config)
+    val BASE_URL: String get() = config.apiBaseUrl
+    val CDN_BASE_URL: String get() = config.cdnBaseUrl
+    val TELEMETRY_URL: String get() = config.telemetryUrl
+    val ANALYTICS_URL: String get() = config.analyticsUrl
 
-    val BASE_URL: String = when (ENVIRONMENT) {
-        Environment.DEVELOPMENT -> "https://dev-api.runanywhere.ai"
-        Environment.PRODUCTION -> "https://api.runanywhere.ai"
-    }
+    // MARK: - API Keys (loaded from config)
+    val DEFAULT_API_KEY: String get() = config.defaultApiKey
 
-    /**
-     * Base CDN URL for model downloads
-     */
-    val CDN_BASE_URL: String = when (ENVIRONMENT) {
-        Environment.DEVELOPMENT -> "https://dev-cdn.runanywhere.ai"
-        Environment.PRODUCTION -> "https://cdn.runanywhere.ai"
-    }
+    // MARK: - Model Download URLs (loaded from config)
+    object ModelUrls {
+        // Language Models
+        val LLAMA_3_2_1B: String get() = config.modelUrls.llama32_1b
+        val LLAMA_3_2_3B: String get() = config.modelUrls.llama32_3b
+        val SMOLLM2_1_7B: String get() = config.modelUrls.smollm2_17b
+        val SMOLLM2_360M: String get() = config.modelUrls.smollm2_360m
+        val QWEN_2_5_0_5B: String get() = config.modelUrls.qwen25_05b
+        val QWEN_2_5_1_5B: String get() = config.modelUrls.qwen25_15b
+        val LFM2_350M_Q4: String get() = config.modelUrls.lfm2_350m_q4
+        val LFM2_350M_Q8: String get() = config.modelUrls.lfm2_350m_q8
 
-    /**
-     * Telemetry endpoint URL
-     */
-    val TELEMETRY_URL: String = when (ENVIRONMENT) {
-        Environment.DEVELOPMENT -> "https://dev-telemetry.runanywhere.ai"
-        Environment.PRODUCTION -> "https://telemetry.runanywhere.ai"
+        // Speech Models
+        val WHISPER_TINY: String get() = config.modelUrls.whisperTiny
+        val WHISPER_BASE: String get() = config.modelUrls.whisperBase
+        val WHISPER_SMALL: String get() = config.modelUrls.whisperSmall
+        val WHISPER_MEDIUM: String get() = config.modelUrls.whisperMedium
+        val WHISPER_LARGE: String get() = config.modelUrls.whisperLarge
     }
 
     // MARK: - API Endpoints
-
     object API {
         // Authentication
         const val AUTHENTICATE = "/v1/auth/token"
@@ -90,51 +113,14 @@ object SDKConstants {
         const val STT_METRICS = "/v1/analytics/stt/metrics"
     }
 
-    // MARK: - Model Catalog URLs
-
-    object ModelCatalog {
-        // HuggingFace Base URLs
-        const val HUGGINGFACE_BASE = "https://huggingface.co"
-
-        // Language Models
-        object Language {
-            // Llama Models
-            const val LLAMA_3_2_1B_Q6K = "$HUGGINGFACE_BASE/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf"
-            const val LLAMA_3_2_3B_Q6K = "$HUGGINGFACE_BASE/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q6_K.gguf"
-
-            // SmolLM Models
-            const val SMOLLM2_1_7B_Q6K_L = "$HUGGINGFACE_BASE/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf"
-            const val SMOLLM2_360M_Q8_0 = "$HUGGINGFACE_BASE/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf"
-
-            // Qwen Models
-            const val QWEN_2_5_0_5B_Q6K = "$HUGGINGFACE_BASE/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf"
-            const val QWEN_2_5_1_5B_Q6K = "$HUGGINGFACE_BASE/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf"
-
-            // LiquidAI Models
-            const val LFM2_350M_Q4K_M = "$HUGGINGFACE_BASE/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf"
-            const val LFM2_350M_Q8_0 = "$HUGGINGFACE_BASE/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf"
-        }
-
-        // Speech Recognition Models
-        object Speech {
-            // Whisper Models
-            const val WHISPER_TINY = "$HUGGINGFACE_BASE/openai/whisper-tiny/resolve/main/pytorch_model.bin"
-            const val WHISPER_BASE = "$HUGGINGFACE_BASE/openai/whisper-base/resolve/main/pytorch_model.bin"
-            const val WHISPER_SMALL = "$HUGGINGFACE_BASE/openai/whisper-small/resolve/main/pytorch_model.bin"
-            const val WHISPER_MEDIUM = "$HUGGINGFACE_BASE/openai/whisper-medium/resolve/main/pytorch_model.bin"
-            const val WHISPER_LARGE = "$HUGGINGFACE_BASE/openai/whisper-large/resolve/main/pytorch_model.bin"
-        }
-    }
-
     // MARK: - Configuration Defaults
-
     object Defaults {
         // Network
-        const val REQUEST_TIMEOUT_MS = 30000L // 30 seconds
-        const val CONNECT_TIMEOUT_MS = 15000L // 15 seconds
-        const val READ_TIMEOUT_MS = 30000L // 30 seconds
+        const val REQUEST_TIMEOUT_MS = 30000L
+        const val CONNECT_TIMEOUT_MS = 15000L
+        const val READ_TIMEOUT_MS = 30000L
         const val RETRY_ATTEMPTS = 3
-        const val RETRY_DELAY_MS = 1000L // 1 second
+        const val RETRY_DELAY_MS = 1000L
 
         // Database
         const val DATABASE_NAME = "runanywhere.db"
@@ -142,13 +128,13 @@ object SDKConstants {
 
         // Telemetry
         const val TELEMETRY_BATCH_SIZE = 50
-        const val TELEMETRY_UPLOAD_INTERVAL_MS = 300000L // 5 minutes
+        const val TELEMETRY_UPLOAD_INTERVAL_MS = 300000L
         const val TELEMETRY_RETRY_ATTEMPTS = 3
         const val TELEMETRY_MAX_EVENTS = 1000
 
         // Model Management
-        const val MAX_MODEL_SIZE_BYTES = 2000000000L // 2GB
-        const val MODEL_DOWNLOAD_CHUNK_SIZE = 8192 // 8KB
+        const val MAX_MODEL_SIZE_BYTES = 2000000000L
+        const val MODEL_DOWNLOAD_CHUNK_SIZE = 8192
         const val MAX_CONCURRENT_DOWNLOADS = 2
 
         // STT Configuration
@@ -165,42 +151,36 @@ object SDKConstants {
         const val VAD_MIN_SPEECH_DURATION_MS = 100
 
         // Authentication
-        const val AUTH_TOKEN_REFRESH_THRESHOLD_SECONDS = 300L // 5 minutes before expiry
+        const val AUTH_TOKEN_REFRESH_THRESHOLD_SECONDS = 300L
         const val MAX_AUTH_RETRY_ATTEMPTS = 3
 
         // Device Info
-        const val DEVICE_INFO_UPDATE_INTERVAL_MS = 60000L // 1 minute
-        const val MEMORY_PRESSURE_UPDATE_INTERVAL_MS = 5000L // 5 seconds
+        const val DEVICE_INFO_UPDATE_INTERVAL_MS = 60000L
+        const val MEMORY_PRESSURE_UPDATE_INTERVAL_MS = 5000L
     }
 
     // MARK: - Storage Paths
-
     object Storage {
-        // Base directories
         const val BASE_DIRECTORY = "runanywhere"
         const val MODELS_DIRECTORY = "$BASE_DIRECTORY/models"
         const val CACHE_DIRECTORY = "$BASE_DIRECTORY/cache"
         const val TEMP_DIRECTORY = "$BASE_DIRECTORY/temp"
         const val LOGS_DIRECTORY = "$BASE_DIRECTORY/logs"
 
-        // Model subdirectories
         const val LANGUAGE_MODELS_DIR = "$MODELS_DIRECTORY/language"
         const val SPEECH_MODELS_DIR = "$MODELS_DIRECTORY/speech"
         const val VISION_MODELS_DIR = "$MODELS_DIRECTORY/vision"
 
-        // Cache subdirectories
         const val NETWORK_CACHE_DIR = "$CACHE_DIRECTORY/network"
         const val MODEL_CACHE_DIR = "$CACHE_DIRECTORY/models"
         const val TELEMETRY_CACHE_DIR = "$CACHE_DIRECTORY/telemetry"
     }
 
     // MARK: - Secure Storage Keys
-
     object SecureStorage {
         const val KEYSTORE_ALIAS = "runanywhere_sdk_keystore"
         const val SHARED_PREFS_NAME = "runanywhere_secure_prefs"
 
-        // Keys for encrypted storage
         const val ACCESS_TOKEN_KEY = "access_token"
         const val REFRESH_TOKEN_KEY = "refresh_token"
         const val API_KEY_KEY = "api_key"
@@ -209,64 +189,104 @@ object SDKConstants {
     }
 
     // MARK: - Development Mode
-
     object Development {
-        val MOCK_DELAY_MS = if (ENVIRONMENT == Environment.DEVELOPMENT) 500L else 0L
-        val ENABLE_VERBOSE_LOGGING = ENVIRONMENT == Environment.DEVELOPMENT
-        val ENABLE_MOCK_SERVICES = ENVIRONMENT == Environment.DEVELOPMENT
+        val MOCK_DELAY_MS: Long get() = if (config.environment == Environment.DEVELOPMENT) 500L else 0L
+        val ENABLE_VERBOSE_LOGGING: Boolean get() = config.enableVerboseLogging
+        val ENABLE_MOCK_SERVICES: Boolean get() = config.enableMockServices
 
-        // Mock data generation
         const val MOCK_DEVICE_ID_PREFIX = "dev-device-"
         const val MOCK_SESSION_ID_PREFIX = "dev-session-"
         const val MOCK_USER_ID_PREFIX = "dev-user-"
     }
 
     // MARK: - Feature Flags
-
     object Features {
-        // Core features
-        val ENABLE_ON_DEVICE_INFERENCE = true
-        val ENABLE_CLOUD_FALLBACK = true
-        val ENABLE_TELEMETRY = true
-        val ENABLE_ANALYTICS = true
-
-        // Development features
-        val ENABLE_DEBUG_LOGGING = ENVIRONMENT == Environment.DEVELOPMENT
-        val ENABLE_PERFORMANCE_MONITORING = true
-        val ENABLE_CRASH_REPORTING = ENVIRONMENT == Environment.PRODUCTION
-
-        // STT features
-        val ENABLE_VAD = true
-        val ENABLE_STT_ANALYTICS = true
-        val ENABLE_REAL_TIME_STT = true
-        val ENABLE_STT_CONFIDENCE_SCORING = true
+        val ENABLE_ON_DEVICE_INFERENCE: Boolean get() = config.features.onDeviceInference
+        val ENABLE_CLOUD_FALLBACK: Boolean get() = config.features.cloudFallback
+        val ENABLE_TELEMETRY: Boolean get() = config.features.telemetry
+        val ENABLE_ANALYTICS: Boolean get() = config.features.analytics
+        val ENABLE_DEBUG_LOGGING: Boolean get() = config.features.debugLogging
+        val ENABLE_PERFORMANCE_MONITORING: Boolean get() = config.features.performanceMonitoring
+        val ENABLE_CRASH_REPORTING: Boolean get() = config.features.crashReporting
+        val ENABLE_VAD: Boolean get() = config.features.vad
+        val ENABLE_STT_ANALYTICS: Boolean get() = config.features.sttAnalytics
+        val ENABLE_REAL_TIME_STT: Boolean get() = config.features.realTimeStt
+        val ENABLE_STT_CONFIDENCE_SCORING: Boolean get() = config.features.sttConfidenceScoring
     }
 
     // MARK: - Error Codes
-
     object ErrorCodes {
-        // Network errors
         const val NETWORK_UNAVAILABLE = 1001
         const val REQUEST_TIMEOUT = 1002
         const val AUTHENTICATION_FAILED = 1003
         const val INVALID_API_KEY = 1004
 
-        // Model errors
         const val MODEL_NOT_FOUND = 2001
         const val MODEL_DOWNLOAD_FAILED = 2002
         const val MODEL_LOAD_FAILED = 2003
         const val INSUFFICIENT_MEMORY = 2004
 
-        // STT errors
         const val STT_INITIALIZATION_FAILED = 3001
         const val STT_PROCESSING_FAILED = 3002
         const val AUDIO_RECORDING_FAILED = 3003
         const val VAD_INITIALIZATION_FAILED = 3004
 
-        // General errors
         const val INITIALIZATION_FAILED = 5001
         const val CONFIGURATION_INVALID = 5002
         const val PERMISSION_DENIED = 5003
         const val STORAGE_UNAVAILABLE = 5004
     }
 }
+
+/**
+ * SDK Configuration Model
+ * This data class represents the complete configuration for the SDK
+ */
+@Serializable
+data class SDKConfig(
+    val environment: SDKConstants.Environment = SDKConstants.Environment.DEVELOPMENT,
+    val apiBaseUrl: String = "",
+    val cdnBaseUrl: String = "",
+    val telemetryUrl: String = "",
+    val analyticsUrl: String = "",
+    val defaultApiKey: String = "",
+    val enableVerboseLogging: Boolean = false,
+    val enableMockServices: Boolean = false,
+    val modelUrls: ModelUrlConfig = ModelUrlConfig(),
+    val features: FeatureConfig = FeatureConfig()
+)
+
+@Serializable
+data class ModelUrlConfig(
+    // Language Models
+    val llama32_1b: String = "",
+    val llama32_3b: String = "",
+    val smollm2_17b: String = "",
+    val smollm2_360m: String = "",
+    val qwen25_05b: String = "",
+    val qwen25_15b: String = "",
+    val lfm2_350m_q4: String = "",
+    val lfm2_350m_q8: String = "",
+
+    // Speech Models
+    val whisperTiny: String = "",
+    val whisperBase: String = "",
+    val whisperSmall: String = "",
+    val whisperMedium: String = "",
+    val whisperLarge: String = ""
+)
+
+@Serializable
+data class FeatureConfig(
+    val onDeviceInference: Boolean = true,
+    val cloudFallback: Boolean = true,
+    val telemetry: Boolean = true,
+    val analytics: Boolean = true,
+    val debugLogging: Boolean = false,
+    val performanceMonitoring: Boolean = true,
+    val crashReporting: Boolean = false,
+    val vad: Boolean = true,
+    val sttAnalytics: Boolean = true,
+    val realTimeStt: Boolean = true,
+    val sttConfidenceScoring: Boolean = true
+)
