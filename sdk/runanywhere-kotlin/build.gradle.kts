@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.runanywhere.sdk"
-version = "1.0.0-SNAPSHOT"
+version = "0.1.0"
 
 kotlin {
     // JVM target for IntelliJ plugins and general JVM usage
