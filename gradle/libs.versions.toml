@@ -1,0 +1,106 @@
+[versions]
+# Android & Kotlin
+agp = "8.7.2"
+kotlin = "2.0.0"
+
+# AndroidX Core
+coreKtx = "1.13.1"
+appcompat = "1.7.0"
+material = "1.12.0"
+lifecycleRuntimeKtx = "2.8.6"
+activityCompose = "1.9.0"
+
+# Compose
+composeBom = "2024.06.00"
+
+# Coroutines
+coroutines = "1.8.1"
+
+# Testing
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+mockito = "5.1.0"
+
+# Logging
+slf4j = "2.0.16"
+logback = "1.5.12"
+
+# Networking
+okhttp = "4.12.0"
+
+# JSON
+gson = "2.11.0"
+
+# Navigation
+navigationCompose = "2.7.7"
+
+# Code Quality
+detekt = "1.23.7"
+
+# Plugin versions
+intellij = "1.17.4"
+
+[libraries]
+# AndroidX Core
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
+# Material Design
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+
+# Compose
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+
+# Material Icons Extended
+androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# Navigation
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+
+# Kotlin Coroutines
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+
+# Logging
+slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
+logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
+
+# Networking
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+
+# JSON
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockito" }
+
+[plugins]
+# Android
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+
+# Kotlin
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+# Code Quality
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+
+# IntelliJ Plugin Development
+intellij = { id = "org.jetbrains.intellij", version.ref = "intellij" }
