@@ -27,16 +27,16 @@ class ModelManager {
     /**
      * Ensure model is available locally, download if needed
      */
-    suspend fun ensureModel(modelId: String): String {
+    suspend fun ensureModel(modelInfo: ModelInfo): String {
         // Check if model exists locally
-        storage.getModelPath(modelId)?.let {
+        storage.getModelPath(modelInfo.id)?.let {
             return it
         }
 
         // Download if needed
-        return downloader.downloadModel(modelId) { progress ->
+        return downloader.downloadModel(modelInfo) { progress ->
             kotlinx.coroutines.runBlocking {
-                EventBus.publish(SDKModelEvent.DownloadProgress(modelId, progress))
+                EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, progress))
             }
         }
     }
@@ -44,9 +44,9 @@ class ModelManager {
     /**
      * Load a model and return its handle
      */
-    suspend fun loadModel(modelId: String): ModelHandle {
-        val path = ensureModel(modelId)
-        return ModelHandle(modelId, path)
+    suspend fun loadModel(modelInfo: ModelInfo): ModelHandle {
+        val path = ensureModel(modelInfo)
+        return ModelHandle(modelInfo.id, path)
     }
 
     /**

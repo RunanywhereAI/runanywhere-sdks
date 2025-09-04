@@ -45,7 +45,7 @@ enum class ModelCategory(
          */
         fun from(framework: LLMFramework): ModelCategory {
             return when (framework) {
-                LLMFramework.WHISPER_KIT, LLMFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
+                LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
                 LLMFramework.LLAMA_CPP, LLMFramework.MLX, LLMFramework.MLC,
                 LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM,
                 LLMFramework.FOUNDATION_MODELS, LLMFramework.SWIFT_TRANSFORMERS -> LANGUAGE

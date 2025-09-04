@@ -9,6 +9,7 @@ import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
 import com.runanywhere.sdk.services.sync.SyncCoordinator
+import com.runanywhere.sdk.services.ValidationService
 
 /**
  * Central service container - JVM Implementation
@@ -42,6 +43,11 @@ class ServiceContainer {
 
     val sttComponent: STTComponent by lazy {
         STTComponent(STTConfiguration())
+    }
+
+    // Services
+    val validationService: ValidationService by lazy {
+        ValidationService()
     }
 
     /**
