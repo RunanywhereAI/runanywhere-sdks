@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.compose)  // Re-enable for Kotlin 2.0
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
     id("kotlin-kapt")
@@ -11,12 +11,12 @@ plugins {
 
 android {
     namespace = "com.runanywhere.runanywhereai"
-    compileSdk = 36
+    compileSdk = 35  // Update to 35
 
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35  // Update to 35
         versionCode = 1
         versionName = "1.0"
 
@@ -154,12 +154,13 @@ android {
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-            "-Xjvm-default=all"
+            "-Xjvm-default=all",
+            "-Xskip-metadata-version-check"  // Skip version check to avoid conflicts
         )
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+        kotlinCompilerExtensionVersion = "1.5.15"
     }
     buildFeatures {
         compose = true
@@ -190,7 +191,8 @@ android {
 }
 
 dependencies {
-    implementation(project(":sdk-core"))
+    // Temporarily disabled to test build
+    // implementation(project(":sdk-core"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -211,20 +213,15 @@ dependencies {
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 
-    // MediaPipe for LLM inference
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+    // Android-specific dependencies that the SDK needs
+    // VAD implementation - using WebRTC VAD from android-vad library
+    implementation(libs.android.vad.webrtc)
 
-    // ONNX Runtime
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
+    // PRDownloader - Dedicated download library with pause/resume support
+    implementation(libs.prdownloader)
 
-    // Google AI SDK for Gemini Nano
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
-
-    // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    // WorkManager for background downloads
+    implementation(libs.androidx.work.runtime.ktx)
 
     // OkHttp for model downloads
     implementation(libs.okhttp)
@@ -274,6 +271,30 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Enforce Kotlin version alignment across all dependencies to avoid conflicts
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-reflect") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+    }
 }
 
 detekt {

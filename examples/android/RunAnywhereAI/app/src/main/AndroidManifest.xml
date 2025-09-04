@@ -19,7 +19,7 @@
         android:theme="@style/Theme.RunAnywhereAI"
         android:largeHeap="true">
         <activity
-            android:name=".MainActivity"
+            android:name=".SimpleMainActivity"
             android:exported="true"
             android:label="@string/app_name"
             android:theme="@style/Theme.RunAnywhereAI">

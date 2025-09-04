@@ -1,7 +1,7 @@
 [versions]
 # Android & Kotlin
 agp = "8.7.2"
-kotlin = "2.0.0"
+kotlin = "2.0.21"
 
 # AndroidX Core
 coreKtx = "1.13.1"
@@ -21,13 +21,16 @@ junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 mockito = "5.1.0"
+mockk = "1.13.8"
 
 # Logging
 slf4j = "2.0.16"
 logback = "1.5.12"
+timber = "5.0.1"
 
 # Networking
 okhttp = "4.12.0"
+retrofit = "2.9.0"
 
 # JSON
 gson = "2.11.0"
@@ -40,6 +43,27 @@ detekt = "1.23.7"
 
 # Plugin versions
 intellij = "1.17.4"
+
+# Dependency Injection
+hilt = "2.48"
+
+# Work Manager
+workManager = "2.9.0"
+
+# File Management
+commonsIo = "2.11.0"
+
+# Speech Recognition
+whisperJni = "1.7.1"
+
+# Voice Activity Detection
+androidVad = "2.0.10"
+
+# Download Manager - Updated to use JitPack version
+prdownloader = "1.0.2"
+
+# Android
+androidCore = "4.1.1.4"
 
 [libraries]
 # AndroidX Core
@@ -75,9 +99,13 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 # Logging
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 # Networking
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", version.ref = "retrofit" }
 
 # JSON
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
@@ -87,6 +115,32 @@ junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockito" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+
+# Dependency Injection
+hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
+hilt-android-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
+
+# Work Manager
+androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
+
+# File Management
+commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
+
+# Speech Recognition
+whisper-jni = { group = "io.github.givimad", name = "whisper-jni", version.ref = "whisperJni" }
+
+# Voice Activity Detection
+android-vad-webrtc = { group = "com.github.gkonovalov.android-vad", name = "webrtc", version.ref = "androidVad" }
+
+# Download Manager - Updated to use correct JitPack coordinates
+prdownloader = { group = "com.github.amitshekhariitbhu", name = "PRDownloader", version.ref = "prdownloader" }
+
+# Android Core
+android-core = { group = "com.google.android", name = "android", version.ref = "androidCore" }
+
+# Kotlin stdlib
+kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
 
 [plugins]
 # Android

@@ -1,62 +1,78 @@
 plugins {
-    kotlin("jvm")
+    id("com.android.library")
+    kotlin("android")
 }
 
-group = "com.runanywhere.sdk"
-version = "1.0.0"
+android {
+    namespace = "com.runanywhere.sdk.core"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 21
+        targetSdk = 35
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
 
 dependencies {
-    implementation(project(":sdk:runanywhere-android:jni"))
+    implementation(project(":sdk-jni"))
 
     // Kotlin
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // Logging
-    implementation(libs.timber)
-
-    // Dependency injection
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.android.compiler)
+    // Android Core
+    implementation(libs.androidx.core.ktx)
 
     // JSON processing
     implementation(libs.gson)
 
-    // Network and download management - Battle tested solutions
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    // Network and download management
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
 
-    // Retrofit for API calls (widely used, battle-tested)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Retrofit for API calls
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
 
     // PRDownloader - Dedicated download library with pause/resume support
-    implementation("com.mindorks.android:prdownloader:0.6.0")
+    implementation(libs.prdownloader)
 
     // WorkManager for background downloads
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // File management
-    implementation("commons-io:commons-io:2.11.0")
+    implementation(libs.commons.io)
 
     // Whisper implementation - using whisper-jni from Maven Central
-    implementation("io.github.givimad:whisper-jni:1.7.1")
+    implementation(libs.whisper.jni)
 
     // VAD implementation - using WebRTC VAD from android-vad library
-    implementation("com.github.gkonovalov.android-vad:webrtc:2.0.10")
+    implementation(libs.android.vad.webrtc)
 
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockito.kotlin)
-}
-
-kotlin {
-    jvmToolchain(17)
-}
-
-tasks.test {
-    useJUnitPlatform()
+    testImplementation(libs.mockk)
 }

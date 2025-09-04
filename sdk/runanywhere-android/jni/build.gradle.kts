@@ -1,4 +1,5 @@
 plugins {
+    id("java-library")
     kotlin("jvm")
 }
 
@@ -6,14 +7,20 @@ group = "com.runanywhere.sdk"
 version = "1.0.0"
 
 dependencies {
-    implementation(kotlin("stdlib"))
+    // Kotlin
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.9.20")
 
     // Kotlin coroutines
     implementation(libs.kotlinx.coroutines.core)
 
     // Testing
-    testImplementation(libs.junit)
     testImplementation(kotlin("test"))
+    testImplementation(libs.junit)
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 kotlin {
