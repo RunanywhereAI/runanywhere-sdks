@@ -18,21 +18,48 @@ import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.ui.chat.ChatScreen
 import com.runanywhere.runanywhereai.ui.models.ModelsScreen
 import com.runanywhere.runanywhereai.ui.theme.RunAnywhereAITheme
-import com.runanywhere.sdk.RunAnywhereSDK
+import com.runanywhere.sdk.public.RunAnywhereSTT
+import com.runanywhere.sdk.public.STTSDKConfig
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-    private val runAnywhereSDK = RunAnywhereSDK()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Initialize the SDK
-        runAnywhereSDK.initialize("demo-api-key")
+        GlobalScope.launch {
+            try {
+                val config = STTSDKConfig(
+                    modelId = "whisper-base",
+                    enableVAD = true,
+                    language = "en"
+                )
+                RunAnywhereSTT.initialize(config)
+            } catch (e: Exception) {
+                // Handle initialization error
+                e.printStackTrace()
+            }
+        }
 
         enableEdgeToEdge()
         setContent {
             RunAnywhereAITheme {
                 RunAnywhereApp()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        // Cleanup SDK resources
+        GlobalScope.launch {
+            try {
+                RunAnywhereSTT.cleanup()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -136,15 +163,15 @@ fun AboutScreen() {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "RunAnywhere AI",
+                        text = "RunAnywhere AI STT",
                         style = MaterialTheme.typography.headlineMedium
                     )
                     Text(
-                        text = "SDK Version: ${RunAnywhereSDK.VERSION}",
+                        text = "SDK Version: 1.0.0",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        text = "On-device LLM inference demo app showcasing MediaPipe and ONNX Runtime integration.",
+                        text = "On-device Speech-to-Text demo app showcasing Whisper and WebRTC VAD integration.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -161,10 +188,10 @@ fun AboutScreen() {
                         text = "Features",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text("• On-device LLM inference")
-                    Text("• Multiple framework support (MediaPipe, ONNX)")
-                    Text("• Model management and downloading")
-                    Text("• Real-time streaming responses")
+                    Text("• On-device Speech-to-Text")
+                    Text("• Voice Activity Detection (VAD)")
+                    Text("• Multiple Whisper models support")
+                    Text("• Real-time streaming transcription")
                     Text("• Privacy-focused - no data leaves device")
                 }
             }
@@ -180,10 +207,10 @@ fun AboutScreen() {
                         text = "Supported Models",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Text("• Gemma 2B (MediaPipe)")
-                    Text("• Phi-2 (MediaPipe)")
-                    Text("• TinyLlama 1.1B (ONNX)")
-                    Text("• More models coming soon...")
+                    Text("• Whisper Tiny (39MB)")
+                    Text("• Whisper Base (74MB)")
+                    Text("• Whisper Small (244MB)")
+                    Text("• Whisper Medium (769MB)")
                 }
             }
         }

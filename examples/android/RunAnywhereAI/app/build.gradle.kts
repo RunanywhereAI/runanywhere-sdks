@@ -189,7 +189,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":sdk:runanywhere-android"))
+    implementation(project(":sdk-core"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
