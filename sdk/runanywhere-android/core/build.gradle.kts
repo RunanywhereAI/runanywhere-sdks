@@ -2,17 +2,31 @@ plugins {
     kotlin("jvm")
 }
 
+group = "com.runanywhere.sdk"
+version = "1.0.0"
+
 dependencies {
-    // Kotlin coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation(kotlin("stdlib"))
+    implementation(libs.kotlinx.coroutines.core)
+
+    // Logging
+    implementation(libs.slf4j.api)
+    implementation(libs.logback.classic)
+
+    // HTTP client for model downloading
+    implementation(libs.okhttp)
+
+    // JSON parsing
+    implementation(libs.gson)
 
     // JNI module dependency
     implementation(project(":jni"))
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockito.kotlin)
 }
 
 kotlin {
@@ -20,5 +34,5 @@ kotlin {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnit()
 }

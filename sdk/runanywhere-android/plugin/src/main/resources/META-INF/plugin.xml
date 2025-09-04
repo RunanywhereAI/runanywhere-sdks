@@ -1,0 +1,68 @@
+<idea-plugin>
+    <id>com.runanywhere.stt</id>
+    <name>RunAnywhere Voice Commands</name>
+    <vendor email="support@runanywhere.com" url="https://runanywhere.com">RunAnywhere</vendor>
+    <version>1.0.0</version>
+
+    <description><![CDATA[
+        Voice commands and dictation for IntelliJ IDEA.
+        <br/><br/>
+        <b>Features:</b>
+        <ul>
+            <li>Voice-to-code dictation</li>
+            <li>Voice commands for IDE actions</li>
+            <li>On-device Whisper AI models</li>
+            <li>Real-time transcription with VAD</li>
+        </ul>
+        <br/>
+        Powered by on-device AI models for privacy and performance.
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <b>Version 1.0.0</b>
+        <ul>
+            <li>Initial release</li>
+            <li>Voice command support</li>
+            <li>Voice dictation mode</li>
+            <li>Whisper-based transcription</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Minimum IDE version -->
+    <idea-version since-build="233.0" until-build="241.*" />
+
+    <!-- Dependencies -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Application services -->
+        <applicationService serviceImplementation="com.runanywhere.plugin.services.VoiceService" />
+
+        <!-- Project services -->
+        <projectService
+            serviceImplementation="com.runanywhere.plugin.services.TranscriptionService" />
+
+        <!-- Tool window -->
+        <toolWindow id="RunAnywhere Voice" secondary="false" anchor="bottom" factoryClass="com.runanywhere.plugin.ui.VoiceToolWindowFactory"
+            icon="/icons/microphone.svg" />
+    </extensions>
+
+    <!-- Actions -->
+    <actions>
+        <!-- Voice Command Action -->
+        <action id="RunAnywhere.VoiceCommand" class="com.runanywhere.plugin.actions.VoiceCommandAction"
+            text="Voice Command" description="Execute IDE command using voice">
+            <add-to-group group-id="ToolsMenu" anchor="last" />
+            <keyboard-shortcut first-keystroke="ctrl shift V" keymap="$default" />
+        </action>
+
+        <!-- Voice Dictation Toggle -->
+        <action id="RunAnywhere.VoiceDictation" class="com.runanywhere.plugin.actions.VoiceDictationAction"
+            text="Toggle Voice Dictation" description="Toggle voice dictation mode">
+            <add-to-group group-id="EditMenu" anchor="last" />
+            <keyboard-shortcut first-keystroke="ctrl shift D" keymap="$default" />
+        </action>
+    </actions>
+</idea-plugin>
