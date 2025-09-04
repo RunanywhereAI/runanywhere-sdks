@@ -65,7 +65,7 @@ public struct DeviceCapabilities {
 }
 
 /// Memory pressure levels
-public enum MemoryPressureLevel {
+public enum MemoryPressureLevel: Sendable {
     case low
     case medium
     case high

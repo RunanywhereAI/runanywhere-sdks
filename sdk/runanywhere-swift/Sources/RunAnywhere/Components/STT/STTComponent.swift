@@ -1,5 +1,5 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 // MARK: - STT Options
 
@@ -455,7 +455,7 @@ public final class STTServiceWrapper: ServiceWrapper {
 
 /// Speech-to-Text component following the clean architecture
 @MainActor
-public final class STTComponent: BaseComponent<STTServiceWrapper> {
+public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 

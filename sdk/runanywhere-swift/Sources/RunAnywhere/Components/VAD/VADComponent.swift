@@ -1,5 +1,5 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 // MARK: - VAD Service Protocol
 
@@ -195,7 +195,7 @@ public final class DefaultVADAdapter: ComponentAdapter {
 
 /// Voice Activity Detection component following the clean architecture
 @MainActor
-public final class VADComponent: BaseComponent<SimpleEnergyVAD> {
+public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Sendable {
 
     // MARK: - Properties
 

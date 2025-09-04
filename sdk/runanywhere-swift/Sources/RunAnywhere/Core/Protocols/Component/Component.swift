@@ -24,26 +24,8 @@ public protocol Component: AnyObject, Sendable {
     /// Check if component is ready for use
     var isReady: Bool { get }
 
-    /// Get current health status
-    func healthCheck() async -> ComponentHealth
-
     /// Handle state transitions
     func transitionTo(state: ComponentState) async
-}
-
-// MARK: - Component Health
-
-/// Health status for a component
-public struct ComponentHealth: Sendable {
-    public let isHealthy: Bool
-    public let details: String?
-    public let metrics: [String: Any]?
-
-    public init(isHealthy: Bool, details: String? = nil, metrics: [String: Any]? = nil) {
-        self.isHealthy = isHealthy
-        self.details = details
-        self.metrics = metrics
-    }
 }
 
 // MARK: - Lifecycle Management Protocol
@@ -144,11 +126,6 @@ public struct ComponentInitResult: Sendable {
 // MARK: - Default Implementations
 
 extension Component {
-    /// Default health check implementation
-    public func healthCheck() async -> ComponentHealth {
-        ComponentHealth(isHealthy: isReady, details: "Component state: \(state.rawValue)")
-    }
-
     /// Default isReady implementation based on state
     public var isReady: Bool {
         state == .ready

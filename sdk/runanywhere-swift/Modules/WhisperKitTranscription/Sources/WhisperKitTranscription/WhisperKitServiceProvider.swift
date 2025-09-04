@@ -19,10 +19,9 @@ public final class WhisperKitServiceProvider: STTServiceProvider {
     public static let shared = WhisperKitServiceProvider()
 
     /// Super simple registration - just call this in your app
+    @MainActor
     public static func register() {
-        Task { @MainActor in
-            ModuleRegistry.shared.registerSTT(shared)
-        }
+        ModuleRegistry.shared.registerSTT(shared)
     }
 
     // MARK: - STTServiceProvider Protocol
@@ -71,6 +70,7 @@ public final class WhisperKitServiceProvider: STTServiceProvider {
 /// Automatic registration when module is imported
 public enum WhisperKitModule {
     /// Call this to automatically register WhisperKit with the SDK
+    @MainActor
     public static func autoRegister() {
         WhisperKitServiceProvider.register()
     }

@@ -12,7 +12,7 @@ public final class VoiceAgentService: @unchecked Sendable {
 /// Voice Agent component that orchestrates VAD, STT, LLM, and TTS components
 /// Can be used as a complete pipeline or with individual components
 @MainActor
-public final class VoiceAgentComponent: BaseComponent<VoiceAgentService> {
+public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unchecked Sendable {
 
     // MARK: - Properties
 

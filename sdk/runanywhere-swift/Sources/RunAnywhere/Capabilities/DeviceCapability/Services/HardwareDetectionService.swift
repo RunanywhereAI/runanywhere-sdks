@@ -22,12 +22,12 @@ import AppKit
 #endif
 
 /// Manager for hardware capability detection and configuration
-public final class HardwareCapabilityManager: Sendable {
+public final class HardwareCapabilityManager: @unchecked Sendable {
 
     // MARK: - Properties
 
     /// Shared instance
-    nonisolated(unsafe) public static let shared: HardwareCapabilityManager = HardwareCapabilityManager()
+    public static let shared: HardwareCapabilityManager = HardwareCapabilityManager()
 
     /// Capability analyzer
     private let capabilityAnalyzer: CapabilityAnalyzer
