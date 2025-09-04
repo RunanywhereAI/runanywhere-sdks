@@ -191,8 +191,8 @@ android {
 }
 
 dependencies {
-    // SDK module
-    implementation(project(":sdk-core"))
+    // SDK module - Updated to use new KMP SDK
+    implementation(project(":sdk:runanywhere-kotlin"))
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)

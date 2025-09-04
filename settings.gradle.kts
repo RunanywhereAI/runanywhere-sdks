@@ -24,9 +24,8 @@ dependencyResolutionManagement {
 rootProject.name = "RunAnywhere-Android"
 
 // Include SDK modules
-include(":sdk:runanywhere-android:core")
-include(":sdk:runanywhere-android:jni")
-include(":sdk:runanywhere-android:plugin")
+include(":sdk:runanywhere-kotlin")
+include(":sdk:runanywhere-kotlin:jni")
 
 // Include example apps
 include(":examples:android-stt-demo")

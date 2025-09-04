@@ -38,6 +38,9 @@ object RunAnywhere {
 
         _currentEnvironment = environment
 
+        // Initialize service container with context
+        serviceContainer.initialize(context)
+
         // Initialize file manager
         FileManager.initialize(context)
 
@@ -55,8 +58,7 @@ object RunAnywhere {
                     SDKInitParams(apiKey, baseURL, environment)
                 )
             } else {
-                // For production, would need proper auth service
-                serviceContainer.bootstrapDevelopmentMode(
+                serviceContainer.bootstrap(
                     SDKInitParams(apiKey, baseURL, environment)
                 )
             }
@@ -92,11 +94,51 @@ object RunAnywhere {
     }
 
     /**
-     * Get available models
+     * Get available models (using new ModelInfoService)
      */
-    suspend fun availableModels(): List<ModelInfo> {
+    suspend fun availableModels(): List<ModelInfoData> {
         requireInitialized()
-        return serviceContainer.modelRegistry.discoverModels()
+        return serviceContainer.modelInfoService.getAllModels()
+    }
+
+    /**
+     * Get device information
+     */
+    suspend fun deviceInfo(): DeviceInfoData {
+        requireInitialized()
+        return serviceContainer.deviceInfoService.getCurrentDeviceInfo()
+    }
+
+    /**
+     * Get current configuration
+     */
+    suspend fun configuration(): ConfigurationData {
+        requireInitialized()
+        return serviceContainer.configurationService.getCurrentConfiguration()
+    }
+
+    /**
+     * Download a model by ID
+     */
+    suspend fun downloadModel(modelId: String): Flow<DownloadProgress> {
+        requireInitialized()
+        return serviceContainer.modelInfoService.downloadModel(modelId)
+    }
+
+    /**
+     * Search models by query
+     */
+    suspend fun searchModels(query: String): List<ModelInfoData> {
+        requireInitialized()
+        return serviceContainer.modelInfoService.searchModels(query)
+    }
+
+    /**
+     * Get models by category
+     */
+    suspend fun modelsByCategory(category: ModelCategory): List<ModelInfoData> {
+        requireInitialized()
+        return serviceContainer.modelInfoService.getModelsByCategory(category)
     }
 
     /**
@@ -149,8 +191,7 @@ object RunAnywhere {
     suspend fun cleanup() {
         if (!_isInitialized.get()) return
 
-        serviceContainer.sttComponent.cleanup()
-        serviceContainer.vadComponent.cleanup()
+        serviceContainer.cleanup()
 
         _isInitialized.set(false)
         logger.info("SDK cleaned up")

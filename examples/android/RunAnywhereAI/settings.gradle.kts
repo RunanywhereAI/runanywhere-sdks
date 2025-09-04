@@ -27,8 +27,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "RunAnywhereAI"
 include(":app")
-include(":sdk-core")
-project(":sdk-core").projectDir = file("../../../sdk/runanywhere-android/core")
 
-include(":jni")
-project(":jni").projectDir = file("../../../sdk/runanywhere-android/jni")
+// Include KMP SDK
+include(":sdk:runanywhere-kotlin")
+project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
+
+// Include JNI module from KMP SDK
+include(":sdk:runanywhere-kotlin:jni")
+project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
