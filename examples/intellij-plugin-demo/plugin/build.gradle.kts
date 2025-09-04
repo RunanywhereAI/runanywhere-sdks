@@ -1,6 +1,6 @@
 plugins {
-    id("org.jetbrains.intellij")
-    kotlin("jvm")
+    id("org.jetbrains.intellij") version "1.17.4"
+    kotlin("jvm") version "1.9.20"
 }
 
 group = "com.runanywhere"
@@ -8,20 +8,27 @@ version = "1.0.0"
 
 intellij {
     version.set("2023.3")
-    type.set("IC") // IntelliJ IDEA Community Edition
+    type.set("IC")
     plugins.set(listOf("java"))
 }
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":jni"))
-    implementation(libs.kotlinx.coroutines.core)
+    // RunAnywhere KMP SDK
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 }
 
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("241.*")
+        untilBuild.set("261.*")
         changeNotes.set(
             """
             <h2>1.0.0</h2>
@@ -36,7 +43,7 @@ tasks {
     }
 
     buildPlugin {
-        archiveFileName.set("runanywhere-voice-${version.get()}.zip")
+        archiveFileName.set("runanywhere-voice-${project.version}.zip")
     }
 
     publishPlugin {
