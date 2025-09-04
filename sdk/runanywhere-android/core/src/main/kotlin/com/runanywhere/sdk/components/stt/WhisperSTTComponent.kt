@@ -20,53 +20,80 @@ data class STTConfig(
 /**
  * Whisper STT Component implementation
  */
-class WhisperSTTComponent : STTComponent {
+class WhisperSTTComponent : STTService {
     private val jni = WhisperJNI()
     private var modelPtr: Long = 0
     private val modelManager = ModelManager()
     private var config: STTConfig? = null
 
-    override suspend fun initialize(config: ComponentConfig) {
-        require(config is STTConfig) { "Invalid config type" }
-        this.config = config
+    override val isReady: Boolean
+        get() = modelPtr != 0L
+
+    override val currentModel: String?
+        get() = config?.modelId
+
+    override suspend fun initialize(modelPath: String?) {
+        if (modelPath == null) {
+            throw SDKError.ModelNotFound("Model path is required")
+        }
 
         // Ensure model is available and load it
-        val modelPath = modelManager.ensureModel(config.modelId)
+        val actualPath = modelManager.ensureModel(modelPath)
         modelPtr = withContext(Dispatchers.IO) {
-            jni.loadModel(modelPath)
+            jni.loadModel(actualPath)
         }
+        config = STTConfig(modelId = modelPath)
     }
 
-    override suspend fun transcribe(audioData: ByteArray): TranscriptionResult {
+    override suspend fun transcribe(
+        audioData: ByteArray,
+        options: STTOptions
+    ): STTTranscriptionResult {
         require(modelPtr != 0L) { "Model not loaded" }
         val cfg = config ?: throw IllegalStateException("Component not initialized")
 
         return withContext(Dispatchers.IO) {
-            val text = jni.transcribe(modelPtr, audioData, cfg.language)
-            TranscriptionResult(
-                text = text,
+            val text = jni.transcribe(modelPtr, audioData, options.language)
+
+            // Parse timestamps if enabled
+            val timestamps = if (options.enableTimestamps) {
+                // This would need JNI support for timestamps
+                null // For now, return null
+            } else {
+                null
+            }
+
+            STTTranscriptionResult(
+                transcript = text,
                 confidence = 0.95f,
-                language = cfg.language,
-                duration = audioData.size / 32000.0 // 16kHz stereo
+                timestamps = timestamps,
+                language = options.language
             )
         }
     }
 
-    override fun transcribeStream(audioFlow: Flow<ByteArray>): Flow<TranscriptionUpdate> = flow {
+    override suspend fun <T> streamTranscribe(
+        audioStream: Flow<ByteArray>,
+        options: STTOptions,
+        onPartial: (String) -> Unit
+    ): STTTranscriptionResult {
         require(modelPtr != 0L) { "Model not loaded" }
 
-        audioFlow.collect { chunk ->
+        val fullText = StringBuilder()
+
+        audioStream.collect { chunk ->
             val partial = withContext(Dispatchers.IO) {
                 jni.transcribePartial(modelPtr, chunk)
             }
-            emit(
-                TranscriptionUpdate(
-                    text = partial,
-                    isFinal = false,
-                    timestamp = System.currentTimeMillis()
-                )
-            )
+            onPartial(partial)
+            fullText.append(partial).append(" ")
         }
+
+        return STTTranscriptionResult(
+            transcript = fullText.toString().trim(),
+            confidence = 0.95f,
+            language = options.language
+        )
     }
 
     override suspend fun cleanup() {
@@ -75,6 +102,7 @@ class WhisperSTTComponent : STTComponent {
                 jni.unloadModel(modelPtr)
             }
             modelPtr = 0
+            config = null
         }
     }
 }

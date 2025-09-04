@@ -17,9 +17,14 @@ object EventBus {
 }
 
 /**
+ * Base interface for all component events
+ */
+interface ComponentEvent
+
+/**
  * Base SDK event interface
  */
-sealed interface SDKEvent
+sealed interface SDKEvent : ComponentEvent
 
 /**
  * STT related events
@@ -52,4 +57,13 @@ sealed class TranscriptionEvent : SDKEvent {
     data class PartialTranscription(val text: String) : TranscriptionEvent()
     data class FinalTranscription(val text: String) : TranscriptionEvent()
     data class Error(val error: Throwable) : TranscriptionEvent()
+}
+
+/**
+ * Legacy Event Types (for compatibility)
+ */
+sealed class Event {
+    data class Info(val message: String) : Event()
+    data class Warning(val message: String) : Event()
+    data class Error(val message: String, val throwable: Throwable? = null) : Event()
 }
