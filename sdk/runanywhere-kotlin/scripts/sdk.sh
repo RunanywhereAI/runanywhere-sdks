@@ -122,6 +122,13 @@ ${BOLD}${GREEN}PUBLISHING COMMANDS:${NC}
     ${YELLOW}publish-jvm${NC}     Publish JVM artifact to local Maven
     ${YELLOW}publish-remote${NC}  Publish to remote repository (requires credentials)
 
+${BOLD}${GREEN}CONFIGURATION COMMANDS:${NC}
+    ${YELLOW}config-dev${NC}      Configure SDK for development environment
+    ${YELLOW}config-staging${NC}  Configure SDK for staging environment
+    ${YELLOW}config-prod${NC}     Configure SDK for production environment
+    ${YELLOW}config-show${NC}     Show current configuration (masked)
+    ${YELLOW}config-validate${NC} Validate current configuration
+
 ${BOLD}${GREEN}UTILITY COMMANDS:${NC}
     ${YELLOW}deps${NC}            Show dependency tree
     ${YELLOW}updates${NC}         Check for dependency updates
@@ -219,6 +226,12 @@ cmd_clean() {
 
 # Build JVM target (primary for IntelliJ plugins)
 cmd_jvm() {
+    # Set up configuration if environment specified
+    if [[ -n "$OPT_ENV" ]]; then
+        print_step "Setting up $OPT_ENV configuration..."
+        "$SCRIPT_DIR/config-manager.sh" setup "$OPT_ENV"
+    fi
+
     print_header "Building JVM Target for IntelliJ Plugin"
 
     print_step "Compiling JVM sources..."
@@ -430,6 +443,43 @@ cmd_format() {
 }
 
 # ============================================================================
+# CONFIGURATION COMMANDS
+# ============================================================================
+
+# Configure SDK for development
+cmd_config_dev() {
+    print_header "Configuring SDK for Development"
+    "$SCRIPT_DIR/config-manager.sh" setup dev
+    print_success "SDK configured for development"
+}
+
+# Configure SDK for staging
+cmd_config_staging() {
+    print_header "Configuring SDK for Staging"
+    "$SCRIPT_DIR/config-manager.sh" setup staging
+    print_success "SDK configured for staging"
+}
+
+# Configure SDK for production
+cmd_config_prod() {
+    print_header "Configuring SDK for Production"
+    "$SCRIPT_DIR/config-manager.sh" setup prod
+    print_success "SDK configured for production"
+}
+
+# Show current configuration
+cmd_config_show() {
+    print_header "Current Configuration"
+    "$SCRIPT_DIR/config-manager.sh" show
+}
+
+# Validate current configuration
+cmd_config_validate() {
+    print_header "Validating Configuration"
+    "$SCRIPT_DIR/config-manager.sh" validate
+}
+
+# ============================================================================
 # WATCH MODE
 # ============================================================================
 
@@ -478,6 +528,7 @@ OPT_NO_CACHE=false
 OPT_REFRESH=false
 OPT_IDE_TYPE=""
 OPT_IDE_VERSION=""
+OPT_ENV=""
 
 COMMANDS=()
 
@@ -494,6 +545,7 @@ while [[ $# -gt 0 ]]; do
         --refresh)      OPT_REFRESH=true; shift ;;
         --ide-type)     OPT_IDE_TYPE="$2"; shift 2 ;;
         --ide-version)  OPT_IDE_VERSION="$2"; shift 2 ;;
+        --env)          OPT_ENV="$2"; shift 2 ;;
         --help|-h)      show_help; exit 0 ;;
         --*)            print_error "Unknown option: $1"; show_help; exit 1 ;;
         *)              COMMANDS+=("$1"); shift ;;
@@ -877,6 +929,13 @@ for cmd in "${COMMANDS[@]}"; do
         publish)        cmd_publish ;;
         publish-jvm)    cmd_publish_jvm ;;
         publish-remote) print_warning "Remote publishing not configured"; exit 1 ;;
+
+        # Configuration
+        config-dev)     cmd_config_dev ;;
+        config-staging) cmd_config_staging ;;
+        config-prod)    cmd_config_prod ;;
+        config-show)    cmd_config_show ;;
+        config-validate) cmd_config_validate ;;
 
         # Utilities
         deps)           cmd_deps ;;

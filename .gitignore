@@ -153,3 +153,15 @@ sdk/runanywhere-swift/Configuration/Private/
 
 # Keep example files
 !sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json
+
+# Kotlin SDK Configuration files with real values
+sdk/runanywhere-kotlin/config/dev.json
+sdk/runanywhere-kotlin/config/staging.json
+sdk/runanywhere-kotlin/config/prod.json
+sdk/runanywhere-kotlin/config/*.private.json
+sdk/runanywhere-kotlin/build/generated/config/
+
+# Keep example and template files
+!sdk/runanywhere-kotlin/config/*.example.json
+!sdk/runanywhere-kotlin/config/template.json
+!sdk/runanywhere-kotlin/config/README.md

@@ -7,6 +7,7 @@ import com.runanywhere.sdk.models.QuantizationLevel
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.delay
 
 /**
@@ -18,7 +19,7 @@ class MockNetworkService {
     /**
      * Simulated network delay in milliseconds
      */
-    private val mockDelay = 500L
+    private val mockDelay = SDKConstants.Development.MOCK_DELAY_MS
 
     /**
      * Get mock models for development - exact same models as iOS
@@ -54,7 +55,7 @@ class MockNetworkService {
                 name = "Llama 3.2 1B Instruct Q6_K",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
+                downloadURL = SDKConstants.ModelUrls.LLAMA_3_2_1B.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 1_100_000_000, // ~1.1GB
                 memoryRequired = 1_200_000_000, // 1.2GB
@@ -70,7 +71,7 @@ class MockNetworkService {
                 name = "SmolLM2 1.7B Instruct Q6_K_L",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
+                downloadURL = SDKConstants.ModelUrls.SMOLLM2_1_7B.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 1_700_000_000, // ~1.7GB
                 memoryRequired = 1_800_000_000, // 1.8GB
@@ -86,7 +87,7 @@ class MockNetworkService {
                 name = "Qwen 2.5 0.5B Instruct Q6_K",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                downloadURL = SDKConstants.ModelUrls.QWEN_2_5_0_5B.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 650_000_000, // ~650MB
                 memoryRequired = 600_000_000, // 600MB
@@ -102,7 +103,7 @@ class MockNetworkService {
                 name = "SmolLM2 360M Q8_0",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                downloadURL = SDKConstants.ModelUrls.SMOLLM2_360M.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 385_000_000, // ~385MB
                 memoryRequired = 500_000_000, // 500MB
@@ -118,7 +119,7 @@ class MockNetworkService {
                 name = "Qwen 2.5 1.5B Instruct Q6_K",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
+                downloadURL = SDKConstants.ModelUrls.QWEN_2_5_1_5B.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 1_400_000_000, // ~1.4GB
                 memoryRequired = 1_600_000_000, // 1.6GB
@@ -136,7 +137,7 @@ class MockNetworkService {
                 name = "Whisper Tiny",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.MLMODEL,
-                downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 39_000_000, // ~39MB
                 memoryRequired = 39_000_000, // 39MB
@@ -152,7 +153,7 @@ class MockNetworkService {
                 name = "Whisper Base",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.MLMODEL,
-                downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 74_000_000, // ~74MB
                 memoryRequired = 74_000_000, // 74MB
@@ -170,7 +171,7 @@ class MockNetworkService {
                 name = "LiquidAI LFM2 350M Q4_K_M",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                downloadURL = SDKConstants.ModelUrls.LFM2_350M_Q4.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 218_690_000, // ~219MB
                 memoryRequired = 250_000_000, // 250MB
@@ -186,7 +187,7 @@ class MockNetworkService {
                 name = "LiquidAI LFM2 350M Q8_0",
                 category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                downloadURL = SDKConstants.ModelUrls.LFM2_350M_Q8.takeIf { it.isNotEmpty() },
                 localPath = null,
                 downloadSize = 361_650_000, // ~362MB
                 memoryRequired = 400_000_000, // 400MB

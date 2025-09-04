@@ -4,6 +4,7 @@ import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -59,7 +60,7 @@ class ModelManager {
                 name = "Whisper Tiny",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.BIN,
-                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() },
                 downloadSize = 39L * 1024 * 1024 // 39MB
             ),
             ModelInfo(
@@ -67,7 +68,7 @@ class ModelManager {
                 name = "Whisper Base",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.BIN,
-                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() },
                 downloadSize = 74L * 1024 * 1024 // 74MB
             ),
             ModelInfo(
@@ -75,7 +76,7 @@ class ModelManager {
                 name = "Whisper Small",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.BIN,
-                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_SMALL.takeIf { it.isNotEmpty() },
                 downloadSize = 244L * 1024 * 1024 // 244MB
             ),
             ModelInfo(
@@ -83,7 +84,7 @@ class ModelManager {
                 name = "Whisper Medium",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.BIN,
-                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+                downloadURL = SDKConstants.ModelUrls.WHISPER_MEDIUM.takeIf { it.isNotEmpty() },
                 downloadSize = 769L * 1024 * 1024 // 769MB
             )
         )
