@@ -24,22 +24,24 @@ object EventBus {
     private val _configurationEvents = MutableSharedFlow<SDKConfigurationEvent>()
     val configurationEvents: SharedFlow<SDKConfigurationEvent> = _configurationEvents.asSharedFlow()
 
-    // Publish methods
-    suspend fun publish(event: SDKInitializationEvent) {
-        _initializationEvents.emit(event)
+    // Publish methods (non-suspending for easier usage)
+    fun publish(event: SDKInitializationEvent) {
+        _initializationEvents.tryEmit(event)
     }
 
-    suspend fun publish(event: SDKModelEvent) {
-        _modelEvents.emit(event)
+    fun publish(event: SDKModelEvent) {
+        _modelEvents.tryEmit(event)
     }
 
-    suspend fun publish(event: SDKVoiceEvent) {
-        _voiceEvents.emit(event)
+    fun publish(event: SDKVoiceEvent) {
+        _voiceEvents.tryEmit(event)
     }
 
-    suspend fun publish(event: SDKConfigurationEvent) {
-        _configurationEvents.emit(event)
+    fun publish(event: SDKConfigurationEvent) {
+        _configurationEvents.tryEmit(event)
     }
+
+    val shared = EventBus
 }
 
 // Event definitions
@@ -56,6 +58,7 @@ sealed class SDKModelEvent {
     data class DownloadStarted(val modelId: String) : SDKModelEvent()
     data class DownloadProgress(val modelId: String, val progress: Float) : SDKModelEvent()
     data class DownloadCompleted(val modelId: String) : SDKModelEvent()
+    data class DownloadFailed(val modelId: String, val error: Throwable) : SDKModelEvent()
 }
 
 sealed class SDKVoiceEvent {

@@ -167,6 +167,40 @@ class VADComponent(configuration: VADConfiguration) :
         return vadService
     }
 
+    /**
+     * Check if VAD is enabled
+     */
+    fun isEnabled(): Boolean {
+        return state == ComponentState.READY
+    }
+
+    /**
+     * Enable VAD (initialize if needed)
+     */
+    suspend fun enable() {
+        if (state != ComponentState.READY) {
+            initialize()
+        }
+    }
+
+    /**
+     * Disable VAD
+     */
+    suspend fun disable() {
+        if (state == ComponentState.READY) {
+            cleanup()
+        }
+    }
+
+    /**
+     * Process audio and keep pipeline warm
+     */
+    fun processAudio(audioData: ByteArray): ByteArray {
+        // Simply pass through for now
+        // In production, this would apply VAD filtering
+        return audioData
+    }
+
     // MARK: - Private Helpers
 
     private fun calculateEnergyLevel(audioSamples: FloatArray): Float {
