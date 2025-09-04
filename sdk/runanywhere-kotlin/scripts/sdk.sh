@@ -141,6 +141,8 @@ ${BOLD}${GREEN}OPTIONS:${NC}
     ${CYAN}--parallel${NC}      Enable parallel execution
     ${CYAN}--no-cache${NC}      Disable build cache
     ${CYAN}--refresh${NC}       Refresh all dependencies
+    ${CYAN}--ide-type${NC}      Override IDE type (IC, IU, AS)
+    ${CYAN}--ide-version${NC}   Override IDE version (e.g., 2023.3, 2024.1)
 
 ${BOLD}${GREEN}EXAMPLES:${NC}
     ${CYAN}# Quick JVM build for plugin development${NC}
@@ -160,6 +162,12 @@ ${BOLD}${GREEN}EXAMPLES:${NC}
 
     ${CYAN}# Build with debug output${NC}
     ./scripts/sdk.sh jvm --debug
+
+    ${CYAN}# Force Android Studio configuration${NC}
+    ./scripts/sdk.sh run-plugin-as --ide-type AS --ide-version 2024.1.1
+
+    ${CYAN}# Override IntelliJ version${NC}
+    ./scripts/sdk.sh plugin --ide-type IC --ide-version 2024.2
 
 ${BOLD}${GREEN}MAVEN COORDINATES:${NC}
     ${CYAN}Group:${NC}    $SDK_GROUP
@@ -468,23 +476,27 @@ OPT_OFFLINE=false
 OPT_PARALLEL=false
 OPT_NO_CACHE=false
 OPT_REFRESH=false
+OPT_IDE_TYPE=""
+OPT_IDE_VERSION=""
 
 COMMANDS=()
 
 # Process all arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --publish)   OPT_PUBLISH=true; shift ;;
-        --watch)     OPT_WATCH=true; shift ;;
-        --debug)     OPT_DEBUG=true; shift ;;
-        --info)      OPT_INFO=true; shift ;;
-        --offline)   OPT_OFFLINE=true; shift ;;
-        --parallel)  OPT_PARALLEL=true; shift ;;
-        --no-cache)  OPT_NO_CACHE=true; shift ;;
-        --refresh)   OPT_REFRESH=true; shift ;;
-        --help|-h)   show_help; exit 0 ;;
-        --*)         print_error "Unknown option: $1"; show_help; exit 1 ;;
-        *)           COMMANDS+=("$1"); shift ;;
+        --publish)      OPT_PUBLISH=true; shift ;;
+        --watch)        OPT_WATCH=true; shift ;;
+        --debug)        OPT_DEBUG=true; shift ;;
+        --info)         OPT_INFO=true; shift ;;
+        --offline)      OPT_OFFLINE=true; shift ;;
+        --parallel)     OPT_PARALLEL=true; shift ;;
+        --no-cache)     OPT_NO_CACHE=true; shift ;;
+        --refresh)      OPT_REFRESH=true; shift ;;
+        --ide-type)     OPT_IDE_TYPE="$2"; shift 2 ;;
+        --ide-version)  OPT_IDE_VERSION="$2"; shift 2 ;;
+        --help|-h)      show_help; exit 0 ;;
+        --*)            print_error "Unknown option: $1"; show_help; exit 1 ;;
+        *)              COMMANDS+=("$1"); shift ;;
     esac
 done
 
@@ -513,13 +525,123 @@ detect_ide() {
     fi
 }
 
+# Helper function to get compatible plugin configuration for IDE
+get_ide_config() {
+    local ide_type=$1
+    local ide_info=$2
+
+    # Default configurations
+    local config_type="IC"
+    local config_version="2023.3"
+    local config_plugins='"java"'
+    local config_until_build="251.*"
+
+    # Apply command line overrides first
+    if [[ -n "$OPT_IDE_TYPE" ]]; then
+        ide_type="$OPT_IDE_TYPE"
+    fi
+
+    if [[ -n "$OPT_IDE_VERSION" ]]; then
+        # Create synthetic ide_info with overridden version
+        ide_info="$ide_type:$OPT_IDE_VERSION:overridden:"
+    fi
+
+    if [[ -n "$ide_info" ]]; then
+        local detected_version=$(echo "$ide_info" | cut -d':' -f2)
+        local build_major=$(echo "$ide_info" | cut -d':' -f4)
+
+        # Map detected version to compatible plugin platform version
+        if [[ "$ide_type" == "AS" ]]; then
+            # Android Studio version mapping
+            # For Android Studio, we use IntelliJ platform with compatible version
+            case "$detected_version" in
+                2023.*|2024.1.*)
+                    config_type="IC"
+                    config_version="2023.3"
+                    config_plugins='"java"'
+                    config_until_build="241.*"
+                    ;;
+                2024.2.*|2025.*)
+                    config_type="IC"
+                    config_version="2024.1"
+                    config_plugins='"java"'
+                    config_until_build="251.*"
+                    ;;
+                *)
+                    # Fallback for newer versions
+                    config_type="IC"
+                    config_version="2024.1"
+                    config_plugins='"java"'
+                    config_until_build="251.*"
+                    ;;
+            esac
+        else
+            # IntelliJ IDEA version mapping
+            case "$detected_version" in
+                2023.*)
+                    config_type="IC"
+                    config_version="2023.3"
+                    config_plugins='"java"'
+                    config_until_build="241.*"
+                    ;;
+                2024.1.*)
+                    config_type="IC"
+                    config_version="2024.1"
+                    config_plugins='"java"'
+                    config_until_build="251.*"
+                    ;;
+                2024.2.*|2024.3.*|2025.*)
+                    config_type="IC"
+                    config_version="2024.2"
+                    config_plugins='"java"'
+                    config_until_build="251.*"
+                    ;;
+                *)
+                    # Fallback for newer versions - be more permissive
+                    config_type="IC"
+                    config_version="2024.2"
+                    config_plugins='"java"'
+                    config_until_build="261.*"
+                    ;;
+            esac
+        fi
+
+        # Override until_build if we detected build number
+        if [[ -n "$build_major" && "$build_major" -gt 0 ]]; then
+            local next_major=$((build_major + 20))  # More conservative buffer
+            config_until_build="${next_major}.*"
+        fi
+    fi
+
+    echo "$config_type:$config_version:$config_plugins:$config_until_build"
+}
+
 # Helper function to update plugin build configuration for IDE type
 update_plugin_for_ide() {
     local plugin_dir=$1
     local ide_type=$2
-    local ide_version=$3
-    local plugins_list=$4
-    local until_build=${5:-"251.*"}  # Default to 251.* if not provided
+    local ide_info=$3
+
+    # Show override info before getting config
+    if [[ -n "$OPT_IDE_TYPE" ]]; then
+        print_info "Using command line IDE type override: $OPT_IDE_TYPE"
+    fi
+
+    if [[ -n "$OPT_IDE_VERSION" ]]; then
+        print_info "Using command line IDE version override: $OPT_IDE_VERSION"
+    fi
+
+    # Get optimal configuration for this IDE
+    local config=$(get_ide_config "$ide_type" "$ide_info")
+    local config_type=$(echo "$config" | cut -d':' -f1)
+    local config_version=$(echo "$config" | cut -d':' -f2)
+    local config_plugins=$(echo "$config" | cut -d':' -f3)
+    local config_until_build=$(echo "$config" | cut -d':' -f4)
+
+    print_info "Configuring plugin:"
+    print_info "  - Platform: $config_type $config_version"
+    print_info "  - Plugins: $config_plugins"
+    print_info "  - Compatibility: up to $config_until_build"
 
     # Update build.gradle.kts for the specific IDE
     cat > "$plugin_dir/build.gradle.kts.tmp" << EOF
@@ -532,9 +654,9 @@ group = "com.runanywhere"
 version = "1.0.0"
 
 intellij {
-    version.set("$ide_version")
-    type.set("$ide_type")
-    plugins.set(listOf($plugins_list))
+    version.set("$config_version")
+    type.set("$config_type")
+    plugins.set(listOf($config_plugins))
 }
 
 repositories {
@@ -553,7 +675,7 @@ dependencies {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("$until_build")
+        untilBuild.set("$config_until_build")
         changeNotes.set(
             """
             <h2>1.0.0</h2>
@@ -628,33 +750,18 @@ build_plugin_for_ide() {
 
     # Step 3: Detect IDE and configure
     local ide_info=$(detect_ide "$ide_type")
-    local until_build="251.*"  # Default
 
     if [[ -n "$ide_info" ]]; then
         local detected_version=$(echo "$ide_info" | cut -d':' -f2)
-        local build_major=$(echo "$ide_info" | cut -d':' -f4)
         print_info "Detected $ide_name version: $detected_version"
-
-        # Dynamically set until_build based on detected build
-        if [[ -n "$build_major" ]]; then
-            # Add some buffer for future compatibility
-            local next_major=$((build_major + 10))
-            until_build="${next_major}.*"
-            print_info "Setting compatibility up to build: $until_build"
-        fi
-    fi
-
-    # Configure based on IDE type
-    print_step "Configuring plugin for $ide_name..."
-    if [[ "$ide_type" == "AS" ]]; then
-        # Android Studio - use version without android plugin for simplicity
-        # This works with most AS versions
-        update_plugin_for_ide "$plugin_dir" "IC" "2023.3" '"java"' "$until_build"
-        print_warning "Using IntelliJ platform for Android Studio compatibility"
     else
-        # IntelliJ IDEA
-        update_plugin_for_ide "$plugin_dir" "IC" "2023.3" '"java"' "$until_build"
+        print_warning "Could not auto-detect $ide_name installation"
+        print_info "Using default configuration"
     fi
+
+    # Configure plugin for detected/default IDE
+    print_step "Configuring plugin for $ide_name..."
+    update_plugin_for_ide "$plugin_dir" "$ide_type" "$ide_info"
 
     # Step 4: Build the plugin
     print_step "Building IntelliJ plugin..."
