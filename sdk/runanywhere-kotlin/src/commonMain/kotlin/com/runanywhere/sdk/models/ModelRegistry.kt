@@ -1,7 +1,5 @@
 package com.runanywhere.sdk.models
 
-import com.runanywhere.sdk.data.models.ModelInfo
-
 /**
  * Central registry for model discovery and management
  */

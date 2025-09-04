@@ -247,7 +247,7 @@ class ModelInfoService(
             val allModels = getAllModels()
             val models = allModels.filter { model ->
                 (criteria.category == null || model.category == criteria.category) &&
-                (criteria.framework == null || model.framework == criteria.framework) &&
+                (criteria.framework == null || model.preferredFramework == criteria.framework) &&
                 (criteria.format == null || model.format == criteria.format)
             }
             logger.info("Found ${models.size} models matching criteria")
