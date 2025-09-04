@@ -1,146 +1,349 @@
-# Kotlin SDK - STT Pipeline MVP Implementation Plan
+# Android SDK - STT Pipeline Implementation Plan (Updated)
 
 ## Executive Summary
 
-This document outlines the MVP implementation plan for the RunAnywhere Kotlin SDK, focusing **exclusively** on the Speech-to-Text (STT) pipeline with Voice Activity Detection (VAD). The first release targets **Android Studio IDE plugin** for voice-driven code completion and commands, with architecture designed for future expansion to Android apps.
+This document outlines the comprehensive implementation plan for the RunAnywhere Android SDK, focusing on the Speech-to-Text (STT) pipeline with Voice Activity Detection (VAD). The architecture is designed to mirror the iOS SDK while following modern Android development patterns, with full integration into the sample Android app.
 
-## 1. MVP Scope Definition
+## Key Architectural Updates Based on iOS SDK Analysis
 
-### In Scope ✅
-- **VAD Component**: WebRTC VAD for efficient voice activity detection
+Following comprehensive analysis of the iOS SDK architecture and existing Android SDK structure, this plan has been updated to ensure full architectural parity while maintaining Android-specific best practices:
+
+### Architecture Alignment with iOS SDK
+- **Three-layer clean architecture**: Components → Services → Adapters (matching iOS patterns)
+- **Service Container pattern**: Central dependency injection with lazy initialization
+- **Event-driven communication**: Flow-based events matching iOS Combine patterns
+- **Configuration management**: Multi-source configuration with fallback chain
+- **Mock service ecosystem**: Complete development mode support
+- **Strong typing**: Comprehensive data models and sealed classes
+- **Modern patterns**: Kotlin coroutines, Flow/StateFlow, Compose UI
+
+### Target Integration
+- **Android Sample App**: Primary integration target (not Android Studio plugin)
+- **Production-ready SDK**: Complete SDK implementation with all necessary services
+- **Development mode**: Full mock service support for offline development
+
+## 1. Implementation Scope
+
+### Core SDK Implementation ✅
+- **RunAnywhere Object**: Main SDK entry point with initialization
+- **Service Container**: Dependency injection and service management
+- **Configuration System**: Remote/local/default configuration chain
+- **Database Layer**: Room/SQLite persistence with migrations
+- **Model Management**: Registry, loading, downloading with progress
+- **Event System**: Flow-based event-driven architecture
+- **File Management**: Organized storage with cleanup
+- **Analytics Service**: STT-specific usage and performance tracking
+
+### STT Pipeline Components ✅
+- **VAD Component**: WebRTC VAD with lifecycle management
 - **STT Component**: Whisper.cpp integration via JNI
-- **Model Management**: Download, storage, lifecycle management for STT models
-- **File Management**: Efficient file storage and caching system
-- **Analytics**: Usage tracking, performance metrics, error reporting
-- **Event System**: Real-time events for VAD and STT status
-- **Android Studio Plugin**: Voice command interface for IDE
+- **Audio Processing**: Stream processing with VAD integration
+- **Native Integration**: JNI wrappers for whisper.cpp and WebRTC VAD
+- **Mock Services**: Complete development mode ecosystem
 
-### Out of Scope (Deferred) ❌
-- LLM Component
-- TTS Component
-- VLM Component
-- Speaker Diarization
-- Wake Word Detection
-- Full Android app support (architecture prepared but not implemented)
-- iOS/Desktop platforms
+### Sample App Integration ✅
+- **MainActivity**: SDK initialization and event subscription
+- **TranscriptionScreen**: Compose UI for real-time STT
+- **ViewModels**: State management with Flow/StateFlow
+- **Permission Handling**: Audio recording permissions
+- **Real-time Updates**: Live transcription with partial/final results
 
-## 2. Target Use Case: Android Studio Voice Commands
+### Development Infrastructure ✅
+- **Mock Models**: Matching iOS mock model catalog
+- **Development Mode**: Offline operation with mock services
+- **Testing Framework**: Unit and integration tests
+- **Build System**: Gradle configuration with native libraries
+
+## 2. Target Use Case: Android Sample App STT Integration
 
 ### Primary Features
-1. **Voice-to-Code**: Dictate code directly into the editor
-2. **Voice Commands**: Execute IDE actions via voice ("run tests", "debug app", "find usages")
-3. **Voice Search**: Search in project using natural language
-4. **Voice Refactoring**: Trigger refactoring commands
-5. **Continuous Dictation**: Real-time transcription with VAD
+1. **Real-time Transcription**: Live speech-to-text with visual feedback
+2. **Voice Activity Detection**: Smart start/stop with VAD integration
+3. **Model Management**: Download and switch between Whisper models
+4. **Development Mode**: Offline operation with mock services
+5. **Analytics Tracking**: Usage metrics and performance monitoring
 
 ### User Experience Flow
 ```
-1. User activates voice mode (hotkey/button)
-2. VAD detects speech start
-3. Audio captured and buffered
-4. VAD detects speech end
-5. STT processes audio chunk
-6. Transcription returned to IDE
-7. IDE processes command/inserts text
+1. User opens transcription screen in sample app
+2. Taps record button to start listening
+3. VAD detects speech and shows visual feedback
+4. Real-time partial transcription appears
+5. VAD detects speech end
+6. Final transcription result displayed
+7. Process repeats for continuous transcription
 ```
 
-## 3. Simplified Architecture
+### Integration Points with iOS Sample App
+- **Matching UI patterns**: Similar transcription interface design
+- **Event handling**: Same event types and flow
+- **Model management**: Consistent model selection and loading
+- **Development mode**: Same mock service behavior
+- **Analytics tracking**: Matching event tracking patterns
 
-### 3.1 Project Structure (MVP)
+## 3. Android SDK Architecture
+
+### 3.1 Project Structure
 
 ```
-sdk/runanywhere-kotlin-stt/
-├── core/                           # Core SDK module (JVM)
-│   ├── src/main/kotlin/
-│   │   ├── components/
-│   │   │   ├── base/              # Component abstractions
-│   │   │   ├── vad/               # VAD component
-│   │   │   └── stt/               # STT component
-│   │   ├── models/                # Model management
-│   │   │   ├── ModelManager.kt
-│   │   │   ├── ModelDownloader.kt
-│   │   │   └── ModelStorage.kt
-│   │   ├── files/                 # File management
-│   │   │   ├── FileManager.kt
-│   │   │   └── CacheManager.kt
-│   │   ├── analytics/             # Analytics
-│   │   │   ├── AnalyticsTracker.kt
-│   │   │   └── PerformanceMonitor.kt
-│   │   ├── events/                # Event system
-│   │   │   ├── EventBus.kt
-│   │   │   └── STTEvents.kt
-│   │   └── public/                # Public API
-│   │       └── RunAnywhereSTT.kt
-│   └── resources/
-│       └── native/                # Native libraries
-│           ├── win/
-│           ├── mac/
-│           └── linux/
-├── jni/                           # JNI module
-│   ├── src/main/
-│   │   ├── cpp/
-│   │   │   ├── whisper-jni.cpp
-│   │   │   └── webrtc-vad-jni.cpp
-│   │   └── kotlin/
-│   │       ├── WhisperJNI.kt
-│   │       └── WebRTCVadJNI.kt
-│   └── CMakeLists.txt
-├── plugin/                        # IntelliJ Plugin module
-│   ├── src/main/
-│   │   ├── kotlin/
-│   │   │   ├── RunAnywherePlugin.kt
-│   │   │   ├── actions/          # IDE actions
-│   │   │   │   ├── VoiceCommandAction.kt
-│   │   │   │   └── VoiceDictationAction.kt
-│   │   │   ├── services/         # Plugin services
-│   │   │   │   ├── VoiceService.kt
-│   │   │   │   └── TranscriptionService.kt
-│   │   │   ├── ui/               # UI components
-│   │   │   │   ├── VoiceToolWindow.kt
-│   │   │   │   └── VoiceStatusBar.kt
-│   │   │   └── settings/         # Plugin settings
-│   │   │       └── VoiceSettings.kt
-│   │   └── resources/
-│   │       ├── META-INF/
-│   │       │   └── plugin.xml
-│   │       └── icons/
-│   └── build.gradle.kts
-└── build.gradle.kts
+sdk/runanywhere-android/
+├── core/                                    # Core SDK module
+│   ├── src/main/kotlin/com/runanywhere/sdk/
+│   │   ├── public/                         # Public API
+│   │   │   ├── RunAnywhere.kt             # Main SDK entry point
+│   │   │   ├── Configuration.kt           # Configuration classes
+│   │   │   └── Events.kt                  # Public event definitions
+│   │   ├── foundation/                     # Core infrastructure
+│   │   │   ├── ServiceContainer.kt        # DI container
+│   │   │   ├── EventBus.kt               # Event system
+│   │   │   └── SDKLogger.kt              # Logging system
+│   │   ├── components/                     # Component layer
+│   │   │   ├── base/                      # Base abstractions
+│   │   │   │   ├── BaseComponent.kt      # Component lifecycle
+│   │   │   │   ├── Component.kt          # Interface definitions
+│   │   │   │   └── ComponentConfiguration.kt
+│   │   │   ├── stt/                       # STT component
+│   │   │   │   ├── STTComponent.kt       # STT component impl
+│   │   │   │   ├── STTService.kt         # STT service interface
+│   │   │   │   ├── WhisperCppSTTService.kt # Whisper impl
+│   │   │   │   └── STTModels.kt          # STT data models
+│   │   │   └── vad/                       # VAD component
+│   │   │       ├── VADComponent.kt       # VAD component impl
+│   │   │       ├── VADService.kt         # VAD service interface
+│   │   │       ├── WebRTCVADService.kt   # WebRTC impl
+│   │   │       └── VADModels.kt          # VAD data models
+│   │   ├── services/                       # Service layer
+│   │   │   ├── configuration/             # Configuration management
+│   │   │   │   ├── ConfigurationService.kt
+│   │   │   │   ├── ConfigurationRepository.kt
+│   │   │   │   ├── RemoteDataSource.kt
+│   │   │   │   └── LocalDataSource.kt
+│   │   │   ├── models/                    # Model management
+│   │   │   │   ├── ModelRegistry.kt      # Model discovery
+│   │   │   │   ├── ModelLoadingService.kt # Model loading
+│   │   │   │   ├── DownloadService.kt    # File downloads
+│   │   │   │   └── MemoryService.kt      # Memory management
+│   │   │   ├── network/                   # Network services
+│   │   │   │   ├── NetworkService.kt     # Network interface
+│   │   │   │   ├── MockNetworkService.kt # Mock implementation
+│   │   │   │   └── HttpNetworkService.kt # Production impl
+│   │   │   └── analytics/                 # Analytics services
+│   │   │       ├── AnalyticsService.kt   # Analytics interface
+│   │   │       ├── STTAnalyticsService.kt # STT analytics
+│   │   │       └── AnalyticsQueueManager.kt
+│   │   ├── data/                          # Data layer
+│   │   │   ├── database/                  # Database components
+│   │   │   │   ├── RunAnywhereDatabase.kt # Room database
+│   │   │   │   ├── ConfigurationDao.kt   # Configuration DAO
+│   │   │   │   ├── ModelDao.kt           # Model DAO
+│   │   │   │   └── AnalyticsDao.kt       # Analytics DAO
+│   │   │   ├── models/                    # Data models
+│   │   │   │   ├── ConfigurationData.kt  # Configuration entity
+│   │   │   │   ├── ModelInfo.kt          # Model entity
+│   │   │   │   └── AnalyticsEvent.kt     # Analytics entity
+│   │   │   └── converters/                # Type converters
+│   │   │       └── DatabaseConverters.kt
+│   │   └── files/                         # File management
+│   │       ├── FileManager.kt            # File operations
+│   │       └── StorageInfo.kt            # Storage utilities
+│   ├── src/main/assets/                   # Assets
+│   │   └── models/                        # Bundled model files
+│   └── src/test/                          # Unit tests
+├── jni/                                   # JNI module
+│   ├── src/main/kotlin/                   # JNI Kotlin wrappers
+│   │   ├── WhisperJNI.kt                 # Whisper JNI wrapper
+│   │   └── WebRTCVadJNI.kt              # VAD JNI wrapper
+│   ├── src/main/cpp/                      # Native C++ code
+│   │   ├── whisper-jni.cpp               # Whisper JNI implementation
+│   │   ├── webrtc-vad-jni.cpp           # VAD JNI implementation
+│   │   └── jni-common.h                  # Common JNI utilities
+│   └── CMakeLists.txt                     # CMake build configuration
+└── examples/android/RunAnywhereAI/        # Sample application
+    └── [Sample app integration code]
 ```
 
-### 3.2 Core Components
+### 3.2 Core SDK Implementation
 
-#### VAD Component
+#### RunAnywhere Object (Main Entry Point)
+
 ```kotlin
-interface VADComponent {
-    suspend fun initialize(config: VADConfig)
-    fun processAudioChunk(audio: FloatArray): VADResult
-    suspend fun cleanup()
-}
+object RunAnywhere {
+    private var _isInitialized = AtomicBoolean(false)
+    private var _currentEnvironment: SDKEnvironment? = null
 
-class WebRTCVADComponent : VADComponent {
-    private val jni = WebRTCVadJNI()
+    val serviceContainer: ServiceContainer get() = ServiceContainer.shared
+    val eventBus: EventBus get() = EventBus.shared
 
-    override suspend fun initialize(config: VADConfig) {
-        jni.initialize(config.aggressiveness, config.sampleRate)
+    suspend fun initialize(
+        apiKey: String,
+        baseURL: String? = null,
+        environment: SDKEnvironment = SDKEnvironment.PRODUCTION
+    ) {
+        if (_isInitialized.get()) return
+
+        _currentEnvironment = environment
+
+        // 8-step initialization process (matching iOS)
+        EventBus.shared.publish(SDKInitializationEvent.Started)
+
+        try {
+            // Step 1-4: Basic setup
+            initializeLogging()
+            initializeDatabase()
+            storeCredentials(apiKey, baseURL)
+
+            // Step 5-7: Environment-specific bootstrap
+            val configData = if (environment == SDKEnvironment.DEVELOPMENT) {
+                serviceContainer.bootstrapDevelopmentMode(SDKInitParams(apiKey, baseURL, environment))
+            } else {
+                val authService = serviceContainer.authenticationService
+                serviceContainer.bootstrap(SDKInitParams(apiKey, baseURL, environment), authService)
+            }
+
+            // Step 8: Mark as initialized
+            _isInitialized.set(true)
+            EventBus.shared.publish(SDKInitializationEvent.Completed)
+
+        } catch (e: Exception) {
+            EventBus.shared.publish(SDKInitializationEvent.Failed(e))
+            throw e
+        }
     }
 
-    override fun processAudioChunk(audio: FloatArray): VADResult {
-        val isSpeech = jni.isSpeech(audio)
-        return VADResult(
-            isSpeech = isSpeech,
-            confidence = if (isSpeech) 0.9f else 0.1f,
-            timestamp = System.currentTimeMillis()
+    suspend fun loadModel(modelId: String): LoadedModel {
+        return serviceContainer.modelLoadingService.loadModel(modelId)
+    }
+
+    suspend fun availableModels(): List<ModelInfo> {
+        return serviceContainer.modelRegistry.discoverModels()
+    }
+
+    suspend fun createVoicePipeline(config: VoicePipelineConfig): VoicePipeline {
+        // Create coordinated voice pipeline with STT and VAD components
+        return VoicePipelineImpl(
+            sttComponent = serviceContainer.sttComponent,
+            vadComponent = serviceContainer.vadComponent,
+            config = config
         )
     }
 }
+```
 
-data class VADConfig(
-    val aggressiveness: Int = 2, // 0-3, higher = more aggressive
-    val sampleRate: Int = 16000,
-    val frameDuration: Int = 30, // ms
-    val silenceThreshold: Int = 500 // ms of silence to stop
-)
+#### Configuration Management System
+
+```kotlin
+// Multi-source configuration with fallback chain (matching iOS)
+data class ConfigurationData(
+    val id: String,
+    val apiKey: String,
+    val baseURL: String,
+    val environment: SDKEnvironment,
+    val source: ConfigurationSource,
+    val lastUpdated: Long,
+
+    // Nested configurations
+    val routing: RoutingConfiguration,
+    val generation: GenerationConfiguration,
+    val storage: StorageConfiguration,
+    val api: APIConfiguration,
+    val download: ModelDownloadConfiguration,
+    val hardware: HardwareConfiguration?
+) {
+    companion object {
+        fun defaultConfiguration(apiKey: String): ConfigurationData {
+            return ConfigurationData(
+                id = "default",
+                apiKey = apiKey,
+                baseURL = "https://api.runanywhere.ai",
+                environment = SDKEnvironment.DEVELOPMENT,
+                source = ConfigurationSource.DEFAULTS,
+                lastUpdated = System.currentTimeMillis(),
+                routing = RoutingConfiguration.defaults(),
+                generation = GenerationConfiguration.defaults(),
+                storage = StorageConfiguration.defaults(),
+                api = APIConfiguration.defaults(),
+                download = ModelDownloadConfiguration.defaults(),
+                hardware = null
+            )
+        }
+    }
+}
+
+class ConfigurationService(
+    private val repository: ConfigurationRepository
+) {
+    suspend fun loadConfigurationOnLaunch(apiKey: String): ConfigurationData {
+        // Priority chain: Remote → Database → Consumer → Defaults
+        return repository.fetchRemoteConfiguration(apiKey)
+            ?: repository.getLocalConfiguration()
+            ?: ConfigurationData.defaultConfiguration(apiKey)
+    }
+}
+```
+
+#### Mock Network Service (Development Mode)
+
+```kotlin
+// Matches iOS MockNetworkService with same model catalog
+class MockNetworkService : NetworkService {
+    companion object {
+        fun getMockModels(): List<ModelInfo> = listOf(
+            // Whisper Models (matching iOS exactly)
+            ModelInfo(
+                id = "whisper-tiny",
+                name = "Whisper Tiny",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.WHISPER_CPP,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                localPath = null,
+                downloadSize = 39_000_000L,
+                memoryRequired = 39_000_000L,
+                compatibleFrameworks = listOf("whisper-cpp"),
+                version = "1.0.0",
+                description = "Fastest Whisper model for real-time transcription",
+                isBuiltIn = false
+            ),
+            ModelInfo(
+                id = "whisper-base",
+                name = "Whisper Base",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.WHISPER_CPP,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                localPath = null,
+                downloadSize = 74_000_000L,
+                memoryRequired = 74_000_000L,
+                compatibleFrameworks = listOf("whisper-cpp"),
+                version = "1.0.0",
+                description = "Balanced accuracy and speed for most use cases",
+                isBuiltIn = false
+            ),
+            ModelInfo(
+                id = "whisper-small",
+                name = "Whisper Small",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.WHISPER_CPP,
+                downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+                localPath = null,
+                downloadSize = 244_000_000L,
+                memoryRequired = 244_000_000L,
+                compatibleFrameworks = listOf("whisper-cpp"),
+                version = "1.0.0",
+                description = "Higher accuracy for professional transcription",
+                isBuiltIn = false
+            )
+        )
+    }
+
+    override suspend fun fetchModelCatalog(): List<ModelInfo> = getMockModels()
+    override suspend fun downloadModel(modelInfo: ModelInfo, progressCallback: (Float) -> Unit): String {
+        // Simulate progressive download with realistic timing
+        for (i in 0..100) {
+            delay(50) // Simulate download time
+            progressCallback(i / 100f)
+        }
+        return "/mock/path/to/${modelInfo.id}.bin"
+    }
+}
 ```
 
 #### STT Component

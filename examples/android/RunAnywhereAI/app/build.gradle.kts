@@ -191,8 +191,8 @@ android {
 }
 
 dependencies {
-    // SDK module (re-enable when fixed)
-    // implementation(project(":sdk-core"))
+    // SDK module
+    implementation(project(":sdk:runanywhere-android:core"))
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
