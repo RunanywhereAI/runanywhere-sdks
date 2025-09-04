@@ -9,7 +9,7 @@ import SwiftUI
 import RunAnywhere
 import LLMSwift
 import WhisperKitTranscription
-// import FluidAudioDiarization  // Uncomment when you add this dependency
+import FluidAudioDiarization
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -76,15 +76,17 @@ struct RunAnywhereAIApp: App {
 
             // Register WhisperKit for Speech-to-Text
             WhisperKitServiceProvider.register()
+            RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
             logger.info("✅ WhisperKit registered for Speech-to-Text")
 
             // Register LLMSwift for Language Models (llama.cpp)
             LLMSwiftServiceProvider.register()
+            RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
             logger.info("✅ LLMSwift registered for Language Models")
 
-            // Register FluidAudioDiarization if available
-            // FluidAudioDiarizationProvider.register()
-            // logger.info("✅ FluidAudioDiarization registered for Speaker Diarization")
+            // Register FluidAudioDiarization for Speaker Diarization
+            FluidAudioDiarizationProvider.register()
+            logger.info("✅ FluidAudioDiarization registered for Speaker Diarization")
 
             // Register Foundation Models adapter for iOS 26+ and macOS 26+
             if #available(iOS 26.0, macOS 26.0, *) {
@@ -107,7 +109,7 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ SDK successfully initialized!")
             logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
             logger.info("📊 SDK Status: Ready for on-device AI inference")
-            logger.info("🔧 Registered modules: WhisperKit, LLMSwift, FoundationModels")
+            logger.info("🔧 Registered modules: WhisperKit, LLMSwift, FluidAudioDiarization, FoundationModels")
 
             // Note: User settings are now applied per-request, not globally
 
