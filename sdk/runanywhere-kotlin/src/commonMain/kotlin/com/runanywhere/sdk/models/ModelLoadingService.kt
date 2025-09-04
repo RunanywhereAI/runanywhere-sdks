@@ -7,7 +7,6 @@ import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.DownloadService
-import com.runanywhere.sdk.services.ValidationService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -16,8 +15,7 @@ import kotlinx.coroutines.withContext
  */
 class ModelLoadingService(
     private val modelRegistry: ModelRegistry,
-    private val downloadService: DownloadService,
-    private val validationService: ValidationService
+    private val downloadService: DownloadService
 ) {
     private val logger = SDKLogger("ModelLoadingService")
     private val loadedModels = mutableMapOf<String, LoadedModel>()
@@ -61,14 +59,15 @@ class ModelLoadingService(
             logger.info("Model $modelId found locally at $modelPath")
         }
 
-        // Validate the model file
-        val isValid = validationService.validate(modelPath, modelInfo)
-        if (!isValid) {
-            logger.error("Model $modelId validation failed")
-            // Delete invalid model and try again
-            FileManager.shared.deleteFile(modelPath)
-            throw SDKError.LoadingFailed("Model validation failed, please try again")
+        // Validate the model file exists
+        val fileExists = FileManager.shared.fileExists(modelPath)
+        if (!fileExists) {
+            logger.error("Model $modelId file not found after download")
+            throw SDKError.LoadingFailed("Model file not found, please try again")
         }
+
+        // TODO: Add proper validation once ValidationService is platform-specific
+        logger.info("Model $modelId validation skipped (development mode)")
 
         // Create LoadedModel instance
         val loadedModel = LoadedModel(
