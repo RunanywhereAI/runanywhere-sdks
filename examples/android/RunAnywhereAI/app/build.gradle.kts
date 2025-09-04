@@ -191,12 +191,20 @@ android {
 }
 
 dependencies {
-    // Temporarily disabled to test build
+    // SDK module (re-enable when fixed)
     // implementation(project(":sdk-core"))
 
+    // AndroidX Core
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+
+    // Material Design
+    implementation(libs.material)
+
+    // Compose
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -207,64 +215,56 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-
     // Coroutines
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // Android-specific dependencies that the SDK needs
-    // VAD implementation - using WebRTC VAD from android-vad library
-    implementation(libs.android.vad.webrtc)
+    // Serialization
+    implementation(libs.kotlinx.serialization.json)
 
-    // PRDownloader - Dedicated download library with pause/resume support
-    implementation(libs.prdownloader)
+    // Dependency Injection
+    implementation(libs.hilt.android)
+    kapt(libs.hilt.android.compiler)
+    implementation(libs.hilt.navigation.compose)
 
-    // WorkManager for background downloads
-    implementation(libs.androidx.work.runtime.ktx)
-
-    // OkHttp for model downloads
+    // Networking
     implementation(libs.okhttp)
-
-    // Gson for JSON parsing
+    implementation(libs.okhttp.logging)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
-    // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    // File Management
+    implementation(libs.commons.io)
 
-    // ExecuTorch runtime (Note: These are placeholder versions as ExecuTorch Android packages may not be published yet)
-    // implementation("org.pytorch:executorch-runtime:0.3.0")
-    // implementation("org.pytorch:executorch-backend-xnnpack:0.3.0")
-    // implementation("org.pytorch:executorch-backend-vulkan:0.3.0")
+    // Background Work
+    implementation(libs.androidx.work.runtime.ktx)
 
-    // Android AI Core (Note: These dependencies are not yet published)
-    // TODO: #002 - Uncomment when AI Core SDK is publicly available
-    // implementation("com.google.android.gms:play-services-aicore:1.0.0")
-    implementation("androidx.core:core-ktx:1.12.0")
-
-    // picoLLM (Note: Requires Picovoice account and SDK access)
-    // TODO: #003 - Uncomment when picoLLM SDK is available
-    // implementation("ai.picovoice:picollm-android:1.0.0")
-
-    // Room database
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    kapt("androidx.room:room-compiler:$roomVersion")
-
-    // Hilt for dependency injection
-    implementation("com.google.dagger:hilt-android:2.48")
-    kapt("com.google.dagger:hilt-compiler:2.48")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    // Speech Recognition & VAD (for SDK)
+    implementation(libs.whisper.jni)
+    implementation(libs.android.vad.webrtc)
+    implementation(libs.prdownloader)
 
     // Security
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation(libs.androidx.security.crypto)
 
-    // Play Core for dynamic feature delivery
-    implementation("com.google.android.play:core:1.10.3")
-    implementation("com.google.android.play:core-ktx:1.8.1")
+    // Room Database (if needed for model caching)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    kapt(libs.androidx.room.compiler)
 
+    // Play Core (for in-app updates)
+    implementation(libs.google.play.core)
+    implementation(libs.google.play.core.ktx)
+
+    // Logging
+    implementation(libs.timber)
+
+    // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
