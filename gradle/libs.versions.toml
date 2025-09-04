@@ -1,7 +1,7 @@
 [versions]
 # Android & Kotlin
 agp = "8.7.3"
-kotlin = "2.0.21"
+kotlin = "2.2.0"
 
 # AndroidX Core
 coreKtx = "1.15.0"
@@ -186,6 +186,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 # Kotlin
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 
