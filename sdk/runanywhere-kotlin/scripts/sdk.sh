@@ -96,6 +96,10 @@ ${BOLD}${GREEN}USAGE:${NC}
 
 ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
     ${YELLOW}jvm${NC}             Build JVM target for IntelliJ/JetBrains plugins
+    ${YELLOW}plugin${NC}          Build SDK and plugin for IntelliJ IDEA
+    ${YELLOW}plugin-as${NC}       Build SDK and plugin for Android Studio
+    ${YELLOW}run-plugin${NC}      Build and run IntelliJ IDEA with plugin
+    ${YELLOW}run-plugin-as${NC}   Build and run Android Studio with plugin
     ${YELLOW}android${NC}         Build Android AAR library
     ${YELLOW}all${NC}             Build all targets (JVM, Android, Native)
     ${YELLOW}clean${NC}           Clean all build artifacts
@@ -142,17 +146,17 @@ ${BOLD}${GREEN}EXAMPLES:${NC}
     ${CYAN}# Quick JVM build for plugin development${NC}
     ./scripts/sdk.sh jvm
 
-    ${CYAN}# Build and publish JVM to local Maven${NC}
-    ./scripts/sdk.sh jvm --publish
+    ${CYAN}# Build and run plugin in IntelliJ IDEA${NC}
+    ./scripts/sdk.sh run-plugin
+
+    ${CYAN}# Build and run plugin in Android Studio${NC}
+    ./scripts/sdk.sh run-plugin-as
+
+    ${CYAN}# Build plugin for Android Studio only${NC}
+    ./scripts/sdk.sh plugin-as
 
     ${CYAN}# Clean and rebuild everything${NC}
     ./scripts/sdk.sh clean all
-
-    ${CYAN}# Run tests with coverage${NC}
-    ./scripts/sdk.sh test coverage
-
-    ${CYAN}# Watch mode for continuous JVM builds${NC}
-    ./scripts/sdk.sh jvm --watch
 
     ${CYAN}# Build with debug output${NC}
     ./scripts/sdk.sh jvm --debug
@@ -490,6 +494,243 @@ if [[ ${#COMMANDS[@]} -eq 0 ]]; then
     exit 0
 fi
 
+# Detect installed IDEs
+detect_ide() {
+    local ide_type=$1
+    local detect_script="$SCRIPT_DIR/detect-ide.sh"
+
+    if [[ -f "$detect_script" ]]; then
+        local result
+        if [[ "$ide_type" == "AS" ]]; then
+            result=$("$detect_script" | grep "^AS:" | head -1)
+        else
+            result=$("$detect_script" | grep -E "^(IC|IU):" | head -1)
+        fi
+
+        if [[ -n "$result" ]]; then
+            echo "$result"
+        fi
+    fi
+}
+
+# Helper function to update plugin build configuration for IDE type
+update_plugin_for_ide() {
+    local plugin_dir=$1
+    local ide_type=$2
+    local ide_version=$3
+    local plugins_list=$4
+    local until_build=${5:-"251.*"}  # Default to 251.* if not provided
+
+    # Update build.gradle.kts for the specific IDE
+    cat > "$plugin_dir/build.gradle.kts.tmp" << EOF
+plugins {
+    id("org.jetbrains.intellij") version "1.17.4"
+    kotlin("jvm") version "1.9.20"
+}
+
+group = "com.runanywhere"
+version = "1.0.0"
+
+intellij {
+    version.set("$ide_version")
+    type.set("$ide_type")
+    plugins.set(listOf($plugins_list))
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    // RunAnywhere KMP SDK
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:$SDK_VERSION")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+}
+
+tasks {
+    patchPluginXml {
+        sinceBuild.set("233")
+        untilBuild.set("$until_build")
+        changeNotes.set(
+            """
+            <h2>1.0.0</h2>
+            <ul>
+                <li>Initial release</li>
+                <li>Voice command support</li>
+                <li>Voice dictation mode</li>
+                <li>Whisper-based transcription</li>
+            </ul>
+        """.trimIndent()
+        )
+    }
+
+    buildPlugin {
+        archiveFileName.set("runanywhere-voice-\${project.version}.zip")
+    }
+
+    publishPlugin {
+        token.set(System.getenv("JETBRAINS_TOKEN"))
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}
+EOF
+    mv "$plugin_dir/build.gradle.kts.tmp" "$plugin_dir/build.gradle.kts"
+}
+
+# Plugin command - build SDK and plugin together for IntelliJ IDEA
+cmd_plugin() {
+    build_plugin_for_ide "IC" "IntelliJ IDEA"
+}
+
+# Plugin command for Android Studio
+cmd_plugin_as() {
+    build_plugin_for_ide "AS" "Android Studio"
+}
+
+# Generic plugin builder for any IDE
+build_plugin_for_ide() {
+    local ide_type=$1
+    local ide_name=$2
+
+    print_header "Building SDK and $ide_name Plugin"
+
+    # Step 1: Build and publish SDK
+    print_step "Building and publishing SDK to local Maven..."
+    cmd_jvm
+    cmd_publish_jvm
+
+    # Step 2: Find plugin directory using relative path
+    # Script is in sdk/runanywhere-kotlin/scripts, plugin is in examples/intellij-plugin-demo/plugin
+    local plugin_dir="$(cd "$SCRIPT_DIR/../../../examples/intellij-plugin-demo/plugin" 2>/dev/null && pwd)"
+
+    if [[ -z "$plugin_dir" ]] || [[ ! -d "$plugin_dir" ]]; then
+        print_warning "Plugin directory not found. Looking for alternative locations..."
+        # Try to find it relative to git root if in a git repo
+        local git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [[ -n "$git_root" ]]; then
+            plugin_dir="$git_root/examples/intellij-plugin-demo/plugin"
+        fi
+
+        if [[ ! -d "$plugin_dir" ]]; then
+            print_error "Could not find plugin directory. Expected at: examples/intellij-plugin-demo/plugin"
+            print_info "Please ensure the plugin project exists relative to the SDK"
+            exit 1
+        fi
+    fi
+
+    print_info "Plugin directory: $plugin_dir"
+
+    # Step 3: Detect IDE and configure
+    local ide_info=$(detect_ide "$ide_type")
+    local until_build="251.*"  # Default
+
+    if [[ -n "$ide_info" ]]; then
+        local detected_version=$(echo "$ide_info" | cut -d':' -f2)
+        local build_major=$(echo "$ide_info" | cut -d':' -f4)
+        print_info "Detected $ide_name version: $detected_version"
+
+        # Dynamically set until_build based on detected build
+        if [[ -n "$build_major" ]]; then
+            # Add some buffer for future compatibility
+            local next_major=$((build_major + 10))
+            until_build="${next_major}.*"
+            print_info "Setting compatibility up to build: $until_build"
+        fi
+    fi
+
+    # Configure based on IDE type
+    print_step "Configuring plugin for $ide_name..."
+    if [[ "$ide_type" == "AS" ]]; then
+        # Android Studio - use version without android plugin for simplicity
+        # This works with most AS versions
+        update_plugin_for_ide "$plugin_dir" "IC" "2023.3" '"java"' "$until_build"
+        print_warning "Using IntelliJ platform for Android Studio compatibility"
+    else
+        # IntelliJ IDEA
+        update_plugin_for_ide "$plugin_dir" "IC" "2023.3" '"java"' "$until_build"
+    fi
+
+    # Step 4: Build the plugin
+    print_step "Building IntelliJ plugin..."
+    cd "$plugin_dir"
+
+    # Check if gradlew exists, if not use system gradle
+    if [[ -f "./gradlew" ]]; then
+        ./gradlew clean buildPlugin
+    elif command -v gradle &> /dev/null; then
+        gradle clean buildPlugin
+    else
+        print_error "Neither gradlew nor gradle found. Please install Gradle or add gradle wrapper."
+        exit 1
+    fi
+
+    # Check for built plugin
+    local plugin_zip=$(find "$plugin_dir/build/distributions" -name "*.zip" 2>/dev/null | head -1)
+    if [[ -f "$plugin_zip" ]]; then
+        print_success "Plugin built successfully!"
+        print_info "Plugin ZIP: $plugin_zip"
+        print_info "To install: File > Settings > Plugins > Install Plugin from Disk"
+    else
+        print_error "Plugin build failed - no ZIP file found"
+        exit 1
+    fi
+}
+
+# Run plugin - build and run IntelliJ with plugin
+cmd_run_plugin() {
+    run_plugin_for_ide "IC" "IntelliJ IDEA"
+}
+
+# Run plugin in Android Studio
+cmd_run_plugin_as() {
+    run_plugin_for_ide "AS" "Android Studio"
+}
+
+# Generic runner for any IDE
+run_plugin_for_ide() {
+    local ide_type=$1
+    local ide_name=$2
+
+    print_header "Running $ide_name Plugin with Latest SDK"
+
+    # First build everything
+    build_plugin_for_ide "$ide_type" "$ide_name"
+
+    # Find plugin directory (same logic as above)
+    local plugin_dir="$(cd "$SCRIPT_DIR/../../../examples/intellij-plugin-demo/plugin" 2>/dev/null && pwd)"
+
+    if [[ -z "$plugin_dir" ]] || [[ ! -d "$plugin_dir" ]]; then
+        local git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [[ -n "$git_root" ]]; then
+            plugin_dir="$git_root/examples/intellij-plugin-demo/plugin"
+        fi
+    fi
+
+    if [[ ! -d "$plugin_dir" ]]; then
+        print_error "Could not find plugin directory"
+        exit 1
+    fi
+
+    # Run the plugin
+    print_step "Starting IntelliJ with plugin..."
+    cd "$plugin_dir"
+
+    if [[ -f "./gradlew" ]]; then
+        ./gradlew runIde
+    elif command -v gradle &> /dev/null; then
+        gradle runIde
+    else
+        print_error "Neither gradlew nor gradle found"
+        exit 1
+    fi
+}
+
 # Execute commands in order
 for cmd in "${COMMANDS[@]}"; do
     # Map command to function
@@ -506,6 +747,12 @@ for cmd in "${COMMANDS[@]}"; do
         android)        cmd_android ;;
         native)         cmd_native ;;
         all)            cmd_all ;;
+
+        # Plugin commands
+        plugin)         cmd_plugin ;;
+        plugin-as)      cmd_plugin_as ;;
+        run-plugin)     cmd_run_plugin ;;
+        run-plugin-as)  cmd_run_plugin_as ;;
 
         # Build commands
         jar)            cmd_jvm ;;

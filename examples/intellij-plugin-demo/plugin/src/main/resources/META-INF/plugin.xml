@@ -51,6 +51,13 @@
 
     <!-- Actions -->
     <actions>
+        <!-- SDK Test Action -->
+        <action id="RunAnywhere.SDKTest" class="com.runanywhere.plugin.actions.SDKTestAction"
+            text="Test RunAnywhere SDK" description="Test RunAnywhere SDK integration">
+            <add-to-group group-id="ToolsMenu" anchor="first" />
+            <keyboard-shortcut first-keystroke="ctrl shift T" keymap="$default" />
+        </action>
+
         <!-- Voice Command Action -->
         <action id="RunAnywhere.VoiceCommand" class="com.runanywhere.plugin.actions.VoiceCommandAction"
             text="Voice Command" description="Execute IDE command using voice">
