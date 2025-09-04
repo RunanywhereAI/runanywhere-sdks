@@ -2,6 +2,7 @@ package com.runanywhere.sdk.components.stt
 
 import com.runanywhere.sdk.components.base.BaseComponent
 import com.runanywhere.sdk.components.base.ComponentState
+import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.data.models.LoadedModel
@@ -14,48 +15,60 @@ import kotlinx.coroutines.flow.flow
  * Speech-to-Text component matching Swift SDK architecture
  */
 class STTComponent(
-    private val configuration: STTConfiguration
-) : BaseComponent<STTService>() {
+    private val sttConfiguration: STTConfiguration
+) : BaseComponent<STTService>(sttConfiguration) {
+
+    override val componentType: SDKComponent = SDKComponent.STT
 
     private var currentModel: LoadedModel? = null
     private lateinit var sttService: STTService
 
-    override suspend fun initialize() {
-        state = ComponentState.INITIALIZING
+    override suspend fun createService(): STTService {
+        return WhisperSTTService()
+    }
 
-        try {
-            // Create STT service based on configuration
-            sttService = createSTTService(configuration)
+    override suspend fun initializeService() {
+        // Create STT service based on configuration
+        sttService = createService()
 
-            // Initialize with model if specified
-            configuration.modelId?.let { modelId ->
-                val modelPath = getModelPath(modelId)
-                sttService.initialize(modelPath)
-            }
-
-            state = ComponentState.READY
-        } catch (e: Exception) {
-            state = ComponentState.FAILED
-            throw e
+        // Initialize with model if specified
+        sttConfiguration.modelId?.let { modelId ->
+            val modelPath = getModelPath(modelId)
+            sttService.initialize(modelPath)
         }
     }
 
     suspend fun transcribe(audioData: ByteArray): TranscriptionResult {
         requireReady()
 
-        return sttService.transcribe(
+        val result = sttService.transcribe(
             audioData = audioData,
             options = STTOptions(
-                language = configuration.language,
-                enableTimestamps = configuration.enableTimestamps
+                language = sttConfiguration.language,
+                enableTimestamps = sttConfiguration.enableTimestamps
             )
+        )
+
+        // Convert STTTranscriptionResult to TranscriptionResult
+        return TranscriptionResult(
+            text = result.transcript,
+            confidence = result.confidence ?: 0.0f,
+            language = result.language,
+            timestamps = result.timestamps?.map {
+                WordTimestamp(
+                    word = it.word,
+                    startTime = it.startTime.toDouble(),
+                    endTime = it.endTime.toDouble(),
+                    confidence = it.confidence ?: 0.0f
+                )
+            }
         )
     }
 
     fun transcribeStream(audioStream: Flow<ByteArray>): Flow<TranscriptionEvent> = flow {
         requireReady()
 
-        if (configuration.enableVAD) {
+        if (true) { // TODO: Add enableVAD to configuration
             // Use VAD for speech detection
             val vadComponent = VADComponent(VADConfiguration())
             vadComponent.initialize()
@@ -98,7 +111,7 @@ class STTComponent(
             // Direct transcription without VAD
             audioStream.collect { chunk ->
                 val result = sttService.transcribe(chunk, STTOptions())
-                emit(TranscriptionEvent.FinalTranscription(result.text))
+                emit(TranscriptionEvent.FinalTranscription(result.transcript))
             }
         }
     }
@@ -113,7 +126,7 @@ class STTComponent(
 
     override suspend fun cleanup() {
         sttService.cleanup()
-        state = ComponentState.TERMINATED
+        state = ComponentState.NOT_INITIALIZED
     }
 
     private fun createSTTService(config: STTConfiguration): STTService {
@@ -124,7 +137,7 @@ class STTComponent(
     private suspend fun transcribeBuffer(buffer: List<ByteArray>): String {
         val merged = buffer.reduce { acc, bytes -> acc + bytes }
         val result = sttService.transcribe(merged, STTOptions())
-        return result.text
+        return result.transcript
     }
 
     private fun getModelPath(modelId: String): String {
@@ -151,27 +164,6 @@ private fun ByteArray.toFloatArray(): FloatArray {
 }
 
 /**
- * STT Configuration
- */
-data class STTConfiguration(
-    val modelId: String? = "whisper-base",
-    val language: String = "en",
-    val sampleRate: Int = 16000,
-    val enablePunctuation: Boolean = true,
-    val enableTimestamps: Boolean = false,
-    val enableVAD: Boolean = true,
-    val maxAlternatives: Int = 1
-)
-
-/**
- * STT Options for transcription
- */
-data class STTOptions(
-    val language: String = "en",
-    val enableTimestamps: Boolean = false
-)
-
-/**
  * Transcription result
  */
 data class TranscriptionResult(
@@ -179,15 +171,6 @@ data class TranscriptionResult(
     val confidence: Float = 0.0f,
     val language: String? = null,
     val timestamps: List<WordTimestamp>? = null
-)
-
-/**
- * Word timestamp information
- */
-data class WordTimestamp(
-    val word: String,
-    val startTime: Float,
-    val endTime: Float
 )
 
 /**

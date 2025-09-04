@@ -10,10 +10,6 @@ import kotlinx.coroutines.flow.asSharedFlow
  */
 object EventBus {
 
-    companion object {
-        val shared = EventBus
-    }
-
     // Event flows for different event types
     private val _initializationEvents = MutableSharedFlow<SDKInitializationEvent>()
     val initializationEvents: SharedFlow<SDKInitializationEvent> =

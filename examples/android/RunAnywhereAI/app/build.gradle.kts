@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)  // Re-enable for Kotlin 2.0
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
-    id("kotlin-kapt")
+    // id("kotlin-kapt")
     // TODO: #001 - Add Hilt plugin when configured in project level build.gradle
     // id("dagger.hilt.android.plugin")
 }
@@ -223,9 +223,9 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
 
     // Dependency Injection
-    implementation(libs.hilt.android)
-    kapt(libs.hilt.android.compiler)
-    implementation(libs.hilt.navigation.compose)
+    // implementation(libs.hilt.android)
+    // kapt(libs.hilt.android.compiler)
+    // implementation(libs.hilt.navigation.compose)
 
     // Networking
     implementation(libs.okhttp)
@@ -254,7 +254,7 @@ dependencies {
     // Room Database (if needed for model caching)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    kapt(libs.androidx.room.compiler)
+    // kapt(libs.androidx.room.compiler)
 
     // Play Core (for in-app updates)
     implementation(libs.google.play.core)

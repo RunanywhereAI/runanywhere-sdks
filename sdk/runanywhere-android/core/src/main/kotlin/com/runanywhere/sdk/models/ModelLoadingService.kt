@@ -44,18 +44,18 @@ class ModelLoadingService(
             logger.info("Model $modelId not found locally, downloading...")
 
             // Emit download required event
-            EventBus.shared.publish(SDKModelEvent.DownloadStarted(modelId))
+            EventBus.publish(SDKModelEvent.DownloadStarted(modelId))
 
             try {
                 // Download the model
                 downloadModel(modelInfo, modelFile)
 
                 // Emit download completed
-                EventBus.shared.publish(SDKModelEvent.DownloadCompleted(modelId))
+                EventBus.publish(SDKModelEvent.DownloadCompleted(modelId))
 
             } catch (e: Exception) {
                 logger.error("Failed to download model $modelId", e)
-                EventBus.shared.publish(SDKModelEvent.LoadFailed(modelId, e))
+                EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
                 throw SDKError.LoadingFailed("Failed to download model: ${e.message}")
             }
         } else {
@@ -107,7 +107,7 @@ class ModelLoadingService(
 
         // Emit progress events
         for (progress in 1..10) {
-            EventBus.shared.publish(SDKModelEvent.DownloadProgress(modelInfo.id, progress / 10f))
+            EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, progress / 10f))
             kotlinx.coroutines.delay(100) // Simulate download time
         }
     }

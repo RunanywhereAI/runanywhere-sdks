@@ -30,5 +30,5 @@ include(":app")
 include(":sdk-core")
 project(":sdk-core").projectDir = file("../../../sdk/runanywhere-android/core")
 
-include(":sdk-jni")
-project(":sdk-jni").projectDir = file("../../../sdk/runanywhere-android/jni")
+include(":jni")
+project(":jni").projectDir = file("../../../sdk/runanywhere-android/jni")

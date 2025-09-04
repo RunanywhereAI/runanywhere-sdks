@@ -2,18 +2,18 @@ package com.runanywhere.runanywhereai.presentation.voice
 
 import androidx.lifecycle.ViewModel
 import com.runanywhere.runanywhereai.domain.models.SessionState
-import dagger.hilt.android.lifecycle.HiltViewModel
+// import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import javax.inject.Inject
+// import javax.inject.Inject
 
 /**
  * ViewModel for Voice Assistant screen
  * TODO: Implement full voice pipeline when SDK services are available
  */
-@HiltViewModel
-class VoiceAssistantViewModel @Inject constructor(
+// @HiltViewModel
+class VoiceAssistantViewModel(
     // TODO: Inject voice pipeline service when available
     // private val voicePipelineService: VoicePipelineService,
     // private val audioCapture: AudioCaptureService,

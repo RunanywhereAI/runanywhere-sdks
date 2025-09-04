@@ -1,24 +1,213 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
-import android.Manifest
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
-import com.google.accompanist.permissions.shouldShowRationale
-import com.runanywhere.runanywhereai.domain.models.TranscriptSegment
-import com.runanywhere.runanywhereai.presentation.voice.components.TranscriptSegmentItem
-import java.text.SimpleDateFormat
-import java.util.*\n\n/**\n * Transcription screen for STT-only functionality\n * Uses the current SDK's transcription capabilities\n */\n@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)\n@Composable\nfun TranscriptionScreen(\n    viewModel: TranscriptionViewModel = hiltViewModel()\n) {\n    val transcriptSegments by viewModel.transcriptSegments.collectAsState()\n    val isRecording by viewModel.isRecording.collectAsState()\n    val recordingDuration by viewModel.recordingDuration.collectAsState()\n    val error by viewModel.error.collectAsState()\n    val sttStatus by viewModel.sttStatus.collectAsState()\n    \n    // Handle audio permission\n    val audioPermissionState = rememberPermissionState(Manifest.permission.RECORD_AUDIO)\n    \n    LaunchedEffect(Unit) {\n        if (!audioPermissionState.status.isGranted) {\n            audioPermissionState.launchPermissionRequest()\n        }\n    }\n    \n    Scaffold(\n        topBar = {\n            TopAppBar(\n                title = { Text(\"Speech-to-Text\") },\n                colors = TopAppBarDefaults.topAppBarColors(\n                    containerColor = MaterialTheme.colorScheme.primaryContainer\n                )\n            )\n        }\n    ) { paddingValues ->\n        if (!audioPermissionState.status.isGranted) {\n            // Permission not granted UI\n            Column(\n                modifier = Modifier\n                    .fillMaxSize()\n                    .padding(paddingValues)\n                    .padding(24.dp),\n                horizontalAlignment = Alignment.CenterHorizontally,\n                verticalArrangement = Arrangement.Center\n            ) {\n                Text(\n                    text = \"🎤\",\n                    style = MaterialTheme.typography.displayLarge\n                )\n                Spacer(modifier = Modifier.height(16.dp))\n                Text(\n                    text = \"Microphone Permission Required\",\n                    style = MaterialTheme.typography.headlineSmall\n                )\n                Spacer(modifier = Modifier.height(8.dp))\n                Text(\n                    text = if (audioPermissionState.status.shouldShowRationale) {\n                        \"This app needs microphone access to transcribe your speech. Please grant the permission in settings.\"\n                    } else {\n                        \"This app needs microphone access to transcribe your speech.\"\n                    },\n                    style = MaterialTheme.typography.bodyMedium\n                )\n                Spacer(modifier = Modifier.height(16.dp))\n                Button(\n                    onClick = { audioPermissionState.launchPermissionRequest() }\n                ) {\n                    Text(\"Grant Permission\")\n                }\n            }\n        } else {\n            // Main transcription UI\n            Column(\n                modifier = Modifier\n                    .fillMaxSize()\n                    .padding(paddingValues)\n            ) {\n                // Header with recording status\n                Card(\n                    modifier = Modifier\n                        .fillMaxWidth()\n                        .padding(16.dp)\n                ) {\n                    Column(\n                        modifier = Modifier.padding(16.dp)\n                    ) {\n                        Text(\n                            text = \"Transcription Status\",\n                            style = MaterialTheme.typography.headlineSmall\n                        )\n                        Spacer(modifier = Modifier.height(8.dp))\n                        Text(text = sttStatus)\n                        Text(text = if (isRecording) \"Recording: ${formatDuration(recordingDuration)}\" else \"Ready to record\")\n                        Text(text = \"Segments: ${transcriptSegments.size}\")\n                    }\n                }\n                \n                // Transcript display\n                LazyColumn(\n                    modifier = Modifier.weight(1f),\n                    contentPadding = PaddingValues(16.dp),\n                    verticalArrangement = Arrangement.spacedBy(8.dp)\n                ) {\n                    if (transcriptSegments.isEmpty()) {\n                        item {\n                            Card(\n                                modifier = Modifier.fillMaxWidth(),\n                                colors = CardDefaults.cardColors(\n                                    containerColor = MaterialTheme.colorScheme.surfaceVariant\n                                )\n                            ) {\n                                Column(\n                                    modifier = Modifier.padding(24.dp),\n                                    horizontalAlignment = Alignment.CenterHorizontally\n                                ) {\n                                    Text(\n                                        text = \"📝\",\n                                        style = MaterialTheme.typography.displayMedium\n                                    )\n                                    Spacer(modifier = Modifier.height(16.dp))\n                                    Text(\n                                        text = \"No transcriptions yet\",\n                                        style = MaterialTheme.typography.headlineSmall\n                                    )\n                                    Spacer(modifier = Modifier.height(8.dp))\n                                    Text(\n                                        text = \"Press the microphone button to start recording and transcribing speech.\",\n                                        style = MaterialTheme.typography.bodyMedium,\n                                        color = MaterialTheme.colorScheme.onSurfaceVariant\n                                    )\n                                }\n                            }\n                        }\n                    }\n                    \n                    items(\n                        items = transcriptSegments,\n                        key = { it.id }\n                    ) { segment ->\n                        TranscriptSegmentItem(\n                            segment = segment,\n                            modifier = Modifier.fillMaxWidth()\n                        )\n                    }\n                }\n                \n                // Control buttons\n                Row(\n                    modifier = Modifier\n                        .fillMaxWidth()\n                        .padding(16.dp),\n                    horizontalArrangement = Arrangement.spacedBy(8.dp)\n                ) {\n                    // Record/Stop Button\n                    FloatingActionButton(\n                        onClick = {\n                            if (isRecording) {\n                                viewModel.stopRecording()\n                            } else {\n                                viewModel.startRecording()\n                            }\n                        },\n                        containerColor = if (isRecording)\n                            MaterialTheme.colorScheme.error\n                        else\n                            MaterialTheme.colorScheme.primary,\n                        modifier = Modifier.weight(1f)\n                    ) {\n                        Row(\n                            verticalAlignment = Alignment.CenterVertically,\n                            horizontalArrangement = Arrangement.Center\n                        ) {\n                            Icon(\n                                imageVector = if (isRecording) Icons.Filled.Stop else Icons.Filled.Mic,\n                                contentDescription = if (isRecording) \"Stop Recording\" else \"Start Recording\"\n                            )\n                            Spacer(modifier = Modifier.width(8.dp))\n                            Text(if (isRecording) \"Stop\" else \"Record\")\n                        }\n                    }\n                    \n                    // Clear Button\n                    if (transcriptSegments.isNotEmpty()) {\n                        OutlinedButton(\n                            onClick = { viewModel.clearTranscript() },\n                            enabled = !isRecording\n                        ) {\n                            Text(\"Clear\")\n                        }\n                    }\n                }\n                \n                // Error display\n                error?.let { errorMessage ->\n                    Card(\n                        modifier = Modifier\n                            .fillMaxWidth()\n                            .padding(16.dp),\n                        colors = CardDefaults.cardColors(\n                            containerColor = MaterialTheme.colorScheme.errorContainer\n                        )\n                    ) {\n                        Row(\n                            modifier = Modifier.padding(16.dp),\n                            horizontalArrangement = Arrangement.SpaceBetween\n                        ) {\n                            Text(\n                                text = errorMessage,\n                                color = MaterialTheme.colorScheme.onErrorContainer,\n                                modifier = Modifier.weight(1f)\n                            )\n                            TextButton(\n                                onClick = { viewModel.clearError() }\n                            ) {\n                                Text(\"Dismiss\")\n                            }\n                        }\n                    }\n                }\n            }\n        }\n    }\n}\n\nprivate fun formatDuration(millis: Long): String {\n    val seconds = millis / 1000\n    val minutes = seconds / 60\n    val remainingSeconds = seconds % 60\n    return String.format(\"%02d:%02d\", minutes, remainingSeconds)\n}
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TranscriptionScreen(
+    viewModel: TranscriptionViewModel = viewModel()
+) {
+    val isRecording by viewModel.isRecording.collectAsState()
+    val transcriptionText by viewModel.transcriptionText.collectAsState()
+    val partialTranscript by viewModel.partialTranscript.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val isInitialized by viewModel.isInitialized.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Header
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Speech to Text",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+
+                Text(
+                    text = if (isInitialized) {
+                        if (isRecording) "Listening..." else "Ready"
+                    } else {
+                        "Initializing SDK..."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+        }
+
+        // Recording Controls
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            // Record/Stop Button
+            FloatingActionButton(
+                onClick = {
+                    if (isRecording) {
+                        viewModel.stopRecording()
+                    } else {
+                        viewModel.startRecording()
+                    }
+                },
+                containerColor = if (isRecording) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.primary
+                },
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(
+                    imageVector = if (isRecording) Icons.Default.MicOff else Icons.Default.Mic,
+                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                    modifier = Modifier.size(32.dp),
+                    tint = Color.White
+                )
+            }
+
+            // Clear Button
+            FloatingActionButton(
+                onClick = { viewModel.clearTranscription() },
+                containerColor = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(64.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Clear,
+                    contentDescription = "Clear Transcription",
+                    modifier = Modifier.size(32.dp),
+                    tint = Color.White
+                )
+            }
+        }
+
+        // Transcription Display
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Transcription",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (transcriptionText.isEmpty() && partialTranscript.isEmpty()) {
+                        Text(
+                            text = if (isInitialized) {
+                                "Tap the microphone button to start recording"
+                            } else {
+                                "Initializing..."
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        Column {
+                            // Final transcription text
+                            if (transcriptionText.isNotEmpty()) {
+                                Text(
+                                    text = transcriptionText,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 24.sp
+                                )
+                            }
+
+                            // Partial transcript (real-time)
+                            if (partialTranscript.isNotEmpty()) {
+                                if (transcriptionText.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                Text(
+                                    text = partialTranscript,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 24.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Error Display
+        error?.let { errorMessage ->
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    TextButton(
+                        onClick = { viewModel.clearError() }
+                    ) {
+                        Text(
+                            text = "Dismiss",
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,21 +1,155 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
-import android.util.Log
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.runanywhereai.domain.models.TranscriptSegment
-import com.runanywhere.runanywhereai.domain.models.TranscriptType
+import com.runanywhere.sdk.components.stt.STTConfiguration
+import com.runanywhere.sdk.components.stt.STTOptions
+import com.runanywhere.sdk.components.vad.VADConfiguration
+import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.public.RunAnywhere
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.*
-import javax.inject.Inject\n\n/**\n * ViewModel for Transcription screen\n * Integrates with the current SDK for STT functionality\n */\n@HiltViewModel\nclass TranscriptionViewModel @Inject constructor(\n    // TODO: Inject enhanced services when available\n    // private val voicePipelineService: VoicePipelineService,\n    // private val analyticsService: AnalyticsService\n) : ViewModel() {\n    \n    private val _transcriptSegments = MutableStateFlow<List<TranscriptSegment>>(emptyList())\n    val transcriptSegments: StateFlow<List<TranscriptSegment>> = _transcriptSegments.asStateFlow()\n    \n    private val _isRecording = MutableStateFlow(false)\n    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()\n    \n    private val _recordingDuration = MutableStateFlow(0L)\n    val recordingDuration: StateFlow<Long> = _recordingDuration.asStateFlow()\n    \n    private val _error = MutableStateFlow<String?>(null)\n    val error: StateFlow<String?> = _error.asStateFlow()\n    \n    private val _sttStatus = MutableStateFlow(\"Initializing...\")\n    val sttStatus: StateFlow<String> = _sttStatus.asStateFlow()\n    \n    private var recordingStartTime = 0L\n    private var durationTimer: Job? = null\n    private var audioRecord: AudioRecord? = null\n    \n    // Audio configuration\n    companion object {\n        private const val SAMPLE_RATE = 16000\n        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO\n        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT\n        private const val RECORDING_TIMEOUT_MS = 10000L // 10 seconds max recording\n    }\n    \n    init {\n        initializeSDK()\n    }\n    \n    private fun initializeSDK() {\n        viewModelScope.launch {\n            try {\n                _sttStatus.value = \"Loading model...\"\n                \n                // Load the whisper-base model using current SDK\n                RunAnywhere.loadModel(\"whisper-base\")\n                \n                _sttStatus.value = \"Ready\"\n                Log.i(\"TranscriptionVM\", \"SDK initialized successfully\")\n                \n            } catch (e: Exception) {\n                _sttStatus.value = \"Error: ${e.message}\"\n                _error.value = \"Failed to initialize: ${e.message}\"\n                Log.e(\"TranscriptionVM\", \"Failed to initialize SDK\", e)\n            }\n        }\n    }\n    \n    fun startRecording() {\n        if (_isRecording.value) return\n        \n        viewModelScope.launch(Dispatchers.IO) {\n            try {\n                _isRecording.value = true\n                _error.value = null\n                recordingStartTime = System.currentTimeMillis()\n                startDurationTimer()\n                \n                Log.i(\"TranscriptionVM\", \"Starting audio recording\")\n                \n                // Setup AudioRecord\n                val bufferSize = AudioRecord.getMinBufferSize(\n                    SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT\n                ) * 2\n                \n                audioRecord = AudioRecord(\n                    MediaRecorder.AudioSource.MIC,\n                    SAMPLE_RATE,\n                    CHANNEL_CONFIG,\n                    AUDIO_FORMAT,\n                    bufferSize\n                )\n                \n                if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {\n                    throw IllegalStateException(\"AudioRecord initialization failed\")\n                }\n                \n                audioRecord?.startRecording()\n                \n                // Record audio for up to RECORDING_TIMEOUT_MS or until stopped\n                val maxSamples = (SAMPLE_RATE * (RECORDING_TIMEOUT_MS / 1000.0)).toInt()\n                val audioBuffer = mutableListOf<Short>()\n                val tempBuffer = ShortArray(bufferSize / 2)\n                \n                val startTime = System.currentTimeMillis()\n                \n                while (_isRecording.value && \n                       audioBuffer.size < maxSamples &&\n                       (System.currentTimeMillis() - startTime) < RECORDING_TIMEOUT_MS) {\n                    \n                    val samplesRead = audioRecord?.read(tempBuffer, 0, tempBuffer.size) ?: 0\n                    \n                    if (samplesRead > 0) {\n                        // Add samples to buffer\n                        for (i in 0 until samplesRead) {\n                            audioBuffer.add(tempBuffer[i])\n                        }\n                    }\n                    \n                    // Small delay to prevent excessive CPU usage\n                    delay(10)\n                }\n                \n                // Stop recording\n                stopRecording()\n                \n                if (audioBuffer.isNotEmpty()) {\n                    // Convert to byte array for SDK\n                    val byteArray = ByteArray(audioBuffer.size * 2)\n                    for (i in audioBuffer.indices) {\n                        val sample = audioBuffer[i]\n                        byteArray[i * 2] = (sample.toInt() and 0xFF).toByte()\n                        byteArray[i * 2 + 1] = ((sample.toInt() shr 8) and 0xFF).toByte()\n                    }\n                    \n                    // Transcribe using current SDK\n                    transcribeAudio(byteArray)\n                } else {\n                    _error.value = \"No audio data recorded\"\n                }\n                \n            } catch (e: SecurityException) {\n                _error.value = \"Microphone permission required\"\n                Log.e(\"TranscriptionVM\", \"Security exception\", e)\n            } catch (e: Exception) {\n                _error.value = \"Recording failed: ${e.message}\"\n                Log.e(\"TranscriptionVM\", \"Recording error\", e)\n            } finally {\n                stopRecording()\n            }\n        }\n    }\n    \n    private suspend fun transcribeAudio(audioData: ByteArray) {\n        try {\n            Log.i(\"TranscriptionVM\", \"Transcribing audio (${audioData.size} bytes)\")\n            \n            // Add processing segment\n            val processingSegment = TranscriptSegment(\n                id = UUID.randomUUID().toString(),\n                text = \"Processing audio...\",\n                timestamp = System.currentTimeMillis(),\n                type = TranscriptType.PARTIAL_USER,\n                confidence = 0.0f\n            )\n            \n            _transcriptSegments.value = _transcriptSegments.value + processingSegment\n            \n            // Transcribe using current SDK\n            val transcription = RunAnywhere.transcribe(audioData)\n            \n            // Remove processing segment and add final result\n            val finalSegments = _transcriptSegments.value.filterNot { it.id == processingSegment.id }\n            \n            if (transcription.isNotBlank()) {\n                val finalSegment = TranscriptSegment(\n                    id = UUID.randomUUID().toString(),\n                    text = transcription,\n                    timestamp = System.currentTimeMillis(),\n                    type = TranscriptType.FINAL_USER,\n                    confidence = 1.0f // TODO: Get actual confidence from SDK when available\n                )\n                \n                _transcriptSegments.value = finalSegments + finalSegment\n                Log.i(\"TranscriptionVM\", \"Transcription completed: $transcription\")\n            } else {\n                _transcriptSegments.value = finalSegments\n                _error.value = \"No speech detected in audio\"\n            }\n            \n        } catch (e: Exception) {\n            // Remove processing segment\n            val finalSegments = _transcriptSegments.value.filterNot { \n                it.type == TranscriptType.PARTIAL_USER \n            }\n            _transcriptSegments.value = finalSegments\n            \n            _error.value = \"Transcription failed: ${e.message}\"\n            Log.e(\"TranscriptionVM\", \"Transcription error\", e)\n        }\n    }\n    \n    fun stopRecording() {\n        viewModelScope.launch {\n            _isRecording.value = false\n            stopDurationTimer()\n            \n            audioRecord?.apply {\n                try {\n                    if (recordingState == AudioRecord.RECORDSTATE_RECORDING) {\n                        stop()\n                    }\n                    release()\n                } catch (e: Exception) {\n                    Log.e(\"TranscriptionVM\", \"Error stopping AudioRecord\", e)\n                }\n            }\n            audioRecord = null\n            \n            Log.i(\"TranscriptionVM\", \"Recording stopped\")\n        }\n    }\n    \n    fun clearTranscript() {\n        _transcriptSegments.value = emptyList()\n        _recordingDuration.value = 0L\n    }\n    \n    fun clearError() {\n        _error.value = null\n    }\n    \n    private fun startDurationTimer() {\n        durationTimer = viewModelScope.launch {\n            while (_isRecording.value) {\n                _recordingDuration.value = System.currentTimeMillis() - recordingStartTime\n                delay(100) // Update every 100ms for smooth UI\n            }\n        }\n    }\n    \n    private fun stopDurationTimer() {\n        durationTimer?.cancel()\n        durationTimer = null\n    }\n    \n    override fun onCleared() {\n        super.onCleared()\n        stopRecording()\n        Log.i(\"TranscriptionVM\", \"ViewModel cleared\")\n    }\n}
+
+// @HiltViewModel
+class TranscriptionViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
+
+    private val _transcriptionText = MutableStateFlow("")
+    val transcriptionText: StateFlow<String> = _transcriptionText.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _isInitialized = MutableStateFlow(false)
+    val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
+
+    private val _partialTranscript = MutableStateFlow("")
+    val partialTranscript: StateFlow<String> = _partialTranscript.asStateFlow()
+
+    init {
+        initializeSDK()
+        observeSDKEvents()
+    }
+
+    private fun initializeSDK() {
+        viewModelScope.launch {
+            try {
+                // Initialize SDK with context
+                RunAnywhere.initialize(
+                    context = getApplication(),
+                    apiKey = "demo-api-key",
+                    baseURL = "https://api.runanywhere.ai",
+                    environment = com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT
+                )
+
+                _isInitialized.value = true
+
+            } catch (e: Exception) {
+                _error.value = "Failed to initialize SDK: ${e.message}"
+            }
+        }
+    }
+
+    private fun observeSDKEvents() {
+        viewModelScope.launch {
+            // Observe voice events from EventBus
+            EventBus.voiceEvents.collect { event ->
+                when (event) {
+                    is com.runanywhere.sdk.events.SDKVoiceEvent.TranscriptionStarted -> {
+                        _isRecording.value = true
+                        _partialTranscript.value = ""
+                    }
+
+                    is com.runanywhere.sdk.events.SDKVoiceEvent.TranscriptionFinal -> {
+                        val currentText = _transcriptionText.value
+                        _transcriptionText.value = if (currentText.isEmpty()) {
+                            event.text
+                        } else {
+                            "$currentText\n${event.text}"
+                        }
+                        _partialTranscript.value = ""
+                        _isRecording.value = false
+                    }
+
+                    is com.runanywhere.sdk.events.SDKVoiceEvent.TranscriptionPartial -> {
+                        _partialTranscript.value = event.text
+                    }
+
+                    is com.runanywhere.sdk.events.SDKVoiceEvent.PipelineError -> {
+                        _error.value = event.error.message ?: "Unknown error"
+                        _isRecording.value = false
+                    }
+
+                    else -> {
+                        // Handle other events
+                    }
+                }
+            }
+        }
+    }
+
+    fun startRecording() {
+        viewModelScope.launch {
+            try {
+                if (!_isInitialized.value) {
+                    _error.value = "SDK not initialized yet. Please wait..."
+                    return@launch
+                }
+
+                // For now, just simulate starting transcription
+                // In a real implementation, we would:
+                // 1. Create STT and VAD components with configurations
+                // 2. Start audio capture
+                // 3. Process audio through the pipeline
+
+                val sttConfig = STTConfiguration(
+                    modelId = "whisper-base",
+                    language = "en-US"
+                )
+
+                val vadConfig = VADConfiguration(
+                    aggressiveness = 2
+                )
+
+                // Simulate starting recording
+                _isRecording.value = true
+
+                // TODO: Implement actual audio capture and processing
+                // This would involve using the audio capture service from the implementation plan
+
+            } catch (e: Exception) {
+                _error.value = "Failed to start recording: ${e.message}"
+            }
+        }
+    }
+
+    fun stopRecording() {
+        viewModelScope.launch {
+            try {
+                // Stop recording
+                _isRecording.value = false
+                _partialTranscript.value = ""
+
+                // TODO: Stop actual audio capture and processing
+
+            } catch (e: Exception) {
+                _error.value = "Failed to stop recording: ${e.message}"
+            }
+        }
+    }
+
+    fun clearTranscription() {
+        _transcriptionText.value = ""
+        _partialTranscript.value = ""
+        _error.value = null
+    }
+
+    fun clearError() {
+        _error.value = null
+    }
+}

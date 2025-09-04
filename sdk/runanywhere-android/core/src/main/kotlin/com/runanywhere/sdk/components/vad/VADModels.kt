@@ -164,7 +164,7 @@ class VADServiceWrapper(service: VADService? = null) : ServiceWrapper<VADService
 
 sealed class VADError : Exception() {
     object ServiceNotInitialized : VADError()
-    data class ProcessingFailed(val cause: Throwable) : VADError()
+    data class ProcessingFailed(override val cause: Throwable) : VADError()
     object InvalidAudioFormat : VADError()
     object ConfigurationError : VADError()
 

@@ -1,6 +1,6 @@
 plugins {
     id("com.android.library")
-    kotlin("android")
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
@@ -12,6 +12,12 @@ android {
         targetSdk = 35
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles("consumer-rules.pro")
+
+        // Add native library support
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
@@ -31,13 +37,15 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        freeCompilerArgs += listOf("-Xskip-metadata-version-check")
     }
 }
 
 dependencies {
-    implementation(project(":sdk-jni"))
+    implementation(project(":jni"))
 
-    // Kotlin
+    // Kotlin - Force specific version to avoid conflicts
+    implementation(platform("org.jetbrains.kotlin:kotlin-bom:2.0.21"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
@@ -66,13 +74,37 @@ dependencies {
     implementation(libs.commons.io)
 
     // Whisper implementation - using whisper-jni from Maven Central
-    implementation(libs.whisper.jni)
+    implementation("io.github.givimad:whisper-jni:1.6.1")
 
-    // VAD implementation - using WebRTC VAD from android-vad library
-    implementation(libs.android.vad.webrtc)
+    // VAD implementation - WebRTC VAD for speech detection
+    implementation("com.github.gkonovalov:android-vad:2.0.10")
 
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+
+    // Force Kotlin version alignment across all dependencies
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
+            version {
+                strictly("2.0.21")
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
+            version {
+                strictly("2.0.21")
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
+            version {
+                strictly("2.0.21")
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-reflect") {
+            version {
+                strictly("2.0.21")
+            }
+        }
+    }
 }

@@ -3,10 +3,11 @@ package com.runanywhere.runanywhereai
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.lifecycleScope
-import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.data.models.SDKEnvironment
-import com.runanywhere.sdk.files.FileManager
-import dagger.hilt.android.HiltAndroidApp
+// TODO: Re-enable when SDK compilation issues are fixed
+// import com.runanywhere.sdk.public.RunAnywhere
+// import com.runanywhere.sdk.data.models.SDKEnvironment
+// import com.runanywhere.sdk.files.FileManager
+// import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -14,14 +15,15 @@ import kotlinx.coroutines.launch
  * Application class for RunAnywhere AI sample app
  * Handles SDK initialization and global configuration
  */
-@HiltAndroidApp
+// @HiltAndroidApp
 class RunAnywhereApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
 
+        // TODO: Re-enable when SDK compilation issues are fixed
         // Initialize FileManager with application context
-        FileManager.initialize(applicationContext)
+        // FileManager.initialize(applicationContext)
 
         // Initialize SDK with framework adapters
         initializeSDK()
@@ -33,13 +35,14 @@ class RunAnywhereApplication : Application() {
     private fun initializeSDK() {
         // Note: Using the current SDK interface - TODO: Replace with enhanced SDK when available
         try {
+            // TODO: Re-enable when SDK compilation issues are fixed
             // Initialize SDK in development mode
-            RunAnywhere.initialize(
-                apiKey = "dev-api-key",
-                environment = SDKEnvironment.DEVELOPMENT
-            )
+            // RunAnywhere.initialize(
+            //     apiKey = "dev-api-key",
+            //     environment = SDKEnvironment.DEVELOPMENT
+            // )
 
-            Log.i("RunAnywhereApp", "SDK initialized successfully")
+            Log.i("RunAnywhereApp", "SDK initialization temporarily disabled")
 
         } catch (e: Exception) {
             Log.e("RunAnywhereApp", "Failed to initialize SDK", e)
