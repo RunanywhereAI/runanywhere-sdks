@@ -1,23 +1,22 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import LLM
 import os.log
 
 public class LLMSwiftService: LLMService {
     private var llm: LLM?
     private var modelPath: String?
-    private var _modelInfo: LoadedModelInfo?
-    private let hardwareConfig: HardwareConfiguration?
     private let logger = Logger(subsystem: "com.runanywhere.llmswift", category: "LLMSwiftService")
 
     public var isReady: Bool { llm != nil }
-    public var modelInfo: LoadedModelInfo? { _modelInfo }
+    public var currentModel: String? { modelPath?.components(separatedBy: "/").last }
 
-    init(hardwareConfig: HardwareConfiguration? = nil) {
-        self.hardwareConfig = hardwareConfig
-    }
+    public init() {}
 
-    public func initialize(modelPath: String) async throws {
+    public func initialize(modelPath: String?) async throws {
+        guard let modelPath = modelPath else {
+            throw LLMServiceError.modelNotFound("No model path provided")
+        }
         logger.info("🚀 Initializing with model path: \(modelPath)")
         self.modelPath = modelPath
 
@@ -25,7 +24,7 @@ public class LLMSwiftService: LLMService {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: modelPath) else {
             logger.error("❌ Model file does not exist at path: \(modelPath)")
-            throw LLMServiceError.modelNotLoaded
+            throw LLMServiceError.notInitialized
         }
 
         let fileSize = (try? fileManager.attributesOfItem(atPath: modelPath)[.size] as? Int64) ?? 0
@@ -49,51 +48,25 @@ public class LLMSwiftService: LLMService {
             )
 
             guard let llm = self.llm else {
-                throw LLMSwiftError.modelLoadFailed
+                throw LLMServiceError.notInitialized
             }
 
             logger.info("✅ LLM instance created")
 
             // Validate model readiness with a simple test prompt
             logger.info("🧪 Validating model readiness with test prompt")
-            guard let llm = self.llm else {
-                throw FrameworkError(
-                    framework: .llamaCpp,
-                    underlying: LLMSwiftError.modelLoadFailed,
-                    context: "Failed to initialize LLM.swift with model at \(modelPath)"
-                )
+            guard self.llm != nil else {
+                throw LLMServiceError.notInitialized
             }
 
             // Skip the test prompt to avoid blocking during initialization
             logger.info("✅ Skipping test prompt to avoid blocking")
 
-            // Create model info
-            guard self.llm != nil else {
-                throw FrameworkError(
-                    framework: .llamaCpp,
-                    underlying: LLMSwiftError.modelLoadFailed,
-                    context: "Failed to initialize LLM.swift with model at \(modelPath)"
-                )
-            }
-
-            _modelInfo = LoadedModelInfo(
-                id: UUID().uuidString,
-                name: URL(fileURLWithPath: modelPath).lastPathComponent,
-                framework: .llamaCpp,
-                format: determineFormat(from: modelPath),
-                memoryUsage: try await getModelMemoryUsage(),
-                contextLength: Int(maxTokens),
-                configuration: hardwareConfig ?? HardwareConfiguration(
-                    primaryAccelerator: .cpu,
-                    memoryMode: .balanced
-                )
-            )
+            // Model loaded successfully
+            logger.info("✅ Model initialized successfully")
         } catch {
-            throw FrameworkError(
-                framework: .llamaCpp,
-                underlying: error,
-                context: "Failed to initialize LLM.swift with model at \(modelPath)"
-            )
+            logger.error("❌ Failed to initialize model: \(error)")
+            throw LLMServiceError.notInitialized
         }
     }
 
@@ -147,12 +120,12 @@ public class LLMSwiftService: LLMService {
                     // Timeout task
                     try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
                     self.logger.error("❌ Generation timed out after 60 seconds")
-                    throw LLMSwiftError.generationFailed("Generation timed out after 60 seconds")
+                    throw TimeoutError(message: "Generation timed out after 60 seconds")
                 }
 
                 // Return the first completed task (either result or timeout)
                 guard let result = try await group.next() else {
-                    throw LLMSwiftError.generationFailed("No result from generation")
+                    throw GenerationError(message: "No result from generation")
                 }
 
                 // Cancel the other task
@@ -187,11 +160,7 @@ public class LLMSwiftService: LLMService {
             return finalResponse
         } catch {
             logger.error("❌ Generation failed: \(error)")
-            throw FrameworkError(
-                framework: .llamaCpp,
-                underlying: error,
-                context: "Generation failed for prompt: \(prompt)"
-            )
+            throw LLMServiceError.generationFailed(error)
         }
     }
 
@@ -302,7 +271,6 @@ public class LLMSwiftService: LLMService {
     public func cleanup() async {
         llm = nil
         modelPath = nil
-        _modelInfo = nil
     }
 
     public func getModelMemoryUsage() async throws -> Int64 {
@@ -345,4 +313,16 @@ public class LLMSwiftService: LLMService {
         // Return only the new message - LLM.swift will handle the rest
         return prompt
     }
+}
+
+// MARK: - Error Types
+
+struct TimeoutError: Error, LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
+struct GenerationError: Error, LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
 }

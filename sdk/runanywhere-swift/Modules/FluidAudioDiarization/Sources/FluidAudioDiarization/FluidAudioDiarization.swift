@@ -1,7 +1,47 @@
 import Foundation
-@preconcurrency import RunAnywhereSDK
+@preconcurrency import RunAnywhere
 import FluidAudio
 import os
+
+// Define the missing type locally until it's added to the SDK
+public struct SpeakerDiarizationResult {
+    public let segments: [DiarizedSegment]
+    public let speakers: [SpeakerInfo]
+
+    public init(segments: [DiarizedSegment], speakers: [SpeakerInfo]) {
+        self.segments = segments
+        self.speakers = speakers
+    }
+}
+
+public struct DiarizedSegment {
+    public let speaker: String
+    public let startTime: TimeInterval
+    public let endTime: TimeInterval
+    public let text: String?
+
+    public init(speaker: String, startTime: TimeInterval, endTime: TimeInterval, text: String? = nil) {
+        self.speaker = speaker
+        self.startTime = startTime
+        self.endTime = endTime
+        self.text = text
+    }
+}
+
+// Legacy type for compatibility
+struct SpeakerSegment {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+    let speakerId: String
+    let confidence: Float?
+
+    init(startTime: TimeInterval, endTime: TimeInterval, speakerId: String, confidence: Float? = nil) {
+        self.startTime = startTime
+        self.endTime = endTime
+        self.speakerId = speakerId
+        self.confidence = confidence
+    }
+}
 
 /// FluidAudio-based implementation of speaker diarization
 /// Provides production-ready speaker diarization with 17.7% DER
@@ -11,8 +51,8 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     private let diarizerManager: DiarizerManager
     private var speakers: [String: SpeakerInfo] = [:]
     private var currentSpeaker: SpeakerInfo?
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
-    private let diarizationQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
+    private let logger: Logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
+    private let diarizationQueue: DispatchQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
 
     // Audio buffering for minimum chunk size (3 seconds recommended)
     private var audioAccumulator: [Float] = []
@@ -21,6 +61,25 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
 
     /// Configuration for diarization
     private let config: DiarizerConfig
+
+    // MARK: - Protocol Requirements
+
+    public var isReady: Bool = false
+
+    public func initialize() async throws {
+        // Already initialized in init
+        isReady = true
+    }
+
+    public func cleanup() async {
+        reset()
+        isReady = false
+    }
+
+    public func processAudio(_ samples: [Float]) -> SpeakerInfo {
+        // For now, return a placeholder until API is fixed
+        return currentSpeaker ?? SpeakerInfo(id: "speaker_1", confidence: 0.95)
+    }
 
     /// Initialize FluidAudio diarization service
     /// - Parameter threshold: Similarity threshold for speaker matching (0.5-0.9)
@@ -46,6 +105,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
         diarizerManager.initialize(models: models)
 
         logger.info("FluidAudio diarization ready")
+        isReady = true
     }
 
     // MARK: - SpeakerDiarizationService Implementation
@@ -189,7 +249,17 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
                 }
             }
 
-            return SpeakerDiarizationResult(segments: segments, speakers: speakerInfos)
+            // Convert SpeakerSegment to DiarizedSegment
+            let diarizedSegments = segments.map { segment in
+                DiarizedSegment(
+                    speaker: segment.speakerId,
+                    startTime: segment.startTime,
+                    endTime: segment.endTime,
+                    text: nil
+                )
+            }
+
+            return SpeakerDiarizationResult(segments: diarizedSegments, speakers: speakerInfos)
         } catch {
             logger.error("Detailed diarization failed: \(error.localizedDescription)")
             throw error

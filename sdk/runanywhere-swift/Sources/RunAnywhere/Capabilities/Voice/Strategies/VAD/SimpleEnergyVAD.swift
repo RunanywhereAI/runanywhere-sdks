@@ -126,7 +126,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
         let energy = calculateAverageEnergy(of: audioData)
         let hasVoice = energy > energyThreshold
 
-        logger.debug("Audio buffer: \(audioData.count) samples, energy: \(String(format: "%.6f", energy)), threshold: \(self.energyThreshold), hasVoice: \(hasVoice)")
+        let energyStr = String(format: "%.6f", energy)
+        logger.debug("Audio buffer: \(audioData.count) samples, energy: \(energyStr), threshold: \(self.energyThreshold), hasVoice: \(hasVoice)")
 
         // Update state based on voice detection
         updateVoiceActivityState(hasVoice: hasVoice)

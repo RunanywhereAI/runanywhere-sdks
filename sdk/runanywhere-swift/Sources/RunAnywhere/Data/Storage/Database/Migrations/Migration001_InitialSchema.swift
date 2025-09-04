@@ -35,49 +35,75 @@ struct Migration001_InitialSchema {
                      columns: ["source"])
 
 
-        // MARK: - Model Metadata Table
+        // MARK: - Models Table
 
-        try db.create(table: "model_metadata") { t in
+        try db.create(table: "models") { t in
             t.primaryKey("id", .text)
             t.column("name", .text).notNull()
+            t.column("category", .text).notNull() // language, speech-recognition, etc.
+
+            // Format and location
             t.column("format", .text).notNull() // gguf, onnx, coreml, mlx, tflite
-            t.column("framework", .text).notNull() // LLMFramework enum
-            t.column("size_bytes", .integer).notNull()
-            t.column("quantization", .text) // none, int8, int4, etc.
-            t.column("version", .text).notNull()
-            t.column("sha256_hash", .text)
+            t.column("downloadURL", .text)
+            t.column("localPath", .text)
 
-            // Capabilities as JSON
-            t.column("capabilities", .blob).notNull() // JSON: max_tokens, supports_streaming, etc.
+            // Size information
+            t.column("downloadSize", .integer) // Size in bytes when downloading
+            t.column("memoryRequired", .integer) // RAM needed to run the model
 
-            // Requirements as JSON
-            t.column("requirements", .blob) // JSON: min_memory, min_compute, etc.
+            // Framework compatibility (stored as JSON array)
+            t.column("compatibleFrameworks", .blob).notNull() // JSON array of frameworks
+            t.column("preferredFramework", .text)
 
-            // Download info
-            t.column("download_url", .text)
-            t.column("local_path", .text)
-            t.column("is_downloaded", .boolean).notNull().defaults(to: false)
-            t.column("download_date", .datetime)
+            // Model-specific capabilities
+            t.column("contextLength", .integer) // For language models
+            t.column("supportsThinking", .boolean).notNull().defaults(to: false)
+
+            // Metadata (stored as JSON)
+            t.column("metadata", .blob) // JSON: ModelInfoMetadata
+
+            // Tracking fields
+            t.column("source", .text).notNull().defaults(to: "remote")
+            t.column("createdAt", .datetime).notNull()
+            t.column("updatedAt", .datetime).notNull()
+            t.column("syncPending", .boolean).notNull().defaults(to: false)
 
             // Usage tracking
-            t.column("last_used_at", .datetime)
-            t.column("use_count", .integer).notNull().defaults(to: 0)
-            t.column("total_tokens_generated", .integer).notNull().defaults(to: 0)
+            t.column("lastUsed", .datetime)
+            t.column("usageCount", .integer).notNull().defaults(to: 0)
 
-            // Timestamps
-            t.column("created_at", .datetime).notNull()
-            t.column("updated_at", .datetime).notNull()
-            t.column("sync_pending", .boolean).notNull().defaults(to: true)
-
-            // Indexes
-            t.check(sql: "format IN ('gguf', 'onnx', 'coreml', 'mlx', 'tflite')")
+            // Check constraints
+            t.check(sql: "category IN ('language', 'speech-recognition', 'speech-synthesis', 'vision', 'image-generation', 'multimodal', 'audio')")
+            t.check(sql: "format IN ('gguf', 'onnx', 'coreml', 'mlx', 'tflite', 'safetensors', 'pytorch', 'mlmodel', 'bnk', 'whisper', 'bin')")
+            t.check(sql: "source IN ('defaults', 'remote', 'consumer')")
         }
+
+        // Create indexes for models table
+        try db.create(index: "idx_models_category",
+                     on: "models",
+                     columns: ["category"])
+
+        try db.create(index: "idx_models_format",
+                     on: "models",
+                     columns: ["format"])
+
+        try db.create(index: "idx_models_localPath",
+                     on: "models",
+                     columns: ["localPath"])
+
+        try db.create(index: "idx_models_syncPending",
+                     on: "models",
+                     columns: ["syncPending"])
+
+        try db.create(index: "idx_models_updatedAt",
+                     on: "models",
+                     columns: ["updatedAt"])
 
         // MARK: - Model Usage Stats Table
 
         try db.create(table: "model_usage_stats") { t in
             t.primaryKey("id", .text)
-            t.belongsTo("model_metadata", onDelete: .cascade).notNull()
+            t.belongsTo("models", onDelete: .cascade).notNull()
             t.column("date", .date).notNull()
             t.column("generation_count", .integer).notNull().defaults(to: 0)
             t.column("total_tokens", .integer).notNull().defaults(to: 0)
@@ -87,14 +113,14 @@ struct Migration001_InitialSchema {
             t.column("created_at", .datetime).notNull()
 
             // Unique constraint on model_id + date
-            t.uniqueKey(["model_metadataId", "date"])
+            t.uniqueKey(["modelsId", "date"])
         }
 
         // MARK: - Generation Sessions Table
 
         try db.create(table: "generation_sessions") { t in
             t.primaryKey("id", .text)
-            t.belongsTo("model_metadata").notNull()
+            t.belongsTo("models").notNull()
             t.column("session_type", .text).notNull() // chat, completion, etc.
             t.column("total_tokens", .integer).notNull().defaults(to: 0)
             t.column("total_cost", .double).notNull().defaults(to: 0.0)
@@ -153,16 +179,12 @@ struct Migration001_InitialSchema {
 
         try db.create(table: "telemetry") { t in
             t.primaryKey("id", .text)
-            t.column("event_type", .text).notNull()
-            t.column("event_name", .text).notNull()
-            t.column("properties", .blob) // JSON: event properties
-            t.column("user_id", .text) // Anonymous user ID
-            t.column("session_id", .text)
-            t.column("device_info", .blob) // JSON: device model, OS version, etc.
-            t.column("sdk_version", .text).notNull()
+            t.column("eventType", .text).notNull()
+            t.column("properties", .blob).notNull() // JSON: event properties stored as Data
             t.column("timestamp", .datetime).notNull()
-            t.column("created_at", .datetime).notNull()
-            t.column("sync_pending", .boolean).notNull().defaults(to: true)
+            t.column("createdAt", .datetime).notNull()
+            t.column("updatedAt", .datetime).notNull()
+            t.column("syncPending", .boolean).notNull().defaults(to: true)
         }
 
         // MARK: - User Preferences Table

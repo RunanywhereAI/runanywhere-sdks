@@ -4,6 +4,7 @@ import GRDB
 /// Repository for managing telemetry data using DataSource pattern
 public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
     public typealias Entity = TelemetryData
+    public typealias RemoteDS = RemoteTelemetryDataSource
 
     private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
@@ -11,7 +12,12 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
 
     // Data sources for telemetry operations
     private let localDataSource: LocalTelemetryDataSource
-    private let remoteDataSource: RemoteTelemetryDataSource
+    private let _remoteDataSource: RemoteTelemetryDataSource
+
+    // Expose remote data source for sync coordinator
+    public nonisolated var remoteDataSource: RemoteTelemetryDataSource? {
+        return _remoteDataSource
+    }
 
     // MARK: - Initialization
 
@@ -19,7 +25,7 @@ public actor TelemetryRepositoryImpl: Repository, TelemetryRepository {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
         self.localDataSource = LocalTelemetryDataSource(databaseManager: databaseManager)
-        self.remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient)
+        self._remoteDataSource = RemoteTelemetryDataSource(apiClient: apiClient)
     }
 
     // MARK: - Repository Implementation

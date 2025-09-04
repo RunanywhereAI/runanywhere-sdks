@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 import LLMSwift
 import WhisperKitTranscription
+import FluidAudioDiarization
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -68,51 +69,49 @@ struct RunAnywhereAIApp: App {
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
-            // Create configuration for the SDK
-            var config = Configuration(
-                apiKey: "demo-api-key", // For demo purposes
-                enableRealTimeDashboard: false,
-                telemetryConsent: .granted
-            )
+            // SUPER SIMPLE MODULE REGISTRATION
+            // Just import the modules and call register() - that's it!
 
-            // Configure additional settings
-            config.routingPolicy = RoutingPolicy.preferDevice
-            config.privacyMode = PrivacyMode.standard
-            config.memoryThreshold = 2_000_000_000 // 2GB
+            logger.info("🎯 Registering AI modules with the SDK...")
 
-            // Register framework adapters before initializing SDK
-            RunAnywhereSDK.shared.registerFrameworkAdapter(LLMSwiftAdapter())
+            // Register WhisperKit for Speech-to-Text
+            WhisperKitServiceProvider.register()
+            RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
+            logger.info("✅ WhisperKit registered for Speech-to-Text")
+
+            // Register LLMSwift for Language Models (llama.cpp)
+            LLMSwiftServiceProvider.register()
+            RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
+            logger.info("✅ LLMSwift registered for Language Models")
+
+            // Register FluidAudioDiarization for Speaker Diarization
+            FluidAudioDiarizationProvider.register()
+            logger.info("✅ FluidAudioDiarization registered for Speaker Diarization")
 
             // Register Foundation Models adapter for iOS 26+ and macOS 26+
             if #available(iOS 26.0, macOS 26.0, *) {
-                RunAnywhereSDK.shared.registerFrameworkAdapter(FoundationModelsAdapter())
+                RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
+                logger.info("✅ Foundation Models registered")
             }
 
-            // Register voice framework adapter (now uses unified adapter with singleton)
-            logger.info("🎤 Registering WhisperKitAdapter...")
-            RunAnywhereSDK.shared.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKitAdapter registered")
-
-            // Register WhisperKit download strategy
-            logger.info("📥 Registering WhisperKit download strategy...")
-            RunAnywhereSDK.shared.registerDownloadStrategy(WhisperKitDownloadStrategy())
-            logger.info("✅ WhisperKit download strategy registered")
-
-            // Initialize the SDK
+            // Initialize the SDK with just API key
             let startTime = Date()
             logger.info("🚀 Starting SDK initialization...")
-            logger.debug("📋 Configuration: API Key: \(String(config.apiKey.prefix(8)), privacy: .public)..., Routing: \(String(describing: config.routingPolicy), privacy: .public), Privacy: \(String(describing: config.privacyMode), privacy: .public)")
+            logger.debug("📋 Configuration: API Key: demo-api-key...")
 
-            try await RunAnywhereSDK.shared.initialize(configuration: config)
+            try await RunAnywhere.initialize(
+                apiKey: "demo-api-key",
+                baseURL: "https://api.runanywhere.ai",
+                environment: .development
+            )
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized!")
             logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
             logger.info("📊 SDK Status: Ready for on-device AI inference")
-            logger.info("🔧 Registered frameworks: LLMSwift, FoundationModels, WhisperKit")
+            logger.info("🔧 Registered modules: WhisperKit, LLMSwift, FluidAudioDiarization, FoundationModels")
 
-            // Load and apply user settings before marking as initialized
-            await loadAndApplyUserSettings()
+            // Note: User settings are now applied per-request, not globally
 
             // Mark as initialized
             await MainActor.run {
@@ -148,7 +147,7 @@ struct RunAnywhereAIApp: App {
 
         do {
             // Get available models from SDK
-            let availableModels = try await RunAnywhereSDK.shared.listAvailableModels()
+            let availableModels = try await RunAnywhere.availableModels()
 
             // Filter for Llama CPP compatible models first, then any model
             let llamaCppModels = availableModels.filter { $0.compatibleFrameworks.contains(.llamaCpp) && $0.localPath != nil }
@@ -161,7 +160,7 @@ struct RunAnywhereAIApp: App {
                 logger.info("✅ Found model to auto-load: \(model.name, privacy: .public) (Framework: \(model.compatibleFrameworks.first?.displayName ?? "Unknown", privacy: .public))")
 
                 // Load the model
-                try await RunAnywhereSDK.shared.loadModel(model.id)
+                _ = try await RunAnywhere.loadModel(model.id)
 
                 logger.info("🎉 Successfully auto-loaded model: \(model.name, privacy: .public)")
 
@@ -182,23 +181,8 @@ struct RunAnywhereAIApp: App {
         }
     }
 
-    private func loadAndApplyUserSettings() async {
-        logger.info("⚙️ Loading user settings from UserDefaults...")
-
-        // Load temperature setting
-        let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
-        let temperature = savedTemperature != 0 ? savedTemperature : 0.7
-
-        // Load max tokens setting
-        let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-        let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
-
-        // Apply settings to SDK
-        await RunAnywhereSDK.shared.setTemperature(Float(temperature))
-        await RunAnywhereSDK.shared.setMaxTokens(maxTokens)
-
-        logger.info("✅ Applied user settings - Temperature: \(temperature, privacy: .public), MaxTokens: \(maxTokens, privacy: .public)")
-    }
+    // User settings are now stored locally and applied per-request
+    // This method is no longer needed with the new event-based architecture
 }
 
 // MARK: - Loading Views

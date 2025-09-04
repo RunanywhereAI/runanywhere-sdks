@@ -1,7 +1,20 @@
 import SwiftUI
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import os
+import Combine
+
+// Temporary stub types until SDK provides them
+struct GenerationHints {
+    let temperature: Float
+    let maxTokens: Int
+    let systemRole: String
+}
+
+struct StreamToken: Identifiable {
+    let id = UUID()
+    let text: String
+}
 
 // MARK: - Quiz Generation Errors
 
@@ -148,7 +161,7 @@ class QuizViewModel: ObservableObject {
     private var currentSession: QuizSession?
     private var questionStartTime: Date?
     private var generationTask: Task<Void, Never>?
-    private let sdk = RunAnywhereSDK.shared
+    private var cancellables = Set<AnyCancellable>()
     private let logger = Logger(subsystem: "com.runanywhere.example", category: "QuizViewModel")
 
     // Constants
@@ -272,11 +285,15 @@ class QuizViewModel: ObservableObject {
 
                 logger.info("✅ Using already loaded model: \(self.loadedModelName ?? "unknown")")
 
-                // Get SDK configuration for generation options
-                let effectiveSettings = await sdk.getGenerationSettings()
+                // Get user preferences from UserDefaults (now applied per-request)
+                let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+                let temperature = savedTemperature != 0 ? savedTemperature : 0.7
+                let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+                let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
+
                 let options = RunAnywhereGenerationOptions(
-                    maxTokens: effectiveSettings.maxTokens,
-                    temperature: Float(effectiveSettings.temperature),
+                    maxTokens: maxTokens,
+                    temperature: Float(temperature),
                     topP: 0.9,
                     preferredExecutionTarget: .onDevice  // Force on-device execution
                 )
@@ -295,23 +312,19 @@ class QuizViewModel: ObservableObject {
                 \(inputText)
                 """
 
-                // Get streaming result from SDK
-                let streamResult = sdk.generateStructuredStream(
-                    QuizGeneration.self,
-                    content: quizPrompt,
+                // For now, use regular generation since structured streaming isn't implemented
+                // Generate the quiz as JSON text
+                let jsonText = try await RunAnywhere.generate(
+                    quizPrompt + "\n\nProvide the response as valid JSON matching the quiz schema.",
                     options: options
                 )
 
-                // Stream tokens for UI display
-                for try await token in streamResult.tokenStream {
-                    await MainActor.run {
-                        self.streamingTokens.append(token)
-                        self.generationText += token.text
-                    }
+                // Parse the JSON response
+                guard let jsonData = jsonText.data(using: .utf8) else {
+                    throw QuizGenerationError.invalidJSONFormat
                 }
 
-                // Get final parsed quiz
-                let generatedQuiz = try await streamResult.result.value
+                let generatedQuiz = try JSONDecoder().decode(QuizGeneration.self, from: jsonData)
 
                 // Validate we have questions
                 guard !generatedQuiz.questions.isEmpty else {

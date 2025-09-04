@@ -7,11 +7,6 @@ public class ServiceContainer {
     public static let shared: ServiceContainer = ServiceContainer()
     // MARK: - Core Services
 
-    // Configuration validator - to be implemented when needed
-    // private(set) lazy var configurationValidator: ConfigurationValidator = {
-    //     ConfigurationValidator()
-    // }()
-
     /// Model registry
     private(set) lazy var modelRegistry: ModelRegistry = {
         RegistryService()
@@ -20,7 +15,6 @@ public class ServiceContainer {
     /// Single adapter registry for all frameworks (text and voice)
     internal let adapterRegistry = AdapterRegistry()
 
-
     // MARK: - Capability Services
 
     /// Model loading service
@@ -28,7 +22,6 @@ public class ServiceContainer {
         ModelLoadingService(
             registry: modelRegistry,
             adapterRegistry: adapterRegistry,
-            validationService: validationService,
             memoryService: memoryService
         )
     }()
@@ -37,7 +30,6 @@ public class ServiceContainer {
     private(set) lazy var generationService: GenerationService = {
         GenerationService(
             routingService: routingService,
-            performanceMonitor: performanceMonitor,
             modelLoadingService: modelLoadingService
         )
     }()
@@ -53,28 +45,10 @@ public class ServiceContainer {
     }()
 
 
-/// Validation service
-    private(set) lazy var validationService: ValidationService = {
-        ValidationService()
-    }()
-
     /// Download service
     private(set) lazy var downloadService: AlamofireDownloadService = {
         AlamofireDownloadService()
     }()
-
-    // Download queue removed - handled by AlamofireDownloadService
-
-    /// Progress service (implements ProgressTracker protocol)
-    private(set) lazy var progressService: ProgressTracker = {
-        ProgressService(
-            stageManager: StageManager(),
-            progressAggregator: ProgressAggregator()
-        )
-    }()
-
-    // Storage service removed - replaced by SimplifiedFileManager
-    // Model storage manager removed - replaced by SimplifiedFileManager
 
     /// Simplified file manager
     private(set) lazy var fileManager: SimplifiedFileManager = {
@@ -85,6 +59,11 @@ public class ServiceContainer {
         }
     }()
 
+    /// Storage analyzer for storage operations
+    private(set) lazy var storageAnalyzer: StorageAnalyzer = {
+        DefaultStorageAnalyzer(fileManager: fileManager, modelRegistry: modelRegistry)
+    }()
+
     /// Routing service
     private(set) lazy var routingService: RoutingService = {
         RoutingService(
@@ -93,29 +72,7 @@ public class ServiceContainer {
         )
     }()
 
-    // Memory service and monitor placeholders removed - using unifiedMemoryManager instead
-
-    // MARK: - Monitoring Services
-
-    /// Performance monitor
-    private(set) lazy var performanceMonitor: PerformanceMonitor = {
-        MonitoringService()
-    }()
-
-    // Storage monitor removed - storage monitoring handled by SimplifiedFileManager
-
-    /// Benchmark runner
-    private(set) lazy var benchmarkRunner: BenchmarkRunner = {
-        BenchmarkService()
-    }()
-
-    /// A/B test runner
-    private(set) lazy var abTestRunner: ABTestRunner = {
-        ABTestService()
-    }()
-
     // MARK: - Infrastructure
-
     /// Hardware manager
     private(set) lazy var hardwareManager: HardwareCapabilityManager = {
         HardwareCapabilityManager.shared
@@ -130,32 +87,21 @@ public class ServiceContainer {
         )
     }()
 
-    /// Compatibility service
-    private(set) lazy var compatibilityService: CompatibilityService = {
-        CompatibilityService()
-    }()
-
-    /// Format detector for model validation
-    private(set) lazy var formatDetector: FormatDetector = {
-        FormatDetectorImpl()
-    }()
-
-    /// Metadata extractor for model validation
-    private(set) lazy var metadataExtractor: MetadataExtractor = {
-        MetadataExtractorImpl()
-    }()
-
     /// Logger
     private(set) lazy var logger: SDKLogger = {
         SDKLogger()
     }()
 
-    // Configuration service is defined below in Data Services section
-
     /// Database manager
     private lazy var databaseManager: DatabaseManager = {
         DatabaseManager.shared
     }()
+
+    /// Network service (environment-based: mock or real)
+    public private(set) var networkService: (any NetworkService)?
+
+    /// Authentication service
+    private var authenticationService: AuthenticationService?
 
     /// API client for sync operations
     private var apiClient: APIClient?
@@ -166,7 +112,6 @@ public class ServiceContainer {
         get async {
             if _syncCoordinator == nil {
                 _syncCoordinator = SyncCoordinator(
-                    apiClient: apiClient,
                     enableAutoSync: false // Disabled: No backend currently available
                 )
             }
@@ -180,17 +125,19 @@ public class ServiceContainer {
     private var _configurationService: ConfigurationService?
     public var configurationService: ConfigurationServiceProtocol {
         get async {
-            if _configurationService == nil {
-                let configRepo = ConfigurationRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _configurationService = ConfigurationService(
-                    configRepository: configRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _configurationService {
+                return service
             }
-            return _configurationService!
+            let configRepo = ConfigurationRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = ConfigurationService(
+                configRepository: configRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _configurationService = service
+            return service
         }
     }
 
@@ -198,35 +145,59 @@ public class ServiceContainer {
     private var _telemetryService: TelemetryService?
     public var telemetryService: TelemetryService {
         get async {
-            if _telemetryService == nil {
-                let telemetryRepo = TelemetryRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _telemetryService = TelemetryService(
-                    telemetryRepository: telemetryRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _telemetryService {
+                return service
             }
-            return _telemetryService!
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = TelemetryService(
+                telemetryRepository: telemetryRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _telemetryService = service
+            return service
         }
     }
 
-    /// Model metadata service
-    private var _modelMetadataService: ModelMetadataService?
-    public var modelMetadataService: ModelMetadataService {
+    /// Model info service
+    private var _modelInfoService: ModelInfoService?
+    public var modelInfoService: ModelInfoService {
         get async {
-            if _modelMetadataService == nil {
-                let modelRepo = ModelMetadataRepositoryImpl(
-                    databaseManager: databaseManager,
-                    apiClient: apiClient
-                )
-                _modelMetadataService = ModelMetadataService(
-                    modelMetadataRepository: modelRepo,
-                    syncCoordinator: await syncCoordinator
-                )
+            if let service = _modelInfoService {
+                return service
             }
-            return _modelMetadataService!
+            let modelRepo = ModelInfoRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = ModelInfoService(
+                modelInfoRepository: modelRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _modelInfoService = service
+            return service
+        }
+    }
+
+    /// Device info service
+    private var _deviceInfoService: DeviceInfoService?
+    public var deviceInfoService: DeviceInfoService {
+        get async {
+            if let service = _deviceInfoService {
+                return service
+            }
+            let deviceRepo = DeviceInfoRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: apiClient
+            )
+            let service = DeviceInfoService(
+                deviceInfoRepository: deviceRepo,
+                syncCoordinator: await syncCoordinator
+            )
+            _deviceInfoService = service
+            return service
         }
     }
 
@@ -234,10 +205,12 @@ public class ServiceContainer {
     private var _generationAnalytics: GenerationAnalyticsService?
     public var generationAnalytics: GenerationAnalyticsService {
         get async {
-            if _generationAnalytics == nil {
-                _generationAnalytics = GenerationAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _generationAnalytics {
+                return service
             }
-            return _generationAnalytics!
+            let service = GenerationAnalyticsService(queueManager: analyticsQueueManager)
+            _generationAnalytics = service
+            return service
         }
     }
 
@@ -252,10 +225,12 @@ public class ServiceContainer {
     private var _sttAnalytics: STTAnalyticsService?
     public var sttAnalytics: STTAnalyticsService {
         get async {
-            if _sttAnalytics == nil {
-                _sttAnalytics = STTAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _sttAnalytics {
+                return service
             }
-            return _sttAnalytics!
+            let service = STTAnalyticsService(queueManager: analyticsQueueManager)
+            _sttAnalytics = service
+            return service
         }
     }
 
@@ -263,40 +238,22 @@ public class ServiceContainer {
     private var _voiceAnalytics: VoiceAnalyticsService?
     public var voiceAnalytics: VoiceAnalyticsService {
         get async {
-            if _voiceAnalytics == nil {
-                _voiceAnalytics = VoiceAnalyticsService(queueManager: analyticsQueueManager)
+            if let service = _voiceAnalytics {
+                return service
             }
-            return _voiceAnalytics!
-        }
-    }
-
-    /// Monitoring Analytics Service - using unified pattern
-    private var _monitoringAnalytics: MonitoringAnalyticsService?
-    public var monitoringAnalytics: MonitoringAnalyticsService {
-        get async {
-            if _monitoringAnalytics == nil {
-                _monitoringAnalytics = MonitoringAnalyticsService(queueManager: analyticsQueueManager)
-            }
-            return _monitoringAnalytics!
+            let service = VoiceAnalyticsService(queueManager: analyticsQueueManager)
+            _voiceAnalytics = service
+            return service
         }
     }
 
     // MARK: - Public Service Access
-
-    /// Get compatibility service
-    public var compatibility: CompatibilityService {
-        return compatibilityService
-    }
 
     /// Get memory service
     public var memory: MemoryManager {
         return memoryService
     }
 
-    /// Get progress service
-    public var progress: ProgressTracker {
-        return progressService
-    }
 
     // MARK: - Initialization
 
@@ -304,41 +261,57 @@ public class ServiceContainer {
         // Container is ready for lazy initialization
     }
 
-    /// Bootstrap all services with configuration
-    public func bootstrap(with configuration: Configuration) async throws {
-        // Initialize database first
-        do {
-            try databaseManager.setup()
-            logger.info("Database initialized successfully during bootstrap")
-        } catch {
-            logger.error("Failed to initialize database during bootstrap: \(error)")
+    /**
+     * Initialize all SDK services and sync with backend
+     *
+     * This method performs complete SDK service initialization:
+     *
+     * 1. **Network Services**: Store authentication service and API client
+     * 2. **Device Information**: Collect and sync device info to backend
+     * 3. **Configuration Service**: Load configuration from backend/cache/defaults
+     * 4. **Model Catalog**: Sync model information from backend
+     * 5. **Model Registry**: Initialize for model discovery and management
+     * 6. **Memory Management**: Configure memory thresholds
+     * 7. **Voice Services**: Initialize voice capability (optional)
+     * 8. **Analytics**: Setup telemetry and analytics tracking
+     *
+     * - Parameters:
+     *   - params: SDK initialization parameters
+     *   - authService: Configured authentication service
+     *   - apiClient: Configured API client for backend communication
+     *
+     * - Returns: Loaded configuration data
+     * - Throws: SDKError if critical service initialization fails
+     */
+    public func bootstrap(with params: SDKInitParams, authService: AuthenticationService, apiClient: APIClient) async throws -> ConfigurationData {
+        // Step 1: Create and store network service based on environment
+        self.networkService = NetworkServiceFactory.createNetworkService(
+            for: params.environment,
+            params: params
+        )
 
-            // In development, reset database on schema errors
-            #if DEBUG
-            logger.warning("Attempting to reset database due to error: \(error)")
-            do {
-                try databaseManager.reset()
-                logger.info("Database reset successful after error")
-            } catch let resetError {
-                logger.error("Failed to reset database: \(resetError)")
-                throw SDKError.databaseInitializationFailed(resetError)
-            }
-            #else
-            throw SDKError.databaseInitializationFailed(error)
-            #endif
+        // Store auth service and API client if provided
+        self.authenticationService = authService
+        self.apiClient = apiClient
+
+        logger.debug("Network services configured for \(params.environment.description)")
+
+        // Step 2: Initialize and sync device information
+        logger.debug("Collecting device information")
+        let deviceInfoService = await self.deviceInfoService
+        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
+            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
+
+            // Sync to backend
+            try? await deviceInfoService.syncToCloud()
+            logger.info("Device information synced to backend")
+
+            // Log device summary for debugging
+            let summary = await deviceInfoService.getDeviceInfoSummary()
+            logger.info("Device Info:\n\(summary)")
         }
 
-        // Logger is pre-configured through LoggingManager
-
-        // Initialize API client if API key is provided
-        if !configuration.apiKey.isEmpty {
-            apiClient = APIClient(
-                baseURL: "https://api.runanywhere.ai",
-                apiKey: configuration.apiKey
-            )
-        }
-
-        // Initialize configuration service with repository
+        // Step 3: Initialize configuration service and load configuration
         let configRepository = ConfigurationRepositoryImpl(
             databaseManager: databaseManager,
             apiClient: apiClient
@@ -348,108 +321,149 @@ public class ServiceContainer {
             syncCoordinator: await syncCoordinator
         )
 
-        // Load configuration on launch with simple fallback
+        // Load configuration from backend/cache/defaults
+        var loadedConfig: ConfigurationData?
         if let configService = _configurationService {
-            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: configuration.apiKey)
-            logger.info("Configuration loaded during SDK initialization (source: \(effectiveConfig.source))")
+            let effectiveConfig = await configService.loadConfigurationOnLaunch(apiKey: params.apiKey)
+            loadedConfig = effectiveConfig
+            EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: effectiveConfig))
+            logger.info("Configuration loaded (source: \(effectiveConfig.source))")
         }
 
-        // Initialize core services
-        // Initialize model registry with configuration
-        await (modelRegistry as? RegistryService)?.initialize(with: configuration)
+        // Step 4: Sync model catalog from backend
+        logger.debug("Syncing model catalog")
+        let modelInfoService = await self.modelInfoService
 
-        // Configure hardware preferences
-        // Hardware manager is self-configuring
+        // Trigger sync to fetch latest models from backend
+        try? await modelInfoService.syncModelInfo()
 
-        // Set memory threshold
-        memoryService.setMemoryThreshold(configuration.memoryThreshold)
-
-        // Configure download settings
-        // Download service is configured via its initializer
-
-        // Initialize monitoring if enabled
-        if configuration.enableRealTimeDashboard {
-            performanceMonitor.startMonitoring()
-            // Storage monitoring is now handled by SimplifiedFileManager
+        // Load stored models (now includes synced data)
+        let storedModels = try? await modelInfoService.loadStoredModels()
+        if let models = storedModels {
+            logger.info("Model catalog synced: \(models.count) models available")
+            EventBus.shared.publish(SDKModelEvent.catalogLoaded(models: models))
         }
 
-        // Initialize voice capability service
+        // Step 5: Initialize model registry
+        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+        logger.debug("Model registry initialized")
+
+        // Step 6: Configure memory management
+        memoryService.setMemoryThreshold(500_000_000) // 500MB default
+        logger.debug("Memory threshold configured")
+
+        // Step 7: Initialize optional voice services
         do {
             try await voiceCapabilityService.initialize()
             logger.info("Voice capability service initialized")
         } catch {
-            logger.warning("Failed to initialize voice capability service: \(error)")
-            // Voice is optional, don't fail the entire initialization
+            logger.warning("Voice service initialization failed (optional): \(error)")
         }
 
-        // Initialize unified analytics queue manager
-        if let apiClient = apiClient {
+        // Step 8: Initialize analytics
+        if let client = self.apiClient {
             let telemetryRepo = TelemetryRepositoryImpl(
                 databaseManager: databaseManager,
-                apiClient: apiClient
+                apiClient: client
             )
             await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics queue manager initialized")
+            logger.info("Analytics initialized")
         }
 
-        // Start service health monitoring
-        await startHealthMonitoring()
-    }
-
-    /// Check health of all services
-    public func checkServiceHealth() async -> [String: Bool] {
-        var health: [String: Bool] = [:]
-
-        health["memory"] = await checkMemoryServiceHealth()
-        health["download"] = await checkDownloadServiceHealth()
-        health["storage"] = await checkStorageServiceHealth()
-        health["validation"] = await checkValidationServiceHealth()
-        health["compatibility"] = await checkCompatibilityServiceHealth()
-        health["voice"] = await voiceCapabilityService.isHealthy()
-        // Removed tokenizer health check
-
-        return health
-    }
-
-    private func startHealthMonitoring() async {
-        // Start periodic health checks every 30 seconds
-        Task {
-            while !Task.isCancelled {
-                let health = await checkServiceHealth()
-                let unhealthyServices = health.filter { !$0.value }.map { $0.key }
-
-                if !unhealthyServices.isEmpty {
-                    logger.warning("Unhealthy services detected: \(unhealthyServices.joined(separator: ", "))")
-                }
-
-                try? await Task.sleep(nanoseconds: 30_000_000_000) // 30 seconds
-            }
+        // Return the loaded configuration or create a default one
+        if let config = loadedConfig {
+            return config
+        } else {
+            // Create default configuration if none was loaded
+            let defaultConfig = ConfigurationData(
+                id: "default-\(UUID().uuidString)",
+                apiKey: params.apiKey,
+                source: .defaults
+            )
+            return defaultConfig
         }
     }
 
-    private func checkMemoryServiceHealth() async -> Bool {
-        // Basic health check - ensure memory service is responsive
-        return memoryService.isHealthy()
-    }
+    /**
+     * Initialize SDK services for development mode (no API authentication)
+     *
+     * This method performs local-only SDK service initialization:
+     *
+     * 1. **Device Information**: Collect local device info
+     * 2. **Configuration Service**: Load configuration from defaults only
+     * 3. **Model Catalog**: Use mock model data
+     * 4. **Model Registry**: Initialize for model discovery and management
+     * 5. **Memory Management**: Configure memory thresholds
+     * 6. **Voice Services**: Initialize voice capability (optional)
+     * 7. **Analytics**: Setup with local-only tracking
+     *
+     * - Parameters:
+     *   - params: SDK initialization parameters
+     *
+     * - Returns: Loaded configuration data
+     * - Throws: SDKError if critical service initialization fails
+     */
+    public func bootstrapDevelopmentMode(with params: SDKInitParams) async throws -> ConfigurationData {
+        logger.info("🚀 Bootstrapping SDK in DEVELOPMENT mode")
 
-    private func checkDownloadServiceHealth() async -> Bool {
-        // Check if download service can handle requests
-        return downloadService.isHealthy()
-    }
+        // Create mock network service for development
+        self.networkService = NetworkServiceFactory.createNetworkService(
+            for: .development,
+            params: params
+        )
+        logger.info("🔧 Mock network service initialized")
 
-    private func checkStorageServiceHealth() async -> Bool {
-        // Check storage service health
-        return true // SimplifiedFileManager doesn't need health checks
-    }
+        // Step 1: Collect device information (local only)
+        logger.debug("Collecting device information")
+        let deviceInfoService = await self.deviceInfoService
+        if let deviceInfo = await deviceInfoService.loadCurrentDeviceInfo() {
+            EventBus.shared.publish(SDKDeviceEvent.deviceInfoCollected(deviceInfo: deviceInfo))
 
-    private func checkValidationServiceHealth() async -> Bool {
-        // Check validation service
-        return validationService.isHealthy()
-    }
+            // Log device summary for debugging
+            let summary = await deviceInfoService.getDeviceInfoSummary()
+            logger.info("Device Info:\n\(summary)")
+        }
 
-    private func checkCompatibilityServiceHealth() async -> Bool {
-        // Check compatibility service
-        return compatibilityService.isHealthy()
-    }
+        // Step 2: Create default configuration (no API needed)
+        let defaultConfig = ConfigurationData(
+            id: "dev-\(UUID().uuidString)",
+            apiKey: params.apiKey.isEmpty ? "dev-mode" : params.apiKey,
+            source: .defaults
+        )
 
+        _configurationService = ConfigurationService(
+            configRepository: nil, // No repository in dev mode
+            syncCoordinator: nil // No sync in dev mode
+        )
+
+        EventBus.shared.publish(SDKConfigurationEvent.loaded(configuration: defaultConfig))
+        logger.info("Configuration loaded (source: defaults for development)")
+
+        // Step 3: Mock model catalog
+        logger.debug("Mock models will be provided by MockNetworkService")
+
+        // Step 4: Initialize model registry
+        await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+        logger.debug("Model registry initialized")
+
+        // Step 5: Configure memory management
+        memoryService.setMemoryThreshold(500_000_000) // 500MB default
+        logger.debug("Memory threshold configured")
+
+        // Step 6: Initialize optional voice services
+        do {
+            try await voiceCapabilityService.initialize()
+            logger.info("Voice capability service initialized")
+        } catch {
+            logger.warning("Voice service initialization failed (optional): \(error)")
+        }
+
+        // Step 7: Skip analytics initialization in development mode
+        logger.info("Analytics disabled in development mode")
+
+        logger.info("✅ Development mode bootstrap completed")
+
+        // Return the default configuration
+        return defaultConfig
+    }
 }

@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import os
 import FluidAudioDiarization  // Direct import since it's added to the project
 
@@ -24,31 +24,31 @@ class FluidAudioIntegration {
 
     /// Create a voice pipeline with FluidAudio diarization
     static func createVoicePipelineWithDiarization(
-        sdk: RunAnywhereSDK,
         config: ModularPipelineConfig
-    ) async -> VoicePipelineManager {
+    ) async -> ModularVoicePipeline? {
         // Try to create FluidAudio diarization
         let diarizationService = await createDiarizationService()
 
-        if let diarization = diarizationService {
-            // Use smart phrase segmentation for better diarization accuracy
-            let segmentationStrategy = SmartPhraseSegmentation(
-                minimumPhraseLength: 3.0,   // Minimum 3 seconds for reliable diarization
-                optimalPhraseLength: 8.0,   // 8 seconds is optimal for speaker identification
-                phraseEndSilence: 2.0,      // 2 seconds of silence indicates phrase end
-                briefPauseThreshold: 0.5    // Brief pauses (breathing) don't trigger processing
-            )
+        do {
+            // Create pipeline with diarization service
+            if let diarization = diarizationService {
+                logger.info("Creating voice pipeline with FluidAudio diarization")
+                let pipeline = try await ModularVoicePipeline(
+                    config: config,
+                    speakerDiarization: diarization
+                )
 
-            let pipeline = sdk.createVoicePipeline(
-                config: config,
-                speakerDiarization: diarization,
-                segmentationStrategy: segmentationStrategy
-            )
-            logger.debug("Pipeline created with FluidAudio diarization")
-            return pipeline
-        } else {
-            logger.info("Using default diarization (FluidAudio unavailable)")
-            return sdk.createVoicePipeline(config: config)
+                // Enable speaker diarization
+                pipeline.enableSpeakerDiarization(true)
+
+                return pipeline
+            } else {
+                logger.info("Creating standard voice pipeline (diarization not available)")
+                return try await RunAnywhere.createVoicePipeline(config: config)
+            }
+        } catch {
+            logger.error("Failed to create voice pipeline: \(error)")
+            return nil
         }
     }
 }

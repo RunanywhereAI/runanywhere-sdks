@@ -13,7 +13,7 @@ public protocol DataSource: Actor {
 }
 
 /// Helper for remote operations with timeout
-public struct RemoteOperationHelper {
+public struct RemoteOperationHelper: Sendable {
     private let timeout: TimeInterval
 
     public init(timeout: TimeInterval = 10.0) {
@@ -62,6 +62,10 @@ public protocol RemoteDataSource: DataSource {
 
     /// Test network connectivity and authentication
     func testConnection() async throws -> Bool
+
+    /// Sync a batch of entities to the remote source
+    /// Returns successfully synced entity IDs
+    func syncBatch(_ batch: [Entity]) async throws -> [String]
 }
 
 /// Protocol for local data sources that store data locally (database, file system, etc.)
@@ -86,7 +90,7 @@ public protocol LocalDataSource: DataSource {
 }
 
 /// Information about local storage status
-public struct DataSourceStorageInfo: Codable {
+public struct DataSourceStorageInfo: Codable, Sendable {
     public let totalSpace: Int64?
     public let availableSpace: Int64?
     public let usedSpace: Int64?

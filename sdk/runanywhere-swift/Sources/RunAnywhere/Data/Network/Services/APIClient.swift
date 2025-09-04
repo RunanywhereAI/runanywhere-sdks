@@ -1,25 +1,29 @@
 import Foundation
 import Pulse
 
-/// Simple API client for cloud sync operations
-public actor APIClient {
+/// Production API client for backend operations
+/// Implements NetworkService protocol for real network calls
+public actor APIClient: NetworkService {
     private let baseURL: URL
     private let apiKey: String
+    private var authService: AuthenticationService?
     private let session: URLSession
     private let logger = SDKLogger(category: "APIClient")
 
     // MARK: - Initialization
 
-    public init(baseURL: String, apiKey: String) {
-        self.baseURL = URL(string: baseURL)!
+    public init(baseURL: URL, apiKey: String) {
+        self.baseURL = baseURL
         self.apiKey = apiKey
+        self.authService = nil
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30.0
         config.httpAdditionalHeaders = [
-            "Authorization": "Bearer \(apiKey)",
             "Content-Type": "application/json",
-            "X-SDK-Client": "RunAnywhereSDK"
+            "X-SDK-Client": "RunAnywhereSDK",
+            "X-SDK-Version": SDKConstants.version,
+            "X-Platform": SDKConstants.platform
         ]
 
         // Configure URLSession with Pulse proxy for automatic network logging
@@ -28,19 +32,47 @@ public actor APIClient {
             delegate: URLSessionProxyDelegate(),
             delegateQueue: nil
         )
+
+        logger.info("APIClient initialized with baseURL: \(baseURL.absoluteString)")
     }
 
     // MARK: - Public Methods
 
-    /// Perform a POST request
-    public func post<T: Encodable, R: Decodable>(
+    /// Set the authentication service (called after AuthenticationService is created)
+    public func setAuthenticationService(_ authService: AuthenticationService) {
+        self.authService = authService
+    }
+
+    // MARK: - NetworkService Protocol Implementation
+
+    /// Perform a raw POST request
+    public func postRaw(
         _ endpoint: APIEndpoint,
-        _ payload: T
-    ) async throws -> R {
+        _ payload: Data,
+        requiresAuth: Bool
+    ) async throws -> Data {
+        let token: String?
+        if requiresAuth {
+            guard let authService = authService else {
+                throw SDKError.notInitialized
+            }
+            token = try await authService.getAccessToken()
+        } else {
+            token = nil
+        }
+
         let url = baseURL.appendingPathComponent(endpoint.path)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.httpBody = try JSONEncoder().encode(payload)
+        request.httpBody = payload
+
+        // Set authorization header
+        if let token = token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        } else if endpoint == .authenticate {
+            // For authentication endpoint, use API key
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
 
         logger.debug("POST request to: \(endpoint.path)")
 
@@ -60,16 +92,32 @@ public actor APIClient {
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
-        return try JSONDecoder().decode(R.self, from: data)
+        return data
     }
 
-    /// Perform a GET request
-    public func get<R: Decodable>(
-        _ endpoint: APIEndpoint
-    ) async throws -> R {
+    /// Perform a raw GET request
+    public func getRaw(
+        _ endpoint: APIEndpoint,
+        requiresAuth: Bool
+    ) async throws -> Data {
+        let token: String?
+        if requiresAuth {
+            guard let authService = authService else {
+                throw SDKError.notInitialized
+            }
+            token = try await authService.getAccessToken()
+        } else {
+            token = nil
+        }
+
         let url = baseURL.appendingPathComponent(endpoint.path)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
+
+        // Set authorization header
+        if let token = token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
 
         logger.debug("GET request to: \(endpoint.path)")
 
@@ -89,6 +137,6 @@ public actor APIClient {
             throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
         }
 
-        return try JSONDecoder().decode(R.self, from: data)
+        return data
     }
 }

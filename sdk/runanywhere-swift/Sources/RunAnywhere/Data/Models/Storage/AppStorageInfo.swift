@@ -1,7 +1,7 @@
 import Foundation
 
 /// App storage breakdown
-public struct AppStorageInfo {
+public struct AppStorageInfo: Sendable {
     public let documentsSize: Int64
     public let cacheSize: Int64
     public let appSupportSize: Int64

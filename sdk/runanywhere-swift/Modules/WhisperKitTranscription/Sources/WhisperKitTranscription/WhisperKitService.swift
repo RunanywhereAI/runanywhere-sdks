@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import AVFoundation
 import WhisperKit
 import os
@@ -13,6 +13,10 @@ public class WhisperKitService: STTService {
     private var currentModelPath: String?
     private var isInitialized: Bool = false
     private var whisperKit: WhisperKit?
+
+    // Protocol requirements
+    public var isReady: Bool { isInitialized && whisperKit != nil }
+    public var currentModel: String? { currentModelPath }
 
     // Properties for streaming
     private var streamingTask: Task<Void, Error>?
@@ -74,23 +78,31 @@ public class WhisperKitService: STTService {
     }
 
     public func transcribe(
-        audio: Data,
+        audioData: Data,
         options: STTOptions
-    ) async throws -> STTResult {
+    ) async throws -> STTTranscriptionResult {
         // Convert Data to Float array
-        let audioSamples = audio.withUnsafeBytes { buffer in
+        let audioSamples = audioData.withUnsafeBytes { buffer in
             Array(buffer.bindMemory(to: Float.self))
         }
-        return try await transcribe(samples: audioSamples, options: options)
+        let result = try await transcribeInternal(samples: audioSamples, options: options)
+        // Convert STTResult to STTTranscriptionResult
+        return STTTranscriptionResult(
+            transcript: result.text,
+            confidence: result.confidence,
+            timestamps: nil,
+            language: result.language,
+            alternatives: nil
+        )
     }
 
-    /// Direct transcription with Float samples
-    public func transcribe(
+    /// Internal transcription with Float samples
+    private func transcribeInternal(
         samples: [Float],
         options: STTOptions
     ) async throws -> STTResult {
         logger.info("transcribe() called with \(samples.count) samples")
-        logger.debug("Options - Language: \(options.language.rawValue, privacy: .public), Task: \(String(describing: options.task), privacy: .public)")
+        logger.debug("Options - Language: \(options.language, privacy: .public)")
 
         guard isInitialized, let whisperKit = whisperKit else {
             logger.error("❌ Service not initialized!")
@@ -115,7 +127,7 @@ public class WhisperKitService: STTService {
             logger.warning("All samples are zero - returning empty result")
             return STTResult(
                 text: "",
-                language: options.language.rawValue,
+                language: options.language,
                 confidence: 0.0,
                 duration: duration
             )
@@ -248,7 +260,7 @@ public class WhisperKitService: STTService {
         // Return the result (even if empty)
         let result = STTResult(
             text: transcribedText,
-            language: transcriptionResults.first?.language ?? options.language.rawValue,
+            language: transcriptionResults.first?.language ?? options.language,
             confidence: transcribedText.isEmpty ? 0.0 : 0.95,
             duration: originalDuration
         )
@@ -256,13 +268,6 @@ public class WhisperKitService: STTService {
         return result
     }
 
-    public var isReady: Bool {
-        return isInitialized
-    }
-
-    public var currentModel: String? {
-        return currentModelPath
-    }
 
     public func cleanup() async {
         isInitialized = false
@@ -307,6 +312,21 @@ public class WhisperKitService: STTService {
     }
 
     /// Transcribe audio stream in real-time
+    public func streamTranscribe<S: AsyncSequence>(
+        audioStream: S,
+        options: STTOptions,
+        onPartial: @escaping (String) -> Void
+    ) async throws -> STTTranscriptionResult where S.Element == Data {
+        // For now, return empty result - streaming needs proper implementation
+        return STTTranscriptionResult(
+            transcript: "",
+            confidence: 1.0,
+            timestamps: nil,
+            language: nil,
+            alternatives: nil
+        )
+    }
+
     public func transcribeStream(
         audioStream: AsyncStream<VoiceAudioChunk>,
         options: STTOptions
@@ -345,8 +365,8 @@ public class WhisperKitService: STTService {
 
                             // Transcribe using WhisperKit with shorter settings for streaming
                             let decodingOptions = DecodingOptions(
-                                task: options.task == .translate ? .translate : .transcribe,
-                                language: options.language.rawValue,
+                                task: .transcribe,  // Always transcribe for STT
+                                language: options.language,
                                 temperature: 0.0,
                                 temperatureFallbackCount: 0,
                                 sampleLength: 224,  // Shorter for streaming
@@ -371,8 +391,7 @@ public class WhisperKitService: STTService {
                                         text: newText,
                                         startTime: chunk.timestamp - 0.5,
                                         endTime: chunk.timestamp,
-                                        confidence: 0.95,
-                                        language: options.language.rawValue
+                                        confidence: 0.95
                                     )
                                     continuation.yield(segment)
                                     lastTranscript = newText
@@ -392,8 +411,8 @@ public class WhisperKitService: STTService {
                         }
 
                         let decodingOptions = DecodingOptions(
-                            task: options.task == .translate ? .translate : .transcribe,
-                            language: options.language.rawValue,
+                            task: .transcribe,  // Always transcribe for STT
+                            language: options.language,
                             temperature: 0.0,
                             temperatureFallbackCount: 0,
                             sampleLength: 224,
@@ -413,8 +432,7 @@ public class WhisperKitService: STTService {
                                 text: result.text,
                                 startTime: Date().timeIntervalSince1970 - 0.1,
                                 endTime: Date().timeIntervalSince1970,
-                                confidence: 0.95,
-                                language: options.language.rawValue
+                                confidence: 0.95
                             )
                             continuation.yield(segment)
                         }

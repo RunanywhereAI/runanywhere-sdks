@@ -1,25 +1,40 @@
 import Foundation
 
-/// API endpoints for cloud sync
+/// API endpoints
 public enum APIEndpoint {
-    case syncConfiguration
-    case syncTelemetry
-    case syncModelMetadata
-    case syncGenerationHistory
-    case syncUserPreferences
+    // Authentication & Health
+    case authenticate
+    case healthCheck
+
+    // Core endpoints
+    case configuration
+    case telemetry
+    case models
+    case deviceInfo
+    case generationHistory
+    case userPreferences
 
     var path: String {
         switch self {
-        case .syncConfiguration:
-            return "/v1/sync/configuration"
-        case .syncTelemetry:
-            return "/v1/sync/telemetry"
-        case .syncModelMetadata:
-            return "/v1/sync/models"
-        case .syncGenerationHistory:
-            return "/v1/sync/history"
-        case .syncUserPreferences:
-            return "/v1/sync/preferences"
+        // Authentication & Health
+        case .authenticate:
+            return "/v1/auth/token"
+        case .healthCheck:
+            return "/v1/health"
+
+        // Core endpoints
+        case .configuration:
+            return "/v1/configuration"
+        case .telemetry:
+            return "/v1/telemetry"
+        case .models:
+            return "/v1/models"
+        case .deviceInfo:
+            return "/v1/device"
+        case .generationHistory:
+            return "/v1/history"
+        case .userPreferences:
+            return "/v1/preferences"
         }
     }
 }
