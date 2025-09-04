@@ -13,7 +13,7 @@ public struct RoutingConfiguration: Codable, Sendable {
 
     /// Custom routing rules (only used when policy is .custom)
     /// Note: Using a dictionary of strings for Sendable conformance
-    public var customRules: [String: String]?
+    public var customRules: [String: String]
 
     /// Maximum latency threshold for routing decisions (milliseconds)
     public var maxLatencyThreshold: Int?
@@ -25,7 +25,7 @@ public struct RoutingConfiguration: Codable, Sendable {
         policy: RoutingPolicy = .deviceOnly,
         cloudEnabled: Bool = false,
         privacyMode: PrivacyMode = .standard,
-        customRules: [String: String]? = nil,
+        customRules: [String: String] = [:],
         maxLatencyThreshold: Int? = nil,
         minConfidenceScore: Double? = nil
     ) {
@@ -52,7 +52,7 @@ public struct RoutingConfiguration: Codable, Sendable {
         minConfidenceScore = try container.decodeIfPresent(Double.self, forKey: .minConfidenceScore)
 
         // Handle custom rules as JSON string dictionary
-        customRules = try container.decodeIfPresent([String: String].self, forKey: .customRules)
+        customRules = try container.decodeIfPresent([String: String].self, forKey: .customRules) ?? [:]
     }
 
     public func encode(to encoder: Encoder) throws {
