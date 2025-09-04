@@ -4,7 +4,7 @@ import Files
 import Pulse
 
 /// Simplified download service using Alamofire
-public class AlamofireDownloadService: DownloadManager {
+public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 
     // MARK: - Properties
 

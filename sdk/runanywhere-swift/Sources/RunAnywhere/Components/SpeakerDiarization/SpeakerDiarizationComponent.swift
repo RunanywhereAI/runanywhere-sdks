@@ -300,7 +300,7 @@ public final class DefaultSpeakerDiarizationAdapter: ComponentAdapter {
 
 /// Speaker Diarization component following the clean architecture
 @MainActor
-public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiarization> {
+public final class SpeakerDiarizationComponent: BaseComponent<DefaultSpeakerDiarization>, @unchecked Sendable {
 
     // MARK: - Properties
 

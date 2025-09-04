@@ -11,7 +11,7 @@ import UIKit
 #endif
 
 /// Analyzes hardware capabilities and makes optimization recommendations
-public class CapabilityAnalyzer {
+public class CapabilityAnalyzer: @unchecked Sendable {
 
     // MARK: - Properties
 

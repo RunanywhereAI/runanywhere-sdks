@@ -20,10 +20,9 @@ public final class LLMSwiftServiceProvider: LLMServiceProvider {
     public static let shared = LLMSwiftServiceProvider()
 
     /// Super simple registration - just call this in your app
+    @MainActor
     public static func register() {
-        Task { @MainActor in
-            ModuleRegistry.shared.registerLLM(shared)
-        }
+        ModuleRegistry.shared.registerLLM(shared)
     }
 
     // MARK: - LLMServiceProvider Protocol
@@ -84,6 +83,7 @@ public final class LLMSwiftServiceProvider: LLMServiceProvider {
 /// Automatic registration when module is imported
 public enum LLMSwiftModule {
     /// Call this to automatically register LLMSwift with the SDK
+    @MainActor
     public static func autoRegister() {
         LLMSwiftServiceProvider.register()
     }

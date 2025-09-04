@@ -276,7 +276,7 @@ public final class LLMServiceWrapper: ServiceWrapper {
 
 /// Language Model component following the clean architecture
 @MainActor
-public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
+public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 
