@@ -4,10 +4,10 @@ plugins {
 }
 
 group = "com.runanywhere"
-version = "1.0.0"
+version = "0.1.0"
 
 intellij {
-    version.set("2024.2")
+    version.set("2023.3")
     type.set("IC")
     plugins.set(listOf("java"))
 }
@@ -28,7 +28,7 @@ dependencies {
 tasks {
     patchPluginXml {
         sinceBuild.set("233")
-        untilBuild.set("261.*")
+        untilBuild.set("251.*")
         changeNotes.set(
             """
             <h2>1.0.0</h2>
