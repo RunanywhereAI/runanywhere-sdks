@@ -166,50 +166,155 @@ class JvmNetworkService {
     }
 
     /**
-     * Get local Whisper models as fallback
+     * Get comprehensive mock models matching iOS implementation
      */
     private fun getLocalWhisperModels(): List<ModelInfo> {
         return listOf(
+            // Llama-3.2 1B Q6_K
             ModelInfo(
-                id = "whisper-tiny-en",
-                name = "Whisper Tiny English",
-                category = ModelCategory.SPEECH_RECOGNITION,
+                id = "llama-3.2-1b-instruct-q6-k",
+                name = "Llama 3.2 1B Instruct Q6_K",
+                category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/ggml-org/whisper.cpp/resolve/main/ggml-tiny.en.bin",
+                downloadURL = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
+                localPath = null,
+                downloadSize = 1_100_000_000L, // ~1.1GB
+                memoryRequired = 1_200_000_000L, // 1.2GB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 131072,
+                supportsThinking = true
+            ),
+
+            // SmolLM2 1.7B Instruct Q6_K_L
+            ModelInfo(
+                id = "smollm2-1.7b-instruct-q6-k-l",
+                name = "SmolLM2 1.7B Instruct Q6_K_L",
+                category = ModelCategory.LANGUAGE,
+                format = ModelFormat.GGUF,
+                downloadURL = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
+                localPath = null,
+                downloadSize = 1_700_000_000L, // ~1.7GB
+                memoryRequired = 1_800_000_000L, // 1.8GB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 8192,
+                supportsThinking = true
+            ),
+
+            // Qwen-2.5 0.5B Q6_K
+            ModelInfo(
+                id = "qwen-2.5-0.5b-instruct-q6-k",
+                name = "Qwen 2.5 0.5B Instruct Q6_K",
+                category = ModelCategory.LANGUAGE,
+                format = ModelFormat.GGUF,
+                downloadURL = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                localPath = null,
+                downloadSize = 650_000_000L, // ~650MB
+                memoryRequired = 600_000_000L, // 600MB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 32768,
+                supportsThinking = true
+            ),
+
+            // SmolLM2 360M Q8_0
+            ModelInfo(
+                id = "smollm2-360m-q8-0",
+                name = "SmolLM2 360M Q8_0",
+                category = ModelCategory.LANGUAGE,
+                format = ModelFormat.GGUF,
+                downloadURL = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                localPath = null,
+                downloadSize = 385_000_000L, // ~385MB
+                memoryRequired = 500_000_000L, // 500MB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 8192,
+                supportsThinking = false
+            ),
+
+            // Qwen-2.5 1.5B Q6_K
+            ModelInfo(
+                id = "qwen-2.5-1.5b-instruct-q6-k",
+                name = "Qwen 2.5 1.5B Instruct Q6_K",
+                category = ModelCategory.LANGUAGE,
+                format = ModelFormat.GGUF,
+                downloadURL = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
+                localPath = null,
+                downloadSize = 1_400_000_000L, // ~1.4GB
+                memoryRequired = 1_600_000_000L, // 1.6GB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 32768,
+                supportsThinking = true
+            ),
+
+            // MARK: - Voice Models (WhisperKit/Whisper.cpp)
+
+            // Whisper Tiny
+            ModelInfo(
+                id = "whisper-tiny",
+                name = "Whisper Tiny",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-tiny.en/AudioEncoder.mlmodelc.zip",
                 localPath = null,
                 downloadSize = 39_000_000L, // ~39MB
-                memoryRequired = 50_000_000L, // 50MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP),
+                memoryRequired = 39_000_000L, // 39MB
+                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP, LLMFramework.WHISPER_KIT),
                 preferredFramework = LLMFramework.WHISPER_CPP,
                 contextLength = 0,
                 supportsThinking = false
             ),
+
+            // Whisper Base
             ModelInfo(
-                id = "whisper-base-en",
-                name = "Whisper Base English",
+                id = "whisper-base",
+                name = "Whisper Base",
                 category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/ggml-org/whisper.cpp/resolve/main/ggml-base.en.bin",
+                format = ModelFormat.BIN,
+                downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/resolve/main/openai_whisper-base/AudioEncoder.mlmodelc.zip",
                 localPath = null,
-                downloadSize = 142_000_000L, // ~142MB
-                memoryRequired = 200_000_000L, // 200MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP),
+                downloadSize = 74_000_000L, // ~74MB
+                memoryRequired = 74_000_000L, // 74MB
+                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP, LLMFramework.WHISPER_KIT),
                 preferredFramework = LLMFramework.WHISPER_CPP,
                 contextLength = 0,
                 supportsThinking = false
             ),
+
+            // MARK: - LiquidAI Models
+
+            // LiquidAI LFM2 350M Q4_K_M (Smallest, fastest)
             ModelInfo(
-                id = "whisper-small-en",
-                name = "Whisper Small English",
-                category = ModelCategory.SPEECH_RECOGNITION,
+                id = "lfm2-350m-q4-k-m",
+                name = "LiquidAI LFM2 350M Q4_K_M",
+                category = ModelCategory.LANGUAGE,
                 format = ModelFormat.GGUF,
-                downloadURL = "https://huggingface.co/ggml-org/whisper.cpp/resolve/main/ggml-small.en.bin",
+                downloadURL = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
                 localPath = null,
-                downloadSize = 488_000_000L, // ~488MB
-                memoryRequired = 600_000_000L, // 600MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP),
-                preferredFramework = LLMFramework.WHISPER_CPP,
-                contextLength = 0,
+                downloadSize = 218_690_000L, // ~219MB
+                memoryRequired = 250_000_000L, // 250MB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 32768,
+                supportsThinking = false
+            ),
+
+            // LiquidAI LFM2 350M Q8_0 (Highest quality)
+            ModelInfo(
+                id = "lfm2-350m-q8-0",
+                name = "LiquidAI LFM2 350M Q8_0",
+                category = ModelCategory.LANGUAGE,
+                format = ModelFormat.GGUF,
+                downloadURL = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                localPath = null,
+                downloadSize = 361_650_000L, // ~362MB
+                memoryRequired = 400_000_000L, // 400MB
+                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
+                preferredFramework = LLMFramework.LLAMA_CPP,
+                contextLength = 32768,
                 supportsThinking = false
             )
         )
