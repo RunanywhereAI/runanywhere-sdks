@@ -3,6 +3,7 @@ package com.runanywhere.sdk.components.stt
 import com.runanywhere.sdk.components.base.BaseComponent
 import com.runanywhere.sdk.components.base.ComponentState
 import com.runanywhere.sdk.components.base.SDKComponent
+import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.data.models.ModelInfo
@@ -22,7 +23,7 @@ class STTComponent(
 
     override val componentType: SDKComponent = SDKComponent.STT
 
-    private var currentModel: ModelInfo? = null
+    private var currentModel: LoadedModel? = null
     private lateinit var sttService: STTService
     private var analyticsCallback: ((String, Map<String, Any>) -> Unit)? = null
 
@@ -49,7 +50,7 @@ class STTComponent(
         // Send analytics event for transcription start
         analyticsCallback?.invoke("transcription_started", mapOf(
             "audio_size_bytes" to audioData.size,
-            "model_id" to (currentModel?.id ?: "unknown"),
+            "model_id" to (currentModel?.model?.id ?: "unknown"),
             "session_id" to generateSessionId(),
             "timestamp" to startTime
         ))
@@ -71,7 +72,7 @@ class STTComponent(
             "text_length" to result.transcript.length,
             "confidence" to (result.confidence ?: 0.0f),
             "language" to (result.language ?: "unknown"),
-            "model_id" to (currentModel?.id ?: "unknown"),
+            "model_id" to (currentModel?.model?.id ?: "unknown"),
             "session_id" to generateSessionId(),
             "timestamp" to endTime,
             "audio_duration_ms" to estimateAudioDuration(audioData.size),
@@ -104,7 +105,7 @@ class STTComponent(
         analyticsCallback?.invoke("stream_transcription_started", mapOf(
             "session_id" to sessionId,
             "timestamp" to streamStartTime,
-            "model_id" to (currentModel?.id ?: "unknown"),
+            "model_id" to (currentModel?.model?.id ?: "unknown"),
             "vad_enabled" to true
         ))
 
@@ -167,10 +168,10 @@ class STTComponent(
                             emit(TranscriptionEvent.SpeechEnd)
 
                             // Send analytics for speech segment completion
-                            analyticsCallback?.invoke("speech_segment_completed", mapOf(
+                            analyticsCallback?.invoke("speech_segment_completed", mapOf<String, Any>(
                                 "session_id" to sessionId,
                                 "timestamp" to speechEndTime,
-                                "speech_duration" to speechDuration,
+                                "speech_duration" to (speechDuration ?: 0L),
                                 "final_text_length" to final.length,
                                 "buffer_chunks" to audioBuffer.size,
                                 "estimated_audio_duration" to estimateAudioDuration(audioBuffer.sumOf { it.size })

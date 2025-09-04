@@ -1,6 +1,8 @@
 package com.runanywhere.sdk.data.repository
 
 import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.models.enums.LLMFramework
 
 /**
  * Repository interfaces

@@ -1,13 +1,22 @@
 package com.runanywhere.sdk.data.database
 
 import androidx.room.TypeConverter
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.models.APIConfiguration
+import com.runanywhere.sdk.data.models.BatteryState
+import com.runanywhere.sdk.data.models.ConfigurationSource
+import com.runanywhere.sdk.data.models.GPUType
+import com.runanywhere.sdk.data.models.GenerationConfiguration
+import com.runanywhere.sdk.data.models.HardwareConfiguration
+import com.runanywhere.sdk.data.models.ModelDownloadConfiguration
+import com.runanywhere.sdk.data.models.RoutingConfiguration
+import com.runanywhere.sdk.data.models.SDKEnvironment
+import com.runanywhere.sdk.data.models.StorageConfiguration
+import com.runanywhere.sdk.data.models.TelemetryEventType
+import com.runanywhere.sdk.data.models.ThermalState
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.decodeFromString
 
 /**
  * Database Type Converters

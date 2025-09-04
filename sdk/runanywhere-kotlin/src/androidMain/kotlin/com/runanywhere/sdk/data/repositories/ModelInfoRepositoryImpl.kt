@@ -5,7 +5,8 @@ import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import java.util.Date
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
 
 /**
  * Repository for managing model information - exact match with iOS
@@ -18,7 +19,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
 
     override suspend fun save(entity: ModelInfo) {
         mutex.withLock {
-            entity.updatedAt = Date()
+            entity.updatedAt = Clock.System.now()
             models[entity.id] = entity
         }
     }
@@ -65,7 +66,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
         mutex.withLock {
             models[modelId]?.let { model ->
                 model.localPath = localPath
-                model.updatedAt = Date()
+                model.updatedAt = Clock.System.now()
             }
         }
     }
@@ -73,9 +74,9 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
     override suspend fun updateLastUsed(modelId: String) {
         mutex.withLock {
             models[modelId]?.let { model ->
-                model.lastUsed = Date()
+                model.lastUsed = Clock.System.now()
                 model.usageCount++
-                model.updatedAt = Date()
+                model.updatedAt = Clock.System.now()
             }
         }
     }
@@ -91,7 +92,7 @@ class ModelInfoRepositoryImpl : ModelInfoRepository {
             ids.forEach { id ->
                 models[id]?.let { model ->
                     model.syncPending = false
-                    model.updatedAt = Date()
+                    model.updatedAt = Clock.System.now()
                 }
             }
         }

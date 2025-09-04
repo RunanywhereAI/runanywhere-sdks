@@ -9,6 +9,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
+ * Platform-specific VAD service creation for Android
+ */
+actual fun createPlatformVADService(): VADService = WebRTCVADService()
+
+/**
  * WebRTC VAD Service implementation using the android-vad library
  * Provides robust voice activity detection using the WebRTC GMM-based algorithm
  */

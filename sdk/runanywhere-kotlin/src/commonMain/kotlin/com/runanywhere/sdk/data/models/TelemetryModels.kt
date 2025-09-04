@@ -3,6 +3,7 @@ package com.runanywhere.sdk.data.models
 import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Contextual
 
 /**
  * Telemetry data models
@@ -48,6 +49,7 @@ enum class TelemetryEventType {
     STT_TRANSCRIPTION_FAILED,
     STT_VAD_DETECTED,
     STT_AUDIO_PROCESSED,
+    STT_EVENT,  // Generic STT event
 
     // TTS events
     TTS_SYNTHESIS_STARTED,
@@ -67,6 +69,22 @@ enum class TelemetryEventType {
     // Custom events
     CUSTOM_EVENT
 }
+
+/**
+ * Simple telemetry event data
+ * Used for quick event tracking
+ */
+@Serializable
+data class TelemetryEventData(
+    val id: String = generateUUID(),
+    val type: TelemetryEventType,
+    val sessionId: String,
+    val deviceId: String,
+    val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
+    val eventData: Map<String, @Contextual Any?> = emptyMap(),
+    val success: Boolean = true,
+    val duration: Long? = null
+)
 
 /**
  * Telemetry data class

@@ -50,49 +50,31 @@ data class StoredTokens(
 )
 
 /**
- * SDK Error types matching iOS exactly
- * Sealed class equivalent to Swift enum with associated values
+ * SDK Error extensions matching iOS pattern
  */
-sealed class SDKError : Exception() {
-    object NotInitialized : SDKError() {
-        override val message: String = "SDK not initialized"
-    }
+// Localized error description matching iOS pattern
+val SDKError.errorDescription: String
+    get() = message ?: "Unknown error"
 
-    data class InvalidAPIKey(override val message: String) : SDKError()
-    data class AuthenticationFailed(override val message: String) : SDKError()
-    data class NetworkError(override val message: String) : SDKError()
-    data class DatabaseInitializationFailed(override val cause: Throwable) : SDKError() {
-        override val message: String = "Database initialization failed: ${cause.message}"
+val SDKError.recoverySuggestion: String
+    get() = when (this) {
+        is SDKError.NotInitialized -> "Call RunAnywhere.initialize() first"
+        is SDKError.InvalidAPIKey -> "Check your API key and ensure it's valid"
+        is SDKError.AuthenticationError -> "Verify your API key and network connection"
+        is SDKError.NetworkError -> "Check your internet connection and try again"
+        is SDKError.ConfigurationError -> "Check your configuration parameters"
+        is SDKError.ModelNotFound -> "Ensure the model is available or download it first"
+        is SDKError.ModelLoadingFailed -> "Check available memory and model file integrity"
+        is SDKError.FileSystemError -> "Check storage permissions and available space"
+        is SDKError.FileNotFound -> "Check if the file exists"
+        is SDKError.InitializationFailed -> "Check initialization parameters"
+        is SDKError.ModelDownloadFailed -> "Check network and retry download"
+        is SDKError.InvalidConfiguration -> "Fix configuration settings"
+        is SDKError.RuntimeError -> "Check runtime environment"
+        is SDKError.ComponentNotAvailable -> "Ensure component is initialized"
+        is SDKError.ValidationError -> "Check input validation"
+        is SDKError.InvalidInput -> "Provide valid input"
+        is SDKError.TranscriptionFailed -> "Check audio input and model"
+        is SDKError.LoadingFailed -> "Check resource availability"
+        else -> "Check error details and retry"
     }
-    data class ConfigurationError(override val message: String) : SDKError()
-    data class ModelNotFound(val modelId: String) : SDKError() {
-        override val message: String = "Model not found: $modelId"
-    }
-    data class ModelLoadFailed(val modelId: String, override val cause: Throwable?) : SDKError() {
-        override val message: String = "Failed to load model $modelId: ${cause?.message}"
-    }
-    data class GenerationFailed(override val message: String) : SDKError()
-    data class ComponentError(val component: String, override val message: String) : SDKError()
-    data class FileSystemError(override val message: String) : SDKError()
-    data class PermissionDenied(override val message: String) : SDKError()
-
-    // Localized error description matching iOS pattern
-    val errorDescription: String
-        get() = message
-
-    val recoverySuggestion: String
-        get() = when (this) {
-            is NotInitialized -> "Call RunAnywhere.initialize() first"
-            is InvalidAPIKey -> "Check your API key and ensure it's valid"
-            is AuthenticationFailed -> "Verify your API key and network connection"
-            is NetworkError -> "Check your internet connection and try again"
-            is DatabaseInitializationFailed -> "Restart the app or clear app data"
-            is ConfigurationError -> "Check your configuration parameters"
-            is ModelNotFound -> "Ensure the model is available or download it first"
-            is ModelLoadFailed -> "Check available memory and model file integrity"
-            is GenerationFailed -> "Try adjusting generation parameters or check model status"
-            is ComponentError -> "Check component configuration and dependencies"
-            is FileSystemError -> "Check storage permissions and available space"
-            is PermissionDenied -> "Grant required permissions in app settings"
-        }
-}

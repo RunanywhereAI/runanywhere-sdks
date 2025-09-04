@@ -10,6 +10,17 @@ import kotlinx.serialization.SerialName
  */
 
 /**
+ * SDK Initialization Parameters
+ * Used during SDK initialization
+ */
+data class SDKInitParams(
+    val apiKey: String,
+    val baseURL: String? = null,
+    val environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
+    val configuration: ConfigurationData? = null
+)
+
+/**
  * Configuration source enumeration
  * Equivalent to iOS ConfigurationSource enum
  */
@@ -70,6 +81,8 @@ data class ConfigurationData(
                 hardware = null
             )
         }
+
+        fun default(apiKey: String): ConfigurationData = defaultConfiguration(apiKey)
     }
 }
 

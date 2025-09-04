@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.models
 
-import com.runanywhere.sdk.data.models.ModelInfo
 import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
@@ -11,7 +10,6 @@ import com.runanywhere.sdk.services.DownloadService
 import com.runanywhere.sdk.services.ValidationService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Model loading service with download support
@@ -38,9 +36,10 @@ class ModelLoadingService(
             ?: throw SDKError.ModelNotFound(modelId)
 
         // Check if model file exists locally
-        val modelFile = FileManager.getModelPath(modelId)
+        val modelPath = FileManager.shared.getModelPath(modelId)
+        val modelExists = FileManager.shared.fileExists(modelPath)
 
-        if (!modelFile.exists()) {
+        if (!modelExists) {
             logger.info("Model $modelId not found locally, downloading...")
 
             // Emit download required event
@@ -48,7 +47,7 @@ class ModelLoadingService(
 
             try {
                 // Download the model
-                downloadModel(modelInfo, modelFile)
+                downloadModel(modelInfo, modelPath)
 
                 // Emit download completed
                 EventBus.publish(SDKModelEvent.DownloadCompleted(modelId))
@@ -59,22 +58,22 @@ class ModelLoadingService(
                 throw SDKError.LoadingFailed("Failed to download model: ${e.message}")
             }
         } else {
-            logger.info("Model $modelId found locally at ${modelFile.path}")
+            logger.info("Model $modelId found locally at $modelPath")
         }
 
         // Validate the model file
-        val isValid = validationService.validate(modelFile.path, modelInfo)
+        val isValid = validationService.validate(modelPath, modelInfo)
         if (!isValid) {
             logger.error("Model $modelId validation failed")
             // Delete invalid model and try again
-            modelFile.delete()
+            FileManager.shared.deleteFile(modelPath)
             throw SDKError.LoadingFailed("Model validation failed, please try again")
         }
 
         // Create LoadedModel instance
         val loadedModel = LoadedModel(
-            model = modelInfo.copy(localPath = modelFile.path),
-            localPath = modelFile.path,
+            model = modelInfo,
+            localPath = modelPath,
             loadedAt = System.currentTimeMillis()
         )
 
@@ -85,24 +84,24 @@ class ModelLoadingService(
         return@withContext loadedModel
     }
 
-    private suspend fun downloadModel(modelInfo: ModelInfo, targetFile: File) {
+    private suspend fun downloadModel(modelInfo: ModelInfo, targetPath: String) {
         if (modelInfo.downloadURL == null) {
             throw SDKError.LoadingFailed("No download URL available for model ${modelInfo.id}")
         }
 
         // For development mode, we'll simulate a successful download
         // In production, this would actually download the model
-        logger.info("Simulating model download for development mode")
+        logger.info("Downloading model to $targetPath")
 
         // Create parent directories if needed
-        targetFile.parentFile?.mkdirs()
+        val parentDir = targetPath.substringBeforeLast("/")
+        FileManager.shared.createDirectory(parentDir)
 
         // For development, create a dummy file
         // In production, this would be replaced with actual download logic
-        if (!targetFile.exists()) {
-            targetFile.createNewFile()
+        if (!FileManager.shared.fileExists(targetPath)) {
             // Write some dummy data to simulate a model file
-            targetFile.writeBytes("DUMMY_MODEL_DATA_${modelInfo.id}".toByteArray())
+            FileManager.shared.writeFile(targetPath, "DUMMY_MODEL_DATA_${modelInfo.id}".toByteArray())
         }
 
         // Emit progress events
