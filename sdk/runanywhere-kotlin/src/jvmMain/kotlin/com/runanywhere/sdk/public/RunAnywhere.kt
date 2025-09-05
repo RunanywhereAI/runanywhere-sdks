@@ -103,20 +103,22 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
             } else {
                 // Production/Staging mode
-                logger.info("Step 5/8: Authenticating with backend")
+                logger.info("Step 5/8: Authenticating with RunAnywhere backend")
 
                 // Initialize real network service
                 networkService = JvmNetworkService()
                 networkService.initialize(apiKey, baseURL ?: environment.defaultBaseURL)
 
-                // Fetch configuration from API
-                logger.info("Step 6/8: Fetching configuration")
-                configurationData = networkService.fetchConfiguration()
+                // Authenticate and register device
+                logger.info("Step 6/8: Authenticating SDK and registering device")
+                val authSuccess = networkService.authenticateAndRegister()
+                if (!authSuccess) {
+                    throw IllegalStateException("Failed to authenticate with RunAnywhere API")
+                }
 
-                // Perform device info call (similar to health check)
-                logger.info("Step 7/8: Sending device info")
-                val deviceInfo = getDeviceInfo()
-                // networkService.reportDeviceInfo(deviceInfo) // TODO: Implement if needed
+                // Fetch configuration from API (fallback to default if fails)
+                logger.info("Step 7/8: Fetching configuration")
+                configurationData = networkService.fetchConfiguration()
 
                 // Bootstrap services
                 val params = SDKInitParams(apiKey, baseURL, environment)
