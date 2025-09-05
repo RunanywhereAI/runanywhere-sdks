@@ -21,6 +21,7 @@ import javax.swing.table.DefaultTableModel
  */
 class ModelManagerDialog(private val project: Project) : DialogWrapper(project, true) {
 
+    private val logger = com.runanywhere.sdk.foundation.SDKLogger("ModelManagerDialog")
     private val tableModel = DefaultTableModel()
     private val table = JBTable(tableModel)
     private val progressBar = JProgressBar()
@@ -131,12 +132,30 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
             try {
                 statusLabel.text = "Loading models..."
 
+                // Check if SDK is initialized
+                if (!RunAnywhere.isInitialized) {
+                    withContext(Dispatchers.Main) {
+                        statusLabel.text = "SDK not initialized"
+                        com.intellij.openapi.ui.Messages.showErrorDialog(
+                            "RunAnywhere SDK is not initialized. Please restart the IDE.",
+                            "SDK Not Initialized"
+                        )
+                    }
+                    return@launch
+                }
+
                 val models = RunAnywhere.availableModels()
                 val downloader = RunAnywhere.getModelDownloader()
 
                 withContext(Dispatchers.Main) {
                     // Clear existing rows
                     tableModel.rowCount = 0
+
+                    if (models.isEmpty()) {
+                        statusLabel.text = "No models available"
+                        logger.warn("No models returned from RunAnywhere.availableModels()")
+                        return@withContext
+                    }
 
                     // Add models to table
                     models.forEach { model ->

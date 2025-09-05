@@ -54,13 +54,27 @@ actual class WhisperSTTService : STTService {
                 logger.info("Initializing Whisper model from: $modelPath")
 
                 // Initialize WhisperJNI
-                whisperJNI = WhisperJNI()
+                try {
+                    whisperJNI = WhisperJNI()
+                    logger.info("WhisperJNI instance created successfully")
+                } catch (e: Exception) {
+                    logger.error("Failed to create WhisperJNI instance: ${e.message}", e)
+                    throw STTError.ServiceNotInitialized
+                }
 
                 // Load the model
                 val path = Paths.get(modelPath)
-                whisperContext = whisperJNI?.init(path)
+                logger.info("Attempting to load model from path: $path")
 
-                if (whisperContext == null) {
+                try {
+                    whisperContext = whisperJNI?.init(path)
+                    if (whisperContext == null) {
+                        logger.error("WhisperJNI init returned null context for model at: $modelPath")
+                        logger.warn("This may be due to incompatible model format or missing native libraries")
+                        throw STTError.ServiceNotInitialized
+                    }
+                } catch (e: Exception) {
+                    logger.error("Failed to initialize Whisper model: ${e.message}", e)
                     throw STTError.ServiceNotInitialized
                 }
 

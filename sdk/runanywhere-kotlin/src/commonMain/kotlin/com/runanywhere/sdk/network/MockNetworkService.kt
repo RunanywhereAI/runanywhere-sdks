@@ -44,8 +44,8 @@ class MockNetworkService {
                 downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() }
                     ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
                 localPath = null,
-                downloadSize = 39_000_000, // ~39MB
-                memoryRequired = 39_000_000, // 39MB
+                downloadSize = 77_691_713, // ~77MB - actual size
+                memoryRequired = 80_000_000, // 80MB
                 compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
                 preferredFramework = LLMFramework.WHISPER_KIT,
                 contextLength = 0,
