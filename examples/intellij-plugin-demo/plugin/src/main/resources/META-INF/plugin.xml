@@ -46,6 +46,12 @@
 
         <!-- Notification Group -->
         <notificationGroup id="RunAnywhere.Notifications" displayType="BALLOON" />
+
+        <!-- STT Tool Window -->
+        <toolWindow id="RunAnywhere STT"
+                    anchor="right"
+                    factoryClass="com.runanywhere.plugin.toolwindow.STTToolWindow"
+                    icon="AllIcons.Actions.Execute" />
     </extensions>
 
     <!-- Actions -->
