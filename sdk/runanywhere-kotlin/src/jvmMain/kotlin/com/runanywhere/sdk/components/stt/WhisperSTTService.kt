@@ -251,9 +251,7 @@ actual class WhisperSTTService : STTService {
      * Create Whisper parameters from STT options
      */
     private fun createWhisperParams(options: STTOptions): WhisperFullParams {
-        // Create params with GREEDY strategy (better for real-time)
-        return WhisperFullParams(WhisperSamplingStrategy.GREEDY).apply {
-
+        return WhisperFullParams().apply {
             // Set number of threads for processing
             nThreads = Runtime.getRuntime().availableProcessors()
 
@@ -269,26 +267,17 @@ actual class WhisperSTTService : STTService {
             // Enable timestamps if requested
             printTimestamps = options.enableTimestamps
 
-            // Other useful parameters
+            // Sensitivity-based parameters
             noContext = false // Use context for better accuracy
-            singleSegment = false // Allow multiple segments
+            singleSegment = false // Allow multiple segments for better detection
             printSpecial = false // Don't print special tokens
             printProgress = false // Don't print progress
             printRealtime = false // Don't print realtime
 
-            // Performance settings
-            // speedUp is not available in whisper-jni
-            audioCtx = 0 // Use default audio context
+            // Temperature settings from options
+            temperature = options.temperature
 
-            // Temperature for sampling (0 = deterministic)
-            temperature = 0.0f
-
-            // Beam search parameters (for better accuracy)
-            beamSearchBeamSize = 5
-
-            // Suppress blanks
-            suppressBlank = true
-            suppressNonSpeechTokens = true
+            logger.debug("Created Whisper parameters: temperature=$temperature, suppressBlank=${options.suppressBlank}, suppressNonSpeech=${options.suppressNonSpeechTokens}")
         }
     }
 }
