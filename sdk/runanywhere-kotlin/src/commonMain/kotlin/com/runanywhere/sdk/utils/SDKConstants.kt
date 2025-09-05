@@ -61,22 +61,8 @@ object SDKConstants {
 
     // MARK: - Model Download URLs (loaded from config)
     object ModelUrls {
-        // Language Models
-        val LLAMA_3_2_1B: String get() = config.modelUrls.llama32_1b
-        val LLAMA_3_2_3B: String get() = config.modelUrls.llama32_3b
-        val SMOLLM2_1_7B: String get() = config.modelUrls.smollm2_17b
-        val SMOLLM2_360M: String get() = config.modelUrls.smollm2_360m
-        val QWEN_2_5_0_5B: String get() = config.modelUrls.qwen25_05b
-        val QWEN_2_5_1_5B: String get() = config.modelUrls.qwen25_15b
-        val LFM2_350M_Q4: String get() = config.modelUrls.lfm2_350m_q4
-        val LFM2_350M_Q8: String get() = config.modelUrls.lfm2_350m_q8
-
-        // Speech Models
-        val WHISPER_TINY: String get() = config.modelUrls.whisperTiny
+        // Default Speech Model - Whisper Base only
         val WHISPER_BASE: String get() = config.modelUrls.whisperBase
-        val WHISPER_SMALL: String get() = config.modelUrls.whisperSmall
-        val WHISPER_MEDIUM: String get() = config.modelUrls.whisperMedium
-        val WHISPER_LARGE: String get() = config.modelUrls.whisperLarge
     }
 
     // MARK: - API Endpoints
@@ -258,22 +244,8 @@ data class SDKConfig(
 
 @Serializable
 data class ModelUrlConfig(
-    // Language Models
-    val llama32_1b: String = "",
-    val llama32_3b: String = "",
-    val smollm2_17b: String = "",
-    val smollm2_360m: String = "",
-    val qwen25_05b: String = "",
-    val qwen25_15b: String = "",
-    val lfm2_350m_q4: String = "",
-    val lfm2_350m_q8: String = "",
-
-    // Speech Models
-    val whisperTiny: String = "",
-    val whisperBase: String = "",
-    val whisperSmall: String = "",
-    val whisperMedium: String = "",
-    val whisperLarge: String = ""
+    // Default Speech Model - Whisper Base only
+    val whisperBase: String = ""
 )
 
 @Serializable
