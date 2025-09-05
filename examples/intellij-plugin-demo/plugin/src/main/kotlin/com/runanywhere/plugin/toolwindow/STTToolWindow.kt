@@ -473,8 +473,13 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         recordingTimer?.start()
 
         // Start voice capture
+        logToUI("INFO", "Starting voice capture...")
+        println("STTToolWindow: Starting voice capture")
         voiceService.startVoiceCapture { transcription ->
+            println("STTToolWindow: Received transcription callback: '$transcription'")
+            logToUI("INFO", "Received transcription callback: '$transcription'")
             ApplicationManager.getApplication().invokeLater {
+                println("STTToolWindow: Dispatching to UI thread")
                 handleTranscription(transcription)
             }
         }
@@ -499,8 +504,13 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         recordingTimer?.start()
 
         // Resume voice capture
+        logToUI("INFO", "Resuming voice capture...")
+        println("STTToolWindow: Resuming voice capture")
         voiceService.startVoiceCapture { transcription ->
+            println("STTToolWindow: Received transcription callback (resume): '$transcription'")
+            logToUI("INFO", "Received transcription callback (resume): '$transcription'")
             ApplicationManager.getApplication().invokeLater {
+                println("STTToolWindow: Dispatching to UI thread (resume)")
                 handleTranscription(transcription)
             }
         }
@@ -534,9 +544,15 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
     }
 
     private fun handleTranscription(transcription: String) {
+        logToUI("INFO", "handleTranscription called with: '$transcription'")
+        println("STTToolWindow: handleTranscription called with: '$transcription'")
+
         currentTranscription = transcription
         transcriptionArea.text = transcription
-        statusLabel.text = "Transcription received"
+        statusLabel.text = "Transcription received: ${transcription.take(50)}${if (transcription.length > 50) "..." else ""}"
+
+        logToUI("INFO", "Transcription text updated in UI")
+        println("STTToolWindow: Transcription area updated with text")
     }
 
     private fun addToHistory(transcription: String) {

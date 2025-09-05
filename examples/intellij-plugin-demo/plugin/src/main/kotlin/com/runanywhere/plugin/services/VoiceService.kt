@@ -121,28 +121,79 @@ class VoiceService(private val project: Project) : Disposable {
     private fun processAudioData(audioData: ByteArray, onTranscription: (String) -> Unit) {
         scope.launch {
             try {
-                showNotification("Processing", "Transcribing audio...", NotificationType.INFORMATION)
+                println("VoiceService: Processing ${audioData.size} bytes of audio data")
+
+                // Analyze audio levels
+                val audioLevels = analyzeAudioLevels(audioData)
+                println("VoiceService: Audio analysis - Max: ${audioLevels.max}, Average: ${audioLevels.average}, RMS: ${audioLevels.rms}")
+                println("VoiceService: Audio has significant content: ${audioLevels.hasSignificantAudio}")
+
+                showNotification("Processing", "Transcribing audio... (${audioData.size} bytes)", NotificationType.INFORMATION)
 
                 // Use SDK to transcribe
+                println("VoiceService: Calling RunAnywhere.transcribe()...")
                 val transcription = RunAnywhere.transcribe(audioData)
+                println("VoiceService: Raw transcription result: '$transcription' (length: ${transcription.length})")
 
                 if (transcription.isNotEmpty()) {
-                    withContext(Dispatchers.Main) {
+                    // Check if it's just punctuation or actually meaningful
+                    val meaningfulText = transcription.trim().replace(Regex("[.!?\\s]+"), "")
+                    if (meaningfulText.isNotEmpty()) {
+                        println("VoiceService: Meaningful transcription found: '$transcription'")
                         onTranscription(transcription)
                         showNotification("Transcription Complete", transcription, NotificationType.INFORMATION)
+                    } else {
+                        println("VoiceService: Only punctuation detected, likely no speech or low audio quality")
+                        val message = "Only punctuation detected. Try speaking louder or closer to microphone. Audio stats: max=${audioLevels.max}, avg=${audioLevels.average}"
+                        onTranscription(message)
+                        showNotification("Low Audio Quality", message, NotificationType.WARNING)
                     }
                 } else {
+                    println("VoiceService: Empty transcription result")
                     showNotification("No Speech", "No speech detected in the recording", NotificationType.WARNING)
                 }
 
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showNotification("Transcription Error", "Failed to transcribe: ${e.message}", NotificationType.ERROR)
-                }
+                println("VoiceService: Transcription error: ${e.message}")
                 e.printStackTrace()
+                showNotification("Transcription Error", "Failed to transcribe: ${e.message}", NotificationType.ERROR)
             }
         }
     }
+
+    private fun analyzeAudioLevels(audioData: ByteArray): AudioLevels {
+        if (audioData.size < 2) return AudioLevels(0, 0.0, 0.0, false)
+
+        var maxLevel = 0
+        var sumSquares = 0.0
+        var sum = 0.0
+        val sampleCount = audioData.size / 2
+
+        for (i in 0 until audioData.size - 1 step 2) {
+            // Convert bytes to 16-bit signed integer (little endian)
+            val sample = ((audioData[i + 1].toInt() shl 8) or (audioData[i].toInt() and 0xFF)).toShort().toInt()
+            val absSample = kotlin.math.abs(sample)
+
+            maxLevel = kotlin.math.max(maxLevel, absSample)
+            sum += absSample
+            sumSquares += sample * sample
+        }
+
+        val average = sum / sampleCount
+        val rms = kotlin.math.sqrt(sumSquares / sampleCount)
+
+        // Consider audio significant if max > 1000 (out of 32767) and RMS > 500
+        val hasSignificantAudio = maxLevel > 1000 && rms > 500
+
+        return AudioLevels(maxLevel, average, rms, hasSignificantAudio)
+    }
+
+    private data class AudioLevels(
+        val max: Int,
+        val average: Double,
+        val rms: Double,
+        val hasSignificantAudio: Boolean
+    )
 
     fun isRecording(): Boolean = isRecording
 
