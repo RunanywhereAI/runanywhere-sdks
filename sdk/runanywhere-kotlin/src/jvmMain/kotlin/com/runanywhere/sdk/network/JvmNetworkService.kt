@@ -35,6 +35,9 @@ class JvmNetworkService {
 
     private var baseURL: String = DEFAULT_BASE_URL
     private var apiKey: String? = null
+    private var accessToken: String? = null
+    private var refreshToken: String? = null
+    private var deviceId: String? = null
 
     /**
      * Initialize the network service
@@ -43,6 +46,161 @@ class JvmNetworkService {
         this.apiKey = apiKey
         this.baseURL = baseURL ?: DEFAULT_BASE_URL
         logger.info("Initialized JvmNetworkService with base URL: ${this.baseURL}")
+    }
+
+    /**
+     * Complete authentication and device registration flow
+     * This should be called during SDK initialization
+     */
+    suspend fun authenticateAndRegister(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            logger.info("Starting RunAnywhere API authentication and registration flow...")
+
+            // Step 1: Authenticate with API key
+            if (!authenticateSDK()) {
+                logger.error("SDK authentication failed")
+                return@withContext false
+            }
+
+            // Step 2: Register device
+            if (!registerDevice()) {
+                logger.error("Device registration failed")
+                return@withContext false
+            }
+
+            logger.info("✅ Authentication and registration completed successfully")
+            return@withContext true
+
+        } catch (e: Exception) {
+            logger.error("Error during authentication and registration flow", e)
+            return@withContext false
+        }
+    }
+
+    /**
+     * Step 1: Authenticate SDK with API key
+     * POST /api/v1/auth/sdk/authenticate
+     */
+    private suspend fun authenticateSDK(): Boolean {
+        try {
+            logger.info("Authenticating SDK with RunAnywhere API...")
+
+            val url = URL("$baseURL/api/v1/auth/sdk/authenticate")
+            val requestBody = json.encodeToString(
+                AuthenticateRequest.serializer(),
+                AuthenticateRequest(apiKey = apiKey ?: "")
+            )
+
+            val response = makeRequest(url, "POST", requestBody)
+
+            if (response.isSuccessful) {
+                val authResponse = json.decodeFromString<AuthenticateResponse>(response.body)
+
+                // Store tokens
+                accessToken = authResponse.accessToken
+                refreshToken = authResponse.refreshToken
+
+                logger.info("✅ SDK authenticated successfully")
+                return true
+            } else {
+                logger.error("❌ SDK authentication failed: HTTP ${response.code} - ${response.body}")
+                return false
+            }
+
+        } catch (e: Exception) {
+            logger.error("❌ Error during SDK authentication", e)
+            return false
+        }
+    }
+
+    /**
+     * Step 2: Register device with RunAnywhere backend
+     * POST /api/v1/devices/register
+     */
+    private suspend fun registerDevice(): Boolean {
+        try {
+            if (accessToken == null) {
+                logger.error("Cannot register device: no access token available")
+                return false
+            }
+
+            logger.info("Registering device with RunAnywhere backend...")
+
+            val url = URL("$baseURL/api/v1/devices/register")
+            val deviceInfo = getDeviceInfo()
+            val requestBody = json.encodeToString(
+                DeviceRegistrationRequest.serializer(),
+                DeviceRegistrationRequest(
+                    deviceName = deviceInfo["device_name"] as String,
+                    platform = deviceInfo["platform"] as String,
+                    osVersion = deviceInfo["os_version"] as String,
+                    architecture = deviceInfo["os_arch"] as String,
+                    metadata = deviceInfo
+                )
+            )
+
+            val response = makeAuthenticatedRequest(url, "POST", requestBody)
+
+            if (response.isSuccessful) {
+                val deviceResponse = json.decodeFromString<DeviceRegistrationResponse>(response.body)
+
+                // Store device ID
+                deviceId = deviceResponse.deviceId
+
+                logger.info("✅ Device registered successfully: ${deviceResponse.deviceId}")
+                return true
+            } else {
+                logger.error("❌ Device registration failed: HTTP ${response.code} - ${response.body}")
+                return false
+            }
+
+        } catch (e: Exception) {
+            logger.error("❌ Error during device registration", e)
+            return false
+        }
+    }
+
+    /**
+     * Refresh access token using refresh token
+     * POST /api/v1/auth/sdk/refresh
+     */
+    suspend fun refreshAccessToken(): Boolean = withContext(Dispatchers.IO) {
+        try {
+            if (refreshToken == null) {
+                logger.warn("No refresh token available")
+                return@withContext false
+            }
+
+            logger.info("Refreshing access token...")
+
+            val url = URL("$baseURL/api/v1/auth/sdk/refresh")
+            val requestBody = json.encodeToString(
+                RefreshTokenRequest.serializer(),
+                RefreshTokenRequest(refreshToken = refreshToken!!)
+            )
+
+            val response = makeRequest(url, "POST", requestBody)
+
+            if (response.isSuccessful) {
+                val refreshResponse = json.decodeFromString<RefreshTokenResponse>(response.body)
+
+                // Update tokens
+                accessToken = refreshResponse.accessToken
+                if (refreshResponse.refreshToken != null) {
+                    refreshToken = refreshResponse.refreshToken
+                }
+
+                logger.info("✅ Access token refreshed successfully")
+                return@withContext true
+            } else {
+                logger.error("❌ Token refresh failed: HTTP ${response.code} - ${response.body}")
+                return@withContext false
+            }
+
+        } catch (e: Exception) {
+            logger.error("❌ Error refreshing access token", e)
+            return@withContext false
+        }
     }
 
     /**
@@ -124,9 +282,16 @@ class JvmNetworkService {
     }
 
     /**
+     * Make authenticated HTTP request
+     */
+    private fun makeAuthenticatedRequest(url: URL, method: String, body: String? = null): HttpResponse {
+        return makeRequest(url, method, body, true)
+    }
+
+    /**
      * Make HTTP request with proper headers and authentication
      */
-    private fun makeRequest(url: URL, method: String, body: String? = null): HttpResponse {
+    private fun makeRequest(url: URL, method: String, body: String? = null, authenticated: Boolean = false): HttpResponse {
         val connection = url.openConnection() as HttpURLConnection
 
         try {
@@ -137,9 +302,12 @@ class JvmNetworkService {
             connection.setRequestProperty("Content-Type", "application/json")
             connection.setRequestProperty("User-Agent", "RunAnywhere-SDK-JVM/1.0")
 
-            // Add authentication if available
-            apiKey?.let { key ->
-                connection.setRequestProperty("Authorization", "Bearer $key")
+            // Add authentication if required
+            if (authenticated && accessToken != null) {
+                connection.setRequestProperty("Authorization", "Bearer $accessToken")
+            } else if (!authenticated && apiKey != null) {
+                // For non-authenticated requests, still add API key if available
+                connection.setRequestProperty("Authorization", "Bearer $apiKey")
             }
 
             // Add body for POST/PUT requests
@@ -320,8 +488,46 @@ class JvmNetworkService {
         )
     }
 
-    // Data classes for API responses
+    // Minimal data classes for auth flow
 
+    @Serializable
+    data class AuthenticateRequest(val apiKey: String)
+
+    @Serializable
+    data class AuthenticateResponse(
+        val accessToken: String,
+        val refreshToken: String,
+        val expiresIn: Int
+    )
+
+    @Serializable
+    data class RefreshTokenRequest(val refreshToken: String)
+
+    @Serializable
+    data class RefreshTokenResponse(
+        val accessToken: String,
+        val refreshToken: String? = null
+    )
+
+    @Serializable
+    data class DeviceRegistrationRequest(
+        val deviceName: String,
+        val platform: String,
+        val osVersion: String,
+        val architecture: String,
+        val metadata: Map<String, Any>
+    )
+
+    @Serializable
+    data class DeviceRegistrationResponse(
+        val deviceId: String,
+        val status: String
+    )
+
+    @Serializable
+    data class DeviceStatusUpdate(val status: String)
+
+    // Legacy data classes for existing functionality
     @Serializable
     private data class ModelsResponse(
         val models: List<ApiModelInfo>

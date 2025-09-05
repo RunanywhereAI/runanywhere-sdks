@@ -45,11 +45,11 @@ class RunAnywherePlugin : StartupActivity {
 
                     initializationJob = GlobalScope.launch {
                         try {
-                            // Initialize SDK with development mode for testing
+                            // Initialize SDK with production mode and real API key
                             RunAnywhere.initialize(
-                                apiKey = "dev-api-key",
+                                apiKey = "your-actual-api-key-here", // TODO: Replace with actual API key
                                 baseURL = "https://api.runanywhere.ai",
-                                environment = SDKEnvironment.DEVELOPMENT
+                                environment = SDKEnvironment.PRODUCTION
                             )
 
                             isInitialized = true
