@@ -144,7 +144,20 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                     return@launch
                 }
 
-                val models = RunAnywhere.availableModels()
+                // Get models and check for errors
+                logger.info("Fetching available models...")
+                val models = try {
+                    RunAnywhere.availableModels()
+                } catch (e: Exception) {
+                    logger.error("Failed to fetch models", e)
+                    withContext(Dispatchers.Main) {
+                        statusLabel.text = "Failed to fetch models: ${e.message}"
+                    }
+                    return@launch
+                }
+
+                logger.info("Fetched ${models.size} models")
+
                 val downloader = RunAnywhere.getModelDownloader()
 
                 withContext(Dispatchers.Main) {
@@ -154,13 +167,33 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                     if (models.isEmpty()) {
                         statusLabel.text = "No models available"
                         logger.warn("No models returned from RunAnywhere.availableModels()")
+
+                        // Add a message row to help debug
+                        com.intellij.openapi.ui.Messages.showWarningDialog(
+                            "No models available. Please check:\n" +
+                            "1. SDK is properly initialized\n" +
+                            "2. Models are configured in MockNetworkService\n" +
+                            "3. Check IDE logs for errors",
+                            "No Models Available"
+                        )
                         return@withContext
                     }
 
                     // Add models to table
                     models.forEach { model ->
-                        val isDownloaded = downloader.isModelDownloaded(model)
-                        val status = if (isDownloaded) "Downloaded" else "Available"
+                        logger.info("Adding model to table: ${model.id} (${model.name})")
+                        val isDownloaded = try {
+                            downloader.isModelDownloaded(model)
+                        } catch (e: Exception) {
+                            logger.error("Error checking download status for ${model.id}", e)
+                            false
+                        }
+
+                        val status = when {
+                            isDownloaded -> "Downloaded"
+                            model == RunAnywhere.getLoadedSTTModel() -> "Loaded"
+                            else -> "Available"
+                        }
                         val sizeMB = (model.downloadSize ?: 0) / (1024 * 1024)
 
                         tableModel.addRow(arrayOf(
@@ -176,6 +209,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                     updateButtonStates()
                 }
             } catch (e: Exception) {
+                logger.error("Error loading models", e)
                 withContext(Dispatchers.Main) {
                     statusLabel.text = "Error: ${e.message}"
                 }

@@ -1,5 +1,7 @@
 package com.runanywhere.plugin
 
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.service
 import com.intellij.openapi.progress.ProgressIndicator
@@ -7,15 +9,16 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.StartupActivity
+import com.intellij.openapi.ui.Messages
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKInitializationEvent
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import java.util.prefs.Preferences
 
 /**
  * Main plugin startup activity
@@ -23,8 +26,12 @@ import kotlinx.coroutines.launch
 class RunAnywherePlugin : StartupActivity {
 
     companion object {
+        private val logger = SDKLogger("RunAnywherePlugin")
         var isInitialized = false
         var initializationJob: Job? = null
+        private val prefs = Preferences.userNodeForPackage(RunAnywherePlugin::class.java)
+        private const val PREF_SELECTED_MODEL = "selected_stt_model"
+        private const val PREF_AUTO_LOAD_MODEL = "auto_load_model"
     }
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -61,7 +68,7 @@ class RunAnywherePlugin : StartupActivity {
                                             }
 
                                             // Auto-download default STT model
-                                            downloadDefaultSTTModel()
+                                            checkAndLoadSTTModel(project)
                                         }
 
                                         is SDKInitializationEvent.Failed -> {
@@ -88,75 +95,110 @@ class RunAnywherePlugin : StartupActivity {
         println("RunAnywhere Voice Commands plugin started for project: ${project.name}")
     }
 
-    private suspend fun downloadDefaultSTTModel() {
+    private suspend fun checkAndLoadSTTModel(project: Project) {
         try {
             val models = RunAnywhere.availableModels()
-            val whisperModel = models.find {
-                it.category == ModelCategory.SPEECH_RECOGNITION &&
-                        it.id == "whisper-tiny"
+                .filter { it.category == ModelCategory.SPEECH_RECOGNITION }
+
+            if (models.isEmpty()) {
+                showNotification(project, "No STT Models",
+                    "No STT models available", NotificationType.WARNING)
+                return
             }
 
-            whisperModel?.let { model ->
-                println("🔍 Checking STT model: ${model.id}")
+            logger.info("Found ${models.size} STT models available")
+            val downloader = RunAnywhere.getModelDownloader()
 
-                if (!RunAnywhere.getModelDownloader().isModelDownloaded(model)) {
-                    println("📥 Model not found locally. Downloading STT model: ${model.id}")
+            // Check for already downloaded models
+            val downloadedModels = models.filter { downloader.isModelDownloaded(it) }
 
-                    ApplicationManager.getApplication().invokeLater {
-                        println("⏳ Starting download for model: ${model.id}")
-                    }
+            if (downloadedModels.isNotEmpty()) {
+                logger.info("Found ${downloadedModels.size} already downloaded models")
+                // Auto-load the first downloaded model (preferring tiny, then base, then first)
+                val modelToLoad = downloadedModels.find { it.id == "whisper-tiny" }
+                    ?: downloadedModels.find { it.id == "whisper-base" }
+                    ?: downloadedModels.first()
 
-                    RunAnywhere.downloadModel(model.id).collect { progress ->
-                        val percentage = (progress * 100).toInt()
-                        if (percentage % 10 == 0 || percentage == 100) {
-                            ApplicationManager.getApplication().invokeLater {
-                                println("📊 Download progress: $percentage%")
-                            }
-                        }
+                logger.info("Auto-loading existing model: ${modelToLoad.id}")
+                loadModelIntoWhisper(project, modelToLoad)
+            } else {
+                // No models downloaded - show notification to use UI
+                logger.info("No models downloaded yet")
+                showNotification(project, "Models Available",
+                    "STT models available for download. Open 'RunAnywhere STT' tool window to download.",
+                    NotificationType.INFORMATION)
+            }
 
-                        if (progress >= 1.0f) {
-                            ApplicationManager.getApplication().invokeLater {
-                                println("✅ Model downloaded successfully: ${model.id}")
-                                println("🔄 Model is being loaded automatically...")
-                            }
-                        }
-                    }
-                } else {
-                    // Model already downloaded, just load it
-                    println(
-                        "✓ Model already downloaded at: ${
-                            RunAnywhere.getModelDownloader().getModelPath(model)
-                        }"
-                    )
+            // Always show which models are available
+            val availableInfo = models.joinToString(", ") { "${it.name} (${(it.downloadSize ?: 0) / 1048576}MB)" }
+            logger.info("Available models: $availableInfo")
 
-                    // Check if already loaded
-                    if (RunAnywhere.getLoadedSTTModel()?.id != model.id) {
-                        println("🔄 Loading existing model into memory...")
-                        RunAnywhere.loadSTTModel(model)
-                        ApplicationManager.getApplication().invokeLater {
-                            println("✅ STT model loaded from disk: ${model.id}")
-                        }
-                    } else {
-                        ApplicationManager.getApplication().invokeLater {
-                            println("✅ STT model already loaded in memory: ${model.id}")
-                        }
-                    }
-                }
+        } catch (e: Exception) {
+            logger.error("Failed to check STT models", e)
+            showNotification(project, "STT Error",
+                "Failed to check STT models: ${e.message}",
+                NotificationType.ERROR)
+        }
+    }
 
-                // Verify pipeline is ready
-                if (RunAnywhere.isSTTPipelineReady()) {
-                    ApplicationManager.getApplication().invokeLater {
-                        println("🎤 STT pipeline is ready for voice transcription!")
-                    }
-                }
-            } ?: run {
-                println("⚠️ No STT model found in available models list")
+    private suspend fun loadModelIntoWhisper(project: Project, model: ModelInfo) {
+        try {
+            // Check if already loaded
+            val currentModel = RunAnywhere.getLoadedSTTModel()
+            if (currentModel?.id == model.id) {
+                logger.info("Model already loaded in WhisperJNI: ${model.id}")
+                showNotification(project, "Model Ready",
+                    "${model.name} is ready for transcription",
+                    NotificationType.INFORMATION)
+            } else {
+                logger.info("Loading model into WhisperJNI: ${model.id}")
+                RunAnywhere.loadSTTModel(model)
+
+                // Save as preferred model
+                prefs.put(PREF_SELECTED_MODEL, model.id)
+
+                showNotification(project, "Model Loaded",
+                    "${model.name} loaded successfully",
+                    NotificationType.INFORMATION)
+            }
+
+            // Verify pipeline is ready
+            if (RunAnywhere.isSTTPipelineReady()) {
+                logger.info("STT pipeline is ready for voice transcription")
             }
         } catch (e: Exception) {
-            ApplicationManager.getApplication().invokeLater {
-                println("❌ Failed to initialize STT model: ${e.message}")
-                e.printStackTrace()
+            logger.error("Failed to load model into WhisperJNI", e)
+            showNotification(project, "Load Error",
+                "Failed to load model: ${e.message}",
+                NotificationType.ERROR)
+        }
+    }
+
+    private suspend fun downloadAndLoadModel(project: Project, model: ModelInfo) {
+        try {
+            showNotification(project, "Downloading",
+                "Downloading ${model.name}...",
+                NotificationType.INFORMATION)
+
+            RunAnywhere.downloadModel(model.id).collect { progress ->
+                if (progress >= 1.0f) {
+                    loadModelIntoWhisper(project, model)
+                }
             }
+        } catch (e: Exception) {
+            logger.error("Failed to download model", e)
+            showNotification(project, "Download Error",
+                "Failed to download: ${e.message}",
+                NotificationType.ERROR)
+        }
+    }
+
+    private fun showNotification(project: Project, title: String, content: String, type: NotificationType) {
+        ApplicationManager.getApplication().invokeLater {
+            NotificationGroupManager.getInstance()
+                .getNotificationGroup("RunAnywhere.Notifications")
+                .createNotification(title, content, type)
+                .notify(project)
         }
     }
 }
