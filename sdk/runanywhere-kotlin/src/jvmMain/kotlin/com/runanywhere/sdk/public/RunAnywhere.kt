@@ -152,7 +152,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             val models = fetchAvailableModels()
             val defaultSTTModel = models.find {
                 it.category == ModelCategory.SPEECH_RECOGNITION &&
-                it.id == "whisper-tiny"
+                it.id == "whisper-base"
             }
 
             if (defaultSTTModel != null) {

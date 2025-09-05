@@ -51,18 +51,10 @@ class ModelManager {
     }
 
     /**
-     * Get list of available models
+     * Get list of available models - only Whisper Base as default
      */
     fun getAvailableModels(): List<ModelInfo> {
         return listOf(
-            ModelInfo(
-                id = "whisper-tiny",
-                name = "Whisper Tiny",
-                category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.BIN,
-                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() },
-                downloadSize = 39L * 1024 * 1024 // 39MB
-            ),
             ModelInfo(
                 id = "whisper-base",
                 name = "Whisper Base",
@@ -70,22 +62,6 @@ class ModelManager {
                 format = ModelFormat.BIN,
                 downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() },
                 downloadSize = 74L * 1024 * 1024 // 74MB
-            ),
-            ModelInfo(
-                id = "whisper-small",
-                name = "Whisper Small",
-                category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.BIN,
-                downloadURL = SDKConstants.ModelUrls.WHISPER_SMALL.takeIf { it.isNotEmpty() },
-                downloadSize = 244L * 1024 * 1024 // 244MB
-            ),
-            ModelInfo(
-                id = "whisper-medium",
-                name = "Whisper Medium",
-                category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.BIN,
-                downloadURL = SDKConstants.ModelUrls.WHISPER_MEDIUM.takeIf { it.isNotEmpty() },
-                downloadSize = 769L * 1024 * 1024 // 769MB
             )
         )
     }

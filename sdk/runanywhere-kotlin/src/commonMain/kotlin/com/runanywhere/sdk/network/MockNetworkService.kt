@@ -32,27 +32,9 @@ class MockNetworkService {
     }
 
     private fun createMockModels(): List<ModelInfo> {
-        // Only include Whisper STT models for testing
+        // Only include Whisper Base model as default
         return listOf(
-            // Whisper Tiny - Fastest, smallest
-            ModelInfo(
-                id = "whisper-tiny",
-                name = "Whisper Tiny",
-                category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.MLMODEL,
-                // Use hardcoded URL for development mode
-                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() }
-                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-                localPath = null,
-                downloadSize = 77_691_713, // ~77MB - actual size
-                memoryRequired = 80_000_000, // 80MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
-                preferredFramework = LLMFramework.WHISPER_KIT,
-                contextLength = 0,
-                supportsThinking = false
-            ),
-
-            // Whisper Base - Better accuracy
+            // Whisper Base - Default model
             ModelInfo(
                 id = "whisper-base",
                 name = "Whisper Base",
@@ -64,24 +46,6 @@ class MockNetworkService {
                 localPath = null,
                 downloadSize = 74_000_000, // ~74MB
                 memoryRequired = 74_000_000, // 74MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
-                preferredFramework = LLMFramework.WHISPER_KIT,
-                contextLength = 0,
-                supportsThinking = false
-            ),
-
-            // Whisper Small - Good balance
-            ModelInfo(
-                id = "whisper-small",
-                name = "Whisper Small",
-                category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.MLMODEL,
-                // Use hardcoded URL for development mode
-                downloadURL = SDKConstants.ModelUrls.WHISPER_SMALL.takeIf { it.isNotEmpty() }
-                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-                localPath = null,
-                downloadSize = 244_000_000, // ~244MB
-                memoryRequired = 244_000_000, // 244MB
                 compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
                 preferredFramework = LLMFramework.WHISPER_KIT,
                 contextLength = 0,
