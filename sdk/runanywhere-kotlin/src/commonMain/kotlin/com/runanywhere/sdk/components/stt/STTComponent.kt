@@ -44,6 +44,13 @@ class STTComponent(
     }
 
     suspend fun transcribe(audioData: ByteArray): TranscriptionResult {
+        return transcribe(audioData, STTOptions(
+            language = sttConfiguration.language,
+            enableTimestamps = sttConfiguration.enableTimestamps
+        ))
+    }
+
+    suspend fun transcribe(audioData: ByteArray, options: STTOptions): TranscriptionResult {
         requireReady()
 
         val startTime = Clock.System.now().toEpochMilliseconds()
@@ -53,16 +60,11 @@ class STTComponent(
             "audio_size_bytes" to audioData.size,
             "model_id" to (currentModel?.model?.id ?: "unknown"),
             "session_id" to generateSessionId(),
-            "timestamp" to startTime
+            "timestamp" to startTime,
+            "sensitivity_mode" to options.sensitivityMode.toString()
         ))
 
-        val result = sttService.transcribe(
-            audioData = audioData,
-            options = STTOptions(
-                language = sttConfiguration.language,
-                enableTimestamps = sttConfiguration.enableTimestamps
-            )
-        )
+        val result = sttService.transcribe(audioData, options)
 
         val endTime = Clock.System.now().toEpochMilliseconds()
         val duration = endTime - startTime
@@ -77,7 +79,8 @@ class STTComponent(
             "session_id" to generateSessionId(),
             "timestamp" to endTime,
             "audio_duration_ms" to estimateAudioDuration(audioData.size),
-            "has_timestamps" to (result.timestamps?.isNotEmpty() == true)
+            "has_timestamps" to (result.timestamps?.isNotEmpty() == true),
+            "sensitivity_mode" to options.sensitivityMode.toString()
         ))
 
         // Convert STTTranscriptionResult to TranscriptionResult

@@ -29,8 +29,48 @@ data class STTOptions(
     val maxSpeakers: Int? = null,
     val enableTimestamps: Boolean = true,
     val vocabularyFilter: List<String> = emptyList(),
-    val audioFormat: AudioFormat = AudioFormat.PCM
-)
+    val audioFormat: AudioFormat = AudioFormat.PCM,
+    // Enhanced sensitivity settings
+    val sensitivityMode: STTSensitivityMode = STTSensitivityMode.NORMAL,
+    val beamSize: Int = 5,
+    val temperature: Float = 0.0f,
+    val suppressBlank: Boolean = true,
+    val suppressNonSpeechTokens: Boolean = true
+) {
+    companion object {
+        /**
+         * Create highly sensitive STT options for better detection of quiet or unclear speech
+         */
+        fun createSensitive(): STTOptions = STTOptions(
+            language = "en",
+            detectLanguage = false,
+            enablePunctuation = true,
+            enableTimestamps = true,
+            sensitivityMode = STTSensitivityMode.HIGH,
+            beamSize = 10,
+            temperature = 0.3f,
+            suppressBlank = false,
+            suppressNonSpeechTokens = false
+        )
+
+        /**
+         * Create default STT options
+         */
+        fun createDefault(): STTOptions = STTOptions()
+    }
+}
+
+/**
+ * Sensitivity modes for STT processing
+ */
+enum class STTSensitivityMode {
+    /** Standard sensitivity - good for clear speech */
+    NORMAL,
+    /** Higher sensitivity - better for quiet or unclear speech */
+    HIGH,
+    /** Maximum sensitivity - for very quiet or distant speech */
+    MAXIMUM
+}
 
 // MARK: - STT Configuration
 

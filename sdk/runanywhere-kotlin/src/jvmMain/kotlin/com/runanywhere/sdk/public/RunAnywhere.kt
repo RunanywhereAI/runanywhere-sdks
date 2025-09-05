@@ -2,6 +2,7 @@ package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTComponent
+import com.runanywhere.sdk.components.stt.STTOptions
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.JvmVADServiceProvider
@@ -241,8 +242,55 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             audioData
         }
 
-        // Transcribe
+        // Transcribe using default options
         return sttComponent?.transcribe(processedAudio)?.text
+            ?: throw IllegalStateException("STT component not initialized")
+    }
+
+    /**
+     * Enhanced transcription with sensitive settings for better detection of quiet or unclear speech
+     */
+    suspend fun transcribeSensitive(audioData: ByteArray): String {
+        requireInitialized()
+
+        // Ensure STT model is loaded
+        if (sttModel == null) {
+            throw IllegalStateException("No STT model loaded. Please download and load an STT model first.")
+        }
+
+        // Apply VAD if configured
+        val processedAudio = if (vadComponent?.isEnabled() == true) {
+            vadComponent!!.processAudio(audioData)
+        } else {
+            audioData
+        }
+
+        // Transcribe using sensitive options
+        val sensitiveOptions = STTOptions.createSensitive()
+        return sttComponent?.transcribe(processedAudio, sensitiveOptions)?.text
+            ?: throw IllegalStateException("STT component not initialized")
+    }
+
+    /**
+     * Transcription with custom STT options for fine-grained control
+     */
+    suspend fun transcribeWithOptions(audioData: ByteArray, options: STTOptions): String {
+        requireInitialized()
+
+        // Ensure STT model is loaded
+        if (sttModel == null) {
+            throw IllegalStateException("No STT model loaded. Please download and load an STT model first.")
+        }
+
+        // Apply VAD if configured
+        val processedAudio = if (vadComponent?.isEnabled() == true) {
+            vadComponent!!.processAudio(audioData)
+        } else {
+            audioData
+        }
+
+        // Transcribe using custom options
+        return sttComponent?.transcribe(processedAudio, options)?.text
             ?: throw IllegalStateException("STT component not initialized")
     }
 

@@ -130,9 +130,9 @@ class VoiceService(private val project: Project) : Disposable {
 
                 showNotification("Processing", "Transcribing audio... (${audioData.size} bytes)", NotificationType.INFORMATION)
 
-                // Use SDK to transcribe
-                println("VoiceService: Calling RunAnywhere.transcribe()...")
-                val transcription = RunAnywhere.transcribe(audioData)
+                // Use SDK to transcribe with enhanced sensitivity
+                println("VoiceService: Calling RunAnywhere.transcribeSensitive() for better speech detection...")
+                val transcription = RunAnywhere.transcribeSensitive(audioData)
                 println("VoiceService: Raw transcription result: '$transcription' (length: ${transcription.length})")
 
                 if (transcription.isNotEmpty()) {
