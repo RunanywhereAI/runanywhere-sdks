@@ -4,6 +4,7 @@ import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
+import com.runanywhere.sdk.components.vad.JvmVADServiceProvider
 import com.runanywhere.sdk.data.models.*
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKInitializationEvent
@@ -124,6 +125,9 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             // Step 8: Initialize core components
             logger.info("Step 8/8: Initializing core components")
 
+            // Register VAD service provider for JVM
+            JvmVADServiceProvider.register()
+
             // Initialize model services
             modelDownloader = ModelDownloader()
             val modelRegistry = com.runanywhere.sdk.models.ModelRegistry()
@@ -133,6 +137,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             // Initialize STT and VAD components
             sttComponent = STTComponent(STTConfiguration())
             vadComponent = VADComponent(VADConfiguration())
+
+            // Initialize the components to set them to READY state
+            sttComponent?.initialize()
+            vadComponent?.initialize()
 
             // Mark SDK as initialized BEFORE attempting to load models
             _isInitialized = true

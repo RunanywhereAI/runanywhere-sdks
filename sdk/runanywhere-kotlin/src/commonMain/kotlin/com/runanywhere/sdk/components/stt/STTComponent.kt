@@ -221,6 +221,10 @@ class STTComponent(
      * Load a model into the STT service
      */
     suspend fun loadModel(modelPath: String) {
+        // Initialize component if not ready
+        if (state == ComponentState.NOT_INITIALIZED) {
+            initialize()
+        }
         requireReady()
         sttService.initialize(modelPath)
         logger.info("Loaded STT model from $modelPath")
