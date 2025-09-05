@@ -16,7 +16,7 @@ import com.runanywhere.sdk.models.ModelLoadingService
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.network.JvmNetworkService
 import com.runanywhere.sdk.network.MockNetworkService
-import com.runanywhere.sdk.storage.DatabaseManager
+// import com.runanywhere.sdk.storage.DatabaseManager // Disabled - JVM uses direct backend sync
 import com.runanywhere.sdk.storage.KeychainManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -74,7 +74,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
             // Step 4: Initialize database
             logger.info("Step 4/8: Initializing local database")
-            DatabaseManager.initialize()
+            // Database disabled for JVM - all data synced directly with backend
+            // if (environment != SDKEnvironment.DEVELOPMENT) {
+            //     DatabaseManager.initialize()
+            // } else {
+            //     logger.info("Skipping database initialization in development mode")
+            // }
+            logger.info("Database disabled for JVM - using direct backend sync")
 
             // Initialize JVM-specific service container
             serviceContainer = ServiceContainer.shared
@@ -127,6 +133,9 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             // Initialize STT and VAD components
             sttComponent = STTComponent(STTConfiguration())
             vadComponent = VADComponent(VADConfiguration())
+
+            // Mark SDK as initialized BEFORE attempting to load models
+            _isInitialized = true
 
             // Auto-load default STT model if available
             val models = fetchAvailableModels()

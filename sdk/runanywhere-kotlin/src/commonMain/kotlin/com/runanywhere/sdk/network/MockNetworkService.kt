@@ -32,112 +32,17 @@ class MockNetworkService {
     }
 
     private fun createMockModels(): List<ModelInfo> {
+        // Only include Whisper STT models for testing
         return listOf(
-            // Apple Foundation Models (iOS 18+ equivalent for Android)
-            ModelInfo(
-                id = "foundation-models-default",
-                name = "Apple Foundation Model",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.MLMODEL,
-                downloadURL = null, // Built-in, no download needed
-                localPath = null,
-                downloadSize = 0, // Built-in
-                memoryRequired = 500_000_000, // 500MB
-                compatibleFrameworks = listOf(LLMFramework.FOUNDATION_MODELS),
-                preferredFramework = LLMFramework.FOUNDATION_MODELS,
-                contextLength = 8192,
-                supportsThinking = false
-            ),
-
-            // Llama-3.2 1B Q6_K
-            ModelInfo(
-                id = "llama-3.2-1b-instruct-q6-k",
-                name = "Llama 3.2 1B Instruct Q6_K",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.LLAMA_3_2_1B.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 1_100_000_000, // ~1.1GB
-                memoryRequired = 1_200_000_000, // 1.2GB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 131072,
-                supportsThinking = true
-            ),
-
-            // SmolLM2 1.7B Instruct Q6_K_L
-            ModelInfo(
-                id = "smollm2-1.7b-instruct-q6-k-l",
-                name = "SmolLM2 1.7B Instruct Q6_K_L",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.SMOLLM2_1_7B.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 1_700_000_000, // ~1.7GB
-                memoryRequired = 1_800_000_000, // 1.8GB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 8192,
-                supportsThinking = true
-            ),
-
-            // Qwen-2.5 0.5B Q6_K
-            ModelInfo(
-                id = "qwen-2.5-0.5b-instruct-q6-k",
-                name = "Qwen 2.5 0.5B Instruct Q6_K",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.QWEN_2_5_0_5B.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 650_000_000, // ~650MB
-                memoryRequired = 600_000_000, // 600MB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 32768,
-                supportsThinking = true
-            ),
-
-            // SmolLM2 360M Q8_0
-            ModelInfo(
-                id = "smollm2-360m-q8-0",
-                name = "SmolLM2 360M Q8_0",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.SMOLLM2_360M.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 385_000_000, // ~385MB
-                memoryRequired = 500_000_000, // 500MB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 8192,
-                supportsThinking = false
-            ),
-
-            // Qwen-2.5 1.5B Q6_K
-            ModelInfo(
-                id = "qwen-2.5-1.5b-instruct-q6-k",
-                name = "Qwen 2.5 1.5B Instruct Q6_K",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.QWEN_2_5_1_5B.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 1_400_000_000, // ~1.4GB
-                memoryRequired = 1_600_000_000, // 1.6GB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 32768,
-                supportsThinking = true
-            ),
-
-            // Voice Models (WhisperKit equivalents)
-
-            // Whisper Tiny
+            // Whisper Tiny - Fastest, smallest
             ModelInfo(
                 id = "whisper-tiny",
                 name = "Whisper Tiny",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.MLMODEL,
-                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() },
+                // Use hardcoded URL for development mode
+                downloadURL = SDKConstants.ModelUrls.WHISPER_TINY.takeIf { it.isNotEmpty() }
+                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
                 localPath = null,
                 downloadSize = 39_000_000, // ~39MB
                 memoryRequired = 39_000_000, // 39MB
@@ -147,13 +52,15 @@ class MockNetworkService {
                 supportsThinking = false
             ),
 
-            // Whisper Base
+            // Whisper Base - Better accuracy
             ModelInfo(
                 id = "whisper-base",
                 name = "Whisper Base",
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.MLMODEL,
-                downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() },
+                // Use hardcoded URL for development mode
+                downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() }
+                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
                 localPath = null,
                 downloadSize = 74_000_000, // ~74MB
                 memoryRequired = 74_000_000, // 74MB
@@ -163,37 +70,21 @@ class MockNetworkService {
                 supportsThinking = false
             ),
 
-            // LiquidAI Models
-
-            // LiquidAI LFM2 350M Q4_K_M (Smallest, fastest)
+            // Whisper Small - Good balance
             ModelInfo(
-                id = "lfm2-350m-q4-k-m",
-                name = "LiquidAI LFM2 350M Q4_K_M",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.LFM2_350M_Q4.takeIf { it.isNotEmpty() },
+                id = "whisper-small",
+                name = "Whisper Small",
+                category = ModelCategory.SPEECH_RECOGNITION,
+                format = ModelFormat.MLMODEL,
+                // Use hardcoded URL for development mode
+                downloadURL = SDKConstants.ModelUrls.WHISPER_SMALL.takeIf { it.isNotEmpty() }
+                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
                 localPath = null,
-                downloadSize = 218_690_000, // ~219MB
-                memoryRequired = 250_000_000, // 250MB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 32768,
-                supportsThinking = false
-            ),
-
-            // LiquidAI LFM2 350M Q8_0 (Highest quality)
-            ModelInfo(
-                id = "lfm2-350m-q8-0",
-                name = "LiquidAI LFM2 350M Q8_0",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = SDKConstants.ModelUrls.LFM2_350M_Q8.takeIf { it.isNotEmpty() },
-                localPath = null,
-                downloadSize = 361_650_000, // ~362MB
-                memoryRequired = 400_000_000, // 400MB
-                compatibleFrameworks = listOf(LLMFramework.LLAMA_CPP),
-                preferredFramework = LLMFramework.LLAMA_CPP,
-                contextLength = 32768,
+                downloadSize = 244_000_000, // ~244MB
+                memoryRequired = 244_000_000, // 244MB
+                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
+                preferredFramework = LLMFramework.WHISPER_KIT,
+                contextLength = 0,
                 supportsThinking = false
             )
         )

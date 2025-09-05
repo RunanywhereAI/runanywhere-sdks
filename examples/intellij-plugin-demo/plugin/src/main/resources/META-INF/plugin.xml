@@ -65,8 +65,7 @@
         <action id="RunAnywhere.VoiceDictation"
                 class="com.runanywhere.plugin.actions.VoiceDictationAction"
                 text="Toggle Voice Dictation"
-                description="Toggle continuous voice dictation mode"
-                icon="AllIcons.General.Microphone">
+                description="Toggle continuous voice dictation mode">
             <add-to-group group-id="EditMenu" anchor="last" />
             <keyboard-shortcut first-keystroke="ctrl shift D" keymap="$default" />
         </action>
@@ -94,8 +93,7 @@
         <group id="RunAnywhere.ActionGroup"
                text="RunAnywhere"
                description="RunAnywhere voice actions"
-               popup="true"
-               icon="AllIcons.General.Microphone">
+               popup="true">
             <add-to-group group-id="MainMenu" anchor="after" relative-to-action="ToolsMenu" />
             <reference ref="RunAnywhere.VoiceCommand" />
             <reference ref="RunAnywhere.VoiceDictation" />

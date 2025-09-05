@@ -173,7 +173,7 @@ sealed class VADError : Exception() {
     override val message: String
         get() = when (this) {
             is ServiceNotInitialized -> "VAD service is not initialized"
-            is ProcessingFailed -> "VAD processing failed: ${cause.localizedMessage}"
+            is ProcessingFailed -> "VAD processing failed: $cause"
             is InvalidAudioFormat -> "Invalid audio format for VAD"
             is ConfigurationError -> "VAD configuration error"
         }
