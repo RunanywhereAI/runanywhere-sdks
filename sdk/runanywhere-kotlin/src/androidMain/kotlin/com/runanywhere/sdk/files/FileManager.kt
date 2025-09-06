@@ -499,10 +499,12 @@ actual class FileManager {
         }
     }
 
-    actual suspend fun cleanupTempFiles() = mutex.withLock {
-        tempDir.listFiles()?.forEach { file ->
-            if (file.lastModified() < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
-                file.deleteRecursively()
+    actual suspend fun cleanupTempFiles() {
+        mutex.withLock {
+            tempDir.listFiles()?.forEach { file ->
+                if (file.lastModified() < System.currentTimeMillis() - 24 * 60 * 60 * 1000) {
+                    file.deleteRecursively()
+                }
             }
         }
     }

@@ -1,6 +1,5 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.datetime.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -46,7 +45,7 @@ data class HealthCheckResponse(
 data class StoredTokens(
     val accessToken: String,
     val refreshToken: String,
-    val expiresAt: Instant
+    val expiresAt: Long
 )
 
 /**

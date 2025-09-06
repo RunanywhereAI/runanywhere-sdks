@@ -3,11 +3,26 @@ package com.runanywhere.sdk.data.database.entities
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.models.APIConfiguration
+import com.runanywhere.sdk.data.models.BatteryState
+import com.runanywhere.sdk.data.models.ConfigurationData
+import com.runanywhere.sdk.data.models.ConfigurationSource
+import com.runanywhere.sdk.data.models.DeviceInfoData
+import com.runanywhere.sdk.data.models.GPUType
+import com.runanywhere.sdk.data.models.GenerationConfiguration
+import com.runanywhere.sdk.data.models.HardwareConfiguration
+import com.runanywhere.sdk.data.models.ModelDownloadConfiguration
+import com.runanywhere.sdk.data.models.ModelInfo
+import com.runanywhere.sdk.data.models.RoutingConfiguration
+import com.runanywhere.sdk.data.models.SDKEnvironment
+import com.runanywhere.sdk.data.models.StorageConfiguration
+import com.runanywhere.sdk.data.models.StoredTokens
+import com.runanywhere.sdk.data.models.TelemetryData
+import com.runanywhere.sdk.data.models.TelemetryEventType
+import com.runanywhere.sdk.data.models.ThermalState
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import kotlinx.datetime.Instant
 
 /**
  * Database Entities
@@ -525,7 +540,7 @@ data class AuthTokenEntity(
         return StoredTokens(
             accessToken = accessToken,
             refreshToken = refreshToken,
-            expiresAt = Instant.fromEpochMilliseconds(expiresAt)
+            expiresAt = expiresAt
         )
     }
 
@@ -538,7 +553,7 @@ data class AuthTokenEntity(
                 id = id,
                 accessToken = tokens.accessToken,
                 refreshToken = tokens.refreshToken,
-                expiresAt = tokens.expiresAt.toEpochMilliseconds()
+                expiresAt = tokens.expiresAt
             )
         }
     }

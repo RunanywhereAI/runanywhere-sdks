@@ -1,7 +1,7 @@
 [versions]
 # Android & Kotlin
 agp = "8.7.3"
-kotlin = "2.0.21"
+kotlin = "2.1.21"
 
 # AndroidX Core
 coreKtx = "1.15.0"

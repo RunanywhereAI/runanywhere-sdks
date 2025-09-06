@@ -43,39 +43,59 @@ This repository contains cross-platform SDKs for the RunAnywhere on-device AI pl
 # Navigate to Kotlin SDK
 cd sdk/runanywhere-kotlin/
 
-# Primary build commands (most commonly used)
-./scripts/sdk.sh jvm              # Build JVM target for IntelliJ plugin
-./scripts/sdk.sh jvm --publish    # Build and publish to local Maven
-./scripts/sdk.sh plugin           # Build SDK and plugin for IntelliJ IDEA
-./scripts/sdk.sh plugin-as        # Build SDK and plugin for Android Studio
-./scripts/sdk.sh run-plugin       # Build and run IntelliJ IDEA with plugin
-./scripts/sdk.sh run-plugin-as    # Build and run Android Studio with plugin
+# Build Commands (using scripts/sdk.sh)
+./scripts/sdk.sh build            # Build all platforms (JVM and Android)
+./scripts/sdk.sh build-all        # Same as 'build' - builds all targets
+./scripts/sdk.sh build-all --clean # Clean before building (removes build directories)
+./scripts/sdk.sh build-all --deep-clean # Deep clean including Gradle caches
+./scripts/sdk.sh build-all --no-clean   # Build without any cleanup (default)
 
-# Build all targets
-./scripts/sdk.sh all              # Build all targets (JVM, Android, Native)
-./scripts/sdk.sh android          # Build Android AAR library
-./scripts/sdk.sh native           # Build native targets
+# Individual Platform Builds
+./scripts/sdk.sh jvm              # Build JVM JAR only
+./scripts/sdk.sh android          # Build Android AAR only
+./scripts/sdk.sh common           # Compile common module only
 
 # Testing
 ./scripts/sdk.sh test             # Run all tests
-./scripts/sdk.sh test-jvm         # Run JVM tests only
-./scripts/sdk.sh test-android     # Run Android tests only
-./gradlew jvmTest                 # Run JVM tests directly
+./scripts/sdk.sh test-jvm         # Run JVM tests
+./scripts/sdk.sh test-android     # Run Android tests
 
-# Clean and rebuild
-./scripts/sdk.sh clean all        # Clean and rebuild everything
-./scripts/sdk.sh reset            # Reset Gradle daemon and caches
+# Publishing
+./scripts/sdk.sh publish          # Publish to Maven Local (~/.m2/repository)
+./scripts/sdk.sh publish-local    # Same as 'publish'
 
-# Configuration management
-./scripts/sdk.sh config-dev       # Configure for development
-./scripts/sdk.sh config-staging   # Configure for staging
-./scripts/sdk.sh config-prod      # Configure for production
-./scripts/sdk.sh config-show      # Show current configuration
+# Cleanup Options
+./scripts/sdk.sh clean            # Clean build directories
+./scripts/sdk.sh deep-clean       # Clean build dirs and Gradle caches
 
-# Code quality
-./scripts/sdk.sh lint             # Run code quality checks
-./scripts/sdk.sh format           # Auto-format code with ktlint
+# Help and Info
+./scripts/sdk.sh help             # Show all available commands
+./scripts/sdk.sh --help           # Same as 'help'
+
+# Direct Gradle Commands (Alternative)
+./gradlew build                   # Build all targets
+./gradlew jvmJar                  # Build JVM JAR
+./gradlew assembleDebug           # Build Android Debug AAR
+./gradlew assembleRelease         # Build Android Release AAR
+./gradlew clean                   # Clean build directories
+./gradlew publishToMavenLocal     # Publish to local Maven
 ```
+
+#### Build Script Features
+
+The `scripts/sdk.sh` script provides:
+- **Automatic cleanup options**: `--clean`, `--deep-clean`, `--no-clean` flags
+- **Build verification**: Checks for successful JAR and AAR creation
+- **Error handling**: Continues building other targets if one fails
+- **Progress indicators**: Clear output showing build status
+- **Flexible commands**: Support for multiple build scenarios
+
+#### Build Output Locations
+
+After a successful build:
+- **JVM JAR**: `build/libs/RunAnywhereKotlinSDK-jvm-0.1.0.jar`
+- **Android AAR**: `build/outputs/aar/RunAnywhereKotlinSDK-debug.aar`
+- **Maven Local**: `~/.m2/repository/com/runanywhere/sdk/`
 
 ### Android SDK Development
 
@@ -235,7 +255,7 @@ The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native 
 ### Platform Requirements
 
 **Kotlin Multiplatform SDK:**
-- Kotlin: 2.0.21
+- Kotlin: 2.1.21 (upgraded from 2.0.21 to fix compiler issues)
 - Gradle: 8.11.1
 - JVM Target: 17
 - Android Min SDK: 24

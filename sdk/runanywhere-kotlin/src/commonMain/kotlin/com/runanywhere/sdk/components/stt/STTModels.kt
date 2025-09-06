@@ -3,8 +3,7 @@ package com.runanywhere.sdk.components.stt
 import com.runanywhere.sdk.components.base.*
 import com.runanywhere.sdk.components.vad.VADOutput
 import com.runanywhere.sdk.data.models.SDKError
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - Audio Format
 
@@ -112,7 +111,7 @@ data class STTConfiguration(
  */
 data class STTInput(
     // Audio data to transcribe
-    val audioData: ByteArray,
+    val audioData: ByteArray = byteArrayOf(),
 
     // Audio buffer (alternative to data)
     val audioBuffer: FloatArray? = null,
@@ -183,7 +182,7 @@ data class STTOutput(
     val metadata: TranscriptionMetadata,
 
     // Timestamp (required by ComponentOutput)
-    override val timestamp: Instant = Clock.System.now()
+    override val timestamp: Long = getCurrentTimeMillis()
 ) : ComponentOutput
 
 // MARK: - Supporting Data Classes

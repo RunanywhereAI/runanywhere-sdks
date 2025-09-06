@@ -2,8 +2,8 @@ package com.runanywhere.sdk.components.vad
 
 import com.runanywhere.sdk.components.base.*
 import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.*
-import kotlinx.datetime.Clock
 
 // MARK: - VAD Component
 
@@ -70,12 +70,12 @@ class VADComponent(configuration: VADConfiguration) :
         input.validate()
 
         // Track processing time
-        val startTime = Clock.System.now().toEpochMilliseconds()
+        val startTime = getCurrentTimeMillis()
 
         // Process audio chunk
         val result = service.processAudioChunk(input.audioSamples)
 
-        val processingTime = (Clock.System.now().toEpochMilliseconds() - startTime) / 1000.0
+        val processingTime = (getCurrentTimeMillis() - startTime) / 1000.0
 
         // Calculate energy level (simple RMS)
         val energyLevel = calculateEnergyLevel(input.audioSamples)

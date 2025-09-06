@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.datetime.Clock
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -138,9 +138,9 @@ data class DeviceInfoData(
 
     // Timestamps
     @SerialName("created_at")
-    val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+    val createdAt: Long = getCurrentTimeMillis(),
     @SerialName("updated_at")
-    val updatedAt: Long = Clock.System.now().toEpochMilliseconds()
+    val updatedAt: Long = getCurrentTimeMillis()
 ) {
 
     /**
@@ -241,7 +241,7 @@ data class DeviceFingerprint(
     @SerialName("display_fingerprint")
     val displayFingerprint: String,
     @SerialName("created_at")
-    val createdAt: Long = Clock.System.now().toEpochMilliseconds()
+    val createdAt: Long = getCurrentTimeMillis()
 ) {
 
     /**
@@ -294,7 +294,7 @@ data class DevicePerformanceMetrics(
     val gpuScore: Int? = null,
 
     @SerialName("measured_at")
-    val measuredAt: Long = Clock.System.now().toEpochMilliseconds()
+    val measuredAt: Long = getCurrentTimeMillis()
 )
 
 /**

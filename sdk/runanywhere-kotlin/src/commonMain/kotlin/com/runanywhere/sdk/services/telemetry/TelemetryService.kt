@@ -1,26 +1,23 @@
 package com.runanywhere.sdk.services.telemetry
 
-import com.runanywhere.sdk.data.models.ErrorTelemetryData
-import com.runanywhere.sdk.data.models.PerformanceTelemetryData
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.data.models.STTTelemetryData
 import com.runanywhere.sdk.data.models.SessionTelemetryData
 import com.runanywhere.sdk.data.models.TelemetryBatch
 import com.runanywhere.sdk.data.models.TelemetryData
-import com.runanywhere.sdk.data.models.TelemetryEventType
-import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.data.models.TelemetryEventData
+import com.runanywhere.sdk.data.models.TelemetryEventType
+import com.runanywhere.sdk.data.models.generateUUID
+import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.sync.SyncCoordinator
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.datetime.Clock
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import com.runanywhere.sdk.data.models.generateUUID
 
 /**
  * Telemetry Service
@@ -34,7 +31,7 @@ class TelemetryService(
 
     private val logger = SDKLogger("TelemetryService")
     private val mutex = Mutex()
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     // Session management
     private val sessionId = generateUUID()
@@ -44,7 +41,7 @@ class TelemetryService(
     private val batchSize = 10
     private val batchTimeoutMs = 30_000L // 30 seconds
     private var pendingEvents = mutableListOf<TelemetryData>()
-    private var lastBatchSent = Clock.System.now().toEpochMilliseconds()
+    private var lastBatchSent = getCurrentTimeMillis()
 
     // Device and app information
     private var deviceId: String? = null
@@ -80,72 +77,74 @@ class TelemetryService(
      * Track a telemetry event
      * Equivalent to iOS: func trackEvent(_ type: TelemetryEventType, properties: [String: String]) async throws
      */
-    suspend fun trackEvent(type: TelemetryEventType, properties: Map<String, String> = emptyMap()) = mutex.withLock {
-        logger.debug("Tracking event: $type")
+    suspend fun trackEvent(type: TelemetryEventType, properties: Map<String, String> = emptyMap()) =
+        mutex.withLock {
+            logger.debug("Tracking event: $type")
 
-        try {
-            val event = TelemetryData(
-                type = type,
-                name = type.name.lowercase().replace('_', '.'),
-                properties = properties,
-                sessionId = sessionId,
-                deviceId = deviceId ?: "unknown",
-                appVersion = appVersion,
-                sdkVersion = sdkVersion,
-                osVersion = "Android"
-            )
+            try {
+                val event = TelemetryData(
+                    type = type,
+                    name = type.name.lowercase().replace('_', '.'),
+                    properties = properties,
+                    sessionId = sessionId,
+                    deviceId = deviceId ?: "unknown",
+                    appVersion = appVersion,
+                    sdkVersion = sdkVersion,
+                    osVersion = "Android"
+                )
 
-            // Save to repository
-            telemetryRepository.saveEvent(event)
+                // Save to repository
+                telemetryRepository.saveEvent(event)
 
-            // Add to pending batch
-            pendingEvents.add(event)
+                // Add to pending batch
+                pendingEvents.add(event)
 
-            // Send batch if full
-            if (pendingEvents.size >= batchSize) {
-                sendBatch()
+                // Send batch if full
+                if (pendingEvents.size >= batchSize) {
+                    sendBatch()
+                }
+
+                logger.debug("Event tracked: $type")
+
+            } catch (e: Exception) {
+                logger.error("Failed to track event: $type - ${e.message}")
+                // Don't throw - telemetry failures shouldn't break the app
             }
-
-            logger.debug("Event tracked: $type")
-
-        } catch (e: Exception) {
-            logger.error("Failed to track event: $type - ${e.message}")
-            // Don't throw - telemetry failures shouldn't break the app
         }
-    }
 
     /**
      * Track a custom event
      * Equivalent to iOS: func trackCustomEvent(_ name: String, properties: [String: String]) async throws
      */
-    suspend fun trackCustomEvent(name: String, properties: Map<String, String> = emptyMap()) = mutex.withLock {
-        logger.debug("Tracking custom event: $name")
+    suspend fun trackCustomEvent(name: String, properties: Map<String, String> = emptyMap()) =
+        mutex.withLock {
+            logger.debug("Tracking custom event: $name")
 
-        try {
-            val event = TelemetryData(
-                type = TelemetryEventType.CUSTOM_EVENT,
-                name = name,
-                properties = properties,
-                sessionId = sessionId,
-                deviceId = deviceId ?: "unknown",
-                appVersion = appVersion,
-                sdkVersion = sdkVersion,
-                osVersion = "Android"
-            )
+            try {
+                val event = TelemetryData(
+                    type = TelemetryEventType.CUSTOM_EVENT,
+                    name = name,
+                    properties = properties,
+                    sessionId = sessionId,
+                    deviceId = deviceId ?: "unknown",
+                    appVersion = appVersion,
+                    sdkVersion = sdkVersion,
+                    osVersion = "Android"
+                )
 
-            telemetryRepository.saveEvent(event)
-            pendingEvents.add(event)
+                telemetryRepository.saveEvent(event)
+                pendingEvents.add(event)
 
-            if (pendingEvents.size >= batchSize) {
-                sendBatch()
+                if (pendingEvents.size >= batchSize) {
+                    sendBatch()
+                }
+
+                logger.debug("Custom event tracked: $name")
+
+            } catch (e: Exception) {
+                logger.error("Failed to track custom event: $name - ${e.message}")
             }
-
-            logger.debug("Custom event tracked: $name")
-
-        } catch (e: Exception) {
-            logger.error("Failed to track custom event: $name - ${e.message}")
         }
-    }
 
     /**
      * Get all events
@@ -170,7 +169,7 @@ class TelemetryService(
         logger.debug("Marking ${eventIds.size} events as sent")
 
         try {
-            telemetryRepository.markEventsSent(eventIds, Clock.System.now().toEpochMilliseconds())
+            telemetryRepository.markEventsSent(eventIds, getCurrentTimeMillis())
             logger.info("${eventIds.size} events marked as sent")
 
         } catch (e: Exception) {
@@ -237,7 +236,12 @@ class TelemetryService(
      * Track STT model loading
      * Equivalent to iOS STT analytics helper
      */
-    suspend fun trackSTTModelLoad(modelId: String, success: Boolean, loadTime: Long, modelSizeMB: Long) {
+    suspend fun trackSTTModelLoad(
+        modelId: String,
+        success: Boolean,
+        loadTime: Long,
+        modelSizeMB: Long
+    ) {
         val properties = mutableMapOf<String, String>()
         properties["model_id"] = modelId
         properties["success"] = success.toString()
@@ -392,22 +396,23 @@ class TelemetryService(
      * Set device and app information
      * Initialize telemetry context
      */
-    suspend fun setContext(deviceId: String, appVersion: String?, sdkVersion: String) = mutex.withLock {
-        this.deviceId = deviceId
-        this.appVersion = appVersion
-        this.sdkVersion = sdkVersion
+    suspend fun setContext(deviceId: String, appVersion: String?, sdkVersion: String) =
+        mutex.withLock {
+            this.deviceId = deviceId
+            this.appVersion = appVersion
+            this.sdkVersion = sdkVersion
 
-        // Start session
-        currentSession = SessionTelemetryData(
-            sessionId = sessionId,
-            startTime = Clock.System.now().toEpochMilliseconds(),
-            deviceId = deviceId,
-            appVersion = appVersion,
-            sdkVersion = sdkVersion
-        )
+            // Start session
+            currentSession = SessionTelemetryData(
+                sessionId = sessionId,
+                startTime = getCurrentTimeMillis(),
+                deviceId = deviceId,
+                appVersion = appVersion,
+                sdkVersion = sdkVersion
+            )
 
-        logger.info("Telemetry context set - Device: $deviceId, App: $appVersion, SDK: $sdkVersion")
-    }
+            logger.info("Telemetry context set - Device: $deviceId, App: $appVersion, SDK: $sdkVersion")
+        }
 
     /**
      * End current session
@@ -415,7 +420,7 @@ class TelemetryService(
      */
     suspend fun endSession() = mutex.withLock {
         currentSession?.let { session ->
-            val endTime = Clock.System.now().toEpochMilliseconds()
+            val endTime = getCurrentTimeMillis()
             val updatedSession = session.copy(
                 endTime = endTime,
                 duration = endTime - session.startTime
@@ -427,8 +432,10 @@ class TelemetryService(
                 "events_count" to updatedSession.eventsCount.toString()
             )
 
-            trackEvent(TelemetryEventType.CUSTOM_EVENT,
-                properties + ("event_name" to "session_ended"))
+            trackEvent(
+                TelemetryEventType.CUSTOM_EVENT,
+                properties + ("event_name" to "session_ended")
+            )
         }
 
         // Send final batch
@@ -453,7 +460,7 @@ class TelemetryService(
             markEventsSent(pendingEvents.map { it.id })
 
             pendingEvents.clear()
-            lastBatchSent = Clock.System.now().toEpochMilliseconds()
+            lastBatchSent = getCurrentTimeMillis()
 
             logger.debug("Telemetry batch sent with ${batch.size} events")
 
@@ -465,7 +472,7 @@ class TelemetryService(
 
     private suspend fun sendPendingBatches() {
         mutex.withLock {
-            val timeSinceLastBatch = Clock.System.now().toEpochMilliseconds() - lastBatchSent
+            val timeSinceLastBatch = getCurrentTimeMillis() - lastBatchSent
             if (pendingEvents.isNotEmpty() && timeSinceLastBatch >= batchTimeoutMs) {
                 sendBatch()
             }

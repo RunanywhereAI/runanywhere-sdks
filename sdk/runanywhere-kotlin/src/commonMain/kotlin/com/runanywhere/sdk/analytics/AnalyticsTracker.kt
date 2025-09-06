@@ -1,7 +1,6 @@
 package com.runanywhere.sdk.analytics
 
-import com.runanywhere.sdk.data.models.generateUUID
-import kotlin.random.Random
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
  * Analytics event data class
@@ -9,7 +8,7 @@ import kotlin.random.Random
 data class AnalyticsEvent(
     val name: String,
     val properties: Map<String, Any>,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = getCurrentTimeMillis(),
     val sessionId: String
 )
 
@@ -40,7 +39,7 @@ class AnalyticsTracker {
      * Track an analytics event
      */
     fun track(eventName: String, properties: Map<String, Any> = emptyMap()) {
-        val currentTime = System.currentTimeMillis()
+        val currentTime = getCurrentTimeMillis()
         val enrichedProperties = mutableMapOf<String, Any>().apply {
             putAll(properties)
             put("session_id", sessionId)

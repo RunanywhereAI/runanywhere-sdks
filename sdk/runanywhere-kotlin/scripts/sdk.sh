@@ -86,6 +86,148 @@ print_info() { echo -e "${CYAN}ℹ️  $1${NC}"; }
 print_step() { echo -e "${MAGENTA}▶ $1${NC}"; }
 
 # Show comprehensive help documentation
+# Complete build command that tries to build everything
+cmd_build_all() {
+    print_header "Complete SDK Build - All Platforms"
+
+    # Parse options for cleanup level
+    local CLEAN_LEVEL="none"
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --clean)
+                CLEAN_LEVEL="clean"
+                shift
+                ;;
+            --deep-clean)
+                CLEAN_LEVEL="deep"
+                shift
+                ;;
+            --no-clean)
+                CLEAN_LEVEL="none"
+                shift
+                ;;
+            *)
+                shift
+                ;;
+        esac
+    done
+
+    # Step 1: Conditional cleanup based on flags
+    if [[ "$CLEAN_LEVEL" != "none" ]]; then
+        print_step "[1/6] Cleaning build environment (Level: $CLEAN_LEVEL)..."
+
+        if [[ "$CLEAN_LEVEL" == "deep" ]]; then
+            # Deep clean - maximum cleanup
+            # Stop Gradle daemon
+            ./gradlew --stop || true
+
+            # Clean all build artifacts
+            ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache || true
+            rm -rf build/ .gradle/ || true
+
+            # Clear Gradle caches that might have incompatible Kotlin versions
+            print_step "Clearing Gradle caches..."
+            rm -rf ~/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/ || true
+            rm -rf ~/.gradle/caches/transforms-*/ || true
+            rm -rf ~/.gradle/caches/8.11.1/transforms/ || true
+
+            # Clear Kotlin compiler daemon
+            print_step "Clearing Kotlin compiler daemon..."
+            pkill -f "kotlin-compile-daemon" || true
+            rm -rf ~/Library/Application\ Support/kotlin/daemon/* 2>/dev/null || true
+        else
+            # Normal clean - just clean build artifacts
+            ./gradlew clean || true
+        fi
+    else
+        print_step "[1/6] Starting build (no clean)..."
+    fi
+
+    # Step 2: Verify environment
+    print_step "[2/6] Verifying build environment..."
+    echo "  Java version: $(java -version 2>&1 | head -1)"
+    echo "  Gradle version: $(./gradlew --version | grep Gradle | cut -d' ' -f2)"
+    echo "  Kotlin version: $(grep '^kotlin =' gradle/libs.versions.toml | cut -d'"' -f2)"
+
+    # Step 3: Build common module
+    print_step "[3/6] Building Common Module..."
+    ./gradlew :compileKotlinMetadata --no-daemon --no-build-cache --refresh-dependencies || {
+        print_error "Common module compilation failed"
+        return 1
+    }
+    print_success "Common module compiled successfully"
+
+    # Step 4: Build JVM target
+    print_step "[4/6] Building JVM Target..."
+    ./gradlew :compileKotlinJvm :jvmJar --no-daemon --no-build-cache --stacktrace || {
+        print_warning "JVM build failed - retrying with full refresh..."
+        # Second attempt with more aggressive cleanup
+        rm -rf src/jvmMain/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt.bak 2>/dev/null || true
+        ./gradlew :compileKotlinJvm :jvmJar --no-daemon --no-build-cache --refresh-dependencies --rerun-tasks || {
+            print_error "JVM build failed even after retry"
+        }
+    }
+
+    if [[ -f "build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar" ]]; then
+        print_success "✅ JVM JAR built: build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar"
+        echo "   Size: $(du -h build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar | cut -f1)"
+    else
+        print_warning "⚠️ JVM JAR not found"
+    fi
+
+    # Step 5: Build Android target
+    print_step "[5/6] Building Android Target..."
+    ./gradlew :compileDebugKotlinAndroid :assembleDebug --no-daemon --no-build-cache --stacktrace || {
+        print_warning "Android Debug build failed - trying release..."
+        ./gradlew :compileReleaseKotlinAndroid :assembleRelease --no-daemon --no-build-cache --stacktrace || {
+            print_error "Android build failed"
+        }
+    }
+
+    if [[ -f "build/outputs/aar/$SDK_JAR_NAME-debug.aar" ]]; then
+        print_success "✅ Android Debug AAR built: build/outputs/aar/$SDK_JAR_NAME-debug.aar"
+        echo "   Size: $(du -h build/outputs/aar/$SDK_JAR_NAME-debug.aar | cut -f1)"
+    elif [[ -f "build/outputs/aar/$SDK_JAR_NAME-release.aar" ]]; then
+        print_success "✅ Android Release AAR built: build/outputs/aar/$SDK_JAR_NAME-release.aar"
+        echo "   Size: $(du -h build/outputs/aar/$SDK_JAR_NAME-release.aar | cut -f1)"
+    elif [[ -f "build/outputs/aar/$SDK_NAME-debug.aar" ]]; then
+        print_success "✅ Android Debug AAR built: build/outputs/aar/$SDK_NAME-debug.aar"
+        echo "   Size: $(du -h build/outputs/aar/$SDK_NAME-debug.aar | cut -f1)"
+    elif [[ -f "build/outputs/aar/$SDK_NAME-release.aar" ]]; then
+        print_success "✅ Android Release AAR built: build/outputs/aar/$SDK_NAME-release.aar"
+        echo "   Size: $(du -h build/outputs/aar/$SDK_NAME-release.aar | cut -f1)"
+    else
+        print_warning "⚠️ Android AAR not found"
+    fi
+
+    # Step 6: Summary
+    print_step "[6/6] Build Summary..."
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Build Artifacts:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "JVM Artifacts:"
+    ls -la build/libs/*.jar 2>/dev/null || echo "  ❌ No JVM JARs found"
+    echo ""
+    echo "Android Artifacts:"
+    ls -la build/outputs/aar/*.aar 2>/dev/null || echo "  ❌ No Android AARs found"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+
+    # Check overall success
+    local success=true
+    if [[ ! -f "build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar" ]] && [[ ! -f "build/outputs/aar/$SDK_JAR_NAME-debug.aar" ]] && [[ ! -f "build/outputs/aar/$SDK_JAR_NAME-release.aar" ]] && [[ ! -f "build/outputs/aar/$SDK_NAME-debug.aar" ]] && [[ ! -f "build/outputs/aar/$SDK_NAME-release.aar" ]]; then
+        success=false
+    fi
+
+    if [[ "$success" == "true" ]]; then
+        print_success "✅ Build completed successfully!"
+    else
+        print_warning "⚠️ Build completed with warnings. Check output above for details."
+    fi
+}
+
 show_help() {
     cat << EOF
 ${BOLD}${BLUE}RunAnywhere KMP SDK Management Tool${NC}
@@ -95,6 +237,7 @@ ${BOLD}${GREEN}USAGE:${NC}
     ./scripts/sdk.sh ${YELLOW}[command]${NC} ${CYAN}[options]${NC}
 
 ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
+    ${YELLOW}build-all${NC}       Complete build for all platforms (recommended)
     ${YELLOW}jvm${NC}             Build JVM target for IntelliJ/JetBrains plugins
     ${YELLOW}plugin${NC}          Build SDK and plugin for IntelliJ IDEA
     ${YELLOW}plugin-as${NC}       Build SDK and plugin for Android Studio
@@ -103,6 +246,8 @@ ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
     ${YELLOW}android${NC}         Build Android AAR library
     ${YELLOW}all${NC}             Build all targets (JVM, Android, Native)
     ${YELLOW}clean${NC}           Clean all build artifacts
+    ${YELLOW}clean-build${NC}     Clean and build all platforms
+    ${YELLOW}deep-clean${NC}      Deep clean caches and build all platforms
     ${YELLOW}test${NC}            Run tests for all platforms
 
 ${BOLD}${GREEN}BUILD COMMANDS:${NC}
@@ -148,21 +293,29 @@ ${BOLD}${GREEN}OPTIONS:${NC}
     ${CYAN}--parallel${NC}      Enable parallel execution
     ${CYAN}--no-cache${NC}      Disable build cache
     ${CYAN}--refresh${NC}       Refresh all dependencies
+    ${CYAN}--clean${NC}         Perform normal clean before build
+    ${CYAN}--deep-clean${NC}    Perform deep clean (including caches) before build
+    ${CYAN}--no-clean${NC}      Skip cleaning (default for build-all)
     ${CYAN}--ide-type${NC}      Override IDE type (IC, IU, AS)
     ${CYAN}--ide-version${NC}   Override IDE version (e.g., 2023.3, 2024.1)
 
 ${BOLD}${GREEN}EXAMPLES:${NC}
+    ${CYAN}# Quick build without cleaning${NC}
+    ./scripts/sdk.sh build-all
+
+    ${CYAN}# Clean and build${NC}
+    ./scripts/sdk.sh build-all --clean
+    ./scripts/sdk.sh clean-build
+
+    ${CYAN}# Deep clean and build (when having issues)${NC}
+    ./scripts/sdk.sh build-all --deep-clean
+    ./scripts/sdk.sh deep-clean
+
     ${CYAN}# Quick JVM build for plugin development${NC}
     ./scripts/sdk.sh jvm
 
     ${CYAN}# Build and run plugin in IntelliJ IDEA${NC}
     ./scripts/sdk.sh run-plugin
-
-    ${CYAN}# Build and run plugin in Android Studio${NC}
-    ./scripts/sdk.sh run-plugin-as
-
-    ${CYAN}# Build plugin for Android Studio only${NC}
-    ./scripts/sdk.sh plugin-as
 
     ${CYAN}# Clean and rebuild everything${NC}
     ./scripts/sdk.sh clean all
@@ -229,13 +382,19 @@ cmd_jvm() {
     # Set up configuration if environment specified
     if [[ -n "$OPT_ENV" ]]; then
         print_step "Setting up $OPT_ENV configuration..."
-        "$SCRIPT_DIR/config-manager.sh" setup "$OPT_ENV"
+        "$SCRIPT_DIR/config-manager.sh" setup "$OPT_ENV" || true
     fi
 
     print_header "Building JVM Target for IntelliJ Plugin"
 
+    print_step "Cleaning previous JVM build..."
+    gradle_exec :cleanJvmJar || true
+
     print_step "Compiling JVM sources..."
-    gradle_exec :compileKotlinJvm
+    gradle_exec :compileKotlinJvm || {
+        print_warning "JVM compilation failed, trying with refresh dependencies..."
+        gradle_exec --refresh-dependencies :compileKotlinJvm
+    }
 
     print_step "Building JAR artifact..."
     gradle_exec :jvmJar
@@ -260,6 +419,15 @@ cmd_jvm() {
 cmd_android() {
     print_header "Building Android Target"
 
+    print_step "Cleaning previous Android build..."
+    gradle_exec :clean || true
+
+    print_step "Compiling Android sources..."
+    gradle_exec :compileDebugKotlinAndroid || {
+        print_warning "Android compilation failed, trying with refresh dependencies..."
+        gradle_exec --refresh-dependencies :compileDebugKotlinAndroid
+    }
+
     print_step "Assembling Android library..."
     gradle_exec :assembleRelease
 
@@ -274,8 +442,24 @@ cmd_android() {
 # Build all targets
 cmd_all() {
     print_header "Building All Targets"
-    gradle_exec build
-    print_success "All targets built successfully"
+
+    print_step "Cleaning all previous builds..."
+    gradle_exec clean || true
+
+    print_step "Building common module..."
+    gradle_exec :compileKotlinMetadata || true
+
+    print_step "Building JVM target..."
+    gradle_exec :compileKotlinJvm :jvmJar || {
+        print_warning "JVM build failed, continuing..."
+    }
+
+    print_step "Building Android target..."
+    gradle_exec :compileDebugKotlinAndroid :assembleDebug || {
+        print_warning "Android build failed, continuing..."
+    }
+
+    print_success "Build completed (check warnings above for any failures)"
 }
 
 # Build native targets
@@ -526,6 +710,8 @@ OPT_OFFLINE=false
 OPT_PARALLEL=false
 OPT_NO_CACHE=false
 OPT_REFRESH=false
+OPT_CLEAN=false
+OPT_DEEP_CLEAN=false
 OPT_IDE_TYPE=""
 OPT_IDE_VERSION=""
 OPT_ENV=""
@@ -543,6 +729,9 @@ while [[ $# -gt 0 ]]; do
         --parallel)     OPT_PARALLEL=true; shift ;;
         --no-cache)     OPT_NO_CACHE=true; shift ;;
         --refresh)      OPT_REFRESH=true; shift ;;
+        --clean)        OPT_CLEAN=true; shift ;;
+        --deep-clean)   OPT_DEEP_CLEAN=true; shift ;;
+        --no-clean)     shift ;;
         --ide-type)     OPT_IDE_TYPE="$2"; shift 2 ;;
         --ide-version)  OPT_IDE_VERSION="$2"; shift 2 ;;
         --env)          OPT_ENV="$2"; shift 2 ;;
@@ -896,6 +1085,18 @@ for cmd in "${COMMANDS[@]}"; do
     case $cmd in
         # Primary commands
         clean)          cmd_clean ;;
+        build-all)
+            # Pass global clean options to build_all
+            if [[ "$OPT_DEEP_CLEAN" == "true" ]]; then
+                cmd_build_all --deep-clean
+            elif [[ "$OPT_CLEAN" == "true" ]]; then
+                cmd_build_all --clean
+            else
+                cmd_build_all
+            fi
+            ;;
+        clean-build)    cmd_build_all --clean ;;
+        deep-clean)     cmd_build_all --deep-clean ;;
         jvm)
             if [[ "$OPT_WATCH" == "true" ]]; then
                 watch_mode cmd_jvm

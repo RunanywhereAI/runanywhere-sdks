@@ -9,8 +9,8 @@ import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import com.runanywhere.sdk.data.models.BatteryState
-import com.runanywhere.sdk.data.models.DeviceInfoData
 import com.runanywhere.sdk.data.models.DeviceFingerprint
+import com.runanywhere.sdk.data.models.DeviceInfoData
 import com.runanywhere.sdk.data.models.GPUType
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.models.ThermalState
@@ -21,15 +21,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.util.UUID
-import javax.microedition.khronos.egl.EGL10
-import javax.microedition.khronos.egl.EGLContext
 
 /**
  * Device Info Service
  * One-to-one translation from iOS Swift Actor to Kotlin with thread-safety
  * Handles device information collection, caching, and synchronization
  */
-class DeviceInfoService(
+class AndroidDeviceInfoService(
     private val context: Context,
     private val deviceInfoRepository: DeviceInfoRepository,
     private val syncCoordinator: SyncCoordinator?
@@ -240,7 +238,7 @@ class DeviceInfoService(
             cpuType = getCpuType(),
             cpuArchitecture = getCpuArchitecture(),
             cpuCoreCount = getCpuCoreCount(),
-            cpuFrequencyMhz = getCpuFrequency(),
+            cpuFrequencyMHz = getCpuFrequency(),
 
             // Memory information
             totalMemoryMB = memInfo.totalMem / (1024 * 1024),
@@ -421,7 +419,7 @@ class DeviceInfoService(
 
     private fun getThermalState(): ThermalState {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val thermalService = context.getSystemService(Context.THERMAL_SERVICE) as? android.os.PowerManager
+            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
             // This would require proper thermal state detection
             ThermalState.NOMINAL
         } else {

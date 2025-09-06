@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Read(//Users/sanchitmonga/development/ODLM/sdks.worktree/android_init/**)",
-      "Bash(./gradlew:*)"
+      "Bash(./gradlew:*)",
+      "Bash(./scripts/sdk.sh:*)",
+      "WebSearch",
+      "Bash(java:*)",
+      "Bash(sed:*)",
+      "Bash(chmod:*)",
+      "Bash(./scripts/sdk_enhanced.sh build:*)",
+      "Bash(bash scripts/sdk.sh:*)",
+      "Bash(bash:*)"
     ],
     "deny": [],
     "ask": []

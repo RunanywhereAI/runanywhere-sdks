@@ -1,14 +1,14 @@
 package com.runanywhere.sdk.services.modelinfo
 
+import com.runanywhere.sdk.data.models.ModelSearchCriteria
+import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.data.repositories.ModelInfoRepository
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.LLMFramework
-import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.data.models.ModelSearchCriteria
-import com.runanywhere.sdk.data.repositories.ModelInfoRepository
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.sync.SyncCoordinator
+import com.runanywhere.sdk.utils.SimpleInstant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -130,7 +130,7 @@ class ModelInfoService(
             // Update download status
             val updatedModel = currentModel.copy(
                 localPath = if (isDownloaded) "/path/to/model" else null,
-                updatedAt = Clock.System.now()
+                updatedAt = SimpleInstant.now()
             )
 
             // Save updated model
@@ -159,7 +159,7 @@ class ModelInfoService(
                 ?: throw SDKError.ModelNotFound(modelId)
 
             val updatedModel = currentModel.copy(
-                updatedAt = Clock.System.now()
+                updatedAt = SimpleInstant.now()
             )
 
             modelInfoRepository.save(updatedModel)
@@ -201,7 +201,7 @@ class ModelInfoService(
                 }
             }
 
-            lastCacheUpdate = Clock.System.now().toEpochMilliseconds()
+            lastCacheUpdate = getCurrentTimeMillis()
             logger.info("Model info synced successfully")
 
         } catch (e: Exception) {
@@ -247,8 +247,8 @@ class ModelInfoService(
             val allModels = getAllModels()
             val models = allModels.filter { model ->
                 (criteria.category == null || model.category == criteria.category) &&
-                (criteria.framework == null || model.preferredFramework == criteria.framework) &&
-                (criteria.format == null || model.format == criteria.format)
+                        (criteria.framework == null || model.preferredFramework == criteria.framework) &&
+                        (criteria.format == null || model.format == criteria.format)
             }
             logger.info("Found ${models.size} models matching criteria")
             return models
@@ -290,8 +290,8 @@ class ModelInfoService(
                 ?: throw SDKError.ModelNotFound(modelId)
 
             val updatedModel = currentModel.copy(
-                lastUsed = Clock.System.now(),
-                updatedAt = Clock.System.now()
+                lastUsed = SimpleInstant.now(),
+                updatedAt = SimpleInstant.now()
             )
 
             modelInfoRepository.save(updatedModel)
@@ -325,7 +325,7 @@ class ModelInfoService(
     // Private helper methods
 
     private fun isCacheValid(): Boolean {
-        return (Clock.System.now().toEpochMilliseconds() - lastCacheUpdate) < cacheValidityMs
+        return (getCurrentTimeMillis() - lastCacheUpdate) < cacheValidityMs
     }
 
     private fun validateModelInfo(model: ModelInfo) {

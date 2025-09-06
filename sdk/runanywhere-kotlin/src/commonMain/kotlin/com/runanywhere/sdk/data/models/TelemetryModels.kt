@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.datetime.Clock
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
@@ -80,7 +80,7 @@ data class TelemetryEventData(
     val type: TelemetryEventType,
     val sessionId: String,
     val deviceId: String,
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
+    val timestamp: Long = getCurrentTimeMillis(),
     val eventData: Map<String, @Contextual Any?> = emptyMap(),
     val success: Boolean = true,
     val duration: Long? = null
@@ -116,7 +116,7 @@ data class TelemetryData(
     val osVersion: String,
 
     // Timing information
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds(),
+    val timestamp: Long = getCurrentTimeMillis(),
     val duration: Long? = null, // milliseconds
 
     // Status information
@@ -352,7 +352,9 @@ data class SessionTelemetryData(
     @SerialName("sdk_version")
     val sdkVersion: String,
     @SerialName("device_id")
-    val deviceId: String
+    val deviceId: String,
+    @SerialName("created_at")
+    val createdAt: Long = getCurrentTimeMillis()
 )
 
 /**
@@ -365,7 +367,7 @@ data class TelemetryBatch(
     val batchId: String = generateUUID(),
     val events: List<TelemetryData>,
     @SerialName("created_at")
-    val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+    val createdAt: Long = getCurrentTimeMillis(),
     @SerialName("device_id")
     val deviceId: String,
     @SerialName("session_id")

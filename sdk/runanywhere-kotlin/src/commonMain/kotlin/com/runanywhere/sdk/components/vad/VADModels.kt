@@ -2,8 +2,7 @@ package com.runanywhere.sdk.components.vad
 
 import com.runanywhere.sdk.components.base.*
 import com.runanywhere.sdk.data.models.SDKError
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - VAD Configuration
 
@@ -102,7 +101,7 @@ data class VADOutput(
     val metadata: VADMetadata,
 
     // Timestamp (required by ComponentOutput)
-    override val timestamp: Instant = Clock.System.now()
+    override val timestamp: Long = getCurrentTimeMillis()
 ) : ComponentOutput
 
 // MARK: - VAD Metadata
@@ -149,8 +148,8 @@ interface VADService {
  */
 data class VADResult(
     val isSpeech: Boolean,
-    val confidence: Float,
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds()
+    val confidence: Float = 0.0f,
+    val timestamp: Long = getCurrentTimeMillis()
 )
 
 // MARK: - VAD Service Wrapper

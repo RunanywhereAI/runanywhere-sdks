@@ -7,6 +7,7 @@ import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -20,7 +21,7 @@ class ModelLoadingService(
     private val logger = SDKLogger("ModelLoadingService")
     private val loadedModels = mutableMapOf<String, LoadedModel>()
 
-    suspend fun loadModel(modelId: String): LoadedModel = withContext(Dispatchers.IO) {
+    suspend fun loadModel(modelId: String): LoadedModel = withContext(Dispatchers.Default) {
         logger.info("Loading model: $modelId")
 
         // Check if already loaded
@@ -73,7 +74,7 @@ class ModelLoadingService(
         val loadedModel = LoadedModel(
             model = modelInfo,
             localPath = modelPath,
-            loadedAt = System.currentTimeMillis()
+            loadedAt = getCurrentTimeMillis()
         )
 
         // Cache the loaded model
@@ -100,7 +101,10 @@ class ModelLoadingService(
         // In production, this would be replaced with actual download logic
         if (!FileManager.shared.fileExists(targetPath)) {
             // Write some dummy data to simulate a model file
-            FileManager.shared.writeFile(targetPath, "DUMMY_MODEL_DATA_${modelInfo.id}".toByteArray())
+            FileManager.shared.writeFile(
+                targetPath,
+                "DUMMY_MODEL_DATA_${modelInfo.id}".toByteArray()
+            )
         }
 
         // Emit progress events

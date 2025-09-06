@@ -15,9 +15,9 @@ import kotlinx.serialization.decodeFromString
  * Handles HTTP operations with authentication, logging, and error handling
  */
 class APIClient(
-    internal val baseURL: String,
-    internal val httpClient: HttpClient,
-    internal val authenticationService: AuthenticationService? = null,
+    val baseURL: String,
+    val httpClient: HttpClient,
+    val authenticationService: AuthenticationService? = null,
     private val networkChecker: NetworkChecker? = null
 ) : NetworkService {
 

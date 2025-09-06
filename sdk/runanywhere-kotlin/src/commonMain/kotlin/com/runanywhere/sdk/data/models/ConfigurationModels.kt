@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.data.models
 
-import kotlinx.datetime.Clock
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
  * Configuration data models
@@ -72,7 +72,7 @@ data class ConfigurationData(
                 baseURL = "https://api.runanywhere.ai",
                 environment = SDKEnvironment.DEVELOPMENT,
                 source = ConfigurationSource.DEFAULTS,
-                lastUpdated = Clock.System.now().toEpochMilliseconds(),
+                lastUpdated = getCurrentTimeMillis(),
                 routing = RoutingConfiguration.defaults(),
                 generation = GenerationConfiguration.defaults(),
                 storage = StorageConfiguration.defaults(),

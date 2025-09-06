@@ -46,6 +46,7 @@ sealed class SDKError : Exception() {
     data class ComponentNotReady(override val message: String) : SDKError()
     data class ComponentNotInitialized(override val message: String) : SDKError()
     data class ServiceNotAvailable(override val message: String) : SDKError()
+    data class ComponentError(val component: String, override val message: String) : SDKError()
 
     // Validation errors
     data class ValidationError(override val message: String) : SDKError()
