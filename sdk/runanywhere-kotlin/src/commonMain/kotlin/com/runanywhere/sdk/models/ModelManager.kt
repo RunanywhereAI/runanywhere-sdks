@@ -7,7 +7,8 @@ import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import com.runanywhere.sdk.storage.FileSystem
+import com.runanywhere.sdk.services.DownloadService
 
 /**
  * Model handle for loaded models
@@ -20,9 +21,12 @@ data class ModelHandle(
 /**
  * Model Manager for handling model downloads and storage
  */
-class ModelManager {
+class ModelManager(
+    private val fileSystem: FileSystem,
+    private val downloadService: DownloadService
+) {
     private val storage = ModelStorage()
-    private val downloader = ModelDownloader()
+    private val downloader = ModelDownloader(fileSystem, downloadService)
     private val loadedModels = mutableMapOf<String, ModelInfo>()
 
     /**
@@ -77,7 +81,7 @@ class ModelManager {
      * Delete a model from local storage
      */
     suspend fun deleteModel(modelId: String) {
-        withContext(Dispatchers.IO) {
+        withContext(Dispatchers.Default) {
             storage.deleteModel(modelId)
             loadedModels.remove(modelId)
         }

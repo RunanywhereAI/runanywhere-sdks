@@ -3,7 +3,7 @@ package com.runanywhere.sdk.services
 import java.security.MessageDigest
 
 /**
- * JVM implementation of MD5 calculation
+ * Shared JVM/Android implementation of MD5 calculation
  */
 actual fun calculateMD5(data: ByteArray): String {
     val digest = MessageDigest.getInstance("MD5")

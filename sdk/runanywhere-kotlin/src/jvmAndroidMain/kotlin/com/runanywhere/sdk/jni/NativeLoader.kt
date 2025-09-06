@@ -4,6 +4,7 @@ import java.io.File
 
 /**
  * Native library loader for platform-specific libraries
+ * Shared between JVM and Android
  */
 object NativeLoader {
     private val loadedLibraries = mutableSetOf<String>()

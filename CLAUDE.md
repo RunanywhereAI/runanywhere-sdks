@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ### Before starting work
 - Always in plan mode to make a plan refer to `thoughts/shared/plans/{descriptive_name}.md`.
 - After get the plan, make sure you Write the plan to the appropriate file as mentioned in the guide that you referred to.
@@ -24,14 +26,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository contains cross-platform SDKs for the RunAnywhere on-device AI platform. The platform provides intelligent routing between on-device and cloud AI models to optimize for cost and privacy.
 
 ### SDK Implementations
+- **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
 - **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
 - **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
 
 ### Example Applications
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
+- **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
+
+### Kotlin Multiplatform SDK Development
+
+```bash
+# Navigate to Kotlin SDK
+cd sdk/runanywhere-kotlin/
+
+# Primary build commands (most commonly used)
+./scripts/sdk.sh jvm              # Build JVM target for IntelliJ plugin
+./scripts/sdk.sh jvm --publish    # Build and publish to local Maven
+./scripts/sdk.sh plugin           # Build SDK and plugin for IntelliJ IDEA
+./scripts/sdk.sh plugin-as        # Build SDK and plugin for Android Studio
+./scripts/sdk.sh run-plugin       # Build and run IntelliJ IDEA with plugin
+./scripts/sdk.sh run-plugin-as    # Build and run Android Studio with plugin
+
+# Build all targets
+./scripts/sdk.sh all              # Build all targets (JVM, Android, Native)
+./scripts/sdk.sh android          # Build Android AAR library
+./scripts/sdk.sh native           # Build native targets
+
+# Testing
+./scripts/sdk.sh test             # Run all tests
+./scripts/sdk.sh test-jvm         # Run JVM tests only
+./scripts/sdk.sh test-android     # Run Android tests only
+./gradlew jvmTest                 # Run JVM tests directly
+
+# Clean and rebuild
+./scripts/sdk.sh clean all        # Clean and rebuild everything
+./scripts/sdk.sh reset            # Reset Gradle daemon and caches
+
+# Configuration management
+./scripts/sdk.sh config-dev       # Configure for development
+./scripts/sdk.sh config-staging   # Configure for staging
+./scripts/sdk.sh config-prod      # Configure for production
+./scripts/sdk.sh config-show      # Show current configuration
+
+# Code quality
+./scripts/sdk.sh lint             # Run code quality checks
+./scripts/sdk.sh format           # Auto-format code with ktlint
+```
 
 ### Android SDK Development
 
@@ -56,8 +100,7 @@ cd sdk/runanywhere-android/
 ```
 
 ### iOS SDK Development
-## While implementing:
-- Always use the latest Swift syntax - Swift 6 version is the latest right now. Use the latest concurrency etc patterns and try to implement CLEAN architecture unless explicitly mentioned otherwise.
+
 ```bash
 # Navigate to iOS SDK
 cd sdk/runanywhere-swift/
@@ -100,20 +143,23 @@ cd examples/android/RunAnywhereAI/
 ### iOS Example App
 
 To get logs for sample app and sdk use this in another terminal:
+```bash
 log stream --predicate 'subsystem CONTAINS "com.runanywhere"' --info --debug
+```
 
 For physical device:
+```bash
 idevicesyslog | grep "com.runanywhere"
+```
 
 #### Quick Build & Run (Recommended)
 ```bash
 # Navigate to iOS example
 cd examples/ios/RunAnywhereAI/
-IMPORTANT!! - Always use build and run to run the project with correct device or sim
+
 # Build and run on simulator (handles dependencies automatically)
 ./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 
-NOTE: When running the app always check for running on the REAL device that's connected!
 # Build and run on connected device
 ./scripts/build_and_run.sh device
 
@@ -140,10 +186,8 @@ open RunAnywhereAI.xcworkspace
 ```
 
 #### Known Issues - Xcode 16 Sandbox
-
 **Error**: `Sandbox: rsync deny(1) file-write-create`
 **Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
-**Note**: Required after each `pod install`
 
 ### Pre-commit Hooks
 
@@ -158,45 +202,60 @@ pre-commit run ios-sdk-swiftlint --all-files
 
 ## Architecture Overview
 
-### Core SDK Design Patterns
+### Kotlin Multiplatform SDK Architecture
 
-Both SDKs follow similar architectural patterns:
+The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native platforms:
 
-1. **Singleton Pattern**: Main SDK access through `RunAnywhereSDK.shared` (iOS) or `RunAnywhereSDK.getInstance()` (Android)
-2. **Configuration-based Initialization**: Initialize with API key and optional settings
-3. **Async/Promise-based APIs**: Modern async patterns (Kotlin coroutines for Android, async/await for iOS)
-4. **Model Loading**: Universal model loader supporting multiple formats (GGUF, ONNX, Core ML, MLX, TFLite)
-5. **Intelligent Routing**: Automatic decision-making for on-device vs cloud execution
-6. **Cost Tracking**: Real-time cost and savings tracking
+1. **Common Module** (`commonMain/`) - Platform-agnostic business logic
+   - Core services and interfaces
+   - Data models and repositories
+   - Network and authentication logic
+   - Model management abstractions
 
-### Key Components
+2. **Platform-Specific Implementations**:
+   - **JVM** (`jvmMain/`) - Desktop/IntelliJ plugin support
+   - **Android** (`androidMain/`) - Android-specific implementations with Room DB
+   - **Native** (`nativeMain/`) - Linux, macOS, Windows support
 
-**Android SDK Structure:**
-- `RunAnywhereSDK.kt` - Main SDK entry point and singleton
-- `Configuration.kt` - SDK configuration options
-- `GenerationOptions.kt` - Text generation parameters
-- `GenerationResult.kt` - Generation response with metrics
-- `Message.kt` & `Context.kt` - Conversation management
+3. **Key Components**:
+   - `RunAnywhere.kt` - Main SDK entry point (platform-specific implementations)
+   - `Services.kt` - Service container and dependency injection
+   - `STTComponent` - Speech-to-text with Whisper integration
+   - `VADComponent` - Voice activity detection
+   - `ModelManager` - Model downloading and lifecycle
+   - `ConfigurationService` - Environment-specific configuration
 
-**iOS SDK Structure:**
-- `RunAnywhereSDK.swift` - Main SDK class with shared instance
-- `Configuration.swift` - SDK configuration and policies
-- `GenerationOptions.swift` - Generation parameters
-- `GenerationResult.swift` - Results with cost tracking
-- `Context.swift` & `Message.swift` - Conversation context
+### Design Patterns
+
+1. **Repository Pattern**: Data access abstraction with platform-specific implementations
+2. **Service Container**: Centralized dependency injection
+3. **Event Bus**: Reactive communication between components
+4. **Provider Pattern**: Platform-specific service providers (STT, VAD)
 
 ### Platform Requirements
 
-**Android:**
-- Minimum SDK: 24 (Android 7.0)
-- Target SDK: 36
+**Kotlin Multiplatform SDK:**
 - Kotlin: 2.0.21
 - Gradle: 8.11.1
+- JVM Target: 17
+- Android Min SDK: 24
+- Android Target SDK: 36
 
-**iOS:**
+**iOS SDK:**
 - iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
 - Swift: 5.9+
 - Xcode: 15.0+
+
+## Maven Coordinates
+
+For IntelliJ/JetBrains plugin development:
+```kotlin
+dependencies {
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+}
+```
+
+Location after local publish: `~/.m2/repository/com/runanywhere/sdk/`
 
 ## CI/CD Pipeline
 
@@ -215,8 +274,9 @@ Workflows are located in `.github/workflows/`:
 
 ## Development Notes
 
-- Both SDKs are in early development with placeholder implementations
-- The SDKs focus on privacy-first, on-device AI with intelligent routing
+- The Kotlin Multiplatform SDK is the primary SDK implementation
+- Use `./scripts/sdk.sh` for all SDK operations - it handles configuration and build complexity
+- Configuration files (`dev.json`, `staging.json`, `prod.json`) are git-ignored - use example files as templates
+- Both SDKs focus on privacy-first, on-device AI with intelligent routing
 - Cost optimization is a key feature with real-time tracking
 - Pre-commit hooks are configured for code quality enforcement
-- SwiftLint is temporarily disabled in iOS SDK build due to plugin issues

@@ -10,9 +10,9 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
- * JVM implementation of HttpClient using OkHttp
+ * Shared OkHttp implementation for JVM and Android
  */
-internal class JvmHttpClient : HttpClient {
+internal class OkHttpEngine : HttpClient {
 
     private var defaultHeaders = mutableMapOf<String, String>()
     private var timeoutMillis = 30_000L
@@ -155,6 +155,6 @@ internal class JvmHttpClient : HttpClient {
 }
 
 /**
- * Factory function to create HttpClient for JVM
+ * Factory function to create HttpClient for JVM and Android
  */
-actual fun createHttpClient(): HttpClient = JvmHttpClient()
+actual fun createHttpClient(): HttpClient = OkHttpEngine()
