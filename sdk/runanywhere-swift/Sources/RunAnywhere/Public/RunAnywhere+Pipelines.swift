@@ -180,7 +180,7 @@ public class ModularVoicePipeline {
     /// Initialize all components
     public func initializeComponents() -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            Task { @MainActor in
                 do {
                     // Initialize VAD
                     if let vad = vadComponent {
@@ -233,9 +233,11 @@ public class ModularVoicePipeline {
     /// Process audio stream through the pipeline
     public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
-            Task {
+            Task { @MainActor in
                 do {
                     var currentSpeaker: SpeakerInfo?
+                    var audioBuffer: [Float] = []  // Accumulate audio samples
+                    var isSpeaking = false
 
                     for await voiceChunk in audioStream {
                         // Extract float samples from VoiceAudioChunk
@@ -243,13 +245,66 @@ public class ModularVoicePipeline {
                         let audioChunk = voiceChunk.data
 
                         // Process through VAD if available
+                        var speechDetected = false
                         if let vad = vadComponent {
                             let vadResult = try await vad.detectSpeech(in: floatSamples)
-                            if vadResult.isSpeechDetected {
+                            speechDetected = vadResult.isSpeechDetected
+
+                            if speechDetected && !isSpeaking {
+                                // Speech just started
                                 continuation.yield(.vadSpeechStart)
-                            } else {
+                                isSpeaking = true
+                                audioBuffer = []  // Clear buffer for new speech
+                            } else if !speechDetected && isSpeaking {
+                                // Speech just ended
                                 continuation.yield(.vadSpeechEnd)
+                                isSpeaking = false
+
+                                // Now transcribe the accumulated audio
+                                if let stt = sttComponent, !audioBuffer.isEmpty {
+                                    // Convert accumulated float samples to Data
+                                    let accumulatedData = audioBuffer.withUnsafeBytes { bytes in
+                                        Data(bytes)
+                                    }
+
+                                    let transcript = try await stt.transcribe(accumulatedData)
+
+                                    // Only emit if we got actual text
+                                    if !transcript.text.isEmpty {
+                                        // Emit transcript with or without speaker info
+                                        if enableDiarization, let speaker = currentSpeaker {
+                                            continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
+                                        } else {
+                                            continuation.yield(.sttFinalTranscript(transcript.text))
+                                        }
+
+                                        // Process through LLM if available
+                                        if let llm = llmComponent {
+                                            continuation.yield(.llmThinking)
+                                            let response = try await llm.generate(prompt: transcript.text)
+                                            continuation.yield(.llmFinalResponse(response.text))
+
+                                            // Process through TTS if available
+                                            if let tts = ttsComponent {
+                                                continuation.yield(.ttsStarted)
+                                                _ = try await tts.synthesize(response.text)
+                                                continuation.yield(.ttsCompleted)
+                                            }
+                                        }
+                                    }
+
+                                    // Clear buffer after processing
+                                    audioBuffer = []
+                                }
                             }
+                        } else {
+                            // No VAD, treat all audio as speech
+                            speechDetected = true
+                        }
+
+                        // Accumulate audio if speaking
+                        if speechDetected {
+                            audioBuffer.append(contentsOf: floatSamples)
                         }
 
                         // Process speaker diarization if enabled
@@ -284,32 +339,6 @@ public class ModularVoicePipeline {
                                         continuation.yield(.sttSpeakerChanged(from: currentSpeaker, to: speaker))
                                     }
                                     currentSpeaker = speaker
-                                }
-                            }
-                        }
-
-                        // Process through STT if available
-                        if let stt = sttComponent {
-                            let transcript = try await stt.transcribe(audioChunk)
-
-                            // Emit transcript with or without speaker info
-                            if enableDiarization, let speaker = currentSpeaker {
-                                continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
-                            } else {
-                                continuation.yield(.sttFinalTranscript(transcript.text))
-                            }
-
-                            // Process through LLM if available
-                            if let llm = llmComponent {
-                                continuation.yield(.llmThinking)
-                                let response = try await llm.generate(prompt: transcript.text)
-                                continuation.yield(.llmFinalResponse(response.text))
-
-                                // Process through TTS if available
-                                if let tts = ttsComponent {
-                                    continuation.yield(.ttsStarted)
-                                    let audio = try await tts.synthesize(response.text)
-                                    continuation.yield(.ttsCompleted)
                                 }
                             }
                         }

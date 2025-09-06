@@ -476,7 +476,12 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
     public override func createService() async throws -> STTServiceWrapper {
         // Try to get a registered STT provider from central registry
-        guard let provider = ModuleRegistry.shared.sttProvider(for: sttConfiguration.modelId) else {
+        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
+        let provider = await MainActor.run {
+            ModuleRegistry.shared.sttProvider(for: sttConfiguration.modelId)
+        }
+
+        guard let provider = provider else {
             throw SDKError.componentNotInitialized(
                 "No STT service provider registered. Please register WhisperKitServiceProvider.register()"
             )

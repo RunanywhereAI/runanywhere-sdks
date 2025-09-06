@@ -327,7 +327,12 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
         }
 
         // Try to get a registered LLM provider from central registry
-        guard let provider = ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId) else {
+        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
+        let provider = await MainActor.run {
+            ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId)
+        }
+
+        guard let provider = provider else {
             throw SDKError.componentNotInitialized(
                 "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.shared.registerLLM(provider)."
             )

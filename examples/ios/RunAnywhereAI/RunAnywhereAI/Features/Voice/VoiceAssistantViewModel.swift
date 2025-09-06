@@ -138,11 +138,11 @@ class VoiceAssistantViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Initializing components..."
 
-        // Create pipeline configuration
+        // Create pipeline configuration with lower VAD threshold for better sensitivity
         // Always include LLM component for complete pipeline flow
         let config = ModularPipelineConfig(
             components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(),
+            vad: VADConfig(energyThreshold: 0.0001), // Much lower threshold for sensitive detection
             stt: VoiceSTTConfig(modelId: whisperModelName),
             llm: VoiceLLMConfig(modelId: "default", systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational."),
             tts: VoiceTTSConfig(voice: "system")

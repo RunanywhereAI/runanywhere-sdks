@@ -32,22 +32,21 @@ public final class LLMSwiftServiceProvider: LLMServiceProvider {
     }
 
     public func canHandle(modelId: String?) -> Bool {
-        // LLMSwift handles GGUF/GGML models
-        guard let modelId = modelId else { return true }
+        // Accept nil or empty/default modelId
+        guard let modelId = modelId, !modelId.isEmpty else {
+            return true
+        }
 
-        // Check for GGUF/GGML models or llama-based models
-        let supportedPrefixes = ["llama", "mistral", "phi", "gemma", "qwen", "tinyllama", "codellama", "vicuna"]
+        // Accept "default" to use currently loaded model
+        if modelId == "default" {
+            return true
+        }
+
+        // Check for supported file extensions (GGUF/GGML/BIN formats)
         let supportedExtensions = [".gguf", ".ggml", ".bin"]
-
         let lowercasedId = modelId.lowercased()
 
-        // Check prefixes
-        let hasPrefix = supportedPrefixes.contains(where: { lowercasedId.contains($0) })
-
-        // Check extensions
-        let hasExtension = supportedExtensions.contains(where: { lowercasedId.hasSuffix($0) })
-
-        return hasPrefix || hasExtension
+        return supportedExtensions.contains { lowercasedId.hasSuffix($0) }
     }
 
     public func createLLMService(configuration: LLMConfiguration) async throws -> LLMService {
@@ -57,14 +56,13 @@ public final class LLMSwiftServiceProvider: LLMServiceProvider {
         let service = LLMSwiftService()
 
         // Initialize with model path if provided
-        if let modelId = configuration.modelId {
+        if let modelId = configuration.modelId, !modelId.isEmpty && modelId != "default" {
             logger.info("Initializing with model: \(modelId)")
-
             // The modelId might be a path or just an identifier
             // In a real implementation, you'd resolve this to an actual path
             try await service.initialize(modelPath: modelId)
         } else {
-            logger.info("No model specified, service will need to be initialized with a model later")
+            logger.info("Using default model - service will use currently loaded model or be initialized later")
         }
 
         logger.info("LLMSwift service created successfully")
