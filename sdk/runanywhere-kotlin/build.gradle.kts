@@ -1,6 +1,4 @@
-@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
-
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+// Removed experimental API for now
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -30,11 +28,11 @@ kotlin {
         }
     }
 
-    // Native targets (optional, for future expansion)
-    linuxX64()
-    macosX64()
-    macosArm64()
-    mingwX64()
+    // Native targets (temporarily disabled to fix compilation issues)
+    // linuxX64()
+    // macosX64()
+    // macosArm64()
+    // mingwX64()
 
     sourceSets {
         // Common source set
@@ -53,25 +51,18 @@ kotlin {
             }
         }
 
-        // Create shared source set for JVM and Android
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                // Shared dependencies between JVM and Android
-                implementation(libs.okhttp)
-                implementation(libs.okhttp.logging)
-                implementation(libs.gson)
-                implementation(libs.commons.io)
-                implementation(libs.whisper.jni)
-            }
-        }
-
         // JVM-specific dependencies
         jvmMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
-                // Remove dependencies that are now in jvmAndroidMain
-                // Add only JVM-specific dependencies here if any
+                // Whisper JNI for STT
+                implementation(libs.whisper.jni)
+                // HTTP client for JVM
+                implementation(libs.okhttp)
+                implementation(libs.okhttp.logging)
+                // JSON processing
+                implementation(libs.gson)
+                // File operations
+                implementation(libs.commons.io)
             }
         }
 
@@ -84,8 +75,16 @@ kotlin {
 
         // Android-specific dependencies
         androidMain {
-            dependsOn(jvmAndroidMain)
             dependencies {
+                // Whisper JNI for Android
+                implementation(libs.whisper.jni)
+                // HTTP client
+                implementation(libs.okhttp)
+                implementation(libs.okhttp.logging)
+                // JSON processing
+                implementation(libs.gson)
+                // File operations
+                implementation(libs.commons.io)
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
                 // Android VAD (only for Android target)
@@ -113,14 +112,14 @@ kotlin {
         }
 
         // Native targets (basic setup)
-        val nativeMain by creating {
-            dependsOn(commonMain.get())
-        }
+        // val nativeMain by creating {
+        //     dependsOn(commonMain.get())
+        // }
 
-        val linuxX64Main by getting { dependsOn(nativeMain) }
-        val macosX64Main by getting { dependsOn(nativeMain) }
-        val macosArm64Main by getting { dependsOn(nativeMain) }
-        val mingwX64Main by getting { dependsOn(nativeMain) }
+        // val linuxX64Main by getting { dependsOn(nativeMain) }
+        // val macosX64Main by getting { dependsOn(nativeMain) }
+        // val macosArm64Main by getting { dependsOn(nativeMain) }
+        // val mingwX64Main by getting { dependsOn(nativeMain) }
     }
 }
 

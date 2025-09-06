@@ -7,6 +7,7 @@ import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKInitParams
+import com.runanywhere.sdk.foundation.PlatformContext
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
@@ -35,7 +36,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         // Initialize service container
         serviceContainer = ServiceContainer.shared
-        serviceContainer.initialize(System.getProperty("user.dir"))
+        val platformContext = PlatformContext(System.getProperty("user.dir"))
+        serviceContainer.initialize(platformContext)
 
         // Create SDK init params
         val params = SDKInitParams(

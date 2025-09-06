@@ -3,7 +3,7 @@ package com.runanywhere.sdk.data.models
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import kotlinx.datetime.Clock
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 
@@ -53,9 +53,9 @@ data class ModelInfo(
     val checksumSHA256: String? = null,
     val metadata: Map<String, String> = emptyMap(),
     @SerialName("created_at")
-    val createdAt: Long = Clock.System.now().toEpochMilliseconds(),
+    val createdAt: Long = getCurrentTimeMillis(),
     @SerialName("updated_at")
-    val updatedAt: Long = Clock.System.now().toEpochMilliseconds()
+    val updatedAt: Long = getCurrentTimeMillis()
 ) {
 
     /**

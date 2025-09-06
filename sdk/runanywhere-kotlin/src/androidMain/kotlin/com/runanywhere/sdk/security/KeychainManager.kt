@@ -33,6 +33,11 @@ class KeychainManager private constructor(private val context: Context) {
                 }
             }
         }
+
+        // Keys for token storage
+        private const val ACCESS_TOKEN_KEY = "access_token"
+        private const val REFRESH_TOKEN_KEY = "refresh_token"
+        private const val EXPIRES_AT_KEY = "expires_at"
     }
 
     private val logger = SDKLogger("KeychainManager")
@@ -54,12 +59,6 @@ class KeychainManager private constructor(private val context: Context) {
         )
     }
 
-    // Keys for token storage
-    private companion object {
-        const val ACCESS_TOKEN_KEY = "access_token"
-        const val REFRESH_TOKEN_KEY = "refresh_token"
-        const val EXPIRES_AT_KEY = "expires_at"
-    }
 
     /**
      * Save authentication tokens securely
@@ -99,7 +98,7 @@ class KeychainManager private constructor(private val context: Context) {
                 val storedTokens = StoredTokens(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
-                    expiresAt = Date(expiresAtMillis)
+                    expiresAt = expiresAtMillis
                 )
 
                 logger.debug("Tokens retrieved successfully")

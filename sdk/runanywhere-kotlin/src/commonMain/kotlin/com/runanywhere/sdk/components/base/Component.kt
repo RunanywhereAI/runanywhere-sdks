@@ -6,9 +6,8 @@ import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 
 // MARK: - Base Protocols
 
@@ -23,7 +22,7 @@ interface ComponentInput {
  * Base protocol for component outputs
  */
 interface ComponentOutput {
-    val timestamp: Instant
+    val timestamp: Long
 }
 
 /**
@@ -178,7 +177,7 @@ abstract class BaseComponent<TService : Any>(
             if (state == ComponentState.READY) {
                 return // Already initialized
             }
-            throw SDKError.InvalidState("Cannot initialize from state: $state")
+            throw SDKError.InvalidState("Cannot initialize from state: ${state.name}")
         }
 
         // Emit state change event
@@ -388,7 +387,7 @@ interface STTComponent : Component {
 data class VADResult(
     val isSpeech: Boolean,
     val confidence: Float,
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds()
+    val timestamp: Long = getCurrentTimeMillis()
 )
 
 // MARK: - Transcription Result
@@ -411,5 +410,5 @@ data class TranscriptionResult(
 data class TranscriptionUpdate(
     val text: String,
     val isFinal: Boolean,
-    val timestamp: Long = Clock.System.now().toEpochMilliseconds()
+    val timestamp: Long = getCurrentTimeMillis()
 )

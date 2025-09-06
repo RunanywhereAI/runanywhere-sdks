@@ -3,16 +3,14 @@ package com.runanywhere.sdk.components.stt
 import com.runanywhere.sdk.components.base.BaseComponent
 import com.runanywhere.sdk.components.base.ComponentState
 import com.runanywhere.sdk.components.base.SDKComponent
-import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.data.models.ModelInfo
+import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.files.FileManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
  * Speech-to-Text component matching Swift SDK architecture
@@ -44,44 +42,50 @@ class STTComponent(
     }
 
     suspend fun transcribe(audioData: ByteArray): TranscriptionResult {
-        return transcribe(audioData, STTOptions(
-            language = sttConfiguration.language,
-            enableTimestamps = sttConfiguration.enableTimestamps
-        ))
+        return transcribe(
+            audioData, STTOptions(
+                language = sttConfiguration.language,
+                enableTimestamps = sttConfiguration.enableTimestamps
+            )
+        )
     }
 
     suspend fun transcribe(audioData: ByteArray, options: STTOptions): TranscriptionResult {
         requireReady()
 
-        val startTime = Clock.System.now().toEpochMilliseconds()
+        val startTime = getCurrentTimeMillis()
 
         // Send analytics event for transcription start
-        analyticsCallback?.invoke("transcription_started", mapOf(
-            "audio_size_bytes" to audioData.size,
-            "model_id" to (currentModel?.model?.id ?: "unknown"),
-            "session_id" to generateSessionId(),
-            "timestamp" to startTime,
-            "sensitivity_mode" to options.sensitivityMode.toString()
-        ))
+        analyticsCallback?.invoke(
+            "transcription_started", mapOf(
+                "audio_size_bytes" to audioData.size,
+                "model_id" to (currentModel?.model?.id ?: "unknown"),
+                "session_id" to generateSessionId(),
+                "timestamp" to startTime,
+                "sensitivity_mode" to options.sensitivityMode.toString()
+            )
+        )
 
         val result = sttService.transcribe(audioData, options)
 
-        val endTime = Clock.System.now().toEpochMilliseconds()
+        val endTime = getCurrentTimeMillis()
         val duration = endTime - startTime
 
         // Send analytics event for transcription completed
-        analyticsCallback?.invoke("transcription_completed", mapOf(
-            "duration" to duration,
-            "text_length" to result.transcript.length,
-            "confidence" to (result.confidence ?: 0.0f),
-            "language" to (result.language ?: "unknown"),
-            "model_id" to (currentModel?.model?.id ?: "unknown"),
-            "session_id" to generateSessionId(),
-            "timestamp" to endTime,
-            "audio_duration_ms" to estimateAudioDuration(audioData.size),
-            "has_timestamps" to (result.timestamps?.isNotEmpty() == true),
-            "sensitivity_mode" to options.sensitivityMode.toString()
-        ))
+        analyticsCallback?.invoke(
+            "transcription_completed", mapOf(
+                "duration" to duration,
+                "text_length" to result.transcript.length,
+                "confidence" to (result.confidence ?: 0.0f),
+                "language" to (result.language ?: "unknown"),
+                "model_id" to (currentModel?.model?.id ?: "unknown"),
+                "session_id" to generateSessionId(),
+                "timestamp" to endTime,
+                "audio_duration_ms" to estimateAudioDuration(audioData.size),
+                "has_timestamps" to (result.timestamps?.isNotEmpty() == true),
+                "sensitivity_mode" to options.sensitivityMode.toString()
+            )
+        )
 
         // Convert STTTranscriptionResult to TranscriptionResult
         return TranscriptionResult(
@@ -103,15 +107,17 @@ class STTComponent(
         requireReady()
 
         val sessionId = generateSessionId()
-        val streamStartTime = Clock.System.now().toEpochMilliseconds()
+        val streamStartTime = getCurrentTimeMillis()
 
         // Send analytics event for stream start
-        analyticsCallback?.invoke("stream_transcription_started", mapOf(
-            "session_id" to sessionId,
-            "timestamp" to streamStartTime,
-            "model_id" to (currentModel?.model?.id ?: "unknown"),
-            "vad_enabled" to true
-        ))
+        analyticsCallback?.invoke(
+            "stream_transcription_started", mapOf(
+                "session_id" to sessionId,
+                "timestamp" to streamStartTime,
+                "model_id" to (currentModel?.model?.id ?: "unknown"),
+                "vad_enabled" to true
+            )
+        )
 
         if (true) { // TODO: Add enableVAD to configuration
             // Use VAD for speech detection
@@ -131,17 +137,19 @@ class STTComponent(
                 when {
                     vadResult.isSpeech && !isInSpeech -> {
                         isInSpeech = true
-                        speechSegmentStartTime = Clock.System.now().toEpochMilliseconds()
+                        speechSegmentStartTime = getCurrentTimeMillis()
                         audioBuffer.clear()
                         audioBuffer.add(chunk)
                         emit(TranscriptionEvent.SpeechStart)
 
                         // Send analytics for speech start
-                        analyticsCallback?.invoke("speech_segment_started", mapOf(
-                            "session_id" to sessionId,
-                            "timestamp" to speechSegmentStartTime!!,
-                            "chunk_number" to totalChunksProcessed
-                        ))
+                        analyticsCallback?.invoke(
+                            "speech_segment_started", mapOf(
+                                "session_id" to sessionId,
+                                "timestamp" to speechSegmentStartTime!!,
+                                "chunk_number" to totalChunksProcessed
+                            )
+                        )
                     }
 
                     vadResult.isSpeech && isInSpeech -> {
@@ -152,18 +160,20 @@ class STTComponent(
                             emit(TranscriptionEvent.PartialTranscription(partial))
 
                             // Send analytics for partial transcription
-                            analyticsCallback?.invoke("partial_transcription", mapOf(
-                                "session_id" to sessionId,
-                                "timestamp" to Clock.System.now().toEpochMilliseconds(),
-                                "text_length" to partial.length,
-                                "buffer_size" to audioBuffer.size
-                            ))
+                            analyticsCallback?.invoke(
+                                "partial_transcription", mapOf(
+                                    "session_id" to sessionId,
+                                    "timestamp" to getCurrentTimeMillis(),
+                                    "text_length" to partial.length,
+                                    "buffer_size" to audioBuffer.size
+                                )
+                            )
                         }
                     }
 
                     !vadResult.isSpeech && isInSpeech -> {
                         isInSpeech = false
-                        val speechEndTime = Clock.System.now().toEpochMilliseconds()
+                        val speechEndTime = getCurrentTimeMillis()
                         val speechDuration = speechSegmentStartTime?.let { speechEndTime - it }
 
                         if (audioBuffer.isNotEmpty()) {
@@ -172,26 +182,30 @@ class STTComponent(
                             emit(TranscriptionEvent.SpeechEnd)
 
                             // Send analytics for speech segment completion
-                            analyticsCallback?.invoke("speech_segment_completed", mapOf<String, Any>(
-                                "session_id" to sessionId,
-                                "timestamp" to speechEndTime,
-                                "speech_duration" to (speechDuration ?: 0L),
-                                "final_text_length" to final.length,
-                                "buffer_chunks" to audioBuffer.size,
-                                "estimated_audio_duration" to estimateAudioDuration(audioBuffer.sumOf { it.size })
-                            ))
+                            analyticsCallback?.invoke(
+                                "speech_segment_completed", mapOf<String, Any>(
+                                    "session_id" to sessionId,
+                                    "timestamp" to speechEndTime,
+                                    "speech_duration" to (speechDuration ?: 0L),
+                                    "final_text_length" to final.length,
+                                    "buffer_chunks" to audioBuffer.size,
+                                    "estimated_audio_duration" to estimateAudioDuration(audioBuffer.sumOf { it.size })
+                                )
+                            )
                         }
                     }
                 }
             }
 
             // Send stream completion analytics
-            analyticsCallback?.invoke("stream_transcription_completed", mapOf(
-                "session_id" to sessionId,
-                "timestamp" to Clock.System.now().toEpochMilliseconds(),
-                "total_duration" to (Clock.System.now().toEpochMilliseconds() - streamStartTime),
-                "total_chunks_processed" to totalChunksProcessed
-            ))
+            analyticsCallback?.invoke(
+                "stream_transcription_completed", mapOf(
+                    "session_id" to sessionId,
+                    "timestamp" to getCurrentTimeMillis(),
+                    "total_duration" to (getCurrentTimeMillis() - streamStartTime),
+                    "total_chunks_processed" to totalChunksProcessed
+                )
+            )
 
         } else {
             // Direct transcription without VAD
@@ -202,12 +216,14 @@ class STTComponent(
                 emit(TranscriptionEvent.FinalTranscription(result.transcript))
 
                 // Send analytics for direct transcription
-                analyticsCallback?.invoke("direct_transcription", mapOf(
-                    "session_id" to sessionId,
-                    "timestamp" to Clock.System.now().toEpochMilliseconds(),
-                    "chunk_number" to chunkCount,
-                    "text_length" to result.transcript.length
-                ))
+                analyticsCallback?.invoke(
+                    "direct_transcription", mapOf(
+                        "session_id" to sessionId,
+                        "timestamp" to getCurrentTimeMillis(),
+                        "chunk_number" to chunkCount,
+                        "text_length" to result.transcript.length
+                    )
+                )
             }
         }
     }
@@ -251,7 +267,13 @@ class STTComponent(
     }
 
     private suspend fun transcribeBuffer(buffer: List<ByteArray>): String {
-        val merged = buffer.reduce { acc, bytes -> acc + bytes }
+        val totalSize = buffer.sumOf { it.size }
+        val merged = ByteArray(totalSize)
+        var offset = 0
+        for (chunk in buffer) {
+            chunk.copyInto(merged, offset)
+            offset += chunk.size
+        }
         val result = sttService.transcribe(merged, STTOptions())
         return result.transcript
     }
@@ -267,10 +289,15 @@ class STTComponent(
     }
 
     private fun generateSessionId(): String {
-        return "stt-session-${Clock.System.now().toEpochMilliseconds()}"
+        return "stt-session-${getCurrentTimeMillis()}"
     }
 
-    private fun estimateAudioDuration(audioDataSize: Int, sampleRate: Int = 16000, channels: Int = 1, bytesPerSample: Int = 2): Long {
+    private fun estimateAudioDuration(
+        audioDataSize: Int,
+        sampleRate: Int = 16000,
+        channels: Int = 1,
+        bytesPerSample: Int = 2
+    ): Long {
         // Estimate duration in milliseconds based on audio data size
         val samplesCount = audioDataSize / (channels * bytesPerSample)
         return (samplesCount * 1000L) / sampleRate

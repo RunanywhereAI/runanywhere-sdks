@@ -71,18 +71,38 @@ abstract class RunAnywhereDatabase : RoomDatabase() {
 }
 
 /**
- * Database Manager for KMP compatibility
- * Provides platform-agnostic database access
+ * Database Manager for Android
+ * Provides database access
  */
-expect class DatabaseManager {
-    suspend fun getDatabase(): RunAnywhereDatabase
-    suspend fun closeDatabase()
-    suspend fun clearAllData()
+class DatabaseManager {
+    private lateinit var context: Context
+    private var database: RunAnywhereDatabase? = null
+
+    suspend fun getDatabase(): RunAnywhereDatabase {
+        return database ?: RunAnywhereDatabase.getDatabase(context).also { database = it }
+    }
+
+    suspend fun closeDatabase() {
+        database?.close()
+        database = null
+    }
+
+    suspend fun clearAllData() {
+        database?.clearAllTables()
+    }
+
+    companion object {
+        val shared: DatabaseManager = DatabaseManager()
+
+        fun initialize(context: Any) {
+            if (context is Context) {
+                shared.context = context
+            }
+        }
+    }
 }
 
-/**
- * Android implementation of DatabaseManager
- */
+// Keep the original for backwards compatibility if needed
 class AndroidDatabaseManager(private val context: Context) {
 
     private var database: RunAnywhereDatabase? = null
