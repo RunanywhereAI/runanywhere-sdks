@@ -40,9 +40,8 @@ class ModelManager(
 
         // Download if needed
         return downloader.downloadModel(modelInfo) { progress ->
-            kotlinx.coroutines.runBlocking {
-                EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, progress))
-            }
+            // TODO: Publish progress events when EventBus supports non-suspend callbacks
+            // or refactor to use Flow-based progress
         }
     }
 
