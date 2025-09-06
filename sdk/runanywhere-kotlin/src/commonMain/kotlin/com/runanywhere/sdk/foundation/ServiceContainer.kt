@@ -1,11 +1,11 @@
 package com.runanywhere.sdk.foundation
 
-import android.content.Context
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.models.ConfigurationData
+import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
 import com.runanywhere.sdk.network.createHttpClient
@@ -13,13 +13,12 @@ import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.services.DownloadService
 import com.runanywhere.sdk.services.ValidationService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
-import com.runanywhere.sdk.storage.AndroidPlatformContext
 import com.runanywhere.sdk.storage.createFileSystem
 import com.runanywhere.sdk.storage.createSecureStorage
 
 /**
- * Central service container - Android Implementation
- * Simplified version using platform abstractions
+ * Central service container - Common implementation
+ * Platform-specific initialization is handled through expect/actual
  */
 class ServiceContainer {
 
@@ -67,10 +66,11 @@ class ServiceContainer {
     }
 
     /**
-     * Initialize the service container with Android context
+     * Initialize the service container with platform-specific context
+     * This is implemented differently for each platform
      */
-    fun initialize(context: Context) {
-        AndroidPlatformContext.initialize(context)
+    fun initialize(platformContext: PlatformContext) {
+        platformContext.initialize()
     }
 
     /**
@@ -109,4 +109,11 @@ class ServiceContainer {
         sttComponent.cleanup()
         vadComponent.cleanup()
     }
+}
+
+/**
+ * Platform-specific context for initialization
+ */
+expect class PlatformContext {
+    fun initialize()
 }

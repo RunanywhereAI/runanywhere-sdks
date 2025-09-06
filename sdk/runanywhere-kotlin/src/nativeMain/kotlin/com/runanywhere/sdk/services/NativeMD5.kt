@@ -19,7 +19,7 @@ actual fun calculateMD5(data: ByteArray): String {
     var tempHash = hash
     repeat(16) {
         val byte = (tempHash and 0xFF).toByte()
-        result.append("%02x".format(byte))
+        result.append(byte.toUByte().toString(16).padStart(2, '0'))
         tempHash = tempHash shr 8
     }
 

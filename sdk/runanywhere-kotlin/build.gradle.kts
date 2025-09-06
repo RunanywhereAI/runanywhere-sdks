@@ -53,18 +53,25 @@ kotlin {
             }
         }
 
-        // JVM-specific dependencies
-        jvmMain {
+        // Create shared source set for JVM and Android
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
             dependencies {
-                // Whisper JNI for STT
-                implementation(libs.whisper.jni)
-                // HTTP client for JVM
+                // Shared dependencies between JVM and Android
                 implementation(libs.okhttp)
                 implementation(libs.okhttp.logging)
-                // JSON processing
                 implementation(libs.gson)
-                // File operations
                 implementation(libs.commons.io)
+                implementation(libs.whisper.jni)
+            }
+        }
+
+        // JVM-specific dependencies
+        jvmMain {
+            dependsOn(jvmAndroidMain)
+            dependencies {
+                // Remove dependencies that are now in jvmAndroidMain
+                // Add only JVM-specific dependencies here if any
             }
         }
 
@@ -77,6 +84,7 @@ kotlin {
 
         // Android-specific dependencies
         androidMain {
+            dependsOn(jvmAndroidMain)
             dependencies {
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
@@ -90,18 +98,10 @@ kotlin {
                 implementation(libs.androidx.room.ktx)
                 // Android security for encrypted storage
                 implementation(libs.androidx.security.crypto)
-                // Whisper JNI for Android
-                implementation(libs.whisper.jni)
-                // HTTP client
-                implementation(libs.okhttp)
-                implementation(libs.okhttp.logging)
-                // JSON processing
-                implementation(libs.gson)
-                // File operations
-                implementation(libs.commons.io)
                 // Retrofit for API calls
                 implementation(libs.retrofit)
                 implementation(libs.retrofit.gson)
+                // Remove dependencies that are now in jvmAndroidMain
             }
         }
 
