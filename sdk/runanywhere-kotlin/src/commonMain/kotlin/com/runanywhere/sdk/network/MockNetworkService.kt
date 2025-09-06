@@ -34,20 +34,20 @@ class MockNetworkService {
     private fun createMockModels(): List<ModelInfo> {
         // Only include Whisper Base model as default
         return listOf(
-            // Whisper Base - Default model
+            // Whisper Base English - Compatible GGML model
             ModelInfo(
                 id = "whisper-base",
-                name = "Whisper Base",
+                name = "Whisper Base English",
                 category = ModelCategory.SPEECH_RECOGNITION,
-                format = ModelFormat.MLMODEL,
-                // Use hardcoded URL for development mode
+                format = ModelFormat.GGML,
+                // Use compatible English model
                 downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() }
-                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                    ?: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
                 localPath = null,
-                downloadSize = 74_000_000, // ~74MB
-                memoryRequired = 74_000_000, // 74MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_KIT),
-                preferredFramework = LLMFramework.WHISPER_KIT,
+                downloadSize = 141_000_000, // ~141MB - GGML format
+                memoryRequired = 141_000_000, // 141MB
+                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP),
+                preferredFramework = LLMFramework.WHISPER_CPP,
                 contextLength = 0,
                 supportsThinking = false
             )

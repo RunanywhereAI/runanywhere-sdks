@@ -4,12 +4,17 @@ import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.models.ConfigurationData
+import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
-import com.runanywhere.sdk.services.modelinfo.ModelInfoService
-import com.runanywhere.sdk.services.sync.SyncCoordinator
+import com.runanywhere.sdk.network.createHttpClient
+import com.runanywhere.sdk.services.AuthenticationService
+import com.runanywhere.sdk.services.DownloadService
 import com.runanywhere.sdk.services.ValidationService
+import com.runanywhere.sdk.services.modelinfo.ModelInfoService
+import com.runanywhere.sdk.storage.createFileSystem
+import com.runanywhere.sdk.storage.createSecureStorage
 
 /**
  * Central service container - JVM Implementation
@@ -23,6 +28,11 @@ class ServiceContainer {
 
     // Working directory (replaces Android Context)
     private var workingDirectory: String? = null
+
+    // Platform abstractions
+    private val fileSystem by lazy { createFileSystem() }
+    private val httpClient by lazy { createHttpClient() }
+    private val secureStorage by lazy { createSecureStorage() }
 
     // Simple in-memory repositories for JVM
     val modelInfoRepository: ModelInfoRepository by lazy {
@@ -46,8 +56,16 @@ class ServiceContainer {
     }
 
     // Services
+    val authenticationService: AuthenticationService by lazy {
+        AuthenticationService(secureStorage, httpClient)
+    }
+
     val validationService: ValidationService by lazy {
-        ValidationService()
+        ValidationService(fileSystem)
+    }
+
+    val downloadService: DownloadService by lazy {
+        DownloadService(httpClient, fileSystem, validationService)
     }
 
     /**
@@ -61,6 +79,9 @@ class ServiceContainer {
      * Bootstrap services for production mode
      */
     suspend fun bootstrap(params: SDKInitParams): ConfigurationData {
+        // Initialize authentication
+        authenticationService.initialize(params.apiKey)
+
         // Initialize services
         modelInfoService.initialize()
 
@@ -72,6 +93,9 @@ class ServiceContainer {
      * Bootstrap services for development mode with mock data
      */
     suspend fun bootstrapDevelopmentMode(params: SDKInitParams): ConfigurationData {
+        // Initialize authentication (even in dev mode)
+        authenticationService.initialize(params.apiKey)
+
         // Initialize services
         modelInfoService.initialize()
 
@@ -83,6 +107,7 @@ class ServiceContainer {
      * Cleanup all services
      */
     suspend fun cleanup() {
+        authenticationService.signOut()
         sttComponent.cleanup()
         vadComponent.cleanup()
     }

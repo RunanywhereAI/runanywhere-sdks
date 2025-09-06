@@ -2,28 +2,28 @@ package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import java.io.File
 
 /**
  * Model downloader for handling model downloads
- * Mirrors iOS ModelDownloader functionality
+ * Uses platform abstractions for file operations
  */
 class ModelDownloader(
-    private val modelsDirectory: String = System.getProperty("user.home") + "/.runanywhere/models"
+    private val fileSystem: FileSystem,
+    private val downloadService: DownloadService,
+    private val modelsDirectory: String = getDefaultModelsDirectory()
 ) {
     private val logger = SDKLogger("ModelDownloader")
-    private val downloadService = DownloadService()
 
     suspend fun downloadModel(
         model: ModelInfo,
         progressCallback: (Float) -> Unit = {}
     ): String {
         // Ensure models directory exists
-        val modelsDir = File(modelsDirectory)
-        if (!modelsDir.exists()) {
-            modelsDir.mkdirs()
+        if (!fileSystem.exists(modelsDirectory)) {
+            fileSystem.createDirectory(modelsDirectory)
             logger.info("Created models directory: $modelsDirectory")
         }
 
@@ -40,12 +40,13 @@ class ModelDownloader(
     /**
      * Check if model is already downloaded
      */
-    fun isModelDownloaded(model: ModelInfo): Boolean {
+    suspend fun isModelDownloaded(model: ModelInfo): Boolean {
         val fileName = model.downloadURL?.substringAfterLast("/")
             ?: "${model.id}.gguf"
-        val file = File("$modelsDirectory/$fileName")
+        val filePath = "$modelsDirectory/$fileName"
 
-        return file.exists() && file.length() == model.downloadSize?.toLong() ?: 0L
+        return fileSystem.exists(filePath) &&
+                fileSystem.fileSize(filePath) == (model.downloadSize ?: 0L)
     }
 
     /**
@@ -68,9 +69,8 @@ class ModelDownloader(
         }
 
         // Ensure models directory exists
-        val modelsDir = File(modelsDirectory)
-        if (!modelsDir.exists()) {
-            modelsDir.mkdirs()
+        if (!fileSystem.exists(modelsDirectory)) {
+            fileSystem.createDirectory(modelsDirectory)
             logger.info("Created models directory: $modelsDirectory")
         }
 
@@ -79,28 +79,25 @@ class ModelDownloader(
         // Download with progress
         emit(0.0f)
 
-        // For now, simulate progress (real implementation would track actual download)
+        var lastProgress = 0.0f
         downloadService.downloadModel(model, destinationPath) { progress ->
-            // Progress callback from download service
-            kotlinx.coroutines.runBlocking {
-                // This is not ideal but works for now
-                // Real implementation would use channels or shared flow
-            }
+            lastProgress = progress
         }
 
+        emit(lastProgress)
         emit(1.0f)
     }
 
     /**
      * Delete downloaded model
      */
-    fun deleteModel(model: ModelInfo): Boolean {
+    suspend fun deleteModel(model: ModelInfo): Boolean {
         val fileName = model.downloadURL?.substringAfterLast("/")
             ?: "${model.id}.gguf"
-        val file = File("$modelsDirectory/$fileName")
+        val filePath = "$modelsDirectory/$fileName"
 
-        return if (file.exists()) {
-            val deleted = file.delete()
+        return if (fileSystem.exists(filePath)) {
+            val deleted = fileSystem.delete(filePath)
             if (deleted) {
                 logger.info("Deleted model: ${model.id}")
             }
@@ -110,3 +107,8 @@ class ModelDownloader(
         }
     }
 }
+
+/**
+ * Platform-specific default models directory
+ */
+expect fun getDefaultModelsDirectory(): String

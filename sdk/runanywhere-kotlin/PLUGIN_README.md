@@ -1,9 +1,11 @@
-# RunAnywhere Voice Commands Plugin - Complete Guide
+# RunAnywhere Kotlin SDK - Complete Guide & Integration
 
 ## 📋 Table of Contents
 - [Quick Start](#-quick-start)
 - [Plugin Features](#-plugin-features)
-- [How to Use](#-how-to-use-the-plugin)
+- [SDK Integration Guide](#-sdk-integration-guide)
+- [Step-by-Step Integration](#-step-by-step-integration)
+- [How to Use Demo Plugin](#-how-to-use-the-demo-plugin)
 - [Available Actions](#-available-actions)
 - [Keyboard Shortcuts](#️-keyboard-shortcuts)
 - [Manual Installation](#-manual-installation)
@@ -52,7 +54,161 @@ The **RunAnywhere Voice Commands** plugin integrates our RunAnywhere SDK into In
 - **Model Manager**: Handles downloading and loading AI models
 - **Analytics**: Tracks usage and performance metrics
 
-## 📖 How to Use the Plugin
+---
+
+## 🔧 SDK Integration Guide
+
+### For Plugin Developers: Integrating RunAnywhere SDK into Your Own Plugin
+
+This section explains how to integrate the RunAnywhere Kotlin SDK into your own JetBrains plugin project.
+
+#### Quick Integration Steps
+
+##### 1. Publish SDK to Local Maven
+```bash
+# Navigate to SDK directory
+cd sdk/runanywhere-kotlin
+
+# Build and publish SDK
+./scripts/sdk.sh publish-jvm
+```
+
+##### 2. Add SDK Dependency to Your Plugin
+In your plugin's `build.gradle.kts`:
+
+```kotlin
+repositories {
+    mavenLocal()  // ⚠️ IMPORTANT: Add this line
+    mavenCentral()
+}
+
+dependencies {
+    // RunAnywhere SDK
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+
+    // Required dependencies
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
+}
+```
+
+##### 3. Initialize SDK in Your Plugin
+```kotlin
+import com.runanywhere.sdk.data.models.SDKEnvironment
+import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+
+class YourPlugin : StartupActivity {
+    override fun runActivity(project: Project) {
+        GlobalScope.launch {
+            try {
+                // Initialize SDK in development mode
+                RunAnywhere.initialize(
+                    apiKey = "dev-api-key",
+                    baseURL = "https://api.runanywhere.ai",
+                    environment = SDKEnvironment.DEVELOPMENT
+                )
+                println("✅ RunAnywhere SDK initialized successfully")
+            } catch (e: Exception) {
+                println("❌ SDK initialization failed: ${e.message}")
+            }
+        }
+    }
+}
+```
+
+##### 4. Use SDK Features
+```kotlin
+// Example: Use voice transcription
+val audioData: ByteArray = captureAudio() // Your audio capture implementation
+val transcription = RunAnywhere.transcribe(audioData)
+println("Transcription: $transcription")
+
+// Example: Get available models
+val models = RunAnywhere.fetchAvailableModels()
+println("Available models: ${models.map { it.name }}")
+```
+
+#### Distribution Package
+
+For sharing the SDK with other developers, create a distribution package:
+
+```bash
+# Build and package SDK for distribution
+./scripts/sdk.sh publish-jvm
+
+# Files will be available at:
+# ~/.m2/repository/com/runanywhere/sdk/RunAnywhereKotlinSDK-jvm/0.1.0/
+# - RunAnywhereKotlinSDK-jvm-0.1.0.jar (Main SDK)
+# - RunAnywhereKotlinSDK-jvm-0.1.0-sources.jar (Source code)
+# - RunAnywhereKotlinSDK-jvm-0.1.0.pom (Maven metadata)
+```
+
+#### Maven Coordinates
+```kotlin
+implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+```
+
+#### Key SDK Features Available for Integration
+- **Voice-to-Text**: Real-time speech recognition using Whisper Base model
+- **Model Management**: Automatic model downloading and loading
+- **Development Mode**: Mock services for easy testing
+- **Event System**: Listen to SDK initialization and model events
+- **Privacy-First**: All processing happens on-device
+
+---
+
+## 📝 Step-by-Step Integration
+
+### Detailed Integration Instructions
+
+For complete step-by-step instructions with code examples, see our comprehensive integration guide:
+
+**📁 Distribution Package Location**: `dist/runanywhere-kotlin-sdk-0.1.0/SDK_INTEGRATION_GUIDE.md`
+
+This guide includes:
+- ✅ Two integration methods (Maven + Direct JAR)
+- ✅ Complete code examples for plugin setup
+- ✅ Event handling and advanced features
+- ✅ Troubleshooting common issues
+- ✅ Verification checklist
+- ✅ Best practices and tips
+
+### Sharing SDK with Other Developers
+
+To share the SDK with other developers:
+
+1. **Create Distribution Package:**
+   ```bash
+   # Build and create distribution
+   ./scripts/sdk.sh publish-jvm
+   mkdir -p dist/runanywhere-kotlin-sdk-0.1.0
+   cp ~/.m2/repository/com/runanywhere/sdk/RunAnywhereKotlinSDK-jvm/0.1.0/* dist/runanywhere-kotlin-sdk-0.1.0/
+   ```
+
+2. **Package Contents:**
+   - `RunAnywhereKotlinSDK-jvm-0.1.0.jar` - Main SDK
+   - `RunAnywhereKotlinSDK-jvm-0.1.0-sources.jar` - Source code
+   - `RunAnywhereKotlinSDK-jvm-0.1.0.pom` - Maven metadata
+   - `SDK_INTEGRATION_GUIDE.md` - Complete integration guide
+
+3. **Developer Instructions:**
+   - Provide the distribution package
+   - Point them to the integration guide
+   - They can install locally or use JAR directly
+
+### Integration Options Summary
+
+| Method | Best For | Setup Complexity |
+|--------|----------|------------------|
+| **Local Maven** | Development teams | Low |
+| **Direct JAR** | Simple projects | Very Low |
+| **Remote Repository** | Production distribution | Medium |
+
+---
+
+## 📖 How to Use the Demo Plugin
 
 ### Step 1: Install the Plugin
 
