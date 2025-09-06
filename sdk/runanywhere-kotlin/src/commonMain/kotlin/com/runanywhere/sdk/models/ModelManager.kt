@@ -61,7 +61,7 @@ class ModelManager {
                 category = ModelCategory.SPEECH_RECOGNITION,
                 format = ModelFormat.BIN,
                 downloadURL = SDKConstants.ModelUrls.WHISPER_BASE.takeIf { it.isNotEmpty() },
-                downloadSize = 74L * 1024 * 1024 // 74MB
+                downloadSize = 141L * 1024 * 1024 // 141MB - GGML format
             )
         )
     }

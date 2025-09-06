@@ -3,8 +3,8 @@ package com.runanywhere.sdk.models
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
+import com.runanywhere.sdk.utils.SimpleInstant
+import kotlin.jvm.Transient
 
 /**
  * Information about a model - exact match with iOS ModelInfo
@@ -37,12 +37,12 @@ data class ModelInfo(
 
     // Tracking fields
     val source: ConfigurationSource = ConfigurationSource.REMOTE,
-    val createdAt: Instant = Clock.System.now(),
-    var updatedAt: Instant = Clock.System.now(),
+    val createdAt: SimpleInstant = SimpleInstant.now(),
+    var updatedAt: SimpleInstant = SimpleInstant.now(),
     var syncPending: Boolean = false,
 
     // Usage tracking
-    var lastUsed: Instant? = null,
+    var lastUsed: SimpleInstant? = null,
     var usageCount: Int = 0,
 
     // Non-persistent runtime properties

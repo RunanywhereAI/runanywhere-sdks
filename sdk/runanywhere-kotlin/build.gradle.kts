@@ -1,3 +1,7 @@
+@file:OptIn(ExperimentalKotlinGradlePluginApi::class)
+
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
@@ -38,7 +42,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation(libs.kotlinx.datetime)
             }
         }
 
@@ -122,7 +126,7 @@ kotlin {
 
 android {
     namespace = "com.runanywhere.sdk.kotlin"
-    compileSdk = 35
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

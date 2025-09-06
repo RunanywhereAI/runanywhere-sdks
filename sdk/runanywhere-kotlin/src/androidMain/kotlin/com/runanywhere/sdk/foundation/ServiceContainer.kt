@@ -5,38 +5,21 @@ import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.models.*
-import com.runanywhere.sdk.services.MemoryService
-import com.runanywhere.sdk.services.AnalyticsService
+import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.data.repositories.ModelInfoRepository
+import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
+import com.runanywhere.sdk.network.createHttpClient
+import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.services.DownloadService
 import com.runanywhere.sdk.services.ValidationService
-import com.runanywhere.sdk.services.auth.AuthenticationService
-import com.runanywhere.sdk.services.configuration.ConfigurationService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
-import com.runanywhere.sdk.services.telemetry.TelemetryService
-import com.runanywhere.sdk.services.sync.SyncCoordinator
-import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
-import com.runanywhere.sdk.data.repositories.ModelInfoRepository
-import com.runanywhere.sdk.data.repositories.ConfigurationRepository
-import com.runanywhere.sdk.data.repositories.ConfigurationRepositoryImpl
-import com.runanywhere.sdk.data.repositories.DeviceInfoRepository
-import com.runanywhere.sdk.data.repositories.DeviceInfoRepositoryImpl
-import com.runanywhere.sdk.data.repositories.TelemetryRepository
-import com.runanywhere.sdk.data.repositories.TelemetryRepositoryImpl
-import com.runanywhere.sdk.data.models.SDKInitParams
-import com.runanywhere.sdk.data.models.ConfigurationData
-import com.runanywhere.sdk.data.models.TelemetryEventData
-import com.runanywhere.sdk.data.models.TelemetryEventType
-import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.network.*
-import com.runanywhere.sdk.data.network.services.MockNetworkService
-import com.runanywhere.sdk.files.FileManager
-import com.runanywhere.sdk.data.database.RunAnywhereDatabase
-import com.runanywhere.sdk.utils.SDKConstants
+import com.runanywhere.sdk.storage.AndroidPlatformContext
+import com.runanywhere.sdk.storage.createFileSystem
+import com.runanywhere.sdk.storage.createSecureStorage
 
 /**
- * Central service container - mirrors Swift's ServiceContainer
- * Manages all SDK services with lazy initialization
+ * Central service container - Android Implementation
+ * Simplified version using platform abstractions
  */
 class ServiceContainer {
 
@@ -44,120 +27,21 @@ class ServiceContainer {
         val shared = ServiceContainer()
     }
 
-    // Context (set during initialization)
-    private var context: Context? = null
+    // Platform abstractions
+    private val fileSystem by lazy { createFileSystem() }
+    private val httpClient by lazy { createHttpClient() }
+    private val secureStorage by lazy { createSecureStorage() }
 
-    // Database
-    val database: RunAnywhereDatabase by lazy {
-        RunAnywhereDatabase.getDatabase(requireContext())
-    }
-
-    // Data Services (translated from iOS)
-    val authenticationService: AuthenticationService by lazy {
-        com.runanywhere.sdk.services.auth.AuthenticationService(requireContext())
-    }
-
-    // Repository implementations
-    val configurationRepository: ConfigurationRepository by lazy {
-        ConfigurationRepositoryImpl(database, networkService)
-    }
-
-    val deviceInfoRepository: DeviceInfoRepository by lazy {
-        DeviceInfoRepositoryImpl(database)
-    }
-
-    val telemetryRepository: TelemetryRepository by lazy {
-        TelemetryRepositoryImpl(database, networkService)
-    }
-
-    val configurationService: ConfigurationService by lazy {
-        ConfigurationService(
-            configRepository = configurationRepository,
-            syncCoordinator = syncCoordinator
-        )
-    }
-
+    // Simple in-memory repositories
     val modelInfoRepository: ModelInfoRepository by lazy {
         ModelInfoRepositoryImpl()
-    }
-
-    val syncCoordinator: SyncCoordinator? by lazy {
-        null // Will be implemented when needed
     }
 
     val modelInfoService: ModelInfoService by lazy {
         ModelInfoService(
             modelInfoRepository = modelInfoRepository,
-            syncCoordinator = syncCoordinator
+            syncCoordinator = null
         )
-    }
-
-    val deviceInfoService: com.runanywhere.sdk.services.deviceinfo.DeviceInfoService by lazy {
-        com.runanywhere.sdk.services.deviceinfo.DeviceInfoService(
-            deviceInfoRepository = deviceInfoRepository,
-            syncCoordinator = syncCoordinator
-        )
-    }
-
-    val telemetryService: TelemetryService by lazy {
-        TelemetryService(
-            telemetryRepository = telemetryRepository,
-            syncCoordinator = syncCoordinator
-        )
-    }
-
-    val fileManager: FileManager by lazy {
-        FileManager.apply {
-            FileManager.initialize(requireContext())
-        }
-        FileManager.shared
-    }
-
-    // Network Services
-    val networkService: NetworkService by lazy {
-        if (SDKConstants.Development.ENABLE_MOCK_SERVICES) {
-            MockNetworkService()
-        } else {
-            // Real network service would be implemented here
-            MockNetworkService() // For now, always use mock in development
-        }
-    }
-
-    val apiClient: APIClient by lazy {
-        APIClient(
-            context = requireContext(),
-            baseURL = SDKConstants.DEFAULT_BASE_URL,
-            authenticationService = authenticationService
-        )
-    }
-
-    // Legacy Services (keeping for compatibility)
-    val modelRegistry: ModelRegistry by lazy {
-        ModelRegistry()
-    }
-
-    val modelLoadingService: ModelLoadingService by lazy {
-        ModelLoadingService(
-            modelRegistry = modelRegistry,
-            downloadService = downloadService,
-            validationService = validationService
-        )
-    }
-
-    val downloadService: DownloadService by lazy {
-        DownloadService()
-    }
-
-    val validationService: ValidationService by lazy {
-        ValidationService()
-    }
-
-    val memoryService: MemoryService by lazy {
-        MemoryService()
-    }
-
-    val analyticsService: AnalyticsService by lazy {
-        AnalyticsService()
     }
 
     // Components
@@ -166,48 +50,27 @@ class ServiceContainer {
     }
 
     val sttComponent: STTComponent by lazy {
-        STTComponent(STTConfiguration()).also { component ->
-            // Integrate STT analytics
-            component.setAnalyticsCallback { event, metadata ->
-                // Send STT analytics through telemetry service
-                val telemetryEvent = TelemetryEventData(
-                    id = java.util.UUID.randomUUID().toString(),
-                    type = TelemetryEventType.STT_EVENT,
-                    sessionId = metadata["sessionId"] as? String ?: "",
-                    deviceId = deviceInfoService.getDeviceId(),
-                    timestamp = System.currentTimeMillis(),
-                    eventData = mapOf(
-                        "stt_event" to event.toString(),
-                        "metadata" to metadata
-                    ),
-                    success = true,
-                    duration = metadata["duration"] as? Long
-                )
+        STTComponent(STTConfiguration())
+    }
 
-                // Launch coroutine to send telemetry
-                kotlinx.coroutines.GlobalScope.launch {
-                    try {
-                        telemetryService.trackEvent(telemetryEvent)
-                    } catch (e: Exception) {
-                        com.runanywhere.sdk.foundation.SDKLogger("ServiceContainer").error("Failed to send STT analytics: ${e.message}")
-                    }
-                }
-            }
-        }
+    // Services
+    val authenticationService: AuthenticationService by lazy {
+        AuthenticationService(secureStorage, httpClient)
+    }
+
+    val validationService: ValidationService by lazy {
+        ValidationService(fileSystem)
+    }
+
+    val downloadService: DownloadService by lazy {
+        DownloadService(httpClient, fileSystem, validationService)
     }
 
     /**
-     * Initialize the service container with context
+     * Initialize the service container with Android context
      */
     fun initialize(context: Context) {
-        this.context = context.applicationContext
-    }
-
-    /**
-     * Get the required context, throwing if not initialized
-     */
-    private fun requireContext(): Context {
-        return context ?: throw IllegalStateException("ServiceContainer not initialized with context")
+        AndroidPlatformContext.initialize(context)
     }
 
     /**
@@ -217,55 +80,32 @@ class ServiceContainer {
         // Initialize authentication
         authenticationService.initialize(params.apiKey)
 
-        // Load configuration from multiple sources
-        val config = configurationService.loadConfiguration()
-            ?: ConfigurationData.default(params.apiKey)
-
-        // Initialize device info service
-        deviceInfoService.initialize()
-
-        // Initialize model info service with remote data
+        // Initialize services
         modelInfoService.initialize()
 
-        // Initialize telemetry service
-        telemetryService.initialize()
-
-        // Initialize legacy services for compatibility
-        modelRegistry.initialize()
-        memoryService.initialize()
-
-        return config
+        // Return default configuration
+        return ConfigurationData.default(params.apiKey)
     }
 
     /**
      * Bootstrap services for development mode with mock data
      */
     suspend fun bootstrapDevelopmentMode(params: SDKInitParams): ConfigurationData {
-        // Initialize device info service
-        deviceInfoService.initialize()
+        // Initialize authentication (even in dev mode)
+        authenticationService.initialize(params.apiKey)
 
-        // Load configuration from mock service
-        val config = configurationService.loadConfiguration()
-            ?: ConfigurationData.default(params.apiKey)
-
-        // Initialize model info service with mock data
+        // Initialize services
         modelInfoService.initialize()
 
-        // Initialize telemetry service (will use mock backend)
-        telemetryService.initialize()
-
-        // Initialize legacy services with mock data
-        modelRegistry.initialize()
-        memoryService.initialize()
-
-        return config
+        // Return default configuration
+        return ConfigurationData.default(params.apiKey)
     }
 
     /**
      * Cleanup all services
      */
     suspend fun cleanup() {
-        telemetryService.cleanup()
+        authenticationService.signOut()
         sttComponent.cleanup()
         vadComponent.cleanup()
     }

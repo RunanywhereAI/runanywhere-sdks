@@ -107,5 +107,4 @@ class AnalyticsTracker {
         // This will need platform-specific implementation
         return "multiplatform"
     }
-
 }

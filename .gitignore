@@ -145,6 +145,10 @@ local/
 examples/web/
 sdk/runanywhere-web/
 
+# External repositories and distribution
+EXTERNAL/
+dist/
+
 # Configuration files with real values
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json

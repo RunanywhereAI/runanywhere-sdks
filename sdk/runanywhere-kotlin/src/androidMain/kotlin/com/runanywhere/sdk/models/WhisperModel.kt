@@ -15,34 +15,14 @@ class WhisperModel(
         val downloadUrl: String,
         val sizeInMB: Int
     ) {
-        TINY(
-            "ggml-tiny.bin",
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
-            39
-        ),
         BASE(
-            "ggml-base.bin",
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-            74
-        ),
-        SMALL(
-            "ggml-small.bin",
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-            244
-        ),
-        MEDIUM(
-            "ggml-medium.bin",
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
-            769
-        ),
-        LARGE(
-            "ggml-large-v3.bin",
-            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin",
-            1550
+            "ggml-base.en.bin",
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin",
+            141
         );
 
         fun isMultilingual(): Boolean {
-            return this != TINY // All models except tiny are multilingual
+            return false // English-only model
         }
     }
 
