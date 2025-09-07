@@ -1,651 +1,523 @@
-# RunAnywhere Kotlin SDK Architecture Documentation
+# RunAnywhere SDK Architecture Documentation
 
 ## Table of Contents
+
 1. [Overview](#overview)
-2. [Architecture Principles](#architecture-principles)
-3. [Core Components](#core-components)
-4. [Platform Architecture](#platform-architecture)
-5. [Data Flow](#data-flow)
-6. [Component Details](#component-details)
-7. [Integration Patterns](#integration-patterns)
-8. [Security & Privacy](#security--privacy)
-9. [Performance Considerations](#performance-considerations)
-10. [API Reference](#api-reference)
+2. [Project Structure](#project-structure)
+3. [Platform Architecture](#platform-architecture)
+4. [Core Components](#core-components)
+5. [Module Breakdown](#module-breakdown)
+6. [Data Flow](#data-flow)
+7. [Key Design Patterns](#key-design-patterns)
+
+---
 
 ## Overview
 
-The RunAnywhere Kotlin SDK is a multiplatform SDK that provides on-device AI capabilities with intelligent routing between local and cloud execution. The SDK is designed to work seamlessly across JVM, Android, and iOS platforms using Kotlin Multiplatform technology.
+RunAnywhere SDK is a **Kotlin Multiplatform (KMP)** project designed for on-device LLM inference
+with speech-to-text capabilities. The SDK provides a unified API across Android, JVM (Desktop), and
+Native platforms (iOS/macOS placeholders).
 
-### Key Features
-- **On-device AI execution** with multiple model format support (GGUF, ONNX, CoreML, TFLite)
-- **Intelligent routing** between on-device and cloud execution
-- **Speech-to-Text (STT)** with Voice Activity Detection (VAD)
-- **Real-time cost tracking** and optimization
-- **Secure credential management** with platform-specific implementations
-- **Event-driven architecture** with comprehensive analytics
-- **Offline-first design** with local caching and fallback mechanisms
+### Key Technologies
 
-### Target Platforms
-- **JVM**: Desktop applications, JetBrains IDE plugins
-- **Android**: Mobile applications (API 24+)
-- **iOS**: Mobile applications (iOS 13.0+) via Kotlin/Native
+- **Kotlin Multiplatform**: Share code across platforms
+- **Expect/Actual Pattern**: Platform-specific implementations
+- **Coroutines**: Asynchronous programming
+- **Flow**: Reactive streams
+- **Room Database** (Android): Local persistence
+- **OkHttp**: Network operations (JVM/Android)
+- **Whisper JNI**: Speech-to-text engine
 
-## Architecture Principles
+---
 
-### 1. Clean Architecture
-The SDK follows Clean Architecture principles with clear separation of concerns:
-- **Presentation Layer**: Public API interfaces (`RunAnywhere` object)
-- **Domain Layer**: Business logic and use cases (components, services)
-- **Data Layer**: Network, storage, and external integrations
-
-### 2. Dependency Injection
-- **ServiceContainer**: Central dependency container managing service lifecycle
-- **Lazy initialization**: Services created on-demand to optimize memory usage
-- **Platform-specific implementations**: Via `expect/actual` mechanism
-
-### 3. SOLID Principles
-- **Single Responsibility**: Each component has a focused responsibility
-- **Open/Closed**: Extensible through interfaces, closed for modification
-- **Liskov Substitution**: Platform implementations are interchangeable
-- **Interface Segregation**: Small, focused interfaces for each capability
-- **Dependency Inversion**: Depend on abstractions, not concrete implementations
-
-### 4. Event-Driven Architecture
-- **EventBus**: Central event publication/subscription system
-- **Kotlin Flow**: Reactive streams for async operations
-- **Analytics Integration**: Comprehensive event tracking
-
-## Core Components
-
-### Component Hierarchy
-
-```
-RunAnywhere SDK
-├── Public API Layer
-│   ├── RunAnywhere (Singleton Entry Point)
-│   ├── RunAnywhereSDK (Interface)
-│   └── BaseRunAnywhereSDK (Common Implementation)
-│
-├── Service Layer
-│   ├── NetworkService (API Communication)
-│   ├── ModelDownloader (Model Management)
-│   ├── ModelLoadingService (Model Runtime)
-│   └── AnalyticsService (Telemetry)
-│
-├── Component Layer
-│   ├── STTComponent (Speech Recognition)
-│   ├── VADComponent (Voice Detection)
-│   └── BaseComponent (Abstract Base)
-│
-├── Storage Layer
-│   ├── DatabaseManager (SQLite)
-│   ├── KeychainManager (Secure Storage)
-│   └── FileManager (File System)
-│
-└── Foundation Layer
-    ├── EventBus (Event System)
-    ├── SDKLogger (Logging)
-    └── ServiceContainer (DI)
-```
-
-## Platform Architecture
-
-### Multiplatform Structure
+## Project Structure
 
 ```
 sdk/runanywhere-kotlin/
 ├── src/
-│   ├── commonMain/          # Shared code (90%)
-│   │   ├── models/          # Data models, enums
-│   │   ├── components/      # STT, VAD components
-│   │   ├── events/          # Event system
-│   │   ├── network/         # Network interfaces
-│   │   └── public/          # Public API
-│   │
-│   ├── jvmMain/            # JVM-specific (10%)
-│   │   ├── network/        # HTTP implementation
-│   │   ├── storage/        # SQLite, Preferences
-│   │   └── public/         # JVM RunAnywhere
-│   │
-│   ├── androidMain/        # Android-specific
-│   │   ├── storage/        # Android KeyStore
-│   │   └── audio/          # Android audio
-│   │
-│   └── iosMain/            # iOS-specific
-│       ├── storage/        # iOS Keychain
-│       └── audio/          # AVAudioSession
+│   ├── commonMain/kotlin/      # Shared code for all platforms
+│   ├── androidMain/kotlin/     # Android-specific implementations
+│   ├── jvmMain/kotlin/         # JVM/Desktop implementations
+│   ├── jvmAndroidMain/kotlin/  # Shared code between JVM and Android
+│   └── nativeMain/kotlin/      # Native platform placeholders
 ```
 
-### Platform-Specific Implementations
+### Module Dependencies
 
-| Component | JVM | Android | iOS |
-|-----------|-----|---------|-----|
-| Secure Storage | Java Preferences + AES | Android KeyStore | iOS Keychain |
-| Database | SQLite JDBC | Room Database | SQLite Swift |
-| Network | HttpURLConnection | OkHttp | URLSession |
-| File System | java.io.File | Context.filesDir | FileManager |
-| Logging | System.out | Android Log | os_log |
+```mermaid
+graph TD
+    Common[commonMain] --> JvmAndroid[jvmAndroidMain]
+    JvmAndroid --> Android[androidMain]
+    JvmAndroid --> JVM[jvmMain]
+    Common --> Native[nativeMain]
+
+    Android --> AndroidRoom[Room DB]
+    Android --> AndroidSecurity[EncryptedSharedPrefs]
+
+    JVM --> WhisperJNI[Whisper JNI]
+    JVM --> SQLite[SQLite]
+
+    JvmAndroid --> OkHttp[OkHttp]
+    JvmAndroid --> JavaFile[Java File API]
+```
+
+---
+
+## Platform Architecture
+
+### Common Module (`commonMain`)
+
+The common module defines the **shared business logic** and **platform abstractions** that all
+platforms must implement.
+
+#### Core Abstractions
+
+1. **Network Layer** (`network/`)
+    - `HttpClient` interface - Platform-agnostic HTTP operations
+    - `NetworkService` protocol - High-level network operations
+    - `APIClient` - Common API client implementation
+    - `NetworkChecker` interface - Network connectivity checking
+
+2. **Storage Layer** (`storage/`)
+    - `FileSystem` interface - File operations abstraction
+    - `PlatformStorage` interface - Key-value storage
+    - `SecureStorage` interface - Encrypted storage for sensitive data
+
+3. **Data Models** (`data/models/`)
+    - `ConfigurationModels` - SDK configuration data classes
+    - `ModelInfoModels` - ML model metadata
+    - `DeviceInfoModels` - Device capabilities and info
+    - `TelemetryModels` - Analytics and telemetry
+    - `AuthenticationModels` - Auth tokens and credentials
+    - `SDKError` - Unified error hierarchy
+
+4. **Components** (`components/`)
+    - **STT (Speech-to-Text)**
+        - `STTComponent` - Main STT component
+        - `STTService` interface - Platform STT implementations
+        - `WhisperSTTService` - Expect class for Whisper integration
+    - **VAD (Voice Activity Detection)**
+        - `VADComponent` - Voice detection component
+        - `VADService` interface - Platform VAD implementations
+    - **Base Architecture**
+        - `BaseComponent` - Abstract component foundation
+        - `ComponentProtocols` - Component interfaces
+
+5. **Services** (`services/`)
+    - `ConfigurationService` - Configuration management
+    - `ModelInfoService` - Model registry and metadata
+    - `TelemetryService` - Analytics tracking
+    - `DeviceInfoService` - Device capability detection
+    - `AuthenticationService` - API key and token management
+    - `DownloadService` - Model downloading
+    - `ValidationService` - Model validation
+
+6. **Foundation** (`foundation/`)
+    - `ServiceContainer` - Dependency injection container
+    - `SDKLogger` - Unified logging
+    - `PlatformContext` - Platform initialization
+
+7. **Public API** (`public/`)
+    - `RunAnywhere` - Main SDK entry point (expect object)
+    - `BaseRunAnywhereSDK` - Common SDK implementation
+
+### Android Module (`androidMain`)
+
+Android-specific implementations leveraging Android SDK features.
+
+#### Key Components
+
+1. **Database Layer** (`data/database/`)
+    - **Room Database Setup**
+        - `RunAnywhereDatabase` - Room database definition
+        - `DatabaseConverters` - Type converters for complex types
+        - **DAOs (Data Access Objects)**
+            - `ConfigurationDao` - Configuration persistence
+            - `ModelInfoDao` - Model metadata queries
+            - `DeviceInfoDao` - Device info persistence
+            - `TelemetryDao` - Analytics data
+            - `AuthTokenDao` - Secure token storage
+        - **Entities**
+            - `DatabaseEntities` - Room entity definitions matching data models
+
+2. **Network Implementation**
+    - `OkHttpEngine` - OkHttp-based HTTP client
+    - `AndroidNetworkChecker` - ConnectivityManager-based network checking
+
+3. **Storage Implementation**
+    - `AndroidFileSystem` - Android file operations
+    - `AndroidPlatformStorage` - SharedPreferences storage
+    - `AndroidSecureStorage` - EncryptedSharedPreferences
+
+4. **Security**
+    - `KeychainManager` - Secure credential storage using Android Keystore
+
+5. **Services**
+    - `AndroidDeviceInfoService` - Android device detection
+    - `WhisperSTTService` - Android STT implementation
+    - `WebRTCVADService` - WebRTC-based VAD for Android
+
+6. **File Management**
+    - `FileManager` - Android file operations with proper directory structure
+
+### JVM Module (`jvmMain`)
+
+Desktop JVM implementations for development and testing.
+
+#### Key Components
+
+1. **Storage**
+    - `JvmFileSystem` - Java NIO file operations
+    - `JvmPlatformStorage` - In-memory key-value storage
+    - `JvmSecureStorage` - Encrypted properties file storage
+    - `DatabaseManager` - SQLite-based local caching
+    - `KeychainManager` - Java Preferences API with encryption
+
+2. **Network**
+    - `OkHttpEngine` - Shared with Android
+    - `JvmNetworkChecker` - InetAddress-based connectivity
+
+3. **Services**
+    - `JvmDeviceInfoService` - JVM system property detection
+    - `WhisperSTTService` - Whisper JNI integration
+    - `JvmVADService` - Energy-based VAD implementation
+
+4. **Native Libraries**
+    - `NativeLoader` - Dynamic library loading for JNI
+
+### JVM-Android Shared Module (`jvmAndroidMain`)
+
+Code shared between JVM and Android platforms that use the same JVM runtime.
+
+#### Shared Components
+
+1. **Network Implementation**
+   - `OkHttpEngine` - OkHttp-based HTTP client used by both platforms
+   - `FileWriter` - File writing operations using Java File API
+
+2. **Native Library Support**
+   - `NativeLoader` - Dynamic library loading for JNI, works on both desktop and Android
+
+3. **Utilities**
+   - `MD5Service` - MD5 hash calculation using Java MessageDigest
+   - `TimeUtils` - Time utilities using System.currentTimeMillis()
+
+This shared source set eliminates code duplication between JVM and Android platforms for components
+that have identical implementations.
+
+### Native Module (`nativeMain`)
+
+Placeholder implementations for iOS/macOS platforms.
+
+- Mock implementations for all platform interfaces
+- In-memory storage simulators
+- Basic stub implementations
+
+---
+
+## Core Components
+
+### 1. Speech-to-Text (STT) Pipeline
+
+```mermaid
+graph LR
+    Audio[Audio Input] --> VAD[VAD Component]
+    VAD --> STT[STT Component]
+    STT --> Whisper[Whisper Service]
+    Whisper --> Result[Transcription]
+```
+
+**Key Classes:**
+
+- `STTComponent` - Orchestrates transcription
+- `WhisperSTTService` - Platform-specific Whisper integration
+- `VADComponent` - Voice activity detection
+- `TranscriptionResult` - Output data
+
+### 2. Model Management
+
+```mermaid
+graph TD
+    Registry[ModelRegistry] --> Manager[ModelManager]
+    Manager --> Downloader[ModelDownloader]
+    Manager --> Storage[ModelStorage]
+    Downloader --> Validation[ValidationService]
+```
+
+**Key Classes:**
+
+- `ModelRegistry` - Central model catalog
+- `ModelManager` - Model lifecycle management
+- `ModelDownloader` - Download with progress
+- `ModelStorage` - Local model storage
+- `ValidationService` - Model integrity checks
+
+### 3. Configuration Management
+
+```mermaid
+graph LR
+    Remote[Remote Config] --> Service[ConfigurationService]
+    Local[Local Cache] --> Service
+    Service --> Repository[ConfigurationRepository]
+    Repository --> Database[(Database)]
+```
+
+**Configuration Priority:**
+
+1. Remote configuration (highest)
+2. Database cache
+3. Consumer overrides
+4. Default values (lowest)
+
+### 4. Telemetry System
+
+**Components:**
+
+- `TelemetryService` - Event tracking
+- `AnalyticsTracker` - Analytics aggregation
+- `TelemetryRepository` - Persistence
+- Event batching and upload
+
+---
+
+## Module Breakdown
+
+### Common Module Components
+
+| Component        | Purpose                | Key Files                                                               |
+|------------------|------------------------|-------------------------------------------------------------------------|
+| **Data Models**  | Shared data structures | `SDKModels.kt`, `ModelInfoModels.kt`, `ConfigurationModels.kt`          |
+| **Repositories** | Data access interfaces | `ModelInfoRepository.kt`, `ConfigurationRepository.kt`                  |
+| **Services**     | Business logic         | `ConfigurationService.kt`, `ModelInfoService.kt`, `TelemetryService.kt` |
+| **Components**   | Feature modules        | `STTComponent.kt`, `VADComponent.kt`                                    |
+| **Network**      | HTTP operations        | `APIClient.kt`, `HttpClient.kt`, `NetworkService.kt`                    |
+| **Storage**      | File/data persistence  | `FileSystem.kt`, `PlatformStorage.kt`, `SecureStorage.kt`               |
+| **Events**       | Event bus system       | `EventBus.kt`, `STTEvents.kt`                                           |
+| **Utils**        | Utilities              | `SDKConstants.kt`, `TimeUtils.kt`                                       |
+
+### Android-Specific Components
+
+| Component         | Android API Used                             | Purpose                     |
+|-------------------|----------------------------------------------|-----------------------------|
+| **Room Database** | AndroidX Room                                | Local data persistence      |
+| **Security**      | Android Keystore, EncryptedSharedPreferences | Secure credential storage   |
+| **Network**       | ConnectivityManager                          | Network state monitoring    |
+| **Device Info**   | Build, ActivityManager                       | Device capability detection |
+| **VAD**           | WebRTC VAD Library                           | Voice activity detection    |
+
+### JVM-Specific Components
+
+| Component       | Technology          | Purpose               |
+|-----------------|---------------------|-----------------------|
+| **Whisper JNI** | whisper-jni library | Speech-to-text engine |
+| **SQLite**      | JDBC SQLite         | Local caching         |
+| **Crypto**      | javax.crypto        | API key encryption    |
+| **Preferences** | java.util.prefs     | Settings storage      |
+
+---
 
 ## Data Flow
 
-### 1. SDK Initialization Flow
+### Initialization Flow
 
 ```mermaid
 sequenceDiagram
     participant App
     participant SDK
-    participant Network
-    participant Storage
-    participant Components
+    participant ServiceContainer
+    participant Config
+    participant Auth
 
-    App->>SDK: initialize(apiKey, baseURL, environment)
-    SDK->>SDK: Step 1: Validate API key
-    SDK->>SDK: Step 2: Initialize logging
-    SDK->>Storage: Step 3: Store credentials securely
-    SDK->>Storage: Step 4: Initialize database
-    SDK->>Network: Step 5: Authenticate (if not dev mode)
-    SDK->>Network: Step 6: Fetch configuration
-    SDK->>Network: Step 7: Report device info
-    SDK->>Components: Step 8: Initialize components
-    SDK-->>App: Initialization complete
+    App->>SDK: initialize(apiKey)
+    SDK->>ServiceContainer: bootstrap()
+    ServiceContainer->>Auth: authenticate(apiKey)
+    ServiceContainer->>Config: loadConfiguration()
+    Config-->>SDK: ConfigurationData
+    SDK-->>App: Initialized
 ```
 
-### 2. Model Download & Loading Flow
+### Transcription Flow
 
 ```mermaid
 sequenceDiagram
     participant App
-    participant SDK
-    participant Downloader
-    participant Storage
-    participant Component
-
-    App->>SDK: downloadModel("whisper-tiny")
-    SDK->>Downloader: downloadModelWithProgress()
-    Downloader->>Downloader: Check if exists
-    alt Not downloaded
-        Downloader->>Network: Download from URL
-        Downloader->>Storage: Save to disk
-        Downloader->>Database: Store metadata
-    end
-    Downloader-->>SDK: Flow<progress>
-    SDK->>Component: loadSTTModel(path)
-    Component->>Component: Initialize Whisper
-    Component-->>SDK: Model ready
-    SDK-->>App: Ready for transcription
-```
-
-### 3. Speech-to-Text Flow
-
-```mermaid
-sequenceDiagram
-    participant App
-    participant SDK
-    participant VAD
     participant STT
-    participant Analytics
+    participant VAD
+    participant Whisper
+    participant Telemetry
 
-    App->>SDK: transcribe(audioData)
-    SDK->>VAD: processAudio(audioData)
-    VAD->>VAD: Detect speech segments
-    VAD-->>SDK: Processed audio
-    SDK->>STT: transcribe(processedAudio)
-    STT->>STT: Run Whisper inference
-    STT-->>SDK: TranscriptionResult
-    SDK->>Analytics: Track metrics
-    SDK-->>App: Return transcript
+    App->>STT: transcribe(audio)
+    STT->>VAD: detectSpeech(audio)
+    VAD-->>STT: speechSegments
+    STT->>Whisper: process(segments)
+    Whisper-->>STT: transcript
+    STT->>Telemetry: trackEvent()
+    STT-->>App: TranscriptionResult
 ```
 
-## Component Details
+---
 
-### 1. RunAnywhere (Main Entry Point)
+## Key Design Patterns
 
-**Location**: `src/jvmMain/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt`
+### 1. Expect/Actual Pattern
 
-The singleton entry point for the SDK, implementing platform-specific initialization:
+Platform-specific implementations for shared interfaces:
 
 ```kotlin
-actual object RunAnywhere : BaseRunAnywhereSDK() {
-    // 8-step initialization process
-    override suspend fun initializePlatform(...)
-
-    // Core API methods
-    suspend fun transcribe(audioData: ByteArray): String
-    suspend fun downloadModel(modelId: String): Flow<Float>
-    suspend fun availableModels(): List<ModelInfo>
+// Common
+expect class FileManager {
+    suspend fun writeFile(path: String, data: ByteArray)
 }
-```
 
-**Key Responsibilities**:
-- SDK lifecycle management
-- Service initialization and coordination
-- Public API implementation
-- Event publishing
-
-### 2. Network Layer
-
-**Location**: `src/jvmMain/kotlin/com/runanywhere/sdk/network/`
-
-Handles all API communication with intelligent fallback:
-
-```kotlin
-class JvmNetworkService {
-    suspend fun fetchModels(): List<ModelInfo>
-    suspend fun fetchConfiguration(): ConfigurationData
-    suspend fun reportAnalytics(data: AnalyticsData): Boolean
-}
-```
-
-**Features**:
-- Bearer token authentication
-- Automatic retry with exponential backoff
-- Fallback to local models on network failure
-- Mock service for development mode
-
-### 3. Storage Layer
-
-#### DatabaseManager (SQLite)
-**Location**: `src/jvmMain/kotlin/com/runanywhere/sdk/storage/DatabaseManager.kt`
-
-Manages local persistence with three main tables:
-- **models**: Downloaded model metadata and paths
-- **configuration**: Cached configuration data
-- **transcriptions**: Transcription history and metrics
-
-#### KeychainManager (Secure Storage)
-**Location**: `src/jvmMain/kotlin/com/runanywhere/sdk/storage/KeychainManager.kt`
-
-Platform-specific secure credential storage:
-- **JVM**: Java Preferences API with AES encryption
-- **Android**: Android KeyStore
-- **iOS**: iOS Keychain Services
-
-#### FileManager
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/files/FileManager.kt`
-
-Handles file system operations:
-- Model file storage in `~/.runanywhere/models/`
-- Temporary file management
-- Cache directory management
-
-### 4. Model Management
-
-#### ModelDownloader
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/models/ModelDownloader.kt`
-
-Manages model downloads with progress tracking:
-```kotlin
-class ModelDownloader {
-    suspend fun downloadModelWithProgress(model: ModelInfo): Flow<Float>
-    fun isModelDownloaded(model: ModelInfo): Boolean
-    fun getModelPath(model: ModelInfo): String
-    fun deleteModel(model: ModelInfo): Boolean
-}
-```
-
-#### ModelLoadingService
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/models/ModelLoadingService.kt`
-
-Loads models into memory and manages runtime:
-- Model format detection (GGUF, ONNX, etc.)
-- Framework selection (Whisper.cpp, ONNX Runtime)
-- Memory management and optimization
-
-### 5. STT Component
-
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/components/stt/STTComponent.kt`
-
-Speech-to-text with comprehensive analytics:
-
-```kotlin
-class STTComponent : BaseComponent<STTService> {
-    suspend fun transcribe(audioData: ByteArray): TranscriptionResult
-    fun transcribeStream(audioStream: Flow<ByteArray>): Flow<TranscriptionEvent>
-    suspend fun loadModel(modelPath: String)
-}
-```
-
-**Features**:
-- Whisper model integration
-- Streaming transcription with VAD
-- Word-level timestamps
-- Confidence scores
-- Multi-language support
-
-### 6. VAD Component
-
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/components/vad/VADComponent.kt`
-
-Voice Activity Detection for optimized transcription:
-
-```kotlin
-class VADComponent : BaseComponent<VADService> {
-    fun processAudioChunk(audioData: FloatArray): VADResult
-    fun enable()
-    fun disable()
-}
-```
-
-**Purpose**:
-- Detect speech/silence boundaries
-- Reduce unnecessary transcription
-- Keep STT pipeline warm
-- Optimize battery usage
-
-### 7. Event System
-
-**Location**: `src/commonMain/kotlin/com/runanywhere/sdk/events/EventBus.kt`
-
-Central event publication and subscription:
-
-```kotlin
-object EventBus {
-    val initializationEvents: SharedFlow<SDKInitializationEvent>
-    val modelEvents: SharedFlow<SDKModelEvent>
-    val voiceEvents: SharedFlow<SDKVoiceEvent>
-    val configurationEvents: SharedFlow<SDKConfigurationEvent>
-}
-```
-
-**Event Types**:
-- **SDKInitializationEvent**: Started, Completed, Failed
-- **SDKModelEvent**: Download/Load progress and status
-- **SDKVoiceEvent**: Transcription events
-- **SDKConfigurationEvent**: Config updates
-
-### 8. Analytics System
-
-Comprehensive metrics tracking throughout the SDK:
-
-**Tracked Metrics**:
-- Model download times and sizes
-- Transcription latency and accuracy
-- API call success rates
-- Error rates and types
-- Device capabilities
-- Usage patterns
-
-**Integration Points**:
-- STT component tracks transcription metrics
-- Network layer tracks API latencies
-- Model loader tracks loading times
-- Event bus enables external analytics integration
-
-## Integration Patterns
-
-### 1. JetBrains Plugin Integration
-
-```kotlin
-class RunAnywherePlugin : ApplicationComponent {
-    override fun initComponent() {
-        GlobalScope.launch {
-            // Initialize SDK
-            RunAnywhere.initialize(
-                apiKey = getApiKey(),
-                baseURL = "https://api.runanywhere.ai",
-                environment = SDKEnvironment.DEVELOPMENT
-            )
-
-            // Subscribe to events
-            EventBus.shared.initializationEvents.collect { event ->
-                when(event) {
-                    is SDKInitializationEvent.Completed -> enableFeatures()
-                    is SDKInitializationEvent.Failed -> showError(event.error)
-                }
-            }
-        }
+// Android/JVM
+actual class FileManager {
+    actual suspend fun writeFile(path: String, data: ByteArray) {
+        File(path).writeBytes(data)
     }
 }
 ```
 
-### 2. Android App Integration
+### 2. Repository Pattern
+
+Data access abstraction:
 
 ```kotlin
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        lifecycleScope.launch {
-            RunAnywhere.initialize(
-                apiKey = BuildConfig.RUNANYWHERE_API_KEY,
-                environment = SDKEnvironment.PRODUCTION
-            )
-
-            // Download STT model
-            RunAnywhere.downloadModel("whisper-tiny").collect { progress ->
-                updateProgressBar(progress)
-            }
-        }
-    }
-
-    suspend fun transcribeAudio(audioData: ByteArray) {
-        val result = RunAnywhere.transcribe(audioData)
-        displayTranscript(result)
-    }
+interface ModelInfoRepository {
+    suspend fun save(entity: ModelInfo)
+    suspend fun fetch(id: String): ModelInfo?
 }
 ```
 
-### 3. Streaming Transcription
+### 3. Service Layer Pattern
+
+Business logic encapsulation:
 
 ```kotlin
-fun startStreamingTranscription() {
-    val audioFlow = getAudioStream() // Your audio source
-
-    RunAnywhere.getSTTComponent()
-        .transcribeStream(audioFlow)
-        .collect { event ->
-            when(event) {
-                is TranscriptionEvent.SpeechStart -> showListening()
-                is TranscriptionEvent.PartialTranscription -> updateText(event.text)
-                is TranscriptionEvent.FinalTranscription -> finalizeText(event.text)
-                is TranscriptionEvent.SpeechEnd -> hideListening()
-            }
-        }
+class ConfigurationService(
+    private val repository: ConfigurationRepository
+) {
+    suspend fun loadConfiguration(): ConfigurationData
 }
 ```
 
-## Security & Privacy
+### 4. Component Architecture
 
-### 1. Data Protection
-- **API keys** stored in platform-specific secure storage
-- **AES encryption** for sensitive data on JVM
-- **No telemetry** without explicit consent
-- **Local-first** architecture minimizes data transmission
-
-### 2. Network Security
-- **HTTPS only** for all API communication
-- **Bearer token** authentication
-- **Certificate pinning** support (configurable)
-- **Request signing** for integrity
-
-### 3. Privacy Features
-- **On-device processing** by default
-- **No audio recording** without explicit permission
-- **Configurable data retention** policies
-- **GDPR/CCPA compliant** data handling
-
-## Performance Considerations
-
-### 1. Memory Management
-- **Lazy loading** of components
-- **Model unloading** when not in use
-- **Streaming processing** for large audio files
-- **Configurable cache sizes**
-
-### 2. CPU Optimization
-- **Native libraries** for intensive operations
-- **Coroutines** for async operations
-- **Thread pools** for parallel processing
-- **VAD** to reduce unnecessary processing
-
-### 3. Battery Optimization
-- **Adaptive processing** based on battery level
-- **Batch operations** to reduce wake-ups
-- **Efficient model formats** (quantized models)
-- **Smart caching** to reduce network calls
-
-### 4. Network Optimization
-- **Request batching** for analytics
-- **Compression** for data transfer
-- **Incremental model downloads**
-- **Connection pooling**
-
-## API Reference
-
-### Core APIs
+Modular, lifecycle-aware components:
 
 ```kotlin
-// Initialize SDK
-RunAnywhere.initialize(
-    apiKey: String,
-    baseURL: String? = null,
-    environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
-)
-
-// Get available models
-val models = RunAnywhere.availableModels()
-
-// Download model with progress
-RunAnywhere.downloadModel("whisper-tiny").collect { progress ->
-    println("Progress: ${(progress * 100).toInt()}%")
-}
-
-// Transcribe audio
-val transcript = RunAnywhere.transcribe(audioByteArray)
-
-// Stream transcription
-RunAnywhere.getSTTComponent()
-    .transcribeStream(audioFlow)
-    .collect { event -> handleEvent(event) }
-
-// Subscribe to events
-EventBus.shared.modelEvents.collect { event ->
-    when(event) {
-        is SDKModelEvent.DownloadCompleted -> onModelReady(event.modelId)
-    }
-}
-
-// Cleanup
-RunAnywhere.cleanup()
-```
-
-### Configuration Options
-
-```kotlin
-data class STTConfiguration(
-    val modelId: String? = null,
-    val language: String = "en",
-    val enableTimestamps: Boolean = false,
-    val enableVAD: Boolean = true,
-    val maxDuration: Int = 30
-)
-
-data class VADConfiguration(
-    val sensitivity: Float = 0.5f,
-    val minSpeechDuration: Int = 250,
-    val maxSilenceDuration: Int = 500,
-    val energyThreshold: Float = 0.0f
-)
-
-enum class SDKEnvironment {
-    DEVELOPMENT,  // Local/mock services
-    STAGING,      // Staging API
-    PRODUCTION    // Production API
+abstract class BaseComponent<TService> {
+    suspend fun initialize()
+    suspend fun cleanup()
+    val state: ComponentState
 }
 ```
 
-### Error Handling
+### 5. Dependency Injection
+
+ServiceContainer for dependency management:
 
 ```kotlin
-sealed class SDKError : Exception() {
-    object NotInitialized : SDKError()
-    data class NetworkError(val code: Int, val message: String) : SDKError()
-    data class ModelNotFound(val modelId: String) : SDKError()
-    data class TranscriptionFailed(val reason: String) : SDKError()
-    data class InvalidConfiguration(val message: String) : SDKError()
+object ServiceContainer {
+    val modelInfoService: ModelInfoService by lazy { ... }
+    val authService: AuthenticationService by lazy { ... }
 }
 ```
 
-## Development Workflow
+---
 
-### Building the SDK
+## Platform-Specific Considerations
 
-```bash
-# Build all targets
-./scripts/sdk.sh all
+### Android
 
-# Build specific target
-./scripts/sdk.sh jvm
-./scripts/sdk.sh android
-./scripts/sdk.sh ios
+- **Context Management**: AndroidPlatformContext handles Android context
+- **Lifecycle**: Components respect Android lifecycle
+- **Permissions**: Microphone permission for STT
+- **Background Work**: Coroutines with proper dispatchers
 
-# Run tests
-./gradlew test
+### JVM
 
-# Generate documentation
-./gradlew dokkaHtml
-```
+- **Native Libraries**: Dynamic loading via NativeLoader
+- **File Paths**: User home directory for storage
+- **Development Mode**: Mock services available
 
-### Testing
+### Native (iOS/macOS)
 
-```kotlin
-class RunAnywhereSDKTest {
-    @Test
-    fun testInitialization() = runTest {
-        RunAnywhere.initialize(
-            apiKey = "test-key",
-            environment = SDKEnvironment.DEVELOPMENT
-        )
-        assertTrue(RunAnywhere.isInitialized)
-    }
+- **Placeholder**: Current implementation is mock
+- **Future**: Would integrate with iOS Core ML, Swift APIs
 
-    @Test
-    fun testModelDownload() = runTest {
-        val progress = mutableListOf<Float>()
-        RunAnywhere.downloadModel("whisper-tiny").collect {
-            progress.add(it)
-        }
-        assertEquals(1.0f, progress.last())
-    }
-}
-```
+---
 
-### Debugging
+## Security Considerations
 
-Enable verbose logging:
-```kotlin
-SDKLogger.setLogLevel(LogLevel.DEBUG)
-```
+1. **API Key Storage**
+    - Android: EncryptedSharedPreferences with Android Keystore
+    - JVM: Encrypted properties with AES
+    - Never stored in plain text
 
-Monitor events:
-```kotlin
-EventBus.shared.apply {
-    initializationEvents.collect { println("Init: $it") }
-    modelEvents.collect { println("Model: $it") }
-    voiceEvents.collect { println("Voice: $it") }
-}
-```
+2. **Token Management**
+    - Secure storage for access/refresh tokens
+    - Automatic token refresh
+    - Token expiry handling
+
+3. **Data Encryption**
+    - Sensitive data encrypted at rest
+    - Platform-specific secure storage APIs
+
+---
+
+## Performance Optimizations
+
+1. **Caching**
+    - Model metadata caching
+    - Configuration caching with TTL
+    - In-memory caches for frequently accessed data
+
+2. **Lazy Loading**
+    - Services initialized on-demand
+    - Models loaded when needed
+
+3. **Resource Management**
+    - Proper cleanup in component lifecycle
+    - Memory pressure monitoring
+    - Storage space management
+
+4. **Parallel Processing**
+    - Coroutines for concurrent operations
+    - Flow for streaming data
+
+---
+
+## Testing Strategy
+
+The architecture supports:
+
+- **Unit Testing**: Service and repository testing
+- **Integration Testing**: Component interaction testing
+- **Platform Testing**: Platform-specific implementation testing
+- **Mock Services**: Development mode with mock implementations
+
+---
 
 ## Future Enhancements
 
-### Planned Features
-1. **Text-to-Speech (TTS)** component
-2. **Large Language Model (LLM)** inference
-3. **Image recognition** capabilities
-4. **Real-time translation**
-5. **Custom model training**
-6. **Federated learning** support
+1. **iOS/macOS Support**: Proper native implementations
+2. **More Models**: Support for additional LLM frameworks
+3. **Cloud Sync**: Enhanced cloud synchronization
+4. **Offline Mode**: Better offline capabilities
+5. **Performance Monitoring**: Advanced telemetry
 
-### Architecture Improvements
-1. **Plugin system** for custom components
-2. **GraphQL** support for API
-3. **WebSocket** for real-time updates
-4. **Kotlin/JS** target for web apps
-5. **Compose Multiplatform** UI components
-6. **Ktor** integration for server-side
+---
 
 ## Conclusion
 
-The RunAnywhere Kotlin SDK provides a robust, multiplatform foundation for on-device AI capabilities. Its clean architecture, comprehensive feature set, and focus on privacy and performance make it suitable for a wide range of applications from mobile apps to desktop plugins.
+The RunAnywhere SDK demonstrates a well-structured Kotlin Multiplatform architecture with:
 
-The SDK's modular design allows for easy extension while maintaining backward compatibility. The event-driven architecture enables seamless integration with existing applications and provides comprehensive insights into SDK operations.
+- Clear separation of concerns
+- Platform-specific optimizations
+- Comprehensive abstraction layers
+- Robust error handling
+- Security-first design
+- Extensible component system
 
-For questions or contributions, please refer to the main README.md or contact the RunAnywhere team.
+The architecture enables code sharing while allowing platform-specific optimizations, making it
+maintainable and scalable across multiple platforms.

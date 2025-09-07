@@ -10,14 +10,11 @@ import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
-import java.security.MessageDigest
 import java.util.Date
+import java.security.MessageDigest
+import com.runanywhere.sdk.utils.calculateSHA256 as computeSHA256
 
-actual fun calculateSHA256(data: ByteArray): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hash = digest.digest(data)
-    return hash.joinToString("") { "%02x".format(it) }
-}
+actual fun calculateSHA256(data: ByteArray): String = computeSHA256(data)
 
 /**
  * File Manager
