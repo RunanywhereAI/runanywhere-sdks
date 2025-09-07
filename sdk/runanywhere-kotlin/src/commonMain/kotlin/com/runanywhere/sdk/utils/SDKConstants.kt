@@ -179,6 +179,7 @@ object SDKConstants {
         val MOCK_DELAY_MS: Long get() = if (config.environment == Environment.DEVELOPMENT) 500L else 0L
         val ENABLE_VERBOSE_LOGGING: Boolean get() = config.enableVerboseLogging
         val ENABLE_MOCK_SERVICES: Boolean get() = config.enableMockServices
+        val USE_COMPREHENSIVE_MOCKS: Boolean get() = config.enableMockServices
 
         const val MOCK_DEVICE_ID_PREFIX = "dev-device-"
         const val MOCK_SESSION_ID_PREFIX = "dev-session-"
