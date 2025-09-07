@@ -82,8 +82,7 @@ class RunAnywhereApplication : Application() {
                 Log.i("RunAnywhereApp", "✅ Found model to auto-load: ${modelToLoad.name}")
 
                 // Load the model
-                // TODO: SDK doesn't have loadModel method yet
-                // RunAnywhere.loadModel(modelToLoad.id)
+                RunAnywhere.loadModel(modelToLoad.id)
 
                 Log.i("RunAnywhereApp", "🎉 Successfully auto-loaded model: ${modelToLoad.name}")
 

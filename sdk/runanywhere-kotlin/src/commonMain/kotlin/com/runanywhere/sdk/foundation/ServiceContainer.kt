@@ -8,6 +8,9 @@ import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
 import com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl
+import com.runanywhere.sdk.generation.GenerationService
+import com.runanywhere.sdk.generation.StreamingService
+import com.runanywhere.sdk.models.ModelManager
 import com.runanywhere.sdk.network.createHttpClient
 import com.runanywhere.sdk.services.AuthenticationService
 import com.runanywhere.sdk.services.DownloadService
@@ -63,6 +66,18 @@ class ServiceContainer {
 
     val downloadService: DownloadService by lazy {
         DownloadService(httpClient, fileSystem, validationService)
+    }
+
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    val generationService: GenerationService by lazy {
+        GenerationService()
+    }
+
+    val streamingService: StreamingService by lazy {
+        StreamingService()
     }
 
     /**

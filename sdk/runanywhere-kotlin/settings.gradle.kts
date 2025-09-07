@@ -26,13 +26,12 @@ rootProject.name = "RunAnywhereKotlinSDK"
 // Include JNI module
 include(":jni")
 
-// Core module
-include(":modules:runanywhere-core")
-
-// Feature modules
-include(":modules:runanywhere-whisper-stt")
-include(":modules:runanywhere-vad")
-include(":modules:runanywhere-llm")
-include(":modules:runanywhere-llm-llamacpp")
-include(":modules:runanywhere-tts")
-include(":modules:runanywhere-speaker-diarization")
+// Modules temporarily disabled due to build issues
+// TODO: Fix module build configurations
+// include(":modules:runanywhere-core")
+// include(":modules:runanywhere-whisper-stt")
+// include(":modules:runanywhere-vad")
+// include(":modules:runanywhere-llm")
+// include(":modules:runanywhere-llm-llamacpp")
+// include(":modules:runanywhere-tts")
+// include(":modules:runanywhere-speaker-diarization")
