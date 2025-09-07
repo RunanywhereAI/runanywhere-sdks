@@ -97,12 +97,17 @@ struct RunAnywhereAIApp: App {
             // Initialize the SDK with just API key
             let startTime = Date()
             logger.info("🚀 Starting SDK initialization...")
-            logger.debug("📋 Configuration: API Key: demo-api-key...")
+
+            // TODO: Replace with your actual API key for testing
+            let apiKey = "runa_prod_5hz1mIjWkH50TsdAxx487u6zcrIw8-DiePtisZk9VUg" // Replace with real API key
+            let baseURL = "https://REDACTED_URL" // Replace with your actual API URL if different
+
+            logger.debug("📋 Configuration: API Key: \(String(apiKey.prefix(10)))..., URL: \(baseURL)")
 
             try await RunAnywhere.initialize(
-                apiKey: "demo-api-key",
-                baseURL: "https://api.runanywhere.ai",
-                environment: .development
+                apiKey: apiKey,
+                baseURL: baseURL,
+                environment: .production // Changed to production for real API testing
             )
 
             let initTime = Date().timeIntervalSince(startTime)

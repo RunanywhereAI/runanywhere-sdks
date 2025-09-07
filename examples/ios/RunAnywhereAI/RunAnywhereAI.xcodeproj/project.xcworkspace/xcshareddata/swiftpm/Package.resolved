@@ -1,5 +1,5 @@
 {
-  "originHash" : "bb4e1f7c674c691f91234b6ae009ae828fefe2e9209900bb46803a9069f75368",
+  "originHash" : "027e9365f9d869a1aa44f5cdfcf338acf960804d3f141af8d4be60bec0d26946",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -43,7 +43,7 @@
       "location" : "https://github.com/FluidInference/FluidAudio.git",
       "state" : {
         "branch" : "main",
-        "revision" : "8cc38d7d055f521c0b05bd6ba217bca66108efc1"
+        "revision" : "052cbb27cf073a9407251d74ef3459ea258e41b3"
       }
     },
     {
@@ -114,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "334e682869394ee239a57dbe9262bff3cd9495bd",
-        "version" : "3.14.0"
+        "revision" : "d1c6b70f7c5f19fb0b8750cb8dcdf2ea6e2d8c34",
+        "version" : "3.15.0"
       }
     },
     {
@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-transformers",
       "state" : {
-        "revision" : "e5bf0627bd134cf8ddc407cda403ae84207af959",
-        "version" : "0.1.22"
+        "revision" : "ed54f3c9589d6cdc6fc2bb810e4809b0735fee01",
+        "version" : "0.1.23"
       }
     },
     {

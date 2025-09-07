@@ -157,16 +157,21 @@ public enum RunAnywhere {
                 let authResponse = try await authService.authenticate(apiKey: params.apiKey)
                 logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
 
-                // Step 6: Perform health check
-                logger.info("Step 6/8: Performing health check")
-                let healthResponse = try await authService.healthCheck()
+                // Step 6: Register device with backend
+                logger.info("Step 6/8: Registering device with backend")
+                let deviceRegistration = try await authService.registerDevice()
+                logger.info("Device registered successfully: \(deviceRegistration.deviceId)")
 
-                if healthResponse.status != HealthStatus.healthy {
-                    logger.warning("Backend health status: \(healthResponse.status)")
-                }
+                // Step 7: Perform health check (skipped - endpoint not implemented)
+                logger.info("Step 7/8: Skipping health check (endpoint not implemented)")
+                // TODO: Uncomment when health check endpoint is available
+                // let healthResponse = try await authService.healthCheck()
+                // if healthResponse.status != HealthStatus.healthy {
+                //     logger.warning("Backend health status: \(healthResponse.status)")
+                // }
 
-                // Step 7: Bootstrap SDK services and sync with backend
-                logger.info("Step 7/7: Bootstrapping SDK services and syncing with backend")
+                // Step 8: Bootstrap SDK services and sync with backend
+                logger.info("Step 8/8: Bootstrapping SDK services and syncing with backend")
                 let loadedConfig = try await serviceContainer.bootstrap(
                     with: params,
                     authService: authService,
@@ -394,6 +399,35 @@ public enum RunAnywhere {
 
         // Get the current model from the generation service
         return serviceContainer.generationService.getCurrentModel()?.model
+    }
+
+    // MARK: - Authentication Info
+
+    /// Get current user ID
+    public static func getUserId() async -> String? {
+        guard isInitialized,
+              let authService = serviceContainer.authenticationService else {
+            return nil
+        }
+        return await authService.getUserId()
+    }
+
+    /// Get current organization ID
+    public static func getOrganizationId() async -> String? {
+        guard isInitialized,
+              let authService = serviceContainer.authenticationService else {
+            return nil
+        }
+        return await authService.getOrganizationId()
+    }
+
+    /// Get current device ID
+    public static func getDeviceId() async -> String? {
+        guard isInitialized,
+              let authService = serviceContainer.authenticationService else {
+            return nil
+        }
+        return await authService.getDeviceId()
     }
 }
 

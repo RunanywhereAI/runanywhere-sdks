@@ -4,7 +4,11 @@ import Foundation
 public enum APIEndpoint {
     // Authentication & Health
     case authenticate
+    case refreshToken
     case healthCheck
+
+    // Device Management
+    case registerDevice
 
     // Core endpoints
     case configuration
@@ -18,9 +22,15 @@ public enum APIEndpoint {
         switch self {
         // Authentication & Health
         case .authenticate:
-            return "/v1/auth/token"
+            return "/api/v1/auth/sdk/authenticate"
+        case .refreshToken:
+            return "/api/v1/auth/sdk/refresh"
         case .healthCheck:
             return "/v1/health"
+
+        // Device Management
+        case .registerDevice:
+            return "/api/v1/devices/register"
 
         // Core endpoints
         case .configuration:
