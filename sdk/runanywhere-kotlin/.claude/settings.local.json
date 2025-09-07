@@ -10,7 +10,9 @@
       "Bash(chmod:*)",
       "Bash(./scripts/sdk_enhanced.sh build:*)",
       "Bash(bash scripts/sdk.sh:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(find:*)",
+      "Read(//Users/sanchitmonga/.m2/repository/com/runanywhere/sdk/**)"
     ],
     "deny": [],
     "ask": []

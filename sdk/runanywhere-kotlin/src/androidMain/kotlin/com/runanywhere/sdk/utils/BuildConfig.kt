@@ -5,6 +5,6 @@ package com.runanywhere.sdk.utils
  */
 actual object BuildConfig {
     actual val DEBUG: Boolean = true // Can be configured based on build type
-    actual val VERSION_NAME: String = "1.0.0"
-    actual val APPLICATION_ID: String = "com.runanywhere.sdk"
+    actual val VERSION_NAME: String = SharedBuildConfig.VERSION_NAME
+    actual val APPLICATION_ID: String = SharedBuildConfig.APPLICATION_ID
 }

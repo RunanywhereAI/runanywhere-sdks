@@ -51,18 +51,27 @@ kotlin {
             }
         }
 
-        // JVM-specific dependencies
-        jvmMain {
+        // JVM and Android shared dependencies
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain.get())
             dependencies {
-                // Whisper JNI for STT
+                // Whisper JNI for STT (shared between JVM and Android)
                 implementation(libs.whisper.jni)
-                // HTTP client for JVM
+                // HTTP client
                 implementation(libs.okhttp)
                 implementation(libs.okhttp.logging)
                 // JSON processing
                 implementation(libs.gson)
                 // File operations
                 implementation(libs.commons.io)
+            }
+        }
+
+        // JVM-specific dependencies
+        jvmMain {
+            dependsOn(jvmAndroidMain)
+            dependencies {
+                // JVM-specific dependencies only
             }
         }
 
@@ -75,16 +84,9 @@ kotlin {
 
         // Android-specific dependencies
         androidMain {
+            dependsOn(jvmAndroidMain)
             dependencies {
-                // Whisper JNI for Android
-                implementation(libs.whisper.jni)
-                // HTTP client
-                implementation(libs.okhttp)
-                implementation(libs.okhttp.logging)
-                // JSON processing
-                implementation(libs.gson)
-                // File operations
-                implementation(libs.commons.io)
+                // Android-specific dependencies only
                 implementation(libs.androidx.core.ktx)
                 implementation(libs.kotlinx.coroutines.android)
                 // Android VAD (only for Android target)
@@ -100,7 +102,6 @@ kotlin {
                 // Retrofit for API calls
                 implementation(libs.retrofit)
                 implementation(libs.retrofit.gson)
-                // Remove dependencies that are now in jvmAndroidMain
             }
         }
 

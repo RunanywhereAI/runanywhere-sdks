@@ -1,14 +1,10 @@
 package com.runanywhere.sdk.models
 
-import android.content.Context
-import java.io.File
-
 /**
  * Represents a Whisper model configuration
  */
 class WhisperModel(
-    val type: ModelType,
-    private val context: Context? = null
+    val type: ModelType
 ) {
     enum class ModelType(
         val fileName: String,
@@ -30,21 +26,19 @@ class WhisperModel(
      * Get the local path where the model should be stored
      */
     fun getLocalPath(): String {
-        val modelsDir = context?.getExternalFilesDir("models")
-            ?: File(System.getProperty("user.home"), ".runanywhere/models")
-
-        if (!modelsDir.exists()) {
-            modelsDir.mkdirs()
+        val modelsDir = "${getPlatformBaseDir()}/models"
+        val dir = createPlatformFile(modelsDir)
+        if (!dir.exists()) {
+            createDirectory(modelsDir)
         }
-
-        return File(modelsDir, type.fileName).absolutePath
+        return "$modelsDir/${type.fileName}"
     }
 
     /**
      * Check if the model is already downloaded
      */
     fun isDownloaded(): Boolean {
-        return File(getLocalPath()).exists()
+        return createPlatformFile(getLocalPath()).exists()
     }
 
     /**
