@@ -38,4 +38,4 @@ expect object PlatformUtils {
 /**
  * Secure storage implementation for each platform
  */
-expect class SecureStorageImpl() : com.runanywhere.sdk.network.SecureStorage
+expect class SecureStorageImpl() : com.runanywhere.sdk.storage.SecureStorage

@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.utils
 
-import com.runanywhere.sdk.network.SecureStorage
+import com.runanywhere.sdk.storage.SecureStorage
 import java.io.File
 import java.net.InetAddress
 import java.util.*
@@ -89,7 +89,7 @@ actual class SecureStorageImpl : SecureStorage {
     private val prefs = Preferences.userNodeForPackage(SecureStorageImpl::class.java)
     private val encryptionKey: SecretKey by lazy { getOrCreateKey() }
 
-    override fun store(key: String, value: String) {
+    override suspend fun setSecureString(key: String, value: String) {
         try {
             // For sensitive data, we should encrypt it
             val encrypted = if (key.contains("token", ignoreCase = true) ||
@@ -107,7 +107,7 @@ actual class SecureStorageImpl : SecureStorage {
         }
     }
 
-    override fun retrieve(key: String): String? {
+    override suspend fun getSecureString(key: String): String? {
         val value = prefs.get(key, null) ?: return null
 
         return try {
@@ -124,14 +124,18 @@ actual class SecureStorageImpl : SecureStorage {
         }
     }
 
-    override fun remove(key: String) {
+    override suspend fun removeSecure(key: String) {
         prefs.remove(key)
         prefs.flush()
     }
 
-    override fun clear() {
+    override suspend fun clearSecure() {
         prefs.clear()
         prefs.flush()
+    }
+
+    override suspend fun containsSecure(key: String): Boolean {
+        return prefs.get(key, null) != null
     }
 
     private fun getOrCreateKey(): SecretKey {
