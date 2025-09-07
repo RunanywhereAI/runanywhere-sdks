@@ -133,9 +133,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // Use KMP SDK streaming generation
-            // TODO: SDK doesn't have generateStream method yet
-            // RunAnywhere.generateStream(prompt)
-            flowOf("Sample response") // Placeholder
+            RunAnywhere.generateStream(prompt)
                 .collect { token ->
                     fullResponse += token
                     totalTokensReceived++
@@ -256,9 +254,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val startTime = System.currentTimeMillis()
 
         try {
-            // TODO: SDK doesn't have generate method yet
-            // val response = RunAnywhere.generate(prompt)
-            val response = "Sample response" // Placeholder
+            val response = RunAnywhere.generate(prompt)
             val endTime = System.currentTimeMillis()
 
             updateAssistantMessage(messageId, response, null)

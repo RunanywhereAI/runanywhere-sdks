@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.data.repositories
 
+import com.runanywhere.sdk.core.SDKConstants
 import com.runanywhere.sdk.data.database.RunAnywhereDatabase
 import com.runanywhere.sdk.data.database.entities.TelemetryEventEntity
 import com.runanywhere.sdk.data.models.TelemetryData
@@ -94,7 +95,7 @@ class TelemetryRepositoryImpl(
                 userId = null,
                 deviceId = event.deviceId,
                 appVersion = null,
-                sdkVersion = "0.1.0", // TODO: Get from constants
+                sdkVersion = SDKConstants.SDK_VERSION,
                 platform = "Android",
                 osVersion = android.os.Build.VERSION.RELEASE,
                 timestamp = event.timestamp,

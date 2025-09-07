@@ -28,6 +28,9 @@ interface RunAnywhereSDK {
 
     suspend fun availableModels(): List<ModelInfo>
     suspend fun downloadModel(modelId: String): Flow<Float>
+    suspend fun loadModel(modelId: String): Boolean
+    suspend fun generate(prompt: String, options: Map<String, Any>? = null): String
+    fun generateStream(prompt: String, options: Map<String, Any>? = null): Flow<String>
     suspend fun transcribe(audioData: ByteArray): String
     suspend fun cleanup()
 }

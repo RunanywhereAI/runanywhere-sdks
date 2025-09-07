@@ -14,6 +14,7 @@ import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.storage.createFileSystem
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
  * JVM implementation of RunAnywhere SDK
@@ -78,5 +79,68 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             ?: throw IllegalStateException("STT component not initialized")
 
         return result.text
+    }
+
+    override suspend fun loadModel(modelId: String): Boolean {
+        requireInitialized()
+
+        jvmLogger.info("Loading model: $modelId")
+
+        // Check if model is downloaded
+        val model = serviceContainer.modelInfoService.getModel(modelId)
+            ?: throw IllegalArgumentException("Model not found: $modelId")
+
+        if (model.localPath == null) {
+            jvmLogger.warn("Model $modelId not downloaded. Download it first.")
+            return false
+        }
+
+        // Load model into memory using ModelManager
+        return try {
+            serviceContainer.modelManager.loadModel(model)
+            jvmLogger.info("Model $modelId loaded successfully")
+            true
+        } catch (e: Exception) {
+            jvmLogger.error("Failed to load model $modelId: ${e.message}")
+            false
+        }
+    }
+
+    override suspend fun generate(prompt: String, options: Map<String, Any>?): String {
+        requireInitialized()
+
+        jvmLogger.info("Generating response for prompt: ${prompt.take(50)}...")
+
+        // Convert Map options to GenerationOptions (using defaults for now)
+        val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
+            model = options?.get("modelId") as? String,
+            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
+            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
+            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
+        )
+
+        // Use generation service from service container
+        val result = serviceContainer.generationService.generate(prompt, generationOptions)
+
+        jvmLogger.info("Generated response: ${result.text.take(50)}...")
+        return result.text
+    }
+
+    override fun generateStream(prompt: String, options: Map<String, Any>?): Flow<String> {
+        requireInitialized()
+
+        jvmLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
+
+        // Convert Map options to GenerationOptions
+        val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
+            model = options?.get("modelId") as? String,
+            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
+            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
+            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
+        )
+
+        // Use streaming service from service container
+        return serviceContainer.streamingService.stream(prompt, generationOptions)
+            .map { chunk -> chunk.text }
     }
 }
