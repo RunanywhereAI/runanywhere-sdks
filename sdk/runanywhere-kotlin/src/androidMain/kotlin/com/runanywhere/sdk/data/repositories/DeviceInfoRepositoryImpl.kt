@@ -25,7 +25,8 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun getDeviceInfoByDeviceId(deviceId: String): DeviceInfoData? {
+    // Additional helper methods (not from interface)
+    suspend fun getDeviceInfoByDeviceId(deviceId: String): DeviceInfoData? {
         return try {
             val entity = database.deviceInfoDao().getDeviceInfoById(deviceId)
             entity?.toDeviceInfoData()
@@ -35,7 +36,7 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun getAllDeviceInfo(): List<DeviceInfoData> {
+    suspend fun getAllDeviceInfo(): List<DeviceInfoData> {
         return try {
             database.deviceInfoDao().getAllDeviceInfo()
                 .map { it.toDeviceInfoData() }
@@ -56,7 +57,7 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun updateDeviceInfo(deviceInfo: DeviceInfoData) {
+    suspend fun updateDeviceInfo(deviceInfo: DeviceInfoData) {
         try {
             val entity = DeviceInfoEntity.fromDeviceInfoData(deviceInfo)
             database.deviceInfoDao().updateDeviceInfo(entity)
@@ -67,7 +68,7 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun deleteDeviceInfo(deviceId: String) {
+    suspend fun deleteDeviceInfo(deviceId: String) {
         try {
             database.deviceInfoDao().deleteDeviceInfoById(deviceId)
             logger.debug("Device info deleted from database with ID: $deviceId")
@@ -87,7 +88,7 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun getDeviceInfoCount(): Int {
+    suspend fun getDeviceInfoCount(): Int {
         return try {
             database.deviceInfoDao().getDeviceInfoCount()
         } catch (e: Exception) {
@@ -96,7 +97,7 @@ class DeviceInfoRepositoryImpl(
         }
     }
 
-    override suspend fun deleteOldDeviceInfo(olderThanTimestamp: Long) {
+    suspend fun deleteOldDeviceInfo(olderThanTimestamp: Long) {
         try {
             database.deviceInfoDao().deleteOldDeviceInfo(olderThanTimestamp)
             logger.debug("Deleted old device info older than $olderThanTimestamp")

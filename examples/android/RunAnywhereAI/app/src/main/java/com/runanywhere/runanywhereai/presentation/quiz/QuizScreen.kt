@@ -90,7 +90,7 @@ fun QuizScreen(
 
                 is QuizViewState.QUIZ -> {
                     QuizSwipeView(
-                        session = uiState.viewState.session,
+                        session = (uiState.viewState as QuizViewState.QUIZ).session,
                         currentQuestionIndex = uiState.currentQuestionIndex,
                         dragOffset = uiState.dragOffset,
                         swipeDirection = uiState.swipeDirection,
@@ -101,7 +101,7 @@ fun QuizScreen(
 
                 is QuizViewState.RESULTS -> {
                     QuizResultsView(
-                        results = uiState.viewState.results,
+                        results = (uiState.viewState as QuizViewState.RESULTS).results,
                         onNewQuiz = viewModel::startNewQuiz,
                         onRetry = {
                             scope.launch {

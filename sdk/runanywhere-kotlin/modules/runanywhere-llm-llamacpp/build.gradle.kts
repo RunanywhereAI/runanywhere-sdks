@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
+    `maven-publish`
 }
 
 kotlin {
@@ -27,7 +28,7 @@ kotlin {
 
         val commonTest by getting {
             dependencies {
-                implementation(libs.kotlin.test)
+                implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
@@ -79,15 +80,4 @@ tasks.register<Copy>("copyNativeLibraries") {
         include("**/*.so")
     }
     into("src/androidMain/jniLibs")
-}
-
-// Publishing configuration
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            groupId = "com.runanywhere.sdk"
-            artifactId = "runanywhere-llm-llamacpp"
-            version = "0.1.0"
-        }
-    }
 }

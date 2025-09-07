@@ -39,9 +39,8 @@ class TranscriptionViewModel(application: Application) : AndroidViewModel(applic
     private fun initializeSDK() {
         viewModelScope.launch {
             try {
-                // Initialize SDK with context
+                // Initialize SDK without context parameter (not needed in new SDK)
                 RunAnywhere.initialize(
-                    context = getApplication(),
                     apiKey = "demo-api-key",
                     baseURL = "https://api.runanywhere.ai",
                     environment = com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT

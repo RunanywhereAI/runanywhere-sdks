@@ -47,12 +47,7 @@ actual class WhisperSTTService : STTService {
     ): STTTranscriptionResult = withContext(Dispatchers.Default) {
         if (!whisperService.isReady()) {
             logger.error("WhisperSTTService not initialized or not ready")
-            return@withContext STTTranscriptionResult(
-                transcript = "",
-                confidence = 0.0f,
-                language = options.language,
-                error = "Service not initialized"
-            )
+            throw STTError.ServiceNotInitialized
         }
 
         try {
@@ -65,12 +60,12 @@ actual class WhisperSTTService : STTService {
             val whisperParams = WhisperParams(
                 language = options.language,
                 enableTimestamps = options.enableTimestamps,
-                enableTranslate = options.translateToEnglish,
-                temperature = options.temperature ?: 0.0f,
-                beamSize = options.beamSize ?: 1,
+                enableTranslate = false, // Translation not exposed in STTOptions
+                temperature = options.temperature,
+                beamSize = options.beamSize,
                 suppressBlank = true,
                 suppressNonSpeech = true,
-                prompt = options.prompt
+                prompt = null // No prompt in STTOptions
             )
 
             // Perform transcription
@@ -80,7 +75,7 @@ actual class WhisperSTTService : STTService {
             val timestamps = if (options.enableTimestamps && result.segments.isNotEmpty()) {
                 result.segments.map { segment ->
                     STTTranscriptionResult.TimestampInfo(
-                        text = segment.text,
+                        word = segment.text,
                         startTime = segment.startTime,
                         endTime = segment.endTime,
                         confidence = segment.confidence
@@ -99,17 +94,12 @@ actual class WhisperSTTService : STTService {
                 confidence = confidence,
                 language = result.language,
                 timestamps = timestamps,
-                processingTimeMs = result.processingTimeMs
+                // processingTimeMs not in STTTranscriptionResult
             )
 
         } catch (e: Exception) {
             logger.error("Error during transcription", e)
-            STTTranscriptionResult(
-                transcript = "",
-                confidence = 0.0f,
-                language = options.language ?: "unknown",
-                error = e.message
-            )
+            throw STTError.TranscriptionFailed(e)
         }
     }
 
@@ -120,12 +110,7 @@ actual class WhisperSTTService : STTService {
     ): STTTranscriptionResult {
         if (!whisperService.isReady()) {
             logger.error("WhisperSTTService not ready for streaming")
-            return STTTranscriptionResult(
-                transcript = "",
-                confidence = 0.0f,
-                language = options.language,
-                error = "Service not ready"
-            )
+            throw STTError.ServiceNotInitialized
         }
 
         val audioChunks = mutableListOf<ByteArray>()
@@ -145,7 +130,7 @@ actual class WhisperSTTService : STTService {
                         audioData = floatAudio,
                         language = options.language,
                         enableTimestamps = false,
-                        enableTranslate = options.translateToEnglish
+                        enableTranslate = false
                     )
 
                     if (partialResult.text.isNotEmpty() && partialResult.text != accumulatedText) {
@@ -153,7 +138,7 @@ actual class WhisperSTTService : STTService {
                         onPartial(partialResult.text)
                     }
                 } catch (e: Exception) {
-                    logger.debug("Error in partial transcription", e)
+                    logger.debug("Error in partial transcription: ${e.message}")
                     // Continue processing, don't fail the stream
                 }
             }
