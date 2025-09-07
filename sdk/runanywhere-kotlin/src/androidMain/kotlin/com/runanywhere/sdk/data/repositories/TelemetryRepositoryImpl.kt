@@ -50,7 +50,8 @@ class TelemetryRepositoryImpl(
         }
     }
 
-    override suspend fun getEventsByTimeRange(startTime: Long, endTime: Long): List<TelemetryData> {
+    // Additional helper methods (not from interface)
+    suspend fun getEventsByTimeRange(startTime: Long, endTime: Long): List<TelemetryData> {
         return try {
             database.telemetryDao().getEventsByTimeRange(startTime, endTime)
                 .map { it.toTelemetryData() }
@@ -60,9 +61,9 @@ class TelemetryRepositoryImpl(
         }
     }
 
-    override suspend fun getEventsByType(type: String): List<TelemetryData> {
+    suspend fun getEventsByType(type: String): List<TelemetryData> {
         return try {
-            database.telemetryDao().getEventsByType(type)
+            database.telemetryDao().getEventsByType(com.runanywhere.sdk.data.models.TelemetryEventType.valueOf(type))
                 .map { it.toTelemetryData() }
         } catch (e: Exception) {
             logger.error("Failed to get telemetry events by type from database", e)
@@ -84,23 +85,23 @@ class TelemetryRepositoryImpl(
         try {
             // Convert TelemetryEventData to TelemetryData
             val telemetryData = TelemetryData(
-                id = event.id ?: generateEventId(),
+                id = event.id,
                 type = event.type,
-                name = event.name,
-                properties = event.properties,
-                metrics = event.metrics,
+                name = event.type.name,
+                properties = event.eventData.mapValues { it.value?.toString() ?: "" },
+                metrics = emptyMap(),
                 sessionId = event.sessionId,
-                userId = event.userId,
+                userId = null,
                 deviceId = event.deviceId,
-                appVersion = event.appVersion,
+                appVersion = null,
                 sdkVersion = "0.1.0", // TODO: Get from constants
                 platform = "Android",
                 osVersion = android.os.Build.VERSION.RELEASE,
                 timestamp = event.timestamp,
                 duration = event.duration,
                 success = event.success,
-                errorCode = event.errorCode,
-                errorMessage = event.errorMessage,
+                error = if (!event.success) "Event failed" else null,
+                errorMessage = null,
                 isSent = false,
                 sentAt = null,
                 retryCount = 0

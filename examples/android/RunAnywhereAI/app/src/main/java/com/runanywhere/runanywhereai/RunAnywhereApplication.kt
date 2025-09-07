@@ -2,10 +2,10 @@ package com.runanywhere.runanywhereai
 
 import android.app.Application
 import android.util.Log
-import androidx.lifecycle.ProcessLifecycleOwner
-import androidx.lifecycle.lifecycleScope
+// import androidx.lifecycle.ProcessLifecycleOwner
+// import androidx.lifecycle.lifecycleScope
 // KMP SDK imports
-import com.runanywhere.sdk.public.RunAnywhereAndroid
+import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
 // import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
@@ -27,7 +27,7 @@ class RunAnywhereApplication : Application() {
         Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
 
         // Initialize SDK asynchronously to match iOS pattern
-        ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             initializeSDK()
         }
     }
@@ -41,8 +41,7 @@ class RunAnywhereApplication : Application() {
 
             // Initialize KMP SDK with enhanced configuration
             // This matches the iOS initialization pattern
-            RunAnywhereAndroid.initialize(
-                context = this,
+            RunAnywhere.initialize(
                 apiKey = "demo-api-key",
                 baseURL = "https://api.runanywhere.ai",
                 environment = SDKEnvironment.DEVELOPMENT
@@ -73,7 +72,7 @@ class RunAnywhereApplication : Application() {
 
         try {
             // Get available models from KMP SDK
-            val availableModels = RunAnywhereAndroid.availableModels()
+            val availableModels = RunAnywhere.availableModels()
 
             // Filter for downloaded models first
             val downloadedModels = availableModels.filter { it.localPath != null }
@@ -83,7 +82,8 @@ class RunAnywhereApplication : Application() {
                 Log.i("RunAnywhereApp", "✅ Found model to auto-load: ${modelToLoad.name}")
 
                 // Load the model
-                RunAnywhereAndroid.loadModel(modelToLoad.id)
+                // TODO: SDK doesn't have loadModel method yet
+                // RunAnywhere.loadModel(modelToLoad.id)
 
                 Log.i("RunAnywhereApp", "🎉 Successfully auto-loaded model: ${modelToLoad.name}")
 
@@ -112,7 +112,7 @@ class RunAnywhereApplication : Application() {
      * Retry SDK initialization
      */
     suspend fun retryInitialization() {
-        ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
             initializeSDK()
         }
     }

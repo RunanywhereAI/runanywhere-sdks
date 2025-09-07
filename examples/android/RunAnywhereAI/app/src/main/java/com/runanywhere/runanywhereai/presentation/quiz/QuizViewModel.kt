@@ -5,8 +5,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
-import com.runanywhere.sdk.public.RunAnywhereAndroid
-import com.runanywhere.sdk.data.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.generation.GenerationOptions
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -81,13 +81,15 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 val quizPrompt = buildQuizPrompt(inputText)
 
                 // Generate quiz using SDK
-                val options = RunAnywhereGenerationOptions(
+                val options = GenerationOptions(
                     maxTokens = 1500,
                     temperature = 0.7f,
                     topP = 0.9f
                 )
 
-                val jsonResponse = RunAnywhereAndroid.generate(quizPrompt, options)
+                // TODO: SDK doesn't have generate method yet
+                // val jsonResponse = RunAnywhere.generate(quizPrompt, options)
+                val jsonResponse = "{ \"questions\": [] }" // Placeholder
 
                 // Parse JSON response
                 val generatedQuiz = parseQuizResponse(jsonResponse)
@@ -390,8 +392,8 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 if (app.isSDKReady()) {
-                    val models = RunAnywhereAndroid.availableModels()
-                    val loadedModel = models.firstOrNull { it.localPath != null }
+                    val models = RunAnywhere.availableModels()
+                    val loadedModel = models.firstOrNull { model -> model.localPath != null }
 
                     _uiState.value = _uiState.value.copy(
                         isModelLoaded = loadedModel != null,

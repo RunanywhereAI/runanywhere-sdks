@@ -29,7 +29,8 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun getConfigurationByEnvironment(environment: SDKEnvironment): ConfigurationData? {
+    // Additional helper methods (not from interface)
+    suspend fun getConfigurationByEnvironment(environment: SDKEnvironment): ConfigurationData? {
         return try {
             val entity = database.configurationDao().getConfigurationByEnvironment(environment)
             entity?.toConfigurationData()
@@ -39,7 +40,7 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun getConfigurationBySource(source: ConfigurationSource): ConfigurationData? {
+    suspend fun getConfigurationBySource(source: ConfigurationSource): ConfigurationData? {
         return try {
             val entity = database.configurationDao().getConfigurationBySource(source)
             entity?.toConfigurationData()
@@ -49,7 +50,7 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun getAllConfigurations(): List<ConfigurationData> {
+    suspend fun getAllConfigurations(): List<ConfigurationData> {
         return try {
             database.configurationDao().getAllConfigurations()
                 .map { it.toConfigurationData() }
@@ -70,7 +71,8 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun updateConfiguration(configuration: ConfigurationData) {
+    // Additional helper method (not from interface)
+    suspend fun updateConfiguration(configuration: ConfigurationData) {
         try {
             val entity = ConfigurationEntity.fromConfigurationData(configuration)
             database.configurationDao().updateConfiguration(entity)
@@ -81,7 +83,7 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun deleteConfiguration(configurationId: String) {
+    suspend fun deleteConfiguration(configurationId: String) {
         try {
             database.configurationDao().deleteConfigurationById(configurationId)
             logger.debug("Configuration deleted from database with ID: $configurationId")
@@ -101,7 +103,7 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun getConfigurationCount(): Int {
+    suspend fun getConfigurationCount(): Int {
         return try {
             database.configurationDao().getConfigurationCount()
         } catch (e: Exception) {
@@ -110,7 +112,7 @@ class ConfigurationRepositoryImpl(
         }
     }
 
-    override suspend fun deleteOldConfigurations(olderThanTimestamp: Long) {
+    suspend fun deleteOldConfigurations(olderThanTimestamp: Long) {
         try {
             database.configurationDao().deleteOldConfigurations(olderThanTimestamp)
             logger.debug("Deleted old configurations older than $olderThanTimestamp")

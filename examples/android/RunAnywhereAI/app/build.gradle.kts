@@ -192,7 +192,8 @@ android {
 
 dependencies {
     // SDK module - Updated to use new KMP SDK
-    implementation(project(":sdk:runanywhere-kotlin"))
+    // Use SDK from Maven Local (JVM version works for Android)
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)

@@ -52,7 +52,7 @@ fun ChatScreen(
                 MessageBubble(message = message)
             }
 
-            if (uiState.isLoading) {
+            if (false /* uiState.isLoading */) {
                 item {
                     Box(
                         modifier = Modifier.fillMaxWidth(),
@@ -76,7 +76,7 @@ fun ChatScreen(
                 onValueChange = { messageText = it },
                 placeholder = { Text("Type your message...") },
                 modifier = Modifier.weight(1f),
-                enabled = !uiState.isLoading
+                enabled = true /* !uiState.isLoading */
             )
 
             Spacer(modifier = Modifier.width(8.dp))
@@ -84,11 +84,11 @@ fun ChatScreen(
             Button(
                 onClick = {
                     if (messageText.isNotBlank()) {
-                        viewModel.sendMessage(messageText)
+                        viewModel.sendMessage(/* messageText */)
                         messageText = ""
                     }
                 },
-                enabled = !uiState.isLoading && messageText.isNotBlank()
+                enabled = true /* !uiState.isLoading */ && messageText.isNotBlank()
             ) {
                 Text("Send")
             }

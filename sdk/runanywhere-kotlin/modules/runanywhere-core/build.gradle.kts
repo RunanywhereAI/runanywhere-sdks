@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.serialization)
+    `maven-publish`
 }
 
 kotlin {
@@ -28,13 +29,13 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
-                api(libs.koin.core)
+                // api(libs.koin.core) // Uncomment when koin is added to libs
             }
         }
 
         val commonTest by getting {
             dependencies {
-                implementation(libs.kotlin.test)
+                implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
@@ -77,16 +78,5 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-// Publishing configuration
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            groupId = "com.runanywhere.sdk"
-            artifactId = "runanywhere-core"
-            version = "0.1.0"
-        }
     }
 }

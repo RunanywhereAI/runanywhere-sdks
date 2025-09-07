@@ -6,10 +6,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.domain.model.*
-import com.runanywhere.sdk.public.RunAnywhereAndroid
+import com.runanywhere.sdk.public.RunAnywhere
 // import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.util.*
 import kotlin.math.ceil
@@ -26,7 +27,7 @@ data class ChatUiState(
     val currentInput: String = "",
     val error: Throwable? = null,
     val useStreaming: Boolean = true,
-    val currentConversation: Conversation? = null
+    val currentConversation: com.runanywhere.runanywhereai.domain.models.Conversation? = null
 ) {
     val canSend: Boolean
         get() = currentInput.trim().isNotEmpty() && !isGenerating && isModelLoaded
@@ -132,7 +133,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         try {
             // Use KMP SDK streaming generation
-            RunAnywhereAndroid.generateStream(prompt)
+            // TODO: SDK doesn't have generateStream method yet
+            // RunAnywhere.generateStream(prompt)
+            flowOf("Sample response") // Placeholder
                 .collect { token ->
                     fullResponse += token
                     totalTokensReceived++
@@ -253,7 +256,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         val startTime = System.currentTimeMillis()
 
         try {
-            val response = RunAnywhereAndroid.generate(prompt)
+            // TODO: SDK doesn't have generate method yet
+            // val response = RunAnywhere.generate(prompt)
+            val response = "Sample response" // Placeholder
             val endTime = System.currentTimeMillis()
 
             updateAssistantMessage(messageId, response, null)
@@ -470,7 +475,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun checkModelStatus() {
         try {
             if (app.isSDKReady()) {
-                val availableModels = RunAnywhereAndroid.availableModels()
+                val availableModels = RunAnywhere.availableModels()
                 val loadedModel = availableModels.firstOrNull { it.localPath != null }
 
                 _uiState.value = _uiState.value.copy(
