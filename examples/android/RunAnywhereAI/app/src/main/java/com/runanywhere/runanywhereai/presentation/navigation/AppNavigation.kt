@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.presentation.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,13 +17,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
-import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
-import com.runanywhere.runanywhereai.presentation.voice.TranscriptionScreen
 import com.runanywhere.runanywhereai.presentation.storage.StorageScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
+import com.runanywhere.runanywhereai.presentation.quiz.QuizScreen
+import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
 /**
- * Main navigation component with bottom tab navigation
+ * Main navigation component matching iOS app structure
+ * 5 tabs: Chat, Storage, Settings, Quiz, Voice
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,27 +38,27 @@ fun AppNavigation() {
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = "chat",
+            startDestination = NavigationRoute.CHAT,
             modifier = Modifier.padding(paddingValues)
         ) {
-            composable("chat") {
+            composable(NavigationRoute.CHAT) {
                 ChatScreen()
             }
 
-            composable("voice") {
-                VoiceAssistantScreen()
-            }
-
-            composable("transcription") {
-                TranscriptionScreen()
-            }
-
-            composable("storage") {
+            composable(NavigationRoute.STORAGE) {
                 StorageScreen()
             }
 
-            composable("settings") {
+            composable(NavigationRoute.SETTINGS) {
                 SettingsScreen()
+            }
+
+            composable(NavigationRoute.QUIZ) {
+                QuizScreen()
+            }
+
+            composable(NavigationRoute.VOICE) {
+                VoiceAssistantScreen()
             }
         }
     }
@@ -67,20 +69,53 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
+    // Match iOS tab order and icons exactly
     val items = listOf(
-        BottomNavItem("chat", "Chat", Icons.Default.Chat),
-        BottomNavItem("voice", "Voice", Icons.Default.Mic),
-        BottomNavItem("transcription", "Transcription", Icons.Default.Notes),
-        BottomNavItem("storage", "Storage", Icons.Default.Storage),
-        BottomNavItem("settings", "Settings", Icons.Default.Settings)
+        BottomNavItem(
+            route = NavigationRoute.CHAT,
+            label = "Chat",
+            icon = Icons.Filled.Chat,
+            selectedIcon = Icons.Filled.Chat
+        ),
+        BottomNavItem(
+            route = NavigationRoute.STORAGE,
+            label = "Storage",
+            icon = Icons.Outlined.Storage,
+            selectedIcon = Icons.Filled.Storage
+        ),
+        BottomNavItem(
+            route = NavigationRoute.SETTINGS,
+            label = "Settings",
+            icon = Icons.Outlined.Settings,
+            selectedIcon = Icons.Filled.Settings
+        ),
+        BottomNavItem(
+            route = NavigationRoute.QUIZ,
+            label = "Quiz",
+            icon = Icons.Outlined.Quiz,
+            selectedIcon = Icons.Filled.Quiz
+        ),
+        BottomNavItem(
+            route = NavigationRoute.VOICE,
+            label = "Voice",
+            icon = Icons.Outlined.Mic,
+            selectedIcon = Icons.Filled.Mic
+        )
     )
 
     NavigationBar {
         items.forEach { item ->
+            val selected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+
             NavigationBarItem(
-                icon = { Icon(item.icon, contentDescription = item.label) },
+                icon = {
+                    Icon(
+                        imageVector = if (selected) item.selectedIcon else item.icon,
+                        contentDescription = item.label
+                    )
+                },
                 label = { Text(item.label) },
-                selected = currentDestination?.hierarchy?.any { it.route == item.route } == true,
+                selected = selected,
                 onClick = {
                     navController.navigate(item.route) {
                         // Pop up to the start destination to avoid building up a large stack
@@ -98,8 +133,23 @@ fun BottomNavigationBar(navController: NavController) {
     }
 }
 
+/**
+ * Navigation routes matching iOS tabs
+ */
+object NavigationRoute {
+    const val CHAT = "chat"
+    const val STORAGE = "storage"
+    const val SETTINGS = "settings"
+    const val QUIZ = "quiz"
+    const val VOICE = "voice"
+}
+
+/**
+ * Bottom navigation item data
+ */
 data class BottomNavItem(
     val route: String,
     val label: String,
-    val icon: ImageVector
+    val icon: ImageVector,
+    val selectedIcon: ImageVector = icon
 )

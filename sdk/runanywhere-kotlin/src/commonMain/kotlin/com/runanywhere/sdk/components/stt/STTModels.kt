@@ -91,7 +91,10 @@ data class STTConfiguration(
     val vocabularyList: List<String> = emptyList(),
     val maxAlternatives: Int = 1,
     val enableTimestamps: Boolean = true,
-    val useGPUIfAvailable: Boolean = true
+    val useGPUIfAvailable: Boolean = true,
+
+    // VAD configuration
+    val enableVAD: Boolean = true
 ) : ComponentConfiguration, ComponentInitParameters {
 
     override fun validate() {

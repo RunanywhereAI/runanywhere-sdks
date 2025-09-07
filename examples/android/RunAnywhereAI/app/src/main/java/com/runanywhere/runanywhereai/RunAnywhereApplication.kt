@@ -2,9 +2,10 @@ package com.runanywhere.runanywhereai
 
 import android.app.Application
 import android.util.Log
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
-// SDK imports - Updated for KMP
-import com.runanywhere.sdk.public.RunAnywhere
+// KMP SDK imports
+import com.runanywhere.sdk.public.RunAnywhereAndroid
 import com.runanywhere.sdk.data.models.SDKEnvironment
 // import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
@@ -12,93 +13,107 @@ import kotlinx.coroutines.launch
 
 /**
  * Application class for RunAnywhere AI sample app
- * Handles SDK initialization and global configuration
+ * Enhanced to match iOS functionality with proper KMP SDK initialization
  */
 // @HiltAndroidApp
 class RunAnywhereApplication : Application() {
 
+    private var isSDKInitialized = false
+    private var initializationError: Throwable? = null
+
     override fun onCreate() {
         super.onCreate()
 
-        // Note: FileManager is now handled by the KMP SDK internally
+        Log.i("RunAnywhereApp", "🏁 App launched, initializing SDK...")
 
-        // Initialize SDK with framework adapters
-        initializeSDK()
-
-        // Setup logging and analytics
-        setupLogging()
+        // Initialize SDK asynchronously to match iOS pattern
+        ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+            initializeSDK()
+        }
     }
 
-    private fun initializeSDK() {
-        // Note: Using the current SDK interface - TODO: Replace with enhanced SDK when available
+    private suspend fun initializeSDK() {
         try {
-            // Initialize SDK in development mode with KMP SDK
-            RunAnywhere.initialize(
+            initializationError = null
+            Log.i("RunAnywhereApp", "🎯 Starting SDK initialization...")
+
+            val startTime = System.currentTimeMillis()
+
+            // Initialize KMP SDK with enhanced configuration
+            // This matches the iOS initialization pattern
+            RunAnywhereAndroid.initialize(
                 context = this,
-                apiKey = "dev-api-key",
+                apiKey = "demo-api-key",
+                baseURL = "https://api.runanywhere.ai",
                 environment = SDKEnvironment.DEVELOPMENT
             )
 
-            Log.i("RunAnywhereApp", "KMP SDK initialized successfully")
+            val initTime = System.currentTimeMillis() - startTime
+            Log.i("RunAnywhereApp", "✅ KMP SDK successfully initialized!")
+            Log.i("RunAnywhereApp", "⏱️  Initialization time: ${initTime}ms")
+            Log.i("RunAnywhereApp", "📊 SDK Status: Ready for on-device AI inference")
+
+            isSDKInitialized = true
+
+            // Auto-load first available model (matching iOS behavior)
+            autoLoadFirstModel()
 
         } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "Failed to initialize SDK", e)
-            // Handle initialization failure gracefully
+            Log.e("RunAnywhereApp", "❌ SDK initialization failed!")
+            Log.e("RunAnywhereApp", "🔍 Error: ${e.message}")
+            Log.e("RunAnywhereApp", "💡 Tip: Check your API key and network connection")
+
+            initializationError = e
+            isSDKInitialized = false
         }
-
-        // TODO: When SDK is enhanced, use this configuration:
-        /*
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                RunAnywhereSDK.initialize(
-                    context = this@RunAnywhereApplication,
-                    config = SDKInitializationConfig(
-                        frameworkAdapters = listOf(
-                            WhisperCppAdapter(
-                                modelPath = getWhisperModelPath(),
-                                options = WhisperOptions(
-                                    language = "auto",
-                                    translate = false,
-                                    enableVAD = true
-                                )
-                            ),
-                            LlamaCppAdapter(
-                                modelPath = getLlamaModelPath(),
-                                options = LlamaOptions(
-                                    contextSize = 2048,
-                                    threads = Runtime.getRuntime().availableProcessors()
-                                )
-                            ),
-                            VoiceActivityDetector(
-                                sensitivity = VADSensitivity.MEDIUM,
-                                minSpeechDuration = 250,
-                                minSilenceDuration = 500
-                            ),
-                            SpeakerDiarizationAdapter(
-                                threshold = 0.45f,
-                                maxSpeakers = 8
-                            )
-                        ),
-                        enableAnalytics = true,
-                        enableCrashReporting = !BuildConfig.DEBUG,
-                        logLevel = if (BuildConfig.DEBUG) LogLevel.DEBUG else LogLevel.INFO
-                    )
-                )
-
-                Log.i("RunAnywhereApp", "Enhanced SDK initialized successfully")
-
-            } catch (e: Exception) {
-                Log.e("RunAnywhereApp", "Failed to initialize enhanced SDK", e)
-            }
-        }
-        */
     }
 
-    private fun setupLogging() {
-        if (BuildConfig.DEBUG_MODE) {
-            // TODO: Enable verbose logging for development when SDK supports it
-            // RunAnywhereSDK.setLogLevel(LogLevel.VERBOSE)
-            Log.d("RunAnywhereApp", "Debug mode enabled")
+    private suspend fun autoLoadFirstModel() {
+        Log.i("RunAnywhereApp", "🤖 Auto-loading first available model...")
+
+        try {
+            // Get available models from KMP SDK
+            val availableModels = RunAnywhereAndroid.availableModels()
+
+            // Filter for downloaded models first
+            val downloadedModels = availableModels.filter { it.localPath != null }
+
+            if (downloadedModels.isNotEmpty()) {
+                val modelToLoad = downloadedModels.first()
+                Log.i("RunAnywhereApp", "✅ Found model to auto-load: ${modelToLoad.name}")
+
+                // Load the model
+                RunAnywhereAndroid.loadModel(modelToLoad.id)
+
+                Log.i("RunAnywhereApp", "🎉 Successfully auto-loaded model: ${modelToLoad.name}")
+
+            } else {
+                Log.i("RunAnywhereApp", "ℹ️ No downloaded models available for auto-loading")
+                Log.i("RunAnywhereApp", "💡 User will need to download and select a model manually")
+            }
+
+        } catch (e: Exception) {
+            Log.w("RunAnywhereApp", "⚠️ Failed to auto-load model: ${e.message}")
+            Log.i("RunAnywhereApp", "💡 User will need to select a model manually")
+        }
+    }
+
+    /**
+     * Get SDK initialization status
+     */
+    fun isSDKReady(): Boolean = isSDKInitialized
+
+    /**
+     * Get initialization error if any
+     */
+    fun getInitializationError(): Throwable? = initializationError
+
+    /**
+     * Retry SDK initialization
+     */
+    suspend fun retryInitialization() {
+        ProcessLifecycleOwner.get().lifecycleScope.launch(Dispatchers.IO) {
+            initializeSDK()
         }
     }
 }

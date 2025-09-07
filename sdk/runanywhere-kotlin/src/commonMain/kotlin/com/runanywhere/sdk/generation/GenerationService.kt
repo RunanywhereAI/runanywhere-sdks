@@ -2,6 +2,7 @@ package com.runanywhere.sdk.generation
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.SDKGenerationEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -175,22 +176,22 @@ class GenerationService {
     }
 
     private fun publishGenerationStarted(sessionId: String, prompt: String) {
-        // TODO: Publish event through EventBus
+        EventBus.publish(SDKGenerationEvent.Started(sessionId, prompt))
         logger.debug("Generation started: $sessionId")
     }
 
     private fun publishGenerationCompleted(sessionId: String, result: GenerationResult) {
-        // TODO: Publish event through EventBus
+        EventBus.publish(SDKGenerationEvent.Completed(sessionId, result))
         logger.debug("Generation completed: $sessionId")
     }
 
     private fun publishGenerationFailed(sessionId: String, error: Exception) {
-        // TODO: Publish event through EventBus
+        EventBus.publish(SDKGenerationEvent.Failed(sessionId, error))
         logger.debug("Generation failed: $sessionId - ${error.message}")
     }
 
     private fun publishGenerationCancelled(sessionId: String) {
-        // TODO: Publish event through EventBus
+        EventBus.publish(SDKGenerationEvent.Cancelled(sessionId))
         logger.debug("Generation cancelled: $sessionId")
     }
 

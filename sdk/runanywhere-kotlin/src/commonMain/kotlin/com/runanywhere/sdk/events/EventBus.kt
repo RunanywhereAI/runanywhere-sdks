@@ -24,6 +24,9 @@ object EventBus {
     private val _configurationEvents = MutableSharedFlow<SDKConfigurationEvent>()
     val configurationEvents: SharedFlow<SDKConfigurationEvent> = _configurationEvents.asSharedFlow()
 
+    private val _generationEvents = MutableSharedFlow<SDKGenerationEvent>()
+    val generationEvents: SharedFlow<SDKGenerationEvent> = _generationEvents.asSharedFlow()
+
     // Publish methods (non-suspending for easier usage)
     fun publish(event: SDKInitializationEvent) {
         _initializationEvents.tryEmit(event)
@@ -39,6 +42,10 @@ object EventBus {
 
     fun publish(event: SDKConfigurationEvent) {
         _configurationEvents.tryEmit(event)
+    }
+
+    fun publish(event: SDKGenerationEvent) {
+        _generationEvents.tryEmit(event)
     }
 
     val shared = EventBus
@@ -73,5 +80,14 @@ sealed class SDKConfigurationEvent {
     data class Updated(val key: String, val value: Any) : SDKConfigurationEvent()
 }
 
-// Import configuration data for event usage
+sealed class SDKGenerationEvent {
+    data class Started(val sessionId: String, val prompt: String) : SDKGenerationEvent()
+    data class Completed(val sessionId: String, val result: GenerationResult) : SDKGenerationEvent()
+    data class Failed(val sessionId: String, val error: Exception) : SDKGenerationEvent()
+    data class Cancelled(val sessionId: String) : SDKGenerationEvent()
+    data class PartialResult(val sessionId: String, val text: String) : SDKGenerationEvent()
+}
+
+// Import types for event usage
 typealias ConfigurationData = com.runanywhere.sdk.data.models.ConfigurationData
+typealias GenerationResult = com.runanywhere.sdk.generation.GenerationResult
