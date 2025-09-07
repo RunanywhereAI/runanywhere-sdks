@@ -99,8 +99,8 @@ struct RunAnywhereAIApp: App {
             logger.info("🚀 Starting SDK initialization...")
 
             // TODO: Replace with your actual API key for testing
-            let apiKey = "runa_prod_5hz1mIjWkH50TsdAxx487u6zcrIw8-DiePtisZk9VUg" // Replace with real API key
-            let baseURL = "https://REDACTED_URL" // Replace with your actual API URL if different
+            let apiKey = "test_api_key" // Replace with real API key
+            let baseURL = "backend_link_runanywhere.ai" // Replace with your actual API URL if different
 
             logger.debug("📋 Configuration: API Key: \(String(apiKey.prefix(10)))..., URL: \(baseURL)")
 
