@@ -26,7 +26,10 @@ rootProject.name = "RunAnywhereKotlinSDK"
 // Include JNI module
 include(":jni")
 
-// Modules temporarily disabled due to build issues
+// WhisperKit module - standalone STT module using WhisperJNI
+include(":modules:runanywhere-whisperkit")
+
+// Other modules temporarily disabled due to build issues
 // TODO: Fix module build configurations
 // include(":modules:runanywhere-core")
 // include(":modules:runanywhere-whisper-stt")

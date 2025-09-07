@@ -106,18 +106,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         }
     }
 
-    override suspend fun generate(prompt: String, options: Map<String, Any>?): String {
+    override suspend fun generate(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): String {
         requireInitialized()
 
         jvmLogger.info("Generating response for prompt: ${prompt.take(50)}...")
 
-        // Convert Map options to GenerationOptions (using defaults for now)
-        val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
-            model = options?.get("modelId") as? String,
-            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
-            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
-            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
-        )
+        // Convert RunAnywhereGenerationOptions to GenerationOptions
+        val generationOptions = options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions()
 
         // Use generation service from service container
         val result = serviceContainer.generationService.generate(prompt, generationOptions)
@@ -126,17 +121,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
-    override fun generateStream(prompt: String, options: Map<String, Any>?): Flow<String> {
+    override fun generateStream(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): Flow<String> {
         requireInitialized()
 
         jvmLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
 
-        // Convert Map options to GenerationOptions
-        val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
-            model = options?.get("modelId") as? String,
-            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
-            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
-            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
+        // Convert RunAnywhereGenerationOptions to GenerationOptions
+        val generationOptions = options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions(
         )
 
         // Use streaming service from service container

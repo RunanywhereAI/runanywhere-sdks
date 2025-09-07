@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.models
 
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -34,7 +34,11 @@ class ModelDownloader(
 
         logger.info("Downloading model ${model.id} to $destinationPath")
 
-        return downloadService.downloadModel(model, destinationPath, progressCallback)
+        // Convert Float progress to DownloadProgress and call downloadService
+        return downloadService.downloadModel(model) { downloadProgress ->
+            // Convert DownloadProgress percentage back to Float for callback
+            progressCallback(downloadProgress.percentage.toFloat())
+        }
     }
 
     /**
@@ -80,8 +84,8 @@ class ModelDownloader(
         emit(0.0f)
 
         var lastProgress = 0.0f
-        downloadService.downloadModel(model, destinationPath) { progress ->
-            lastProgress = progress
+        downloadService.downloadModel(model) { downloadProgress ->
+            lastProgress = downloadProgress.percentage.toFloat()
         }
 
         emit(lastProgress)

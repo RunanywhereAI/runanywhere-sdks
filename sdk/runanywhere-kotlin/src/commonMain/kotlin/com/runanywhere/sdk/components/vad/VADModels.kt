@@ -7,7 +7,8 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 // MARK: - VAD Configuration
 
 /**
- * Configuration for VAD component
+ * Configuration for VAD component - simplified to match iOS SimpleEnergyVAD
+ * Based on iOS VADConfiguration: energyThreshold: 0.022, sampleRate: 16000, frameLength: 0.1
  */
 data class VADConfiguration(
     // Component type
@@ -16,27 +17,25 @@ data class VADConfiguration(
     // Model ID (optional for VAD)
     override val modelId: String? = null,
 
-    // VAD parameters
-    val aggressiveness: Int = 2, // 0-3, higher = more aggressive
-    val sampleRate: Int = 16000,
-    val frameDuration: Int = 30, // ms
-    val silenceThreshold: Int = 500, // ms of silence to stop
-    val energyThreshold: Float = 0.5f,
-    val useEnhancedModel: Boolean = false
+    // Core VAD parameters matching iOS SimpleEnergyVAD
+    val energyThreshold: Float = 0.022f,  // Default matches iOS exactly
+    val sampleRate: Int = 16000,          // Default matches iOS exactly
+    val frameLength: Float = 0.1f         // Default matches iOS exactly (100ms)
 ) : ComponentConfiguration, ComponentInitParameters {
 
+    // Computed properties for compatibility and internal use
+    val frameDurationMs: Int get() = (frameLength * 1000).toInt()
+    val frameLengthSamples: Int get() = (frameLength * sampleRate).toInt()
+
     override fun validate() {
-        if (aggressiveness !in 0..3) {
-            throw SDKError.ValidationFailed("Aggressiveness must be between 0 and 3")
+        if (energyThreshold < 0.0f || energyThreshold > 1.0f) {
+            throw SDKError.ValidationFailed("Energy threshold must be between 0.0 and 1.0")
         }
         if (sampleRate <= 0 || sampleRate > 48000) {
             throw SDKError.ValidationFailed("Sample rate must be between 1 and 48000 Hz")
         }
-        if (frameDuration !in listOf(10, 20, 30)) {
-            throw SDKError.ValidationFailed("Frame duration must be 10, 20, or 30 ms")
-        }
-        if (silenceThreshold <= 0) {
-            throw SDKError.ValidationFailed("Silence threshold must be positive")
+        if (frameLength <= 0.0f || frameLength > 1.0f) {
+            throw SDKError.ValidationFailed("Frame length must be between 0.0 and 1.0 seconds")
         }
     }
 }
@@ -44,17 +43,11 @@ data class VADConfiguration(
 // MARK: - VAD Input
 
 /**
- * Input for Voice Activity Detection
+ * Input for Voice Activity Detection - simplified to match iOS pattern
  */
 data class VADInput(
-    // Audio samples to process
-    val audioSamples: FloatArray,
-
-    // Sample rate (optional, uses config if not specified)
-    val sampleRate: Int? = null,
-
-    // Frame duration in ms (optional)
-    val frameDuration: Int? = null
+    // Audio samples to process (primary input like iOS [Float] audio samples)
+    val audioSamples: FloatArray
 ) : ComponentInput {
 
     override fun validate() {
@@ -66,66 +59,65 @@ data class VADInput(
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is VADInput) return false
-        return audioSamples.contentEquals(other.audioSamples) &&
-                sampleRate == other.sampleRate &&
-                frameDuration == other.frameDuration
+        return audioSamples.contentEquals(other.audioSamples)
     }
 
     override fun hashCode(): Int {
-        var result = audioSamples.contentHashCode()
-        result = 31 * result + (sampleRate ?: 0)
-        result = 31 * result + (frameDuration ?: 0)
-        return result
+        return audioSamples.contentHashCode()
     }
 }
 
 // MARK: - VAD Output
 
 /**
- * Output from Voice Activity Detection
+ * Output from Voice Activity Detection - simplified to match iOS pattern
  */
 data class VADOutput(
-    // Whether speech is detected
+    // Whether speech is detected (primary output)
     val isSpeech: Boolean,
 
-    // Confidence score (0.0 to 1.0)
-    val confidence: Float,
-
-    // Energy level of the audio
+    // Energy level of the audio (calculated RMS)
     val energyLevel: Float,
 
-    // Speech probability (0.0 to 1.0)
-    val speechProbability: Float,
-
-    // Processing metadata
-    val metadata: VADMetadata,
+    // Confidence score (0.0 to 1.0) - derived from energy level
+    val confidence: Float = if (isSpeech) energyLevel.coerceIn(0.5f, 1.0f) else energyLevel.coerceIn(0.0f, 0.5f),
 
     // Timestamp (required by ComponentOutput)
     override val timestamp: Long = getCurrentTimeMillis()
 ) : ComponentOutput
 
-// MARK: - VAD Metadata
+// MARK: - VAD Metadata (simplified)
 
 /**
- * VAD processing metadata
+ * VAD processing metadata - simplified to essential information
  */
 data class VADMetadata(
-    val frameDuration: Int, // ms
-    val sampleRate: Int,
-    val aggressiveness: Int,
-    val processingTime: Double // in seconds
+    val frameLength: Float,     // Frame length in seconds
+    val sampleRate: Int,        // Sample rate
+    val energyThreshold: Float, // Energy threshold used
+    val processingTime: Double  // Processing time in seconds
 )
+
+// MARK: - Speech Activity Events (matching iOS patterns)
+
+/**
+ * Speech activity events matching iOS SpeechActivityEvent
+ */
+enum class SpeechActivityEvent {
+    STARTED,  // Equivalent to iOS .started
+    ENDED     // Equivalent to iOS .ended
+}
 
 // MARK: - VAD Service Protocol
 
 /**
- * Protocol for Voice Activity Detection services
+ * Protocol for Voice Activity Detection services - simplified to match iOS
  */
 interface VADService {
     // Initialize the service
     suspend fun initialize(configuration: VADConfiguration)
 
-    // Process audio chunk for voice activity
+    // Process audio chunk for voice activity (primary method)
     fun processAudioChunk(audioSamples: FloatArray): VADResult
 
     // Reset VAD state
@@ -139,6 +131,9 @@ interface VADService {
 
     // Cleanup resources
     suspend fun cleanup()
+
+    // Speech activity callback (matching iOS onSpeechActivity pattern)
+    var onSpeechActivity: ((SpeechActivityEvent) -> Unit)?
 }
 
 // MARK: - VAD Result (for compatibility)

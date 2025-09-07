@@ -27,6 +27,14 @@ object EventBus {
     private val _generationEvents = MutableSharedFlow<SDKGenerationEvent>()
     val generationEvents: SharedFlow<SDKGenerationEvent> = _generationEvents.asSharedFlow()
 
+    // Component Events - New addition for component lifecycle tracking
+    private val _componentEvents = MutableSharedFlow<ComponentEvent>()
+    val componentEvents: SharedFlow<ComponentEvent> = _componentEvents.asSharedFlow()
+
+    // Speaker Diarization Events
+    private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent>()
+    val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent> = _speakerDiarizationEvents.asSharedFlow()
+
     // Publish methods (non-suspending for easier usage)
     fun publish(event: SDKInitializationEvent) {
         _initializationEvents.tryEmit(event)
@@ -46,6 +54,14 @@ object EventBus {
 
     fun publish(event: SDKGenerationEvent) {
         _generationEvents.tryEmit(event)
+    }
+
+    fun publish(event: ComponentEvent) {
+        _componentEvents.tryEmit(event)
+    }
+
+    fun publish(event: com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent) {
+        _speakerDiarizationEvents.tryEmit(event)
     }
 
     val shared = EventBus
@@ -91,3 +107,6 @@ sealed class SDKGenerationEvent {
 // Import types for event usage
 typealias ConfigurationData = com.runanywhere.sdk.data.models.ConfigurationData
 typealias GenerationResult = com.runanywhere.sdk.generation.GenerationResult
+
+// Import ComponentEvent from STTEvents for use in EventBus
+// Note: ComponentEvent and related classes are defined in STTEvents.kt

@@ -6,7 +6,7 @@ import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

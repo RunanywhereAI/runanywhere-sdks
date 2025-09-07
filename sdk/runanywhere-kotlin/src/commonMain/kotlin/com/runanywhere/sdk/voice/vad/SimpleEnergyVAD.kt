@@ -3,50 +3,47 @@ package com.runanywhere.sdk.voice.vad
 import com.runanywhere.sdk.components.vad.VADService
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADResult
+import com.runanywhere.sdk.components.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlin.math.sqrt
 
 /**
  * Simple energy-based Voice Activity Detection
- * Based on WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
+ * Simplified implementation exactly matching iOS SimpleEnergyVAD behavior
+ * Based on iOS VADComponent with SimpleEnergyVAD service
  */
 class SimpleEnergyVAD(
-    private val sampleRate: Int = 16000,
-    frameLength: Float = 0.1f,
-    private var energyThreshold: Float = 0.022f
+    private var vadConfig: VADConfiguration = VADConfiguration()
 ) : VADService {
+
+    override val configuration: VADConfiguration
+        get() = vadConfig
 
     private val logger = SDKLogger("SimpleEnergyVAD")
 
-    // Frame configuration
-    val frameLengthSamples: Int = (frameLength * sampleRate).toInt()
-
-    // State tracking
+    // State tracking (matching iOS exactly)
     private var isActive = false
     private var isCurrentlySpeaking = false
     private var consecutiveSilentFrames = 0
     private var consecutiveVoiceFrames = 0
 
-    // Hysteresis parameters to prevent rapid on/off switching
-    private val voiceStartThreshold = 2  // frames of voice to start
-    private val voiceEndThreshold = 10   // frames of silence to end
+    // Hysteresis parameters (exactly matching iOS values)
+    private val voiceStartThreshold = 2   // frames of voice to start (iOS value)
+    private val voiceEndThreshold = 10    // frames of silence to end (iOS value)
 
-    // Callbacks
-    var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
-    var onAudioBuffer: ((ByteArray) -> Unit)? = null
+    // Speech activity callback (matching iOS onSpeechActivity pattern)
+    override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
 
     init {
-        logger.info("SimpleEnergyVAD initialized - sampleRate: $sampleRate, frameLength: $frameLengthSamples samples, threshold: $energyThreshold")
+        logger.info("SimpleEnergyVAD initialized - frameLength: ${vadConfig.frameLength}, threshold: ${vadConfig.energyThreshold}")
     }
 
     // MARK: - VADService Protocol Implementation
 
     override suspend fun initialize(configuration: VADConfiguration) {
-        // Update configuration if provided
-        configuration.frameDuration?.let {
-            // Update frame length if needed
-        }
+        this.vadConfig = configuration
         start()
+        logger.info("SimpleEnergyVAD configuration updated - threshold: ${configuration.energyThreshold}")
     }
 
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
@@ -54,17 +51,17 @@ class SimpleEnergyVAD(
             return VADResult(isSpeech = false, confidence = 0.0f)
         }
 
-        // Calculate RMS energy
-        val energy = calculateRMSEnergy(audioSamples)
+        // Calculate RMS energy using iOS-style calculation
+        val energy = calculateAverageEnergy(audioSamples)
 
-        // Determine if this frame contains voice
-        val hasVoice = energy > energyThreshold
+        // Determine if this frame contains voice (exactly matching iOS logic)
+        val hasVoice = energy > vadConfig.energyThreshold
 
-        // Update state with hysteresis
+        // Update state with hysteresis (exactly matching iOS updateSpeechState)
         updateSpeechState(hasVoice, energy)
 
         return VADResult(
-            isSpeech = hasVoice,
+            isSpeech = isCurrentlySpeaking, // Use state, not just current frame
             confidence = if (hasVoice) energy.coerceIn(0.5f, 1.0f) else energy.coerceIn(0.0f, 0.5f)
         )
     }
@@ -78,13 +75,6 @@ class SimpleEnergyVAD(
 
     override val isReady: Boolean
         get() = isActive
-
-    override val configuration: VADConfiguration?
-        get() = VADConfiguration(
-            frameDuration = frameLengthSamples * 1000 / sampleRate,
-            sampleRate = sampleRate,
-            aggressiveness = 2
-        )
 
     override suspend fun cleanup() {
         stop()
@@ -114,9 +104,9 @@ class SimpleEnergyVAD(
 
         isActive = false
 
-        // Notify if speech was active
+        // Notify if speech was active (matching iOS pattern)
         if (isCurrentlySpeaking) {
-            onSpeechActivity?.invoke(SpeechActivityEvent.SpeechEnd)
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
             isCurrentlySpeaking = false
         }
 
@@ -124,59 +114,35 @@ class SimpleEnergyVAD(
     }
 
     /**
-     * Process audio buffer for voice activity
-     */
-    suspend fun processAudioBuffer(buffer: FloatArray): Boolean {
-        if (!isActive) return false
-
-        // Calculate RMS energy
-        val energy = calculateRMSEnergy(buffer)
-
-        // Determine if this frame contains voice
-        val hasVoice = energy > energyThreshold
-
-        // Update state with hysteresis
-        updateSpeechState(hasVoice, energy)
-
-        // Convert to byte array if callback is registered
-        onAudioBuffer?.let { callback ->
-            val byteBuffer = floatArrayToByteArray(buffer)
-            callback(byteBuffer)
-        }
-
-        return hasVoice
-    }
-
-    /**
-     * Process audio buffer (byte array version)
-     */
-    suspend fun processAudioBuffer(buffer: ByteArray): Boolean {
-        val floatBuffer = byteArrayToFloatArray(buffer)
-        return processAudioBuffer(floatBuffer)
-    }
-
-    /**
-     * Set the energy threshold for voice detection
+     * Set the energy threshold for voice detection (matching iOS)
      */
     fun setEnergyThreshold(threshold: Float) {
-        energyThreshold = threshold.coerceIn(0.0f, 1.0f)
-        logger.debug("Energy threshold set to: $energyThreshold")
+        vadConfig = VADConfiguration(
+            energyThreshold = threshold.coerceIn(0.0f, 1.0f),
+            frameLength = vadConfig.frameLength
+        )
+        logger.debug("Energy threshold set to: ${vadConfig.energyThreshold}")
     }
 
     // MARK: - Private Methods
 
     /**
-     * Calculate RMS energy of audio buffer
+     * Calculate RMS energy of audio buffer - matching iOS calculateAverageEnergy
+     * iOS uses vDSP_rmsqv but we implement equivalent manual calculation
      */
-    private fun calculateRMSEnergy(buffer: FloatArray): Float {
-        if (buffer.isEmpty()) return 0.0f
+    private fun calculateAverageEnergy(signal: FloatArray): Float {
+        if (signal.isEmpty()) return 0.0f
 
+        // RMS energy calculation (exactly matching iOS formula)
+        var rmsEnergy = 0.0f
         var sum = 0.0f
-        for (sample in buffer) {
+
+        for (sample in signal) {
             sum += sample * sample
         }
 
-        return sqrt(sum / buffer.size)
+        rmsEnergy = sqrt(sum / signal.size)
+        return rmsEnergy
     }
 
     /**
@@ -190,7 +156,7 @@ class SimpleEnergyVAD(
             // Start speech if threshold met
             if (!isCurrentlySpeaking && consecutiveVoiceFrames >= voiceStartThreshold) {
                 isCurrentlySpeaking = true
-                onSpeechActivity?.invoke(SpeechActivityEvent.SpeechStart)
+                onSpeechActivity?.invoke(SpeechActivityEvent.STARTED)
                 logger.debug("Speech started (energy: $energy)")
             }
         } else {
@@ -200,47 +166,10 @@ class SimpleEnergyVAD(
             // End speech if threshold met
             if (isCurrentlySpeaking && consecutiveSilentFrames >= voiceEndThreshold) {
                 isCurrentlySpeaking = false
-                onSpeechActivity?.invoke(SpeechActivityEvent.SpeechEnd)
+                onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
                 logger.debug("Speech ended (energy: $energy)")
             }
         }
     }
 
-    /**
-     * Convert float array to byte array
-     */
-    private fun floatArrayToByteArray(floats: FloatArray): ByteArray {
-        val bytes = ByteArray(floats.size * 2) // 16-bit PCM
-
-        for (i in floats.indices) {
-            val sample = (floats[i] * 32767).toInt().coerceIn(-32768, 32767)
-            bytes[i * 2] = (sample and 0xFF).toByte()
-            bytes[i * 2 + 1] = (sample shr 8 and 0xFF).toByte()
-        }
-
-        return bytes
-    }
-
-    /**
-     * Convert byte array to float array
-     */
-    private fun byteArrayToFloatArray(bytes: ByteArray): FloatArray {
-        val floats = FloatArray(bytes.size / 2)
-
-        for (i in floats.indices) {
-            val sample = (bytes[i * 2 + 1].toInt() shl 8) or (bytes[i * 2].toInt() and 0xFF)
-            floats[i] = sample / 32768.0f
-        }
-
-        return floats
-    }
-}
-
-/**
- * Speech activity events
- */
-sealed class SpeechActivityEvent {
-    object SpeechStart : SpeechActivityEvent()
-    object SpeechEnd : SpeechActivityEvent()
-    data class EnergyUpdate(val energy: Float) : SpeechActivityEvent()
 }

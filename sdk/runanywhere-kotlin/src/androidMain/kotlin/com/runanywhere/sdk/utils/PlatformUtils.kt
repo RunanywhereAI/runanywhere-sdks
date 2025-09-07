@@ -7,7 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
-import com.runanywhere.sdk.network.SecureStorage
+import com.runanywhere.sdk.storage.SecureStorage
 import java.util.*
 
 /**

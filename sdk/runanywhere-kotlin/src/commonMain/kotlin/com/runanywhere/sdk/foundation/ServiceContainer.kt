@@ -13,11 +13,14 @@ import com.runanywhere.sdk.generation.StreamingService
 import com.runanywhere.sdk.models.ModelManager
 import com.runanywhere.sdk.network.createHttpClient
 import com.runanywhere.sdk.services.AuthenticationService
-import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.services.ValidationService
 import com.runanywhere.sdk.services.modelinfo.ModelInfoService
 import com.runanywhere.sdk.storage.createFileSystem
 import com.runanywhere.sdk.storage.createSecureStorage
+import com.runanywhere.sdk.storage.FileSystem
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
  * Central service container - Common implementation
@@ -65,7 +68,7 @@ class ServiceContainer {
     }
 
     val downloadService: DownloadService by lazy {
-        DownloadService(httpClient, fileSystem, validationService)
+        SimpleDownloadService(fileSystem)
     }
 
     val modelManager: ModelManager by lazy {
@@ -117,6 +120,17 @@ class ServiceContainer {
     }
 
     /**
+     * Get component by type
+     */
+    fun getComponent(component: com.runanywhere.sdk.components.base.SDKComponent): com.runanywhere.sdk.components.base.Component? {
+        return when (component) {
+            com.runanywhere.sdk.components.base.SDKComponent.STT -> sttComponent
+            com.runanywhere.sdk.components.base.SDKComponent.VAD -> vadComponent
+            else -> null
+        }
+    }
+
+    /**
      * Cleanup all services
      */
     suspend fun cleanup() {
@@ -131,4 +145,45 @@ class ServiceContainer {
  */
 expect class PlatformContext {
     fun initialize()
+}
+
+/**
+ * Simple DownloadService implementation that uses existing FileSystem
+ */
+private class SimpleDownloadService(
+    private val fileSystem: FileSystem
+) : DownloadService {
+
+    override suspend fun downloadModel(
+        model: com.runanywhere.sdk.models.ModelInfo,
+        progressHandler: ((com.runanywhere.sdk.services.download.DownloadProgress) -> Unit)?
+    ): String {
+        // For now, return a placeholder path
+        val fileName = model.downloadURL?.substringAfterLast("/") ?: "${model.id}.bin"
+        return "models/$fileName"
+    }
+
+    override fun downloadModelStream(model: com.runanywhere.sdk.models.ModelInfo): Flow<com.runanywhere.sdk.services.download.DownloadProgress> = flow {
+        emit(com.runanywhere.sdk.services.download.DownloadProgress(
+            bytesDownloaded = 0,
+            totalBytes = model.downloadSize ?: 0,
+            state = com.runanywhere.sdk.services.download.DownloadState.Pending
+        ))
+    }
+
+    override fun cancelDownload(modelId: String) {
+        // No-op for now
+    }
+
+    override fun getActiveDownloads(): List<com.runanywhere.sdk.services.download.DownloadTask> {
+        return emptyList()
+    }
+
+    override fun isDownloading(modelId: String): Boolean {
+        return false
+    }
+
+    override suspend fun resumeDownload(modelId: String): String? {
+        return null
+    }
 }

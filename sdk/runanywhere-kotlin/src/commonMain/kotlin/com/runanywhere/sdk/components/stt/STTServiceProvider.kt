@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.components.stt
 
-import com.runanywhere.sdk.components.base.ModuleRegistry
-import com.runanywhere.sdk.components.base.STTServiceProvider
+import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
@@ -27,7 +27,7 @@ class WhisperServiceProvider : STTServiceProvider {
          * Register this provider with the module registry
          */
         fun register() {
-            ModuleRegistry.registerSTTProvider(WhisperServiceProvider())
+            ModuleRegistry.registerSTT(WhisperServiceProvider())
         }
     }
 }

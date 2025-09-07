@@ -47,6 +47,7 @@ sealed class SDKError : Exception() {
     data class ComponentNotInitialized(override val message: String) : SDKError()
     data class ServiceNotAvailable(override val message: String) : SDKError()
     data class ComponentError(val component: String, override val message: String) : SDKError()
+    data class ComponentFailure(override val message: String) : SDKError()
 
     // Validation errors
     data class ValidationError(override val message: String) : SDKError()
@@ -61,4 +62,17 @@ sealed class SDKError : Exception() {
 
     // Loading errors
     data class LoadingFailed(override val message: String) : SDKError()
+
+    // Extension error types for public API
+    data class ComponentInitializationFailed(override val message: String) : SDKError()
+    data class SessionNotFound(override val message: String) : SDKError()
+    data class DataRetrievalFailed(override val message: String) : SDKError()
+    data class DataExportFailed(override val message: String) : SDKError()
+    data class ModelLoadFailed(override val message: String) : SDKError()
+    data class ModelOperationFailed(override val message: String) : SDKError()
+    data class PipelineNotFound(override val message: String) : SDKError()
+    data class PipelineExecutionFailed(override val message: String) : SDKError()
+    data class StructuredOutputParsingFailed(override val message: String) : SDKError()
+    data class StructuredOutputGenerationFailed(override val message: String) : SDKError()
+    data class ProcessingFailed(override val message: String) : SDKError()
 }

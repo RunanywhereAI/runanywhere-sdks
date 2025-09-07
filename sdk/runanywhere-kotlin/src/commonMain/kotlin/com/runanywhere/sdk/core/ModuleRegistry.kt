@@ -242,7 +242,7 @@ object ModuleRegistry {
  */
 interface STTServiceProvider {
     suspend fun createSTTService(configuration: STTConfiguration): STTService
-    fun canHandle(modelId: String): Boolean
+    fun canHandle(modelId: String?): Boolean
     val name: String
 }
 
@@ -298,8 +298,8 @@ interface WakeWordServiceProvider {
  * Provider for Speaker Diarization services
  */
 interface SpeakerDiarizationServiceProvider {
-    suspend fun createSpeakerDiarizationService(configuration: Any): Any // TODO: Add SpeakerDiarizationConfiguration
-    fun canHandle(modelId: String): Boolean
+    suspend fun createSpeakerDiarizationService(configuration: com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationConfiguration): com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationService
+    fun canHandle(modelId: String?): Boolean
     val name: String
 }
 

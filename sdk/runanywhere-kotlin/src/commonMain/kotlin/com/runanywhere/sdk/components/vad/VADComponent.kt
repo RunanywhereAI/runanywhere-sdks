@@ -80,20 +80,10 @@ class VADComponent(configuration: VADConfiguration) :
         // Calculate energy level (simple RMS)
         val energyLevel = calculateEnergyLevel(input.audioSamples)
 
-        // Create metadata
-        val metadata = VADMetadata(
-            frameDuration = input.frameDuration ?: vadConfiguration.frameDuration,
-            sampleRate = input.sampleRate ?: vadConfiguration.sampleRate,
-            aggressiveness = vadConfiguration.aggressiveness,
-            processingTime = processingTime
-        )
-
         return VADOutput(
             isSpeech = result.isSpeech,
-            confidence = result.confidence,
             energyLevel = energyLevel,
-            speechProbability = result.confidence, // Use confidence as speech probability
-            metadata = metadata
+            confidence = result.confidence
         )
     }
 
@@ -123,8 +113,8 @@ class VADComponent(configuration: VADConfiguration) :
 
         var isInSpeech = false
         var silenceFrames = 0
-        val silenceFramesThreshold =
-            vadConfiguration.silenceThreshold / vadConfiguration.frameDuration
+        // Use iOS-style hysteresis - 10 frames of silence to end speech
+        val silenceFramesThreshold = 10
 
         audioStream.collect { audioSamples ->
             val output = processAudioChunk(audioSamples)
@@ -158,6 +148,13 @@ class VADComponent(configuration: VADConfiguration) :
      */
     fun reset() {
         vadService?.reset()
+    }
+
+    /**
+     * Set speech activity callback (matching iOS pattern)
+     */
+    fun setSpeechActivityCallback(callback: (SpeechActivityEvent) -> Unit) {
+        vadService?.onSpeechActivity = callback
     }
 
     /**

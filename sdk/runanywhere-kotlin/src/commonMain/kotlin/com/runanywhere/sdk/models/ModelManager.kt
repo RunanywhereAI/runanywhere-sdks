@@ -8,7 +8,7 @@ import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.runanywhere.sdk.storage.FileSystem
-import com.runanywhere.sdk.services.DownloadService
+import com.runanywhere.sdk.services.download.DownloadService
 
 /**
  * Model handle for loaded models
