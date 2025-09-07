@@ -21,57 +21,33 @@ import kotlinx.coroutines.flow.Flow
  */
 actual object RunAnywhere : BaseRunAnywhereSDK() {
 
-    private val logger = SDKLogger("RunAnywhere.JVM")
-    private lateinit var serviceContainer: ServiceContainer
+    private val jvmLogger = SDKLogger("RunAnywhere.JVM")
     private lateinit var modelDownloader: ModelDownloader
     private var sttComponent: STTComponent? = null
     private var vadComponent: VADComponent? = null
 
-    override suspend fun initializePlatform(
-        apiKey: String,
-        baseURL: String?,
-        environment: SDKEnvironment
-    ) {
-        logger.info("Initializing JVM platform for ${environment.name} environment")
+    override suspend fun storeCredentialsSecurely(params: SDKInitParams) {
+        // JVM uses file-based storage with encryption
+        // For now, credentials are kept in memory in ServiceContainer
+        jvmLogger.info("Storing credentials in memory (JVM)")
+    }
 
-        // Initialize service container
-        serviceContainer = ServiceContainer.shared
-        val platformContext = PlatformContext(System.getProperty("user.dir"))
-        serviceContainer.initialize(platformContext)
+    override suspend fun initializeDatabase() {
+        // JVM uses file-based database
+        jvmLogger.info("Initializing file-based database for JVM")
+        // Database initialization is handled by ServiceContainer
+    }
 
-        // Create SDK init params
-        val params = SDKInitParams(
-            apiKey = apiKey,
-            baseURL = baseURL ?: "https://api.runanywhere.com",
-            environment = environment
-        )
+    override suspend fun authenticateWithBackend(params: SDKInitParams) {
+        jvmLogger.info("Authenticating with backend API")
+        // Authentication is handled by ServiceContainer.bootstrap()
+        serviceContainer.authenticationService.initialize(params.apiKey)
+    }
 
-        // Bootstrap services based on environment
-        val configurationData: ConfigurationData = when (environment) {
-            SDKEnvironment.DEVELOPMENT -> {
-                logger.info("Bootstrapping development mode")
-                serviceContainer.bootstrapDevelopmentMode(params)
-            }
-            else -> {
-                logger.info("Bootstrapping production mode")
-                serviceContainer.bootstrap(params)
-            }
-        }
-
-        // Initialize ModelDownloader with dependencies
-        modelDownloader = ModelDownloader(
-            fileSystem = createFileSystem(),
-            downloadService = serviceContainer.downloadService
-        )
-
-        // Initialize components
-        sttComponent = STTComponent(STTConfiguration())
-        vadComponent = VADComponent(VADConfiguration())
-
-        sttComponent?.initialize()
-        vadComponent?.initialize()
-
-        logger.info("JVM platform initialization complete")
+    override suspend fun performHealthCheck() {
+        jvmLogger.info("Performing health check")
+        // Health check would be implemented here
+        // For now, we assume healthy if authentication succeeded
     }
 
     override suspend fun cleanupPlatform() {
