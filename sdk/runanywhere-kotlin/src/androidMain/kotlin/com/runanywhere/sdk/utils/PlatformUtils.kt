@@ -114,7 +114,7 @@ actual object PlatformUtils {
 /**
  * Android implementation of secure storage using EncryptedSharedPreferences
  */
-actual class SecureStorageImpl : com.runanywhere.sdk.network.SecureStorage {
+actual class SecureStorageImpl : com.runanywhere.sdk.storage.SecureStorage {
 
     private val encryptedPrefs: SharedPreferences by lazy {
         createEncryptedSharedPreferences()
@@ -146,19 +146,23 @@ actual class SecureStorageImpl : com.runanywhere.sdk.network.SecureStorage {
         }
     }
 
-    override fun store(key: String, value: String) {
+    override suspend fun setSecureString(key: String, value: String) {
         encryptedPrefs.edit().putString(key, value).apply()
     }
 
-    override fun retrieve(key: String): String? {
+    override suspend fun getSecureString(key: String): String? {
         return encryptedPrefs.getString(key, null)
     }
 
-    override fun remove(key: String) {
+    override suspend fun removeSecure(key: String) {
         encryptedPrefs.edit().remove(key).apply()
     }
 
-    override fun clear() {
+    override suspend fun clearSecure() {
         encryptedPrefs.edit().clear().apply()
+    }
+
+    override suspend fun containsSecure(key: String): Boolean {
+        return encryptedPrefs.contains(key)
     }
 }

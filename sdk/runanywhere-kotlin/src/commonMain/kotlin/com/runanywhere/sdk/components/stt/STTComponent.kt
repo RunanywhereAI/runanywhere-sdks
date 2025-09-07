@@ -119,7 +119,7 @@ class STTComponent(
             )
         )
 
-        if (configuration.enableVAD) {
+        if (sttConfiguration.enableVAD) {
             // Use VAD for speech detection
             val vadComponent = VADComponent(VADConfiguration())
             vadComponent.initialize()

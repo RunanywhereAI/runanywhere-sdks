@@ -15,7 +15,7 @@ interface AuthenticationService {
     suspend fun refreshToken(): String
     suspend fun getAccessToken(): String
     fun isAuthenticated(): Boolean
-    fun clearAuthentication()
+    suspend fun clearAuthentication()
     suspend fun healthCheck(): HealthCheckResponse
 }
 
@@ -162,7 +162,7 @@ class DefaultAuthenticationService(
         return accessToken != null
     }
 
-    override fun clearAuthentication() {
+    override suspend fun clearAuthentication() {
         accessToken = null
         refreshToken = null
         tokenExpiresAt = null
@@ -193,7 +193,7 @@ class DefaultAuthenticationService(
                apiKey.matches(Regex("^[a-zA-Z0-9_-]+$"))
     }
 
-    private fun storeTokens(response: AuthenticationResponse) {
+    private suspend fun storeTokens(response: AuthenticationResponse) {
         val now = getCurrentTimeMillis() / 1000 // convert to seconds
 
         accessToken = response.accessToken
