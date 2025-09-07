@@ -2,9 +2,11 @@ package com.runanywhere.sdk.public
 
 import android.content.Context
 import com.runanywhere.sdk.data.models.SDKEnvironment
+import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -29,22 +31,41 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         initialize(apiKey, baseURL, environment)
     }
 
-    override suspend fun initializePlatform(
-        apiKey: String,
-        baseURL: String?,
-        environment: SDKEnvironment
-    ) {
+    private val androidLogger = SDKLogger("RunAnywhere.Android")
+
+    override suspend fun storeCredentialsSecurely(params: SDKInitParams) {
         val context = androidContext ?: throw IllegalStateException(
             "Android context not provided. Use RunAnywhere.initialize(context, ...) on Android"
         )
 
+        // Android uses Keystore for secure storage
+        androidLogger.info("Storing credentials in Android Keystore")
+        // TODO: Implement Android Keystore storage
+    }
+
+    override suspend fun initializeDatabase() {
+        val context = androidContext ?: throw IllegalStateException(
+            "Android context not provided. Use RunAnywhere.initialize(context, ...) on Android"
+        )
+
+        // Android uses Room database
+        androidLogger.info("Initializing Room database for Android")
         // Initialize Android-specific services
         val platformContext = com.runanywhere.sdk.foundation.PlatformContext(context)
         ServiceContainer.shared.initialize(platformContext)
         FileManager.initialize(context)
+    }
 
-        // TODO: Initialize other Android-specific services
-        println("Android platform initialized with API key: $apiKey")
+    override suspend fun authenticateWithBackend(params: SDKInitParams) {
+        androidLogger.info("Authenticating with backend API")
+        // Authentication is handled by ServiceContainer.bootstrap()
+        serviceContainer.authenticationService.initialize(params.apiKey)
+    }
+
+    override suspend fun performHealthCheck() {
+        androidLogger.info("Performing health check")
+        // Health check would be implemented here
+        // For now, we assume healthy if authentication succeeded
     }
 
     override suspend fun cleanupPlatform() {

@@ -28,9 +28,21 @@ class SDKLogger(private val tag: String) {
     private val platformLogger = PlatformLogger(tag)
 
     companion object {
+        // Nested LogLevel enum for easier access
+        enum class LogLevel(val value: Int) {
+            DEBUG(0),
+            INFO(1),
+            WARNING(2),
+            ERROR(3)
+        }
+
         private var currentLevel: LogLevel = LogLevel.INFO
 
         fun setLevel(level: LogLevel) {
+            currentLevel = level
+        }
+
+        fun setLogLevel(level: LogLevel) {
             currentLevel = level
         }
 

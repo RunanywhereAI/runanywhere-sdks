@@ -1,0 +1,254 @@
+package com.runanywhere.sdk.generation
+
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.events.EventBus
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+/**
+ * Service for text generation with LLM models
+ * Handles both streaming and non-streaming generation
+ */
+class GenerationService {
+
+    private val logger = SDKLogger("GenerationService")
+    private val optionsResolver = GenerationOptionsResolver()
+    private val streamingService = StreamingService()
+    private val mutex = Mutex()
+
+    // Track active generation sessions
+    private val activeSessions = mutableMapOf<String, GenerationSession>()
+    private var currentSessionId: String? = null
+
+    /**
+     * Generate text with the specified prompt and options
+     */
+    suspend fun generate(
+        prompt: String,
+        options: GenerationOptions? = null
+    ): GenerationResult {
+        val resolvedOptions = optionsResolver.resolve(options)
+        val sessionId = createSessionId()
+
+        logger.info("Starting generation session: $sessionId")
+
+        val session = GenerationSession(
+            id = sessionId,
+            prompt = prompt,
+            options = resolvedOptions,
+            startTime = System.currentTimeMillis()
+        )
+
+        mutex.withLock {
+            activeSessions[sessionId] = session
+        }
+
+        try {
+            // Publish generation started event
+            publishGenerationStarted(sessionId, prompt)
+
+            // Perform generation (mock implementation for now)
+            val response = performGeneration(prompt, resolvedOptions)
+
+            val result = GenerationResult(
+                text = response,
+                tokensUsed = calculateTokens(prompt, response),
+                latencyMs = System.currentTimeMillis() - session.startTime,
+                sessionId = sessionId,
+                model = resolvedOptions.model
+            )
+
+            // Publish generation completed event
+            publishGenerationCompleted(sessionId, result)
+
+            return result
+
+        } catch (e: Exception) {
+            logger.error("Generation failed for session $sessionId: ${e.message}")
+            publishGenerationFailed(sessionId, e)
+            throw e
+        } finally {
+            mutex.withLock {
+                activeSessions.remove(sessionId)
+            }
+        }
+    }
+
+    /**
+     * Stream text generation
+     */
+    fun streamGenerate(
+        prompt: String,
+        options: GenerationOptions? = null
+    ): Flow<GenerationChunk> = flow {
+        val resolvedOptions = optionsResolver.resolve(options)
+        val sessionId = createSessionId()
+
+        logger.info("Starting streaming generation session: $sessionId")
+
+        val session = GenerationSession(
+            id = sessionId,
+            prompt = prompt,
+            options = resolvedOptions,
+            startTime = System.currentTimeMillis(),
+            isStreaming = true
+        )
+
+        mutex.withLock {
+            activeSessions[sessionId] = session
+        }
+
+        try {
+            // Publish generation started event
+            publishGenerationStarted(sessionId, prompt)
+
+            // Stream generation
+            streamingService.stream(prompt, resolvedOptions).collect { chunk ->
+                emit(chunk)
+
+                // Update session with partial response
+                session.partialResponse += chunk.text
+            }
+
+            // Publish generation completed event
+            val result = GenerationResult(
+                text = session.partialResponse,
+                tokensUsed = calculateTokens(prompt, session.partialResponse),
+                latencyMs = System.currentTimeMillis() - session.startTime,
+                sessionId = sessionId,
+                model = resolvedOptions.model
+            )
+            publishGenerationCompleted(sessionId, result)
+
+        } catch (e: Exception) {
+            logger.error("Streaming generation failed for session $sessionId: ${e.message}")
+            publishGenerationFailed(sessionId, e)
+            throw e
+        } finally {
+            mutex.withLock {
+                activeSessions.remove(sessionId)
+            }
+        }
+    }
+
+    /**
+     * Cancel an active generation session
+     */
+    suspend fun cancelGeneration(sessionId: String): Boolean {
+        return mutex.withLock {
+            activeSessions.remove(sessionId)?.let { session ->
+                logger.info("Cancelled generation session: $sessionId")
+                publishGenerationCancelled(sessionId)
+                true
+            } ?: false
+        }
+    }
+
+    /**
+     * Get active generation sessions
+     */
+    fun getActiveSessions(): List<GenerationSession> {
+        return activeSessions.values.toList()
+    }
+
+    // Private helpers
+
+    private suspend fun performGeneration(
+        prompt: String,
+        options: GenerationOptions
+    ): String {
+        // TODO: Implement actual generation with LLM service
+        // This is a placeholder implementation
+        kotlinx.coroutines.delay(100) // Simulate processing
+        return "Generated response for: $prompt"
+    }
+
+    private fun calculateTokens(prompt: String, response: String): Int {
+        // Simple token estimation (4 chars per token on average)
+        return (prompt.length + response.length) / 4
+    }
+
+    private fun createSessionId(): String {
+        return "gen_${System.currentTimeMillis()}_${(0..9999).random()}"
+    }
+
+    private fun publishGenerationStarted(sessionId: String, prompt: String) {
+        // TODO: Publish event through EventBus
+        logger.debug("Generation started: $sessionId")
+    }
+
+    private fun publishGenerationCompleted(sessionId: String, result: GenerationResult) {
+        // TODO: Publish event through EventBus
+        logger.debug("Generation completed: $sessionId")
+    }
+
+    private fun publishGenerationFailed(sessionId: String, error: Exception) {
+        // TODO: Publish event through EventBus
+        logger.debug("Generation failed: $sessionId - ${error.message}")
+    }
+
+    private fun publishGenerationCancelled(sessionId: String) {
+        // TODO: Publish event through EventBus
+        logger.debug("Generation cancelled: $sessionId")
+    }
+
+    /**
+     * Cancel the current generation session
+     */
+    fun cancelCurrent() {
+        currentSessionId?.let { sessionId ->
+            activeSessions.remove(sessionId)
+            currentSessionId = null
+            publishGenerationCancelled(sessionId)
+        }
+    }
+}
+
+/**
+ * Generation session tracking
+ */
+data class GenerationSession(
+    val id: String,
+    val prompt: String,
+    val options: GenerationOptions,
+    val startTime: Long,
+    val isStreaming: Boolean = false,
+    var partialResponse: String = ""
+)
+
+/**
+ * Generation result
+ */
+data class GenerationResult(
+    val text: String,
+    val tokensUsed: Int,
+    val latencyMs: Long,
+    val sessionId: String,
+    val model: String?,
+    val savedAmount: Double = 0.0
+)
+
+/**
+ * Generation chunk for streaming
+ */
+data class GenerationChunk(
+    val text: String,
+    val isComplete: Boolean = false,
+    val tokenCount: Int = 0
+)
+
+/**
+ * Generation options
+ */
+data class GenerationOptions(
+    val model: String? = null,
+    val temperature: Float = 0.7f,
+    val maxTokens: Int = 1000,
+    val topP: Float = 0.9f,
+    val topK: Int = 40,
+    val stopSequences: List<String> = emptyList(),
+    val streaming: Boolean = false,
+    val seed: Int? = null
+)
