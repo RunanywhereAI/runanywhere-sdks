@@ -6,6 +6,8 @@ import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.ComponentInitializationEvent
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 
@@ -51,6 +53,10 @@ interface ComponentAdapter<ServiceType : Any> {
 
 enum class ComponentState {
     NOT_INITIALIZED,
+    CHECKING,
+    DOWNLOAD_REQUIRED,
+    DOWNLOADING,
+    DOWNLOADED,
     INITIALIZING,
     READY,
     PROCESSING,
@@ -65,15 +71,31 @@ enum class SDKComponent {
     TTS,
     LLM,
     VLM,
-    WAKEWORD
+    WAKEWORD,
+    SPEAKER_DIARIZATION
 }
 
-// MARK: - Component Health
+// MARK: - Component Health and Status
 
 data class ComponentHealth(
     val isHealthy: Boolean,
     val details: String
 )
+
+/**
+ * Comprehensive component status matching iOS ComponentStatus
+ */
+data class ComponentStatus(
+    val state: ComponentState,
+    val progress: Float? = null,
+    val error: Throwable? = null,
+    val timestamp: Long = getCurrentTimeMillis(),
+    val currentStage: String? = null,
+    val metadata: Map<String, Any>? = null
+) {
+    val isHealthy: Boolean
+        get() = state != ComponentState.FAILED && error == null
+}
 
 // MARK: - Component Protocol
 
@@ -114,7 +136,7 @@ class AnyServiceWrapper<T : Any> : ServiceWrapper<T> {
  */
 abstract class BaseComponent<TService : Any>(
     protected val configuration: ComponentConfiguration,
-    protected var serviceContainer: ServiceContainer? = null
+    serviceContainer: ServiceContainer? = null
 ) : Component {
 
     // MARK: - Core Properties
@@ -147,16 +169,25 @@ abstract class BaseComponent<TService : Any>(
     protected val eventBus = EventBus
 
     /**
+     * Service container reference (can be null for better memory management)
+     */
+    private var serviceContainer: ServiceContainer? = null
+
+    /**
      * Current processing stage
      */
     protected var currentStage: String? = null
 
+    /**
+     * Component status with metadata tracking
+     */
+    private var _status: ComponentStatus = ComponentStatus(ComponentState.NOT_INITIALIZED)
+    val status: ComponentStatus get() = _status
+
     // MARK: - Initialization
 
     init {
-        if (serviceContainer == null) {
-            serviceContainer = ServiceContainer.instance
-        }
+        this.serviceContainer = serviceContainer ?: ServiceContainer.shared
     }
 
     // MARK: - Lifecycle
@@ -186,13 +217,18 @@ abstract class BaseComponent<TService : Any>(
         try {
             // Stage: Validation
             currentStage = "validation"
-            // Note: Component events need proper EventBus integration
-            // TODO: Add component-specific event publishing when EventBus supports ComponentEvents
+            eventBus.publish(ComponentInitializationEvent.ComponentChecking(
+                component = componentType,
+                modelId = parameters.modelId
+            ))
             configuration.validate()
 
             // Stage: Service Creation
             currentStage = "service_creation"
-            // TODO: Add component initialization event publishing
+            eventBus.publish(ComponentInitializationEvent.ComponentInitializing(
+                component = componentType,
+                modelId = parameters.modelId
+            ))
             service = createService()
 
             // Stage: Service Initialization
@@ -202,10 +238,23 @@ abstract class BaseComponent<TService : Any>(
             // Component ready
             currentStage = null
             updateState(ComponentState.READY)
-            // TODO: Add component ready event publishing
+            eventBus.publish(ComponentInitializationEvent.ComponentReady(
+                component = componentType,
+                modelId = parameters.modelId
+            ))
         } catch (e: Exception) {
+            // Update status with error information
+            _status = ComponentStatus(
+                state = ComponentState.FAILED,
+                error = e,
+                currentStage = currentStage,
+                timestamp = getCurrentTimeMillis()
+            )
             updateState(ComponentState.FAILED)
-            // TODO: Add component failure event publishing
+            eventBus.publish(ComponentInitializationEvent.ComponentFailed(
+                component = componentType,
+                error = e
+            ))
             throw e
         }
     }
@@ -224,12 +273,12 @@ abstract class BaseComponent<TService : Any>(
     }
 
     /**
-     * Cleanup
+     * Cleanup - Enhanced with proper resource management
      */
     override suspend fun cleanup() {
         if (state == ComponentState.NOT_INITIALIZED) return
 
-        state = ComponentState.NOT_INITIALIZED
+        updateState(ComponentState.NOT_INITIALIZED)
 
         // Allow subclass to perform cleanup
         performCleanup()
@@ -237,7 +286,11 @@ abstract class BaseComponent<TService : Any>(
         // Clear service reference
         service = null
 
-        state = ComponentState.NOT_INITIALIZED
+        // Clear service container reference for better memory management
+        serviceContainer = null
+
+        // Reset current stage
+        currentStage = null
     }
 
     /**
@@ -272,17 +325,51 @@ abstract class BaseComponent<TService : Any>(
     private fun updateState(newState: ComponentState) {
         val oldState = state
         state = newState
-        // TODO: Add component state change event publishing
+
+        // Update component status with metadata
+        _status = ComponentStatus(
+            state = newState,
+            currentStage = currentStage,
+            timestamp = getCurrentTimeMillis()
+        )
+
+        eventBus.publish(ComponentInitializationEvent.ComponentStateChanged(
+            component = componentType,
+            oldState = oldState,
+            newState = newState
+        ))
     }
 
     // MARK: - Component Protocol Requirements
 
     /**
-     * Health check implementation
+     * Health check implementation - Enhanced with comprehensive status
      */
     override suspend fun healthCheck(): ComponentHealth {
-        return ComponentHealth(isReady, "Component state: ${state.name}")
+        return ComponentHealth(
+            isHealthy = status.isHealthy,
+            details = buildString {
+                append("Component: $componentType, ")
+                append("State: ${state.name}")
+                if (currentStage != null) {
+                    append(", Stage: $currentStage")
+                }
+                if (status.error != null) {
+                    append(", Error: ${status.error?.message}")
+                }
+            }
+        )
     }
+
+    /**
+     * Get detailed component status
+     */
+    fun getDetailedStatus(): ComponentStatus = status
+
+    /**
+     * Safely get service container (null if cleaned up)
+     */
+    protected fun getServiceContainer(): ServiceContainer? = serviceContainer
 
     /**
      * State transition handler
@@ -307,42 +394,69 @@ private class EmptyComponentParameters : ComponentInitParameters {
 
 // MARK: - SDK Errors - using the central SDKError from data.models package
 
-// MARK: - Service Container
-
-object ServiceContainer {
-    val instance: ServiceContainer = this
-    private val services = mutableMapOf<String, Any>()
-
-    fun <T : Any> register(key: String, service: T) {
-        services[key] = service
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    fun <T : Any> get(key: String): T? {
-        return services[key] as? T
-    }
-}
 
 // MARK: - Module Registry
 
+/**
+ * Enhanced Module Registry supporting multiple providers per component type
+ * Matches iOS ModuleRegistry architecture with plugin support
+ */
 object ModuleRegistry {
-    private var sttProvider: STTServiceProvider? = null
-    private var vadProvider: VADServiceProvider? = null
+    private val sttProviders = mutableListOf<STTServiceProvider>()
+    private val vadProviders = mutableListOf<VADServiceProvider>()
 
+    /**
+     * Register STT provider (supports multiple providers)
+     */
     fun registerSTTProvider(provider: STTServiceProvider) {
-        sttProvider = provider
+        sttProviders.add(provider)
     }
 
+    /**
+     * Register VAD provider (supports multiple providers)
+     */
     fun registerVADProvider(provider: VADServiceProvider) {
-        vadProvider = provider
+        vadProviders.add(provider)
     }
 
-    fun sttProvider(modelId: String?): STTServiceProvider? {
-        return sttProvider?.takeIf { it.canHandle(modelId) }
+    /**
+     * Get STT provider for specific model (returns first matching provider)
+     */
+    fun sttProvider(modelId: String? = null): STTServiceProvider? {
+        return if (modelId != null) {
+            sttProviders.firstOrNull { it.canHandle(modelId) }
+        } else {
+            sttProviders.firstOrNull()
+        }
     }
 
-    fun vadProvider(modelId: String?): VADServiceProvider? {
-        return vadProvider?.takeIf { it.canHandle(modelId) }
+    /**
+     * Get VAD provider for specific model (returns first matching provider)
+     */
+    fun vadProvider(modelId: String? = null): VADServiceProvider? {
+        return if (modelId != null) {
+            vadProviders.firstOrNull { it.canHandle(modelId) }
+        } else {
+            vadProviders.firstOrNull()
+        }
+    }
+
+    /**
+     * Get all STT providers
+     */
+    fun sttProviders(): List<STTServiceProvider> = sttProviders.toList()
+
+    /**
+     * Get all VAD providers
+     */
+    fun vadProviders(): List<VADServiceProvider> = vadProviders.toList()
+
+    /**
+     * Clear all providers (for testing)
+     */
+    fun clear() {
+        sttProviders.clear()
+        vadProviders.clear()
     }
 }
 

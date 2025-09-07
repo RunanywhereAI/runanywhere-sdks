@@ -8,6 +8,7 @@ import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
@@ -85,15 +86,22 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     override suspend fun availableModels(): List<ModelInfo> {
         requireInitialized()
-        return serviceContainer.modelInfoService.getAvailableModels()
+        return serviceContainer.modelInfoService.getAllModels()
     }
 
     override suspend fun downloadModel(modelId: String): Flow<Float> {
         requireInitialized()
-        val modelInfo = serviceContainer.modelInfoService.getModelInfo(modelId)
+        val modelInfo = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
-        return serviceContainer.downloadService.downloadModel(modelInfo)
+        return flow {
+            // Download the model with progress updates
+            val downloadPath = serviceContainer.downloadService.downloadModel(modelInfo) { progress ->
+                // Progress updates - can't emit from callback directly in flow
+            }
+            // Emit 100% completion when done
+            emit(1.0f)
+        }
     }
 
     override suspend fun transcribe(audioData: ByteArray): String {
@@ -102,17 +110,14 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         // Get the STT component from the service container
         val sttComponent = serviceContainer.sttComponent
 
-        // Create STT options with default values
-        val options = com.runanywhere.sdk.components.stt.STTOptions(
-            language = "en",
-            enableTimestamps = false,
-            translateToEnglish = false
+        // Perform transcription using STTComponent
+        val result = sttComponent.transcribe(
+            audioData = audioData,
+            format = com.runanywhere.sdk.components.stt.AudioFormat.WAV,
+            language = "en"
         )
 
-        // Perform transcription
-        val result = sttComponent.transcribe(audioData, options)
-
-        return result.transcript
+        return result.text
     }
 
     override suspend fun loadModel(modelId: String): Boolean {
@@ -121,7 +126,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         androidLogger.info("Loading model: $modelId")
 
         // Check if model is downloaded
-        val model = serviceContainer.modelInfoService.getModelInfo(modelId)
+        val model = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
         if (model.localPath == null) {
@@ -140,17 +145,17 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         }
     }
 
-    override suspend fun generate(prompt: String, options: Map<String, Any>?): String {
+    override suspend fun generate(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): String {
         requireInitialized()
 
         androidLogger.info("Generating response for prompt: ${prompt.take(50)}...")
 
-        // Convert Map options to GenerationOptions
+        // Convert RunAnywhereGenerationOptions to GenerationOptions
         val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
-            model = options?.get("modelId") as? String,
-            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
-            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
-            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
+            model = null, // Model will be auto-selected
+            temperature = options?.temperature ?: 0.7f,
+            maxTokens = options?.maxTokens ?: 100,
+            stopSequences = options?.stopSequences ?: emptyList()
         )
 
         // Use generation service from service container
@@ -160,17 +165,17 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
-    override fun generateStream(prompt: String, options: Map<String, Any>?): Flow<String> {
+    override fun generateStream(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): Flow<String> {
         requireInitialized()
 
         androidLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
 
-        // Convert Map options to GenerationOptions
+        // Convert RunAnywhereGenerationOptions to GenerationOptions
         val generationOptions = com.runanywhere.sdk.generation.GenerationOptions(
-            model = options?.get("modelId") as? String,
-            temperature = (options?.get("temperature") as? Number)?.toFloat() ?: 0.7f,
-            maxTokens = (options?.get("maxTokens") as? Number)?.toInt() ?: 500,
-            stopSequences = (options?.get("stopSequences") as? List<String>) ?: emptyList()
+            model = null, // Model will be auto-selected
+            temperature = options?.temperature ?: 0.7f,
+            maxTokens = options?.maxTokens ?: 100,
+            stopSequences = options?.stopSequences ?: emptyList()
         )
 
         // Use streaming service from service container

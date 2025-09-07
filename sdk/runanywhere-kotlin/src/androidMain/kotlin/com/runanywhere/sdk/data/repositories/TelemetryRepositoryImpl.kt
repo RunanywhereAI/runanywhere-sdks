@@ -101,8 +101,7 @@ class TelemetryRepositoryImpl(
                 timestamp = event.timestamp,
                 duration = event.duration,
                 success = event.success,
-                error = if (!event.success) "Event failed" else null,
-                errorMessage = null,
+                errorMessage = if (!event.success) "Event failed" else null,
                 isSent = false,
                 sentAt = null,
                 retryCount = 0
@@ -125,23 +124,19 @@ class TelemetryRepositoryImpl(
 
     override suspend fun sendBatch(batch: TelemetryBatch) {
         try {
-            val response = networkService.sendTelemetryBatch(batch)
-            if (response.isSuccessful) {
-                // Mark events as sent
-                val eventIds = batch.events.map { it.id }
-                markEventsSent(eventIds, System.currentTimeMillis())
-                logger.info("Successfully sent batch of ${batch.events.size} telemetry events")
-            } else {
-                logger.error("Failed to send telemetry batch: ${response.errorMessage}")
-                throw RuntimeException("Failed to send telemetry batch: ${response.errorMessage}")
-            }
+            // Send telemetry batch using generic post method
+            networkService.post<TelemetryBatch, Unit>("/telemetry/batch", batch, requiresAuth = true)
+            // Mark events as sent
+            val eventIds = batch.events.map { it.id }
+            markEventsSent(eventIds, System.currentTimeMillis())
+            logger.info("Successfully sent batch of ${batch.events.size} telemetry events")
         } catch (e: Exception) {
             logger.error("Failed to send telemetry batch", e)
             throw e
         }
     }
 
-    override suspend fun getEventCount(): Int {
+    suspend fun getEventCount(): Int {
         return try {
             database.telemetryDao().getEventCount()
         } catch (e: Exception) {
@@ -150,7 +145,7 @@ class TelemetryRepositoryImpl(
         }
     }
 
-    override suspend fun getUnsentEventCount(): Int {
+    suspend fun getUnsentEventCount(): Int {
         return try {
             database.telemetryDao().getUnsentEventCount()
         } catch (e: Exception) {

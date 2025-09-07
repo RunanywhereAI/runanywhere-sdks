@@ -5,9 +5,9 @@ import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADInput
 import com.runanywhere.sdk.components.vad.VADOutput
 import com.runanywhere.sdk.components.vad.VADMetadata
+import com.runanywhere.sdk.components.vad.SpeechActivityEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.voice.vad.SimpleEnergyVAD
-import com.runanywhere.sdk.voice.vad.SpeechActivityEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -54,32 +54,18 @@ class VADHandler(
             return vadComponent.process(input) as? VADOutput
                 ?: VADOutput(
                     isSpeech = false,
-                    confidence = 0.0f,
-                    energyLevel = 0.0f,
-                    speechProbability = 0.0f,
-                    metadata = VADMetadata(
-                        frameDuration = 100,
-                        sampleRate = 16000,
-                        aggressiveness = 2,
-                        processingTime = 0.0
-                    )
+                    energyLevel = 0.0f
                 )
         }
 
         // Fallback to SimpleVAD
         if (simpleVAD != null) {
-            val isSpeech = simpleVAD.processAudioBuffer(audioData)
+            val floatArray = byteArrayToFloatArray(audioData)
+            val result = simpleVAD.processAudioChunk(floatArray)
+            val isSpeech = result.isSpeech
             return VADOutput(
                 isSpeech = isSpeech,
-                confidence = if (isSpeech) 0.9f else 0.1f,
-                energyLevel = 0.5f, // TODO: Get actual energy from SimpleVAD
-                speechProbability = if (isSpeech) 0.9f else 0.1f,
-                metadata = VADMetadata(
-                    frameDuration = 100,
-                    sampleRate = 16000,
-                    aggressiveness = 2,
-                    processingTime = 0.0
-                )
+                energyLevel = 0.5f // TODO: Get actual energy from SimpleVAD
             )
         }
 
@@ -87,15 +73,7 @@ class VADHandler(
         logger.warning("No VAD available, assuming speech")
         return VADOutput(
             isSpeech = true,
-            confidence = 0.5f,
-            energyLevel = 0.5f,
-            speechProbability = 0.5f,
-            metadata = VADMetadata(
-                frameDuration = 100,
-                sampleRate = 16000,
-                aggressiveness = 2,
-                processingTime = 0.0
-            )
+            energyLevel = 0.5f
         )
     }
 
@@ -234,17 +212,14 @@ class VADHandler(
 
     private fun handleSpeechActivityEvent(event: SpeechActivityEvent) {
         when (event) {
-            is SpeechActivityEvent.SpeechStart -> {
+            SpeechActivityEvent.STARTED -> {
                 speechStartTime = System.currentTimeMillis()
                 onSpeechStart?.invoke()
             }
-            is SpeechActivityEvent.SpeechEnd -> {
+            SpeechActivityEvent.ENDED -> {
                 speechEndTime = System.currentTimeMillis()
                 val duration = speechEndTime!! - (speechStartTime ?: speechEndTime!!)
                 onSpeechEnd?.invoke(duration)
-            }
-            is SpeechActivityEvent.EnergyUpdate -> {
-                // Log energy updates if needed
             }
         }
     }

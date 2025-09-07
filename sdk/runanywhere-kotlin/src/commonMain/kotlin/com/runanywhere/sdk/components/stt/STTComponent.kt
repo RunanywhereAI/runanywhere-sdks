@@ -3,284 +3,341 @@ package com.runanywhere.sdk.components.stt
 import com.runanywhere.sdk.components.base.BaseComponent
 import com.runanywhere.sdk.components.base.ComponentState
 import com.runanywhere.sdk.components.base.SDKComponent
-import com.runanywhere.sdk.components.vad.VADComponent
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.data.models.LoadedModel
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
-import com.runanywhere.sdk.files.FileManager
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import kotlinx.coroutines.flow.Flow
 
 /**
- * Speech-to-Text component matching Swift SDK architecture
+ * Speech-to-Text component matching iOS STTComponent architecture exactly
  */
 class STTComponent(
     private val sttConfiguration: STTConfiguration
-) : BaseComponent<STTService>(sttConfiguration) {
+) : BaseComponent<STTServiceWrapper>(sttConfiguration) {
 
     override val componentType: SDKComponent = SDKComponent.STT
 
     private val logger = com.runanywhere.sdk.foundation.SDKLogger("STTComponent")
-    private var currentModel: LoadedModel? = null
-    private lateinit var sttService: STTService
-    private var analyticsCallback: ((String, Map<String, Any>) -> Unit)? = null
+    private var isModelLoaded = false
+    private var modelPath: String? = null
 
-    override suspend fun createService(): STTService {
-        return WhisperSTTService()
+    override suspend fun createService(): STTServiceWrapper {
+        // Try to get a registered STT provider from central registry
+        val provider = ModuleRegistry.sttProvider(sttConfiguration.modelId)
+            ?: throw SDKError.ComponentNotInitialized(
+                "No STT service provider registered. Please register an STT service provider."
+            )
+
+        // Check if model needs downloading
+        sttConfiguration.modelId?.let { modelId ->
+            modelPath = modelId
+            // Provider should handle model management
+        }
+
+        // Create service through provider
+        val sttService = provider.createSTTService(sttConfiguration)
+
+        // Wrap the service
+        val wrapper = STTServiceWrapper(sttService)
+
+        // Service is already initialized by the provider
+        isModelLoaded = true
+
+        return wrapper
     }
 
     override suspend fun initializeService() {
-        // Create STT service based on configuration
-        sttService = createService()
-
-        // Initialize with model if specified
-        sttConfiguration.modelId?.let { modelId ->
-            val modelPath = getModelPath(modelId)
-            sttService.initialize(modelPath)
-        }
-    }
-
-    suspend fun transcribe(audioData: ByteArray): TranscriptionResult {
-        return transcribe(
-            audioData, STTOptions(
-                language = sttConfiguration.language,
-                enableTimestamps = sttConfiguration.enableTimestamps
-            )
-        )
-    }
-
-    suspend fun transcribe(audioData: ByteArray, options: STTOptions): TranscriptionResult {
-        requireReady()
-
-        val startTime = getCurrentTimeMillis()
-
-        // Send analytics event for transcription start
-        analyticsCallback?.invoke(
-            "transcription_started", mapOf(
-                "audio_size_bytes" to audioData.size,
-                "model_id" to (currentModel?.model?.id ?: "unknown"),
-                "session_id" to generateSessionId(),
-                "timestamp" to startTime,
-                "sensitivity_mode" to options.sensitivityMode.toString()
-            )
-        )
-
-        val result = sttService.transcribe(audioData, options)
-
-        val endTime = getCurrentTimeMillis()
-        val duration = endTime - startTime
-
-        // Send analytics event for transcription completed
-        analyticsCallback?.invoke(
-            "transcription_completed", mapOf(
-                "duration" to duration,
-                "text_length" to result.transcript.length,
-                "confidence" to (result.confidence ?: 0.0f),
-                "language" to (result.language ?: "unknown"),
-                "model_id" to (currentModel?.model?.id ?: "unknown"),
-                "session_id" to generateSessionId(),
-                "timestamp" to endTime,
-                "audio_duration_ms" to estimateAudioDuration(audioData.size),
-                "has_timestamps" to (result.timestamps?.isNotEmpty() == true),
-                "sensitivity_mode" to options.sensitivityMode.toString()
-            )
-        )
-
-        // Convert STTTranscriptionResult to TranscriptionResult
-        return TranscriptionResult(
-            text = result.transcript,
-            confidence = result.confidence ?: 0.0f,
-            language = result.language,
-            timestamps = result.timestamps?.map {
-                WordTimestamp(
-                    word = it.word,
-                    startTime = it.startTime.toDouble(),
-                    endTime = it.endTime.toDouble(),
-                    confidence = it.confidence ?: 0.0f
-                )
-            }
-        )
-    }
-
-    fun transcribeStream(audioStream: Flow<ByteArray>): Flow<TranscriptionEvent> = flow {
-        requireReady()
-
-        val sessionId = generateSessionId()
-        val streamStartTime = getCurrentTimeMillis()
-
-        // Send analytics event for stream start
-        analyticsCallback?.invoke(
-            "stream_transcription_started", mapOf(
-                "session_id" to sessionId,
-                "timestamp" to streamStartTime,
-                "model_id" to (currentModel?.model?.id ?: "unknown"),
-                "vad_enabled" to true
-            )
-        )
-
-        if (sttConfiguration.enableVAD) {
-            // Use VAD for speech detection
-            val vadComponent = VADComponent(VADConfiguration())
-            vadComponent.initialize()
-
-            var isInSpeech = false
-            val audioBuffer = mutableListOf<ByteArray>()
-            var speechSegmentStartTime: Long? = null
-            var totalChunksProcessed = 0
-
-            audioStream.collect { chunk ->
-                totalChunksProcessed++
-                val floatAudio = chunk.toFloatArray()
-                val vadResult = vadComponent.processAudioChunk(floatAudio)
-
-                when {
-                    vadResult.isSpeech && !isInSpeech -> {
-                        isInSpeech = true
-                        speechSegmentStartTime = getCurrentTimeMillis()
-                        audioBuffer.clear()
-                        audioBuffer.add(chunk)
-                        emit(TranscriptionEvent.SpeechStart)
-
-                        // Send analytics for speech start
-                        analyticsCallback?.invoke(
-                            "speech_segment_started", mapOf(
-                                "session_id" to sessionId,
-                                "timestamp" to speechSegmentStartTime!!,
-                                "chunk_number" to totalChunksProcessed
-                            )
-                        )
-                    }
-
-                    vadResult.isSpeech && isInSpeech -> {
-                        audioBuffer.add(chunk)
-                        // Emit partial if buffer is large enough
-                        if (audioBuffer.size > 5) {
-                            val partial = transcribeBuffer(audioBuffer)
-                            emit(TranscriptionEvent.PartialTranscription(partial))
-
-                            // Send analytics for partial transcription
-                            analyticsCallback?.invoke(
-                                "partial_transcription", mapOf(
-                                    "session_id" to sessionId,
-                                    "timestamp" to getCurrentTimeMillis(),
-                                    "text_length" to partial.length,
-                                    "buffer_size" to audioBuffer.size
-                                )
-                            )
-                        }
-                    }
-
-                    !vadResult.isSpeech && isInSpeech -> {
-                        isInSpeech = false
-                        val speechEndTime = getCurrentTimeMillis()
-                        val speechDuration = speechSegmentStartTime?.let { speechEndTime - it }
-
-                        if (audioBuffer.isNotEmpty()) {
-                            val final = transcribeBuffer(audioBuffer)
-                            emit(TranscriptionEvent.FinalTranscription(final))
-                            emit(TranscriptionEvent.SpeechEnd)
-
-                            // Send analytics for speech segment completion
-                            analyticsCallback?.invoke(
-                                "speech_segment_completed", mapOf<String, Any>(
-                                    "session_id" to sessionId,
-                                    "timestamp" to speechEndTime,
-                                    "speech_duration" to (speechDuration ?: 0L),
-                                    "final_text_length" to final.length,
-                                    "buffer_chunks" to audioBuffer.size,
-                                    "estimated_audio_duration" to estimateAudioDuration(audioBuffer.sumOf { it.size })
-                                )
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Send stream completion analytics
-            analyticsCallback?.invoke(
-                "stream_transcription_completed", mapOf(
-                    "session_id" to sessionId,
-                    "timestamp" to getCurrentTimeMillis(),
-                    "total_duration" to (getCurrentTimeMillis() - streamStartTime),
-                    "total_chunks_processed" to totalChunksProcessed
-                )
-            )
-
-        } else {
-            // Direct transcription without VAD
-            var chunkCount = 0
-            audioStream.collect { chunk ->
-                chunkCount++
-                val result = sttService.transcribe(chunk, STTOptions())
-                emit(TranscriptionEvent.FinalTranscription(result.transcript))
-
-                // Send analytics for direct transcription
-                analyticsCallback?.invoke(
-                    "direct_transcription", mapOf(
-                        "session_id" to sessionId,
-                        "timestamp" to getCurrentTimeMillis(),
-                        "chunk_number" to chunkCount,
-                        "text_length" to result.transcript.length
-                    )
-                )
-            }
-        }
-    }
-
-    fun setCurrentModel(model: LoadedModel) {
-        currentModel = model
-    }
-
-    fun getCurrentModel(): LoadedModel? = currentModel
-
-    fun isInitialized(): Boolean = state == ComponentState.READY
-
-    /**
-     * Load a model into the STT service
-     */
-    suspend fun loadModel(modelPath: String) {
-        // Initialize component if not ready
-        if (state == ComponentState.NOT_INITIALIZED) {
-            initialize()
-        }
-        requireReady()
-        sttService.initialize(modelPath)
-        logger.info("Loaded STT model from $modelPath")
-    }
-
-    /**
-     * Set analytics callback for STT events
-     */
-    fun setAnalyticsCallback(callback: (String, Map<String, Any>) -> Unit) {
-        analyticsCallback = callback
+        // Service creation already handles initialization
+        logger.info("STT component initialized with model: ${sttConfiguration.modelId}")
     }
 
     override suspend fun cleanup() {
-        sttService.cleanup()
+        service?.wrappedService?.cleanup()
+        isModelLoaded = false
+        modelPath = null
         state = ComponentState.NOT_INITIALIZED
+        logger.info("STT component cleaned up")
     }
 
-    private fun createSTTService(config: STTConfiguration): STTService {
-        // Create Whisper STT service
-        return WhisperSTTService()
+    // MARK: - Public API (matches iOS STTComponent)
+
+    /**
+     * Transcribe audio data
+     */
+    suspend fun transcribe(
+        audioData: ByteArray,
+        format: AudioFormat = AudioFormat.WAV,
+        language: String? = null
+    ): STTOutput {
+        requireReady()
+
+        val input = STTInput(
+            audioData = audioData,
+            format = format,
+            language = language
+        )
+        return process(input)
     }
 
-    private suspend fun transcribeBuffer(buffer: List<ByteArray>): String {
-        val totalSize = buffer.sumOf { it.size }
-        val merged = ByteArray(totalSize)
-        var offset = 0
-        for (chunk in buffer) {
-            chunk.copyInto(merged, offset)
-            offset += chunk.size
+    /**
+     * Transcribe audio buffer (FloatArray)
+     */
+    suspend fun transcribe(
+        audioBuffer: FloatArray,
+        language: String? = null
+    ): STTOutput {
+        requireReady()
+
+        val input = STTInput(
+            audioData = byteArrayOf(), // Empty, use buffer
+            audioBuffer = audioBuffer,
+            format = AudioFormat.PCM,
+            language = language
+        )
+        return process(input)
+    }
+
+    /**
+     * Transcribe with VAD context
+     */
+    suspend fun transcribeWithVAD(
+        audioData: ByteArray,
+        format: AudioFormat = AudioFormat.WAV,
+        vadOutput: com.runanywhere.sdk.components.vad.VADOutput
+    ): STTOutput {
+        requireReady()
+
+        val input = STTInput(
+            audioData = audioData,
+            format = format,
+            vadOutput = vadOutput
+        )
+        return process(input)
+    }
+
+    /**
+     * Process STT input (matches iOS architecture)
+     */
+    suspend fun process(input: STTInput): STTOutput {
+        requireReady()
+
+        val service = service?.wrappedService
+            ?: throw SDKError.ComponentNotReady("STT service not available")
+
+        // Validate input
+        input.validate()
+
+        // Create options from input or use defaults
+        val options = input.options ?: STTOptions(
+            language = input.language ?: sttConfiguration.language,
+            detectLanguage = input.language == null,
+            enablePunctuation = sttConfiguration.enablePunctuation,
+            enableDiarization = sttConfiguration.enableDiarization,
+            maxSpeakers = null,
+            enableTimestamps = sttConfiguration.enableTimestamps,
+            vocabularyFilter = sttConfiguration.vocabularyList,
+            audioFormat = input.format
+        )
+
+        // Get audio data
+        val audioData: ByteArray = when {
+            input.audioData.isNotEmpty() -> input.audioData
+            input.audioBuffer != null -> convertFloatArrayToBytes(input.audioBuffer)
+            else -> throw SDKError.ValidationFailed("No audio data provided")
         }
-        val result = sttService.transcribe(merged, STTOptions())
-        return result.transcript
+
+        // Track processing time
+        val startTime = getCurrentTimeMillis()
+
+        // Perform transcription
+        val result = service.transcribe(audioData = audioData, options = options)
+
+        val processingTime = (getCurrentTimeMillis() - startTime) / 1000.0 // Convert to seconds
+
+        // Convert to strongly typed output
+        val wordTimestamps = result.timestamps?.map { timestamp ->
+            WordTimestamp(
+                word = timestamp.word,
+                startTime = timestamp.startTime,
+                endTime = timestamp.endTime,
+                confidence = timestamp.confidence ?: 0.9f
+            )
+        }
+
+        val alternatives = result.alternatives?.map { alt ->
+            TranscriptionAlternative(
+                text = alt.transcript,
+                confidence = alt.confidence
+            )
+        }
+
+        // Calculate audio length (estimate based on data size and format)
+        val audioLength = estimateAudioLength(
+            dataSize = audioData.size,
+            format = input.format,
+            sampleRate = sttConfiguration.sampleRate
+        )
+
+        val metadata = TranscriptionMetadata(
+            modelId = service.currentModel ?: "unknown",
+            processingTime = processingTime,
+            audioLength = audioLength
+        )
+
+        return STTOutput(
+            text = result.transcript,
+            confidence = result.confidence ?: 0.9f,
+            wordTimestamps = wordTimestamps,
+            detectedLanguage = result.language,
+            alternatives = alternatives,
+            metadata = metadata
+        )
     }
 
-    private fun getModelPath(modelId: String): String {
-        return "${FileManager.modelsDirectory}/$modelId.bin"
+    /**
+     * Enhanced stream transcription with Speaker Diarization support (matches iOS architecture)
+     */
+    fun streamTranscribe(
+        audioStream: Flow<ByteArray>,
+        language: String? = null,
+        enableSpeakerDiarization: Boolean = sttConfiguration.enableDiarization
+    ): Flow<STTStreamEvent> = kotlinx.coroutines.flow.flow {
+        requireReady()
+
+        val service = service?.wrappedService
+            ?: throw SDKError.ComponentNotReady("STT service not available")
+
+        val streamingOptions = STTStreamingOptions(
+            language = language ?: sttConfiguration.language,
+            detectLanguage = language == null,
+            enablePartialResults = true,
+            enableSpeakerDiarization = enableSpeakerDiarization,
+            enableAudioLevelMonitoring = true
+        )
+
+        try {
+            // Use enhanced streaming if available, otherwise fall back to basic streaming
+            if (service.supportsStreaming) {
+                service.transcribeStream(audioStream, streamingOptions).collect { event ->
+                    emit(event)
+                }
+            } else {
+                // Fallback to basic streaming
+                emit(STTStreamEvent.SpeechStarted)
+
+                val basicOptions = STTOptions(
+                    language = streamingOptions.language ?: "en",
+                    detectLanguage = streamingOptions.detectLanguage,
+                    enablePunctuation = sttConfiguration.enablePunctuation,
+                    enableDiarization = streamingOptions.enableSpeakerDiarization,
+                    enableTimestamps = false,
+                    vocabularyFilter = sttConfiguration.vocabularyList,
+                    audioFormat = AudioFormat.PCM
+                )
+
+                val result = service.streamTranscribe(
+                    audioStream = audioStream,
+                    options = basicOptions
+                ) { partial ->
+                    kotlinx.coroutines.runBlocking {
+                        emit(STTStreamEvent.PartialTranscription(partial))
+                    }
+                }
+
+                // Emit final result
+                emit(STTStreamEvent.FinalTranscription(result))
+                emit(STTStreamEvent.SpeechEnded)
+            }
+        } catch (error: Exception) {
+            val sttError = when (error) {
+                is STTError -> error
+                else -> STTError.TranscriptionFailed(error)
+            }
+            emit(STTStreamEvent.Error(sttError))
+        }
     }
+
+    /**
+     * Detect language from audio sample (matches iOS architecture)
+     */
+    suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
+        requireReady()
+
+        val service = service?.wrappedService
+            ?: throw SDKError.ComponentNotReady("STT service not available")
+
+        return if (service.supportsLanguageDetection) {
+            service.detectLanguage(audioData)
+        } else {
+            // Fallback: use transcription with language detection
+            val options = STTOptions(
+                language = "auto",
+                detectLanguage = true,
+                enablePunctuation = false,
+                enableTimestamps = false
+            )
+
+            val result = service.transcribe(audioData, options)
+            result.language?.let { detectedLang ->
+                mapOf(detectedLang to 1.0f)
+            } ?: emptyMap()
+        }
+    }
+
+    /**
+     * Get supported languages for current service
+     */
+    fun getSupportedLanguages(): List<String> {
+        return service?.wrappedService?.supportedLanguages ?: emptyList()
+    }
+
+    /**
+     * Check if specific language is supported
+     */
+    fun supportsLanguage(languageCode: String): Boolean {
+        return service?.wrappedService?.supportsLanguage(languageCode) ?: false
+    }
+
+    /**
+     * Transcribe with automatic language switching based on confidence
+     */
+    suspend fun transcribeWithAutoLanguage(
+        audioData: ByteArray,
+        candidateLanguages: List<String> = emptyList(),
+        confidenceThreshold: Float = 0.7f
+    ): STTOutput {
+        requireReady()
+
+        // Step 1: Detect language if not specified
+        val detectedLanguages = detectLanguage(audioData)
+        val bestLanguage = detectedLanguages.maxByOrNull { it.value }
+
+        val targetLanguage = if (bestLanguage != null && bestLanguage.value >= confidenceThreshold) {
+            // Use detected language if confidence is high enough
+            bestLanguage.key
+        } else if (candidateLanguages.isNotEmpty()) {
+            // Try candidate languages
+            candidateLanguages.firstOrNull { supportsLanguage(it) }
+        } else {
+            // Fall back to configuration default
+            sttConfiguration.language
+        }
+
+        // Step 2: Transcribe with selected language
+        return transcribe(
+            audioData = audioData,
+            language = targetLanguage
+        )
+    }
+
+    /**
+     * Get service for compatibility
+     */
+    fun getService(): STTService? {
+        return service?.wrappedService
+    }
+
+    // MARK: - Private Helpers
 
     private fun requireReady() {
         if (state != ComponentState.READY) {
@@ -288,51 +345,25 @@ class STTComponent(
         }
     }
 
-    private fun generateSessionId(): String {
-        return "stt-session-${getCurrentTimeMillis()}"
+    private fun convertFloatArrayToBytes(floatArray: FloatArray): ByteArray {
+        val byteArray = ByteArray(floatArray.size * 2) // 2 bytes per float (16-bit PCM)
+        for (i in floatArray.indices) {
+            val sample = (floatArray[i] * 32767).toInt().coerceIn(-32768, 32767)
+            byteArray[i * 2] = (sample and 0xFF).toByte()
+            byteArray[i * 2 + 1] = ((sample shr 8) and 0xFF).toByte()
+        }
+        return byteArray
     }
 
-    private fun estimateAudioDuration(
-        audioDataSize: Int,
-        sampleRate: Int = 16000,
-        channels: Int = 1,
-        bytesPerSample: Int = 2
-    ): Long {
-        // Estimate duration in milliseconds based on audio data size
-        val samplesCount = audioDataSize / (channels * bytesPerSample)
-        return (samplesCount * 1000L) / sampleRate
+    private fun estimateAudioLength(dataSize: Int, format: AudioFormat, sampleRate: Int): Double {
+        // Rough estimation based on format and sample rate
+        val bytesPerSample: Int = when (format) {
+            AudioFormat.PCM, AudioFormat.WAV -> 2 // 16-bit PCM
+            AudioFormat.MP3 -> 1 // Compressed
+            else -> 2
+        }
+
+        val samples = dataSize / bytesPerSample
+        return samples.toDouble() / sampleRate.toDouble()
     }
-}
-
-/**
- * Extension function to convert ByteArray to FloatArray for VAD
- */
-private fun ByteArray.toFloatArray(): FloatArray {
-    val floatArray = FloatArray(this.size / 2)
-    for (i in floatArray.indices) {
-        val sample = (this[i * 2].toInt() and 0xFF) or (this[i * 2 + 1].toInt() shl 8)
-        floatArray[i] = sample / 32768.0f
-    }
-    return floatArray
-}
-
-/**
- * Transcription result
- */
-data class TranscriptionResult(
-    val text: String,
-    val confidence: Float = 0.0f,
-    val language: String? = null,
-    val timestamps: List<WordTimestamp>? = null
-)
-
-/**
- * Transcription events for streaming
- */
-sealed class TranscriptionEvent {
-    object SpeechStart : TranscriptionEvent()
-    object SpeechEnd : TranscriptionEvent()
-    data class PartialTranscription(val text: String) : TranscriptionEvent()
-    data class FinalTranscription(val text: String) : TranscriptionEvent()
-    data class Error(val error: Throwable) : TranscriptionEvent()
 }

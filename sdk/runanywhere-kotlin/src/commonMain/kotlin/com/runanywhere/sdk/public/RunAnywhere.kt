@@ -10,15 +10,18 @@ import com.runanywhere.sdk.events.SDKInitializationEvent
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 
 /**
- * Main public API interface for RunAnywhere SDK
- * Common logic stays here, platform-specific implementations in actual
+ * Enhanced main public API interface for RunAnywhere SDK
+ * Matches iOS RunAnywhere.swift functionality with rich typed methods
  */
 interface RunAnywhereSDK {
     val isInitialized: Boolean
     val currentEnvironment: SDKEnvironment
     val events: EventBus
+
+    // MARK: - Core Initialization
 
     suspend fun initialize(
         apiKey: String,
@@ -26,12 +29,134 @@ interface RunAnywhereSDK {
         environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT
     )
 
-    suspend fun availableModels(): List<ModelInfo>
-    suspend fun downloadModel(modelId: String): Flow<Float>
-    suspend fun loadModel(modelId: String): Boolean
-    suspend fun generate(prompt: String, options: Map<String, Any>? = null): String
-    fun generateStream(prompt: String, options: Map<String, Any>? = null): Flow<String>
+    // MARK: - Text Generation - Enhanced to match iOS
+
+    /**
+     * Simple chat method matching iOS chat() method
+     */
+    suspend fun chat(prompt: String): String
+
+    /**
+     * Enhanced generate method with rich options
+     */
+    suspend fun generate(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions? = null
+    ): String
+
+    /**
+     * Streaming generation with rich options
+     */
+    fun generateStream(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions? = null
+    ): Flow<String>
+
+    /**
+     * Structured output generation - matches iOS generateStructured
+     */
+    suspend fun <T : com.runanywhere.sdk.models.Generatable> generateStructured(
+        type: kotlin.reflect.KClass<T>,
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions? = null
+    ): T
+
+    // MARK: - Voice Operations - Enhanced
+
+    /**
+     * Enhanced transcription with options
+     */
     suspend fun transcribe(audioData: ByteArray): String
+
+    /**
+     * Rich transcription with detailed options
+     */
+    suspend fun transcribe(
+        audio: ByteArray,
+        modelId: String,
+        options: com.runanywhere.sdk.public.extensions.STTOptions
+    ): com.runanywhere.sdk.public.extensions.STTResult
+
+    // MARK: - Model Management - Enhanced
+
+    /**
+     * Get available models
+     */
+    suspend fun availableModels(): List<ModelInfo>
+
+    /**
+     * Download model with progress
+     */
+    suspend fun downloadModel(modelId: String): Flow<Float>
+
+    /**
+     * Load model and return info
+     */
+    suspend fun loadModel(modelId: String): Boolean
+
+    /**
+     * Get currently loaded model
+     */
+    val currentModel: ModelInfo?
+
+    // MARK: - Component Management
+
+    /**
+     * Initialize components with configuration
+     */
+    suspend fun initializeComponents(
+        configs: List<com.runanywhere.sdk.public.extensions.ComponentInitializationConfig>
+    ): Map<com.runanywhere.sdk.components.base.SDKComponent, com.runanywhere.sdk.public.extensions.ComponentInitializationResult>
+
+    // MARK: - Conversation Management
+
+    /**
+     * Create conversation session
+     */
+    suspend fun createConversation(
+        configuration: com.runanywhere.sdk.public.extensions.ConversationConfiguration
+    ): com.runanywhere.sdk.public.extensions.ConversationSession
+
+    // MARK: - Cost and Analytics
+
+    /**
+     * Enable cost tracking
+     */
+    suspend fun enableCostTracking(
+        config: com.runanywhere.sdk.public.extensions.CostTrackingConfig = com.runanywhere.sdk.public.extensions.CostTrackingConfig()
+    )
+
+    /**
+     * Get cost statistics
+     */
+    suspend fun getCostStatistics(
+        period: com.runanywhere.sdk.public.extensions.CostStatistics.TimePeriod
+    ): com.runanywhere.sdk.public.extensions.CostStatistics
+
+    // MARK: - Pipeline Management
+
+    /**
+     * Execute pipeline
+     */
+    suspend fun executePipeline(
+        pipelineId: String,
+        inputs: Map<String, Any>
+    ): com.runanywhere.sdk.public.extensions.PipelineResult
+
+    // MARK: - Configuration
+
+    /**
+     * Get current routing policy
+     */
+    suspend fun getCurrentRoutingPolicy(): com.runanywhere.sdk.public.extensions.RoutingPolicy
+
+    /**
+     * Update routing policy
+     */
+    suspend fun updateRoutingPolicy(policy: com.runanywhere.sdk.public.extensions.RoutingPolicy)
+
+    // MARK: - Lifecycle
+
     suspend fun cleanup()
 }
 
@@ -219,6 +344,171 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     /**
      * Platform-specific cleanup to be implemented
      */
+    // MARK: - Enhanced Interface Implementation
+
+    /**
+     * Simple chat method - calls generate with default options
+     */
+    override suspend fun chat(prompt: String): String {
+        return generate(prompt, com.runanywhere.sdk.models.RunAnywhereGenerationOptions.DEFAULT)
+    }
+
+    /**
+     * Enhanced generate method with RunAnywhereGenerationOptions
+     */
+    override suspend fun generate(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): String {
+        requireInitialized()
+        val result = serviceContainer.generationService?.generate(
+            prompt,
+            options?.toGenerationOptions()
+        ) ?: throw SDKError.ComponentNotAvailable("Generation service not available")
+        return result.text
+    }
+
+    /**
+     * Enhanced streaming generation
+     */
+    override fun generateStream(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): Flow<String> {
+        requireInitialized()
+        val chunkFlow = serviceContainer.generationService?.streamGenerate(
+            prompt,
+            options?.toGenerationOptions()
+        ) ?: throw SDKError.ComponentNotAvailable("Generation service not available")
+
+        return chunkFlow.map { chunk -> chunk.text }
+    }
+
+    /**
+     * Structured output generation
+     */
+    override suspend fun <T : com.runanywhere.sdk.models.Generatable> generateStructured(
+        type: kotlin.reflect.KClass<T>,
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): T {
+        requireInitialized()
+        // Structured output not implemented yet
+        throw SDKError.ComponentNotAvailable("Structured output service not available")
+    }
+
+    /**
+     * Enhanced transcription with rich options
+     */
+    override suspend fun transcribe(
+        audio: ByteArray,
+        modelId: String,
+        options: com.runanywhere.sdk.public.extensions.STTOptions
+    ): com.runanywhere.sdk.public.extensions.STTResult {
+        requireInitialized()
+        // Use STT component for transcription
+        val sttComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
+            as? com.runanywhere.sdk.components.stt.STTComponent
+            ?: throw SDKError.ComponentNotAvailable("STT component not available")
+
+        val startTime = System.currentTimeMillis()
+        val result = sttComponent.transcribe(
+            audioData = audio,
+            format = com.runanywhere.sdk.components.stt.AudioFormat.WAV,
+            language = options.language
+        )
+        val processingTime = (System.currentTimeMillis() - startTime) / 1000.0
+
+        return com.runanywhere.sdk.public.extensions.STTResult(
+            text = result.text,
+            language = result.detectedLanguage ?: options.language,
+            confidence = result.confidence,
+            duration = audio.size / (options.sampleRate * 2.0), // Assuming 16-bit audio
+            wordTimestamps = null, // Not implemented yet
+            speakerSegments = null, // Not implemented yet
+            processingTime = processingTime,
+            modelUsed = modelId
+        )
+    }
+
+    /**
+     * Get current model
+     */
+    override val currentModel: ModelInfo?
+        get() = null // Model manager not implemented yet
+
+    /**
+     * Initialize components
+     */
+    override suspend fun initializeComponents(
+        configs: List<com.runanywhere.sdk.public.extensions.ComponentInitializationConfig>
+    ): Map<com.runanywhere.sdk.components.base.SDKComponent, com.runanywhere.sdk.public.extensions.ComponentInitializationResult> {
+        requireInitialized()
+        // Extension functions not implemented yet
+        return emptyMap<com.runanywhere.sdk.components.base.SDKComponent, com.runanywhere.sdk.public.extensions.ComponentInitializationResult>()
+    }
+
+    /**
+     * Create conversation
+     */
+    override suspend fun createConversation(
+        configuration: com.runanywhere.sdk.public.extensions.ConversationConfiguration
+    ): com.runanywhere.sdk.public.extensions.ConversationSession {
+        requireInitialized()
+        // Extension functions not implemented yet
+        throw SDKError.ComponentNotAvailable("Conversation management not available")
+    }
+
+    /**
+     * Enable cost tracking
+     */
+    override suspend fun enableCostTracking(
+        config: com.runanywhere.sdk.public.extensions.CostTrackingConfig
+    ) {
+        requireInitialized()
+        // Extension functions not implemented yet
+    }
+
+    /**
+     * Get cost statistics
+     */
+    override suspend fun getCostStatistics(
+        period: com.runanywhere.sdk.public.extensions.CostStatistics.TimePeriod
+    ): com.runanywhere.sdk.public.extensions.CostStatistics {
+        requireInitialized()
+        // Extension functions not implemented yet
+        throw SDKError.ComponentNotAvailable("Cost tracking not available")
+    }
+
+    /**
+     * Execute pipeline
+     */
+    override suspend fun executePipeline(
+        pipelineId: String,
+        inputs: Map<String, Any>
+    ): com.runanywhere.sdk.public.extensions.PipelineResult {
+        requireInitialized()
+        // Extension functions not implemented yet
+        throw SDKError.ComponentNotAvailable("Pipeline execution not available")
+    }
+
+    /**
+     * Get current routing policy
+     */
+    override suspend fun getCurrentRoutingPolicy(): com.runanywhere.sdk.public.extensions.RoutingPolicy {
+        requireInitialized()
+        // Extension functions not implemented yet
+        throw SDKError.ComponentNotAvailable("Routing policy not available")
+    }
+
+    /**
+     * Update routing policy
+     */
+    override suspend fun updateRoutingPolicy(policy: com.runanywhere.sdk.public.extensions.RoutingPolicy) {
+        requireInitialized()
+        // Extension functions not implemented yet
+    }
+
     protected abstract suspend fun cleanupPlatform()
 
     protected fun requireInitialized() {

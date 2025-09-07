@@ -292,6 +292,397 @@ Workflows are located in `.github/workflows/`:
 - `android-app.yml` - Android example app CI
 - `ios-app.yml` - iOS example app CI
 
+## Kotlin Multiplatform (KMP) SDK Best Practices
+
+The Kotlin Multiplatform SDK has been aligned with iOS architecture patterns while leveraging Kotlin's strengths. These best practices ensure consistency, maintainability, and cross-platform compatibility.
+
+### Architecture Patterns
+
+#### Component-Based Architecture
+Follow the iOS component pattern but adapted to KMP idioms:
+
+```kotlin
+// Base component with lifecycle management
+abstract class BaseComponent<TService : Any>(
+    protected val configuration: ComponentConfiguration,
+    serviceContainer: ServiceContainer? = null
+) : Component {
+
+    // Component state tracking
+    override var state: ComponentState = ComponentState.NOT_INITIALIZED
+        protected set
+
+    // Service creation (platform-specific via providers)
+    protected abstract suspend fun createService(): TService
+
+    // Lifecycle methods
+    suspend fun initialize() { /* ... */ }
+    override suspend fun cleanup() { /* ... */ }
+    override suspend fun healthCheck(): ComponentHealth { /* ... */ }
+}
+```
+
+#### Event-Driven Architecture
+Use **Flow** instead of AsyncSequence for reactive streams:
+
+```kotlin
+// Central event bus with typed events
+object EventBus {
+    private val _componentEvents = MutableSharedFlow<ComponentEvent>()
+    val componentEvents: SharedFlow<ComponentEvent> = _componentEvents.asSharedFlow()
+
+    fun publish(event: ComponentEvent) {
+        _componentEvents.tryEmit(event)
+    }
+}
+
+// Usage: Listen to component state changes
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .collect { event ->
+        println("Component ${event.component} is ready")
+    }
+```
+
+#### Service Container Pattern
+Centralized dependency injection with lazy initialization:
+
+```kotlin
+class ServiceContainer {
+    companion object {
+        val shared = ServiceContainer()
+    }
+
+    // Platform abstractions via expect/actual
+    private val fileSystem by lazy { createFileSystem() }
+    private val httpClient by lazy { createHttpClient() }
+
+    // Service dependencies
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    // Platform-specific initialization
+    fun initialize(platformContext: PlatformContext) {
+        platformContext.initialize()
+    }
+}
+```
+
+### Code Organization
+
+#### commonMain Structure
+Keep all business logic, interfaces, and data models in `commonMain/`:
+
+```
+commonMain/
+├── components/          # Component implementations
+│   ├── base/           # Base component classes
+│   ├── stt/            # Speech-to-text components
+│   └── vad/            # Voice activity detection
+├── data/               # Data layer
+│   ├── models/         # Data classes and enums
+│   └── repositories/   # Repository interfaces
+├── events/             # Event definitions
+├── foundation/         # Core infrastructure
+│   ├── ServiceContainer.kt
+│   └── SDKLogger.kt
+├── core/               # Plugin architecture
+│   └── ModuleRegistry.kt
+└── services/           # Service interfaces
+    ├── configuration/
+    ├── analytics/
+    └── modelinfo/
+```
+
+#### Platform-Specific Structure
+Use `expect/actual` **only** for platform-specific implementations:
+
+```kotlin
+// commonMain - Interface only
+expect class PlatformContext {
+    fun initialize()
+}
+
+expect fun createFileSystem(): FileSystem
+expect fun createHttpClient(): HttpClient
+
+// androidMain - Android implementation
+actual class PlatformContext(private val context: Context) {
+    actual fun initialize() {
+        // Android-specific setup
+    }
+}
+
+actual fun createFileSystem(): FileSystem = AndroidFileSystem()
+```
+
+#### Module Separation Principles
+
+**Core SDK vs Feature Modules:**
+- Core SDK (`commonMain`): Essential services, base components
+- Feature modules: Optional capabilities (WhisperKit, external AI providers)
+- Plugin architecture: `ModuleRegistry` for runtime registration
+
+```kotlin
+// Plugin registration pattern
+object ModuleRegistry {
+    fun registerSTT(provider: STTServiceProvider) {
+        sttProviders.add(provider)
+    }
+
+    fun sttProvider(modelId: String? = null): STTServiceProvider? {
+        return sttProviders.firstOrNull { it.canHandle(modelId) }
+    }
+}
+
+// External module registration
+// In WhisperKit module:
+ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
+```
+
+### API Design
+
+#### Kotlin Idioms for iOS Patterns
+
+**Flow for Reactive Streams:**
+```kotlin
+// Instead of AsyncSequence, use Flow
+fun transcribeStream(audioFlow: Flow<ByteArray>): Flow<TranscriptionUpdate> {
+    return audioFlow.map { audioData ->
+        // Process audio chunk
+        TranscriptionUpdate(text = processAudio(audioData), isFinal = false)
+    }
+}
+```
+
+**Coroutines for Async Operations:**
+```kotlin
+// Instead of async/await, use suspend functions
+suspend fun loadModel(modelId: String): ModelLoadResult {
+    return withContext(Dispatchers.IO) {
+        modelRepository.loadModel(modelId)
+    }
+}
+```
+
+#### Structured Error Handling
+
+Use **sealed classes** for type-safe error handling:
+
+```kotlin
+sealed class SDKError : Exception() {
+    data class InvalidApiKey(override val message: String) : SDKError()
+    data class NetworkError(override val cause: Throwable?) : SDKError()
+    data class ComponentNotReady(override val message: String) : SDKError()
+    data class InvalidState(override val message: String) : SDKError()
+
+    // Result wrapper for operations
+    sealed class Result<out T> {
+        data class Success<T>(val value: T) : Result<T>()
+        data class Failure(val error: SDKError) : Result<Nothing>()
+    }
+}
+```
+
+#### Strong Typing with Data Classes
+
+**Always use structured types instead of strings:**
+```kotlin
+// Component configuration
+data class STTConfiguration(
+    val modelId: String,
+    val language: Language = Language.EN,
+    val enableVAD: Boolean = true,
+    val audioFormat: AudioFormat = AudioFormat.PCM_16BIT
+) : ComponentConfiguration {
+    override fun validate() {
+        require(modelId.isNotBlank()) { "Model ID cannot be blank" }
+    }
+}
+
+// Enum for type safety
+enum class Language(val code: String) {
+    EN("en"), ES("es"), FR("fr"), DE("de"), JA("ja")
+}
+
+enum class AudioFormat { PCM_16BIT, PCM_24BIT, FLAC, MP3 }
+```
+
+### Integration Patterns
+
+#### ModuleRegistry for Plugin Architecture
+
+**Provider Pattern with Type Safety:**
+```kotlin
+interface STTServiceProvider {
+    suspend fun createSTTService(configuration: STTConfiguration): STTService
+    fun canHandle(modelId: String?): Boolean
+    val name: String
+}
+
+// Registration in app initialization:
+ModuleRegistry.registerSTT(WhisperSTTProvider())
+ModuleRegistry.registerLLM(LlamaProvider())
+```
+
+#### EventBus for Component Communication
+
+**Centralized Event System:**
+```kotlin
+// Component publishes events
+eventBus.publish(ComponentInitializationEvent.ComponentReady(
+    component = SDKComponent.STT,
+    modelId = "whisper-base"
+))
+
+// Other components subscribe to events
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .filter { it.component == SDKComponent.STT }
+    .collect { handleSTTReady(it) }
+```
+
+#### Provider Pattern for Extensibility
+
+**Service Creation with Fallbacks:**
+```kotlin
+class STTComponent(configuration: STTConfiguration) : BaseComponent<STTService>(configuration) {
+
+    override suspend fun createService(): STTService {
+        // Try external providers first
+        val provider = ModuleRegistry.sttProvider(configuration.modelId)
+
+        return provider?.createSTTService(configuration)
+            ?: throw SDKError.ComponentNotAvailable("No STT provider available for model: ${configuration.modelId}")
+    }
+}
+```
+
+### Performance Best Practices
+
+#### Memory Management
+
+**Component Lifecycle:**
+```kotlin
+abstract class BaseComponent<TService : Any> {
+
+    override suspend fun cleanup() {
+        // Proper resource cleanup
+        performCleanup()
+        service = null
+        serviceContainer = null // Allow GC
+        currentStage = null
+    }
+
+    protected open suspend fun performCleanup() {
+        // Override for component-specific cleanup
+    }
+}
+```
+
+**Service Container Memory Management:**
+```kotlin
+class ServiceContainer {
+    // Use lazy initialization to avoid memory pressure
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    suspend fun cleanup() {
+        // Cleanup components in reverse dependency order
+        sttComponent.cleanup()
+        vadComponent.cleanup()
+    }
+}
+```
+
+#### Platform-Specific Optimizations
+
+**Android optimizations in `androidMain`:**
+```kotlin
+actual fun createFileSystem(): FileSystem = AndroidFileSystem().apply {
+    // Configure for Android-specific optimizations
+    enableFileWatcher = false // Reduce battery usage
+    cacheStrategy = CacheStrategy.MEMORY_FIRST
+}
+```
+
+**JVM optimizations in `jvmMain`:**
+```kotlin
+actual fun createHttpClient(): HttpClient = HttpClient {
+    engine {
+        // JVM-specific HTTP client configuration
+        threadsCount = 4
+        pipelining = true
+    }
+}
+```
+
+### Testing Patterns
+
+#### Component Testing
+```kotlin
+class STTComponentTest {
+    @Test
+    fun `should initialize successfully with valid configuration`() = runTest {
+        val config = STTConfiguration(modelId = "whisper-base")
+        val component = STTComponent(config)
+
+        component.initialize()
+
+        assertEquals(ComponentState.READY, component.state)
+        assertTrue(component.isReady)
+    }
+
+    @Test
+    fun `should emit events during initialization`() = runTest {
+        val events = mutableListOf<ComponentEvent>()
+        val job = launch {
+            EventBus.componentEvents.collect { events.add(it) }
+        }
+
+        val component = STTComponent(STTConfiguration(modelId = "whisper-base"))
+        component.initialize()
+
+        assertTrue(events.any { it is ComponentInitializationEvent.ComponentReady })
+        job.cancel()
+    }
+}
+```
+
+#### Mock Providers for Testing
+```kotlin
+class MockSTTProvider : STTServiceProvider {
+    override val name = "MockSTT"
+
+    override suspend fun createSTTService(configuration: STTConfiguration): STTService {
+        return MockSTTService()
+    }
+
+    override fun canHandle(modelId: String?): Boolean = true
+}
+
+// In test setup:
+ModuleRegistry.clear()
+ModuleRegistry.registerSTT(MockSTTProvider())
+```
+
+### Common Patterns Summary
+
+1. **Business Logic in commonMain**: Keep all core logic platform-agnostic
+2. **expect/actual for Platform APIs**: Only use for truly platform-specific code
+3. **Flow over AsyncSequence**: Use Kotlin's reactive streams
+4. **Coroutines over async/await**: Leverage structured concurrency
+5. **Sealed Classes for Errors**: Type-safe error handling
+6. **Data Classes for Models**: Strong typing throughout
+7. **ModuleRegistry for Plugins**: Extensible architecture
+8. **EventBus for Communication**: Decoupled component communication
+9. **Service Container for DI**: Centralized dependency management
+10. **Component Lifecycle**: Proper initialization and cleanup
+
+These patterns ensure the Kotlin Multiplatform SDK maintains architectural consistency with the iOS implementation while leveraging Kotlin's strengths for cross-platform development.
+
 ## Development Notes
 
 - The Kotlin Multiplatform SDK is the primary SDK implementation

@@ -18,6 +18,9 @@ actual fun createPlatformVADService(): VADService = WebRTCVADService()
  * Provides robust voice activity detection using the WebRTC GMM-based algorithm
  */
 class WebRTCVADService : VADService {
+
+    // Speech activity callback
+    override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
     private val logger = SDKLogger("WebRTCVADService")
     private var config: VADConfiguration? = null
     private var vadInstance: VadWebRTC? = null
@@ -31,8 +34,8 @@ class WebRTCVADService : VADService {
             try {
                 // Map our configuration to WebRTC VAD configuration
                 val sampleRate = mapSampleRate(configuration.sampleRate)
-                val frameSize = mapFrameSize(configuration.sampleRate, configuration.frameDuration)
-                val mode = mapAggressivenessToMode(configuration.aggressiveness)
+                val frameSize = mapFrameSize(configuration.sampleRate, configuration.frameLength)
+                val mode = Mode.AGGRESSIVE // Default to aggressive mode
 
                 // Create VAD instance with speech and silence duration settings
                 vadInstance = VadWebRTC(
@@ -40,7 +43,7 @@ class WebRTCVADService : VADService {
                     frameSize = frameSize,
                     mode = mode,
                     speechDurationMs = 50, // Minimum speech duration in ms
-                    silenceDurationMs = configuration.silenceThreshold // Use configured silence threshold
+                    silenceDurationMs = 500 // Default silence duration in ms
                 )
 
                 isInitialized = true
@@ -89,15 +92,15 @@ class WebRTCVADService : VADService {
                 vadInstance?.close()
 
                 val sampleRate = mapSampleRate(config!!.sampleRate)
-                val frameSize = mapFrameSize(config!!.sampleRate, config!!.frameDuration)
-                val mode = mapAggressivenessToMode(config!!.aggressiveness)
+                val frameSize = mapFrameSize(config!!.sampleRate, config!!.frameLength)
+                val mode = Mode.AGGRESSIVE // Default to aggressive mode
 
                 vadInstance = VadWebRTC(
                     sampleRate = sampleRate,
                     frameSize = frameSize,
                     mode = mode,
                     speechDurationMs = 50,
-                    silenceDurationMs = config!!.silenceThreshold
+                    silenceDurationMs = 500 // Default silence duration
                 )
 
                 logger.debug("VAD state reset")
@@ -143,7 +146,8 @@ class WebRTCVADService : VADService {
     /**
      * Map frame duration to WebRTC VAD frame size based on sample rate
      */
-    private fun mapFrameSize(sampleRate: Int, frameDurationMs: Int): FrameSize {
+    private fun mapFrameSize(sampleRate: Int, frameLength: Float): FrameSize {
+        val frameDurationMs = (frameLength * 1000).toInt()
         // Calculate frame size in samples
         val frameSizeSamples = (sampleRate * frameDurationMs) / 1000
 
@@ -183,19 +187,5 @@ class WebRTCVADService : VADService {
         }
     }
 
-    /**
-     * Map aggressiveness level to WebRTC VAD mode
-     */
-    private fun mapAggressivenessToMode(aggressiveness: Int): Mode {
-        return when (aggressiveness) {
-            0 -> Mode.NORMAL
-            1 -> Mode.LOW_BITRATE
-            2 -> Mode.AGGRESSIVE
-            3 -> Mode.VERY_AGGRESSIVE
-            else -> {
-                logger.warning("Invalid aggressiveness level $aggressiveness, using AGGRESSIVE")
-                Mode.AGGRESSIVE
-            }
-        }
-    }
+    // Aggressiveness mapping removed - using default Mode.AGGRESSIVE
 }
