@@ -88,11 +88,34 @@ public actor MockNetworkService: NetworkService {
         case .authenticate:
             let response = AuthenticationResponse(
                 accessToken: "mock-access-token-\(UUID().uuidString)",
-                refreshToken: "mock-refresh-token-\(UUID().uuidString)",
+                deviceId: "mock-device-\(UUID().uuidString)",
                 expiresIn: 3600,
-                tokenType: "Bearer"
+                organizationId: "mock-org-\(UUID().uuidString)",
+                refreshToken: "mock-refresh-token-\(UUID().uuidString)",
+                tokenType: "Bearer",
+                userId: "mock-user-\(UUID().uuidString)"
             )
             return try encoder.encode(response)
+
+        case .refreshToken:
+            let refreshResponse = AuthenticationResponse(
+                accessToken: "mock-access-token-\(UUID().uuidString)",
+                deviceId: "mock-device-\(UUID().uuidString)",
+                expiresIn: 3600,
+                organizationId: "mock-org-\(UUID().uuidString)",
+                refreshToken: "mock-refresh-token-\(UUID().uuidString)",
+                tokenType: "Bearer",
+                userId: "mock-user-\(UUID().uuidString)"
+            )
+            return try encoder.encode(refreshResponse)
+
+        case .registerDevice:
+            let deviceResponse = DeviceRegistrationResponse(
+                deviceId: "mock-device-\(UUID().uuidString)",
+                status: "registered",
+                syncStatus: "completed"
+            )
+            return try encoder.encode(deviceResponse)
 
         case .healthCheck:
             let response = HealthCheckResponse(

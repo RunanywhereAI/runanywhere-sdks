@@ -101,7 +101,7 @@ public class ServiceContainer {
     public private(set) var networkService: (any NetworkService)?
 
     /// Authentication service
-    private var authenticationService: AuthenticationService?
+    public private(set) var authenticationService: AuthenticationService?
 
     /// API client for sync operations
     private var apiClient: APIClient?
