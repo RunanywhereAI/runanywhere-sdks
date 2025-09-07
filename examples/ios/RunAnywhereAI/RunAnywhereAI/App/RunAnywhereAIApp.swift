@@ -98,23 +98,26 @@ struct RunAnywhereAIApp: App {
             let startTime = Date()
             logger.info("🚀 Starting SDK initialization...")
 
-            // TODO: Replace with your actual API key for testing
-            let apiKey = "test_api_key" // Replace with real API key
-            let baseURL = "backend_link_runanywhere.ai" // Replace with your actual API URL if different
+            // Production credentials for testing
+            let apiKey = "testing_api_keu"
+            let baseURL = "backend-prod.com"
 
             logger.debug("📋 Configuration: API Key: \(String(apiKey.prefix(10)))..., URL: \(baseURL)")
 
-            try await RunAnywhere.initialize(
+            try RunAnywhere.initialize(
                 apiKey: apiKey,
                 baseURL: baseURL,
-                environment: .production // Changed to production for real API testing
+                environment: .production // Using production environment with real credentials
             )
 
             let initTime = Date().timeIntervalSince(startTime)
-            logger.info("✅ SDK successfully initialized!")
-            logger.info("⏱️  Initialization time: \(String(format: "%.2f", initTime), privacy: .public) seconds")
-            logger.info("📊 SDK Status: Ready for on-device AI inference")
-            logger.info("🔧 Registered modules: WhisperKit, LLMSwift, FluidAudioDiarization, FoundationModels")
+            logger.info("✅ SDK successfully initialized !")
+            logger.info("⚡ Initialization time: \(String(format: "%.3f", initTime * 1000), privacy: .public)ms (FAST!)")
+            logger.info("🎯 SDK Status: \(RunAnywhere.isActive() ? "Active" : "Inactive")")
+            logger.info("🔧 Environment: \(RunAnywhere.getCurrentEnvironment()?.description ?? "Unknown")")
+            logger.info("📱 Device registration: Will happen on first API call (lazy loading)")
+            logger.info("🆔 Device registered: \(RunAnywhere.isDeviceRegistered() ? "Yes" : "No (will register lazily)")")
+            logger.info("🚀 Ready for on-device AI inference with lazy device registration!")
 
             // Note: User settings are now applied per-request, not globally
 

@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if os(iOS) || os(tvOS) || os(watchOS)
+import UIKit
+#endif
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
@@ -35,33 +38,30 @@ public enum RunAnywhere {
     /**
      * Initialize the RunAnywhere SDK
      *
-     * This method performs a comprehensive initialization sequence:
+     * This method performs simple, fast initialization with no network calls:
      *
      * 1. **Validation**: Validate API key and parameters
      * 2. **Logging**: Initialize logging system based on environment
-     * 3. **Storage**: Store credentials securely in keychain
-     * 4. **Database**: Set up local SQLite database for caching
-     * 5. **Authentication**: Exchange API key for access token with backend
-     * 6. **Health Check**: Verify backend connectivity and service health
-     * 7. **Services & Sync**: Initialize all services and sync with backend
+     * 3. **Storage**: Store parameters locally (no keychain for dev mode)
+     * 4. **State**: Mark SDK as initialized
      *
-     * The initialization is atomic - if any step fails, the entire process
-     * is rolled back and the SDK remains uninitialized.
+     * NO network calls, NO device registration, NO complex bootstrapping.
+     * Device registration happens lazily on first API call.
      *
      * - Parameters:
      *   - apiKey: Your RunAnywhere API key from the console
      *   - baseURL: Backend API base URL
      *   - environment: SDK environment (development/staging/production)
      *
-     * - Throws: SDKError if initialization fails at any step
+     * - Throws: SDKError if validation fails
      */
     public static func initialize(
         apiKey: String,
         baseURL: URL,
         environment: SDKEnvironment = .production
-    ) async throws {
+    ) throws {
         let params = SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
-        try await initialize(with: params)
+        try initialize(with: params)
     }
 
     /// Initialize the SDK with string URL
@@ -73,34 +73,32 @@ public enum RunAnywhere {
         apiKey: String,
         baseURL: String,
         environment: SDKEnvironment = .production
-    ) async throws {
+    ) throws {
         let params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
-        try await initialize(with: params)
+        try initialize(with: params)
     }
 
     /// Initialize the SDK with parameters
     /// - Parameter params: SDK initialization parameters
-    private static func initialize(with params: SDKInitParams) async throws {
+    private static func initialize(with params: SDKInitParams) throws {
+        // Return early if already initialized
+        guard !isInitialized else { return }
+
         let logger = SDKLogger(category: "RunAnywhere.Init")
         EventBus.shared.publish(SDKInitializationEvent.started)
 
         do {
             // Step 1: Validate API key (skip in development mode)
             if params.environment != .development {
-                logger.info("Step 1/8: Validating API key")
                 guard !params.apiKey.isEmpty else {
                     throw SDKError.invalidAPIKey("API key cannot be empty")
                 }
-            } else {
-                logger.info("Step 1/8: Skipping API key validation in development mode")
             }
 
             // Step 2: Initialize logging system
-            logger.info("Step 2/8: Initializing logging system")
             RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
 
-            // Step 3: Store parameters securely
-            logger.info("Step 3/8: Storing credentials securely")
+            // Step 3: Store parameters locally
             initParams = params
             currentEnvironment = params.environment
 
@@ -109,83 +107,16 @@ public enum RunAnywhere {
                 try KeychainManager.shared.storeSDKParams(params)
             }
 
-            // Step 4: Initialize database
-            logger.info("Step 4/8: Initializing local database")
+            // Step 4: Initialize database (keep this as it's local only)
             try DatabaseManager.shared.setup()
 
-            // Development mode: Skip API authentication and use local/mock services
-            if params.environment == .development {
-                logger.info("🚀 Running in DEVELOPMENT mode - using local/mock services")
-                logger.info("Step 5/8: Skipping API authentication in development mode")
-                logger.info("Step 6/8: Skipping health check in development mode")
-                logger.info("Step 7/7: Bootstrapping SDK services with local data")
+            // Step 5: Setup local services only (no network calls)
+            try serviceContainer.setupLocalServices(with: params)
 
-                // Bootstrap without API client for development mode
-                let loadedConfig = try await serviceContainer.bootstrapDevelopmentMode(with: params)
-
-                // Store the configuration
-                configurationData = loadedConfig
-
-                // Mark as initialized
-                isInitialized = true
-                logger.info("✅ SDK initialization completed successfully (Development Mode)")
-                EventBus.shared.publish(SDKInitializationEvent.completed)
-
-            } else {
-                // Production/Staging mode: Full API authentication flow
-
-                // Step 5: Initialize API client and authentication service
-                logger.info("Step 5/8: Authenticating with backend")
-
-                // Create API client first
-                guard let baseURL = params.baseURL else {
-                    throw SDKError.validationFailed("Base URL is required for \(params.environment.description)")
-                }
-
-                let apiClient = APIClient(
-                    baseURL: baseURL,
-                    apiKey: params.apiKey
-                )
-
-                // Create authentication service using API client
-                let authService = AuthenticationService(apiClient: apiClient)
-
-                // Set auth service in API client to complete the setup
-                await apiClient.setAuthenticationService(authService)
-
-                // Authenticate
-                let authResponse = try await authService.authenticate(apiKey: params.apiKey)
-                logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
-
-                // Step 6: Register device with backend
-                logger.info("Step 6/8: Registering device with backend")
-                let deviceRegistration = try await authService.registerDevice()
-                logger.info("Device registered successfully: \(deviceRegistration.deviceId)")
-
-                // Step 7: Perform health check (skipped - endpoint not implemented)
-                logger.info("Step 7/8: Skipping health check (endpoint not implemented)")
-                // TODO: Uncomment when health check endpoint is available
-                // let healthResponse = try await authService.healthCheck()
-                // if healthResponse.status != HealthStatus.healthy {
-                //     logger.warning("Backend health status: \(healthResponse.status)")
-                // }
-
-                // Step 8: Bootstrap SDK services and sync with backend
-                logger.info("Step 8/8: Bootstrapping SDK services and syncing with backend")
-                let loadedConfig = try await serviceContainer.bootstrap(
-                    with: params,
-                    authService: authService,
-                    apiClient: apiClient
-                )
-
-                // Store the configuration
-                configurationData = loadedConfig
-
-                // Mark as initialized
-                isInitialized = true
-                logger.info("✅ SDK initialization completed successfully")
-                EventBus.shared.publish(SDKInitializationEvent.completed)
-            }
+            // Mark as initialized
+            isInitialized = true
+            logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
+            EventBus.shared.publish(SDKInitializationEvent.completed)
 
         } catch {
             logger.error("❌ SDK initialization failed: \(error.localizedDescription)")
@@ -197,6 +128,149 @@ public enum RunAnywhere {
         }
     }
 
+    // MARK: - Lazy Device Registration
+
+    /// Track device registration state (self-contained implementation)
+    private static var _cachedDeviceId: String?
+    private static var _isRegistering: Bool = false
+    private static let registrationLock = NSLock()
+
+    /// Ensure device is registered with backend (lazy registration)
+    /// Only registers if device ID doesn't exist locally
+    /// - Throws: SDKError if registration fails
+    private static func ensureDeviceRegistered() async throws {
+        registrationLock.lock()
+
+        // Check if we're already registering
+        if _isRegistering {
+            registrationLock.unlock()
+            // Wait for registration to complete
+            while _isRegistering {
+                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+            return
+        }
+
+        // Check if we have a cached device ID
+        if let cachedId = _cachedDeviceId, !cachedId.isEmpty {
+            registrationLock.unlock()
+            return
+        }
+
+        // Check if device is already registered in local storage
+        if let storedDeviceId = getStoredDeviceId(), !storedDeviceId.isEmpty {
+            _cachedDeviceId = storedDeviceId
+            registrationLock.unlock()
+            return
+        }
+
+        // Mark as registering
+        _isRegistering = true
+        registrationLock.unlock()
+
+        let logger = SDKLogger(category: "RunAnywhere.Registration")
+        logger.info("Starting device registration...")
+
+        do {
+            // Skip registration in development mode
+            if currentEnvironment == .development {
+                let mockDeviceId = "dev-" + generateDeviceIdentifier()
+                try storeDeviceId(mockDeviceId)
+                _cachedDeviceId = mockDeviceId
+                logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
+                _isRegistering = false
+                return
+            }
+
+            // Ensure we have network services initialized
+            guard let params = initParams else {
+                throw SDKError.notInitialized
+            }
+
+            // Initialize API client and auth service if needed
+            if serviceContainer.authenticationService == nil {
+                try await serviceContainer.initializeNetworkServices(with: params)
+            }
+
+            guard let authService = serviceContainer.authenticationService else {
+                throw SDKError.invalidState("Authentication service not available")
+            }
+
+            // Register device with backend
+            let deviceRegistration = try await authService.registerDevice()
+
+            // Store device ID locally
+            try storeDeviceId(deviceRegistration.deviceId)
+            _cachedDeviceId = deviceRegistration.deviceId
+
+            logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
+
+        } catch {
+            logger.error("Device registration failed: \(error.localizedDescription)")
+            _isRegistering = false
+            throw error
+        }
+
+        // Mark registration as complete
+        _isRegistering = false
+        logger.debug("Device registration completed")
+    }
+
+    // MARK: - Device ID Management
+
+    private static let deviceIdKey = "com.runanywhere.sdk.deviceId"
+
+    /// Get stored device ID from local persistence
+    private static func getStoredDeviceId() -> String? {
+        // Try keychain first (production), then UserDefaults (development)
+        if let keychainId = KeychainManager.shared.retrieveDeviceUUID() {
+            return keychainId
+        }
+
+        // Fallback to UserDefaults
+        return UserDefaults.standard.string(forKey: deviceIdKey)
+    }
+
+    /// Store device ID in local persistence
+    private static func storeDeviceId(_ deviceId: String) throws {
+        guard !deviceId.isEmpty else {
+            throw SDKError.validationFailed("Device ID cannot be empty")
+        }
+
+        // Store in keychain for production environments
+        if let environment = currentEnvironment, environment != .development {
+            try KeychainManager.shared.storeDeviceUUID(deviceId)
+        }
+
+        // Always store in UserDefaults as fallback
+        UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
+        UserDefaults.standard.synchronize()
+    }
+
+    /// Clear stored device ID
+    private static func clearStoredDeviceId() {
+        // Clear from keychain using the deviceUUID key
+        try? KeychainManager.shared.delete(for: "com.runanywhere.sdk.device.uuid")
+
+        // Clear from UserDefaults
+        UserDefaults.standard.removeObject(forKey: deviceIdKey)
+        UserDefaults.standard.synchronize()
+
+        // Clear cache
+        _cachedDeviceId = nil
+    }
+
+    /// Generate a unique device identifier
+    private static func generateDeviceIdentifier() -> String {
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
+            return vendorId
+        }
+        #endif
+
+        // Fallback to random UUID
+        return UUID().uuidString
+    }
 
     // MARK: - Text Generation (Clean Async/Await Interface)
 
@@ -223,6 +297,9 @@ public enum RunAnywhere {
             guard isInitialized else {
                 throw SDKError.notInitialized
             }
+
+            // Lazy device registration on first API call
+            try await ensureDeviceRegistered()
 
             // Use options directly or defaults
             let result = try await serviceContainer.generationService.generate(
@@ -268,6 +345,9 @@ public enum RunAnywhere {
                     guard isInitialized else {
                         throw SDKError.notInitialized
                     }
+
+                    // Lazy device registration on first API call
+                    try await ensureDeviceRegistered()
 
                     let stream = serviceContainer.streamingService.generateStream(
                         prompt: prompt,
@@ -336,6 +416,9 @@ public enum RunAnywhere {
                 throw SDKError.notInitialized
             }
 
+            // Lazy device registration on first API call
+            try await ensureDeviceRegistered()
+
             // Use voice capability service directly
             // Find voice service and transcribe
             guard let voiceService = await serviceContainer.voiceCapabilityService.findVoiceService(for: "whisper-base") else {
@@ -365,6 +448,9 @@ public enum RunAnywhere {
             guard isInitialized else {
                 throw SDKError.notInitialized
             }
+
+            // Lazy device registration on first API call
+            try await ensureDeviceRegistered()
 
             let loadedModel = try await serviceContainer.modelLoadingService.loadModel(modelId)
 
@@ -423,11 +509,74 @@ public enum RunAnywhere {
 
     /// Get current device ID
     public static func getDeviceId() async -> String? {
-        guard isInitialized,
-              let authService = serviceContainer.authenticationService else {
+        guard isInitialized else {
             return nil
         }
-        return await authService.getDeviceId()
+
+        // Try to get from local storage first
+        if let deviceId = getStoredDeviceId() {
+            return deviceId
+        }
+
+        // Fallback to auth service if available
+        if let authService = serviceContainer.authenticationService {
+            return await authService.getDeviceId()
+        }
+
+        return nil
+    }
+
+    // MARK: - SDK State Management
+
+    /// Check if SDK has been initialized
+    /// - Returns: true if SDK has been initialized
+    public static func hasBeenInitialized() -> Bool {
+        return isSDKInitialized
+    }
+
+    /// Check if SDK is active and ready for use
+    /// - Returns: true if SDK is initialized and has valid configuration
+    public static func isActive() -> Bool {
+        return hasBeenInitialized() && initParams != nil
+    }
+
+    /// Reset SDK state (for testing purposes)
+    /// Clears all initialization state and cached data
+    public static func reset() {
+        let logger = SDKLogger(category: "RunAnywhere.Reset")
+        logger.info("Resetting SDK state...")
+
+        // Clear initialization state
+        isInitialized = false
+        initParams = nil
+        currentEnvironment = nil
+        configurationData = nil
+
+        // Clear device registration
+        clearStoredDeviceId()
+
+        // Reset service container if needed
+        serviceContainer.reset()
+
+        logger.info("SDK state reset completed")
+    }
+
+    /// Get current SDK version
+    /// - Returns: SDK version string
+    public static func getSDKVersion() -> String {
+        return "1.0.0" // TODO: Get from build configuration
+    }
+
+    /// Get current environment
+    /// - Returns: Current SDK environment
+    public static func getCurrentEnvironment() -> SDKEnvironment? {
+        return currentEnvironment
+    }
+
+    /// Check if device is registered
+    /// - Returns: true if device has been registered with backend
+    public static func isDeviceRegistered() -> Bool {
+        return getStoredDeviceId() != nil
     }
 }
 
