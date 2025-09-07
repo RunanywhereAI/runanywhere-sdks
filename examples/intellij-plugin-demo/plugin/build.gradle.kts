@@ -1,6 +1,6 @@
 plugins {
     id("org.jetbrains.intellij") version "1.17.4"
-    kotlin("jvm") version "1.9.20"
+    kotlin("jvm") version "2.1.21"
 }
 
 group = "com.runanywhere"

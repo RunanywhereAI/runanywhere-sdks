@@ -47,11 +47,6 @@ class VoiceService(private val project: Project) : Disposable {
             return
         }
 
-        if (!RunAnywhere.isSTTPipelineReady()) {
-            showNotification("STT not ready", "STT model is not loaded. Please wait...", NotificationType.WARNING)
-            return
-        }
-
         if (isRecording) {
             println("Already recording")
             return
@@ -77,16 +72,18 @@ class VoiceService(private val project: Project) : Disposable {
             // Start recording in separate thread
             recordingThread = thread {
                 val buffer = ByteArray(4096)
+                var totalAudioData = ByteArrayOutputStream()
 
                 while (isRecording) {
                     val bytesRead = audioLine?.read(buffer, 0, buffer.size) ?: 0
                     if (bytesRead > 0) {
                         audioOutputStream.write(buffer, 0, bytesRead)
+                        totalAudioData.write(buffer, 0, bytesRead)
                     }
                 }
 
                 // Recording stopped, process the audio
-                val audioData = audioOutputStream.toByteArray()
+                val audioData = totalAudioData.toByteArray()
                 if (audioData.isNotEmpty()) {
                     processAudioData(audioData, onTranscription)
                 }
@@ -123,34 +120,33 @@ class VoiceService(private val project: Project) : Disposable {
             try {
                 println("VoiceService: Processing ${audioData.size} bytes of audio data")
 
-                // Analyze audio levels
-                val audioLevels = analyzeAudioLevels(audioData)
-                println("VoiceService: Audio analysis - Max: ${audioLevels.max}, Average: ${audioLevels.average}, RMS: ${audioLevels.rms}")
-                println("VoiceService: Audio has significant content: ${audioLevels.hasSignificantAudio}")
+                showNotification("Processing", "Transcribing audio with STT pipeline... (${audioData.size} bytes)", NotificationType.INFORMATION)
 
-                showNotification("Processing", "Transcribing audio... (${audioData.size} bytes)", NotificationType.INFORMATION)
+                // Transcribe using SDK
+                val startTime = System.currentTimeMillis()
+                val transcriptionText = RunAnywhere.transcribe(audioData)
+                val endTime = System.currentTimeMillis()
+                val processingTime = endTime - startTime
 
-                // Use SDK to transcribe with enhanced sensitivity
-                println("VoiceService: Calling RunAnywhere.transcribeSensitive() for better speech detection...")
-                val transcription = RunAnywhere.transcribeSensitive(audioData)
-                println("VoiceService: Raw transcription result: '$transcription' (length: ${transcription.length})")
+                println("VoiceService: Transcription result: '$transcriptionText' (time: ${processingTime}ms)")
 
-                if (transcription.isNotEmpty()) {
-                    // Check if it's just punctuation or actually meaningful
-                    val meaningfulText = transcription.trim().replace(Regex("[.!?\\s]+"), "")
+                if (transcriptionText.isNotEmpty()) {
+                    // Check if it's meaningful content
+                    val meaningfulText = transcriptionText.trim().replace(Regex("[.!?\\s]+"), "")
                     if (meaningfulText.isNotEmpty()) {
-                        println("VoiceService: Meaningful transcription found: '$transcription'")
-                        onTranscription(transcription)
-                        showNotification("Transcription Complete", transcription, NotificationType.INFORMATION)
+                        println("VoiceService: Meaningful transcription found: '$transcriptionText'")
+                        onTranscription(transcriptionText)
+                        showNotification("Transcription Complete",
+                            "Result: $transcriptionText",
+                            NotificationType.INFORMATION)
                     } else {
-                        println("VoiceService: Only punctuation detected, likely no speech or low audio quality")
-                        val message = "Only punctuation detected. Try speaking louder or closer to microphone. Audio stats: max=${audioLevels.max}, avg=${audioLevels.average}"
-                        onTranscription(message)
-                        showNotification("Low Audio Quality", message, NotificationType.WARNING)
+                        println("VoiceService: Only punctuation detected")
+                        onTranscription("Only punctuation detected in audio")
+                        showNotification("Low Quality Audio", "Only punctuation detected", NotificationType.WARNING)
                     }
                 } else {
                     println("VoiceService: Empty transcription result")
-                    showNotification("No Speech", "No speech detected in the recording", NotificationType.WARNING)
+                    showNotification("No Speech", "No speech detected in audio", NotificationType.WARNING)
                 }
 
             } catch (e: Exception) {
@@ -160,40 +156,6 @@ class VoiceService(private val project: Project) : Disposable {
             }
         }
     }
-
-    private fun analyzeAudioLevels(audioData: ByteArray): AudioLevels {
-        if (audioData.size < 2) return AudioLevels(0, 0.0, 0.0, false)
-
-        var maxLevel = 0
-        var sumSquares = 0.0
-        var sum = 0.0
-        val sampleCount = audioData.size / 2
-
-        for (i in 0 until audioData.size - 1 step 2) {
-            // Convert bytes to 16-bit signed integer (little endian)
-            val sample = ((audioData[i + 1].toInt() shl 8) or (audioData[i].toInt() and 0xFF)).toShort().toInt()
-            val absSample = kotlin.math.abs(sample)
-
-            maxLevel = kotlin.math.max(maxLevel, absSample)
-            sum += absSample
-            sumSquares += sample * sample
-        }
-
-        val average = sum / sampleCount
-        val rms = kotlin.math.sqrt(sumSquares / sampleCount)
-
-        // Consider audio significant if max > 1000 (out of 32767) and RMS > 500
-        val hasSignificantAudio = maxLevel > 1000 && rms > 500
-
-        return AudioLevels(maxLevel, average, rms, hasSignificantAudio)
-    }
-
-    private data class AudioLevels(
-        val max: Int,
-        val average: Double,
-        val rms: Double,
-        val hasSignificantAudio: Boolean
-    )
 
     fun isRecording(): Boolean = isRecording
 

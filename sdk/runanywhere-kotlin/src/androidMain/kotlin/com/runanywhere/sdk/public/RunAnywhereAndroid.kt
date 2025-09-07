@@ -38,9 +38,17 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             "Android context not provided. Use RunAnywhere.initialize(context, ...) on Android"
         )
 
-        // Android uses Keystore for secure storage
-        androidLogger.info("Storing credentials in Android Keystore")
-        // TODO: Implement Android Keystore storage
+        // Android uses EncryptedSharedPreferences for secure storage
+        androidLogger.info("Storing credentials in Android secure storage")
+
+        // Initialize AndroidPlatformContext if not already done
+        if (!com.runanywhere.sdk.storage.AndroidPlatformContext.isInitialized()) {
+            com.runanywhere.sdk.storage.AndroidPlatformContext.initialize(context)
+        }
+
+        // Store API key securely
+        val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+        secureStorage.setSecureString("com.runanywhere.sdk.apiKey", params.apiKey)
     }
 
     override suspend fun initializeDatabase() {
@@ -76,19 +84,33 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     override suspend fun availableModels(): List<ModelInfo> {
         requireInitialized()
-        // TODO: Implement actual model listing
-        return emptyList()
+        return serviceContainer.modelInfoService.getAvailableModels()
     }
 
     override suspend fun downloadModel(modelId: String): Flow<Float> {
         requireInitialized()
-        // TODO: Implement actual model downloading with progress
-        return flowOf(1.0f)
+        val modelInfo = serviceContainer.modelInfoService.getModelInfo(modelId)
+            ?: throw IllegalArgumentException("Model not found: $modelId")
+
+        return serviceContainer.downloadService.downloadModel(modelInfo)
     }
 
     override suspend fun transcribe(audioData: ByteArray): String {
         requireInitialized()
-        // TODO: Implement actual transcription
-        return "Transcription not yet implemented on Android"
+
+        // Get the STT component from the service container
+        val sttComponent = serviceContainer.sttComponent
+
+        // Create STT options with default values
+        val options = com.runanywhere.sdk.components.stt.STTOptions(
+            language = "en",
+            enableTimestamps = false,
+            translateToEnglish = false
+        )
+
+        // Perform transcription
+        val result = sttComponent.transcribe(audioData, options)
+
+        return result.transcript
     }
 }

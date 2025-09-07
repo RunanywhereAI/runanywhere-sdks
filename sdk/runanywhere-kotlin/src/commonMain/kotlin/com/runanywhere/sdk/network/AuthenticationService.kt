@@ -58,7 +58,7 @@ data class HealthCheckResponse(
  */
 class DefaultAuthenticationService(
     private val apiClient: APIClient,
-    private val secureStorage: SecureStorage
+    private val secureStorage: com.runanywhere.sdk.storage.SecureStorage
 ) : AuthenticationService {
 
     private val logger = SDKLogger("AuthenticationService")
@@ -168,9 +168,9 @@ class DefaultAuthenticationService(
         tokenExpiresAt = null
 
         // Clear from secure storage
-        secureStorage.remove(ACCESS_TOKEN_KEY)
-        secureStorage.remove(REFRESH_TOKEN_KEY)
-        secureStorage.remove(TOKEN_EXPIRY_KEY)
+        secureStorage.removeSecure(ACCESS_TOKEN_KEY)
+        secureStorage.removeSecure(REFRESH_TOKEN_KEY)
+        secureStorage.removeSecure(TOKEN_EXPIRY_KEY)
 
         logger.info("Authentication cleared")
     }
@@ -201,18 +201,18 @@ class DefaultAuthenticationService(
         tokenExpiresAt = now + response.expiresIn
 
         // Store in secure storage for persistence
-        secureStorage.store(ACCESS_TOKEN_KEY, response.accessToken)
+        secureStorage.setSecureString(ACCESS_TOKEN_KEY, response.accessToken)
         response.refreshToken?.let {
-            secureStorage.store(REFRESH_TOKEN_KEY, it)
+            secureStorage.setSecureString(REFRESH_TOKEN_KEY, it)
         }
-        secureStorage.store(TOKEN_EXPIRY_KEY, tokenExpiresAt.toString())
+        secureStorage.setSecureString(TOKEN_EXPIRY_KEY, tokenExpiresAt.toString())
     }
 
     suspend fun loadStoredTokens() {
         try {
-            accessToken = secureStorage.retrieve(ACCESS_TOKEN_KEY)
-            refreshToken = secureStorage.retrieve(REFRESH_TOKEN_KEY)
-            secureStorage.retrieve(TOKEN_EXPIRY_KEY)?.toLongOrNull()?.let {
+            accessToken = secureStorage.getSecureString(ACCESS_TOKEN_KEY)
+            refreshToken = secureStorage.getSecureString(REFRESH_TOKEN_KEY)
+            secureStorage.getSecureString(TOKEN_EXPIRY_KEY)?.toLongOrNull()?.let {
                 tokenExpiresAt = it
             }
 
@@ -223,15 +223,4 @@ class DefaultAuthenticationService(
             logger.error("Failed to load stored tokens", e)
         }
     }
-}
-
-
-/**
- * Secure storage interface for token persistence
- */
-interface SecureStorage {
-    fun store(key: String, value: String)
-    fun retrieve(key: String): String?
-    fun remove(key: String)
-    fun clear()
 }
