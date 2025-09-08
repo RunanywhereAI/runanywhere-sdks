@@ -1,18 +1,11 @@
 package com.runanywhere.sdk.public
 
 import com.runanywhere.sdk.components.stt.STTComponent
-import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
-import com.runanywhere.sdk.components.vad.VADConfiguration
-import com.runanywhere.sdk.data.models.ConfigurationData
-import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKInitParams
-import com.runanywhere.sdk.foundation.PlatformContext
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.storage.createFileSystem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -74,10 +67,43 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     override suspend fun transcribe(audioData: ByteArray): String {
         requireInitialized()
 
-        // Simple transcription without VAD for now
-        val result = sttComponent?.transcribe(audioData)
-            ?: throw IllegalStateException("STT component not initialized")
+        // Ensure STT component is initialized
+        var sttComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT) as? STTComponent
 
+        jvmLogger.info("STT component from service container: ${sttComponent}, state: ${sttComponent?.state}")
+
+        if (sttComponent == null || sttComponent.state != com.runanywhere.sdk.components.base.ComponentState.READY) {
+            // Try to initialize STT component if not ready
+            jvmLogger.info("STT component not ready (state: ${sttComponent?.state}), attempting initialization...")
+            try {
+                val containerComponent = serviceContainer.sttComponent
+                jvmLogger.info("Container STT component state before init: ${containerComponent.state}")
+
+                containerComponent.initialize()
+
+                jvmLogger.info("Container STT component state after init: ${containerComponent.state}")
+                sttComponent = containerComponent
+
+                if (sttComponent.state == com.runanywhere.sdk.components.base.ComponentState.READY) {
+                    jvmLogger.info("STT component initialized successfully and is READY")
+                } else {
+                    jvmLogger.error("STT component initialized but not READY, state: ${sttComponent.state}")
+                }
+            } catch (e: Exception) {
+                jvmLogger.error("Failed to initialize STT component: ${e.message}", e)
+                throw IllegalStateException(
+                    "STT component could not be initialized: ${e.message}",
+                    e
+                )
+            }
+        }
+
+        if (sttComponent.state != com.runanywhere.sdk.components.base.ComponentState.READY) {
+            jvmLogger.error("STT component is not in READY state after init attempt: ${sttComponent.state}")
+            throw IllegalStateException("STT component is not in READY state: ${sttComponent.state}")
+        }
+
+        val result = sttComponent.transcribe(audioData)
         return result.text
     }
 
@@ -106,13 +132,17 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         }
     }
 
-    override suspend fun generate(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): String {
+    override suspend fun generate(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): String {
         requireInitialized()
 
         jvmLogger.info("Generating response for prompt: ${prompt.take(50)}...")
 
         // Convert RunAnywhereGenerationOptions to GenerationOptions
-        val generationOptions = options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions()
+        val generationOptions =
+            options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions()
 
         // Use generation service from service container
         val result = serviceContainer.generationService.generate(prompt, generationOptions)
@@ -121,14 +151,18 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
-    override fun generateStream(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): Flow<String> {
+    override fun generateStream(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): Flow<String> {
         requireInitialized()
 
         jvmLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
 
         // Convert RunAnywhereGenerationOptions to GenerationOptions
-        val generationOptions = options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions(
-        )
+        val generationOptions =
+            options?.toGenerationOptions() ?: com.runanywhere.sdk.generation.GenerationOptions(
+            )
 
         // Use streaming service from service container
         return serviceContainer.streamingService.stream(prompt, generationOptions)

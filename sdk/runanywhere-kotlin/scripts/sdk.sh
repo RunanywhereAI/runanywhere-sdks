@@ -192,6 +192,11 @@ cmd_build_all() {
     if [[ -f "build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar" ]]; then
         print_success "✅ JVM JAR built: build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar"
         echo "   Size: $(du -h build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar | cut -f1)"
+
+        # Optionally publish
+        if [[ "$OPT_PUBLISH" == "true" ]]; then
+            cmd_publish_jvm
+        fi
     else
         print_warning "⚠️ JVM JAR not found"
     fi
@@ -268,6 +273,7 @@ ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
     ${YELLOW}plugin-as${NC}       Build SDK and plugin for Android Studio
     ${YELLOW}run-plugin${NC}      Build and run IntelliJ IDEA with plugin
     ${YELLOW}run-plugin-as${NC}   Build and run Android Studio with plugin
+    ${YELLOW}dev-plugin${NC}      Clean rebuild SDK, force recompile and run plugin
     ${YELLOW}android${NC}         Build Android AAR library
     ${YELLOW}all${NC}             Build all targets (JVM, Android, Native)
     ${YELLOW}clean${NC}           Clean all build artifacts
@@ -400,6 +406,22 @@ cmd_clean() {
     gradle_exec clean
     rm -rf build/
     print_success "Build artifacts cleaned"
+}
+
+# Clean JVM build
+cmd_clean_jvm() {
+    print_header "Cleaning JVM Build"
+
+    echo "▶ Removing JVM build artifacts..."
+    rm -rf build/classes/kotlin/jvm*
+    rm -rf build/kotlin/jvm*
+    rm -rf build/libs/*jvm*.jar
+    rm -rf build/tmp/jvm*
+
+    echo "▶ Cleaning Gradle caches..."
+    ./gradlew clean --no-build-cache
+
+    print_success "JVM build cleaned successfully!"
 }
 
 # Build JVM target (primary for IntelliJ plugins)
@@ -1348,6 +1370,28 @@ build_plugin_for_ide() {
     fi
 }
 
+# Development plugin workflow - force clean rebuild and run
+cmd_dev_plugin() {
+    print_header "Development Plugin Workflow - Force Clean Rebuild"
+
+    # Step 1: Clean all build artifacts
+    print_step "Cleaning all build artifacts..."
+    cmd_clean
+
+    # Step 2: Force recompile by touching source files to invalidate cache
+    print_step "Invalidating build cache..."
+    find src/commonMain/kotlin -name "*.kt" -exec touch {} \; 2>/dev/null || true
+
+    # Step 3: Build JVM and publish to Maven Local
+    print_step "Building and publishing SDK..."
+    cmd_jvm
+    cmd_publish_jvm
+
+    # Step 4: Run plugin
+    print_step "Running plugin with fresh SDK..."
+    run_plugin_for_ide "IC" "IntelliJ IDEA"
+}
+
 # Run plugin - build and run IntelliJ with plugin
 cmd_run_plugin() {
     run_plugin_for_ide "IC" "IntelliJ IDEA"
@@ -1429,12 +1473,13 @@ for cmd in "${COMMANDS[@]}"; do
         android)        cmd_android ;;
         native)         cmd_native ;;
         all)            cmd_all ;;
-
+        clean-jvm)      cmd_clean_jvm ;;
         # Plugin commands
         plugin)         cmd_plugin ;;
         plugin-as)      cmd_plugin_as ;;
         run-plugin)     cmd_run_plugin ;;
         run-plugin-as)  cmd_run_plugin_as ;;
+        dev-plugin)     cmd_dev_plugin ;;
 
         # Build commands
         jar)            cmd_jvm ;;

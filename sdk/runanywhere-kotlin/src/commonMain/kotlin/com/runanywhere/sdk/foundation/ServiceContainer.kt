@@ -118,16 +118,28 @@ class ServiceContainer {
      * Bootstrap services for development mode with mock data
      */
     suspend fun bootstrapDevelopmentMode(params: SDKInitParams): ConfigurationData {
+        logger.info("🧪 DEVELOPMENT MODE: Starting bootstrap process...")
         logger.info("Bootstrapping services for development mode")
 
         // Step 1: Register default modules (including WhisperKit for development)
+        logger.info("🔧 Step 1: Registering default modules...")
         registerDefaultModules()
+        logger.info("✅ Step 1 completed")
 
         // Step 2: Initialize authentication (even in dev mode)
+        logger.info("🔧 Step 2: Initializing authentication...")
         authenticationService.initialize(params.apiKey)
+        logger.info("✅ Step 2 completed")
 
         // Step 3: Initialize services
+        logger.info("🔧 Step 3: Initializing model info service...")
         modelInfoService.initialize()
+        logger.info("✅ Step 3 completed")
+
+        // Step 3a: Populate with mock models in development mode
+        logger.info("🚀 About to populate mock models...")
+        populateMockModels()
+        logger.info("🚀 Mock model population completed")
 
         // Step 4: Initialize components
         initializeComponents()
@@ -188,9 +200,13 @@ class ServiceContainer {
         }
 
         try {
-            // Initialize STT component
-            sttComponent.initialize()
-            logger.info("✅ STT component initialized")
+            // Initialize STT component only if a provider is registered
+            if (ModuleRegistry.hasSTT) {
+                sttComponent.initialize()
+                logger.info("✅ STT component initialized")
+            } else {
+                logger.info("ℹ️ STT component skipped - no provider registered yet")
+            }
         } catch (e: Exception) {
             logger.warn("⚠️ STT component initialization failed: ${e.message}")
         }
@@ -221,6 +237,55 @@ class ServiceContainer {
      * Add logging
      */
     private val logger = SDKLogger("ServiceContainer")
+
+    /**
+     * Populate ModelInfoService with ONLY whisper-base model in development mode
+     * Hardcoded exactly like iOS MockNetworkService whisper-base model
+     */
+    private suspend fun populateMockModels() {
+        logger.info("🔄 Populating ModelInfoService with whisper-base model for development mode")
+
+        try {
+            // Create hardcoded whisper-base model exactly like iOS
+            val whisperBaseModel = com.runanywhere.sdk.models.ModelInfo(
+                id = "whisper-base",
+                name = "Whisper Base",
+                category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
+                format = com.runanywhere.sdk.models.enums.ModelFormat.MLMODEL,
+                downloadURL = "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
+                localPath = null,
+                downloadSize = 74_000_000L, // 74MB like iOS
+                memoryRequired = 74_000_000L, // 74MB like iOS
+                compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT),
+                preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT,
+                contextLength = 0,
+                supportsThinking = false,
+                createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
+                updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now()
+            )
+
+            logger.info("💾 Saving whisper-base model directly...")
+            modelInfoService.saveModel(whisperBaseModel)
+            logger.info("✅ Whisper Base model saved successfully!")
+
+            // Verify it's accessible
+            val savedWhisperBase = modelInfoService.getModel("whisper-base")
+            if (savedWhisperBase != null) {
+                logger.info("✅ Whisper Base model verified and retrievable")
+                logger.info("🎙️ Whisper Base: ${savedWhisperBase.name} (74MB)")
+            } else {
+                logger.error("❌ Whisper Base model not found after save!")
+            }
+
+            // Check total models
+            val allModels = modelInfoService.getAllModels()
+            logger.info("🔍 Total models in ModelInfoService: ${allModels.size}")
+
+        } catch (e: Exception) {
+            logger.error("❌ Failed to populate whisper-base model: ${e.message}", e)
+            e.printStackTrace()
+        }
+    }
 
     /**
      * Cleanup all services

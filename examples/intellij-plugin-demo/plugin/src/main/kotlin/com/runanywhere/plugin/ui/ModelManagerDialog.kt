@@ -124,7 +124,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
 
                         tableModel.addRow(arrayOf(
                             model.id,
-                            model.name ?: "Unknown",
+                            model.name,
                             model.category.name,
                             sizeMB,
                             "Available"
