@@ -80,6 +80,7 @@ iOSInjectionProject/
 
 # IDE
 .idea/
+!.idea/runConfigurations/
 .vscode/
 *.swp
 *.swo

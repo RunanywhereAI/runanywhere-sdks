@@ -11,6 +11,7 @@
             </option>
             <option name="taskNames">
                 <list>
+                    <option value="clean" />
                     <option value="buildPlugin" />
                 </list>
             </option>

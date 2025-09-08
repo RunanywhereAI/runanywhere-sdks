@@ -1,9 +1,6 @@
-
-// Build script for RunAnywhere IntelliJ plugin
-
 plugins {
     id("org.jetbrains.intellij") version "1.17.4"
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm") version "2.1.21"
 }
 
 group = "com.runanywhere"
@@ -22,12 +19,14 @@ repositories {
 
 dependencies {
     // RunAnywhere KMP SDK
-    implementation("com.runanywhere.sdk:runanywhere-kotlin-jvm:0.1.0")
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+
+    // Note: Coroutines are provided by IntelliJ Platform
 }
 
 tasks {
     patchPluginXml {
-        sinceBuild.set("233")
+        sinceBuild.set("241")
         untilBuild.set("271.*")
         changeNotes.set(
             """
@@ -53,8 +52,4 @@ tasks {
 
 kotlin {
     jvmToolchain(17)
-    compilerOptions {
-        freeCompilerArgs.add("-Xskip-metadata-version-check")
-        freeCompilerArgs.add("-Xsuppress-version-warnings")
-    }
 }
