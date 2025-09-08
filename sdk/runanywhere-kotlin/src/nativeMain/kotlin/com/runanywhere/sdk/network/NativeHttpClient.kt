@@ -93,3 +93,8 @@ internal class NativeHttpClient : HttpClient {
  * Factory function to create HttpClient for native platforms
  */
 actual fun createHttpClient(): HttpClient = NativeHttpClient()
+
+/**
+ * Factory function to create configured HttpClient for native platforms
+ */
+actual fun createHttpClient(config: NetworkConfiguration): HttpClient = NativeHttpClient()

@@ -1,5 +1,6 @@
 package com.runanywhere.plugin.ui
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
@@ -92,7 +93,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                     RunAnywhere.availableModels()
                 } catch (e: Exception) {
                     logger.error("Failed to fetch models", e)
-                    withContext(Dispatchers.Main) {
+                    ApplicationManager.getApplication().invokeLater {
                         statusLabel.text = "Failed to fetch models: ${e.message}"
                     }
                     return@launch
@@ -100,7 +101,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
 
                 logger.info("Fetched ${models.size} models")
 
-                withContext(Dispatchers.Main) {
+                ApplicationManager.getApplication().invokeLater {
                     // Clear existing rows
                     tableModel.rowCount = 0
 
@@ -113,7 +114,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                             "No models available. Please check SDK initialization.",
                             "No Models Available"
                         )
-                        return@withContext
+                        return@invokeLater
                     }
 
                     // Add models to table

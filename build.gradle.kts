@@ -1,3 +1,4 @@
+
 // Root build script for RunAnywhere Android SDK
 
 plugins {
@@ -10,12 +11,7 @@ allprojects {
     group = "com.runanywhere"
     version = "0.1.0"
 
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://jitpack.io") }
-        mavenLocal()
-    }
+    // Remove repositories from here - they are defined in settings.gradle.kts
 }
 
 // Configure subprojects (not composite builds)

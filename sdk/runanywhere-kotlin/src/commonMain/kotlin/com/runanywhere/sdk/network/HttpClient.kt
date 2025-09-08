@@ -35,6 +35,7 @@ data class HttpResponse(
 /**
  * Platform-agnostic HTTP client interface
  * Provides common HTTP operations that are implemented differently on each platform
+ * Enhanced with multipart support and advanced features
  */
 interface HttpClient {
     /**
@@ -99,9 +100,31 @@ interface HttpClient {
      * Set default headers that will be included in all requests
      */
     fun setDefaultHeaders(headers: Map<String, String>)
+
+    /**
+     * Cancel all pending requests (platform-specific implementation)
+     */
+    fun cancelAllRequests() {}
 }
+
+/**
+ * Configuration for HTTP client behavior
+ */
+data class HttpClientConfig(
+    val connectTimeoutMs: Long = 30_000,
+    val readTimeoutMs: Long = 30_000,
+    val writeTimeoutMs: Long = 30_000,
+    val enableLogging: Boolean = false,
+    val maxRetries: Int = 3,
+    val retryDelayMs: Long = 1000
+)
 
 /**
  * Expected to be provided by each platform
  */
 expect fun createHttpClient(): HttpClient
+
+/**
+ * Expected to be provided by each platform with configuration
+ */
+expect fun createHttpClient(config: NetworkConfiguration): HttpClient
