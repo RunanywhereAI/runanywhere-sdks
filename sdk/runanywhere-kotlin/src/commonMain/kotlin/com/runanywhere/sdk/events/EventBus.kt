@@ -35,6 +35,14 @@ object EventBus {
     private val _speakerDiarizationEvents = MutableSharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent>()
     val speakerDiarizationEvents: SharedFlow<com.runanywhere.sdk.components.speakerdiarization.SpeakerDiarizationEvent> = _speakerDiarizationEvents.asSharedFlow()
 
+    // Bootstrap Events - For detailed 8-step initialization tracking
+    private val _bootstrapEvents = MutableSharedFlow<SDKBootstrapEvent>()
+    val bootstrapEvents: SharedFlow<SDKBootstrapEvent> = _bootstrapEvents.asSharedFlow()
+
+    // Device Events - For device information tracking
+    private val _deviceEvents = MutableSharedFlow<SDKDeviceEvent>()
+    val deviceEvents: SharedFlow<SDKDeviceEvent> = _deviceEvents.asSharedFlow()
+
     // Publish methods (non-suspending for easier usage)
     fun publish(event: SDKInitializationEvent) {
         _initializationEvents.tryEmit(event)
@@ -64,6 +72,14 @@ object EventBus {
         _speakerDiarizationEvents.tryEmit(event)
     }
 
+    fun publish(event: SDKBootstrapEvent) {
+        _bootstrapEvents.tryEmit(event)
+    }
+
+    fun publish(event: SDKDeviceEvent) {
+        _deviceEvents.tryEmit(event)
+    }
+
     val shared = EventBus
 }
 
@@ -72,6 +88,11 @@ sealed class SDKInitializationEvent {
     object Started : SDKInitializationEvent()
     object Completed : SDKInitializationEvent()
     data class Failed(val error: Throwable) : SDKInitializationEvent()
+
+    // Step-by-step initialization events matching iOS 8-step process
+    data class StepStarted(val step: Int, val stepName: String) : SDKInitializationEvent()
+    data class StepCompleted(val step: Int, val stepName: String, val durationMs: Long) : SDKInitializationEvent()
+    data class StepFailed(val step: Int, val stepName: String, val error: Throwable) : SDKInitializationEvent()
 }
 
 sealed class SDKModelEvent {
@@ -107,6 +128,63 @@ sealed class SDKGenerationEvent {
 // Import types for event usage
 typealias ConfigurationData = com.runanywhere.sdk.data.models.ConfigurationData
 typealias GenerationResult = com.runanywhere.sdk.generation.GenerationResult
+
+/**
+ * Bootstrap Events - For detailed 8-step initialization tracking
+ * Matches iOS bootstrap process events
+ */
+sealed class SDKBootstrapEvent {
+    // Step 1: Network Services Configuration
+    object NetworkServicesConfigured : SDKBootstrapEvent()
+    data class NetworkServicesConfigurationFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 2: Device Information Collection and Sync
+    data class DeviceInfoCollected(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKBootstrapEvent()
+    data class DeviceInfoCollectionFailed(val error: String) : SDKBootstrapEvent()
+    data class DeviceInfoSynced(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKBootstrapEvent()
+    data class DeviceInfoSyncFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 3: Configuration Service with Repository Pattern
+    data class ConfigurationLoaded(val config: ConfigurationData) : SDKBootstrapEvent()
+    data class ConfigurationLoadFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 4: Model Catalog Sync from Backend
+    data class ModelCatalogSynced(val models: List<com.runanywhere.sdk.models.ModelInfo>) : SDKBootstrapEvent()
+    data class ModelCatalogSyncFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 5: Model Registry Initialization
+    object ModelRegistryInitialized : SDKBootstrapEvent()
+    data class ModelRegistryInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 6: Memory Management Configuration
+    data class MemoryConfigured(val threshold: Long) : SDKBootstrapEvent()
+    data class MemoryConfigurationFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 7: Voice Services Initialization (Optional)
+    object VoiceServicesInitialized : SDKBootstrapEvent()
+    data class VoiceServicesInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    // Step 8: Analytics Initialization
+    object AnalyticsInitialized : SDKBootstrapEvent()
+    data class AnalyticsInitializationFailed(val error: String) : SDKBootstrapEvent()
+
+    // Bootstrap start/completion
+    object BootstrapStarted : SDKBootstrapEvent()
+    object BootstrapCompleted : SDKBootstrapEvent()
+    data class BootstrapFailed(val step: String, val error: String) : SDKBootstrapEvent()
+}
+
+/**
+ * Device Events - For device information tracking
+ * Matches iOS device-related events
+ */
+sealed class SDKDeviceEvent {
+    data class DeviceInfoCollected(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKDeviceEvent()
+    data class DeviceInfoSynced(val deviceInfo: com.runanywhere.sdk.data.models.DeviceInfoData) : SDKDeviceEvent()
+    data class DeviceInfoSyncFailed(val error: String) : SDKDeviceEvent()
+    data class DeviceCapabilitiesAssessed(val assessment: com.runanywhere.sdk.data.models.DeviceCapabilityAssessment) : SDKDeviceEvent()
+    data class DevicePerformanceUpdated(val metrics: com.runanywhere.sdk.data.models.DevicePerformanceMetrics) : SDKDeviceEvent()
+}
 
 // Import ComponentEvent from STTEvents for use in EventBus
 // Note: ComponentEvent and related classes are defined in STTEvents.kt

@@ -23,7 +23,13 @@ kotlin {
     }
 
     // Android target
-    androidTarget()
+    androidTarget {
+        compilations.all {
+            kotlinOptions {
+                jvmTarget = "17"
+            }
+        }
+    }
 
     // Native targets (temporarily disabled to fix compilation issues)
     // linuxX64()
@@ -38,6 +44,12 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.kotlinx.datetime)
+
+                // Ktor for networking
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.client.logging)
+                implementation(libs.ktor.serialization.kotlinx.json)
             }
         }
 
@@ -61,6 +73,8 @@ kotlin {
                 implementation(libs.gson)
                 // File operations
                 implementation(libs.commons.io)
+                // Ktor engine for JVM/Android
+                implementation(libs.ktor.client.okhttp)
             }
         }
 

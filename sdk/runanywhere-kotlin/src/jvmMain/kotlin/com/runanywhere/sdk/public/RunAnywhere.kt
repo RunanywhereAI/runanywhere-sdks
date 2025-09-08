@@ -29,7 +29,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     override suspend fun initializeDatabase() {
         // JVM uses file-based database
         jvmLogger.info("Initializing file-based database for JVM")
-        // Database initialization is handled by ServiceContainer
+
+        // Initialize ServiceContainer with platform context and environment
+        val platformContext = com.runanywhere.sdk.foundation.PlatformContext()
+        serviceContainer.initialize(platformContext, currentEnvironment)
+
+        jvmLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
     }
 
     override suspend fun authenticateWithBackend(params: SDKInitParams) {

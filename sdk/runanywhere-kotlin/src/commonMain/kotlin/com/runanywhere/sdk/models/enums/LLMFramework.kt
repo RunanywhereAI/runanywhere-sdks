@@ -1,8 +1,11 @@
 package com.runanywhere.sdk.models.enums
 
+import kotlinx.serialization.Serializable
+
 /**
  * Supported LLM frameworks - exact match with iOS
  */
+@Serializable
 enum class LLMFramework(val value: String, val displayName: String) {
     CORE_ML("CoreML", "Core ML"),
     TENSOR_FLOW_LITE("TFLite", "TensorFlow Lite"),
@@ -11,6 +14,7 @@ enum class LLMFramework(val value: String, val displayName: String) {
     ONNX("ONNX", "ONNX Runtime"),
     EXECU_TORCH("ExecuTorch", "ExecuTorch"),
     LLAMA_CPP("LlamaCpp", "llama.cpp"),
+    LLAMACPP("LlamaCpp", "llama.cpp"), // Alias for compatibility
     FOUNDATION_MODELS("FoundationModels", "Foundation Models"),
     PICO_LLM("PicoLLM", "Pico LLM"),
     MLC("MLC", "MLC"),

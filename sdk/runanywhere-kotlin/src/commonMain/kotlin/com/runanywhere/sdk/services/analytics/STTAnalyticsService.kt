@@ -9,6 +9,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.json.Json
 
 /**
@@ -50,7 +51,7 @@ class STTAnalyticsService(
         currentSessionId = sessionId
         sessionStartTimes[sessionId] = getCurrentTimeMillis()
 
-        val event = AnalyticsEvent.TranscriptionStarted(
+        val event = STTAnalyticsEvent.TranscriptionStarted(
             sessionId = sessionId,
             modelId = modelId,
             audioFormat = audioFormat,
@@ -78,7 +79,7 @@ class STTAnalyticsService(
             getCurrentTimeMillis() - it
         } ?: 0L
 
-        val event = AnalyticsEvent.TranscriptionCompleted(
+        val event = STTAnalyticsEvent.TranscriptionCompleted(
             sessionId = sessionId,
             duration = calculatedDuration,
             wordCount = wordCount,
@@ -103,7 +104,7 @@ class STTAnalyticsService(
         errorMessage: String,
         modelId: String? = null
     ) {
-        val event = AnalyticsEvent.TranscriptionError(
+        val event = STTAnalyticsEvent.TranscriptionError(
             sessionId = sessionId,
             errorCode = errorCode,
             errorMessage = errorMessage,
@@ -127,7 +128,7 @@ class STTAnalyticsService(
         energyLevel: Float,
         duration: Long
     ) {
-        val event = AnalyticsEvent.VADActivity(
+        val event = STTAnalyticsEvent.VADActivity(
             sessionId = sessionId,
             speechDetected = speechDetected,
             energyLevel = energyLevel,
@@ -147,7 +148,7 @@ class STTAnalyticsService(
         downloadTime: Long,
         success: Boolean
     ) {
-        val event = AnalyticsEvent.ModelDownload(
+        val event = STTAnalyticsEvent.ModelDownload(
             modelId = modelId,
             downloadSize = downloadSize,
             downloadTime = downloadTime,
@@ -168,7 +169,7 @@ class STTAnalyticsService(
         memoryUsed: Long,
         cpuUsage: Float? = null
     ) {
-        val event = AnalyticsEvent.PerformanceMetrics(
+        val event = STTAnalyticsEvent.PerformanceMetrics(
             sessionId = sessionId,
             realTimeFactor = realTimeFactor,
             memoryUsed = memoryUsed,
@@ -190,6 +191,19 @@ class STTAnalyticsService(
                 logger.error("Failed to queue analytics event: ${e.message}")
             }
         }
+    }
+
+    private fun sendEvent(event: STTAnalyticsEvent) {
+        // Convert STTAnalyticsEvent to AnalyticsEvent for compatibility
+        val analyticsEvent = when (event) {
+            is STTAnalyticsEvent.TranscriptionStarted -> AnalyticsEvent.VoiceOperation("transcription_started")
+            is STTAnalyticsEvent.TranscriptionCompleted -> AnalyticsEvent.VoiceOperation("transcription_completed")
+            is STTAnalyticsEvent.TranscriptionError -> AnalyticsEvent.VoiceOperation("transcription_error")
+            is STTAnalyticsEvent.VADActivity -> AnalyticsEvent.VoiceOperation("vad_activity")
+            is STTAnalyticsEvent.ModelDownload -> AnalyticsEvent.ModelOperation("download", "unknown")
+            is STTAnalyticsEvent.PerformanceMetrics -> AnalyticsEvent.VoiceOperation("performance_metrics")
+        }
+        sendEvent(analyticsEvent)
     }
 
     /**
@@ -287,10 +301,10 @@ class STTAnalyticsService(
 }
 
 /**
- * Analytics event types
+ * STT Analytics event types
  */
 @Serializable
-sealed class AnalyticsEvent {
+sealed class STTAnalyticsEvent {
     abstract val timestamp: Long
 
     @Serializable
@@ -301,7 +315,7 @@ sealed class AnalyticsEvent {
         val sampleRate: Int? = null,
         override val timestamp: Long,
         val deviceInfo: Map<String, String>
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 
     @Serializable
     data class TranscriptionCompleted(
@@ -311,7 +325,7 @@ sealed class AnalyticsEvent {
         val averageConfidence: Float,
         val language: String? = null,
         override val timestamp: Long
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 
     @Serializable
     data class TranscriptionError(
@@ -320,7 +334,7 @@ sealed class AnalyticsEvent {
         val errorMessage: String,
         val modelId: String? = null,
         override val timestamp: Long
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 
     @Serializable
     data class VADActivity(
@@ -329,7 +343,7 @@ sealed class AnalyticsEvent {
         val energyLevel: Float,
         val duration: Long,
         override val timestamp: Long
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 
     @Serializable
     data class ModelDownload(
@@ -338,7 +352,7 @@ sealed class AnalyticsEvent {
         val downloadTime: Long,
         val success: Boolean,
         override val timestamp: Long
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 
     @Serializable
     data class PerformanceMetrics(
@@ -347,7 +361,7 @@ sealed class AnalyticsEvent {
         val memoryUsed: Long,
         val cpuUsage: Float? = null,
         override val timestamp: Long
-    ) : AnalyticsEvent()
+    ) : STTAnalyticsEvent()
 }
 
 /**
@@ -355,7 +369,7 @@ sealed class AnalyticsEvent {
  */
 @Serializable
 data class AnalyticsBatch(
-    val events: List<AnalyticsEvent>,
+    val events: List<@Contextual AnalyticsEvent>,
     val deviceId: String,
     val platform: String,
     val sdkVersion: String,

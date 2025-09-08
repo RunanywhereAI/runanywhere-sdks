@@ -334,11 +334,38 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     protected abstract suspend fun performHealthCheck()
 
     override suspend fun cleanup() {
-        if (!_isInitialized) return
+        shutdown()
+    }
 
-        cleanupPlatform()
-        _isInitialized = false
-        println("SDK cleaned up")
+    /**
+     * Enhanced shutdown method matching iOS implementation
+     */
+    suspend fun shutdown() {
+        if (!_isInitialized) {
+            logger.info("SDK not initialized, nothing to shutdown")
+            return
+        }
+
+        logger.info("Shutting down RunAnywhere SDK...")
+
+        try {
+            // Cleanup service container
+            serviceContainer.cleanup()
+
+            // Platform-specific cleanup
+            cleanupPlatform()
+
+            // Reset state
+            _isInitialized = false
+            _configurationData = null
+            _initParams = null
+
+            logger.info("✅ SDK shutdown completed successfully")
+
+        } catch (error: Exception) {
+            logger.error("❌ SDK shutdown failed: ${error.message}")
+            throw error
+        }
     }
 
     /**

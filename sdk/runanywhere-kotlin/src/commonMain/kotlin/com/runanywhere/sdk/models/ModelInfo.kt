@@ -4,11 +4,13 @@ import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.utils.SimpleInstant
-import kotlin.jvm.Transient
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * Information about a model - exact match with iOS ModelInfo
  */
+@Serializable
 data class ModelInfo(
     // Essential identifiers
     val id: String,
@@ -81,6 +83,7 @@ data class ModelInfo(
 /**
  * Model information metadata - exact match with iOS
  */
+@Serializable
 data class ModelInfoMetadata(
     val author: String? = null,
     val license: String? = null,
@@ -97,6 +100,7 @@ data class ModelInfoMetadata(
 /**
  * Quantization level for models
  */
+@Serializable
 enum class QuantizationLevel(val value: String) {
     Q2_K("q2_k"),
     Q3_K_S("q3_k_s"),
@@ -126,6 +130,7 @@ enum class QuantizationLevel(val value: String) {
 /**
  * Configuration source
  */
+@Serializable
 enum class ConfigurationSource {
     LOCAL,
     REMOTE,

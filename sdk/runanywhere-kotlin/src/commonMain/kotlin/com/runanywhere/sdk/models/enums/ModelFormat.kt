@@ -1,8 +1,11 @@
 package com.runanywhere.sdk.models.enums
 
+import kotlinx.serialization.Serializable
+
 /**
  * Model formats supported - exact match with iOS
  */
+@Serializable
 enum class ModelFormat(val value: String) {
     MLMODEL("mlmodel"),
     MLPACKAGE("mlpackage"),

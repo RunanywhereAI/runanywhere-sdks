@@ -1,15 +1,19 @@
 package com.runanywhere.sdk.models.enums
 
+import kotlinx.serialization.Serializable
+
 /**
  * Defines the category/type of a model based on its input/output modality
  * This aligns with FrameworkModality for consistency across the SDK
  */
+@Serializable
 enum class ModelCategory(
     val value: String,
     val displayName: String,
     val iconName: String
 ) {
     LANGUAGE("language", "Language Model", "text_bubble"),
+    LANGUAGE_MODEL("language", "Language Model", "text_bubble"), // Alias for compatibility
     SPEECH_RECOGNITION("speech-recognition", "Speech Recognition", "mic"),
     SPEECH_SYNTHESIS("speech-synthesis", "Text-to-Speech", "speaker_wave_2"),
     VISION("vision", "Vision Model", "photo_badge_arrow_down"),
@@ -22,7 +26,7 @@ enum class ModelCategory(
      */
     val requiresContextLength: Boolean
         get() = when (this) {
-            LANGUAGE, MULTIMODAL -> true
+            LANGUAGE, LANGUAGE_MODEL, MULTIMODAL -> true
             else -> false
         }
 
@@ -31,7 +35,7 @@ enum class ModelCategory(
      */
     val supportsThinking: Boolean
         get() = when (this) {
-            LANGUAGE, MULTIMODAL -> true
+            LANGUAGE, LANGUAGE_MODEL, MULTIMODAL -> true
             else -> false
         }
 
@@ -46,7 +50,7 @@ enum class ModelCategory(
         fun from(framework: LLMFramework): ModelCategory {
             return when (framework) {
                 LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> SPEECH_RECOGNITION
-                LLMFramework.LLAMA_CPP, LLMFramework.MLX, LLMFramework.MLC,
+                LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP, LLMFramework.MLX, LLMFramework.MLC,
                 LLMFramework.EXECU_TORCH, LLMFramework.PICO_LLM,
                 LLMFramework.FOUNDATION_MODELS, LLMFramework.SWIFT_TRANSFORMERS -> LANGUAGE
 
