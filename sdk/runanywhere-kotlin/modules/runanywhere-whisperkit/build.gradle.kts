@@ -81,12 +81,11 @@ android {
 }
 
 publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            groupId = "com.runanywhere.sdk"
+    publications.withType<MavenPublication>().configureEach {
+        groupId = "com.runanywhere.sdk"
+        if (artifactId == "runanywhere-kotlin-modules-runanywhere-whisperkit") {
             artifactId = "runanywhere-whisperkit"
-            version = project.version.toString()
         }
+        version = project.version.toString()
     }
 }

@@ -5,7 +5,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.Project
-import com.runanywhere.plugin.RunAnywherePlugin
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.*
 import java.io.ByteArrayOutputStream
@@ -42,7 +41,7 @@ class VoiceService(private val project: Project) : Disposable {
     }
 
     fun startVoiceCapture(onTranscription: (String) -> Unit) {
-        if (!RunAnywherePlugin.isInitialized) {
+        if (!com.runanywhere.plugin.isInitialized) {
             showNotification("SDK not initialized", "Please wait for SDK initialization to complete", NotificationType.WARNING)
             return
         }
@@ -120,41 +119,93 @@ class VoiceService(private val project: Project) : Disposable {
             try {
                 println("VoiceService: Processing ${audioData.size} bytes of audio data")
 
-                showNotification("Processing", "Transcribing audio with STT pipeline... (${audioData.size} bytes)", NotificationType.INFORMATION)
+                showNotification("Processing", "Running VAD + WhisperKit STT pipeline... (${audioData.size} bytes)", NotificationType.INFORMATION)
 
-                // Transcribe using SDK
+                // Step 1: VAD preprocessing (optional - convert bytes to floats for VAD)
+                val audioSamples = convertAudioToFloats(audioData)
+                println("VoiceService: Converted to ${audioSamples.size} float samples")
+
+                // Step 2: Apply VAD filtering if available
+                val serviceContainer = com.runanywhere.sdk.foundation.ServiceContainer.shared
+                val processedAudioData = try {
+                    val vadComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.VAD)
+                        as? com.runanywhere.sdk.components.vad.VADComponent
+
+                    if (vadComponent != null && vadComponent.isEnabled()) {
+                        println("VoiceService: Applying VAD filtering...")
+                        val vadOutput = vadComponent.processAudioChunk(audioSamples)
+                        println("VoiceService: VAD result - Speech: ${vadOutput.isSpeech}, Energy: ${vadOutput.energyLevel}, Confidence: ${vadOutput.confidence}")
+
+                        if (vadOutput.isSpeech) {
+                            // VAD detected speech, proceed with original audio
+                            audioData
+                        } else {
+                            // VAD detected no speech, but still process for demo purposes
+                            println("VoiceService: VAD detected no speech, but proceeding with transcription...")
+                            audioData
+                        }
+                    } else {
+                        println("VoiceService: VAD not available, using raw audio")
+                        audioData
+                    }
+                } catch (e: Exception) {
+                    println("VoiceService: VAD processing failed: ${e.message}, using raw audio")
+                    audioData
+                }
+
+                // Step 3: Transcribe using SDK with WhisperKit
                 val startTime = System.currentTimeMillis()
-                val transcriptionText = RunAnywhere.transcribe(audioData)
+                val transcriptionText = RunAnywhere.transcribe(processedAudioData)
                 val endTime = System.currentTimeMillis()
                 val processingTime = endTime - startTime
 
                 println("VoiceService: Transcription result: '$transcriptionText' (time: ${processingTime}ms)")
 
+                // Step 4: Process results
                 if (transcriptionText.isNotEmpty()) {
                     // Check if it's meaningful content
                     val meaningfulText = transcriptionText.trim().replace(Regex("[.!?\\s]+"), "")
                     if (meaningfulText.isNotEmpty()) {
                         println("VoiceService: Meaningful transcription found: '$transcriptionText'")
                         onTranscription(transcriptionText)
-                        showNotification("Transcription Complete",
-                            "Result: $transcriptionText",
+                        showNotification("STT Pipeline Complete",
+                            "WhisperKit Result: $transcriptionText (${processingTime}ms)",
                             NotificationType.INFORMATION)
                     } else {
                         println("VoiceService: Only punctuation detected")
                         onTranscription("Only punctuation detected in audio")
-                        showNotification("Low Quality Audio", "Only punctuation detected", NotificationType.WARNING)
+                        showNotification("Low Quality Audio", "VAD + WhisperKit: Only punctuation detected", NotificationType.WARNING)
                     }
                 } else {
                     println("VoiceService: Empty transcription result")
-                    showNotification("No Speech", "No speech detected in audio", NotificationType.WARNING)
+                    showNotification("No Speech", "VAD + WhisperKit: No speech detected", NotificationType.WARNING)
                 }
 
             } catch (e: Exception) {
-                println("VoiceService: Transcription error: ${e.message}")
+                println("VoiceService: STT pipeline error: ${e.message}")
                 e.printStackTrace()
-                showNotification("Transcription Error", "Failed to transcribe: ${e.message}", NotificationType.ERROR)
+                showNotification("Pipeline Error", "VAD + WhisperKit pipeline failed: ${e.message}", NotificationType.ERROR)
             }
         }
+    }
+
+    /**
+     * Convert 16-bit PCM audio bytes to float samples for VAD processing
+     */
+    private fun convertAudioToFloats(audioData: ByteArray): FloatArray {
+        val samples = FloatArray(audioData.size / 2)
+        var index = 0
+
+        for (i in audioData.indices step 2) {
+            if (i + 1 < audioData.size) {
+                // Convert 16-bit PCM to float (-1.0 to 1.0)
+                val sample = ((audioData[i + 1].toInt() shl 8) or (audioData[i].toInt() and 0xFF)).toShort()
+                samples[index] = sample / 32768.0f
+                index++
+            }
+        }
+
+        return samples.sliceArray(0 until index)
     }
 
     fun isRecording(): Boolean = isRecording

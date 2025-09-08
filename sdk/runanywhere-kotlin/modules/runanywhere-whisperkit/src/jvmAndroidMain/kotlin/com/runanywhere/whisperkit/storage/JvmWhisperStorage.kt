@@ -1,11 +1,10 @@
 package com.runanywhere.whisperkit.storage
 
+import com.runanywhere.sdk.storage.DownloadError
 import com.runanywhere.sdk.storage.DownloadProgress
 import com.runanywhere.sdk.storage.DownloadState
-import com.runanywhere.sdk.storage.DownloadError
 import com.runanywhere.whisperkit.models.WhisperModelInfo
 import com.runanywhere.whisperkit.models.WhisperModelType
-import com.runanywhere.whisperkit.models.WhisperError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -13,7 +12,6 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.file.Files
-import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
@@ -34,38 +32,42 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
 
     // Cache manager removed - doesn't exist in iOS
 
-    override suspend fun getModelPath(type: WhisperModelType): String = withContext(Dispatchers.IO) {
-        File(modelsDir, type.fileName).absolutePath
-    }
+    override suspend fun getModelPath(type: WhisperModelType): String =
+        withContext(Dispatchers.IO) {
+            File(modelsDir, type.fileName).absolutePath
+        }
 
-    override suspend fun isModelDownloaded(type: WhisperModelType): Boolean = withContext(Dispatchers.IO) {
-        val modelFile = File(modelsDir, type.fileName)
-        modelFile.exists() && modelFile.length() > 0
-    }
+    override suspend fun isModelDownloaded(type: WhisperModelType): Boolean =
+        withContext(Dispatchers.IO) {
+            val modelFile = File(modelsDir, type.fileName)
+            modelFile.exists() && modelFile.length() > 0
+        }
 
-    override suspend fun getModelInfo(type: WhisperModelType): WhisperModelInfo = withContext(Dispatchers.IO) {
-        val modelFile = File(modelsDir, type.fileName)
-        WhisperModelInfo(
-            type = type,
-            localPath = if (modelFile.exists()) modelFile.absolutePath else null,
-            isDownloaded = modelFile.exists() && modelFile.length() > 0,
-            downloadProgress = if (modelFile.exists() && modelFile.length() > 0) 1.0f else 0.0f,
-            lastUsed = if (modelFile.exists()) modelFile.lastModified() else null
-        )
-    }
+    override suspend fun getModelInfo(type: WhisperModelType): WhisperModelInfo =
+        withContext(Dispatchers.IO) {
+            val modelFile = File(modelsDir, type.fileName)
+            WhisperModelInfo(
+                type = type,
+                localPath = if (modelFile.exists()) modelFile.absolutePath else null,
+                isDownloaded = modelFile.exists() && modelFile.length() > 0,
+                downloadProgress = if (modelFile.exists() && modelFile.length() > 0) 1.0f else 0.0f,
+                lastUsed = if (modelFile.exists()) modelFile.lastModified() else null
+            )
+        }
 
     override suspend fun getAllModels(): List<WhisperModelInfo> = withContext(Dispatchers.IO) {
         WhisperModelType.values().map { getModelInfo(it) }
     }
 
-    override suspend fun deleteModel(type: WhisperModelType): Boolean = withContext(Dispatchers.IO) {
-        val modelFile = File(modelsDir, type.fileName)
-        if (modelFile.exists()) {
-            modelFile.delete()
-        } else {
-            true // Already doesn't exist
+    override suspend fun deleteModel(type: WhisperModelType): Boolean =
+        withContext(Dispatchers.IO) {
+            val modelFile = File(modelsDir, type.fileName)
+            if (modelFile.exists()) {
+                modelFile.delete()
+            } else {
+                true // Already doesn't exist
+            }
         }
-    }
 
     override suspend fun getTotalStorageUsed(): Long = withContext(Dispatchers.IO) {
         modelsDir.listFiles()?.sumOf { file ->
@@ -73,15 +75,16 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
         } ?: 0L
     }
 
-    override suspend fun cleanupOldModels(keepTypes: List<WhisperModelType>): Unit = withContext(Dispatchers.IO) {
-        val keepFileNames = keepTypes.map { it.fileName }.toSet()
+    override suspend fun cleanupOldModels(keepTypes: List<WhisperModelType>): Unit =
+        withContext(Dispatchers.IO) {
+            val keepFileNames = keepTypes.map { it.fileName }.toSet()
 
-        modelsDir.listFiles()?.forEach { file ->
-            if (file.name.endsWith(".bin") && !keepFileNames.contains(file.name)) {
-                file.delete()
+            modelsDir.listFiles()?.forEach { file ->
+                if (file.name.endsWith(".bin") && !keepFileNames.contains(file.name)) {
+                    file.delete()
+                }
             }
         }
-    }
 
     override suspend fun updateLastUsed(type: WhisperModelType) = withContext(Dispatchers.IO) {
         val modelFile = File(modelsDir, type.fileName)
@@ -91,6 +94,7 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
         }
     }
 
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.O)
     override suspend fun downloadModel(
         type: WhisperModelType,
         onProgress: (DownloadProgress) -> Unit
@@ -100,12 +104,14 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
 
         // Check if already downloaded
         if (isModelDownloaded(type)) {
-            onProgress(DownloadProgress(
-                bytesDownloaded = modelFile.length(),
-                totalBytes = modelFile.length(),
-                state = DownloadState.COMPLETED,
-                currentFile = type.fileName
-            ))
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = modelFile.length(),
+                    totalBytes = modelFile.length(),
+                    state = DownloadState.COMPLETED,
+                    currentFile = type.fileName
+                )
+            )
             return@withContext
         }
 
@@ -116,12 +122,14 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
             tempFile = File(modelsDir, "${type.fileName}.tmp")
 
             // Initialize progress
-            onProgress(DownloadProgress(
-                bytesDownloaded = 0L,
-                totalBytes = type.approximateSizeMB * 1024 * 1024L, // Estimated size
-                state = DownloadState.DOWNLOADING,
-                currentFile = type.fileName
-            ))
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = 0L,
+                    totalBytes = type.approximateSizeMB * 1024 * 1024L, // Estimated size
+                    state = DownloadState.DOWNLOADING,
+                    currentFile = type.fileName
+                )
+            )
 
             // Download the model with enhanced error handling
             val url = URL(type.downloadUrl)
@@ -140,7 +148,8 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
             }
 
             val totalSize = connection.contentLengthLong
-            val actualTotalSize = if (totalSize > 0) totalSize else type.approximateSizeMB * 1024 * 1024L
+            val actualTotalSize =
+                if (totalSize > 0) totalSize else type.approximateSizeMB * 1024 * 1024L
 
             connection.inputStream.use { input ->
                 tempFile.outputStream().use { output ->
@@ -158,17 +167,20 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
                         if (now - lastProgressUpdate >= 100) {
                             val estimatedTimeRemaining = if (totalBytesRead > 0 && totalSize > 0) {
                                 val remainingBytes = totalSize - totalBytesRead
-                                val bytesPerSecond = totalBytesRead.toDouble() / ((now - lastProgressUpdate + 1000) / 1000.0)
+                                val bytesPerSecond =
+                                    totalBytesRead.toDouble() / ((now - lastProgressUpdate + 1000) / 1000.0)
                                 if (bytesPerSecond > 0) remainingBytes / bytesPerSecond else null
                             } else null
 
-                            onProgress(DownloadProgress(
-                                bytesDownloaded = totalBytesRead,
-                                totalBytes = actualTotalSize,
-                                state = DownloadState.DOWNLOADING,
-                                estimatedTimeRemaining = estimatedTimeRemaining,
-                                currentFile = type.fileName
-                            ))
+                            onProgress(
+                                DownloadProgress(
+                                    bytesDownloaded = totalBytesRead,
+                                    totalBytes = actualTotalSize,
+                                    state = DownloadState.DOWNLOADING,
+                                    estimatedTimeRemaining = estimatedTimeRemaining,
+                                    currentFile = type.fileName
+                                )
+                            )
                             lastProgressUpdate = now
                         }
                     }
@@ -193,45 +205,56 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
             )
 
             // Final progress update
-            onProgress(DownloadProgress(
-                bytesDownloaded = modelFile.length(),
-                totalBytes = modelFile.length(),
-                state = DownloadState.COMPLETED,
-                currentFile = type.fileName
-            ))
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = modelFile.length(),
+                    totalBytes = modelFile.length(),
+                    state = DownloadState.COMPLETED,
+                    currentFile = type.fileName
+                )
+            )
 
             // Cache events removed - doesn't exist in iOS
 
         } catch (e: DownloadError) {
             // Clean up and re-throw download errors
             tempFile?.let { if (it.exists()) it.delete() }
-            onProgress(DownloadProgress(
-                bytesDownloaded = 0L,
-                totalBytes = type.approximateSizeMB * 1024 * 1024L,
-                state = DownloadState.FAILED,
-                currentFile = type.fileName
-            ))
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = 0L,
+                    totalBytes = type.approximateSizeMB * 1024 * 1024L,
+                    state = DownloadState.FAILED,
+                    currentFile = type.fileName
+                )
+            )
             throw e
         } catch (e: IOException) {
             // Clean up temp file if exists
             tempFile?.let { if (it.exists()) it.delete() }
-            onProgress(DownloadProgress(
-                bytesDownloaded = 0L,
-                totalBytes = type.approximateSizeMB * 1024 * 1024L,
-                state = DownloadState.FAILED,
-                currentFile = type.fileName
-            ))
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = 0L,
+                    totalBytes = type.approximateSizeMB * 1024 * 1024L,
+                    state = DownloadState.FAILED,
+                    currentFile = type.fileName
+                )
+            )
             throw DownloadError.NetworkError(e)
         } catch (e: Exception) {
             // Clean up temp file if exists
             tempFile?.let { if (it.exists()) it.delete() }
-            onProgress(DownloadProgress(
-                bytesDownloaded = 0L,
-                totalBytes = type.approximateSizeMB * 1024 * 1024L,
-                state = DownloadState.FAILED,
-                currentFile = type.fileName
-            ))
-            throw DownloadError.UnknownError("Failed to download model ${type.modelName}: ${e.message}", e)
+            onProgress(
+                DownloadProgress(
+                    bytesDownloaded = 0L,
+                    totalBytes = type.approximateSizeMB * 1024 * 1024L,
+                    state = DownloadState.FAILED,
+                    currentFile = type.fileName
+                )
+            )
+            throw DownloadError.UnknownError(
+                "Failed to download model ${type.modelName}: ${e.message}",
+                e
+            )
         }
     }
 
@@ -271,16 +294,17 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
     /**
      * Validate model integrity using checksum
      */
-    suspend fun validateModelIntegrity(type: WhisperModelType): Boolean = withContext(Dispatchers.IO) {
-        val modelFile = File(modelsDir, type.fileName)
-        if (!modelFile.exists()) return@withContext false
+    suspend fun validateModelIntegrity(type: WhisperModelType): Boolean =
+        withContext(Dispatchers.IO) {
+            val modelFile = File(modelsDir, type.fileName)
+            if (!modelFile.exists()) return@withContext false
 
-        try {
-            // For now, just check if file exists and has content
-            // In the future, this could validate against known checksums
-            modelFile.exists() && modelFile.length() > 0
-        } catch (e: Exception) {
-            false
+            try {
+                // For now, just check if file exists and has content
+                // In the future, this could validate against known checksums
+                modelFile.exists() && modelFile.length() > 0
+            } catch (e: Exception) {
+                false
+            }
         }
-    }
 }

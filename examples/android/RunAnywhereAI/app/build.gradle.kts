@@ -142,11 +142,11 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
 
         // Kotlin compiler optimizations
         freeCompilerArgs += listOf(
@@ -191,9 +191,8 @@ android {
 }
 
 dependencies {
-    // SDK module - Updated to use new KMP SDK
-    // Use SDK from Maven Local (JVM version works for Android)
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+    // SDK module - Use Android variant from Maven Local
+    implementation("com.runanywhere.sdk:runanywhere-kotlin-android:0.1.0")
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)

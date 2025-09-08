@@ -36,6 +36,7 @@ retrofit = "2.11.0"
 # JSON
 gson = "2.11.0"
 kotlinxSerialization = "1.8.0"
+kotlinxDatetime = "0.6.1"
 
 # Navigation
 navigationCompose = "2.8.5"
@@ -115,6 +116,7 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 
 # Serialization
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime", version.ref = "kotlinxDatetime" }
 
 # Logging
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }

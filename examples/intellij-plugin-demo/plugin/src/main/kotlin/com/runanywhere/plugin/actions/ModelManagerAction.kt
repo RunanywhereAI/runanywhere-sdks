@@ -3,7 +3,7 @@ package com.runanywhere.plugin.actions
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.ui.Messages
-import com.runanywhere.plugin.RunAnywherePlugin
+import com.runanywhere.plugin.isInitialized
 import com.runanywhere.plugin.ui.ModelManagerDialog
 
 /**
@@ -21,7 +21,7 @@ class ModelManagerAction : AnAction("Manage Models") {
             return
         }
 
-        if (!RunAnywherePlugin.isInitialized) {
+        if (!isInitialized) {
             Messages.showWarningDialog(
                 project,
                 "RunAnywhere SDK is still initializing. Please wait...",
@@ -37,6 +37,6 @@ class ModelManagerAction : AnAction("Manage Models") {
 
     override fun update(e: AnActionEvent) {
         // Enable the action only when a project is open and SDK is initialized
-        e.presentation.isEnabled = e.project != null && RunAnywherePlugin.isInitialized
+        e.presentation.isEnabled = e.project != null && isInitialized
     }
 }

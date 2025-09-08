@@ -6,9 +6,8 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.Messages
-import com.runanywhere.plugin.RunAnywherePlugin
+import com.runanywhere.plugin.isInitialized
 import com.runanywhere.plugin.services.VoiceService
-import com.runanywhere.plugin.ui.ModelManagerDialog
 import javax.swing.SwingUtilities
 
 /**
@@ -28,7 +27,7 @@ class VoiceCommandAction : AnAction("Voice Command") {
             return
         }
 
-        if (!RunAnywherePlugin.isInitialized) {
+        if (!isInitialized) {
             Messages.showWarningDialog(
                 project,
                 "RunAnywhere SDK is still initializing. Please wait...",
