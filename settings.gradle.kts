@@ -13,11 +13,12 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
         maven { url = uri("https://jitpack.io") } // Add JitPack for android-vad
+        mavenLocal()
     }
 }
 
@@ -27,6 +28,6 @@ rootProject.name = "RunAnywhere-Android"
 include(":sdk:runanywhere-kotlin")
 include(":sdk:runanywhere-kotlin:jni")
 
-// Include example apps
-include(":examples:android-stt-demo")
-include(":examples:intellij-plugin-demo")
+// Include example apps as composite builds to keep them self-contained
+includeBuild("examples/android/RunAnywhereAI")
+includeBuild("examples/intellij-plugin-demo/plugin")

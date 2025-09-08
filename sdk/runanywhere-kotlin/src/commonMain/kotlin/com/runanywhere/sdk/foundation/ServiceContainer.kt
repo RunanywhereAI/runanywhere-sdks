@@ -4,6 +4,7 @@ import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.components.vad.VADConfiguration
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.ConfigurationData
 import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.data.repositories.ModelInfoRepository
@@ -95,13 +96,21 @@ class ServiceContainer {
      * Bootstrap services for production mode
      */
     suspend fun bootstrap(params: SDKInitParams): ConfigurationData {
-        // Initialize authentication
+        logger.info("Bootstrapping services for production mode")
+
+        // Step 1: Register default modules
+        registerDefaultModules()
+
+        // Step 2: Initialize authentication
         authenticationService.initialize(params.apiKey)
 
-        // Initialize services
+        // Step 3: Initialize services
         modelInfoService.initialize()
 
-        // Return default configuration
+        // Step 4: Initialize components
+        initializeComponents()
+
+        logger.info("Production bootstrap completed successfully")
         return ConfigurationData.default(params.apiKey)
     }
 
@@ -109,13 +118,21 @@ class ServiceContainer {
      * Bootstrap services for development mode with mock data
      */
     suspend fun bootstrapDevelopmentMode(params: SDKInitParams): ConfigurationData {
-        // Initialize authentication (even in dev mode)
+        logger.info("Bootstrapping services for development mode")
+
+        // Step 1: Register default modules (including WhisperKit for development)
+        registerDefaultModules()
+
+        // Step 2: Initialize authentication (even in dev mode)
         authenticationService.initialize(params.apiKey)
 
-        // Initialize services
+        // Step 3: Initialize services
         modelInfoService.initialize()
 
-        // Return default configuration
+        // Step 4: Initialize components
+        initializeComponents()
+
+        logger.info("Development bootstrap completed successfully")
         return ConfigurationData.default(params.apiKey)
     }
 
@@ -129,6 +146,81 @@ class ServiceContainer {
             else -> null
         }
     }
+
+    /**
+     * Register default modules for SDK operation
+     */
+    private fun registerDefaultModules() {
+        logger.info("Registering default modules")
+
+        // Register WhisperKit provider
+        try {
+            // Note: WhisperKit registration will be handled by the consuming application
+            // since it's an external module dependency
+            logger.info("ℹ️ WhisperKit provider should be registered by consuming application")
+        } catch (e: Exception) {
+            logger.warn("⚠️ WhisperKit provider registration failed: ${e.message}")
+        }
+
+        // Register simple energy VAD provider
+        try {
+            registerSimpleEnergyVADProvider()
+            logger.info("✅ Simple Energy VAD provider registered")
+        } catch (e: Exception) {
+            logger.warn("⚠️ VAD provider registration failed: ${e.message}")
+        }
+
+        logger.info("Module registration completed. Registered modules: ${ModuleRegistry.registeredModules}")
+    }
+
+    /**
+     * Initialize all components
+     */
+    private suspend fun initializeComponents() {
+        logger.info("Initializing SDK components")
+
+        try {
+            // Initialize VAD component
+            vadComponent.initialize()
+            logger.info("✅ VAD component initialized")
+        } catch (e: Exception) {
+            logger.warn("⚠️ VAD component initialization failed: ${e.message}")
+        }
+
+        try {
+            // Initialize STT component
+            sttComponent.initialize()
+            logger.info("✅ STT component initialized")
+        } catch (e: Exception) {
+            logger.warn("⚠️ STT component initialization failed: ${e.message}")
+        }
+
+        logger.info("Component initialization completed")
+    }
+
+    /**
+     * Register simple energy VAD provider for development
+     */
+    private fun registerSimpleEnergyVADProvider() {
+        val simpleVADProvider = object : com.runanywhere.sdk.core.VADServiceProvider {
+            override suspend fun createVADService(configuration: VADConfiguration): com.runanywhere.sdk.components.vad.VADService {
+                return com.runanywhere.sdk.voice.vad.SimpleEnergyVAD(
+                    vadConfig = configuration
+                )
+            }
+
+            override fun canHandle(modelId: String): Boolean = modelId.contains("simple", ignoreCase = true) || modelId.contains("energy", ignoreCase = true)
+
+            override val name: String = "SimpleEnergyVAD"
+        }
+
+        ModuleRegistry.registerVAD(simpleVADProvider)
+    }
+
+    /**
+     * Add logging
+     */
+    private val logger = SDKLogger("ServiceContainer")
 
     /**
      * Cleanup all services

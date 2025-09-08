@@ -1,4 +1,5 @@
-// Removed experimental API for now
+
+// Clean Gradle script for KMP SDK
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -11,22 +12,18 @@ group = "com.runanywhere.sdk"
 version = "0.1.0"
 
 kotlin {
+    // Use Java 17 toolchain across targets
+    jvmToolchain(17)
+
     // JVM target for IntelliJ plugins and general JVM usage
     jvm {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
     }
 
     // Android target
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-        }
-    }
+    androidTarget()
 
     // Native targets (temporarily disabled to fix compilation issues)
     // linuxX64()
@@ -111,27 +108,12 @@ kotlin {
                 implementation(libs.mockk)
             }
         }
-
-        // Native targets (basic setup)
-        // val nativeMain by creating {
-        //     dependsOn(commonMain.get())
-        // }
-
-        // val linuxX64Main by getting { dependsOn(nativeMain) }
-        // val macosX64Main by getting { dependsOn(nativeMain) }
-        // val macosArm64Main by getting { dependsOn(nativeMain) }
-        // val mingwX64Main by getting { dependsOn(nativeMain) }
     }
 }
 
 android {
     namespace = "com.runanywhere.sdk.kotlin"
-    compileSdk = 36
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 24
@@ -156,13 +138,4 @@ android {
     }
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("maven") {
-            from(components["kotlin"])
-            groupId = project.group.toString()
-            artifactId = "runanywhere-kotlin"
-            version = project.version.toString()
-        }
-    }
-}
+// Rely on Kotlin Multiplatform's default publications for all targets
