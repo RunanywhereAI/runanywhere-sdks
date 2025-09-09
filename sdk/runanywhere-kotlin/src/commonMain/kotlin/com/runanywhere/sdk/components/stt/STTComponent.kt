@@ -6,6 +6,7 @@ import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.events.ModularPipelineEvent
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -20,6 +21,14 @@ class STTComponent(
     private val logger = com.runanywhere.sdk.foundation.SDKLogger("STTComponent")
     private var isModelLoaded = false
     private var modelPath: String? = null
+
+    // iOS parity - STT Handler for voice pipeline integration
+    private val sttHandler by lazy {
+        STTHandler(
+            voiceAnalytics = null, // Will be injected later
+            sttAnalytics = null // Will be injected later
+        )
+    }
 
     override suspend fun createService(): STTServiceWrapper {
         // Try to get a registered STT provider from central registry
@@ -251,7 +260,7 @@ class STTComponent(
         } catch (error: Exception) {
             val sttError = when (error) {
                 is STTError -> error
-                else -> STTError.TranscriptionFailed(error)
+                else -> STTError.transcriptionFailed(error)
             }
             emit(STTStreamEvent.Error(sttError))
         }
@@ -331,7 +340,39 @@ class STTComponent(
     }
 
     /**
-     * Get service for compatibility
+     * Transcribe audio using the voice pipeline handler (matches iOS STTHandler integration)
+     */
+    suspend fun transcribeAudioWithHandler(
+        samples: FloatArray,
+        options: STTOptions? = null,
+        speakerDiarization: SpeakerDiarizationService? = null,
+        continuation: kotlinx.coroutines.flow.MutableSharedFlow<ModularPipelineEvent>
+    ): String {
+        requireReady()
+
+        val service = service?.wrappedService
+            ?: throw SDKError.ComponentNotReady("STT service not available")
+
+        val transcriptionOptions = options ?: STTOptions(
+            language = sttConfiguration.language,
+            detectLanguage = false,
+            enablePunctuation = sttConfiguration.enablePunctuation,
+            enableDiarization = sttConfiguration.enableDiarization,
+            enableTimestamps = sttConfiguration.enableTimestamps,
+            vocabularyFilter = sttConfiguration.vocabularyList
+        )
+
+        return sttHandler.transcribeAudio(
+            samples = samples,
+            service = service,
+            options = transcriptionOptions,
+            speakerDiarization = speakerDiarization,
+            continuation = continuation
+        )
+    }
+
+    /**
+     * Get service for compatibility (matches iOS)
      */
     fun getService(): STTService? {
         return service?.wrappedService

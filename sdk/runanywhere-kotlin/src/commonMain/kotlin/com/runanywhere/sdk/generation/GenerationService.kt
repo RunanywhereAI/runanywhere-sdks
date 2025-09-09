@@ -176,17 +176,17 @@ class GenerationService {
     }
 
     private fun publishGenerationStarted(sessionId: String, prompt: String) {
-        EventBus.publish(SDKGenerationEvent.Started(sessionId, prompt))
+        EventBus.publish(SDKGenerationEvent.Started(prompt, sessionId))
         logger.debug("Generation started: $sessionId")
     }
 
     private fun publishGenerationCompleted(sessionId: String, result: GenerationResult) {
-        EventBus.publish(SDKGenerationEvent.Completed(sessionId, result))
+        EventBus.publish(SDKGenerationEvent.Completed(result.text, result.tokensUsed, result.latencyMs.toDouble()))
         logger.debug("Generation completed: $sessionId")
     }
 
     private fun publishGenerationFailed(sessionId: String, error: Exception) {
-        EventBus.publish(SDKGenerationEvent.Failed(sessionId, error))
+        EventBus.publish(SDKGenerationEvent.Failed(error))
         logger.debug("Generation failed: $sessionId - ${error.message}")
     }
 

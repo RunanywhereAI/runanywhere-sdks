@@ -413,8 +413,8 @@ class APIClient(
      */
     private fun handleHttpError(statusCode: Int, endpoint: String, method: String): SDKError {
         return when (statusCode) {
-            401 -> SDKError.InvalidApiKey("Authentication failed for $method $endpoint")
-            403 -> SDKError.InvalidApiKey("Access forbidden for $method $endpoint")
+            401 -> SDKError.InvalidAPIKey("Authentication failed for $method $endpoint")
+            403 -> SDKError.InvalidAPIKey("Access forbidden for $method $endpoint")
             404 -> SDKError.NetworkError("Endpoint not found: $method $endpoint")
             408 -> SDKError.NetworkError("Request timeout for $method $endpoint")
             429 -> SDKError.NetworkError("Rate limit exceeded for $method $endpoint")
@@ -443,7 +443,7 @@ class APIClient(
         if (attempt >= maxRetryAttempts - 1) return false
 
         return when (exception) {
-            is SDKError.InvalidApiKey -> false  // Don't retry auth errors
+            is SDKError.InvalidAPIKey -> false  // Don't retry auth errors
             is SDKError.NetworkError -> {
                 // Retry on network connectivity issues
                 val message = exception.message?.lowercase() ?: ""

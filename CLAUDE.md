@@ -292,7 +292,93 @@ Workflows are located in `.github/workflows/`:
 - `android-app.yml` - Android example app CI
 - `ios-app.yml` - iOS example app CI
 
-## Kotlin Multiplatform (KMP) SDK Best Practices
+## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
+
+### 🚨 MANDATORY: iOS as Source of Truth
+**NEVER make assumptions when implementing KMP code. ALWAYS refer to the iOS implementation as the definitive source of truth.**
+
+#### Core Principles:
+1. **iOS First**: When encountering missing logic, unimplemented features, or unclear requirements in KMP, ALWAYS:
+   - Check the corresponding iOS implementation
+   - Copy the iOS logic exactly (head-to-head translation)
+   - Adapt only for Kotlin syntax, not business logic
+
+2. **commonMain First**: ALL business logic, protocols, interfaces, and structures MUST be defined in `commonMain/`:
+   - Interfaces and abstract classes
+   - Data models and enums
+   - Business logic and algorithms
+   - Service contracts and protocols
+   - Component definitions
+   - Even platform-specific service interfaces
+
+3. **Platform Implementation Naming Convention**: Platform-specific implementations MUST use clear prefixes:
+   - `AndroidTTSService.kt` (not just `TTSService.kt`)
+   - `JvmTTSService.kt` (not just `TTSServiceImpl.kt`)
+   - `IosTTSService.kt` (for any iOS-specific bridges)
+   - `WindowsTTSService.kt`, `LinuxTTSService.kt`, etc.
+
+#### Implementation Process:
+```kotlin
+// Step 1: Check iOS implementation (e.g., TTSService.swift)
+// Step 2: Define interface in commonMain matching iOS exactly
+// commonMain/kotlin/com/runanywhere/sdk/services/tts/TTSService.kt
+interface TTSService {
+    // Match iOS protocol exactly
+    suspend fun synthesize(text: String, options: TTSOptions): ByteArray
+    val availableVoices: List<String>
+}
+
+// Step 3: Implement platform-specific versions with clear names
+// androidMain/kotlin/com/runanywhere/sdk/services/tts/AndroidTTSService.kt
+class AndroidTTSService : TTSService {
+    // Android-specific implementation
+}
+
+// jvmMain/kotlin/com/runanywhere/sdk/services/tts/JvmTTSService.kt
+class JvmTTSService : TTSService {
+    // JVM-specific implementation
+}
+```
+
+#### Common Mistakes to AVOID:
+❌ **DON'T** invent your own logic when something is unclear
+❌ **DON'T** put business logic in platform-specific modules
+❌ **DON'T** name platform files generically (e.g., `TTSServiceImpl.kt`)
+❌ **DON'T** assume behavior - check iOS implementation
+
+#### Correct Approach:
+✅ **DO** check iOS implementation for every feature
+✅ **DO** keep all logic in commonMain
+✅ **DO** use platform prefixes for all platform files
+✅ **DO** translate iOS logic exactly, adapting only syntax
+
+#### Example: When you see incomplete KMP code:
+```kotlin
+// KMP has this incomplete method:
+fun processAudio(data: ByteArray): String {
+    // TODO: implement
+    return ""
+}
+
+// WRONG approach:
+fun processAudio(data: ByteArray): String {
+    // Making assumptions about what it should do
+    return data.toString()
+}
+
+// CORRECT approach:
+// 1. Find iOS AudioProcessor.swift
+// 2. Find processAudio method
+// 3. Copy exact logic:
+fun processAudio(data: ByteArray): String {
+    // Exact translation of iOS logic
+    val rms = calculateRMS(data)  // If iOS does this
+    val normalized = normalizeAudio(data, rms)  // If iOS does this
+    return encodeToBase64(normalized)  // If iOS does this
+}
+```
+
+### KMP Best Practices
 
 The Kotlin Multiplatform SDK has been aligned with iOS architecture patterns while leveraging Kotlin's strengths. These best practices ensure consistency, maintainability, and cross-platform compatibility.
 

@@ -21,4 +21,9 @@ object AndroidPlatformContext {
     fun isInitialized(): Boolean {
         return _applicationContext != null
     }
+
+    /**
+     * Get the application context (alias for applicationContext for compatibility)
+     */
+    fun getContext(): Context = applicationContext
 }

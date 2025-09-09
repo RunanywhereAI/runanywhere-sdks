@@ -16,6 +16,16 @@ enum class AudioFormat {
     OGG
 }
 
+/**
+ * Enum to specify preferred audio format for the service (matches iOS STTServiceAudioFormat)
+ */
+enum class STTServiceAudioFormat {
+    /** Service prefers raw ByteArray data */
+    DATA,
+    /** Service prefers FloatArray samples */
+    FLOAT_ARRAY
+}
+
 // MARK: - STT Options
 
 /**
@@ -361,35 +371,40 @@ data class STTTranscriptionResult(
     )
 }
 
-// MARK: - STT Errors
+// MARK: - STT Errors (matches iOS STTError exactly)
 
 sealed class STTError : Exception() {
-    object ServiceNotInitialized : STTError()
-    data class TranscriptionFailed(override val cause: Throwable) : STTError()
-    object StreamingNotSupported : STTError()
-    data class LanguageNotSupported(val language: String) : STTError()
-    data class ModelNotFound(val model: String) : STTError()
-    object AudioFormatNotSupported : STTError()
-    object InsufficientAudioData : STTError()
-    object NoVoiceServiceAvailable : STTError()
-    object AudioSessionNotConfigured : STTError()
-    object AudioSessionActivationFailed : STTError()
-    object MicrophonePermissionDenied : STTError()
+    object serviceNotInitialized : STTError()
+    data class transcriptionFailed(override val cause: Throwable) : STTError()
+    object streamingNotSupported : STTError()
+    data class languageNotSupported(val language: String) : STTError()
+    data class modelNotFound(val model: String) : STTError()
+    object audioFormatNotSupported : STTError()
+    object insufficientAudioData : STTError()
+    object noVoiceServiceAvailable : STTError()
+    object audioSessionNotConfigured : STTError()
+    object audioSessionActivationFailed : STTError()
+    object microphonePermissionDenied : STTError()
 
-    override val message: String
+    /**
+     * Localized error description (matches iOS errorDescription)
+     */
+    val errorDescription: String
         get() = when (this) {
-            is ServiceNotInitialized -> "STT service is not initialized"
-            is TranscriptionFailed -> "Transcription failed: ${cause.localizedMessage}"
-            is StreamingNotSupported -> "Streaming transcription is not supported"
-            is LanguageNotSupported -> "Language not supported: $language"
-            is ModelNotFound -> "Model not found: $model"
-            is AudioFormatNotSupported -> "Audio format is not supported"
-            is InsufficientAudioData -> "Insufficient audio data for transcription"
-            is NoVoiceServiceAvailable -> "No STT service available for transcription"
-            is AudioSessionNotConfigured -> "Audio session is not configured"
-            is AudioSessionActivationFailed -> "Failed to activate audio session"
-            is MicrophonePermissionDenied -> "Microphone permission was denied"
+            is serviceNotInitialized -> "STT service is not initialized"
+            is transcriptionFailed -> "Transcription failed: ${cause.message ?: cause.toString()}"
+            is streamingNotSupported -> "Streaming transcription is not supported"
+            is languageNotSupported -> "Language not supported: $language"
+            is modelNotFound -> "Model not found: $model"
+            is audioFormatNotSupported -> "Audio format is not supported"
+            is insufficientAudioData -> "Insufficient audio data for transcription"
+            is noVoiceServiceAvailable -> "No STT service available for transcription"
+            is audioSessionNotConfigured -> "Audio session is not configured"
+            is audioSessionActivationFailed -> "Failed to activate audio session"
+            is microphonePermissionDenied -> "Microphone permission was denied"
         }
+
+    override val message: String get() = errorDescription
 }
 
 // MARK: - STT Service Protocol
@@ -404,12 +419,12 @@ interface STTService {
     suspend fun initialize(modelPath: String?)
 
     /**
-     * Transcribe audio data
+     * Transcribe audio data (matches iOS exactly)
      */
     suspend fun transcribe(audioData: ByteArray, options: STTOptions): STTTranscriptionResult
 
     /**
-     * Stream transcription for real-time processing (basic callback version)
+     * Stream transcription for real-time processing with callback (matches iOS signature)
      */
     suspend fun streamTranscribe(
         audioStream: Flow<ByteArray>,
@@ -426,47 +441,52 @@ interface STTService {
     ): Flow<STTStreamEvent>
 
     /**
-     * Language detection from audio
+     * Language detection from audio (matches iOS signature)
      */
     suspend fun detectLanguage(audioData: ByteArray): Map<String, Float>
 
     /**
-     * Check if service supports specific language
+     * Check if service supports specific language (matches iOS)
      */
     fun supportsLanguage(languageCode: String): Boolean
 
     /**
-     * Get list of supported languages
+     * Get list of supported languages (matches iOS)
      */
     val supportedLanguages: List<String>
 
     /**
-     * Check if service is ready
+     * Check if service is ready (matches iOS)
      */
     val isReady: Boolean
 
     /**
-     * Get current model identifier
+     * Get current model identifier (matches iOS)
      */
     val currentModel: String?
 
     /**
-     * Check if streaming is supported
+     * Check if streaming is supported (matches iOS)
      */
     val supportsStreaming: Boolean get() = true
 
     /**
-     * Check if language detection is supported
+     * Check if language detection is supported (matches iOS)
      */
     val supportsLanguageDetection: Boolean get() = true
 
     /**
-     * Check if speaker diarization is supported
+     * Check if speaker diarization is supported (matches iOS)
      */
     val supportsSpeakerDiarization: Boolean get() = false
 
     /**
-     * Cleanup resources
+     * Get preferred audio format for this service (matches iOS STTServiceAudioFormat)
+     */
+    val preferredAudioFormat: STTServiceAudioFormat get() = STTServiceAudioFormat.DATA
+
+    /**
+     * Cleanup resources (matches iOS)
      */
     suspend fun cleanup()
 }

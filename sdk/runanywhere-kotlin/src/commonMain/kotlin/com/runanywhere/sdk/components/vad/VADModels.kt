@@ -43,16 +43,25 @@ data class VADConfiguration(
 // MARK: - VAD Input
 
 /**
- * Input for Voice Activity Detection - simplified to match iOS pattern
+ * Input for Voice Activity Detection - matching iOS VADInput exactly
  */
 data class VADInput(
     // Audio samples to process (primary input like iOS [Float] audio samples)
-    val audioSamples: FloatArray
+    val audioSamples: FloatArray,
+
+    // Optional override for energy threshold (matching iOS)
+    val energyThresholdOverride: Float? = null
 ) : ComponentInput {
 
     override fun validate() {
         if (audioSamples.isEmpty()) {
             throw SDKError.ValidationFailed("Audio samples cannot be empty")
+        }
+        // Validate threshold override if provided (matching iOS validation)
+        energyThresholdOverride?.let { threshold ->
+            if (threshold < 0.0f || threshold > 1.0f) {
+                throw SDKError.ValidationFailed("Energy threshold override must be between 0.0 and 1.0")
+            }
         }
     }
 
@@ -70,21 +79,26 @@ data class VADInput(
 // MARK: - VAD Output
 
 /**
- * Output from Voice Activity Detection - simplified to match iOS pattern
+ * Output from Voice Activity Detection - matching iOS VADOutput exactly
  */
 data class VADOutput(
-    // Whether speech is detected (primary output)
-    val isSpeech: Boolean,
+    // Whether speech is detected (matching iOS property name)
+    val isSpeechDetected: Boolean,
 
     // Energy level of the audio (calculated RMS)
     val energyLevel: Float,
 
     // Confidence score (0.0 to 1.0) - derived from energy level
-    val confidence: Float = if (isSpeech) energyLevel.coerceIn(0.5f, 1.0f) else energyLevel.coerceIn(0.0f, 0.5f),
+    val confidence: Float = if (isSpeechDetected) energyLevel.coerceIn(0.5f, 1.0f) else energyLevel.coerceIn(0.0f, 0.5f),
 
     // Timestamp (required by ComponentOutput)
     override val timestamp: Long = getCurrentTimeMillis()
-) : ComponentOutput
+) : ComponentOutput {
+
+    // iOS compatibility property alias
+    @Deprecated("Use isSpeechDetected for iOS parity", ReplaceWith("isSpeechDetected"))
+    val isSpeech: Boolean get() = isSpeechDetected
+}
 
 // MARK: - VAD Metadata (simplified)
 
@@ -111,17 +125,36 @@ enum class SpeechActivityEvent {
 // MARK: - VAD Service Protocol
 
 /**
- * Protocol for Voice Activity Detection services - simplified to match iOS
+ * Protocol for Voice Activity Detection services - exactly matching iOS VADService
  */
 interface VADService {
+    // Properties matching iOS VADService protocol
+    var energyThreshold: Float
+    val sampleRate: Int
+    val frameLength: Float
+    val isSpeechActive: Boolean
+
+    // Callbacks matching iOS VADService protocol
+    var onSpeechActivity: ((SpeechActivityEvent) -> Unit)?
+    var onAudioBuffer: ((ByteArray) -> Unit)?
+
     // Initialize the service
     suspend fun initialize(configuration: VADConfiguration)
+
+    // Start processing (matching iOS)
+    fun start()
+
+    // Stop processing (matching iOS)
+    fun stop()
+
+    // Reset VAD state
+    fun reset()
 
     // Process audio chunk for voice activity (primary method)
     fun processAudioChunk(audioSamples: FloatArray): VADResult
 
-    // Reset VAD state
-    fun reset()
+    // Process audio data - alternative method matching iOS
+    fun processAudioData(audioData: FloatArray): Boolean
 
     // Check if service is ready
     val isReady: Boolean
@@ -131,21 +164,22 @@ interface VADService {
 
     // Cleanup resources
     suspend fun cleanup()
-
-    // Speech activity callback (matching iOS onSpeechActivity pattern)
-    var onSpeechActivity: ((SpeechActivityEvent) -> Unit)?
 }
 
 // MARK: - VAD Result (for compatibility)
 
 /**
- * VAD Result data class (kept for compatibility)
+ * VAD Result data class - aligned with iOS output expectations
  */
 data class VADResult(
-    val isSpeech: Boolean,
+    val isSpeechDetected: Boolean,
     val confidence: Float = 0.0f,
     val timestamp: Long = getCurrentTimeMillis()
-)
+) {
+    // iOS compatibility property alias
+    @Deprecated("Use isSpeechDetected for iOS parity", ReplaceWith("isSpeechDetected"))
+    val isSpeech: Boolean get() = isSpeechDetected
+}
 
 // MARK: - VAD Service Wrapper
 

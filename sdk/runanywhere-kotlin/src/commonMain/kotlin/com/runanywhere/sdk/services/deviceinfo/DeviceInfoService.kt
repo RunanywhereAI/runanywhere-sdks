@@ -7,6 +7,7 @@ import com.runanywhere.sdk.data.repositories.DeviceInfoRepository
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.SDKDeviceEvent
 import com.runanywhere.sdk.network.APIClient
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -36,7 +37,7 @@ class DeviceInfoService(
                 logger.info("Device info loaded successfully: ${_currentDeviceInfo!!.deviceName}")
 
                 // Publish event
-                EventBus.publish(SDKDeviceEvent.DeviceInfoCollected(_currentDeviceInfo!!))
+                EventBus.publishDeviceInfo(_currentDeviceInfo!!)
 
             } else {
                 logger.warn("Failed to load device information")
@@ -130,7 +131,7 @@ class DeviceInfoService(
 
                 if (success) {
                     logger.info("Device info synced to cloud successfully")
-                    EventBus.publish(SDKDeviceEvent.DeviceInfoSynced(deviceInfo))
+                    EventBus.publishDeviceInfoSyncCompleted()
                 } else {
                     logger.warn("Device info sync to cloud failed")
                 }
@@ -279,28 +280,24 @@ class DeviceInfoService(
  */
 expect suspend fun collectPlatformDeviceInfo(): DeviceInfoData
 
-/**
- * Device-related events for EventBus
- */
-sealed class SDKDeviceEvent {
-    data class DeviceInfoCollected(val deviceInfo: DeviceInfoData) : SDKDeviceEvent()
-    data class DeviceInfoSynced(val deviceInfo: DeviceInfoData) : SDKDeviceEvent()
-    data class DeviceInfoSyncFailed(val error: String) : SDKDeviceEvent()
+// Device events are now defined in com.runanywhere.sdk.events.SDKEvent.kt
+
+// Extension to publish device events - updated to use proper event types
+fun EventBus.publishDeviceInfo(deviceInfo: DeviceInfoData) {
+    val deviceInfoMap = mapOf(
+        "deviceId" to deviceInfo.deviceId,
+        "deviceName" to deviceInfo.deviceName,
+        "systemName" to deviceInfo.systemName,
+        "systemVersion" to deviceInfo.systemVersion,
+        "modelName" to deviceInfo.modelName
+    )
+    publish(SDKDeviceEvent.DeviceInfoCollected(deviceInfoMap))
 }
 
-// Extension to publish device events
-fun EventBus.publish(event: SDKDeviceEvent) {
-    // For now, we'll publish as configuration events until we add device events to EventBus
-    when (event) {
-        is SDKDeviceEvent.DeviceInfoCollected -> {
-            // Convert to a configuration event for compatibility
-            publish(com.runanywhere.sdk.events.SDKConfigurationEvent.Updated("device_info_collected", event.deviceInfo.deviceId))
-        }
-        is SDKDeviceEvent.DeviceInfoSynced -> {
-            publish(com.runanywhere.sdk.events.SDKConfigurationEvent.Updated("device_info_synced", event.deviceInfo.deviceId))
-        }
-        is SDKDeviceEvent.DeviceInfoSyncFailed -> {
-            publish(com.runanywhere.sdk.events.SDKConfigurationEvent.Updated("device_info_sync_failed", event.error))
-        }
-    }
+fun EventBus.publishDeviceInfoSyncFailed(error: Throwable) {
+    publish(SDKDeviceEvent.DeviceInfoSyncFailed(error))
+}
+
+fun EventBus.publishDeviceInfoSyncCompleted() {
+    publish(SDKDeviceEvent.DeviceInfoSyncCompleted)
 }

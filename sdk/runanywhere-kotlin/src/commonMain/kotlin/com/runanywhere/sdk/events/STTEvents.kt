@@ -10,48 +10,50 @@ import com.runanywhere.sdk.components.base.SDKComponent
  */
 sealed class ComponentEvent
 
-sealed class ComponentInitializationEvent : ComponentEvent() {
+// Legacy ComponentInitializationEvent - now replaced by the one in SDKEvent.kt
+// Keeping this as LegacyComponentInitializationEvent for backwards compatibility
+sealed class LegacyComponentInitializationEvent : ComponentEvent() {
     data class ComponentChecking(
-        val component: SDKComponent,
+        val component: String, // Changed to String to avoid dependency issues
         val modelId: String?
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentInitializing(
-        val component: SDKComponent,
+        val component: String,
         val modelId: String?
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadStarted(
-        val component: SDKComponent,
+        val component: String,
         val modelId: String
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadProgress(
-        val component: SDKComponent,
+        val component: String,
         val modelId: String,
         val progress: Float
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentDownloadCompleted(
-        val component: SDKComponent,
+        val component: String,
         val modelId: String
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentReady(
-        val component: SDKComponent,
+        val component: String,
         val modelId: String?
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentFailed(
-        val component: SDKComponent,
+        val component: String,
         val error: Throwable
-    ) : ComponentInitializationEvent()
+    ) : LegacyComponentInitializationEvent()
 
     data class ComponentStateChanged(
-        val component: SDKComponent,
-        val oldState: ComponentState,
-        val newState: ComponentState
-    ) : ComponentInitializationEvent()
+        val component: String,
+        val oldState: String,
+        val newState: String
+    ) : LegacyComponentInitializationEvent()
 }
 
 // MARK: - STT Events
@@ -154,3 +156,47 @@ sealed class ModelEvent : ComponentEvent() {
         val modelId: String
     ) : ModelEvent()
 }
+
+// MARK: - Pipeline Events (iOS Parity)
+
+/**
+ * Pipeline events that exactly match iOS ModularPipelineEvent patterns
+ * These are used by STTHandler and voice pipeline components
+ */
+sealed class ModularPipelineEvent {
+    // STT specific events matching iOS patterns
+    data class sttFinalTranscript(val transcript: String) : ModularPipelineEvent()
+
+    data class sttFinalTranscriptWithSpeaker(
+        val transcript: String,
+        val speaker: SpeakerInfo
+    ) : ModularPipelineEvent()
+
+    data class sttSpeakerChanged(
+        val from: SpeakerInfo?,
+        val to: SpeakerInfo
+    ) : ModularPipelineEvent()
+
+    data class sttPartialTranscript(val partial: String) : ModularPipelineEvent()
+
+    data class sttLanguageDetected(
+        val language: String,
+        val confidence: Float
+    ) : ModularPipelineEvent()
+
+    data class sttAudioLevelChanged(
+        val level: Float,
+        val timestamp: Double
+    ) : ModularPipelineEvent()
+
+    data class sttError(val error: com.runanywhere.sdk.components.stt.STTError) : ModularPipelineEvent()
+}
+
+/**
+ * Speaker information for diarization (matches iOS SpeakerInfo)
+ */
+data class SpeakerInfo(
+    val id: String,
+    val name: String? = null,
+    val confidence: Float? = null
+)

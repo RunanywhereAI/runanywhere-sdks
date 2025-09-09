@@ -61,17 +61,16 @@ data class ConfigurationEntity(
     fun toConfigurationData(): ConfigurationData {
         return ConfigurationData(
             id = id,
-            apiKey = apiKey,
-            baseURL = baseURL,
-            environment = environment,
-            source = source,
-            lastUpdated = lastUpdated,
             routing = routing,
             generation = generation,
             storage = storage,
             api = api,
             download = download,
-            hardware = hardware
+            hardware = hardware,
+            apiKey = apiKey,
+            source = source,
+            createdAt = lastUpdated,
+            updatedAt = lastUpdated
         )
     }
 
@@ -82,11 +81,11 @@ data class ConfigurationEntity(
         fun fromConfigurationData(config: ConfigurationData): ConfigurationEntity {
             return ConfigurationEntity(
                 id = config.id,
-                apiKey = config.apiKey,
-                baseURL = config.baseURL,
-                environment = config.environment,
+                apiKey = config.apiKey ?: "",
+                baseURL = config.api.baseURL,
+                environment = SDKEnvironment.PRODUCTION, // Default value
                 source = config.source,
-                lastUpdated = config.lastUpdated,
+                lastUpdated = config.updatedAt,
                 routing = config.routing,
                 generation = config.generation,
                 storage = config.storage,

@@ -9,7 +9,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.StartupActivity
-import com.runanywhere.sdk.components.stt.WhisperServiceProvider
+import com.runanywhere.sdk.providers.JvmWhisperSTTServiceProvider
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
@@ -34,10 +34,10 @@ class RunAnywherePlugin : StartupActivity {
 
                     initializationJob = GlobalScope.launch {
                         try {
-                            logger.info("Starting SDK initialization with WhisperKit integration...")
+                            logger.info("Starting SDK initialization with WhisperJNI integration...")
 
-                            // Step 1: Register WhisperKit STT provider before SDK initialization
-                            logger.info("Registering WhisperKit STT provider...")
+                            // Step 1: Register WhisperJNI STT provider before SDK initialization
+                            logger.info("Registering WhisperJNI STT provider...")
                             registerWhisperKitProvider()
 
                             // Step 2: Initialize SDK with development environment
@@ -61,12 +61,12 @@ class RunAnywherePlugin : StartupActivity {
                                 println("✅ RunAnywhere SDK v0.1 initialized successfully")
                                 println("📊 Development mode enabled")
                                 println("🔧 Registered modules: $registeredModules")
-                                println("🎙️ WhisperKit STT: ${if (com.runanywhere.sdk.core.ModuleRegistry.hasSTT) "✅" else "❌"}")
+                                println("🎙️ WhisperJNI STT: ${if (com.runanywhere.sdk.core.ModuleRegistry.hasSTT) "✅" else "❌"}")
                                 println("🔊 VAD: ${if (com.runanywhere.sdk.core.ModuleRegistry.hasVAD) "✅" else "❌"}")
 
                                 showNotification(
                                     project, "SDK Ready",
-                                    "RunAnywhere SDK initialized with WhisperKit and VAD support",
+                                    "RunAnywhere SDK initialized with WhisperJNI and VAD support",
                                     NotificationType.INFORMATION
                                 )
                             }
@@ -107,20 +107,22 @@ class RunAnywherePlugin : StartupActivity {
     }
 
     /**
-     * Register WhisperKit STT provider with the SDK
-     * This enables WhisperKit to be used for speech-to-text functionality
+     * Register JVM WhisperJNI STT provider with the SDK
+     * This enables real WhisperJNI transcription functionality (not mocked)
      */
     private fun registerWhisperKitProvider() {
         try {
-            // Use the WhisperServiceProvider from the main SDK
-            val whisperProvider = WhisperServiceProvider()
+            // Use the real JVM WhisperSTT provider instead of mock
+            JvmWhisperSTTServiceProvider.register()
+            logger.info("✅ JVM WhisperJNI STT provider registered successfully")
 
-            // Register the provider with the module registry
-            com.runanywhere.sdk.core.ModuleRegistry.registerSTT(whisperProvider)
-            logger.info("✅ WhisperKit STT provider registered successfully")
+            // Log available models
+            val provider = JvmWhisperSTTServiceProvider()
+            val availableModels = provider.getAvailableModels()
+            logger.info("Available Whisper models: ${availableModels.map { "${it.modelId} (${if (it.isDownloaded) "downloaded" else "not downloaded"})" }}")
 
         } catch (e: Exception) {
-            logger.error("❌ Failed to register WhisperKit STT provider", e)
+            logger.error("❌ Failed to register JVM WhisperJNI STT provider", e)
         }
     }
 }

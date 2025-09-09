@@ -288,6 +288,94 @@ class STTAnalyticsService(
         logger.info("Analytics service shutdown")
     }
 
+    // MARK: - iOS STTHandler Compatibility Methods
+
+    /**
+     * Track transcription started (iOS STTHandler compatible signature)
+     */
+    suspend fun trackTranscriptionStarted(audioLength: Double) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        trackTranscriptionStarted(
+            sessionId = sessionId,
+            modelId = "unknown",
+            audioFormat = "pcm",
+            sampleRate = 16000
+        )
+    }
+
+    /**
+     * Track transcription with iOS STTHandler signature
+     */
+    suspend fun trackTranscription(
+        text: String,
+        confidence: Float,
+        duration: Double,
+        audioLength: Double
+    ) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        val wordCount = text.split(" ").size
+        trackTranscriptionCompleted(
+            sessionId = sessionId,
+            duration = (duration * 1000).toLong(),
+            wordCount = wordCount,
+            confidence = confidence
+        )
+    }
+
+    /**
+     * Track final transcript (iOS STTHandler compatible)
+     */
+    suspend fun trackFinalTranscript(
+        text: String,
+        confidence: Float
+    ) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        logger.debug("Final transcript tracked: $text (confidence: $confidence)")
+    }
+
+    /**
+     * Track speaker detection (iOS STTHandler compatible)
+     */
+    suspend fun trackSpeakerDetection(
+        speaker: String,
+        confidence: Float
+    ) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        logger.debug("Speaker detection tracked: $speaker (confidence: $confidence)")
+    }
+
+    /**
+     * Track speaker change (iOS STTHandler compatible)
+     */
+    suspend fun trackSpeakerChange(
+        from: String?,
+        to: String
+    ) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        logger.debug("Speaker change tracked: $from -> $to")
+    }
+
+    /**
+     * Track error with context (iOS STTHandler compatible)
+     */
+    suspend fun trackError(error: Throwable, context: String) {
+        val sessionId = currentSessionId ?: generateSessionId()
+        trackTranscriptionError(
+            sessionId = sessionId,
+            errorCode = error::class.simpleName ?: "UnknownError",
+            errorMessage = error.message ?: "Unknown error occurred"
+        )
+    }
+
+    /**
+     * Generate a new session ID
+     */
+    private fun generateSessionId(): String {
+        val newSessionId = "stt_${getCurrentTimeMillis()}_${(0..9999).random()}"
+        currentSessionId = newSessionId
+        return newSessionId
+    }
+
     /**
      * Get basic device info for analytics
      */

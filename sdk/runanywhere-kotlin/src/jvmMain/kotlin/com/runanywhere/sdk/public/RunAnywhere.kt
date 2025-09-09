@@ -40,7 +40,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     override suspend fun authenticateWithBackend(params: SDKInitParams) {
         jvmLogger.info("Authenticating with backend API")
         // Authentication is handled by ServiceContainer.bootstrap()
-        serviceContainer.authenticationService.initialize(params.apiKey)
+        serviceContainer.authenticationService.authenticate(params.apiKey)
     }
 
     override suspend fun performHealthCheck() {

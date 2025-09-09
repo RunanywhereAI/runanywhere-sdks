@@ -9,7 +9,7 @@ import com.runanywhere.sdk.storage.AndroidPlatformContext
  * Android implementation of device info collection
  */
 actual fun collectDeviceInfo(): DeviceInfo {
-    val context = AndroidPlatformContext.getContext()
+    val context = AndroidPlatformContext.applicationContext
     val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
 
     // Get memory info
@@ -39,6 +39,11 @@ actual fun collectDeviceInfo(): DeviceInfo {
         cpuCores = Runtime.getRuntime().availableProcessors(),
         totalMemoryMB = totalMemoryMB,
         appBundleId = context.packageName,
-        appVersion = packageInfo?.versionName
+        appVersion = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            packageInfo?.versionName
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo?.versionName
+        }
     )
 }

@@ -1,14 +1,19 @@
 package com.runanywhere.sdk.services
 
-import com.runanywhere.sdk.data.models.AuthenticationResponse
+import com.runanywhere.sdk.data.models.*
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.network.HttpClient
 import com.runanywhere.sdk.storage.SecureStorage
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.utils.PersistentDeviceIdentity
+import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
- * Common authentication service handling API key management, token refresh, etc.
+ * Service responsible for authentication and token management
+ * Full parity with iOS AuthenticationService implementation
  */
 class AuthenticationService(
     private val secureStorage: SecureStorage,
@@ -17,167 +22,282 @@ class AuthenticationService(
     private val logger = SDKLogger("AuthenticationService")
     private val json = Json { ignoreUnknownKeys = true }
 
+    // Thread safety mutex (replaces actor pattern from iOS)
+    private val mutex = Mutex()
+
+    // Storage keys (matching iOS KeychainManager pattern)
     companion object {
-        private const val KEY_API_KEY = "api_key"
-        private const val KEY_ACCESS_TOKEN = "access_token"
-        private const val KEY_REFRESH_TOKEN = "refresh_token"
-        private const val KEY_TOKEN_EXPIRY = "token_expiry"
-        private const val KEY_USER_ID = "user_id"
+        // Authentication tokens
+        private const val KEY_ACCESS_TOKEN = "com.runanywhere.sdk.accessToken"
+        private const val KEY_REFRESH_TOKEN = "com.runanywhere.sdk.refreshToken"
+        private const val KEY_TOKEN_EXPIRES_AT = "com.runanywhere.sdk.tokenExpiresAt"
+
+        // API configuration
+        private const val KEY_API_KEY = "com.runanywhere.sdk.apiKey"
+        private const val KEY_BASE_URL = "com.runanywhere.sdk.baseURL"
+        private const val KEY_ENVIRONMENT = "com.runanywhere.sdk.environment"
+
+        // Device identity (matching iOS KeychainManager)
+        private const val KEY_DEVICE_UUID = "com.runanywhere.sdk.device.uuid"
+        private const val KEY_DEVICE_FINGERPRINT = "com.runanywhere.sdk.device.fingerprint"
+
+        // Token buffer for refresh (1 minute like iOS)
+        private const val TOKEN_REFRESH_BUFFER_MILLIS = 60_000L
     }
 
-    private var cachedToken: String? = null
-    private var tokenExpiry: Long = 0L
+    // In-memory cache
+    private var accessToken: String? = null
+    private var refreshToken: String? = null
+    private var tokenExpiresAt: Long? = null
 
     /**
-     * Initialize with API key
+     * Authenticate with the backend and obtain access token
+     * Matches iOS AuthenticationService.authenticate(apiKey:) method
      */
-    suspend fun initialize(apiKey: String) {
-        logger.info("Initializing authentication service")
-        secureStorage.setSecureString(KEY_API_KEY, apiKey)
+    suspend fun authenticate(apiKey: String): AuthenticationResponse = mutex.withLock {
+        val deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID()
 
-        // Exchange API key for access token
-        val token = exchangeApiKeyForToken(apiKey)
-        if (token != null) {
-            saveToken(token)
+        val request = AuthenticationRequest(
+            apiKey = apiKey,
+            deviceId = deviceId,
+            sdkVersion = SDKConstants.version,
+            platform = SDKConstants.platform
+        )
+
+        logger.debug("Authenticating with backend")
+
+        try {
+            val response = performAuthenticationRequest(request)
+
+            // Store tokens in memory and secure storage
+            this.accessToken = response.accessToken
+            this.refreshToken = response.refreshToken
+            this.tokenExpiresAt = getCurrentTimeMillis() + (response.expiresIn * 1000)
+
+            // Store in secure storage for persistence
+            storeTokensInSecureStorage(response)
+
+            logger.info("Authentication successful")
+            return response
+
+        } catch (e: Exception) {
+            logger.error("Authentication failed", e)
+            throw SDKError.AuthenticationError("Authentication failed: ${e.message}")
         }
     }
 
     /**
      * Get current access token, refreshing if needed
+     * Matches iOS AuthenticationService.getAccessToken() method
      */
-    suspend fun getAccessToken(): String? {
+    suspend fun getAccessToken(): String = mutex.withLock {
+        // Check if token exists and is valid (with buffer like iOS)
         val currentTime = getCurrentTimeMillis()
-
-        // Check cached token
-        if (cachedToken != null && currentTime < tokenExpiry) {
-            return cachedToken
+        if (accessToken != null && tokenExpiresAt != null &&
+            tokenExpiresAt!! > currentTime + TOKEN_REFRESH_BUFFER_MILLIS) {
+            return accessToken!!
         }
 
-        // Try to load from storage
-        val storedToken = secureStorage.getSecureString(KEY_ACCESS_TOKEN)
-        val storedExpiry = secureStorage.getSecureString(KEY_TOKEN_EXPIRY)?.toLongOrNull() ?: 0L
-
-        if (storedToken != null && currentTime < storedExpiry) {
-            cachedToken = storedToken
-            tokenExpiry = storedExpiry
-            return storedToken
-        }
-
-        // Token expired, try to refresh
-        val refreshToken = secureStorage.getSecureString(KEY_REFRESH_TOKEN)
+        // Try to refresh token if we have a refresh token
         if (refreshToken != null) {
-            val newToken = refreshAccessToken(refreshToken)
-            if (newToken != null) {
-                saveToken(newToken)
-                return newToken.accessToken
+            try {
+                return refreshAccessToken()
+            } catch (e: Exception) {
+                logger.error("Token refresh failed", e)
+                // Continue to re-authentication error
             }
         }
 
-        // Fall back to API key exchange
-        val apiKey = secureStorage.getSecureString(KEY_API_KEY)
-        if (apiKey != null) {
-            val token = exchangeApiKeyForToken(apiKey)
-            if (token != null) {
-                saveToken(token)
-                return token.accessToken
-            }
+        // Otherwise, we can't re-authenticate without API key
+        throw SDKError.AuthenticationError("No valid token and no way to re-authenticate")
+    }
+
+    /**
+     * Perform health check
+     * Matches iOS AuthenticationService.healthCheck() method
+     */
+    suspend fun healthCheck(): HealthCheckResponse = mutex.withLock {
+        logger.debug("Performing health check")
+
+        try {
+            // Health check requires authentication
+            val token = getAccessToken()
+            return performHealthCheckRequest(token)
+
+        } catch (e: Exception) {
+            logger.error("Health check failed", e)
+            throw SDKError.NetworkError("Health check failed: ${e.message}")
         }
-
-        logger.error("Failed to obtain access token")
-        return null
-    }
-
-    /**
-     * Get stored API key
-     */
-    suspend fun getApiKey(): String? {
-        return secureStorage.getSecureString(KEY_API_KEY)
-    }
-
-    /**
-     * Get current user ID
-     */
-    suspend fun getUserId(): String? {
-        return secureStorage.getSecureString(KEY_USER_ID)
     }
 
     /**
      * Check if authenticated
+     * Matches iOS AuthenticationService.isAuthenticated() method
      */
-    suspend fun isAuthenticated(): Boolean {
-        return getAccessToken() != null
+    fun isAuthenticated(): Boolean {
+        return accessToken != null
     }
 
     /**
-     * Sign out and clear credentials
+     * Clear authentication state
+     * Matches iOS AuthenticationService.clearAuthentication() method
      */
-    suspend fun signOut() {
-        logger.info("Signing out")
-        cachedToken = null
-        tokenExpiry = 0L
-        secureStorage.clearSecure()
-    }
+    suspend fun clearAuthentication() = mutex.withLock {
+        accessToken = null
+        refreshToken = null
+        tokenExpiresAt = null
 
-    /**
-     * Exchange API key for access token
-     */
-    private suspend fun exchangeApiKeyForToken(apiKey: String): AuthenticationResponse? {
-        return try {
-            val body = """{"api_key": "$apiKey"}""".encodeToByteArray()
-            val response = httpClient.post(
-                url = "https://api.runanywhere.ai/v1/auth/exchange",
-                body = body,
-                headers = mapOf("Content-Type" to "application/json")
-            )
+        // Clear from secure storage
+        try {
+            secureStorage.removeSecure(KEY_ACCESS_TOKEN)
+            secureStorage.removeSecure(KEY_REFRESH_TOKEN)
+            secureStorage.removeSecure(KEY_TOKEN_EXPIRES_AT)
 
-            if (response.isSuccessful) {
-                json.decodeFromString<AuthenticationResponse>(response.bodyAsString())
-            } else {
-                logger.error("Token exchange failed: ${response.statusCode}")
-                null
-            }
+            logger.info("Authentication cleared")
         } catch (e: Exception) {
-            logger.error("Error exchanging API key for token", e)
-            null
+            logger.error("Failed to clear authentication from storage", e)
+            throw SDKError.FileSystemError("Failed to clear authentication: ${e.message}")
         }
+    }
+
+    /**
+     * Load tokens from secure storage if available
+     * Matches iOS AuthenticationService.loadStoredTokens() method
+     */
+    suspend fun loadStoredTokens() = mutex.withLock {
+        try {
+            val storedAccessToken = secureStorage.getSecureString(KEY_ACCESS_TOKEN)
+            if (storedAccessToken != null) {
+                this.accessToken = storedAccessToken
+                logger.debug("Loaded stored access token from secure storage")
+            }
+
+            val storedRefreshToken = secureStorage.getSecureString(KEY_REFRESH_TOKEN)
+            if (storedRefreshToken != null) {
+                this.refreshToken = storedRefreshToken
+                logger.debug("Loaded stored refresh token from secure storage")
+            }
+
+            val storedExpiresAt = secureStorage.getSecureString(KEY_TOKEN_EXPIRES_AT)?.toLongOrNull()
+            if (storedExpiresAt != null) {
+                this.tokenExpiresAt = storedExpiresAt
+                logger.debug("Loaded stored token expiry from secure storage")
+            }
+
+        } catch (e: Exception) {
+            logger.error("Failed to load stored tokens", e)
+            // Don't throw - this is optional recovery
+        }
+    }
+
+    // MARK: - Private Methods
+
+    /**
+     * Perform authentication request
+     */
+    private suspend fun performAuthenticationRequest(request: AuthenticationRequest): AuthenticationResponse {
+        val requestBody = json.encodeToString(AuthenticationRequest.serializer(), request)
+
+        val response = httpClient.post(
+            url = "https://api.runanywhere.ai/v1/auth/token", // Matches iOS endpoint
+            body = requestBody.encodeToByteArray(),
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "X-SDK-Client" to "RunAnywhereKotlinSDK",
+                "X-SDK-Version" to SDKConstants.version,
+                "X-Platform" to SDKConstants.platform
+            )
+        )
+
+        if (!response.isSuccessful) {
+            val errorMessage = "Authentication failed with status: ${response.statusCode}"
+            logger.error(errorMessage)
+            throw SDKError.AuthenticationError(errorMessage)
+        }
+
+        return json.decodeFromString<AuthenticationResponse>(response.bodyAsString())
     }
 
     /**
      * Refresh access token using refresh token
      */
-    private suspend fun refreshAccessToken(refreshToken: String): AuthenticationResponse? {
-        return try {
-            val body = """{"refresh_token": "$refreshToken"}""".encodeToByteArray()
-            val response = httpClient.post(
-                url = "https://api.runanywhere.ai/v1/auth/refresh",
-                body = body,
-                headers = mapOf("Content-Type" to "application/json")
-            )
+    private suspend fun refreshAccessToken(): String {
+        val currentRefreshToken = refreshToken
+            ?: throw SDKError.InvalidAPIKey("No refresh token available")
 
-            if (response.isSuccessful) {
-                json.decodeFromString<AuthenticationResponse>(response.bodyAsString())
-            } else {
-                logger.error("Token refresh failed: ${response.statusCode}")
-                null
-            }
-        } catch (e: Exception) {
-            logger.error("Error refreshing token", e)
-            null
+        logger.info("Refresh token available but refresh endpoint not implemented")
+        throw SDKError.AuthenticationError("Token refresh not implemented")
+
+        // TODO: Implement when refresh endpoint is available
+        /*
+        val refreshRequest = mapOf("refresh_token" to currentRefreshToken)
+        val requestBody = json.encodeToString(refreshRequest)
+
+        val response = httpClient.post(
+            url = "https://api.runanywhere.ai/v1/auth/refresh",
+            body = requestBody.encodeToByteArray(),
+            headers = mapOf(
+                "Content-Type" to "application/json",
+                "X-SDK-Client" to "RunAnywhereKotlinSDK",
+                "X-SDK-Version" to SDKConstants.version,
+                "X-Platform" to SDKConstants.platform
+            )
+        )
+
+        if (!response.isSuccessful) {
+            throw SDKError.AuthenticationError("Token refresh failed with status: ${response.statusCode}")
         }
+
+        val authResponse = json.decodeFromString<AuthenticationResponse>(response.bodyAsString())
+
+        // Update tokens
+        this.accessToken = authResponse.accessToken
+        this.refreshToken = authResponse.refreshToken
+        this.tokenExpiresAt = getCurrentTimeMillis() + (authResponse.expiresIn * 1000)
+
+        // Store in secure storage
+        storeTokensInSecureStorage(authResponse)
+
+        return authResponse.accessToken
+        */
     }
 
     /**
-     * Save token to secure storage
+     * Perform health check request
      */
-    private suspend fun saveToken(token: AuthenticationResponse) {
-        val currentTime = getCurrentTimeMillis()
-        cachedToken = token.accessToken
-        tokenExpiry = currentTime + (token.expiresIn * 1000)
+    private suspend fun performHealthCheckRequest(accessToken: String): HealthCheckResponse {
+        val response = httpClient.get(
+            url = "https://api.runanywhere.ai/v1/health",
+            headers = mapOf(
+                "Authorization" to "Bearer $accessToken",
+                "Content-Type" to "application/json",
+                "X-SDK-Client" to "RunAnywhereKotlinSDK",
+                "X-SDK-Version" to SDKConstants.version,
+                "X-Platform" to SDKConstants.platform
+            )
+        )
 
-        secureStorage.setSecureString(KEY_ACCESS_TOKEN, token.accessToken)
-        secureStorage.setSecureString(KEY_TOKEN_EXPIRY, tokenExpiry.toString())
-        secureStorage.setSecureString(KEY_REFRESH_TOKEN, token.refreshToken)
+        if (!response.isSuccessful) {
+            throw SDKError.NetworkError("Health check failed with status: ${response.statusCode}")
+        }
 
-        // Note: AuthenticationResponse doesn't have userId, so we skip it
+        return json.decodeFromString<HealthCheckResponse>(response.bodyAsString())
+    }
+
+    /**
+     * Store tokens in secure storage for persistence
+     * Matches iOS storeTokensInKeychain method
+     */
+    private suspend fun storeTokensInSecureStorage(response: AuthenticationResponse) {
+        try {
+            secureStorage.setSecureString(KEY_ACCESS_TOKEN, response.accessToken)
+            secureStorage.setSecureString(KEY_REFRESH_TOKEN, response.refreshToken)
+            tokenExpiresAt?.let { expiresAt ->
+                secureStorage.setSecureString(KEY_TOKEN_EXPIRES_AT, expiresAt.toString())
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to store tokens in secure storage", e)
+            throw SDKError.FileSystemError("Failed to store tokens: ${e.message}")
+        }
     }
 }

@@ -237,6 +237,24 @@ actual class FileManager {
         }
     }
 
+    actual suspend fun getDirectorySize(path: String): Long = mutex.withLock {
+        return try {
+            val directory = File(path)
+            if (!directory.exists() || !directory.isDirectory) return@withLock 0L
+
+            var size = 0L
+            directory.walkTopDown().forEach { file ->
+                if (file.isFile) {
+                    size += file.length()
+                }
+            }
+            size
+        } catch (e: Exception) {
+            logger.error("Failed to get directory size: $path", e)
+            0L
+        }
+    }
+
     /**
      * Calculate file checksum
      * For integrity verification

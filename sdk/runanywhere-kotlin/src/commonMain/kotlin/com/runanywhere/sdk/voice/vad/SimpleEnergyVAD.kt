@@ -21,6 +21,23 @@ class SimpleEnergyVAD(
 
     private val logger = SDKLogger("SimpleEnergyVAD")
 
+    // Properties matching iOS VADService protocol
+    override var energyThreshold: Float
+        get() = vadConfig.energyThreshold
+        set(value) {
+            vadConfig = vadConfig.copy(energyThreshold = value.coerceIn(0.0f, 1.0f))
+            logger.debug("Energy threshold updated to: $energyThreshold")
+        }
+
+    override val sampleRate: Int
+        get() = vadConfig.sampleRate
+
+    override val frameLength: Float
+        get() = vadConfig.frameLength
+
+    override val isSpeechActive: Boolean
+        get() = isCurrentlySpeaking
+
     // State tracking (matching iOS exactly)
     private var isActive = false
     private var isCurrentlySpeaking = false
@@ -31,8 +48,9 @@ class SimpleEnergyVAD(
     private val voiceStartThreshold = 2   // frames of voice to start (iOS value)
     private val voiceEndThreshold = 10    // frames of silence to end (iOS value)
 
-    // Speech activity callback (matching iOS onSpeechActivity pattern)
+    // Callbacks matching iOS VADService protocol
     override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
+    override var onAudioBuffer: ((ByteArray) -> Unit)? = null
 
     init {
         logger.info("SimpleEnergyVAD initialized - frameLength: ${vadConfig.frameLength}, threshold: ${vadConfig.energyThreshold}")
@@ -46,9 +64,14 @@ class SimpleEnergyVAD(
         logger.info("SimpleEnergyVAD configuration updated - threshold: ${configuration.energyThreshold}")
     }
 
+    // Additional method matching iOS VADService
+    override fun processAudioData(audioData: FloatArray): Boolean {
+        return processAudioChunk(audioData).isSpeechDetected
+    }
+
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
         if (!isActive) {
-            return VADResult(isSpeech = false, confidence = 0.0f)
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
         }
 
         // Calculate RMS energy using iOS-style calculation
@@ -61,7 +84,7 @@ class SimpleEnergyVAD(
         updateSpeechState(hasVoice, energy)
 
         return VADResult(
-            isSpeech = isCurrentlySpeaking, // Use state, not just current frame
+            isSpeechDetected = isCurrentlySpeaking, // Use state, not just current frame
             confidence = if (hasVoice) energy.coerceIn(0.5f, 1.0f) else energy.coerceIn(0.0f, 0.5f)
         )
     }
@@ -83,9 +106,9 @@ class SimpleEnergyVAD(
     // MARK: - Public Methods
 
     /**
-     * Start voice activity detection
+     * Start voice activity detection (matching iOS VADService protocol)
      */
-    fun start() {
+    override fun start() {
         if (isActive) return
 
         isActive = true
@@ -97,9 +120,9 @@ class SimpleEnergyVAD(
     }
 
     /**
-     * Stop voice activity detection
+     * Stop voice activity detection (matching iOS VADService protocol)
      */
-    fun stop() {
+    override fun stop() {
         if (!isActive) return
 
         isActive = false
@@ -113,16 +136,6 @@ class SimpleEnergyVAD(
         logger.info("SimpleEnergyVAD stopped")
     }
 
-    /**
-     * Set the energy threshold for voice detection (matching iOS)
-     */
-    fun setEnergyThreshold(threshold: Float) {
-        vadConfig = VADConfiguration(
-            energyThreshold = threshold.coerceIn(0.0f, 1.0f),
-            frameLength = vadConfig.frameLength
-        )
-        logger.debug("Energy threshold set to: ${vadConfig.energyThreshold}")
-    }
 
     // MARK: - Private Methods
 

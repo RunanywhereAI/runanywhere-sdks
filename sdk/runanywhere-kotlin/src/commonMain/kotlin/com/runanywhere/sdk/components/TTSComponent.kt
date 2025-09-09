@@ -47,7 +47,7 @@ class TTSComponent(
 
     // MARK: - Progressive Streaming Support
 
-    private val streamingTTSHandler = StreamingTTSHandler()
+    private var streamingTTSHandler: StreamingTTSHandler? = null
     private val ssmlProcessor = DefaultSSMLProcessor()
 
     override suspend fun createService(): TTSService {
@@ -64,6 +64,11 @@ class TTSComponent(
         // Initialize service
         service = createService()
         service?.initialize()
+
+        // Initialize streaming handler with service
+        service?.let { ttsService ->
+            streamingTTSHandler = StreamingTTSHandler(ttsService)
+        }
 
         // Load model if specified
         ttsConfiguration.modelId?.let { modelId ->
@@ -98,30 +103,27 @@ class TTSComponent(
             val options = createTTSOptions(input)
             _currentOptions.value = options
 
-            // Perform synthesis
+            // Perform synthesis using iOS-compatible interface
             val audioData = service?.synthesize(
                 text = input.textToSynthesize,
-                voice = options.voice,
-                rate = options.rate,
-                pitch = options.pitch,
-                volume = options.volume
+                options = options
             ) ?: throw SDKError.ComponentFailure("TTS service not initialized")
 
             // Calculate processing metrics
             val processingTime = getCurrentTimeMillis() - startTime
-            val estimatedDuration = estimateAudioDuration(audioData, options.outputFormat)
+            val estimatedDuration = estimateAudioDuration(audioData, options.audioFormat)
 
             // Create comprehensive output with metadata
             TTSOutput(
                 audioData = audioData,
-                format = options.outputFormat,
+                format = options.outputFormat ?: TTSOutputFormat.PCM_16KHZ, // Default fallback
                 duration = estimatedDuration,
                 metadata = SynthesisMetadata(
-                    voice = options.voice,
-                    language = options.language ?: "en-US",
+                    voice = options.effectiveVoice,
+                    language = options.language,
                     processingTimeMs = processingTime,
-                    audioFormat = options.outputFormat,
-                    sampleRate = options.outputFormat.sampleRate,
+                    audioFormat = options.outputFormat ?: TTSOutputFormat.PCM_16KHZ,
+                    sampleRate = options.sampleRate,
                     originalText = input.text,
                     processedText = input.textToSynthesize,
                     synthesizedAt = getCurrentTimeMillis()
@@ -147,13 +149,9 @@ class TTSComponent(
         try {
             service?.synthesizeStream(
                 text = text,
-                voice = options.voice,
-                rate = options.rate,
-                pitch = options.pitch,
-                volume = options.volume
-            )?.collect { chunk ->
-                onChunk(chunk)
-            } ?: throw SDKError.ComponentFailure("TTS service not initialized")
+                options = options,
+                onChunk = onChunk
+            ) ?: throw SDKError.ComponentFailure("TTS service not initialized")
         } finally {
             _isSynthesizing.value = false
         }
@@ -173,10 +171,7 @@ class TTSComponent(
             try {
                 service?.synthesizeStream(
                     text = text,
-                    voice = options.voice,
-                    rate = options.rate,
-                    pitch = options.pitch,
-                    volume = options.volume
+                    options = options
                 )?.collect { audioChunk ->
                     emit(audioChunk)
                 } ?: throw SDKError.ComponentFailure("TTS service not initialized")
@@ -222,15 +217,10 @@ class TTSComponent(
     /**
      * Get available voices (iOS-style with comprehensive voice info)
      */
-    fun getAvailableVoices(): List<TTSVoice> {
-        return service?.getAvailableVoices() ?: listOf(TTSVoice.DEFAULT)
+    fun getAllVoices(): List<TTSVoice> {
+        return service?.getAllVoices() ?: listOf(TTSVoice.DEFAULT)
     }
 
-    /**
-     * Get available voice identifiers (iOS compatibility)
-     */
-    val availableVoiceIds: List<String>
-        get() = getAvailableVoices().map { it.id }
 
     /**
      * Current synthesis state (iOS-style)
@@ -269,16 +259,38 @@ class TTSComponent(
 
     /**
      * Progressive TTS for streaming text generation (iOS StreamingTTSHandler equivalent)
+     * Returns true if TTS was triggered for complete sentences
      */
-    fun processIncrementalText(token: String): Flow<ByteArray> {
-        return streamingTTSHandler.processToken(token, TTSOptions())
+    suspend fun processIncrementalText(token: String, options: TTSOptions? = null): Boolean {
+        return streamingTTSHandler?.processToken(token, options) ?: false
     }
 
     /**
-     * Flush remaining buffered text
+     * Flow-based progressive TTS (Kotlin-native pattern)
      */
-    fun flushRemainingText(): Flow<ByteArray> {
-        return streamingTTSHandler.flushRemaining(TTSOptions())
+    fun processIncrementalTextFlow(token: String, options: TTSOptions = TTSOptions()): Flow<ByteArray> {
+        return streamingTTSHandler?.processTokenFlow(token, options) ?: emptyFlow()
+    }
+
+    /**
+     * Flush remaining buffered text (iOS equivalent)
+     */
+    suspend fun flushRemainingText(options: TTSOptions? = null) {
+        streamingTTSHandler?.flushRemaining(options)
+    }
+
+    /**
+     * Flow-based flush (Kotlin-native pattern)
+     */
+    fun flushRemainingTextFlow(options: TTSOptions = TTSOptions()): Flow<ByteArray> {
+        return streamingTTSHandler?.flushRemainingFlow(options) ?: emptyFlow()
+    }
+
+    /**
+     * Reset streaming handler for new session (iOS equivalent)
+     */
+    fun resetStreamingSession() {
+        streamingTTSHandler?.reset()
     }
 
     // MARK: - Private Helper Methods
@@ -288,23 +300,38 @@ class TTSComponent(
      */
     private fun createTTSOptions(input: TTSInput): TTSOptions {
         val voice = if (input.voiceId != null) {
-            getAvailableVoices().find { it.id == input.voiceId } ?: TTSVoice.DEFAULT
+            getAllVoices().find { it.id == input.voiceId } ?: TTSVoice.DEFAULT
         } else {
             ttsConfiguration.defaultVoice
         }
 
         return TTSOptions(
+            voiceId = input.voiceId,
             voice = voice,
+            language = input.language ?: voice.language,
             rate = ttsConfiguration.defaultRate,
             pitch = ttsConfiguration.defaultPitch,
             volume = ttsConfiguration.defaultVolume,
-            language = input.language,
+            audioFormat = ttsConfiguration.outputFormat.toAudioFormat(),
+            sampleRate = ttsConfiguration.outputFormat.sampleRate,
+            useSSML = input.isSSML,
             outputFormat = ttsConfiguration.outputFormat
         )
     }
 
     /**
-     * Estimate audio duration from byte array
+     * Estimate audio duration from byte array - supports both AudioFormat and TTSOutputFormat
+     */
+    private fun estimateAudioDuration(audioData: ByteArray, format: AudioFormat): Double {
+        return when (format) {
+            AudioFormat.PCM, AudioFormat.WAV -> audioData.size.toDouble() / (16000 * 2) // 16-bit samples
+            AudioFormat.MP3, AudioFormat.AAC -> audioData.size.toDouble() / (16000 * 2) // Estimate for compressed
+            AudioFormat.FLAC, AudioFormat.OPUS -> audioData.size.toDouble() / (16000 * 2)
+        }
+    }
+
+    /**
+     * Estimate audio duration from byte array (TTSOutputFormat - backward compatibility)
      */
     private fun estimateAudioDuration(audioData: ByteArray, format: TTSOutputFormat): Double {
         return when (format) {
@@ -399,17 +426,73 @@ data class PhonemeTimestamp(
 )
 
 /**
- * TTS Options
+ * TTS Options matching iOS TTSOptions structure for full parity
+ * Supports both string-based voice selection (iOS style) and rich TTSVoice objects (KMP style)
  */
 @Serializable
 data class TTSOptions(
+    // iOS-compatible voice selection - can be voice identifier string
+    val voiceId: String? = null,
+
+    // Rich voice object for KMP-style usage
     val voice: TTSVoice = TTSVoice.DEFAULT,
-    val rate: Float = 1.0f,
-    val pitch: Float = 1.0f,
-    val volume: Float = 1.0f,
-    val language: String? = null,
-    val outputFormat: TTSOutputFormat = TTSOutputFormat.PCM_16KHZ
-)
+
+    // Core parameters matching iOS exactly
+    val language: String = "en-US",
+    val rate: Float = 1.0f,     // Speech rate (0.0 to 2.0, 1.0 is normal) - iOS compatible
+    val pitch: Float = 1.0f,    // Speech pitch (0.0 to 2.0, 1.0 is normal) - iOS compatible
+    val volume: Float = 1.0f,   // Speech volume (0.0 to 1.0) - iOS compatible
+
+    // Audio format - iOS compatible
+    val audioFormat: AudioFormat = AudioFormat.PCM,
+    val sampleRate: Int = 16000,
+
+    // SSML support - iOS compatible
+    val useSSML: Boolean = false,
+
+    // Backward compatibility
+    @Deprecated("Use audioFormat for iOS parity")
+    val outputFormat: TTSOutputFormat? = null
+) {
+    /**
+     * Get effective voice - prioritizes voiceId (iOS style) over voice object
+     */
+    val effectiveVoice: TTSVoice
+        get() = if (voiceId != null) {
+            TTSVoice(
+                id = voiceId,
+                name = voiceId,
+                language = language,
+                gender = TTSGender.NEUTRAL
+            )
+        } else {
+            voice
+        }
+
+    /**
+     * iOS-style constructor for string-based voice selection
+     */
+    constructor(
+        voice: String? = null,
+        language: String = "en-US",
+        rate: Float = 1.0f,
+        pitch: Float = 1.0f,
+        volume: Float = 1.0f,
+        audioFormat: AudioFormat = AudioFormat.PCM,
+        sampleRate: Int = 16000,
+        useSSML: Boolean = false
+    ) : this(
+        voiceId = voice,
+        voice = TTSVoice.DEFAULT,
+        language = language,
+        rate = rate,
+        pitch = pitch,
+        volume = volume,
+        audioFormat = audioFormat,
+        sampleRate = sampleRate,
+        useSSML = useSSML
+    )
+}
 
 /**
  * TTS Voice configuration
@@ -462,7 +545,29 @@ enum class TTSStyle {
 }
 
 /**
- * TTS Output format
+ * Audio format enum matching iOS AudioFormat pattern
+ * Aligned with iOS TTSOptions.audioFormat for cross-platform consistency
+ */
+@Serializable
+enum class AudioFormat {
+    PCM,
+    WAV,
+    MP3,
+    AAC,
+    FLAC,
+    OPUS;
+
+    val sampleRate: Int
+        get() = when (this) {
+            PCM, WAV -> 16000
+            MP3, AAC -> 16000
+            FLAC, OPUS -> 16000
+        }
+}
+
+/**
+ * TTS Output format (keeping existing for backward compatibility)
+ * @deprecated Use AudioFormat for iOS parity
  */
 @Serializable
 enum class TTSOutputFormat {
@@ -482,6 +587,16 @@ enum class TTSOutputFormat {
             PCM_48KHZ -> 48000
             else -> 16000 // Default for compressed formats
         }
+
+    /**
+     * Convert to iOS-compatible AudioFormat
+     */
+    fun toAudioFormat(): AudioFormat = when (this) {
+        PCM_8KHZ, PCM_16KHZ, PCM_24KHZ, PCM_48KHZ -> AudioFormat.PCM
+        MP3 -> AudioFormat.MP3
+        OGG_VORBIS -> AudioFormat.FLAC // Close match
+        OPUS -> AudioFormat.OPUS
+    }
 }
 
 /**
@@ -504,36 +619,65 @@ data class TTSConfiguration(
 }
 
 /**
- * TTS Service interface - Enhanced to match iOS TTSService protocol
+ * TTS Service interface - Enhanced to exactly match iOS TTSService protocol
+ * Provides both iOS-style string-based API and KMP-style rich object API for full parity
  */
 interface TTSService {
-    suspend fun initialize() // iOS-style initialization
+    /**
+     * Initialize the TTS service (iOS TTSService.initialize())
+     */
+    suspend fun initialize()
 
-    suspend fun synthesize(
+    /**
+     * iOS-style synthesize method with options object
+     * Matches: func synthesize(text: String, options: TTSOptions) async throws -> Data
+     */
+    suspend fun synthesize(text: String, options: TTSOptions): ByteArray
+
+    /**
+     * iOS-style stream synthesis with callback
+     * Matches: func synthesizeStream(text: String, options: TTSOptions, onChunk: @escaping (Data) -> Void)
+     */
+    suspend fun synthesizeStream(
         text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): ByteArray
+        options: TTSOptions,
+        onChunk: suspend (ByteArray) -> Unit
+    )
 
-    fun synthesizeStream(
-        text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): Flow<ByteArray>
+    /**
+     * KMP Flow-based streaming (Kotlin-native pattern)
+     */
+    fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray>
 
-    fun getAvailableVoices(): List<TTSVoice>
+    /**
+     * Stop current synthesis (iOS TTSService.stop())
+     */
+    fun stop()
+
+    /**
+     * Check if currently synthesizing (iOS TTSService.isSynthesizing)
+     */
+    val isSynthesizing: Boolean
+
+    /**
+     * Get available voices (iOS TTSService.availableVoices)
+     * Returns string identifiers for iOS compatibility
+     */
+    val availableVoices: List<String>
+
+    /**
+     * Get rich voice objects (KMP enhancement)
+     */
+    fun getAllVoices(): List<TTSVoice>
+
+    /**
+     * Cleanup resources (iOS TTSService.cleanup())
+     */
+    suspend fun cleanup()
+
+    // KMP-specific extensions
     suspend fun loadModel(modelInfo: ModelInfo)
     fun cancelCurrent()
-    fun stop() // iOS-style stop method
-
-    val isSynthesizing: Boolean // iOS-style state property
-    val availableVoiceIds: List<String> // iOS compatibility
-
-    suspend fun cleanup() // iOS-style cleanup
 }
 
 /**
@@ -548,32 +692,38 @@ class TTSServiceAdapter(
         // Provider-specific initialization if needed
     }
 
-    override suspend fun synthesize(
-        text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): ByteArray {
+    // iOS-style synthesize method
+    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         _isSynthesizing = true
         return try {
-            provider.synthesize(text, TTSOptions(voice, rate, pitch, volume))
+            provider.synthesize(text, options)
         } finally {
             _isSynthesizing = false
         }
     }
 
-    override fun synthesizeStream(
+    // iOS-style callback streaming
+    override suspend fun synthesizeStream(
         text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): Flow<ByteArray> {
+        options: TTSOptions,
+        onChunk: suspend (ByteArray) -> Unit
+    ) {
+        _isSynthesizing = true
+        try {
+            provider.synthesizeStream(text, options).collect { chunk ->
+                onChunk(chunk)
+            }
+        } finally {
+            _isSynthesizing = false
+        }
+    }
+
+    // KMP-style Flow streaming
+    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
         return flow {
             _isSynthesizing = true
             try {
-                provider.synthesizeStream(text, TTSOptions(voice, rate, pitch, volume)).collect { chunk ->
+                provider.synthesizeStream(text, options).collect { chunk ->
                     emit(chunk)
                 }
             } finally {
@@ -582,10 +732,11 @@ class TTSServiceAdapter(
         }
     }
 
-    override fun getAvailableVoices(): List<TTSVoice> = listOf(TTSVoice.DEFAULT)
+    override fun getAllVoices(): List<TTSVoice> = listOf(TTSVoice.DEFAULT)
 
-    override val availableVoiceIds: List<String>
-        get() = getAvailableVoices().map { it.id }
+    override val availableVoices: List<String>
+        get() = getAllVoices().map { it.id }
+
 
     override val isSynthesizing: Boolean
         get() = _isSynthesizing
@@ -615,13 +766,8 @@ class DefaultTTSService : TTSService {
         // Platform-specific initialization will be in actual implementations
     }
 
-    override suspend fun synthesize(
-        text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): ByteArray {
+    // iOS-style synthesize method
+    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         _isSynthesizing = true
         try {
             // Default implementation - platform-specific implementations will override
@@ -631,22 +777,38 @@ class DefaultTTSService : TTSService {
         }
     }
 
-    override fun synthesizeStream(
+    // iOS-style callback streaming
+    override suspend fun synthesizeStream(
         text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): Flow<ByteArray> {
-        return flow {
-            emit(synthesize(text, voice, rate, pitch, volume))
+        options: TTSOptions,
+        onChunk: suspend (ByteArray) -> Unit
+    ) {
+        _isSynthesizing = true
+        try {
+            val audioData = synthesize(text, options)
+            if (audioData.isNotEmpty()) {
+                onChunk(audioData)
+            }
+        } finally {
+            _isSynthesizing = false
         }
     }
 
-    override fun getAvailableVoices(): List<TTSVoice> = listOf(TTSVoice.DEFAULT)
+    // KMP-style Flow streaming
+    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
+        return flow {
+            val audioData = synthesize(text, options)
+            if (audioData.isNotEmpty()) {
+                emit(audioData)
+            }
+        }
+    }
 
-    override val availableVoiceIds: List<String>
-        get() = getAvailableVoices().map { it.id }
+    override fun getAllVoices(): List<TTSVoice> = listOf(TTSVoice.DEFAULT)
+
+    override val availableVoices: List<String>
+        get() = getAllVoices().map { it.id }
+
 
     override val isSynthesizing: Boolean
         get() = _isSynthesizing
@@ -670,59 +832,167 @@ class DefaultTTSService : TTSService {
 
 /**
  * Progressive sentence-based TTS for streaming text generation
- * Matches iOS StreamingTTSHandler functionality
+ * Enhanced to exactly match iOS StreamingTTSHandler functionality and patterns
  */
-class StreamingTTSHandler {
+class StreamingTTSHandler(private val ttsService: TTSService) {
+    // State tracking matching iOS implementation
     private var spokenText = ""
     private var pendingBuffer = ""
+
+    // Configuration matching iOS
     private val sentenceDelimiters = setOf('.', '!', '?')
+    private val minSentenceLength = 3 // Minimum characters for a valid sentence
 
     /**
-     * Process incremental text token and return audio if complete sentences are found
+     * Reset the handler for a new streaming session (iOS equivalent)
      */
-    fun processToken(token: String, options: TTSOptions): Flow<ByteArray> = flow {
+    fun reset() {
+        spokenText = ""
+        pendingBuffer = ""
+    }
+
+    /**
+     * Process a new token from the streaming response (iOS equivalent)
+     * Returns true if TTS was triggered
+     */
+    suspend fun processToken(
+        token: String,
+        options: TTSOptions? = null
+    ): Boolean {
+        // Add token to pending buffer
+        pendingBuffer += token
+
+        // Check for complete sentences
+        val sentences = extractCompleteSentences()
+
+        return if (sentences.isNotEmpty()) {
+            // Speak the complete sentences
+            for (sentence in sentences) {
+                speakSentence(sentence, options ?: TTSOptions())
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /**
+     * Flow-based token processing for Kotlin-native usage
+     */
+    fun processTokenFlow(token: String, options: TTSOptions): Flow<ByteArray> = flow {
         pendingBuffer += token
         val sentences = extractCompleteSentences()
 
         for (sentence in sentences) {
-            // This would need to be connected to the actual TTS service
-            // For now, emit empty data as placeholder
-            emit(ByteArray(0))
-            spokenText += sentence
+            if (sentence.length >= minSentenceLength) {
+                val audioData = ttsService.synthesize(sentence, options)
+                if (audioData.isNotEmpty()) {
+                    emit(audioData)
+                }
+                spokenText += sentence
+            }
         }
     }
 
     /**
-     * Flush any remaining text in the buffer
+     * Speak any remaining text in the buffer (iOS equivalent: flushRemaining)
      */
-    fun flushRemaining(options: TTSOptions): Flow<ByteArray> = flow {
-        if (pendingBuffer.isNotBlank()) {
-            emit(ByteArray(0)) // Placeholder implementation
-            spokenText += pendingBuffer
-            pendingBuffer = ""
+    suspend fun flushRemaining(options: TTSOptions? = null) {
+        val remainingText = pendingBuffer.trim()
+        pendingBuffer = ""
+
+        if (remainingText.isNotEmpty() && !spokenText.contains(remainingText)) {
+            speakSentence(remainingText, options ?: TTSOptions())
         }
     }
 
-    private fun extractCompleteSentences(): List<String> {
-        val sentences = mutableListOf<String>()
-        var currentSentence = ""
+    /**
+     * Flow-based flush for Kotlin-native usage
+     */
+    fun flushRemainingFlow(options: TTSOptions): Flow<ByteArray> = flow {
+        if (pendingBuffer.isNotBlank()) {
+            val remainingText = pendingBuffer.trim()
+            pendingBuffer = ""
 
-        for (char in pendingBuffer) {
-            currentSentence += char
-            if (char in sentenceDelimiters) {
-                sentences.add(currentSentence.trim())
-                currentSentence = ""
+            if (remainingText.isNotEmpty() && !spokenText.contains(remainingText)) {
+                val audioData = ttsService.synthesize(remainingText, options)
+                if (audioData.isNotEmpty()) {
+                    emit(audioData)
+                }
+                spokenText += remainingText
+            }
+        }
+    }
+
+    /**
+     * Process streaming text with default TTS options from config (iOS equivalent)
+     */
+    suspend fun processStreamingText(
+        text: String,
+        config: TTSConfiguration?
+    ): Boolean {
+        val options = TTSOptions(
+            voiceId = config?.defaultVoice?.id,
+            language = config?.defaultVoice?.language ?: "en-US",
+            rate = config?.defaultRate ?: 1.0f,
+            pitch = config?.defaultPitch ?: 1.0f,
+            volume = config?.defaultVolume ?: 1.0f
+        )
+
+        return processToken(text, options)
+    }
+
+    /**
+     * Extract complete sentences from the pending buffer (iOS equivalent logic)
+     */
+    private fun extractCompleteSentences(): List<String> {
+        val completeSentences = mutableListOf<String>()
+        var currentIndex = 0
+
+        while (currentIndex < pendingBuffer.length) {
+            // Find next delimiter
+            val delimiterIndex = pendingBuffer.indexOfAny(sentenceDelimiters.toCharArray(), currentIndex)
+
+            if (delimiterIndex != -1) {
+                val sentenceEndIndex = delimiterIndex + 1
+                val sentence = pendingBuffer.substring(currentIndex, sentenceEndIndex)
+
+                // Check if this sentence is new (not already spoken) and meets minimum length
+                val fullTextSoFar = spokenText + sentence
+                if (!spokenText.endsWith(sentence) && sentence.length >= minSentenceLength) {
+                    completeSentences.add(sentence.trim())
+                    spokenText = fullTextSoFar
+                }
+
+                currentIndex = sentenceEndIndex
+            } else {
+                // No more delimiters found
+                break
             }
         }
 
-        // Update pending buffer to remaining incomplete sentence
-        pendingBuffer = currentSentence
-        return sentences
+        // Update pending buffer to only contain unprocessed text
+        pendingBuffer = if (currentIndex < pendingBuffer.length) {
+            pendingBuffer.substring(currentIndex)
+        } else {
+            ""
+        }
+
+        return completeSentences
     }
 
-    fun reset() {
-        spokenText = ""
-        pendingBuffer = ""
+    /**
+     * Speak a single sentence (iOS equivalent: speakSentence)
+     */
+    private suspend fun speakSentence(sentence: String, options: TTSOptions) {
+        if (sentence.isEmpty()) return
+
+        try {
+            ttsService.synthesize(sentence, options)
+        } catch (e: Exception) {
+            // Log error but continue with other sentences
+            println("TTS failed for sentence: $e")
+        }
     }
 }
 

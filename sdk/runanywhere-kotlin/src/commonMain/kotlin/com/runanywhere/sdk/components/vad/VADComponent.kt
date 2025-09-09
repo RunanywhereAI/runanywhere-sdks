@@ -48,7 +48,7 @@ class VADComponent(configuration: VADConfiguration) :
     // MARK: - Public API
 
     /**
-     * Process audio samples for voice activity detection
+     * Process audio samples for voice activity detection - matching iOS detectSpeech(in: [Float])
      */
     fun processAudioChunk(audioSamples: FloatArray): VADOutput {
         ensureReady()
@@ -60,7 +60,14 @@ class VADComponent(configuration: VADConfiguration) :
     }
 
     /**
-     * Process VAD input
+     * Detect speech in audio samples - iOS-style method name
+     */
+    fun detectSpeech(audioSamples: FloatArray): VADOutput {
+        return processAudioChunk(audioSamples)
+    }
+
+    /**
+     * Process VAD input - supporting threshold override like iOS
      */
     fun process(input: VADInput): VADOutput {
         ensureReady()
@@ -70,22 +77,35 @@ class VADComponent(configuration: VADConfiguration) :
         // Validate input
         input.validate()
 
-        // Track processing time
-        val startTime = getCurrentTimeMillis()
+        // Apply threshold override if provided (matching iOS pattern)
+        val originalThreshold = service.energyThreshold
+        input.energyThresholdOverride?.let { override ->
+            service.energyThreshold = override
+        }
 
-        // Process audio chunk
-        val result = service.processAudioChunk(input.audioSamples)
+        try {
+            // Track processing time
+            val startTime = getCurrentTimeMillis()
 
-        val processingTime = (getCurrentTimeMillis() - startTime) / 1000.0
+            // Process audio chunk
+            val result = service.processAudioChunk(input.audioSamples)
 
-        // Calculate energy level (simple RMS)
-        val energyLevel = calculateEnergyLevel(input.audioSamples)
+            val processingTime = (getCurrentTimeMillis() - startTime) / 1000.0
 
-        return VADOutput(
-            isSpeech = result.isSpeech,
-            energyLevel = energyLevel,
-            confidence = result.confidence
-        )
+            // Calculate energy level (simple RMS)
+            val energyLevel = calculateEnergyLevel(input.audioSamples)
+
+            return VADOutput(
+                isSpeechDetected = result.isSpeechDetected,
+                energyLevel = energyLevel,
+                confidence = result.confidence
+            )
+        } finally {
+            // Restore original threshold if it was overridden
+            if (input.energyThresholdOverride != null) {
+                service.energyThreshold = originalThreshold
+            }
+        }
     }
 
     /**
@@ -121,13 +141,13 @@ class VADComponent(configuration: VADConfiguration) :
             val output = processAudioChunk(audioSamples)
 
             when {
-                output.isSpeech && !isInSpeech -> {
+                output.isSpeechDetected && !isInSpeech -> {
                     isInSpeech = true
                     silenceFrames = 0
                     onSpeechStart()
                 }
 
-                !output.isSpeech && isInSpeech -> {
+                !output.isSpeechDetected && isInSpeech -> {
                     silenceFrames++
                     if (silenceFrames >= silenceFramesThreshold) {
                         isInSpeech = false
@@ -135,7 +155,7 @@ class VADComponent(configuration: VADConfiguration) :
                     }
                 }
 
-                output.isSpeech && isInSpeech -> {
+                output.isSpeechDetected && isInSpeech -> {
                     silenceFrames = 0
                 }
             }
@@ -159,6 +179,13 @@ class VADComponent(configuration: VADConfiguration) :
     }
 
     /**
+     * Set audio buffer callback (matching iOS pattern)
+     */
+    fun setAudioBufferCallback(callback: (ByteArray) -> Unit) {
+        vadService?.onAudioBuffer = callback
+    }
+
+    /**
      * Get service for compatibility
      */
     fun getService(): VADService? {
@@ -170,6 +197,20 @@ class VADComponent(configuration: VADConfiguration) :
      */
     fun isEnabled(): Boolean {
         return state == ComponentState.READY
+    }
+
+    /**
+     * Start VAD processing - matching iOS method
+     */
+    fun start() {
+        vadService?.start()
+    }
+
+    /**
+     * Stop VAD processing - matching iOS method
+     */
+    fun stop() {
+        vadService?.stop()
     }
 
     /**
