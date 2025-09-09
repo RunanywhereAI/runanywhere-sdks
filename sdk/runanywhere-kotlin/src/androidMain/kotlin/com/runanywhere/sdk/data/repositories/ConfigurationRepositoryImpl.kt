@@ -11,6 +11,7 @@ import com.runanywhere.sdk.network.NetworkService
 
 /**
  * Android implementation of ConfigurationRepository using Room database
+ * Updated to match iOS ConfigurationRepositoryImpl interface patterns
  */
 class ConfigurationRepositoryImpl(
     private val database: RunAnywhereDatabase,
@@ -18,6 +19,7 @@ class ConfigurationRepositoryImpl(
 ) : ConfigurationRepository {
 
     private val logger = SDKLogger("ConfigurationRepository")
+    private var consumerConfig: ConfigurationData? = null
 
     override suspend fun getConfiguration(): ConfigurationData? {
         return try {
@@ -118,6 +120,51 @@ class ConfigurationRepositoryImpl(
             logger.debug("Deleted old configurations older than $olderThanTimestamp")
         } catch (e: Exception) {
             logger.error("Failed to delete old configurations", e)
+        }
+    }
+
+    // New interface methods to match iOS patterns
+    override suspend fun fetchRemoteConfiguration(apiKey: String): ConfigurationData? {
+        return try {
+            logger.debug("Fetching remote configuration for API key: ${apiKey.take(8)}...")
+            // Use network service to fetch remote configuration
+            // This would be implemented with actual network calls
+            null // For now, return null to indicate no remote config available
+        } catch (e: Exception) {
+            logger.error("Failed to fetch remote configuration", e)
+            null
+        }
+    }
+
+    override suspend fun getLocalConfiguration(): ConfigurationData? {
+        return getConfiguration() // Delegate to existing method
+    }
+
+    override suspend fun saveLocalConfiguration(configuration: ConfigurationData) {
+        saveConfiguration(configuration) // Delegate to existing method
+    }
+
+    override suspend fun getConsumerConfiguration(): ConfigurationData? {
+        return consumerConfig
+    }
+
+    override suspend fun setConsumerConfiguration(configuration: ConfigurationData) {
+        consumerConfig = configuration.copy(source = ConfigurationSource.CONSUMER)
+        logger.debug("Consumer configuration set")
+    }
+
+    override fun getSDKDefaultConfiguration(): ConfigurationData {
+        return ConfigurationData.sdkDefaults("default-api-key")
+    }
+
+    override suspend fun syncToRemote(configuration: ConfigurationData) {
+        try {
+            logger.debug("Syncing configuration to remote: ${configuration.id}")
+            // Use network service to sync configuration to remote
+            // This would be implemented with actual network calls
+        } catch (e: Exception) {
+            logger.error("Failed to sync configuration to remote", e)
+            throw e
         }
     }
 }

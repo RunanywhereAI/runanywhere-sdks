@@ -15,6 +15,7 @@ expect class FileManager {
     suspend fun fileExists(path: String): Boolean
     suspend fun deleteFile(path: String): Boolean
     suspend fun getFileSize(path: String): Long
+    suspend fun getDirectorySize(path: String): Long
     suspend fun listFiles(directory: String): List<String>
     suspend fun createDirectory(path: String)
     suspend fun deleteDirectory(path: String)

@@ -1,17 +1,26 @@
 package com.runanywhere.sdk.services.download
 
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.storage.FileSystem
+import io.ktor.client.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.utils.io.*
+import io.ktor.http.*
+import kotlinx.coroutines.*
 
 /**
  * WhisperKit-specific download strategy for multi-file models
  * Matches iOS WhisperKitDownloadStrategy exactly
  */
 class WhisperKitDownloadStrategy(
-    private val networkService: NetworkService,
-    private val fileManager: FileManager
+    private val httpClient: HttpClient = HttpClient(),
+    private val fileSystem: FileSystem = ServiceContainer.shared.fileSystem
 ) : DownloadStrategy {
 
     private val logger = SDKLogger("WhisperKitDownloadStrategy")
@@ -37,7 +46,7 @@ class WhisperKitDownloadStrategy(
     override fun canHandle(model: ModelInfo): Boolean {
         return model.preferredFramework == LLMFramework.WHISPER_KIT ||
                (model.format == ModelFormat.MLMODEL &&
-                model.category == com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION)
+                model.category == ModelCategory.SPEECH_RECOGNITION)
     }
 
     /**
@@ -51,7 +60,7 @@ class WhisperKitDownloadStrategy(
         logger.info("Starting WhisperKit download for model: ${model.id}")
 
         // Create model directory
-        fileManager.createDirectory(destinationFolder)
+        fileSystem.createDirectory(destinationFolder)
 
         // Map model ID to WhisperKit variant
         val whisperKitVariant = mapModelIdToWhisperKitVariant(model.id)
@@ -69,19 +78,42 @@ class WhisperKitDownloadStrategy(
 
             try {
                 // Download with progress tracking for this file
-                networkService.downloadFile(
-                    url = fileUrl,
-                    destinationPath = destinationPath,
-                    progressCallback = { bytesDownloaded, totalBytes ->
+                val response = httpClient.get(fileUrl)
+
+                if (response.status.isSuccess()) {
+                    val contentLength = response.contentLength() ?: 0L
+                    val channel = response.bodyAsChannel()
+                    val buffer = ByteArray(8192)
+                    var bytesDownloaded = 0L
+                    val fileData = mutableListOf<ByteArray>()
+
+                    while (!channel.isClosedForRead) {
+                        val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
+                        if (bytesRead <= 0) break
+
+                        val chunkData = ByteArray(bytesRead)
+                        buffer.copyInto(chunkData, 0, 0, bytesRead)
+                        fileData.add(chunkData)
+                        bytesDownloaded += bytesRead
+
                         // Calculate overall progress across all files
-                        val fileProgress = if (totalBytes > 0) {
-                            bytesDownloaded.toDouble() / totalBytes
+                        val fileProgress = if (contentLength > 0) {
+                            bytesDownloaded.toDouble() / contentLength
                         } else 0.0
 
                         overallProgress = (downloadedFiles + fileProgress) / totalFiles
                         progressHandler?.invoke(overallProgress)
                     }
-                )
+
+                    // Write all data to file
+                    val allData = fileData.fold(ByteArray(0)) { acc, chunk -> acc + chunk }
+                    fileSystem.writeBytes(destinationPath, allData)
+                } else if (response.status == HttpStatusCode.NotFound) {
+                    // 404 is expected for some files, just log and continue
+                    logger.debug("File not found (expected for some models): $file")
+                } else {
+                    throw Exception("Failed to download $file: HTTP ${response.status.value}")
+                }
 
                 downloadedFiles++
                 logger.debug("Successfully downloaded: $file ($downloadedFiles/$totalFiles)")
@@ -98,10 +130,10 @@ class WhisperKitDownloadStrategy(
         }
 
         // Verify at least the core files were downloaded
-        val hasAudioEncoder = fileManager.fileExists("$destinationFolder/AudioEncoder.mlmodelc") ||
-                             fileManager.fileExists("$destinationFolder/AudioEncoder.mlpackage")
-        val hasTextDecoder = fileManager.fileExists("$destinationFolder/TextDecoder.mlmodelc") ||
-                            fileManager.fileExists("$destinationFolder/TextDecoder.mlpackage")
+        val hasAudioEncoder = fileSystem.exists("$destinationFolder/AudioEncoder.mlmodelc") ||
+                             fileSystem.exists("$destinationFolder/AudioEncoder.mlpackage")
+        val hasTextDecoder = fileSystem.exists("$destinationFolder/TextDecoder.mlmodelc") ||
+                            fileSystem.exists("$destinationFolder/TextDecoder.mlpackage")
 
         if (!hasAudioEncoder || !hasTextDecoder) {
             throw Exception("Failed to download required WhisperKit model files")

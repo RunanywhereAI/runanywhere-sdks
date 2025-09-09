@@ -3,52 +3,62 @@ package com.runanywhere.sdk.services.configuration
 import com.runanywhere.sdk.data.models.ConfigurationData
 
 /**
- * Configuration Service Protocol
- * One-to-one translation from iOS ConfigurationServiceProtocol
- * Defines the contract for configuration management
+ * Protocol for configuration services
+ * Exact match to iOS ConfigurationServiceProtocol
  */
 interface ConfigurationServiceProtocol {
 
     /**
-     * Load configuration on launch with fallback chain
-     * Priority: Remote → Database → Consumer → Defaults
-     * Equivalent to iOS: func loadConfigurationOnLaunch(apiKey: String) async -> ConfigurationData
+     * Get current configuration
+     * Exact match to iOS getConfiguration() method
      */
-    suspend fun loadConfigurationOnLaunch(apiKey: String): ConfigurationData
+    suspend fun getCurrentConfiguration(): ConfigurationData?
 
     /**
-     * Set consumer-provided configuration overrides
-     * Equivalent to iOS: func setConsumerConfiguration(_ config: ConfigurationData) async throws
+     * Ensure configuration is loaded
+     * Exact match to iOS ensureConfigurationLoaded() method
      */
-    suspend fun setConsumerConfiguration(config: ConfigurationData)
+    suspend fun ensureConfigurationLoaded()
 
     /**
      * Update configuration with functional transform
-     * Equivalent to iOS: func updateConfiguration(_ updates: (ConfigurationData) -> ConfigurationData) async
+     * Exact match to iOS updateConfiguration method
      */
     suspend fun updateConfiguration(updates: (ConfigurationData) -> ConfigurationData)
 
     /**
      * Sync configuration to cloud storage
-     * Equivalent to iOS: func syncToCloud() async throws
+     * Exact match to iOS syncToCloud() method
      */
     suspend fun syncToCloud()
 
+    // Simple configuration methods
     /**
-     * Get current configuration
-     * Equivalent to iOS computed property: var currentConfiguration: ConfigurationData? { get }
+     * Load configuration on app launch with simple fallback
+     * Exact match to iOS loadConfigurationOnLaunch method
      */
-    suspend fun getCurrentConfiguration(): ConfigurationData?
+    suspend fun loadConfigurationOnLaunch(apiKey: String): ConfigurationData
 
     /**
-     * Force refresh configuration from remote
-     * Equivalent to iOS: func refreshFromRemote() async throws
+     * Set consumer configuration override
+     * Exact match to iOS setConsumerConfiguration method
      */
-    suspend fun refreshFromRemote()
+    suspend fun setConsumerConfiguration(config: ConfigurationData)
+
+    // Legacy methods for compatibility
+    /**
+     * Legacy method for compatibility
+     * Maps to loadConfigurationOnLaunch
+     */
+    suspend fun loadConfigurationWithFallback(apiKey: String): ConfigurationData
 
     /**
-     * Reset configuration to defaults
-     * Equivalent to iOS: func resetToDefaults() async
+     * Legacy method for compatibility
      */
-    suspend fun resetToDefaults()
+    suspend fun clearCache()
+
+    /**
+     * Legacy method for compatibility
+     */
+    suspend fun startBackgroundSync(apiKey: String)
 }

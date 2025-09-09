@@ -41,7 +41,7 @@ actual class WhisperSTTService : STTService {
         withContext(Dispatchers.IO) {
             if (modelPath == null) {
                 logger.warn("No model path provided, WhisperSTTService cannot initialize without a model")
-                throw STTError.ModelNotFound("Model path is required for WhisperSTTService")
+                throw STTError.modelNotFound("Model path is required for WhisperSTTService")
             }
 
             // Check if it's a model ID rather than a file path
@@ -63,7 +63,7 @@ actual class WhisperSTTService : STTService {
                 // Check if model file exists
                 val modelFile = File(modelPath)
                 if (!modelFile.exists()) {
-                    throw STTError.ModelNotFound("Model file not found: $modelPath")
+                    throw STTError.modelNotFound("Model file not found: $modelPath")
                 }
 
                 logger.info("Initializing Whisper model from: $modelPath")
@@ -74,7 +74,7 @@ actual class WhisperSTTService : STTService {
                     logger.info("WhisperJNI instance created successfully")
                 } catch (e: Exception) {
                     logger.error("Failed to create WhisperJNI instance: ${e.message}", e)
-                    throw STTError.ServiceNotInitialized
+                    throw STTError.serviceNotInitialized
                 }
 
                 // Load the model
@@ -86,11 +86,11 @@ actual class WhisperSTTService : STTService {
                     if (whisperContext == null) {
                         logger.error("WhisperJNI init returned null context for model at: $modelPath")
                         logger.warn("This may be due to incompatible model format or missing native libraries")
-                        throw STTError.ServiceNotInitialized
+                        throw STTError.serviceNotInitialized
                     }
                 } catch (e: Exception) {
                     logger.error("Failed to initialize Whisper model: ${e.message}", e)
-                    throw STTError.ServiceNotInitialized
+                    throw STTError.serviceNotInitialized
                 }
 
                 isInitialized = true
@@ -102,7 +102,7 @@ actual class WhisperSTTService : STTService {
 
             } catch (e: Exception) {
                 logger.error("Failed to initialize Whisper model", e)
-                throw STTError.ServiceNotInitialized
+                throw STTError.serviceNotInitialized
             }
         }
     }
@@ -122,7 +122,7 @@ actual class WhisperSTTService : STTService {
         }
 
         if (!isInitialized || whisperContext == null || whisperJNI == null) {
-            throw STTError.ServiceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         return withContext(Dispatchers.IO) {
@@ -141,7 +141,7 @@ actual class WhisperSTTService : STTService {
 
                 if (result != 0) {
                     logger.error("Whisper transcription failed with code: $result")
-                    throw STTError.TranscriptionFailed(Exception("Transcription failed"))
+                    throw STTError.transcriptionFailed(Exception("Transcription failed"))
                 }
 
                 // Get transcription segments
@@ -178,7 +178,7 @@ actual class WhisperSTTService : STTService {
 
             } catch (e: Exception) {
                 logger.error("Error during transcription", e)
-                throw STTError.TranscriptionFailed(e)
+                throw STTError.transcriptionFailed(e)
             }
         }
     }
@@ -189,7 +189,7 @@ actual class WhisperSTTService : STTService {
         onPartial: (String) -> Unit
     ): STTTranscriptionResult {
         if (!isInitialized || whisperContext == null || whisperJNI == null) {
-            throw STTError.ServiceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         // For streaming, we'll accumulate audio and transcribe in chunks
@@ -249,7 +249,7 @@ actual class WhisperSTTService : STTService {
         options: STTStreamingOptions
     ): Flow<STTStreamEvent> = kotlinx.coroutines.flow.flow {
         if (!isInitialized || whisperContext == null || whisperJNI == null) {
-            throw STTError.ServiceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         emit(STTStreamEvent.SpeechStarted)
@@ -299,7 +299,7 @@ actual class WhisperSTTService : STTService {
                 options.maxDuration?.let { maxDur ->
                     val durationSeconds = audioBuffer.size.toDouble() / (16000 * 2)
                     if (durationSeconds >= maxDur) {
-                        throw STTError.TranscriptionFailed(Exception("Max duration exceeded"))
+                        throw STTError.transcriptionFailed(Exception("Max duration exceeded"))
                     }
                 }
             }
@@ -319,7 +319,7 @@ actual class WhisperSTTService : STTService {
             emit(STTStreamEvent.Error(
                 when (e) {
                     is STTError -> e
-                    else -> STTError.TranscriptionFailed(e)
+                    else -> STTError.transcriptionFailed(e)
                 }
             ))
         }
@@ -330,7 +330,7 @@ actual class WhisperSTTService : STTService {
      */
     override suspend fun detectLanguage(audioData: ByteArray): Map<String, Float> {
         if (!isInitialized || whisperContext == null || whisperJNI == null) {
-            throw STTError.ServiceNotInitialized
+            throw STTError.serviceNotInitialized
         }
 
         return withContext(Dispatchers.IO) {

@@ -82,13 +82,8 @@ class JvmTTSService : TTSService {
         }
     }
 
-    override suspend fun synthesize(
-        text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): ByteArray {
+    // iOS-style synthesize method
+    override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         if (!_isInitialized) {
             throw SDKError.ComponentNotReady("TTS service not initialized")
         }
@@ -96,12 +91,13 @@ class JvmTTSService : TTSService {
         _isSynthesizing = true
         return try {
             withContext(Dispatchers.IO) {
+                val voice = options.effectiveVoice
                 logger.debug("Synthesizing text: '${text.take(50)}...' with voice: ${voice.name}")
 
                 when {
-                    isMacOS() -> synthesizeWithMacOSSay(text, voice, rate, pitch, volume)
-                    isWindows() -> synthesizeWithWindowsSAPI(text, voice, rate, pitch, volume)
-                    isLinux() -> synthesizeWithLinuxTTS(text, voice, rate, pitch, volume)
+                    isMacOS() -> synthesizeWithMacOSSay(text, voice, options.rate, options.pitch, options.volume)
+                    isWindows() -> synthesizeWithWindowsSAPI(text, voice, options.rate, options.pitch, options.volume)
+                    isLinux() -> synthesizeWithLinuxTTS(text, voice, options.rate, options.pitch, options.volume)
                     else -> generateSilentAudio(text.length) // Fallback
                 }
             }
@@ -110,13 +106,8 @@ class JvmTTSService : TTSService {
         }
     }
 
-    override fun synthesizeStream(
-        text: String,
-        voice: TTSVoice,
-        rate: Float,
-        pitch: Float,
-        volume: Float
-    ): Flow<ByteArray> = flow {
+    // KMP Flow-based streaming
+    override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> = flow {
         if (!_isInitialized) {
             throw SDKError.ComponentNotReady("TTS service not initialized")
         }
@@ -129,7 +120,7 @@ class JvmTTSService : TTSService {
             val sentences = text.split(Regex("[.!?]+")).filter { it.trim().isNotEmpty() }
 
             for (sentence in sentences) {
-                val audioData = synthesize(sentence.trim(), voice, rate, pitch, volume)
+                val audioData = synthesize(sentence.trim(), options)
                 if (audioData.isNotEmpty()) {
                     emit(audioData)
                 }
@@ -141,11 +132,22 @@ class JvmTTSService : TTSService {
         }
     }
 
-    override fun getAvailableVoices(): List<TTSVoice> {
+    // iOS-style callback streaming
+    override suspend fun synthesizeStream(
+        text: String,
+        options: TTSOptions,
+        onChunk: suspend (ByteArray) -> Unit
+    ) {
+        synthesizeStream(text, options).collect { chunk ->
+            onChunk(chunk)
+        }
+    }
+
+    override fun getAllVoices(): List<TTSVoice> {
         return availableTTSVoices.toList()
     }
 
-    override val availableVoiceIds: List<String>
+    override val availableVoices: List<String>
         get() = availableTTSVoices.map { it.id }
 
     override val isSynthesizing: Boolean
@@ -457,26 +459,14 @@ class JvmTTSServiceProvider : com.runanywhere.sdk.core.TTSServiceProvider {
     override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         val service = JvmTTSService()
         service.initialize()
-        return service.synthesize(
-            text = text,
-            voice = options.voice,
-            rate = options.rate,
-            pitch = options.pitch,
-            volume = options.volume
-        )
+        return service.synthesize(text = text, options = options)
     }
 
     override fun synthesizeStream(text: String, options: TTSOptions): Flow<ByteArray> {
         val service = JvmTTSService()
         return flow {
             service.initialize()
-            service.synthesizeStream(
-                text = text,
-                voice = options.voice,
-                rate = options.rate,
-                pitch = options.pitch,
-                volume = options.volume
-            ).collect { chunk ->
+            service.synthesizeStream(text = text, options = options).collect { chunk ->
                 emit(chunk)
             }
         }

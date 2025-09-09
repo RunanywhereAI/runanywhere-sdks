@@ -19,12 +19,28 @@ actual fun createPlatformVADService(): VADService = WebRTCVADService()
  */
 class WebRTCVADService : VADService {
 
-    // Speech activity callback
-    override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
     private val logger = SDKLogger("WebRTCVADService")
     private var config: VADConfiguration? = null
     private var vadInstance: VadWebRTC? = null
     private var isInitialized = false
+    private var isActive = false
+    private var currentSpeechState = false
+
+    // Properties matching iOS VADService protocol
+    override var energyThreshold: Float = 0.022f // Not used by WebRTC but required by interface
+
+    override val sampleRate: Int
+        get() = config?.sampleRate ?: 16000
+
+    override val frameLength: Float
+        get() = config?.frameLength ?: 0.1f
+
+    override val isSpeechActive: Boolean
+        get() = currentSpeechState
+
+    // Callbacks matching iOS VADService protocol
+    override var onSpeechActivity: ((SpeechActivityEvent) -> Unit)? = null
+    override var onAudioBuffer: ((ByteArray) -> Unit)? = null
 
     override suspend fun initialize(configuration: VADConfiguration) {
         withContext(Dispatchers.IO) {
@@ -57,14 +73,39 @@ class WebRTCVADService : VADService {
         }
     }
 
+    override fun start() {
+        isActive = true
+        currentSpeechState = false
+        logger.info("WebRTC VAD started")
+    }
+
+    override fun stop() {
+        if (currentSpeechState) {
+            currentSpeechState = false
+            onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
+        }
+        isActive = false
+        logger.info("WebRTC VAD stopped")
+    }
+
+    override fun processAudioData(audioData: FloatArray): Boolean {
+        return processAudioChunk(audioData).isSpeechDetected
+    }
+
     override fun processAudioChunk(audioSamples: FloatArray): VADResult {
-        if (!isInitialized || vadInstance == null) {
-            throw VADError.ServiceNotInitialized
+        if (!isInitialized || vadInstance == null || !isActive) {
+            return VADResult(isSpeechDetected = false, confidence = 0.0f)
         }
 
         return try {
             // WebRTC VAD expects different audio formats, it can handle FloatArray directly
             val isSpeech = vadInstance!!.isSpeech(audioSamples)
+
+            // Update speech state and trigger callbacks
+            updateSpeechState(isSpeech)
+
+            // Call audio buffer callback if set
+            onAudioBuffer?.invoke(floatArrayToByteArray(audioSamples))
 
             // Calculate confidence based on the audio energy
             val confidence = if (isSpeech) {
@@ -74,7 +115,7 @@ class WebRTCVADService : VADService {
             }
 
             VADResult(
-                isSpeech = isSpeech,
+                isSpeechDetected = isSpeech,
                 confidence = confidence,
                 timestamp = System.currentTimeMillis()
             )
@@ -185,6 +226,27 @@ class WebRTCVADService : VADService {
                 FrameSize.FRAME_SIZE_320
             }
         }
+    }
+
+    private fun updateSpeechState(isSpeech: Boolean) {
+        if (isSpeech != currentSpeechState) {
+            currentSpeechState = isSpeech
+            onSpeechActivity?.invoke(
+                if (isSpeech) SpeechActivityEvent.STARTED else SpeechActivityEvent.ENDED
+            )
+        }
+    }
+
+    private fun floatArrayToByteArray(floatArray: FloatArray): ByteArray {
+        val byteArray = ByteArray(floatArray.size * 4)
+        for (i in floatArray.indices) {
+            val intBits = java.lang.Float.floatToIntBits(floatArray[i])
+            byteArray[i * 4] = (intBits and 0xFF).toByte()
+            byteArray[i * 4 + 1] = ((intBits shr 8) and 0xFF).toByte()
+            byteArray[i * 4 + 2] = ((intBits shr 16) and 0xFF).toByte()
+            byteArray[i * 4 + 3] = ((intBits shr 24) and 0xFF).toByte()
+        }
+        return byteArray
     }
 
     // Aggressiveness mapping removed - using default Mode.AGGRESSIVE

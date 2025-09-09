@@ -32,6 +32,19 @@ actual class FileManager {
         return File(path).length()
     }
 
+    actual suspend fun getDirectorySize(path: String): Long {
+        val directory = File(path)
+        if (!directory.exists() || !directory.isDirectory) return 0L
+
+        var size = 0L
+        directory.walkTopDown().forEach { file ->
+            if (file.isFile) {
+                size += file.length()
+            }
+        }
+        return size
+    }
+
     actual suspend fun listFiles(directory: String): List<String> {
         return File(directory).listFiles()?.map { it.name } ?: emptyList()
     }

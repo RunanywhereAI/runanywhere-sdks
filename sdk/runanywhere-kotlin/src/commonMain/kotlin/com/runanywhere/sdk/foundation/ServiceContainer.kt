@@ -34,6 +34,7 @@ import com.runanywhere.sdk.events.SDKInitializationEvent
 import com.runanywhere.sdk.events.SDKBootstrapEvent
 import com.runanywhere.sdk.events.SDKDeviceEvent
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.foundation.currentTimeMillis
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.json.Json
@@ -50,7 +51,7 @@ class ServiceContainer {
     }
 
     // Platform abstractions
-    private val fileSystem by lazy { createFileSystem() }
+    internal val fileSystem by lazy { createFileSystem() }
     private val httpClient by lazy { createHttpClient() }
     private val secureStorage by lazy { createSecureStorage() }
 
@@ -156,7 +157,7 @@ class ServiceContainer {
 
         try {
             // Step 1: Platform initialization & device info collection
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
             EventBus.publish(SDKBootstrapEvent.NetworkServicesConfigured)
 
@@ -174,38 +175,38 @@ class ServiceContainer {
                 EventBus.publish(SDKBootstrapEvent.DeviceInfoSyncFailed(e.message ?: "Unknown error"))
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
 
             // Step 2: Configuration loading (from multiple sources)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
 
             // TODO: Implement multi-source configuration loading
             val configData = ConfigurationData.default(params.apiKey)
             EventBus.publish(SDKBootstrapEvent.ConfigurationLoaded(configData))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
 
             // Step 3: Authentication service initialization
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
 
-            authenticationService.initialize(params.apiKey)
+            authenticationService.authenticate(params.apiKey)
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
 
             // Step 4: Model repository sync
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
 
             modelInfoService.initialize()
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
 
             // Step 5: Analytics service setup
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
 
             try {
@@ -217,34 +218,34 @@ class ServiceContainer {
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
 
             // Step 6: Component initialization
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(6, "Component initialization"))
 
             registerDefaultModules()
             initializeComponents()
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
 
             // Step 7: Cache warmup
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
 
             // TODO: Implement cache warmup
             logger.info("Cache warmup completed (placeholder)")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
 
             // Step 8: Health check
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(8, "Health check"))
 
             // TODO: Implement comprehensive health check
             logger.info("Health check completed (placeholder)")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
 
             EventBus.publish(SDKBootstrapEvent.BootstrapCompleted)
             logger.info("✅ 8-step bootstrap process completed successfully (Production Mode)")
@@ -269,7 +270,7 @@ class ServiceContainer {
 
         try {
             // Step 1: Platform initialization & device info collection
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(1, "Platform initialization & device info collection"))
             logger.info("🔧 Step 1: Platform initialization & device info collection...")
 
@@ -280,32 +281,32 @@ class ServiceContainer {
             EventBus.publish(SDKBootstrapEvent.DeviceInfoCollected(_deviceInfoData!!))
             logger.info("   Device: ${_deviceInfo!!.description}")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(1, "Platform initialization & device info collection", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 1 completed")
 
             // Step 2: Configuration loading (mock in dev mode)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(2, "Configuration loading"))
             logger.info("🔧 Step 2: Configuration loading (dev mode)...")
 
             val configData = ConfigurationData.default(params.apiKey)
             EventBus.publish(SDKBootstrapEvent.ConfigurationLoaded(configData))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 2 completed")
 
             // Step 3: Authentication service initialization (even in dev mode)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
             logger.info("🔧 Step 3: Authentication service initialization...")
 
-            authenticationService.initialize(params.apiKey)
+            authenticationService.authenticate(params.apiKey)
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 3 completed")
 
             // Step 4: Model repository sync (fetch mock models)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
             logger.info("🔧 Step 4: Model repository sync (fetching mock models)...")
 
@@ -314,11 +315,11 @@ class ServiceContainer {
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 4 completed (${models.size} models)")
 
             // Step 5: Analytics service setup (simplified in dev mode)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
             logger.info("🔧 Step 5: Analytics service setup (dev mode)...")
 
@@ -331,40 +332,40 @@ class ServiceContainer {
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
             }
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 5 completed")
 
             // Step 6: Component initialization
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(6, "Component initialization"))
             logger.info("🔧 Step 6: Component initialization...")
 
             registerDefaultModules()
             initializeComponents()
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(6, "Component initialization", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 6 completed")
 
             // Step 7: Cache warmup (minimal in dev mode)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(7, "Cache warmup"))
             logger.info("🔧 Step 7: Cache warmup (dev mode)...")
 
             // Minimal cache warmup for development
             logger.info("   Cache warmup minimal for dev mode")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(7, "Cache warmup", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 7 completed")
 
             // Step 8: Health check (basic in dev mode)
-            stepStartTime = System.currentTimeMillis()
+            stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(8, "Health check"))
             logger.info("🔧 Step 8: Health check (dev mode)...")
 
             // Basic health check for development mode
             logger.info("   Basic health check passed")
 
-            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", System.currentTimeMillis() - stepStartTime))
+            EventBus.publish(SDKInitializationEvent.StepCompleted(8, "Health check", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 8 completed")
 
             EventBus.publish(SDKBootstrapEvent.BootstrapCompleted)
@@ -412,7 +413,7 @@ class ServiceContainer {
             totalStorageMB = 8192L, // Default 8GB storage
             availableStorageMB = 2048L, // Default 2GB available
             gpuType = com.runanywhere.sdk.data.models.GPUType.UNKNOWN,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = currentTimeMillis()
         )
     }
 
@@ -555,7 +556,7 @@ class ServiceContainer {
      * Cleanup all services
      */
     suspend fun cleanup() {
-        authenticationService.signOut()
+        authenticationService.clearAuthentication()
         sttComponent.cleanup()
         vadComponent.cleanup()
     }

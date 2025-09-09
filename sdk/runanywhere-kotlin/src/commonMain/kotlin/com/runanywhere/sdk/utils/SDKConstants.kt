@@ -41,6 +41,10 @@ object SDKConstants {
     val USER_AGENT get() = "RunAnywhere-Kotlin-SDK/${VERSION}"
     const val SDK_NAME = "runanywhere-kotlin"
 
+    // Platform-specific constants matching iOS SDKConstants
+    const val version = VERSION
+    const val platform = "kotlin"
+
     // MARK: - Environment Configuration
     enum class Environment {
         DEVELOPMENT,

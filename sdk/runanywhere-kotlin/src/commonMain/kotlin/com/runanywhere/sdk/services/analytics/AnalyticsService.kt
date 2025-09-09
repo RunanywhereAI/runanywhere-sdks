@@ -58,14 +58,17 @@ class AnalyticsService(
                     is SDKInitializationEvent.Failed -> trackEvent(
                         AnalyticsEvent.SDKInitializationFailed(event.error.message ?: "Unknown error")
                     )
+                    is SDKInitializationEvent.ConfigurationLoaded -> trackEvent(
+                        AnalyticsEvent.SDKConfigurationLoaded(event.source)
+                    )
+                    is SDKInitializationEvent.ServicesBootstrapped -> trackEvent(
+                        AnalyticsEvent.SDKServicesBootstrapped()
+                    )
                     is SDKInitializationEvent.StepStarted -> {
-                        // Track step started events
+                        // Optional: track step events if needed
                     }
                     is SDKInitializationEvent.StepCompleted -> {
-                        // Track step completed events
-                    }
-                    is SDKInitializationEvent.StepFailed -> {
-                        // Track step failed events
+                        // Optional: track step completion if needed
                     }
                 }
             }
@@ -76,11 +79,11 @@ class AnalyticsService(
             .onEach { event ->
                 when (event) {
                     is ComponentInitializationEvent.ComponentReady -> trackEvent(
-                        AnalyticsEvent.ComponentInitialized(event.component.name)
+                        AnalyticsEvent.ComponentInitialized(event.component)
                     )
                     is ComponentInitializationEvent.ComponentFailed -> trackEvent(
                         AnalyticsEvent.ComponentInitializationFailed(
-                            event.component.name,
+                            event.component,
                             event.error.message ?: "Unknown error"
                         )
                     )
@@ -284,6 +287,16 @@ sealed class AnalyticsEvent(
     class SDKInitializationFailed(error: String) : AnalyticsEvent(
         "sdk_initialization_failed",
         mapOf("error" to error, "timestamp" to System.currentTimeMillis())
+    )
+
+    class SDKConfigurationLoaded(source: String) : AnalyticsEvent(
+        "sdk_configuration_loaded",
+        mapOf("source" to source, "timestamp" to System.currentTimeMillis())
+    )
+
+    class SDKServicesBootstrapped : AnalyticsEvent(
+        "sdk_services_bootstrapped",
+        mapOf("timestamp" to System.currentTimeMillis())
     )
 
     class ComponentInitialized(component: String) : AnalyticsEvent(

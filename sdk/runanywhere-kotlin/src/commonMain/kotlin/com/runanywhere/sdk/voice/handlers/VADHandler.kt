@@ -53,7 +53,7 @@ class VADHandler(
             val input = VADInput(audioSamples = floatArray)
             return vadComponent.process(input) as? VADOutput
                 ?: VADOutput(
-                    isSpeech = false,
+                    isSpeechDetected = false,
                     energyLevel = 0.0f
                 )
         }
@@ -62,9 +62,9 @@ class VADHandler(
         if (simpleVAD != null) {
             val floatArray = byteArrayToFloatArray(audioData)
             val result = simpleVAD.processAudioChunk(floatArray)
-            val isSpeech = result.isSpeech
+            val isSpeech = result.isSpeechDetected
             return VADOutput(
-                isSpeech = isSpeech,
+                isSpeechDetected = isSpeech,
                 energyLevel = 0.5f // TODO: Get actual energy from SimpleVAD
             )
         }
@@ -72,7 +72,7 @@ class VADHandler(
         // No VAD available, assume speech
         logger.warning("No VAD available, assuming speech")
         return VADOutput(
-            isSpeech = true,
+            isSpeechDetected = true,
             energyLevel = 0.5f
         )
     }
@@ -99,7 +99,7 @@ class VADHandler(
         audioStream.collect { chunk ->
             val vadOutput = detectSpeech(chunk)
 
-            if (vadOutput.isSpeech) {
+            if (vadOutput.isSpeechDetected) {
                 if (!isInSpeech) {
                     // Speech started
                     isInSpeech = true
@@ -174,7 +174,7 @@ class VADHandler(
     ) {
         minSpeechDuration?.let { this.minSpeechDuration = it }
         maxSilenceDuration?.let { this.maxSilenceDuration = it }
-        energyThreshold?.let { simpleVAD?.setEnergyThreshold(it) }
+        energyThreshold?.let { simpleVAD?.energyThreshold = it }
 
         logger.info("VAD configured - minSpeech: ${this.minSpeechDuration}ms, maxSilence: ${this.maxSilenceDuration}ms")
     }

@@ -7,12 +7,12 @@ import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.network.APIClient
-import com.runanywhere.sdk.network.MockNetworkService
+import com.runanywhere.sdk.data.network.MockNetworkService
 import com.runanywhere.sdk.network.postJson
 import com.runanywhere.sdk.network.getJson
 import com.runanywhere.sdk.services.download.DownloadService
 import com.runanywhere.sdk.services.download.DownloadProgress
-import com.runanywhere.sdk.services.download.FileManager
+import com.runanywhere.sdk.storage.FileSystem
 import com.runanywhere.sdk.utils.SimpleInstant
 import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.flow.Flow
@@ -26,7 +26,7 @@ class WhisperModelService(
     private val apiClient: APIClient,
     private val modelInfoService: ModelInfoService,
     private val downloadService: DownloadService? = null,
-    private val fileManager: FileManager? = null,
+    private val fileSystem: FileSystem? = null,
     private val useMockService: Boolean = SDKConstants.Development.ENABLE_MOCK_SERVICES
 ) {
     private val logger = SDKLogger("WhisperModelService")
@@ -83,7 +83,7 @@ class WhisperModelService(
             val mockModels = if (SDKConstants.Development.USE_COMPREHENSIVE_MOCKS) {
                 mockService.createComprehensiveMockModels()
             } else {
-                mockService.fetchModels()
+                mockService.createComprehensiveMockModels()
             }
 
             // Filter for Whisper models only
@@ -215,7 +215,7 @@ class WhisperModelService(
             ?: throw SDKError.ModelNotFound(modelId)
 
         // Check if already downloaded
-        if (!model.localPath.isNullOrEmpty() && fileManager?.fileExists(model.localPath!!) == true) {
+        if (!model.localPath.isNullOrEmpty() && fileSystem?.exists(model.localPath!!) == true) {
             logger.info("Model $modelId already downloaded at: ${model.localPath}")
             return model.localPath!!
         }
@@ -246,8 +246,8 @@ class WhisperModelService(
      */
     suspend fun isModelDownloaded(modelId: String): Boolean {
         val model = modelInfoService.getModel(modelId)
-        return if (model?.localPath != null && fileManager != null) {
-            fileManager.fileExists(model.localPath!!)
+        return if (model?.localPath != null && fileSystem != null) {
+            fileSystem.exists(model.localPath!!)
         } else {
             false
         }
@@ -260,7 +260,7 @@ class WhisperModelService(
         val model = modelInfoService.getModel(modelId) ?: return null
 
         // Verify file exists
-        return if (model.localPath != null && fileManager?.fileExists(model.localPath!!) == true) {
+        return if (model.localPath != null && fileSystem?.exists(model.localPath!!) == true) {
             model.localPath
         } else {
             null
@@ -290,8 +290,8 @@ class WhisperModelService(
         val model = modelInfoService.getModel(modelId) ?: return false
 
         // Delete files if they exist
-        if (model.localPath != null && fileManager != null) {
-            val deleted = fileManager.deleteFile(model.localPath!!)
+        if (model.localPath != null && fileSystem != null) {
+            val deleted = fileSystem.delete(model.localPath!!)
             if (deleted) {
                 // Update model to remove local path
                 val updatedModel = model.copy(
@@ -313,11 +313,34 @@ class WhisperModelService(
     suspend fun getModelSize(modelId: String): Long {
         val model = modelInfoService.getModel(modelId) ?: return 0L
 
-        if (model.localPath != null && fileManager != null) {
-            return fileManager.getDirectorySize(model.localPath!!)
+        if (model.localPath != null && fileSystem != null) {
+            return calculateDirectorySize(model.localPath!!)
         }
 
         return model.downloadSize ?: 0L
+    }
+
+    /**
+     * Calculate directory size recursively
+     */
+    private suspend fun calculateDirectorySize(path: String): Long {
+        if (fileSystem == null) return 0L
+
+        var totalSize = 0L
+        try {
+            val files = fileSystem.listFiles(path)
+            for (file in files) {
+                val filePath = "$path/$file"
+                if (fileSystem.isDirectory(filePath)) {
+                    totalSize += calculateDirectorySize(filePath)
+                } else {
+                    totalSize += fileSystem.fileSize(filePath)
+                }
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to calculate directory size for $path", e)
+        }
+        return totalSize
     }
 }
 

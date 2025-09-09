@@ -17,10 +17,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 
 /**
- * LLM Component for text generation
- * One-to-one mapping from iOS LLMComponent.swift
+ * Legacy LLM Component - DEPRECATED
+ * Use com.runanywhere.sdk.components.llm.LLMComponent instead
+ * This is kept for backward compatibility during transition
  */
-class LLMComponent(
+@Deprecated("Use com.runanywhere.sdk.components.llm.LLMComponent instead", ReplaceWith("com.runanywhere.sdk.components.llm.LLMComponent"))
+class LegacyLLMComponent(
     private val llmConfiguration: LLMConfiguration
 ) : BaseComponent<LLMService>(llmConfiguration) {
 

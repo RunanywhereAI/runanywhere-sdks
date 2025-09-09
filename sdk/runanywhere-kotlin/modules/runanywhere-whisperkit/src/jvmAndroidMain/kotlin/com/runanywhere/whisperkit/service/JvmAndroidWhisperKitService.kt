@@ -2,168 +2,347 @@ package com.runanywhere.whisperkit.service
 
 import com.runanywhere.sdk.components.stt.STTOptions
 import com.runanywhere.sdk.components.stt.STTTranscriptionResult
+import com.runanywhere.sdk.components.stt.STTTranscriptionResult.TimestampInfo
 import com.runanywhere.whisperkit.models.*
 import com.runanywhere.whisperkit.storage.WhisperStorageStrategy
 import com.runanywhere.whisperkit.storage.JvmAndroidWhisperStorage
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.delay
+import io.github.givimad.whisperjni.WhisperContext
+import io.github.givimad.whisperjni.WhisperFullParams
+import io.github.givimad.whisperjni.WhisperJNI
+import io.github.givimad.whisperjni.WhisperSamplingStrategy
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
- * Shared JVM/Android implementation of WhisperKit service
- * Uses the same whisper-jni library for both platforms
+ * Shared JVM/Android implementation of WhisperKit service using actual WhisperJNI
+ * Both platforms use the same whisper-jni library for real speech transcription
  *
- * This implementation can be used by both JVM (desktop/IntelliJ plugins)
- * and Android platforms since they both utilize the same native whisper-jni library.
+ * This replaces mock implementations with actual WhisperJNI calls
+ * to achieve iOS parity for speech-to-text functionality.
  */
 class JvmAndroidWhisperKitService : WhisperKitService() {
 
+    private var whisperContext: WhisperContext? = null
+    private val whisperJNI = WhisperJNI()
+
     override val whisperStorage: WhisperStorageStrategy = JvmAndroidWhisperStorage()
 
-    private var isInitialized = false
-    private var currentModel: String? = null
+    override val isReady: Boolean
+        get() = whisperContext != null && whisperState.value == WhisperServiceState.READY
 
-    override suspend fun initialize(modelPath: String?) {
-        if (modelPath != null) {
-            currentModel = modelPath
+    override val currentModel: String?
+        get() = currentWhisperModel.value?.modelName
+
+    override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
+        try {
+            _whisperState.value = WhisperServiceState.INITIALIZING
+
+            val actualModelPath = modelPath ?: whisperStorage.getModelPath(WhisperModelType.BASE)
+
+            // Check if model exists, download if needed
+            val modelFile = File(actualModelPath)
+            if (!modelFile.exists()) {
+                _whisperState.value = WhisperServiceState.DOWNLOADING_MODEL
+                val modelType = currentWhisperModel.value ?: WhisperModelType.BASE
+                whisperStorage.downloadModel(modelType) { progress ->
+                    // Progress updates could be emitted via Flow if needed
+                }
+            }
+
+            _whisperState.value = WhisperServiceState.LOADING_MODEL
+
+            // Load WhisperJNI library
+            try {
+                WhisperJNI.loadLibrary()
+            } catch (e: Exception) {
+                // Library may already be loaded
+            }
+
+            // Create context from model file
+            whisperContext?.close()
+            val modelPath = java.nio.file.Paths.get(actualModelPath)
+            whisperContext = whisperJNI.init(modelPath)
+
+            _whisperState.value = WhisperServiceState.READY
+        } catch (e: Exception) {
+            _whisperState.value = WhisperServiceState.ERROR
+            throw WhisperError.InitializationFailed("Failed to initialize WhisperJNI: ${e.message}")
         }
-        isInitialized = true
-        _whisperState.value = WhisperServiceState.READY
     }
 
-    override suspend fun transcribe(audioData: ByteArray, options: STTOptions?): STTTranscriptionResult {
-        if (!isInitialized) {
-            throw IllegalStateException("WhisperKit service not initialized")
+    override suspend fun transcribe(
+        audioData: ByteArray,
+        options: STTOptions
+    ): STTTranscriptionResult = withContext(Dispatchers.Default) {
+
+        val context = whisperContext ?: throw WhisperError.ServiceNotReady()
+
+        // Convert ByteArray to float array (PCM 16-bit to float)
+        val floatAudio = convertPCM16ToFloat(audioData)
+
+        // Create parameters based on options
+        val params = createWhisperParams(options)
+
+        // Perform transcription
+        val result = whisperJNI.full(context, params, floatAudio, floatAudio.size)
+
+        if (result != 0) {
+            throw WhisperError.TranscriptionFailed("Transcription failed with code: $result")
         }
 
-        // In a real implementation, this would call the whisper-jni library
-        // For now, providing mock implementation for development/testing
-        delay(100) // Simulate processing time
+        // Extract segments from result
+        val segmentCount = whisperJNI.fullNSegments(context)
+        val segments = mutableListOf<TimestampInfo>()
+        var fullText = ""
 
-        val mockText = when {
-            audioData.size < 1000 -> "Short audio clip"
-            audioData.size < 5000 -> "Medium length audio transcription"
-            else -> "This is a longer transcription result from WhisperKit service using whisper-jni library"
-        }
+        for (i in 0 until segmentCount) {
+            val text = whisperJNI.fullGetSegmentText(context, i)
+            fullText += text
 
-        return STTTranscriptionResult(
-            transcript = mockText,
-            language = options?.language ?: "en",
-            confidence = 0.95f,
-            timestamps = if (options?.enableTimestamps == true) {
-                listOf(
-                    com.runanywhere.sdk.components.stt.TimestampInfo(
-                        word = mockText.split(" ").first(),
-                        startTime = 0.0,
-                        endTime = 0.5,
-                        confidence = 0.95f
+            // Add word-level timestamps if available
+            if (options.enableTimestamps) {
+                val startTime = whisperJNI.fullGetSegmentTimestamp0(context, i)
+                val endTime = whisperJNI.fullGetSegmentTimestamp1(context, i)
+                segments.add(
+                    TimestampInfo(
+                        word = text.trim(),
+                        startTime = startTime.toDouble() / 100.0, // Convert from centiseconds
+                        endTime = endTime.toDouble() / 100.0,
+                        confidence = 0.95f // WhisperJNI doesn't provide confidence scores
                     )
                 )
-            } else null,
-            metadata = mapOf(
-                "model" -> (currentModel ?: "whisper-base"),
-                "processing_time" -> "100ms",
-                "platform" -> "JVM/Android-Shared",
-                "library" -> "whisper-jni"
-            )
+            }
+        }
+
+        STTTranscriptionResult(
+            transcript = fullText.trim(),
+            confidence = 0.95f, // Default confidence
+            timestamps = if (segments.isNotEmpty()) segments else null,
+            language = options.language,
+            alternatives = null
         )
     }
 
-    override fun transcribeStream(
+    override suspend fun <T> streamTranscribe(
         audioStream: Flow<ByteArray>,
-        options: STTOptions?
-    ): Flow<STTTranscriptionResult> = flow {
-        if (!isInitialized) {
-            throw IllegalStateException("WhisperKit service not initialized")
+        options: STTOptions,
+        onPartial: (String) -> Unit
+    ): STTTranscriptionResult = withContext(Dispatchers.Default) {
+
+        val context = whisperContext ?: throw WhisperError.ServiceNotReady()
+
+        val audioBuffer = mutableListOf<ByteArray>()
+        var lastTranscript = ""
+
+        audioStream.collect { chunk ->
+            audioBuffer.add(chunk)
+
+            // Process when we have enough audio (e.g., 1 second)
+            val totalSize = audioBuffer.sumOf { it.size }
+            if (totalSize >= 16000 * 2) { // 1 second of 16kHz PCM16
+                val combinedAudio = ByteArray(totalSize)
+                var offset = 0
+                audioBuffer.forEach {
+                    it.copyInto(combinedAudio, offset)
+                    offset += it.size
+                }
+
+                val floatAudio = convertPCM16ToFloat(combinedAudio)
+                val params = createWhisperParams(options)
+
+                val result = whisperJNI.full(context, params, floatAudio, floatAudio.size)
+                if (result == 0) {
+                    val segmentCount = whisperJNI.fullNSegments(context)
+                    var transcript = ""
+                    for (i in 0 until segmentCount) {
+                        transcript += whisperJNI.fullGetSegmentText(context, i)
+                    }
+
+                    if (transcript != lastTranscript) {
+                        onPartial(transcript)
+                        lastTranscript = transcript
+                    }
+                }
+
+                // Keep last 100ms for context
+                val keepSize = 1600 * 2 // 100ms at 16kHz
+                audioBuffer.clear()
+                if (combinedAudio.size > keepSize) {
+                    audioBuffer.add(combinedAudio.takeLast(keepSize).toByteArray())
+                }
+            }
         }
 
-        // Mock streaming transcription with realistic behavior
-        val words = listOf(
-            "Hello", "this", "is", "a", "streaming", "transcription",
-            "using", "WhisperKit", "with", "whisper-jni", "library"
-        )
-        var wordIndex = 0
+        // Process any remaining audio
+        if (audioBuffer.isNotEmpty()) {
+            val totalSize = audioBuffer.sumOf { it.size }
+            val combinedAudio = ByteArray(totalSize)
+            var offset = 0
+            audioBuffer.forEach {
+                it.copyInto(combinedAudio, offset)
+                offset += it.size
+            }
 
-        audioStream.collect { audioChunk ->
-            delay(50) // Simulate real-time processing
+            val floatAudio = convertPCM16ToFloat(combinedAudio)
+            val params = createWhisperParams(options)
+            val result = whisperJNI.full(context, params, floatAudio, floatAudio.size)
 
-            val word = words[wordIndex % words.size]
-            wordIndex++
+            if (result == 0) {
+                val segmentCount = whisperJNI.fullNSegments(context)
+                var transcript = ""
+                for (i in 0 until segmentCount) {
+                    transcript += whisperJNI.fullGetSegmentText(context, i)
+                }
 
-            val result = STTTranscriptionResult(
-                transcript = word,
-                language = options?.language ?: "en",
-                confidence = 0.90f + (kotlin.random.Random.nextFloat() * 0.09f), // 90-99% confidence
-                timestamps = if (options?.enableTimestamps == true) {
-                    listOf(
-                        com.runanywhere.sdk.components.stt.TimestampInfo(
-                            word = word,
-                            startTime = wordIndex * 0.5,
-                            endTime = (wordIndex + 1) * 0.5,
-                            confidence = 0.90f
-                        )
-                    )
-                } else null,
-                metadata = mapOf(
-                    "chunk_size" -> audioChunk.size.toString(),
-                    "model" -> (currentModel ?: "whisper-base"),
-                    "platform" -> "JVM/Android-Shared",
-                    "library" -> "whisper-jni",
-                    "streaming" -> "true"
+                return@withContext STTTranscriptionResult(
+                    transcript = transcript.trim(),
+                    confidence = 0.95f,
+                    timestamps = null,
+                    language = options.language,
+                    alternatives = null
                 )
-            )
-            emit(result)
+            }
         }
-    }
 
-    override suspend fun isReady(): Boolean = isInitialized
+        STTTranscriptionResult(
+            transcript = lastTranscript.trim(),
+            confidence = 0.95f,
+            timestamps = null,
+            language = options.language,
+            alternatives = null
+        )
+    }
 
     override suspend fun cleanup() {
         super.cleanup()
-        isInitialized = false
-        currentModel = null
+        whisperContext?.close()
+        whisperContext = null
     }
 
     override fun transcribeStreamInternal(
         audioStream: Flow<ByteArray>,
         options: STTOptions
     ): Flow<WhisperTranscriptionResult> = flow {
-        audioStream.collect { audioChunk ->
-            delay(50)
 
-            val result = WhisperTranscriptionResult(
-                text = "WhisperKit JVM/Android transcription chunk",
-                segments = listOf(
-                    TranscriptionSegment(
-                        id = 0,
-                        text = "WhisperKit transcription",
-                        startTime = 0.0,
-                        endTime = 1.0,
-                        tokens = listOf(
-                            TokenInfo(
-                                id = 1,
-                                text = "WhisperKit",
-                                probability = 0.95f,
-                                startTime = 0.0,
-                                endTime = 0.5f
+        val context = whisperContext ?: throw WhisperError.ServiceNotReady()
+        val audioBuffer = mutableListOf<ByteArray>()
+
+        audioStream.collect { chunk ->
+            audioBuffer.add(chunk)
+
+            val totalSize = audioBuffer.sumOf { it.size }
+            if (totalSize >= 16000 * 2) { // 1 second of audio
+                val combinedAudio = ByteArray(totalSize)
+                var offset = 0
+                audioBuffer.forEach {
+                    it.copyInto(combinedAudio, offset)
+                    offset += it.size
+                }
+
+                val floatAudio = convertPCM16ToFloat(combinedAudio)
+                val params = createWhisperParams(options)
+                val result = whisperJNI.full(context, params, floatAudio, floatAudio.size)
+
+                if (result == 0) {
+                    val segmentCount = whisperJNI.fullNSegments(context)
+                    val segments = mutableListOf<TranscriptionSegment>()
+                    var fullText = ""
+
+                    for (i in 0 until segmentCount) {
+                        val text = whisperJNI.fullGetSegmentText(context, i)
+                        val startTime = whisperJNI.fullGetSegmentTimestamp0(context, i)
+                        val endTime = whisperJNI.fullGetSegmentTimestamp1(context, i)
+                        fullText += text
+
+                        segments.add(
+                            TranscriptionSegment(
+                                id = i,
+                                seek = 0,
+                                start = startTime.toDouble() / 100.0,
+                                end = endTime.toDouble() / 100.0,
+                                text = text,
+                                tokens = emptyList(),
+                                temperature = 0.0f,
+                                avgLogProb = 0.0f,
+                                compressionRatio = 0.0f,
+                                noSpeechProb = 0.0f
                             )
                         )
+                    }
+
+                    emit(
+                        WhisperTranscriptionResult(
+                            text = fullText.trim(),
+                            segments = segments,
+                            language = options.language,
+                            confidence = 0.95f,
+                            duration = segments.lastOrNull()?.end ?: 0.0,
+                            timestamps = null
+                        )
                     )
-                ),
-                language = options.language ?: "en",
-                confidence = 0.92f,
-                duration = audioChunk.size.toDouble() / (16000 * 2), // Assuming 16kHz 16-bit
-                timestamps = listOf(
-                    WordTimestamp(
-                        word = "WhisperKit",
-                        startTime = 0.0,
-                        endTime = 0.5,
-                        confidence = 0.92f
-                    )
-                )
-            )
-            emit(result)
+                }
+
+                // Keep last 100ms for context
+                audioBuffer.clear()
+                if (combinedAudio.size > 3200) {
+                    audioBuffer.add(combinedAudio.takeLast(3200).toByteArray())
+                }
+            }
         }
+    }.flowOn(Dispatchers.Default)
+
+    private fun createWhisperParams(options: STTOptions): WhisperFullParams {
+        // Create params with appropriate strategy based on sensitivity
+        val strategy = when (options.sensitivityMode) {
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> WhisperSamplingStrategy.GREEDY
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH,
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> WhisperSamplingStrategy.BEAM_SEARCH
+        }
+        val params = WhisperFullParams(strategy)
+
+        // Set language
+        params.language = when(options.language) {
+            "auto" -> "auto"
+            else -> options.language.take(2) // Use ISO 639-1 code
+        }
+
+        // Set other parameters based on STTOptions
+        params.printTimestamps = options.enableTimestamps
+        params.suppressBlank = options.suppressBlank
+        params.suppressNonSpeechTokens = options.suppressNonSpeechTokens
+
+        // Set temperature and beam size based on sensitivity mode
+        when (options.sensitivityMode) {
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.NORMAL -> {
+                params.temperature = 0.0f
+            }
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.HIGH -> {
+                params.temperature = 0.3f
+                params.beamSearchBeamSize = 5
+            }
+            com.runanywhere.sdk.components.stt.STTSensitivityMode.MAXIMUM -> {
+                params.temperature = 0.5f
+                params.beamSearchBeamSize = 10
+            }
+        }
+
+        return params
+    }
+
+    private fun convertPCM16ToFloat(pcm16: ByteArray): FloatArray {
+        val buffer = ByteBuffer.wrap(pcm16).order(ByteOrder.LITTLE_ENDIAN)
+        val floatArray = FloatArray(pcm16.size / 2)
+
+        for (i in floatArray.indices) {
+            val sample = buffer.getShort()
+            floatArray[i] = sample.toFloat() / 32768.0f
+        }
+
+        return floatArray
     }
 }
 

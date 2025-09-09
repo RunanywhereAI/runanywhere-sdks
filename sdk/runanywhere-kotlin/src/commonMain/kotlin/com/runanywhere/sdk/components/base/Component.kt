@@ -218,7 +218,7 @@ abstract class BaseComponent<TService : Any>(
             // Stage: Validation
             currentStage = "validation"
             eventBus.publish(ComponentInitializationEvent.ComponentChecking(
-                component = componentType,
+                component = componentType.name,
                 modelId = parameters.modelId
             ))
             configuration.validate()
@@ -226,7 +226,7 @@ abstract class BaseComponent<TService : Any>(
             // Stage: Service Creation
             currentStage = "service_creation"
             eventBus.publish(ComponentInitializationEvent.ComponentInitializing(
-                component = componentType,
+                component = componentType.name,
                 modelId = parameters.modelId
             ))
             service = createService()
@@ -239,7 +239,7 @@ abstract class BaseComponent<TService : Any>(
             currentStage = null
             updateState(ComponentState.READY)
             eventBus.publish(ComponentInitializationEvent.ComponentReady(
-                component = componentType,
+                component = componentType.name,
                 modelId = parameters.modelId
             ))
         } catch (e: Exception) {
@@ -252,7 +252,7 @@ abstract class BaseComponent<TService : Any>(
             )
             updateState(ComponentState.FAILED)
             eventBus.publish(ComponentInitializationEvent.ComponentFailed(
-                component = componentType,
+                component = componentType.name,
                 error = e
             ))
             throw e
@@ -334,9 +334,9 @@ abstract class BaseComponent<TService : Any>(
         )
 
         eventBus.publish(ComponentInitializationEvent.ComponentStateChanged(
-            component = componentType,
-            oldState = oldState,
-            newState = newState
+            component = componentType.name,
+            oldState = oldState.name,
+            newState = newState.name
         ))
     }
 

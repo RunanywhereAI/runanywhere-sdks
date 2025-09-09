@@ -109,7 +109,7 @@ class ModelLoadingService(
 
         // Emit progress events
         for (progress in 1..10) {
-            EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, progress / 10f))
+            EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, (progress / 10f).toDouble()))
             kotlinx.coroutines.delay(100) // Simulate download time
         }
     }

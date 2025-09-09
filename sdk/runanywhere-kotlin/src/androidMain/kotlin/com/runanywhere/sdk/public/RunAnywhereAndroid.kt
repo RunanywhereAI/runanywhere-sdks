@@ -63,13 +63,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         // Initialize Android-specific services
         val platformContext = com.runanywhere.sdk.foundation.PlatformContext(context)
         ServiceContainer.shared.initialize(platformContext)
-        FileManager.initialize(context)
+        // FileManager is initialized through its companion object
     }
 
     override suspend fun authenticateWithBackend(params: SDKInitParams) {
         androidLogger.info("Authenticating with backend API")
         // Authentication is handled by ServiceContainer.bootstrap()
-        serviceContainer.authenticationService.initialize(params.apiKey)
+        serviceContainer.authenticationService.authenticate(params.apiKey)
     }
 
     override suspend fun performHealthCheck() {
@@ -94,13 +94,9 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val modelInfo = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
-        return flow {
-            // Download the model with progress updates
-            val downloadPath = serviceContainer.downloadService.downloadModel(modelInfo) { progress ->
-                // Progress updates - can't emit from callback directly in flow
-            }
-            // Emit 100% completion when done
-            emit(1.0f)
+        // Use downloadModelStream which returns a Flow<DownloadProgress>
+        return serviceContainer.downloadService.downloadModelStream(modelInfo).map { progress ->
+            progress.percentage.toFloat()
         }
     }
 

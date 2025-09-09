@@ -32,7 +32,6 @@ include(":modules:runanywhere-whisperkit")
 // Other modules temporarily disabled due to build issues
 // TODO: Fix module build configurations
 // include(":modules:runanywhere-core")
-// include(":modules:runanywhere-whisper-stt")
 // include(":modules:runanywhere-vad")
 // include(":modules:runanywhere-llm")
 // include(":modules:runanywhere-llm-llamacpp")
