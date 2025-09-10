@@ -295,15 +295,16 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepCompleted(2, "Configuration loading", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 2 completed")
 
-            // Step 3: Authentication service initialization (even in dev mode)
+            // Step 3: Authentication service initialization (SKIPPED in dev mode)
             stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(3, "Authentication service initialization"))
-            logger.info("🔧 Step 3: Authentication service initialization...")
+            logger.info("🔧 Step 3: Skipping authentication service in development mode...")
 
-            authenticationService.authenticate(params.apiKey)
+            // NO AUTHENTICATION IN DEVELOPMENT MODE - Following iOS pattern exactly
+            logger.info("   Authentication skipped - using mock/local services only")
 
             EventBus.publish(SDKInitializationEvent.StepCompleted(3, "Authentication service initialization", currentTimeMillis() - stepStartTime))
-            logger.info("✅ Step 3 completed")
+            logger.info("✅ Step 3 completed (authentication skipped)")
 
             // Step 4: Model repository sync (fetch mock models)
             stepStartTime = currentTimeMillis()
@@ -556,7 +557,11 @@ class ServiceContainer {
      * Cleanup all services
      */
     suspend fun cleanup() {
-        authenticationService.clearAuthentication()
+        // Only clear authentication if not in development mode
+        // This avoids lazy-initializing the authenticationService in dev mode
+        if (currentEnvironment != SDKEnvironment.DEVELOPMENT) {
+            authenticationService.clearAuthentication()
+        }
         sttComponent.cleanup()
         vadComponent.cleanup()
     }

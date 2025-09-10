@@ -17,14 +17,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
-import com.runanywhere.runanywhereai.presentation.storage.StorageScreen
+import com.runanywhere.ai.models.ui.ModelsScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.quiz.QuizScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
 /**
  * Main navigation component matching iOS app structure
- * 5 tabs: Chat, Storage, Settings, Quiz, Voice
+ * 5 tabs: Chat, Models, Settings, Quiz, Voice
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,8 +45,8 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
-            composable(NavigationRoute.STORAGE) {
-                StorageScreen()
+            composable(NavigationRoute.MODELS) {
+                ModelsScreen()
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -78,8 +78,8 @@ fun BottomNavigationBar(navController: NavController) {
             selectedIcon = Icons.Filled.Chat
         ),
         BottomNavItem(
-            route = NavigationRoute.STORAGE,
-            label = "Storage",
+            route = NavigationRoute.MODELS,
+            label = "Models",
             icon = Icons.Outlined.Storage,
             selectedIcon = Icons.Filled.Storage
         ),
@@ -138,7 +138,7 @@ fun BottomNavigationBar(navController: NavController) {
  */
 object NavigationRoute {
     const val CHAT = "chat"
-    const val STORAGE = "storage"
+    const val MODELS = "models"
     const val SETTINGS = "settings"
     const val QUIZ = "quiz"
     const val VOICE = "voice"

@@ -1,6 +1,8 @@
 package com.runanywhere.whisperkit.storage
 
 import com.runanywhere.whisperkit.models.*
+import com.runanywhere.sdk.storage.DownloadProgress
+import com.runanywhere.sdk.storage.DownloadState
 import kotlinx.coroutines.delay
 
 /**
@@ -8,7 +10,7 @@ import kotlinx.coroutines.delay
  * Since both platforms can use the same file system abstractions and whisper-jni library,
  * we can share the storage logic between them.
  */
-class JvmAndroidWhisperStorage : WhisperStorageStrategy {
+class JvmAndroidWhisperStorage : WhisperStorageStrategy() {
 
     // Default models path that works for both JVM and Android
     private val modelsBasePath = when {
@@ -23,19 +25,9 @@ class JvmAndroidWhisperStorage : WhisperStorageStrategy {
         WhisperModelType.values().forEach { modelType ->
             put(modelType, WhisperModelInfo(
                 type = modelType,
-                name = "Whisper ${modelType.name.lowercase().replace("_", "-")} model",
-                size = when (modelType) {
-                    WhisperModelType.TINY -> 39_000_000L
-                    WhisperModelType.BASE -> 74_000_000L
-                    WhisperModelType.SMALL -> 244_000_000L
-                    WhisperModelType.MEDIUM -> 769_000_000L
-                    WhisperModelType.LARGE -> 1550_000_000L
-                    WhisperModelType.LARGE_V2 -> 1550_000_000L
-                    WhisperModelType.LARGE_V3 -> 1550_000_000L
-                },
                 localPath = "$modelsBasePath/${modelType.name.lowercase().replace("_", "-")}.bin",
-                downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-${modelType.name.lowercase().replace("_", "-")}.bin",
-                isDownloaded = true // Mock all models as downloaded for development
+                isDownloaded = true, // Mock all models as downloaded for development
+                lastUsed = System.currentTimeMillis()
             ))
         }
     }
@@ -54,51 +46,68 @@ class JvmAndroidWhisperStorage : WhisperStorageStrategy {
     }
 
     override suspend fun downloadModel(
-        modelType: WhisperModelType,
-        onProgress: (WhisperDownloadProgress) -> Unit
+        type: WhisperModelType,
+        onProgress: (DownloadProgress) -> Unit
     ) {
-        val modelInfo = mockModels[modelType]
-            ?: throw IllegalArgumentException("Model not found: $modelType")
+        val modelInfo = mockModels[type]
+            ?: throw IllegalArgumentException("Model not found: $type")
 
         // Simulate download progress for both JVM and Android
         for (progress in 0..100 step 5) {
             delay(25) // Faster simulation for testing
-            onProgress(WhisperDownloadProgress(
-                modelType = modelType,
-                bytesDownloaded = (modelInfo.size * progress / 100),
-                totalBytes = modelInfo.size,
-                percentage = progress.toDouble(),
-                isComplete = progress == 100,
-                error = null
+            val sizeMB = type.approximateSizeMB * 1024 * 1024L
+            onProgress(DownloadProgress(
+                bytesDownloaded = (sizeMB * progress / 100),
+                totalBytes = sizeMB,
+                state = if (progress == 100) DownloadState.COMPLETED else DownloadState.DOWNLOADING
             ))
         }
 
         // Mark as downloaded
-        mockModels[modelType] = modelInfo.copy(isDownloaded = true)
+        mockModels[type] = modelInfo.copy(isDownloaded = true)
     }
 
-    override suspend fun deleteModel(modelType: WhisperModelType) {
-        mockModels[modelType]?.let { modelInfo ->
-            mockModels[modelType] = modelInfo.copy(
+    override suspend fun deleteModel(type: WhisperModelType): Boolean {
+        mockModels[type]?.let { modelInfo ->
+            mockModels[type] = modelInfo.copy(
                 isDownloaded = false,
                 localPath = null
             )
+            return true
+        }
+        return false
+    }
+
+    override suspend fun getModelInfo(type: WhisperModelType): WhisperModelInfo {
+        return mockModels[type] ?: WhisperModelInfo(
+            type = type,
+            localPath = null,
+            isDownloaded = false
+        )
+    }
+
+    override suspend fun getTotalStorageUsed(): Long {
+        return mockModels.values
+            .filter { it.isDownloaded }
+            .sumOf { it.type.approximateSizeMB * 1024 * 1024L }
+    }
+
+    override suspend fun cleanupOldModels(keepTypes: List<WhisperModelType>) {
+        mockModels.keys.forEach { type ->
+            if (!keepTypes.contains(type)) {
+                mockModels[type]?.let { modelInfo ->
+                    mockModels[type] = modelInfo.copy(isDownloaded = false)
+                }
+            }
         }
     }
 
-    override suspend fun getModelSize(modelType: WhisperModelType): Long {
-        return mockModels[modelType]?.size
-            ?: throw IllegalArgumentException("Model not found: $modelType")
-    }
-
-    override suspend fun validateModelIntegrity(modelType: WhisperModelType): Boolean {
-        // Mock validation - in real implementation would check file integrity
-        return isModelDownloaded(modelType)
-    }
-
-    override suspend fun cleanup() {
-        // Mock cleanup - nothing to do in mock implementation
-        // In real implementation, would clean up temporary files, etc.
+    override suspend fun updateLastUsed(type: WhisperModelType) {
+        mockModels[type]?.let { modelInfo ->
+            mockModels[type] = modelInfo.copy(
+                lastUsed = System.currentTimeMillis()
+            )
+        }
     }
 
     /**

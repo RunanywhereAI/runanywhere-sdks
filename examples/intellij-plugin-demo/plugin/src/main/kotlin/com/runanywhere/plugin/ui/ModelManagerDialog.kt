@@ -123,7 +123,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
 
                         val sizeMB = (model.downloadSize ?: 0) / (1024 * 1024)
 
-                        tableModel.addRow(arrayOf(
+                        tableModel.addRow(arrayOf<Any>(
                             model.id,
                             model.name,
                             model.category.name,

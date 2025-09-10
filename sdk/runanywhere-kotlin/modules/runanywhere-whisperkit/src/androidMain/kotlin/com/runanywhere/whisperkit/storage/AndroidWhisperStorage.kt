@@ -1,6 +1,8 @@
 package com.runanywhere.whisperkit.storage
 
 import android.content.Context
+import com.runanywhere.sdk.storage.DownloadProgress
+import com.runanywhere.sdk.storage.DownloadState
 import com.runanywhere.whisperkit.models.WhisperModelInfo
 import com.runanywhere.whisperkit.models.WhisperModelType
 import kotlinx.coroutines.Dispatchers
@@ -12,9 +14,17 @@ import java.net.URL
  * Android implementation of WhisperStorageStrategy
  * Manages model storage and downloads for Android environments
  */
-actual class DefaultWhisperStorage(
+actual class DefaultWhisperStorage private constructor(
     private val context: Context
-) : WhisperStorageStrategy {
+) : WhisperStorageStrategy() {
+
+    actual constructor() : this(AndroidWhisperStorageHelper.getApplicationContext())
+
+    companion object {
+        fun create(context: Context): DefaultWhisperStorage {
+            return DefaultWhisperStorage(context)
+        }
+    }
 
     private val modelsDir: File by lazy {
         val dir = File(context.filesDir, "whisper/models")
@@ -24,7 +34,7 @@ actual class DefaultWhisperStorage(
         dir
     }
 
-    override suspend fun getModelsDirectory(): String = withContext(Dispatchers.IO) {
+    suspend fun getModelsDirectory(): String = withContext(Dispatchers.IO) {
         modelsDir.absolutePath
     }
 
@@ -53,15 +63,19 @@ actual class DefaultWhisperStorage(
 
     override suspend fun downloadModel(
         type: WhisperModelType,
-        onProgress: (Float) -> Unit
-    ): String = withContext(Dispatchers.IO) {
+        onProgress: (DownloadProgress) -> Unit
+    ) = withContext(Dispatchers.IO) {
 
         val modelFile = File(modelsDir, type.fileName)
 
         // Check if already downloaded
         if (modelFile.exists()) {
-            onProgress(1.0f)
-            return@withContext modelFile.absolutePath
+            onProgress(DownloadProgress(
+                bytesDownloaded = modelFile.length(),
+                totalBytes = modelFile.length(),
+                state = DownloadState.COMPLETED
+            ))
+            return@withContext
         }
 
         try {
@@ -84,8 +98,12 @@ actual class DefaultWhisperStorage(
                         totalBytesRead += bytesRead
 
                         if (totalSize > 0) {
-                            val progress = totalBytesRead.toFloat() / totalSize.toFloat()
-                            onProgress(progress)
+                            onProgress(DownloadProgress(
+                                bytesDownloaded = totalBytesRead,
+                                totalBytes = totalSize,
+                                state = DownloadState.DOWNLOADING,
+                                currentFile = type.fileName
+                            ))
                         }
                     }
                 }
@@ -94,8 +112,12 @@ actual class DefaultWhisperStorage(
             // Move temp file to final location
             tempFile.renameTo(modelFile)
 
-            onProgress(1.0f)
-            modelFile.absolutePath
+            onProgress(DownloadProgress(
+                bytesDownloaded = modelFile.length(),
+                totalBytes = modelFile.length(),
+                state = DownloadState.COMPLETED,
+                currentFile = type.fileName
+            ))
 
         } catch (e: Exception) {
             // Clean up temp file if exists
@@ -133,5 +155,20 @@ actual class DefaultWhisperStorage(
         if (modelFile.exists()) {
             modelFile.setLastModified(System.currentTimeMillis())
         }
+    }
+}
+
+/**
+ * Helper object to manage Android context for WhisperStorage
+ */
+object AndroidWhisperStorageHelper {
+    private var applicationContext: Context? = null
+
+    fun initialize(context: Context) {
+        applicationContext = context.applicationContext
+    }
+
+    fun getApplicationContext(): Context {
+        return applicationContext ?: throw IllegalStateException("AndroidWhisperStorageHelper not initialized. Call initialize(context) first.")
     }
 }

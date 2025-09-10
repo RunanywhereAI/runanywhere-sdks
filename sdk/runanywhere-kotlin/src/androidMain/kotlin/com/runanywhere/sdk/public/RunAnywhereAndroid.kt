@@ -67,6 +67,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     }
 
     override suspend fun authenticateWithBackend(params: SDKInitParams) {
+        // Skip authentication in development mode
+        if (currentEnvironment == SDKEnvironment.DEVELOPMENT) {
+            androidLogger.info("Skipping authentication in development mode")
+            return
+        }
+
         androidLogger.info("Authenticating with backend API")
         // Authentication is handled by ServiceContainer.bootstrap()
         serviceContainer.authenticationService.authenticate(params.apiKey)

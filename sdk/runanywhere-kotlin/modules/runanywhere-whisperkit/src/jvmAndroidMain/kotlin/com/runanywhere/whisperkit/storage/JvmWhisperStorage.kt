@@ -19,7 +19,7 @@ import java.security.MessageDigest
  * JVM implementation of WhisperStorageStrategy with complete iOS alignment
  * Provides comprehensive storage, download, and validation capabilities
  */
-actual class DefaultWhisperStorage : WhisperStorageStrategy() {
+class JvmAndroidDefaultWhisperStorage : WhisperStorageStrategy() {
 
     private val modelsDir: File by lazy {
         val userHome = System.getProperty("user.home")
@@ -94,7 +94,6 @@ actual class DefaultWhisperStorage : WhisperStorageStrategy() {
         }
     }
 
-    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.O)
     override suspend fun downloadModel(
         type: WhisperModelType,
         onProgress: (DownloadProgress) -> Unit
