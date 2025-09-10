@@ -392,8 +392,8 @@ class JvmWhisperKitService : WhisperKitService() {
             emit(com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
                 when (e) {
                     is com.runanywhere.sdk.components.stt.STTError -> e
-                    is WhisperError -> com.runanywhere.sdk.components.stt.STTError.TranscriptionFailed(e)
-                    else -> com.runanywhere.sdk.components.stt.STTError.TranscriptionFailed(e)
+                    is WhisperError -> com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                    else -> com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
                 }
             ))
         }
@@ -494,14 +494,5 @@ class JvmWhisperKitService : WhisperKitService() {
         }
 
         return floatArray
-    }
-}
-
-/**
- * Factory implementation for JVM
- */
-actual object WhisperKitFactory {
-    actual fun createService(): WhisperKitService {
-        return JvmWhisperKitService()
     }
 }

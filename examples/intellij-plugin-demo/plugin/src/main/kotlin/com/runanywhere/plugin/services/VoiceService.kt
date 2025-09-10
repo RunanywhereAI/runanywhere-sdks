@@ -134,9 +134,9 @@ class VoiceService(private val project: Project) : Disposable {
                     if (vadComponent != null && vadComponent.isEnabled()) {
                         println("VoiceService: Applying VAD filtering...")
                         val vadOutput = vadComponent.processAudioChunk(audioSamples)
-                        println("VoiceService: VAD result - Speech: ${vadOutput.isSpeech}, Energy: ${vadOutput.energyLevel}, Confidence: ${vadOutput.confidence}")
+                        println("VoiceService: VAD result - Speech: ${vadOutput.isSpeechDetected}, Energy: ${vadOutput.energyLevel}, Confidence: ${vadOutput.confidence}")
 
-                        if (vadOutput.isSpeech) {
+                        if (vadOutput.isSpeechDetected) {
                             // VAD detected speech, proceed with original audio
                             audioData
                         } else {

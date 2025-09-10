@@ -191,8 +191,8 @@ android {
 }
 
 dependencies {
-    // SDK module - Use Android variant from Maven Local
-    implementation("com.runanywhere.sdk:runanywhere-kotlin-android:0.1.0")
+    // SDK module - Use JVM variant which works for Android
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
@@ -247,6 +247,9 @@ dependencies {
 
     // Security
     implementation(libs.androidx.security.crypto)
+
+    // Permissions handling
+    implementation("com.google.accompanist:accompanist-permissions:0.32.0")
 
     // Permissions
     implementation(libs.accompanist.permissions)
