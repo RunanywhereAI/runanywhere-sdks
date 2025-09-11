@@ -78,9 +78,25 @@ iOSInjectionProject/
 # macOS
 .DS_Store
 
-# IDE
-.idea/
+# IDE - IntelliJ IDEA / Android Studio
+# Ignore all .idea files by default
+.idea/*
+
+# But keep only essential shared configurations:
 !.idea/runConfigurations/
+!.idea/gradle.xml
+!.idea/vcs.xml
+!.idea/misc.xml
+
+# Explicitly ignore personal and generated files
+.idea/workspace.xml
+.idea/ChatHistory*.xml
+.idea/caches/
+.idea/artifacts/
+.idea/discord.xml
+.idea/*.iml
+
+# Other IDE files
 .vscode/
 *.swp
 *.swo
@@ -122,7 +138,7 @@ freeline.py
 freeline/
 freeline_project_description.json
 *.hprof
-vcs.xml
+# vcs.xml moved to .idea section above
 lint/intermediates/
 lint/generated/
 lint/outputs/
@@ -139,7 +155,7 @@ lint/reports/
 *.rar
 hs_err_pid*
 
-thoughts
+# thoughts
 local/
 examples/web/
 sdk/runanywhere-web/
