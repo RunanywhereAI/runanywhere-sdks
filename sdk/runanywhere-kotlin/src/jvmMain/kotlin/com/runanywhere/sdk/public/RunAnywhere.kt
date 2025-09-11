@@ -543,7 +543,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 com.runanywhere.sdk.components.vad.VADConfiguration(
                     sampleRate = 16000,
                     frameLength = 0.02f, // 20ms frames (320 samples at 16kHz)
-                    energyThreshold = 0.008f // More sensitive threshold for quieter speech
+                    energyThreshold = 0.003f // Much more sensitive threshold for normal speech
                 )
             )
             vad.start()
@@ -590,6 +590,18 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                         audioBuffer.clear()
                         audioBuffer.addAll(remainingBuffer)
 
+                        // Calculate audio energy for waveform visualization
+                        val energy = vadFrame.map { it * it }.average().toFloat()
+                        val normalizedEnergy = (energy * 1000).coerceIn(0.0f, 1.0f) // Normalize to 0-1 range
+
+                        // Emit audio level for waveform visualization
+                        emit(
+                            com.runanywhere.sdk.components.stt.STTStreamEvent.AudioLevelChanged(
+                                level = normalizedEnergy,
+                                timestamp = System.currentTimeMillis() / 1000.0
+                            )
+                        )
+
                         // Run VAD on this frame
                         val vadResult = if (vadService != null && vadService.isReady) {
                             try {
@@ -601,7 +613,6 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                             }
                         } else {
                             // VAD not available, use simple energy detection
-                            val energy = vadFrame.map { it * it }.average().toFloat()
                             val isSpeech = energy > 0.001f // Simple energy threshold
                             com.runanywhere.sdk.components.vad.VADResult(isSpeechDetected = isSpeech, confidence = 0.5f)
                         }
@@ -780,6 +791,60 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             } catch (e: Exception) {
                 jvmLogger.error("Recording error", e)
             }
+        }
+    }
+
+    /**
+     * Start recording with real-time waveform feedback
+     * Emits audio energy events while recording for visualization
+     * @return Flow of audio level events during recording
+     */
+    fun startRecordingWithWaveform(): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent.AudioLevelChanged> = flow {
+        if (isRecording) {
+            jvmLogger.warn("Already recording")
+            return@flow
+        }
+
+        jvmLogger.info("Starting audio recording with waveform feedback")
+        recordingBuffer.reset()
+        isRecording = true
+
+        try {
+            audioCapture.startContinuousCapture()
+                .collect { chunk ->
+                    if (isRecording) {
+                        // Store audio for final transcription
+                        val pcmData = convertFloatToPCMBytes(chunk.samples)
+                        recordingBuffer.write(pcmData)
+
+                        // Calculate and emit energy for waveform visualization
+                        // Process in 20ms frames like streaming mode
+                        val samples = chunk.samples
+                        val frameSize = 320 // 20ms at 16kHz
+
+                        var offset = 0
+                        while (offset + frameSize <= samples.size) {
+                            val frame = samples.sliceArray(offset until offset + frameSize)
+                            val energy = frame.map { it * it }.average().toFloat()
+                            val normalizedEnergy = (energy * 1000).coerceIn(0.0f, 1.0f)
+
+                            emit(com.runanywhere.sdk.components.stt.STTStreamEvent.AudioLevelChanged(
+                                level = normalizedEnergy,
+                                timestamp = System.currentTimeMillis() / 1000.0
+                            ))
+
+                            offset += frameSize
+                        }
+                    }
+                }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            jvmLogger.info("Recording with waveform cancelled")
+            throw e
+        } catch (e: Exception) {
+            jvmLogger.error("Recording with waveform error", e)
+            throw e
+        } finally {
+            // Don't reset recording state here, let stopRecordingAndTranscribe handle it
         }
     }
 
