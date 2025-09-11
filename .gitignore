@@ -95,6 +95,18 @@ iOSInjectionProject/
 .idea/artifacts/
 .idea/discord.xml
 .idea/*.iml
+.idea/.name
+.idea/AndroidProjectSystem.xml
+.idea/appInsightsSettings.xml
+.idea/compiler.xml
+.idea/deploymentTargetSelector.xml
+.idea/kotlinc.xml
+.idea/migrations.xml
+.idea/runConfigurations.xml
+
+# Also ignore .idea folders in subdirectories
+examples/intellij-plugin-demo/plugin/.idea/
+sdk/runanywhere-kotlin/.idea/
 
 # Other IDE files
 .vscode/
@@ -155,7 +167,7 @@ lint/reports/
 *.rar
 hs_err_pid*
 
-# thoughts
+thoughts
 local/
 examples/web/
 sdk/runanywhere-web/
