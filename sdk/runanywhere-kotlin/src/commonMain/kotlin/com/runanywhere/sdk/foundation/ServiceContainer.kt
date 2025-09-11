@@ -430,10 +430,11 @@ class ServiceContainer {
             logger.warn("⚠️ WhisperKit provider registration failed: ${e.message}")
         }
 
-        // Register simple energy VAD provider
+        // Register VAD providers based on platform
         try {
-            registerSimpleEnergyVADProvider()
-            logger.info("✅ Simple Energy VAD provider registered")
+            // For JVM platform, register all available VAD providers
+            registerVADProviders()
+            logger.info("✅ VAD providers registered")
         } catch (e: Exception) {
             logger.warn("⚠️ VAD provider registration failed: ${e.message}")
         }
@@ -468,6 +469,14 @@ class ServiceContainer {
         }
 
         logger.info("Component initialization completed")
+    }
+
+    /**
+     * Register VAD providers
+     */
+    private fun registerVADProviders() {
+        // Register SimpleEnergyVAD as the primary VAD implementation
+        registerSimpleEnergyVADProvider()
     }
 
     /**

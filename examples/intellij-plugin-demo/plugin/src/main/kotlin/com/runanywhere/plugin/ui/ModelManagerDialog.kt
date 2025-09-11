@@ -8,7 +8,10 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.awt.*
 import javax.swing.*
 import javax.swing.table.DefaultTableModel
@@ -136,7 +139,7 @@ class ModelManagerDialog(private val project: Project) : DialogWrapper(project, 
                 }
             } catch (e: Exception) {
                 logger.error("Error loading models", e)
-                withContext(Dispatchers.Main) {
+                ApplicationManager.getApplication().invokeLater {
                     statusLabel.text = "Error: ${e.message}"
                 }
             }

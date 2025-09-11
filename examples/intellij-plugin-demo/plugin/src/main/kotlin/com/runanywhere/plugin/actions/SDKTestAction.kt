@@ -2,6 +2,7 @@ package com.runanywhere.plugin.actions
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.ui.Messages
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.public.RunAnywhere
@@ -9,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Test action to demonstrate RunAnywhere SDK integration in IntelliJ plugin
@@ -29,7 +29,7 @@ class SDKTestAction : AnAction("Test RunAnywhere SDK") {
 
                 if (isInitialized) {
                     // Show success on UI thread
-                    withContext(Dispatchers.Main) {
+                    ApplicationManager.getApplication().invokeLater {
                         Messages.showInfoMessage(
                             project,
                             """
@@ -54,7 +54,7 @@ class SDKTestAction : AnAction("Test RunAnywhere SDK") {
                     // Test STT component (if available)
                     testSTTComponent(project)
                 } else {
-                    withContext(Dispatchers.Main) {
+                    ApplicationManager.getApplication().invokeLater {
                         Messages.showErrorDialog(
                             project,
                             "Failed to initialize RunAnywhere SDK",
@@ -63,7 +63,7 @@ class SDKTestAction : AnAction("Test RunAnywhere SDK") {
                     }
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
+                ApplicationManager.getApplication().invokeLater {
                     Messages.showErrorDialog(
                         project,
                         "Error testing SDK: ${e.message}",
@@ -95,7 +95,7 @@ class SDKTestAction : AnAction("Test RunAnywhere SDK") {
             val hasSTT = RunAnywhere.isInitialized
 
             if (hasSTT) {
-                withContext(Dispatchers.Main) {
+                ApplicationManager.getApplication().invokeLater {
                     Messages.showInfoMessage(
                         project,
                         """

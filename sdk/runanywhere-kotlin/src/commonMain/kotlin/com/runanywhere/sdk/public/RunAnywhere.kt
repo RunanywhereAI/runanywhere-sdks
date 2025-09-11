@@ -11,6 +11,7 @@ import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flow
 
 /**
  * Enhanced main public API interface for RunAnywhere SDK
@@ -76,6 +77,45 @@ interface RunAnywhereSDK {
         modelId: String,
         options: com.runanywhere.sdk.public.extensions.STTOptions
     ): com.runanywhere.sdk.public.extensions.STTResult
+
+    /**
+     * Streaming transcription API for real-time audio processing
+     * Processes audio in chunks and emits transcription results as they become available
+     *
+     * @param audioStream Flow of audio chunks (ByteArray)
+     * @param chunkSizeMs Size of each audio chunk in milliseconds (default: 1000ms)
+     * @return Flow of transcription results as they are processed
+     */
+    fun transcribeStream(
+        audioStream: Flow<ByteArray>,
+        chunkSizeMs: Int = 1000
+    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent>
+
+    /**
+     * Start continuous streaming transcription with internal audio capture
+     * This method handles all audio capture internally and provides continuous transcription
+     * until stopStreamingTranscription is called
+     *
+     * @param chunkSizeMs Size of each audio chunk in milliseconds (default: 100ms for real-time)
+     * @return Flow of transcription events
+     */
+    fun startStreamingTranscription(
+        chunkSizeMs: Int = 100
+    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent>
+
+    /**
+     * Stop the continuous streaming transcription
+     */
+    fun stopStreamingTranscription()
+
+    /**
+     * Record audio for specified duration and transcribe it
+     * This is a convenience method that handles audio recording internally
+     *
+     * @param durationSeconds Duration to record in seconds
+     * @return Transcribed text
+     */
+    suspend fun transcribeWithRecording(durationSeconds: Int): String
 
     // MARK: - Model Management - Enhanced
 
@@ -456,6 +496,153 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             processingTime = processingTime,
             modelUsed = modelId
         )
+    }
+
+    /**
+     * Streaming transcription API for real-time audio processing
+     * Processes audio in chunks and emits transcription results as they become available
+     *
+     * @param audioStream Flow of audio chunks (ByteArray)
+     * @param chunkSizeMs Size of each audio chunk in milliseconds (default: 1000ms)
+     * @return Flow of transcription results as they are processed
+     */
+    override fun transcribeStream(
+        audioStream: Flow<ByteArray>,
+        chunkSizeMs: Int
+    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent> = flow {
+        requireInitialized()
+
+        // Get STT component
+        val sttComponent =
+            serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
+                    as? com.runanywhere.sdk.components.stt.STTComponent
+
+        if (sttComponent == null) {
+            emit(
+                com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                    com.runanywhere.sdk.components.stt.STTError.serviceNotInitialized
+                )
+            )
+            return@flow
+        }
+
+        // For now, collect chunks and transcribe them as complete audio
+        // Platform-specific implementations can override for better streaming
+        val audioBuffer = mutableListOf<Byte>()
+
+        audioStream.collect { chunk ->
+            audioBuffer.addAll(chunk.toList())
+
+            // Process when we have enough data (simplified approach)
+            if (audioBuffer.size >= 16000 * 2 * chunkSizeMs / 1000) { // 16kHz, 16-bit
+                val audioData = audioBuffer.toByteArray()
+                audioBuffer.clear()
+
+                try {
+                    val result = sttComponent.transcribe(audioData)
+                    if (result.text.isNotEmpty()) {
+                        emit(
+                            com.runanywhere.sdk.components.stt.STTStreamEvent.PartialTranscription(
+                                text = result.text,
+                                confidence = result.confidence,
+                                isFinal = false
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    emit(
+                        com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                            com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                        )
+                    )
+                }
+            }
+        }
+
+        // Process any remaining audio
+        if (audioBuffer.isNotEmpty()) {
+            try {
+                val result = sttComponent.transcribe(audioBuffer.toByteArray())
+                if (result.text.isNotEmpty()) {
+                    val transcriptionResult =
+                        com.runanywhere.sdk.components.stt.STTTranscriptionResult(
+                            transcript = result.text,
+                            confidence = result.confidence
+                        )
+                    emit(
+                        com.runanywhere.sdk.components.stt.STTStreamEvent.FinalTranscription(
+                            transcriptionResult
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                // Ignore errors on final chunk
+            }
+        }
+    }
+
+    /**
+     * Enhanced transcription with options
+     */
+    override suspend fun transcribe(audioData: ByteArray): String {
+        requireInitialized()
+        // Use STT component for transcription
+        val sttComponent =
+            serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
+                    as? com.runanywhere.sdk.components.stt.STTComponent
+                ?: throw SDKError.ComponentNotAvailable("STT component not available")
+
+        val result = sttComponent.transcribe(
+            audioData = audioData,
+            format = com.runanywhere.sdk.components.stt.AudioFormat.WAV,
+            language = "en-US"
+        )
+
+        return result.text
+    }
+
+    /**
+     * Start continuous streaming transcription with internal audio capture
+     * This method handles all audio capture internally and provides continuous transcription
+     * until stopStreamingTranscription is called
+     *
+     * @param chunkSizeMs Size of each audio chunk in milliseconds (default: 100ms for real-time)
+     * @return Flow of transcription events
+     */
+    override fun startStreamingTranscription(
+        chunkSizeMs: Int
+    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent> {
+        requireInitialized()
+        // Platform-specific implementations should override this
+        // For now, just return an empty flow
+        return flow {
+            emit(
+                com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                    com.runanywhere.sdk.components.stt.STTError.streamingNotSupported
+                )
+            )
+        }
+    }
+
+    /**
+     * Stop the continuous streaming transcription
+     */
+    override fun stopStreamingTranscription() {
+        requireInitialized()
+        // Platform-specific implementations should override this
+    }
+
+    /**
+     * Record audio for specified duration and transcribe it
+     * This is a convenience method that handles audio recording internally
+     *
+     * @param durationSeconds Duration to record in seconds
+     * @return Transcribed text
+     */
+    override suspend fun transcribeWithRecording(durationSeconds: Int): String {
+        requireInitialized()
+        // Platform-specific implementation should override this
+        throw SDKError.ComponentNotAvailable("Transcribe with recording not available")
     }
 
     /**
