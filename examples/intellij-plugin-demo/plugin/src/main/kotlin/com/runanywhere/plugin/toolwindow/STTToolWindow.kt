@@ -12,6 +12,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
 import com.runanywhere.plugin.services.VoiceService
 import com.runanywhere.plugin.ui.ModelManagerDialog
+import com.runanywhere.plugin.ui.WaveformVisualization
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -20,7 +21,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.awt.BorderLayout
 import java.awt.Color
@@ -81,6 +81,7 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         wrapStyleWord = true
         font = Font(Font.MONOSPACED, Font.PLAIN, 12)
     }
+    private val waveformVisualization = WaveformVisualization()
 
     // State tracking
     private var isSimpleRecording = false
@@ -173,11 +174,24 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
             add(clearButton, gbc)
         }
 
+        // Waveform panel
+        val waveformPanel = JPanel(BorderLayout()).apply {
+            border = TitledBorder("Audio Waveform")
+            add(waveformVisualization, BorderLayout.CENTER)
+            preferredSize = Dimension(400, 120)
+        }
+
         // Center panel with transcription area
         val transcriptionPanel = JPanel(BorderLayout()).apply {
             border = TitledBorder("Transcriptions")
             add(JBScrollPane(transcriptionArea), BorderLayout.CENTER)
-            preferredSize = Dimension(400, 300)
+            preferredSize = Dimension(400, 200)
+        }
+
+        // Right panel with waveform and transcription
+        val rightPanel = JPanel(BorderLayout(0, 10)).apply {
+            add(waveformPanel, BorderLayout.NORTH)
+            add(transcriptionPanel, BorderLayout.CENTER)
         }
 
         // Add all panels
@@ -185,7 +199,7 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
 
         val mainPanel = JPanel(BorderLayout(10, 10)).apply {
             add(controlPanel, BorderLayout.WEST)
-            add(transcriptionPanel, BorderLayout.CENTER)
+            add(rightPanel, BorderLayout.CENTER)
         }
         add(mainPanel, BorderLayout.CENTER)
     }
@@ -213,6 +227,7 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         // Clear button
         clearButton.addActionListener {
             transcriptionArea.text = ""
+            waveformVisualization.clear()
         }
     }
 
@@ -242,33 +257,42 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.foreground = Color.RED
         recordingStartTime = System.currentTimeMillis()
 
-        // Start recording using SDK's new recording API
-        RunAnywhere.startRecording()
-
-        // Start a timer to show recording duration
+        // Start recording with waveform visualization using SDK's new API
         recordingJob = scope.launch {
             try {
-                while (isSimpleRecording) {
-                    val elapsed = (System.currentTimeMillis() - recordingStartTime) / 1000
-
-                    // Auto-stop after 30 seconds
-                    if (elapsed >= 30) {
+                // Start recording with waveform feedback
+                RunAnywhere.startRecordingWithWaveform()
+                    .collect { audioEvent ->
+                        // Update waveform with audio energy
                         ApplicationManager.getApplication().invokeLater {
-                            stopSimpleRecording()
+                            waveformVisualization.updateEnergy(audioEvent.level)
                         }
-                        break
-                    }
 
-                    // Update status to show recording time
-                    ApplicationManager.getApplication().invokeLater {
-                        statusLabel.text = "Recording... (${elapsed}s)"
-                    }
+                        // Auto-stop after 30 seconds
+                        val elapsed = (System.currentTimeMillis() - recordingStartTime) / 1000
+                        if (elapsed >= 30) {
+                            ApplicationManager.getApplication().invokeLater {
+                                stopSimpleRecording()
+                            }
+                            return@collect
+                        }
 
-                    delay(100) // Update every 100ms
-                }
+                        // Update status to show recording time
+                        if (elapsed % 1 == 0L) { // Update every second
+                            ApplicationManager.getApplication().invokeLater {
+                                statusLabel.text = "Recording... (${elapsed}s)"
+                            }
+                        }
+                    }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // Normal cancellation when user stops
-                logger.info("Recording timer cancelled")
+                logger.info("Recording with waveform cancelled")
+            } catch (e: Exception) {
+                ApplicationManager.getApplication().invokeLater {
+                    logger.error("Recording with waveform error", e)
+                    statusLabel.text = "Recording error"
+                    statusLabel.foreground = Color.RED
+                }
             }
         }
     }
@@ -285,9 +309,12 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         statusLabel.text = "Transcribing ${recordingDuration}s of audio..."
         statusLabel.foreground = Color.ORANGE
 
-        // Cancel the timer job
+        // Cancel the recording job
         recordingJob?.cancel()
         recordingJob = null
+
+        // Clear waveform
+        waveformVisualization.clear()
 
         // Stop recording and transcribe using SDK's new API
         scope.launch {
@@ -385,6 +412,12 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
                                 // Optionally update UI for silence
                             }
 
+                            is com.runanywhere.sdk.components.stt.STTStreamEvent.AudioLevelChanged -> {
+                                ApplicationManager.getApplication().invokeLater {
+                                    waveformVisualization.updateEnergy(event.level)
+                                }
+                            }
+
                             is com.runanywhere.sdk.components.stt.STTStreamEvent.Error -> {
                                 ApplicationManager.getApplication().invokeLater {
                                     logger.error("Streaming error: ${event.error.message}")
@@ -430,6 +463,9 @@ class STTPanel(private val project: Project) : JPanel(BorderLayout()), Disposabl
         // Cancel the streaming job
         recordingJob?.cancel()
         recordingJob = null
+
+        // Clear waveform
+        waveformVisualization.clear()
 
         // Reset status after a short delay
         Timer(1000) {
