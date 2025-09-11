@@ -1,4 +1,7 @@
 import Foundation
+#if os(iOS)
+import UIKit
+#endif
 
 /// Mock network service for development mode
 /// Returns predefined JSON responses without making actual network calls
@@ -134,9 +137,41 @@ public actor MockNetworkService: NetworkService {
             return try encoder.encode(config)
 
         case .models:
-            // Return mock models for development mode
+            // Legacy endpoint - return mock models for backward compatibility
             let models = createMockModels()
             return try encoder.encode(models)
+
+        case .modelAssignments(let deviceType, let platform):
+            // Return mock model assignments response as a dictionary
+            let models = createMockModels()
+            let assignments = models.map { model in
+                [
+                    "id": model.id,
+                    "name": model.name,
+                    "version": "1.0.0",
+                    "category": model.category.rawValue,
+                    "format": model.format.rawValue,
+                    "download_url": model.downloadURL?.absoluteString ?? "",
+                    "size": model.downloadSize ?? 0,
+                    "memory_required": model.memoryRequired ?? 0,
+                    "context_length": model.contextLength ?? 0,
+                    "supports_thinking": model.supportsThinking,
+                    "compatible_frameworks": model.compatibleFrameworks.map { $0.rawValue },
+                    "preferred_framework": model.preferredFramework?.rawValue ?? "",
+                    "metadata": nil as Any?,
+                    "is_required": false,
+                    "priority": 1
+                ] as [String : Any]
+            }
+
+            let response = [
+                "models": assignments,
+                "device_type": deviceType,
+                "platform": platform,
+                "timestamp": ISO8601DateFormatter().string(from: Date())
+            ] as [String : Any]
+
+            return try JSONSerialization.data(withJSONObject: response)
 
         case .deviceInfo:
             let deviceInfo = DeviceInfo(
