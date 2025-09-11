@@ -3,22 +3,29 @@ package com.runanywhere.sdk.public
 import com.runanywhere.sdk.components.base.ComponentState
 import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.components.stt.STTComponent
+import com.runanywhere.sdk.components.stt.STTStreamEvent
+import com.runanywhere.sdk.components.stt.STTTranscriptionResult
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.data.models.SDKInitParams
-import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.PlatformContext
-import com.runanywhere.sdk.generation.GenerationOptions
+import com.runanywhere.sdk.models.JvmModelStorage
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.JvmModelStorage
-import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.last
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import java.io.ByteArrayOutputStream
 
 /**
  * JVM implementation of RunAnywhere SDK
@@ -31,6 +38,15 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     private var sttComponent: STTComponent? = null
     private var vadComponent: VADComponent? = null
     private val modelStorage = JvmModelStorage()
+    private val audioCapture = com.runanywhere.sdk.audio.JvmAudioCapture()
+
+    // SDK's own coroutine scope for background operations
+    private val sdkScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // For simple recording mode - accumulate audio while recording
+    private val recordingBuffer = ByteArrayOutputStream()
+    private var isRecording = false
+    private var recordingJob: Job? = null
 
     // Default model for v0.1 release
     private val DEFAULT_MODEL = "whisper-base"
@@ -71,9 +87,18 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     }
 
     override suspend fun cleanupPlatform() {
+        // Cancel any ongoing recording
+        isRecording = false
+        recordingJob?.cancel()
+        recordingJob = null
+
+        // Cleanup components
         sttComponent?.cleanup()
         vadComponent?.cleanup()
         serviceContainer.cleanup()
+
+        // Cancel the SDK scope
+        sdkScope.cancel()
     }
 
     override suspend fun availableModels(): List<ModelInfo> {
@@ -94,7 +119,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         requireInitialized()
 
         // For v0.1: Auto-load default model if STT is not ready
-        var sttComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT) as? STTComponent
+        var sttComponent =
+            serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT) as? STTComponent
 
         jvmLogger.info("STT component from service container: ${sttComponent}, state: ${sttComponent?.state}")
 
@@ -130,6 +156,220 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
+    /**
+     * Streaming transcription API for real-time audio processing
+     * Processes audio in chunks and emits transcription results as they become available
+     */
+    override fun transcribeStream(
+        audioStream: Flow<ByteArray>,
+        chunkSizeMs: Int
+    ): Flow<STTStreamEvent> = flow {
+        requireInitialized()
+
+        jvmLogger.info("Starting streaming transcription with chunk size: ${chunkSizeMs}ms")
+
+        // Ensure STT component is ready
+        var sttComponent = serviceContainer.getComponent(SDKComponent.STT) as? STTComponent
+        val vadComponent = serviceContainer.getComponent(SDKComponent.VAD) as? VADComponent
+
+        // Auto-load model if needed
+        if (sttComponent == null || sttComponent.state != ComponentState.READY) {
+            jvmLogger.info("STT not ready for streaming, attempting auto-load...")
+            if (!loadModel(DEFAULT_MODEL)) {
+                emit(
+                    STTStreamEvent.Error(
+                        com.runanywhere.sdk.components.stt.STTError.serviceNotInitialized
+                    )
+                )
+                return@flow
+            }
+            sttComponent = serviceContainer.getComponent(SDKComponent.STT) as? STTComponent
+        }
+
+        if (sttComponent == null) {
+            emit(
+                STTStreamEvent.Error(
+                    com.runanywhere.sdk.components.stt.STTError.serviceNotInitialized
+                )
+            )
+            return@flow
+        }
+
+        // Emit speech started event
+        emit(STTStreamEvent.SpeechStarted)
+
+        // Audio buffer for accumulating chunks
+        val audioBuffer = ByteArrayOutputStream()
+        var silenceCounter = 0
+        val maxSilenceChunks = 6 // Increased to allow more silence (3 seconds at 500ms chunks)
+
+        // WhisperJNI needs at least 1 second of audio
+        val minBufferSizeBytes = 32000 // 1 second at 16kHz, 16-bit mono = 16000 * 2
+        var lastTranscriptionText = ""
+        var speechDetected = false
+
+        try {
+            audioStream.collect { audioChunk ->
+                try {
+                    // Add chunk to buffer
+                    audioBuffer.write(audioChunk)
+
+                    // Apply VAD if available
+                    val isSpeech = if (vadComponent != null && audioChunk.isNotEmpty()) {
+                        val audioFloats = convertBytesToFloats(audioChunk)
+                        val vadResult = vadComponent.processAudioChunk(audioFloats)
+                        val energy = vadResult.energyLevel
+                        jvmLogger.debug("VAD result - Speech: ${vadResult.isSpeechDetected}, Energy: $energy")
+
+                        // Use a more lenient threshold for streaming
+                        energy > 0.005f // Lower threshold for better speech detection
+                    } else {
+                        true // Assume speech if no VAD
+                    }
+
+                    if (isSpeech) {
+                        speechDetected = true
+                        silenceCounter = 0
+                    } else {
+                        silenceCounter++
+                    }
+
+                    // Only process if we have enough audio (at least 1 second)
+                    if (audioBuffer.size() >= minBufferSizeBytes) {
+                        val audioData = audioBuffer.toByteArray()
+
+                        // Only transcribe if we detected speech at some point
+                        if (speechDetected) {
+                            try {
+                                val result = sttComponent.transcribe(audioData)
+
+                                if (result.text.isNotEmpty() && result.text != lastTranscriptionText) {
+                                    lastTranscriptionText = result.text
+
+                                    // Emit partial transcription
+                                    emit(
+                                        STTStreamEvent.PartialTranscription(
+                                            text = result.text,
+                                            confidence = result.confidence,
+                                            isFinal = false
+                                        )
+                                    )
+
+                                    jvmLogger.debug("Partial transcription: ${result.text}")
+                                }
+                            } catch (e: Exception) {
+                                jvmLogger.debug("Transcription error (continuing): ${e.message}")
+                            }
+                        }
+
+                        // Keep last 20% for context continuity
+                        val overlapSize = audioData.size / 5
+                        audioBuffer.reset()
+                        if (overlapSize > 0 && audioData.size > overlapSize) {
+                            audioBuffer.write(audioData, audioData.size - overlapSize, overlapSize)
+                        }
+                    }
+
+                    // Check for end of speech (extended silence)
+                    if (silenceCounter >= maxSilenceChunks && speechDetected) {
+                        // Process any remaining audio
+                        if (audioBuffer.size() > 0) {
+                            val finalAudioData = audioBuffer.toByteArray()
+
+                            // Pad with silence if needed to reach minimum length
+                            val paddedAudio = if (finalAudioData.size < minBufferSizeBytes) {
+                                val padded = ByteArray(minBufferSizeBytes)
+                                System.arraycopy(finalAudioData, 0, padded, 0, finalAudioData.size)
+                                padded
+                            } else {
+                                finalAudioData
+                            }
+
+                            try {
+                                val result = sttComponent.transcribe(paddedAudio)
+                                if (result.text.isNotEmpty()) {
+                                    val transcriptionResult = STTTranscriptionResult(
+                                        transcript = result.text,
+                                        confidence = result.confidence,
+                                        language = result.detectedLanguage
+                                    )
+                                    emit(STTStreamEvent.FinalTranscription(transcriptionResult))
+                                    jvmLogger.debug("Final transcription: ${result.text}")
+                                }
+                            } catch (e: Exception) {
+                                jvmLogger.debug("Final transcription error: ${e.message}")
+                            }
+                        }
+
+                        emit(STTStreamEvent.SpeechEnded)
+                        audioBuffer.reset()
+                        silenceCounter = 0
+                        speechDetected = false
+                        lastTranscriptionText = ""
+                    }
+
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    // Cancellation is expected when stopping, don't treat as error
+                    throw e
+                } catch (e: Exception) {
+                    jvmLogger.error("Error during streaming transcription chunk processing", e)
+                    emit(
+                        STTStreamEvent.Error(
+                            com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                        )
+                    )
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Normal cancellation when stopping recording
+            jvmLogger.debug("Streaming transcription cancelled (normal stop)")
+        }
+
+        // Process any remaining audio in buffer (if not cancelled)
+        if (audioBuffer.size() >= minBufferSizeBytes && speechDetected) {
+            try {
+                val finalAudioData = audioBuffer.toByteArray()
+                val result = sttComponent.transcribe(finalAudioData)
+                if (result.text.isNotEmpty()) {
+                    val transcriptionResult = STTTranscriptionResult(
+                        transcript = result.text,
+                        confidence = result.confidence,
+                        language = result.detectedLanguage
+                    )
+                    emit(STTStreamEvent.FinalTranscription(transcriptionResult))
+                    jvmLogger.debug("Final transcription on completion: ${result.text}")
+                }
+            } catch (e: Exception) {
+                jvmLogger.debug("Error processing final audio buffer: ${e.message}")
+            }
+        }
+
+        // Emit speech ended event
+        emit(STTStreamEvent.SpeechEnded)
+
+        jvmLogger.info("Streaming transcription completed")
+    }
+
+    /**
+     * Helper function to convert byte array to float array for VAD
+     */
+    private fun convertBytesToFloats(audioData: ByteArray): FloatArray {
+        val samples = FloatArray(audioData.size / 2)
+        var index = 0
+
+        for (i in audioData.indices step 2) {
+            if (i + 1 < audioData.size) {
+                // Convert 16-bit PCM to float (-1.0 to 1.0)
+                val sample =
+                    ((audioData[i + 1].toInt() shl 8) or (audioData[i].toInt() and 0xFF)).toShort()
+                samples[index] = sample / 32768.0f
+                index++
+            }
+        }
+
+        return samples.sliceArray(0 until index)
+    }
+
     override suspend fun loadModel(modelId: String): Boolean {
         requireInitialized()
 
@@ -142,65 +382,64 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val modelPath = modelStorage.getModelPath(actualModelId)
         val modelFile = java.io.File(modelPath)
 
-        // For v0.1: Delete existing model if it exists to force fresh download
-        if (modelFile.exists()) {
-            jvmLogger.info("Deleting existing model file to force fresh download: $modelPath")
-            modelFile.delete()
-        }
-
-        // Always download fresh for v0.1 to ensure we have a working model
-        jvmLogger.info("Model $actualModelId will be downloaded fresh for v0.1 release")
-
-        try {
-            // Auto-download the model
-            jvmLogger.info("Starting fresh download of model $actualModelId...")
-            val downloadFlow = modelStorage.downloadModel(actualModelId)
-
-            // Collect the flow to wait for download completion
-            var lastProgress = 0
-            downloadFlow.onEach { progress ->
-                val currentProgress = (progress * 100).toInt()
-                if (currentProgress > lastProgress + 10 || currentProgress == 100) {
-                    jvmLogger.info("Download progress for $actualModelId: $currentProgress%")
-                    lastProgress = currentProgress
-                }
-            }.last() // Wait for completion
-
-            jvmLogger.info("Model $actualModelId downloaded successfully")
-
-            // Verify the downloaded model
-            if (!modelFile.exists()) {
-                throw Exception("Model file does not exist after download: $modelPath")
-            }
-
+        // Check if model is already available (cached)
+        if (modelStorage.isModelAvailable(actualModelId)) {
+            jvmLogger.info("Model $actualModelId already exists at: $modelPath")
             val fileSize = modelFile.length()
-            jvmLogger.info("Downloaded model size: $fileSize bytes")
+            jvmLogger.info("Existing model size: $fileSize bytes")
 
-            // For whisper-base, expect around 142MB
-            if (actualModelId == "whisper-base" && fileSize < 140_000_000) {
-                throw Exception("Downloaded model appears incomplete: $fileSize bytes (expected ~142MB)")
+            // Model exists and is valid, no need to download
+            jvmLogger.info("Using cached model for $actualModelId")
+        } else {
+            // Model doesn't exist or is invalid, download it
+            jvmLogger.info("Model $actualModelId not found locally, downloading...")
+
+            try {
+                // Auto-download the model
+                jvmLogger.info("Starting download of model $actualModelId...")
+                val downloadFlow = modelStorage.downloadModel(actualModelId)
+
+                // Collect the flow to wait for download completion
+                var lastProgress = 0
+                downloadFlow.onEach { progress ->
+                    val currentProgress = (progress * 100).toInt()
+                    if (currentProgress > lastProgress + 10 || currentProgress == 100) {
+                        jvmLogger.info("Download progress for $actualModelId: $currentProgress%")
+                        lastProgress = currentProgress
+                    }
+                }.last() // Wait for completion
+
+                jvmLogger.info("Model $actualModelId downloaded successfully")
+
+                // Verify the downloaded model
+                if (!modelFile.exists()) {
+                    throw Exception("Model file does not exist after download: $modelPath")
+                }
+
+                val fileSize = modelFile.length()
+                jvmLogger.info("Downloaded model size: $fileSize bytes")
+
+            } catch (e: Exception) {
+                jvmLogger.error("Failed to download model $actualModelId: ${e.message}")
+
+                // For v0.1: Return mock success in development mode
+                if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
+                    jvmLogger.warn("DEVELOPMENT MODE: Using mock mode due to download failure")
+                    // Create a mock model entry for development
+                    val mockModel = ModelInfo(
+                        id = actualModelId,
+                        name = "Whisper Base (Mock)",
+                        category = ModelCategory.SPEECH_RECOGNITION,
+                        format = ModelFormat.GGML,
+                        downloadURL = "mock://whisper-base",
+                        downloadSize = 142_000_000,
+                        localPath = null // No local path for mock
+                    )
+                    serviceContainer.modelInfoService.saveModel(mockModel)
+                    return true
+                }
+                return false
             }
-
-        } catch (e: Exception) {
-            jvmLogger.error("Failed to download model $actualModelId: ${e.message}")
-
-            // For v0.1: Return mock success in development mode
-            if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
-                jvmLogger.warn("DEVELOPMENT MODE: Using mock mode due to download failure")
-                // Create a mock model entry for development
-                val mockModel = ModelInfo(
-                    id = actualModelId,
-                    name = "Whisper Base (Mock)",
-                    category = ModelCategory.SPEECH_RECOGNITION,
-                    format = ModelFormat.GGML,
-                    downloadURL = "mock://whisper-base",
-                    downloadSize = 142_000_000,
-                    localPath = null // No local path for mock
-                )
-                serviceContainer.modelInfoService.saveModel(mockModel)
-                return true
-            }
-            return false
         }
 
         // Update model info with local path
@@ -234,7 +473,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
             // For v0.1: Force reinitialize the STT component with the new model
             try {
-                jvmLogger.info("Reinitializing STT component with fresh model...")
+                jvmLogger.info("Reinitializing STT component with model...")
 
                 // Create a new STT component with the loaded model
                 val newSttComponent = STTComponent(
@@ -264,6 +503,214 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             }
             false
         }
+    }
+
+    /**
+     * Start continuous streaming transcription with internal audio capture
+     * This method handles all audio capture internally and provides continuous transcription
+     * until stopStreamingTranscription is called
+     *
+     * @param chunkSizeMs Size of each audio chunk in milliseconds
+     * @return Flow of transcription events
+     */
+    override fun startStreamingTranscription(
+        chunkSizeMs: Int
+    ): Flow<com.runanywhere.sdk.components.stt.STTStreamEvent> = flow {
+        requireInitialized()
+
+        jvmLogger.info("Starting continuous streaming transcription with internal audio capture")
+        jvmLogger.info("Audio capture started, listening for speech...")
+
+        // Get STT component
+        val sttComponent =
+            serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
+                    as? com.runanywhere.sdk.components.stt.STTComponent
+
+        if (sttComponent == null) {
+            emit(
+                com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                    com.runanywhere.sdk.components.stt.STTError.serviceNotInitialized
+                )
+            )
+            return@flow
+        }
+
+        // Use SimpleEnergyVAD directly (hardcoded working solution)
+        val vadService = try {
+            jvmLogger.info("Using hardcoded SimpleEnergyVAD for speech detection")
+            val vad = com.runanywhere.sdk.voice.vad.SimpleEnergyVAD()
+            vad.initialize(
+                com.runanywhere.sdk.components.vad.VADConfiguration(
+                    sampleRate = 16000,
+                    frameLength = 0.02f, // 20ms frames (320 samples at 16kHz)
+                    energyThreshold = 0.008f // More sensitive threshold for quieter speech
+                )
+            )
+            vad.start()
+            jvmLogger.info("SimpleEnergyVAD initialized successfully for Whisper hallucination prevention")
+            vad
+        } catch (e: Exception) {
+            jvmLogger.error("Failed to initialize SimpleEnergyVAD: ${e.message}")
+            null // Continue without VAD as fallback
+        }
+
+        try {
+            // Start continuous audio capture
+            val audioChunkFlow = audioCapture.startContinuousCapture()
+
+            // Buffer for accumulating audio for transcription
+            val audioBuffer = mutableListOf<Float>()
+            var speechAudioBuffer = mutableListOf<Float>() // Buffer for speech segments only
+            var lastTranscriptionText = ""
+            val vadFrameSize = 320 // 20ms at 16kHz for WebRTC VAD
+            val transcriptionThreshold = 24000 // 1.5 seconds of accumulated speech (Whisper needs >1 second)
+
+            jvmLogger.info("Streaming started with WebRTC VAD - filtering silence to prevent hallucinations")
+
+            audioChunkFlow
+                .catch { e ->
+                    // Only log actual errors, not cancellations
+                    if (e !is kotlinx.coroutines.CancellationException) {
+                        jvmLogger.error("Audio capture error: ${e.message}")
+                        emit(
+                            com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                                com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                            )
+                        )
+                    }
+                }
+                .collect { chunk ->
+                    // Accumulate audio chunks for VAD processing
+                    audioBuffer.addAll(chunk.samples.toList())
+
+                    // Process in 20ms frames (320 samples) with WebRTC VAD
+                    while (audioBuffer.size >= vadFrameSize) {
+                        val vadFrame = audioBuffer.take(vadFrameSize).toFloatArray()
+                        val remainingBuffer = audioBuffer.drop(vadFrameSize).toMutableList()
+                        audioBuffer.clear()
+                        audioBuffer.addAll(remainingBuffer)
+
+                        // Run VAD on this frame
+                        val vadResult = if (vadService != null && vadService.isReady) {
+                            try {
+                                vadService.processAudioChunk(vadFrame)
+                            } catch (e: Exception) {
+                                jvmLogger.warn("VAD processing failed: ${e.message}")
+                                // Fallback: assume it's speech if VAD fails
+                                com.runanywhere.sdk.components.vad.VADResult(isSpeechDetected = true, confidence = 0.5f)
+                            }
+                        } else {
+                            // VAD not available, use simple energy detection
+                            val energy = vadFrame.map { it * it }.average().toFloat()
+                            val isSpeech = energy > 0.001f // Simple energy threshold
+                            com.runanywhere.sdk.components.vad.VADResult(isSpeechDetected = isSpeech, confidence = 0.5f)
+                        }
+
+                        // Only accumulate speech segments for transcription
+                        if (vadResult.isSpeechDetected) {
+                            speechAudioBuffer.addAll(vadFrame.toList())
+
+                            // Don't transcribe during speech - let it accumulate
+                            // We'll transcribe when speech ends (in the else block below)
+                        } else {
+                            // Silence detected - this prevents hallucinations!
+                            jvmLogger.debug("VAD: Silence detected, skipping frame (prevents Whisper hallucinations)")
+
+                            // If we have some accumulated speech, transcribe it
+                            if (speechAudioBuffer.size > 16000) { // 1+ second minimum for Whisper
+                                try {
+                                    val pcmData = convertFloatToPCMBytes(speechAudioBuffer.toFloatArray())
+                                    jvmLogger.debug("End of speech detected, transcribing ${speechAudioBuffer.size} samples")
+
+                                    val result = sttComponent.transcribe(pcmData)
+                                    if (result.text.isNotEmpty() && result.text != lastTranscriptionText) {
+                                        emit(
+                                            com.runanywhere.sdk.components.stt.STTStreamEvent.FinalTranscription(
+                                                com.runanywhere.sdk.components.stt.STTTranscriptionResult(
+                                                    transcript = result.text,
+                                                    confidence = result.confidence
+                                                )
+                                            )
+                                        )
+                                        lastTranscriptionText = result.text
+                                        jvmLogger.info("End-of-speech transcription: ${result.text}")
+                                    }
+                                } catch (e: Exception) {
+                                    jvmLogger.error("End-of-speech transcription error: ${e.message}")
+                                }
+
+                                // Clear speech buffer
+                                speechAudioBuffer.clear()
+                            }
+                        }
+                    }
+
+                    // Safety: prevent buffers from growing too large
+                    if (speechAudioBuffer.size > 80000) { // 5 seconds max
+                        val keepSamples = 16000 // Keep last 1 second
+                        val newBuffer = speechAudioBuffer.takeLast(keepSamples).toMutableList()
+                        speechAudioBuffer.clear()
+                        speechAudioBuffer.addAll(newBuffer)
+                    }
+
+                    if (audioBuffer.size > 3200) { // 0.2 seconds max raw buffer
+                        val newBuffer = audioBuffer.takeLast(1600).toMutableList() // Keep 0.1 seconds
+                        audioBuffer.clear()
+                        audioBuffer.addAll(newBuffer)
+                    }
+                }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Normal cancellation when stopping
+            jvmLogger.info("Streaming transcription cancelled (user stopped recording)")
+        } catch (e: Exception) {
+            jvmLogger.error("Streaming transcription error: ${e.message}")
+            emit(
+                com.runanywhere.sdk.components.stt.STTStreamEvent.Error(
+                    com.runanywhere.sdk.components.stt.STTError.transcriptionFailed(e)
+                )
+            )
+        } finally {
+            // Cleanup VAD service if it was initialized
+            if (vadService != null) {
+                try {
+                    vadService.stop()
+                    vadService.cleanup()
+                    jvmLogger.info("VAD service cleaned up")
+                } catch (e: Exception) {
+                    jvmLogger.warn("Error cleaning up VAD service: ${e.message}")
+                }
+            }
+
+            // Ensure audio capture is stopped
+            audioCapture.stopCapture()
+            jvmLogger.info("Audio capture stopped")
+        }
+    }
+
+    /**
+     * Stop the continuous streaming transcription
+     */
+    override fun stopStreamingTranscription() {
+        jvmLogger.info("Stopping streaming transcription")
+        audioCapture.stopCapture()
+    }
+
+    /**
+     * Convert float audio samples to PCM byte array
+     */
+    private fun convertFloatToPCMBytes(samples: FloatArray): ByteArray {
+        val pcmData = ByteArray(samples.size * 2) // 16-bit samples
+
+        for (i in samples.indices) {
+            // Convert float [-1.0, 1.0] to 16-bit signed integer
+            val sample = (samples[i] * 32767).toInt().coerceIn(-32768, 32767).toShort()
+
+            // Convert to little-endian bytes
+            pcmData[i * 2] = (sample.toInt() and 0xFF).toByte()
+            pcmData[i * 2 + 1] = ((sample.toInt() shr 8) and 0xFF).toByte()
+        }
+
+        return pcmData
     }
 
     override suspend fun generate(
@@ -301,5 +748,91 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         // Use streaming service from service container
         return serviceContainer.streamingService.stream(prompt, generationOptions)
             .map { chunk -> chunk.text }
+    }
+
+    /**
+     * Start recording audio for later transcription
+     * Call this when user starts recording
+     */
+    fun startRecording() {
+        if (isRecording) {
+            jvmLogger.warn("Already recording")
+            return
+        }
+
+        jvmLogger.info("Starting audio recording for later transcription")
+        recordingBuffer.reset()
+        isRecording = true
+
+        // Start capturing audio into the buffer
+        recordingJob = sdkScope.launch {
+            try {
+                audioCapture.startContinuousCapture()
+                    .collect { chunk ->
+                        if (isRecording) {
+                            // Convert float samples back to PCM bytes for the buffer
+                            val pcmData = convertFloatToPCMBytes(chunk.samples)
+                            recordingBuffer.write(pcmData)
+                        }
+                    }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                jvmLogger.info("Recording cancelled")
+            } catch (e: Exception) {
+                jvmLogger.error("Recording error", e)
+            }
+        }
+    }
+
+    /**
+     * Stop recording and transcribe the captured audio
+     * Call this when user stops recording
+     * @return Transcribed text
+     */
+    suspend fun stopRecordingAndTranscribe(): String {
+        if (!isRecording) {
+            jvmLogger.warn("Not currently recording")
+            return ""
+        }
+
+        jvmLogger.info("Stopping recording and transcribing")
+        isRecording = false
+
+        // Stop the recording job
+        recordingJob?.cancel()
+        recordingJob = null
+        audioCapture.stopCapture()
+
+        // Get the recorded audio
+        val audioData = recordingBuffer.toByteArray()
+        jvmLogger.info("Recorded ${audioData.size} bytes, transcribing...")
+
+        // Transcribe if we have enough audio (at least 1 second)
+        return if (audioData.size >= 32000) { // 1 second at 16kHz, 16-bit mono
+            transcribe(audioData)
+        } else {
+            jvmLogger.warn("Audio too short for transcription: ${audioData.size} bytes")
+            ""
+        }
+    }
+
+    /**
+     * Record audio for specified duration and transcribe it
+     * This is a convenience method that handles audio recording internally
+     *
+     * @param durationSeconds Duration to record in seconds
+     * @return Transcribed text
+     */
+    override suspend fun transcribeWithRecording(durationSeconds: Int): String {
+        requireInitialized()
+
+        jvmLogger.info("Recording audio for $durationSeconds seconds and transcribing...")
+
+        // Record audio for the specified duration
+        val audioData = audioCapture.recordAudio(durationSeconds * 1000L)
+
+        jvmLogger.info("Recorded ${audioData.size} bytes of audio, transcribing...")
+
+        // Transcribe the recorded audio
+        return transcribe(audioData)
     }
 }

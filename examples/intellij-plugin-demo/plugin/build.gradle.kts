@@ -7,7 +7,7 @@ group = "com.runanywhere"
 version = "1.0.0"
 
 intellij {
-    version.set("2024.1")
+    version.set("2023.3")
     type.set("IC")
     plugins.set(listOf("java"))
 }
@@ -21,13 +21,14 @@ dependencies {
     // RunAnywhere KMP SDK
     implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
 
-    // Note: Coroutines are provided by IntelliJ Platform
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 }
 
 tasks {
     patchPluginXml {
-        sinceBuild.set("241")
-        untilBuild.set("271.*")
+        sinceBuild.set("233")
+        untilBuild.set("251.*")
         changeNotes.set(
             """
             <h2>1.0.0</h2>
