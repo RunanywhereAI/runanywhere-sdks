@@ -52,7 +52,7 @@ struct QuizCardView: View {
             .background(AppColors.backgroundGrouped)
         }
         .background(AppColors.backgroundPrimary)
-        .cornerRadius(AppLayout.cornerRadiusLarge)
+        .cornerRadius(AppSpacing.cornerRadiusModal)
         .shadow(color: AppColors.shadowDefault, radius: AppSpacing.medium, x: 0, y: AppSpacing.xSmall)
         .offset(offset)
         .scaleEffect(scale)
@@ -67,7 +67,7 @@ struct QuizCardOverlay: View {
     var body: some View {
         ZStack {
             if direction == .left {
-                RoundedRectangle(cornerRadius: AppLayout.cornerRadiusLarge)
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusModal)
                     .fill(Color.red.opacity(intensity * 0.3))
 
                 VStack {
@@ -80,7 +80,7 @@ struct QuizCardOverlay: View {
                 }
                 .opacity(intensity)
             } else if direction == .right {
-                RoundedRectangle(cornerRadius: AppLayout.cornerRadiusLarge)
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusModal)
                     .fill(Color.green.opacity(intensity * 0.3))
 
                 VStack {
