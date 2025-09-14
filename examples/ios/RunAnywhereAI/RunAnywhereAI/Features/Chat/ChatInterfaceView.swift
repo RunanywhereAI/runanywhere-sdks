@@ -1042,7 +1042,7 @@ struct ChatOverviewTab: View {
                     .padding(AppSpacing.large)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(platformSystemGray6))
+                            .fill(AppColors.backgroundGray6)
                     )
                 }
 
@@ -1282,7 +1282,7 @@ struct PerformanceTab: View {
                             .padding(AppSpacing.large)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(platformSystemGray6))
+                                    .fill(AppColors.backgroundGray6)
                             )
                         }
                     }
