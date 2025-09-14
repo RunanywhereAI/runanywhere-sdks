@@ -11,21 +11,20 @@ struct QuizCardView: View {
             // Question Number Badge
             HStack {
                 Text("Question")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
                 Spacer()
             }
-            .padding(.horizontal)
-            .padding(.top)
+            .padding(.horizontal, AppSpacing.large)
+            .padding(.top, AppSpacing.large)
 
             // Question Content
             ScrollView {
                 Text(question.question)
-                    .font(.title3)
-                    .fontWeight(.medium)
+                    .font(AppTypography.title3Medium)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-                    .padding(.vertical, 40)
+                    .padding(.horizontal, AppSpacing.large)
+                    .padding(.vertical, AppSpacing.xxLarge)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxHeight: .infinity)
@@ -48,21 +47,13 @@ struct QuizCardView: View {
                 }
                 .foregroundColor(.green)
             }
-            .font(.subheadline)
-            .padding()
-            #if os(iOS)
-            .background(Color(.systemGray6))
-            #else
-            .background(Color(NSColor.controlBackgroundColor))
-            #endif
+            .font(AppTypography.subheadline)
+            .padding(AppSpacing.large)
+            .background(AppColors.backgroundGrouped)
         }
-        #if os(iOS)
-        .background(Color(.systemBackground))
-        #else
-        .background(Color(NSColor.windowBackgroundColor))
-        #endif
-        .cornerRadius(20)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
+        .background(AppColors.backgroundPrimary)
+        .cornerRadius(AppLayout.cornerRadiusLarge)
+        .shadow(color: AppColors.shadowDefault, radius: AppSpacing.medium, x: 0, y: AppSpacing.xSmall)
         .offset(offset)
         .scaleEffect(scale)
         .opacity(opacity)
@@ -76,30 +67,28 @@ struct QuizCardOverlay: View {
     var body: some View {
         ZStack {
             if direction == .left {
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: AppLayout.cornerRadiusLarge)
                     .fill(Color.red.opacity(intensity * 0.3))
 
                 VStack {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 80))
+                        .font(AppTypography.system80)
                         .foregroundColor(.red)
                     Text("FALSE")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(AppTypography.largeTitleBold)
                         .foregroundColor(.red)
                 }
                 .opacity(intensity)
             } else if direction == .right {
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: AppLayout.cornerRadiusLarge)
                     .fill(Color.green.opacity(intensity * 0.3))
 
                 VStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 80))
+                        .font(AppTypography.system80)
                         .foregroundColor(.green)
                     Text("TRUE")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        .font(AppTypography.largeTitleBold)
                         .foregroundColor(.green)
                 }
                 .opacity(intensity)
