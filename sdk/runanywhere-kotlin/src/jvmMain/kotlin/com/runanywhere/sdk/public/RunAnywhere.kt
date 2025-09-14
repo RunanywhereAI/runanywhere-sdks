@@ -9,6 +9,7 @@ import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.JvmModelStorage
+import com.runanywhere.sdk.models.JvmWhisperJNIModelMapper
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.enums.ModelCategory
@@ -433,6 +434,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                         format = ModelFormat.GGML,
                         downloadURL = "mock://whisper-base",
                         downloadSize = 142_000_000,
+                        memoryRequired = 200_000_000, // 200 MB for base model
                         localPath = null // No local path for mock
                     )
                     serviceContainer.modelInfoService.saveModel(mockModel)
@@ -446,13 +448,24 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val model = serviceContainer.modelInfoService.getModel(actualModelId)
             ?: run {
                 jvmLogger.info("Creating model entry for $actualModelId")
+                // Get proper model size and memory requirements
+                val modelSizeMB = JvmWhisperJNIModelMapper.getModelSize(actualModelId)
+                val memoryRequired = when {
+                    actualModelId.contains("tiny") -> 100_000_000L // 100 MB
+                    actualModelId.contains("small") -> 500_000_000L // 500 MB
+                    actualModelId.contains("medium") -> 1_500_000_000L // 1.5 GB
+                    actualModelId.contains("large") -> 3_000_000_000L // 3 GB
+                    else -> 200_000_000L // 200 MB for base (default)
+                }
+
                 val newModel = ModelInfo(
                     id = actualModelId,
-                    name = "Whisper Base",
+                    name = "Whisper ${actualModelId.split("-").lastOrNull()?.capitalize() ?: "Base"}",
                     category = ModelCategory.SPEECH_RECOGNITION,
                     format = ModelFormat.GGML,
-                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-                    downloadSize = 142_000_000,
+                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${JvmWhisperJNIModelMapper.mapModelIdToFileName(actualModelId)}",
+                    downloadSize = modelSizeMB * 1024 * 1024, // Convert MB to bytes
+                    memoryRequired = memoryRequired,
                     localPath = modelPath
                 )
                 serviceContainer.modelInfoService.saveModel(newModel)
@@ -483,12 +496,16 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 // Try to initialize it
                 newSttComponent.initialize()
 
-                // If successful, replace the old one in the container
-                // Note: This is a workaround for v0.1
-                jvmLogger.info("STT component reinitialized successfully with model $actualModelId")
+                // If successful, store it locally
+                if (newSttComponent.state == com.runanywhere.sdk.components.base.ComponentState.READY) {
+                    sttComponent = newSttComponent
+                    jvmLogger.info("STT component reinitialized successfully with model $actualModelId")
+                } else {
+                    jvmLogger.warn("STT component initialized but not in READY state: ${newSttComponent.state}")
+                }
 
             } catch (e: Exception) {
-                jvmLogger.warn("Could not reinitialize STT component: ${e.message}")
+                jvmLogger.error("Could not reinitialize STT component: ${e.message}")
                 // Continue anyway for v0.1
             }
 
