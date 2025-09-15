@@ -522,7 +522,7 @@ class ServiceContainer {
 
             // Fetch models from the network service (will return mock data in dev mode)
             val modelsData = networkService.getRaw(
-                endpoint = APIEndpoint.MODELS,
+                endpoint = APIEndpoint.models,
                 requiresAuth = false
             )
 

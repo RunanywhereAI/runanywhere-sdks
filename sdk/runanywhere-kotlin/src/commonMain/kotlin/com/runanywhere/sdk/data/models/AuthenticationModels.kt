@@ -13,10 +13,14 @@ data class AuthenticationRequest(
     @SerialName("api_key")
     val apiKey: String,
     @SerialName("device_id")
-    val deviceId: String,
+    val deviceId: String?,
     @SerialName("sdk_version")
     val sdkVersion: String,
-    val platform: String
+    val platform: String,
+    @SerialName("platform_version")
+    val platformVersion: String,
+    @SerialName("app_identifier")
+    val appIdentifier: String
 )
 
 @Serializable
@@ -24,11 +28,73 @@ data class AuthenticationResponse(
     @SerialName("access_token")
     val accessToken: String,
     @SerialName("refresh_token")
-    val refreshToken: String,
+    val refreshToken: String?,
     @SerialName("expires_in")
-    val expiresIn: Long, // seconds
+    val expiresIn: Int,
     @SerialName("token_type")
-    val tokenType: String = "Bearer"
+    val tokenType: String,
+    @SerialName("device_id")
+    val deviceId: String,
+    @SerialName("organization_id")
+    val organizationId: String,
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("token_expires_at")
+    val tokenExpiresAt: Long
+)
+
+@Serializable
+data class RefreshTokenRequest(
+    @SerialName("refresh_token")
+    val refreshToken: String,
+    @SerialName("grant_type")
+    val grantType: String = "refresh_token"
+)
+
+@Serializable
+data class RefreshTokenResponse(
+    @SerialName("access_token")
+    val accessToken: String,
+    @SerialName("refresh_token")
+    val refreshToken: String?,
+    @SerialName("expires_in")
+    val expiresIn: Int,
+    @SerialName("token_type")
+    val tokenType: String
+)
+
+@Serializable
+data class DeviceRegistrationRequest(
+    @SerialName("device_model")
+    val deviceModel: String,
+    @SerialName("device_name")
+    val deviceName: String,
+    @SerialName("operating_system")
+    val operatingSystem: String,
+    @SerialName("os_version")
+    val osVersion: String,
+    @SerialName("sdk_version")
+    val sdkVersion: String,
+    @SerialName("app_identifier")
+    val appIdentifier: String,
+    @SerialName("app_version")
+    val appVersion: String,
+    @SerialName("hardware_capabilities")
+    val hardwareCapabilities: Map<String, String> = emptyMap(),
+    @SerialName("privacy_settings")
+    val privacySettings: Map<String, Boolean> = emptyMap()
+)
+
+@Serializable
+data class DeviceRegistrationResponse(
+    @SerialName("device_id")
+    val deviceId: String,
+    @SerialName("registration_status")
+    val registrationStatus: String,
+    @SerialName("created_at")
+    val createdAt: Long,
+    @SerialName("capabilities_verified")
+    val capabilitiesVerified: Boolean = false
 )
 
 @Serializable

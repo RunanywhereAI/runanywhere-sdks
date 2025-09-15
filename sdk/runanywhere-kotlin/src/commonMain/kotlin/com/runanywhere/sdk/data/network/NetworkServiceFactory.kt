@@ -3,6 +3,7 @@ package com.runanywhere.sdk.data.network
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.network.services.MockNetworkService
 import com.runanywhere.sdk.data.network.NetworkService
+import com.runanywhere.sdk.data.network.NetworkServiceImpl
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.network.APIClient
@@ -90,24 +91,8 @@ object NetworkServiceFactory {
             baseDelayMs = config.baseRetryDelayMs
         )
 
-        // Adapter to convert from com.runanywhere.sdk.network.NetworkService
-        // to com.runanywhere.sdk.data.network.NetworkService
-        return object : NetworkService {
-            override suspend fun postRaw(
-                endpoint: APIEndpoint,
-                payload: ByteArray,
-                requiresAuth: Boolean
-            ): ByteArray {
-                return apiClient.postRaw(endpoint.url, payload, requiresAuth)
-            }
-
-            override suspend fun getRaw(
-                endpoint: APIEndpoint,
-                requiresAuth: Boolean
-            ): ByteArray {
-                return apiClient.getRaw(endpoint.url, requiresAuth)
-            }
-        }
+        // Use the new NetworkServiceImpl that implements all methods including generic types
+        return NetworkServiceImpl(apiClient)
     }
 
     /**
