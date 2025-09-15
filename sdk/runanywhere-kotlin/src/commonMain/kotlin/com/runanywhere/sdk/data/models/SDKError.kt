@@ -60,6 +60,9 @@ sealed class SDKError : Exception() {
     // API Key errors
     data class InvalidAPIKey(override val message: String) : SDKError()
 
+    // Device registration errors
+    data class DeviceRegistrationError(override val message: String) : SDKError()
+
     // Loading errors
     data class LoadingFailed(override val message: String) : SDKError()
 

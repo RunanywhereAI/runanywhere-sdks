@@ -4,10 +4,32 @@ import com.runanywhere.sdk.data.network.models.APIEndpoint
 
 /**
  * Network service interface - equivalent to iOS NetworkService protocol
+ * Enhanced with generic POST/GET methods and proper authentication support
  */
 interface NetworkService {
+
     /**
-     * Perform a POST request to the specified endpoint
+     * POST request with JSON payload and typed response
+     * Equivalent to iOS: func post<T: Encodable, R: Decodable>(_ endpoint: APIEndpoint, _ payload: T, requiresAuth: Bool) async throws -> R
+     */
+    suspend fun <T : Any, R : Any> post(
+        endpoint: APIEndpoint,
+        payload: T,
+        requiresAuth: Boolean = true
+    ): R
+
+    /**
+     * GET request with typed response
+     * Equivalent to iOS: func get<R: Decodable>(_ endpoint: APIEndpoint, requiresAuth: Bool) async throws -> R
+     */
+    suspend fun <R : Any> get(
+        endpoint: APIEndpoint,
+        requiresAuth: Boolean = true
+    ): R
+
+    /**
+     * POST request with raw data payload
+     * Equivalent to iOS: func postRaw(_ endpoint: APIEndpoint, _ payload: Data, requiresAuth: Bool) async throws -> Data
      */
     suspend fun postRaw(
         endpoint: APIEndpoint,
@@ -16,7 +38,8 @@ interface NetworkService {
     ): ByteArray
 
     /**
-     * Perform a GET request to the specified endpoint
+     * GET request with raw data response
+     * Equivalent to iOS: func getRaw(_ endpoint: APIEndpoint, requiresAuth: Bool) async throws -> Data
      */
     suspend fun getRaw(
         endpoint: APIEndpoint,

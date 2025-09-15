@@ -5,14 +5,18 @@ package com.runanywhere.sdk.data.network.models
  */
 enum class APIEndpoint(val url: String) {
     // Authentication & Health
-    AUTHENTICATE("/v1/auth/token"),
-    HEALTH_CHECK("/v1/health"),
+    authenticate("/api/v1/auth/sdk/authenticate"),
+    refreshToken("/api/v1/auth/sdk/refresh"),
+    healthCheck("/api/v1/health"),
+
+    // Device management
+    registerDevice("/api/v1/devices/register"),
+    deviceInfo("/api/v1/devices/info"),
 
     // Core endpoints
-    CONFIGURATION("/v1/configuration"),
-    TELEMETRY("/v1/telemetry"),
-    MODELS("/v1/models"),
-    DEVICE_INFO("/v1/device"),
-    GENERATION_HISTORY("/v1/history"),
-    USER_PREFERENCES("/v1/preferences")
+    configuration("/api/v1/configuration"),
+    telemetry("/api/v1/telemetry"),
+    models("/api/v1/models"),
+    history("/api/v1/history"),
+    preferences("/api/v1/preferences")
 }

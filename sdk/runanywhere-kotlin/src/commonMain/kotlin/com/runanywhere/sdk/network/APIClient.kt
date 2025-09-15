@@ -375,26 +375,34 @@ class APIClient(
 
     /**
      * Add authentication header to request
+     * Enhanced to handle new authentication endpoints from APIEndpoint enum
      */
     private suspend fun addAuthHeader(headers: MutableMap<String, String>, endpoint: String) {
         try {
             when {
+                // Authentication endpoints - use API key
+                endpoint.contains("/auth/sdk/authenticate") ||
+                endpoint.contains("/auth/sdk/refresh") ||
                 endpoint.contains("/auth/token") -> {
-                    // For authentication endpoint, use API key
                     headers["Authorization"] = "Bearer $apiKey"
+                    logger.debug("Using API key for authentication endpoint: $endpoint")
                 }
+                // All other endpoints - use access token
                 else -> {
-                    // For other endpoints, use access token
                     val token = authenticationService?.getAccessToken()
                     if (token != null) {
                         headers["Authorization"] = "Bearer $token"
+                        logger.debug("Using access token for endpoint: $endpoint")
                     } else {
-                        logger.warn("No access token available for authenticated request")
+                        logger.warn("No access token available for authenticated request to: $endpoint")
+                        // Fall back to API key if no access token is available
+                        headers["Authorization"] = "Bearer $apiKey"
+                        logger.debug("Falling back to API key for endpoint: $endpoint")
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Failed to add auth header: ${e.message}")
+            logger.warn("Failed to add auth header for $endpoint: ${e.message}")
             // Continue without auth - the server will handle the unauthorized request
         }
     }
