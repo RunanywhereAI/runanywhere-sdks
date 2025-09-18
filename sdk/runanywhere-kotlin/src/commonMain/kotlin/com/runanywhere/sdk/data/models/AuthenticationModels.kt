@@ -38,9 +38,9 @@ data class AuthenticationResponse(
     @SerialName("organization_id")
     val organizationId: String,
     @SerialName("user_id")
-    val userId: String,
+    val userId: String? = null,  // Make nullable with default value
     @SerialName("token_expires_at")
-    val tokenExpiresAt: Long
+    val tokenExpiresAt: Long? = null  // Make nullable - backend may not return this
 )
 
 @Serializable

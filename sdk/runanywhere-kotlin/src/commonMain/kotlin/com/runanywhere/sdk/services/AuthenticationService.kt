@@ -8,6 +8,7 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
 import com.runanywhere.sdk.utils.PlatformUtils
 import com.runanywhere.sdk.utils.SDKConstants
+import com.runanywhere.sdk.config.SDKConfig
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,7 +22,10 @@ class AuthenticationService(
     private val httpClient: HttpClient
 ) {
     private val logger = SDKLogger("AuthenticationService")
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        coerceInputValues = true  // Handle nulls for fields with default values
+    }
 
     // Thread safety mutex (replaces actor pattern from iOS)
     private val mutex = Mutex()
@@ -78,6 +82,11 @@ class AuthenticationService(
         )
 
         logger.debug("Authenticating with backend")
+        logger.debug("API Key: ${apiKey.take(20)}...")
+        logger.debug("Device ID: $deviceId")
+        logger.debug("Platform: ${SDKConstants.platform}")
+        logger.debug("Platform Version: ${getPlatformVersion()}")
+        logger.debug("App Identifier: ${getAppIdentifier()}")
 
         try {
             val response = performAuthenticationRequest(request)
@@ -90,7 +99,7 @@ class AuthenticationService(
             // Store user identity fields
             this.deviceId = response.deviceId
             this.organizationId = response.organizationId
-            this.userId = response.userId
+            this.userId = response.userId  // Can be null
 
             // Store in secure storage for persistence
             storeTokensInSecureStorage(response)
@@ -264,9 +273,12 @@ class AuthenticationService(
      */
     private suspend fun performAuthenticationRequest(request: AuthenticationRequest): AuthenticationResponse {
         val requestBody = json.encodeToString(AuthenticationRequest.serializer(), request)
+        val url = SDKConfig.getAuthUrl("/sdk/authenticate")
+
+        logger.debug("Authenticating with backend")
 
         val response = httpClient.post(
-            url = "https://api.runanywhere.ai/api/v1/auth/sdk/authenticate", // Updated to match PR #49
+            url = url,
             body = requestBody.encodeToByteArray(),
             headers = mapOf(
                 "Content-Type" to "application/json",
@@ -277,9 +289,14 @@ class AuthenticationService(
         )
 
         if (!response.isSuccessful) {
-            val errorMessage = "Authentication failed with status: ${response.statusCode}"
+            val responseBody = try {
+                response.bodyAsString()
+            } catch (e: Exception) {
+                "Unable to read response body"
+            }
+            val errorMessage = "Authentication failed with status: ${response.statusCode}, Response: $responseBody"
             logger.error(errorMessage)
-            throw SDKError.AuthenticationError(errorMessage)
+            throw SDKError.AuthenticationError("Authentication failed with status: ${response.statusCode}")
         }
 
         return json.decodeFromString<AuthenticationResponse>(response.bodyAsString())
@@ -299,7 +316,7 @@ class AuthenticationService(
             val requestBody = json.encodeToString(RefreshTokenRequest.serializer(), refreshRequest)
 
             val response = httpClient.post(
-                url = "https://api.runanywhere.ai/api/v1/auth/sdk/refresh", // Matches APIEndpoint.refreshToken
+                url = SDKConfig.getAuthUrl("/sdk/refresh"),
                 body = requestBody.encodeToByteArray(),
                 headers = mapOf(
                     "Content-Type" to "application/json",
@@ -339,7 +356,7 @@ class AuthenticationService(
      */
     private suspend fun performHealthCheckRequest(accessToken: String): HealthCheckResponse {
         val response = httpClient.get(
-            url = "https://api.runanywhere.ai/v1/health",
+            url = SDKConfig.getApiUrl("/health"),
             headers = mapOf(
                 "Authorization" to "Bearer $accessToken",
                 "Content-Type" to "application/json",
@@ -400,7 +417,9 @@ class AuthenticationService(
             // Store user identity fields
             secureStorage.setSecureString(KEY_DEVICE_ID, response.deviceId)
             secureStorage.setSecureString(KEY_ORGANIZATION_ID, response.organizationId)
-            secureStorage.setSecureString(KEY_USER_ID, response.userId)
+            response.userId?.let { userId ->
+                secureStorage.setSecureString(KEY_USER_ID, userId)
+            }
 
         } catch (e: Exception) {
             logger.error("Failed to store tokens in secure storage", e)
