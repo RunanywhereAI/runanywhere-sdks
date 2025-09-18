@@ -27,10 +27,16 @@ class RunAnywherePlugin : StartupActivity {
         // API key configuration - can be set via:
         // 1. System property: -Drunanywhere.api.key=your_key
         // 2. Environment variable: RUNANYWHERE_API_KEY=your_key
-        // 3. Direct configuration here
         private val API_KEY = System.getProperty("runanywhere.api.key")
             ?: System.getenv("RUNANYWHERE_API_KEY")
             ?: "" // Set via environment variable or system property
+
+        // API URL configuration - can be set via:
+        // 1. System property: -Drunanywhere.api.url=your_url
+        // 2. Environment variable: RUNANYWHERE_API_URL=your_url
+        private val API_URL = System.getProperty("runanywhere.api.url")
+            ?: System.getenv("RUNANYWHERE_API_URL")
+            // No default URL - must be provided via environment
 
         // SDK Environment configuration
         private val SDK_ENVIRONMENT = when (System.getProperty("runanywhere.environment", "production").lowercase()) {
@@ -65,7 +71,7 @@ class RunAnywherePlugin : StartupActivity {
                             logger.info("Initializing RunAnywhere SDK with backend authentication...")
                             RunAnywhere.initialize(
                                 apiKey = API_KEY,
-                                baseURL = null, // Will use production URL automatically : also, need to refactor to remove this
+                                baseURL = API_URL, // Must be provided via environment
                                 environment = SDK_ENVIRONMENT
                             )
 

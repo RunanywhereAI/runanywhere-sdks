@@ -116,15 +116,18 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 throw IllegalArgumentException("API key cannot be empty")
             }
 
-            // 2. Create secure storage and network service
+            // 2. Initialize SDK configuration with base URL
+            com.runanywhere.sdk.config.SDKConfig.initialize(params.baseURL)
+
+            // 3. Create secure storage and network service
             val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
             val networkConfig = com.runanywhere.sdk.network.NetworkConfiguration.production()
             val httpClient = com.runanywhere.sdk.network.createHttpClient(networkConfig)
 
-            // 3. Create authentication service
+            // 4. Create authentication service
             val authService = com.runanywhere.sdk.services.AuthenticationService(secureStorage, httpClient)
 
-            // 4. Authenticate with API key
+            // 5. Authenticate with API key
             val authResponse = authService.authenticate(params.apiKey)
             jvmLogger.info("Authentication successful - deviceId: ${authResponse.deviceId}")
 

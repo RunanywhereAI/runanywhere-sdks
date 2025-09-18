@@ -1,17 +1,21 @@
-# API Key Setup for RunAnywhere IntelliJ Plugin
+# API Configuration for RunAnywhere IntelliJ Plugin
 
-## Setting Up Your API Key
+## Required Configuration
 
-The RunAnywhere plugin requires an API key to authenticate with the backend. You can provide it in one of these ways:
+The RunAnywhere plugin requires both an API URL and API key to connect to your backend.
 
-### Option 1: Environment Variable (Recommended)
+### Setting Up Your API URL and Key
+
+#### Option 1: Environment Variables (Recommended)
 ```bash
+export RUNANYWHERE_API_URL=https://your-api-url.com
 export RUNANYWHERE_API_KEY=your-api-key-here
 ```
 
-### Option 2: JVM System Property
+#### Option 2: JVM System Properties
 Add to your IntelliJ VM options:
 ```
+-Drunanywhere.api.url=https://your-api-url.com
 -Drunanywhere.api.key=your-api-key-here
 ```
 
