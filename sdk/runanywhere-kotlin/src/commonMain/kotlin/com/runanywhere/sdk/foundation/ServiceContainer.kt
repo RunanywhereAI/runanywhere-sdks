@@ -132,15 +132,15 @@ class ServiceContainer {
      * Initialize the service container with platform-specific context
      * This is implemented differently for each platform
      */
-    fun initialize(platformContext: PlatformContext, environment: SDKEnvironment = SDKEnvironment.PRODUCTION) {
+    fun initialize(platformContext: PlatformContext, environment: SDKEnvironment = SDKEnvironment.PRODUCTION, apiKey: String? = null, baseURL: String? = null) {
         platformContext.initialize()
         currentEnvironment = environment
 
         // Create the appropriate network service based on environment
         networkService = NetworkServiceFactory.create(
             environment = environment,
-            baseURL = null,
-            apiKey = null
+            baseURL = baseURL,
+            apiKey = apiKey
         )
 
         logger.info("ServiceContainer initialized with $environment environment")

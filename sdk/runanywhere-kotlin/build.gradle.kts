@@ -153,3 +153,15 @@ android {
 }
 
 // Rely on Kotlin Multiplatform's default publications for all targets
+
+// Task to run authentication tests
+tasks.register<JavaExec>("runAuthTest") {
+    group = "verification"
+    description = "Run authentication API tests"
+
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.runanywhere.sdk.test.AuthenticationTest")
+
+    // Allow passing API key as system property
+    systemProperty("api.key", System.getProperty("api.key", ""))
+}

@@ -6,6 +6,7 @@ import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.NetworkServiceImpl
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.config.SDKConfig
 import com.runanywhere.sdk.network.APIClient
 import com.runanywhere.sdk.network.NetworkConfiguration
 import com.runanywhere.sdk.network.createHttpClient
@@ -100,9 +101,9 @@ object NetworkServiceFactory {
      */
     private fun getDefaultBaseURL(environment: SDKEnvironment): String {
         return when (environment) {
-            SDKEnvironment.DEVELOPMENT -> "https://dev-api.runanywhere.com"
-            SDKEnvironment.STAGING -> "https://staging-api.runanywhere.com"
-            SDKEnvironment.PRODUCTION -> "https://api.runanywhere.com"
+            SDKEnvironment.DEVELOPMENT -> SDKConfig.PRODUCTION_BASE_URL // Use prod URL for dev too
+            SDKEnvironment.STAGING -> SDKConfig.PRODUCTION_BASE_URL // Use prod URL for staging
+            SDKEnvironment.PRODUCTION -> SDKConfig.PRODUCTION_BASE_URL
         }
     }
 

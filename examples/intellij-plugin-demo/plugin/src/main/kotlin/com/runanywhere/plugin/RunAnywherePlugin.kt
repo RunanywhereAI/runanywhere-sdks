@@ -19,9 +19,26 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Main plugin startup activity
+ * Main plugin startup activity with production backend authentication
  */
 class RunAnywherePlugin : StartupActivity {
+
+    companion object {
+        // API key configuration - can be set via:
+        // 1. System property: -Drunanywhere.api.key=your_key
+        // 2. Environment variable: RUNANYWHERE_API_KEY=your_key
+        // 3. Direct configuration here
+        private val API_KEY = System.getProperty("runanywhere.api.key")
+            ?: System.getenv("RUNANYWHERE_API_KEY")
+            ?: "" // Set via environment variable or system property
+
+        // SDK Environment configuration
+        private val SDK_ENVIRONMENT = when (System.getProperty("runanywhere.environment", "production").lowercase()) {
+            "development", "dev" -> SDKEnvironment.DEVELOPMENT
+            "staging" -> SDKEnvironment.STAGING
+            else -> SDKEnvironment.PRODUCTION
+        }
+    }
 
     @OptIn(DelicateCoroutinesApi::class)
     override fun runActivity(project: Project) {
@@ -34,18 +51,22 @@ class RunAnywherePlugin : StartupActivity {
 
                     initializationJob = GlobalScope.launch {
                         try {
-                            logger.info("Starting SDK initialization with WhisperJNI integration...")
+                            logger.info("Starting SDK initialization...")
+                            logger.info("Environment: $SDK_ENVIRONMENT")
+                            logger.info("API Key configured: ${if (API_KEY.isNotEmpty()) "Yes" else "No"}")
 
-                            // Step 1: Register WhisperJNI STT provider before SDK initialization
+                            // Step 1: Register WhisperJNI STT provider
+                            // TODO: For v1, we're using hardcoded models defined in the provider
+                            //       In future versions, models will be served/configured from the console
                             logger.info("Registering WhisperJNI STT provider...")
                             registerWhisperKitProvider()
 
-                            // Step 2: Initialize SDK with development environment
-                            logger.info("Initializing RunAnywhere SDK...")
+                            // Step 2: Initialize SDK with backend authentication
+                            logger.info("Initializing RunAnywhere SDK with backend authentication...")
                             RunAnywhere.initialize(
-                                apiKey = "dev-api-key",
-                                baseURL = null,
-                                environment = SDKEnvironment.DEVELOPMENT
+                                apiKey = API_KEY,
+                                baseURL = null, // Will use production URL automatically : also, need to refactor to remove this
+                                environment = SDK_ENVIRONMENT
                             )
 
                             // Step 3: Verify component initialization
@@ -58,26 +79,42 @@ class RunAnywherePlugin : StartupActivity {
                             isInitialized = true
 
                             ApplicationManager.getApplication().invokeLater {
+                                val envEmoji = when (SDK_ENVIRONMENT) {
+                                    SDKEnvironment.DEVELOPMENT -> "🔧"
+                                    SDKEnvironment.STAGING -> "🚧"
+                                    SDKEnvironment.PRODUCTION -> "🚀"
+                                }
+
                                 println("✅ RunAnywhere SDK v0.1 initialized successfully")
-                                println("📊 Development mode enabled")
-                                println("🔧 Registered modules: $registeredModules")
+                                println("$envEmoji Environment: $SDK_ENVIRONMENT")
+                                println("🔐 Authenticated with backend")
+                                println("📊 Registered modules: $registeredModules")
                                 println("🎙️ WhisperJNI STT: ${if (com.runanywhere.sdk.core.ModuleRegistry.hasSTT) "✅" else "❌"}")
                                 println("🔊 VAD: ${if (com.runanywhere.sdk.core.ModuleRegistry.hasVAD) "✅" else "❌"}")
 
                                 showNotification(
                                     project, "SDK Ready",
-                                    "RunAnywhere SDK initialized with WhisperJNI and VAD support",
+                                    "RunAnywhere SDK initialized and authenticated with backend",
                                     NotificationType.INFORMATION
                                 )
                             }
 
                         } catch (e: Exception) {
                             ApplicationManager.getApplication().invokeLater {
-                                println("❌ Failed to initialize RunAnywhere SDK v0.1: ${e.message}")
+                                val errorMessage = when {
+                                    e.message?.contains("API key") == true ->
+                                        "Invalid API key. Please check your configuration."
+                                    e.message?.contains("network") == true ->
+                                        "Network error. Please check your connection."
+                                    else -> e.message ?: "Unknown error"
+                                }
+
+                                println("❌ Failed to initialize RunAnywhere SDK: $errorMessage")
                                 e.printStackTrace()
+
                                 showNotification(
                                     project, "SDK Error",
-                                    "Failed to initialize SDK: ${e.message}",
+                                    "Failed to initialize SDK: $errorMessage",
                                     NotificationType.ERROR
                                 )
                             }

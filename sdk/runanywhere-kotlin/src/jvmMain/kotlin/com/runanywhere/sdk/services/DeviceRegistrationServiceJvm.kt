@@ -20,6 +20,19 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
     val runtime = Runtime.getRuntime()
 
     try {
+        // Determine platform and form factor
+        val osName = System.getProperty("os.name", "Unknown OS").lowercase()
+        val platform = when {
+            osName.contains("win") -> "windows"
+            osName.contains("mac") -> "macos"
+            osName.contains("linux") -> "linux"
+            else -> "linux"
+        }
+        val formFactor = "desktop" // JVM typically runs on desktop/laptop
+
+        info["platform"] = platform
+        info["form_factor"] = formFactor
+
         // Basic device information
         info["device_name"] = try {
             InetAddress.getLocalHost().hostName
@@ -34,7 +47,15 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
 
         // CPU information
         info["cpu_type"] = System.getProperty("java.vm.name", "Unknown CPU")
-        info["cpu_architecture"] = System.getProperty("os.arch", "Unknown Architecture")
+
+        // Map architecture to expected values
+        val osArch = System.getProperty("os.arch", "unknown").lowercase()
+        val architecture = when {
+            osArch.contains("aarch64") || osArch.contains("arm64") -> "arm64"
+            osArch.contains("x86_64") || osArch.contains("amd64") -> "x86_64"
+            else -> "unknown"
+        }
+        info["cpu_architecture"] = architecture
         info["cpu_core_count"] = runtime.availableProcessors()
 
         // Try to get CPU frequency if available
@@ -77,12 +98,15 @@ actual fun getPlatformSpecificDeviceInfo(): Map<String, Any?> {
         info["gpu_type"] = GPUType.UNKNOWN
         info["gpu_name"] = null
         info["gpu_vendor"] = null
+        info["gpu_family"] = "none"  // Add gpu_family field
         info["supports_vulkan"] = false
         info["supports_opencl"] = false
+        info["has_neural_engine"] = false
+        info["neural_engine_cores"] = 0
 
-        // Power and thermal (not available on JVM)
-        info["battery_level"] = null
-        info["battery_state"] = BatteryState.UNKNOWN
+        // Power and thermal (desktop defaults)
+        info["battery_level"] = 1.0f // Full for desktop
+        info["battery_state"] = BatteryState.FULL // Desktop is plugged in
         info["thermal_state"] = ThermalState.NOMINAL
         info["is_low_power_mode"] = false
 

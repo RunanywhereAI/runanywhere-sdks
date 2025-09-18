@@ -1,19 +1,20 @@
 package com.runanywhere.sdk.services
 
-import com.runanywhere.sdk.data.models.DeviceInfoData
-import com.runanywhere.sdk.data.models.GPUType
-import com.runanywhere.sdk.data.models.BatteryState
-import com.runanywhere.sdk.data.models.ThermalState
-import com.runanywhere.sdk.data.models.SDKError
+import com.runanywhere.sdk.data.models.*
+import com.runanywhere.sdk.config.SDKConfig
 import com.runanywhere.sdk.data.network.NetworkService
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.storage.SecureStorage
 import com.runanywhere.sdk.storage.createSecureStorage
+import com.runanywhere.sdk.utils.PlatformUtils
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 
 /**
  * Service for handling one-time device registration
@@ -93,26 +94,38 @@ class DeviceRegistrationService(
                 val deviceInfo = collectDeviceInfo()
                 logger.debug("Collected device info for registration")
 
-                // Create registration request
-                val registrationRequest = DeviceRegistrationRequest(
-                    deviceId = deviceInfo.deviceId,
-                    deviceInfo = deviceInfo,
-                    deviceFingerprint = PersistentDeviceIdentity.getDeviceFingerprint(),
-                    platformCapabilities = collectPlatformCapabilities(),
-                    registrationTimestamp = System.currentTimeMillis()
+                // Create registration payload with device_info wrapper
+                val registrationPayload = DeviceRegistrationPayload(
+                    deviceInfo = deviceInfo
                 )
 
-                // Call registration endpoint
-                val response = networkService.post<DeviceRegistrationRequest, DeviceRegistrationResponse>(
+                // Serialize and call registration endpoint
+                val json = Json {
+                    ignoreUnknownKeys = true
+                    encodeDefaults = false
+                    coerceInputValues = true  // Handle nulls properly
+                }
+                val jsonPayload = json.encodeToString(registrationPayload)
+
+                logger.debug("Sending device registration request")
+
+                val responseBytes = networkService.postRaw(
                     endpoint = APIEndpoint.registerDevice,
-                    payload = registrationRequest
+                    payload = jsonPayload.encodeToByteArray(),
+                    requiresAuth = true
                 )
+
+                val response = json.decodeFromString<DeviceRegistrationResult>(responseBytes.decodeToString())
 
                 // Store registration status
                 markDeviceAsRegistered()
 
                 logger.info("Device registration completed successfully")
-                Result.success(response)
+                Result.success(DeviceRegistrationResponse(
+                    deviceId = response.deviceId,
+                    registered = response.status == "registered" || response.status == "updated",
+                    message = "Device ${response.status} successfully"
+                ))
 
             } catch (e: Exception) {
                 logger.error("Device registration failed", e)
@@ -198,9 +211,29 @@ class DeviceRegistrationService(
         // Get platform-specific device info
         val platformInfo = getPlatformSpecificDeviceInfo()
 
+        // Determine platform and form factor - use PlatformUtils for consistency
+        val platform = PlatformUtils.getPlatformName()
+        val formFactor = platformInfo["form_factor"] as? String ?: "desktop"
+
         return DeviceInfoData(
             deviceId = deviceId,
             deviceName = platformInfo["device_name"] as? String ?: "Unknown Device",
+            deviceModel = platformInfo["model_name"] as? String ?: "Unknown Model",
+            platform = platform,
+            osVersion = platformInfo["system_version"] as? String ?: "Unknown Version",
+            formFactor = formFactor,
+            architecture = platformInfo["cpu_architecture"] as? String ?: "Unknown Architecture",
+            chipName = platformInfo["cpu_type"] as? String ?: "Unknown CPU",
+            coreCount = platformInfo["cpu_core_count"] as? Int ?: 1,
+            performanceCores = platformInfo["cpu_core_count"] as? Int ?: 1,
+            efficiencyCores = 0,
+            totalMemory = (platformInfo["total_memory_mb"] as? Long ?: 0L) * 1024 * 1024, // Convert MB to bytes
+            availableMemory = (platformInfo["available_memory_mb"] as? Long ?: 0L) * 1024 * 1024,
+            hasNeuralEngine = platformInfo["has_neural_engine"] as? Boolean ?: false,
+            neuralEngineCores = platformInfo["neural_engine_cores"] as? Int ?: 0,
+            gpuFamily = platformInfo["gpu_family"] as? String ?: "none",
+
+            // Keep existing fields for backward compatibility
             systemName = platformInfo["system_name"] as? String ?: "Unknown OS",
             systemVersion = platformInfo["system_version"] as? String ?: "Unknown Version",
             modelName = platformInfo["model_name"] as? String ?: "Unknown Model",
@@ -218,16 +251,16 @@ class DeviceRegistrationService(
             gpuVendor = platformInfo["gpu_vendor"] as? String,
             supportsVulkan = platformInfo["supports_vulkan"] as? Boolean ?: false,
             supportsOpenCL = platformInfo["supports_opencl"] as? Boolean ?: false,
-            batteryLevel = platformInfo["battery_level"] as? Float,
-            batteryState = platformInfo["battery_state"] as? BatteryState ?: BatteryState.UNKNOWN,
+            batteryLevel = (platformInfo["battery_level"] as? Float) ?: 1.0f, // Ensure 0.0-1.0 range
+            batteryState = platformInfo["battery_state"] as? BatteryState ?: BatteryState.FULL,
             thermalState = platformInfo["thermal_state"] as? ThermalState ?: ThermalState.NOMINAL,
             isLowPowerMode = platformInfo["is_low_power_mode"] as? Boolean ?: false,
             hasCellular = platformInfo["has_cellular"] as? Boolean ?: false,
-            hasWifi = platformInfo["has_wifi"] as? Boolean ?: false,
-            hasBluetooth = platformInfo["has_bluetooth"] as? Boolean ?: false,
+            hasWifi = platformInfo["has_wifi"] as? Boolean ?: true,
+            hasBluetooth = platformInfo["has_bluetooth"] as? Boolean ?: true,
             hasCamera = platformInfo["has_camera"] as? Boolean ?: false,
-            hasMicrophone = platformInfo["has_microphone"] as? Boolean ?: false,
-            hasSpeakers = platformInfo["has_speakers"] as? Boolean ?: false,
+            hasMicrophone = platformInfo["has_microphone"] as? Boolean ?: true,
+            hasSpeakers = platformInfo["has_speakers"] as? Boolean ?: true,
             hasBiometric = platformInfo["has_biometric"] as? Boolean ?: false,
             benchmarkScore = platformInfo["benchmark_score"] as? Int,
             memoryPressure = platformInfo["memory_pressure"] as? Float ?: 0.0f
@@ -280,14 +313,7 @@ class DeviceRegistrationService(
 
 // MARK: - Data Models
 
-@Serializable
-data class DeviceRegistrationRequest(
-    val deviceId: String,
-    val deviceInfo: DeviceInfoData,
-    val deviceFingerprint: String,
-    val platformCapabilities: Map<String, String>,
-    val registrationTimestamp: Long
-)
+// DeviceRegistrationPayload and DeviceRegistrationResult are now in DeviceRegistrationWrapper.kt
 
 @Serializable
 data class DeviceRegistrationResponse(
