@@ -30,8 +30,9 @@ class APIClient(
     private val baseDelayMs: Long = 1000
 ) : NetworkService {
 
-    // Use production base URL if not specified
-    val baseURL: String = baseURL?.takeIf { it.isNotBlank() } ?: SDKConfig.PRODUCTION_BASE_URL
+    // Ensure baseURL is provided
+    val baseURL: String = baseURL?.takeIf { it.isNotBlank() }
+        ?: throw IllegalArgumentException("Base URL is required. Initialize the SDK with RunAnywhere.initialize(baseURL = \"your-url\")")
 
     /**
      * Network request interceptor for modifying requests before sending

@@ -100,11 +100,10 @@ object NetworkServiceFactory {
      * Get default base URLs for different environments
      */
     private fun getDefaultBaseURL(environment: SDKEnvironment): String {
-        return when (environment) {
-            SDKEnvironment.DEVELOPMENT -> SDKConfig.PRODUCTION_BASE_URL // Use prod URL for dev too
-            SDKEnvironment.STAGING -> SDKConfig.PRODUCTION_BASE_URL // Use prod URL for staging
-            SDKEnvironment.PRODUCTION -> SDKConfig.PRODUCTION_BASE_URL
-        }
+        // For open source SDK, baseURL must always be provided
+        // Check if it was set during SDK initialization
+        return SDKConfig.baseURL.takeIf { it.isNotBlank() }
+            ?: throw IllegalArgumentException("Base URL must be provided. Call RunAnywhere.initialize(baseURL = \"your-url\") first.")
     }
 
     /**
