@@ -186,11 +186,6 @@ class ChatViewModel: ObservableObject {
         currentConversation = conversation
         messages = [] // Start with empty messages array
 
-        // Add system message only if model is already loaded
-        if isModelLoaded {
-            addSystemMessage()
-        }
-
         // Listen for model loaded notifications
         NotificationCenter.default.addObserver(
             self,
@@ -207,8 +202,9 @@ class ChatViewModel: ObservableObject {
             object: nil
         )
 
-        // Ensure user settings are applied (safety check)
+        // Check if a model is already loaded on startup
         Task {
+            await checkModelStatus()
             await ensureSettingsAreApplied()
         }
 
@@ -956,8 +952,8 @@ class ChatViewModel: ObservableObject {
 
         // Create generation parameters
         let generationParameters = MessageAnalytics.GenerationParameters(
-            temperature: Double(options.temperature ?? 0.7),
-            maxTokens: options.maxTokens ?? 10000,
+            temperature: Double(options.temperature),
+            maxTokens: options.maxTokens,
             topP: nil,
             topK: nil
         )

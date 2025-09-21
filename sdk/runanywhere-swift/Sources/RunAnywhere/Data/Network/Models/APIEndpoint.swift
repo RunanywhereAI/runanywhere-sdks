@@ -12,6 +12,9 @@ public enum APIEndpoint: Equatable {
 
     // Model Management
     case modelAssignments(deviceType: String, platform: String)
+    case fetchModels
+    case fetchModel(id: String)
+    case downloadModel(id: String)
 
     // Core endpoints
     case configuration
@@ -36,8 +39,14 @@ public enum APIEndpoint: Equatable {
             return "/api/v1/devices/register"
 
         // Model Management
-        case .modelAssignments(let deviceType, let platform):
-            return "/api/v1/model-assignments/for-sdk?device_type=\(deviceType)&platform=\(platform)"
+        case .modelAssignments:
+            return "/api/v1/model-assignments/for-sdk"
+        case .fetchModels:
+            return "/api/v1/models/available"
+        case .fetchModel(let id):
+            return "/api/v1/models/\(id)"
+        case .downloadModel(let id):
+            return "/api/v1/models/\(id)/download"
 
         // Core endpoints
         case .configuration:
@@ -52,6 +61,15 @@ public enum APIEndpoint: Equatable {
             return "/v1/history"
         case .userPreferences:
             return "/v1/preferences"
+        }
+    }
+
+    var queryParameters: [String: String]? {
+        switch self {
+        case .modelAssignments(let deviceType, let platform):
+            return ["device_type": deviceType, "platform": platform]
+        default:
+            return nil
         }
     }
 }

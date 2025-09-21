@@ -130,6 +130,25 @@ struct ModelSelectionSheet: View {
 
     private var deviceStatusSection: some View {
         Section("Device Status") {
+            // Add refresh button at the top
+            Button(action: {
+                Task {
+                    print("🔄 User triggered manual refresh of models from backend...")
+                    await viewModel.loadModels()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh Models from Backend")
+                    Spacer()
+                    if viewModel.isLoading {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            }
+            .foregroundColor(.blue)
+            .disabled(viewModel.isLoading)
             if let device = deviceInfo.deviceInfo {
                 deviceInfoRows(device)
             } else {
@@ -315,13 +334,18 @@ struct ModelSelectionSheet: View {
             // Wait a moment to show success message
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
+            // Update the shared view model first
+            await viewModel.selectModel(model)
+
             // Call the callback with the loaded model
             await onModelSelected(model)
 
-            // Update the shared view model
-            await viewModel.selectModel(model)
-
+            // Post notification that model was loaded
             await MainActor.run {
+                NotificationCenter.default.post(
+                    name: Notification.Name("ModelLoaded"),
+                    object: model
+                )
                 dismiss()
             }
 
@@ -450,6 +474,26 @@ private struct SelectableModelRow: View {
                                 .foregroundColor(.green)
                         }
                     }
+                } else if model.localPath != nil {
+                    // Model is locally available without download URL
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption2)
+                        Text("Local")
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                } else {
+                    // Cloud/Remote model
+                    HStack(spacing: 4) {
+                        Image(systemName: "cloud.fill")
+                            .foregroundColor(.blue)
+                            .font(.caption2)
+                        Text("Cloud Model")
+                            .font(.caption2)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
 
@@ -491,6 +535,15 @@ private struct SelectableModelRow: View {
                     }
                 } else if model.localPath != nil {
                     // Model is downloaded - show select button
+                    Button("Select") {
+                        onSelectModel()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isLoading || isSelected)
+                } else {
+                    // Model has no download URL and no local path - could be cloud/remote model
                     Button("Select") {
                         onSelectModel()
                     }

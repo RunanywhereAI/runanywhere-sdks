@@ -31,6 +31,12 @@ public actor AuthenticationService {
     public func authenticate(apiKey: String) async throws -> AuthenticationResponse {
         let deviceId = PersistentDeviceIdentity.getPersistentDeviceUUID()
 
+        logger.info("🔑 Starting authentication with backend")
+        logger.info("📱 Device ID: \(deviceId)")
+        logger.info("🌐 Platform: \(SDKConstants.platform)")
+        logger.info("📦 SDK Version: \(SDKConstants.version)")
+        logger.info("🔐 API Key: \(apiKey.prefix(10))...")
+
         let request = AuthenticationRequest(
             apiKey: apiKey,
             deviceId: deviceId,
@@ -38,7 +44,7 @@ public actor AuthenticationService {
             sdkVersion: SDKConstants.version
         )
 
-        logger.debug("Authenticating with backend")
+        logger.info("📤 Sending authentication request to: \(APIEndpoint.authenticate.path)")
 
         // Use APIClient for the authentication request (doesn't require auth)
         let authResponse: AuthenticationResponse = try await apiClient.post(
@@ -46,6 +52,8 @@ public actor AuthenticationService {
             request,
             requiresAuth: false
         )
+
+        logger.info("✅ Authentication successful - received token")
 
         // Store tokens and additional info
         self.accessToken = authResponse.accessToken

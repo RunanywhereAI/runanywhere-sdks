@@ -121,6 +121,8 @@ public enum DataSourceError: LocalizedError {
     case storageUnavailable
     case entityNotFound(String)
     case operationFailed(Error)
+    case notFound
+    case fetchFailed(String)
 
     public var errorDescription: String? {
         switch self {
@@ -138,6 +140,10 @@ public enum DataSourceError: LocalizedError {
             return "Entity not found: \(id)"
         case .operationFailed(let error):
             return "Operation failed: \(error.localizedDescription)"
+        case .notFound:
+            return "Resource not found"
+        case .fetchFailed(let message):
+            return "Fetch failed: \(message)"
         }
     }
 }

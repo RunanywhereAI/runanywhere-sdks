@@ -61,7 +61,15 @@ public actor APIClient: NetworkService {
             token = nil
         }
 
-        let url = baseURL.appendingPathComponent(endpoint.path)
+        var url = baseURL.appendingPathComponent(endpoint.path)
+
+        // Add query parameters if present
+        if let queryParams = endpoint.queryParameters,
+           var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            urlComponents.queryItems = queryParams.map { URLQueryItem(name: $0.key, value: $0.value) }
+            url = urlComponents.url ?? url
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = payload
@@ -74,9 +82,15 @@ public actor APIClient: NetworkService {
             // No authorization header needed for authentication endpoint
         }
 
-        logger.debug("POST request to: \(endpoint.path)")
+        logger.info("🌐 POST request to: \(url.absoluteString)")
+        logger.debug("🔑 Auth required: \(requiresAuth), Has token: \(token != nil)")
+        if !requiresAuth {
+            logger.info("🔓 This is an unauthenticated request (likely auth endpoint)")
+        }
 
         let (data, response) = try await session.data(for: request)
+
+        logger.info("📥 Received response from POST: \(endpoint.path)")
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RepositoryError.syncFailure("Invalid response")
@@ -126,7 +140,15 @@ public actor APIClient: NetworkService {
             token = nil
         }
 
-        let url = baseURL.appendingPathComponent(endpoint.path)
+        var url = baseURL.appendingPathComponent(endpoint.path)
+
+        // Add query parameters if present
+        if let queryParams = endpoint.queryParameters,
+           var urlComponents = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            urlComponents.queryItems = queryParams.map { URLQueryItem(name: $0.key, value: $0.value) }
+            url = urlComponents.url ?? url
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
@@ -135,9 +157,14 @@ public actor APIClient: NetworkService {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        logger.debug("GET request to: \(endpoint.path)")
+        print("🌐 APIClient: Making GET request to: \(url.absoluteString)")
+        logger.info("🌐 GET request to: \(url.absoluteString)")
+        logger.debug("🔑 Auth required: \(requiresAuth), Has token: \(token != nil)")
 
         let (data, response) = try await session.data(for: request)
+
+        print("📥 APIClient: Received \(data.count) bytes from: \(endpoint.path)")
+        logger.info("📥 Received response from: \(endpoint.path)")
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RepositoryError.syncFailure("Invalid response")

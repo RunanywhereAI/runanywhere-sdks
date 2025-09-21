@@ -205,6 +205,77 @@ public actor MockNetworkService: NetworkService {
                 "preferredModels": [] as [String]
             ]
             return try JSONSerialization.data(withJSONObject: preferences)
+
+        case .fetchModels:
+            // Return available models response
+            let mockModels = createMockModels()
+            let apiModels = mockModels.map { model -> APIModelInfo in
+                let frameworks = Array(model.compatibleFrameworks).map { $0.rawValue }
+                return APIModelInfo(
+                    id: model.id,
+                    name: model.name,
+                    description: model.metadata?.description,
+                    version: model.metadata?.version,
+                    size: model.downloadSize,
+                    format: model.format.rawValue,
+                    downloadUrl: model.downloadURL?.absoluteString,
+                    checksum: nil,
+                    compatibleFrameworks: frameworks,
+                    requirements: nil,
+                    metadata: nil,
+                    createdAt: nil,
+                    updatedAt: nil
+                )
+            }
+            let response = AvailableModelsResponse(
+                success: true,
+                models: apiModels,
+                count: apiModels.count,
+                message: "Mock models"
+            )
+            return try encoder.encode(response)
+
+        case .fetchModel(let id):
+            // Return single model
+            if let model = createMockModels().first(where: { $0.id == id }) {
+                let frameworks = Array(model.compatibleFrameworks).map { $0.rawValue }
+                let apiModel = APIModelInfo(
+                    id: model.id,
+                    name: model.name,
+                    description: model.metadata?.description,
+                    version: model.metadata?.version,
+                    size: model.downloadSize,
+                    format: model.format.rawValue,
+                    downloadUrl: model.downloadURL?.absoluteString,
+                    checksum: nil,
+                    compatibleFrameworks: frameworks,
+                    requirements: nil,
+                    metadata: nil,
+                    createdAt: nil,
+                    updatedAt: nil
+                )
+                return try encoder.encode(apiModel)
+            }
+            throw SDKError.modelNotFound(id)
+
+        case .downloadModel(let id):
+            // Return download URL
+            if let model = createMockModels().first(where: { $0.id == id }),
+               let url = model.downloadURL {
+                let response = ModelDownloadResponse(
+                    modelId: id,
+                    modelName: model.name,
+                    downloadUrl: url.absoluteString,
+                    expiresAt: nil,
+                    sizeBytes: model.downloadSize,
+                    format: model.format.rawValue,
+                    version: model.metadata?.version,
+                    checksum: nil,
+                    compatibility: nil
+                )
+                return try encoder.encode(response)
+            }
+            throw SDKError.modelNotFound(id)
         }
     }
 

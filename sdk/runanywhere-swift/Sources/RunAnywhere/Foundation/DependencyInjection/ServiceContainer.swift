@@ -93,7 +93,7 @@ public class ServiceContainer {
     }()
 
     /// Database manager
-    private lazy var databaseManager: DatabaseManager = {
+    internal lazy var databaseManager: DatabaseManager = {
         DatabaseManager.shared
     }()
 
@@ -104,7 +104,7 @@ public class ServiceContainer {
     public private(set) var authenticationService: AuthenticationService?
 
     /// API client for sync operations
-    private var apiClient: APIClient?
+    internal var apiClient: APIClient?
 
     /// Sync coordinator for centralized sync management
     private var _syncCoordinator: SyncCoordinator?

@@ -36,6 +36,8 @@ class ModelListViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
+        print("🔄 ModelListViewModel: Starting to load models from registry...")
+
         do {
             // Get all models from SDK registry
             // This now includes:
@@ -43,7 +45,9 @@ class ModelListViewModel: ObservableObject {
             // 2. Models from framework adapters (like WhisperKit)
             // 3. Models from local storage
             // 4. User-added models
+            print("📡 ModelListViewModel: Calling RunAnywhere.availableModels()...")
             let allModels = try await RunAnywhere.availableModels()
+            print("✅ ModelListViewModel: Received \(allModels.count) models from SDK")
 
             // Filter based on iOS version if needed
             var filteredModels = allModels
@@ -66,7 +70,13 @@ class ModelListViewModel: ObservableObject {
             availableModels = []
         }
 
-        currentModel = nil
+        // Don't clear currentModel if it's still valid
+        if let current = currentModel {
+            // Check if current model is still in the available models list
+            if !availableModels.contains(where: { $0.id == current.id }) {
+                currentModel = nil
+            }
+        }
         isLoading = false
     }
 
@@ -83,7 +93,7 @@ class ModelListViewModel: ObservableObject {
     func selectModel(_ model: ModelInfo) async {
         do {
             try await loadModel(model)
-            setCurrentModel(model)
+            // currentModel is already set in loadModel, no need to set again
         } catch {
             errorMessage = "Failed to load model: \(error.localizedDescription)"
         }

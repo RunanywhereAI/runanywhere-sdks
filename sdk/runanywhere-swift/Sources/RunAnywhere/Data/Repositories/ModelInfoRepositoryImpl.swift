@@ -84,6 +84,65 @@ public actor ModelInfoRepositoryImpl: Repository, ModelInfoRepository {
         logger.debug("Updated last used for model: \(modelId)")
     }
 
+    // MARK: - Remote Data Fetching
+
+    /// Fetch models from backend API and merge with local data
+    public func fetchFromBackend() async throws -> [ModelInfo] {
+        logger.info("🚀 Starting fetchFromBackend()")
+
+        guard apiClient != nil else {
+            logger.warning("⚠️ API client not available, using local models only")
+            return try await localDataSource.loadAll()
+        }
+
+        logger.info("📡 API client is available, proceeding with remote fetch...")
+
+        do {
+            // Fetch models from remote
+            logger.info("📥 Calling _remoteDataSource.fetchAll()...")
+            print("🔍 ModelInfoRepo: About to call remoteDataSource.fetchAll()")
+            let remoteModels = try await _remoteDataSource.fetchAll()
+            print("📊 ModelInfoRepo: Backend returned \(remoteModels.count) models")
+            logger.info("📊 Received \(remoteModels.count) models from backend")
+
+            // Store them locally for offline access
+            logger.info("💾 Caching models locally...")
+            for model in remoteModels {
+                try await localDataSource.store(model)
+                logger.debug("  - Cached: \(model.name)")
+            }
+
+            logger.info("✅ Successfully fetched and cached \(remoteModels.count) models from backend")
+            return remoteModels
+        } catch {
+            logger.error("❌ Failed to fetch models from backend: \(error)")
+            logger.error("  Error type: \(type(of: error))")
+            logger.error("  Error details: \(error.localizedDescription)")
+
+            // Fall back to local models if remote fetch fails
+            logger.info("🔄 Falling back to locally cached models")
+            return try await localDataSource.loadAll()
+        }
+    }
+
+    /// Fetch single model from backend
+    public func fetchModelFromBackend(id: String) async throws -> ModelInfo? {
+        logger.info("Fetching model \(id) from backend API")
+
+        do {
+            if let model = try await _remoteDataSource.fetch(id: id) {
+                // Store locally for offline access
+                try await localDataSource.store(model)
+                return model
+            }
+            return nil
+        } catch {
+            logger.error("Failed to fetch model \(id) from backend: \(error.localizedDescription)")
+            // Fall back to local
+            return try await localDataSource.load(id: id)
+        }
+    }
+
     // MARK: - Debug Support
     // Mock data population removed - now handled by MockNetworkService in development mode
 

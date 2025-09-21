@@ -36,13 +36,53 @@ public class RegistryService: ModelRegistry {
     }
 
     public func discoverModels() async -> [ModelInfo] {
-        // Discover local models from disk and register them
+        // First, try to fetch models from backend API if available
+        if let apiClient = ServiceContainer.shared.apiClient {
+            print("🔍 RegistryService: Attempting to fetch models from backend API...")
+            logger.info("🔍 Attempting to fetch models from backend API...")
+            do {
+                // Ensure device is registered first
+                print("📱 RegistryService: Ensuring device is registered before fetching models...")
+                logger.info("📱 Ensuring device is registered before fetching models...")
+                try await RunAnywhere.ensureDeviceRegistered()
+                print("✅ RegistryService: Device registration confirmed")
+                logger.info("✅ Device registration confirmed")
+
+                // Create a temporary repository to fetch from backend
+                let modelRepo = ModelInfoRepositoryImpl(
+                    databaseManager: ServiceContainer.shared.databaseManager,
+                    apiClient: apiClient
+                )
+                print("🌐 RegistryService: Calling fetchFromBackend()...")
+                logger.info("🌐 Calling fetchFromBackend()...")
+                let backendModels = try await modelRepo.fetchFromBackend()
+                print("✅ RegistryService: Successfully fetched \(backendModels.count) models from backend")
+                logger.info("✅ Successfully fetched \(backendModels.count) models from backend")
+
+                // Register backend models
+                for model in backendModels {
+                    print("📝 RegistryService: Registering model: \(model.name) (ID: \(model.id))")
+                    logger.debug("📝 Registering model: \(model.name) (ID: \(model.id))")
+                    registerModel(model)
+                }
+            } catch {
+                print("❌ RegistryService: Failed to fetch models from backend: \(error)")
+                print("⚠️ RegistryService: Error details: \(error.localizedDescription)")
+                logger.error("❌ Failed to fetch models from backend: \(error)")
+                logger.warning("⚠️ Falling back to local discovery. Error details: \(error.localizedDescription)")
+            }
+        } else {
+            print("⚠️ RegistryService: No API client available, skipping backend model fetch")
+            logger.warning("⚠️ No API client available, skipping backend model fetch")
+        }
+
+        // Also discover local models from disk and register them
         let localModels = await modelDiscovery.discoverLocalModels()
         for model in localModels {
             registerModel(model)
         }
 
-        // Return all registered models (both pre-configured and discovered)
+        // Return all registered models (both backend and local)
         return accessQueue.sync {
             Array(models.values)
         }

@@ -15,6 +15,7 @@ public enum RunAnywhere {
     internal static var initParams: SDKInitParams?
     internal static var currentEnvironment: SDKEnvironment?
     private static var isInitialized = false
+    private static let logger = SDKLogger(category: "RunAnywhere")
 
     /// Access to service container (through the shared instance for now)
     internal static var serviceContainer: ServiceContainer {
@@ -34,6 +35,22 @@ public enum RunAnywhere {
     }
 
     // MARK: - SDK Initialization
+
+    /// Initialize network services (API client, authentication) for the SDK
+    /// Call this after SDK initialization to enable backend connectivity
+    public static func initializeNetworkServices() async throws {
+        guard isInitialized else {
+            throw SDKError.notInitialized
+        }
+
+        guard let params = initParams else {
+            throw SDKError.notInitialized
+        }
+
+        if params.environment != .development {
+            try await serviceContainer.initializeNetworkServices(with: params)
+        }
+    }
 
     /**
      * Initialize the RunAnywhere SDK
@@ -138,7 +155,7 @@ public enum RunAnywhere {
     /// Ensure device is registered with backend (lazy registration)
     /// Only registers if device ID doesn't exist locally
     /// - Throws: SDKError if registration fails
-    private static func ensureDeviceRegistered() async throws {
+    internal static func ensureDeviceRegistered() async throws {
         registrationLock.lock()
 
         // Check if we're already registering
@@ -189,7 +206,9 @@ public enum RunAnywhere {
 
             // Initialize API client and auth service if needed
             if serviceContainer.authenticationService == nil {
+                print("🔧 DeviceRegistration: Initializing network services...")
                 try await serviceContainer.initializeNetworkServices(with: params)
+                print("✅ DeviceRegistration: Network services initialized")
             }
 
             guard let authService = serviceContainer.authenticationService else {
@@ -471,8 +490,21 @@ public enum RunAnywhere {
             throw SDKError.notInitialized
         }
 
+        // Use print statements for debugging since logger isn't working
+        print("📍 RunAnywhere.availableModels() called")
+        print("🔐 Device registered: \(isDeviceRegistered())")
+        print("🌐 API Client available: \(serviceContainer.apiClient != nil)")
+
+        logger.info("📍 RunAnywhere.availableModels() called")
+        logger.info("🔐 Device registered: \(isDeviceRegistered())")
+        logger.info("🌐 API Client available: \(serviceContainer.apiClient != nil)")
+
         // Use model registry to get available models
+        print("🔍 Calling modelRegistry.discoverModels()...")
+        logger.info("🔍 Calling modelRegistry.discoverModels()...")
         let models = await serviceContainer.modelRegistry.discoverModels()
+        print("📊 ModelRegistry returned \(models.count) models")
+        logger.info("📊 ModelRegistry returned \(models.count) models")
         return models
     }
 
