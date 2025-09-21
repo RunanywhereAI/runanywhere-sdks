@@ -181,6 +181,19 @@ public class ServiceContainer {
         }
     }
 
+    /// Model assignment service storage (using Any to avoid circular dependency)
+    private var _modelAssignmentService: Any?
+
+    /// Set the model assignment service (called from extension)
+    public func setModelAssignmentService(_ service: Any) {
+        _modelAssignmentService = service
+    }
+
+    /// Get the stored model assignment service
+    public func getModelAssignmentService() -> Any? {
+        return _modelAssignmentService
+    }
+
     /// Device info service
     private var _deviceInfoService: DeviceInfoService?
     public var deviceInfoService: DeviceInfoService {
@@ -555,6 +568,7 @@ public class ServiceContainer {
         _configurationService = nil
         _telemetryService = nil
         _modelInfoService = nil
+        _modelAssignmentService = nil
         _deviceInfoService = nil
         _generationAnalytics = nil
         _sttAnalytics = nil
