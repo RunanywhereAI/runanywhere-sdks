@@ -135,7 +135,7 @@ public actor UnifiedComponentInitializer {
 
     private func initializeComponent(_ config: UnifiedComponentConfig) async throws {
         guard let container = serviceContainer else {
-            throw SDKError.notInitialized
+            throw SDKError.notInitialized("Service container is not available for component initialization")
         }
 
         // Check if component already exists

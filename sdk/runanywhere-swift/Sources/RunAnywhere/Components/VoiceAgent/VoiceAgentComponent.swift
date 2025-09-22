@@ -74,7 +74,7 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
     /// Process audio through the full pipeline
     public func processAudio(_ audioData: Data) async throws -> VoiceAgentResult {
         guard state == .ready else {
-            throw SDKError.notInitialized
+            throw SDKError.notInitialized("Voice agent component not initialized")
         }
 
         isProcessing = true

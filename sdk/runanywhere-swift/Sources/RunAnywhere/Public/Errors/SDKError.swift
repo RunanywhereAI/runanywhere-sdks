@@ -2,7 +2,7 @@ import Foundation
 
 /// SDK-specific errors
 public enum SDKError: LocalizedError {
-    case notInitialized
+    case notInitialized(String)
     case notImplemented
     case invalidAPIKey(String)
     case modelNotFound(String)
@@ -20,11 +20,12 @@ public enum SDKError: LocalizedError {
     case networkError(String)
     case invalidState(String)
     case componentNotInitialized(String)
+    case serviceUnavailable(String)
 
     public var errorDescription: String? {
         switch self {
-        case .notInitialized:
-            return "SDK not initialized. Call initialize(with:) first."
+        case .notInitialized(let reason):
+            return "SDK not initialized: \(reason)"
         case .notImplemented:
             return "This feature is not yet implemented."
         case .invalidAPIKey(let reason):
@@ -59,6 +60,8 @@ public enum SDKError: LocalizedError {
             return "Invalid state: \(reason)"
         case .componentNotInitialized(let component):
             return "Component not initialized: \(component)"
+        case .serviceUnavailable(let reason):
+            return "Service unavailable: \(reason)"
         }
     }
 }

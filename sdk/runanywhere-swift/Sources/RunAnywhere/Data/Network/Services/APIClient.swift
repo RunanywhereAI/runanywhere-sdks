@@ -54,7 +54,7 @@ public actor APIClient: NetworkService {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("Authentication service is required for authenticated POST requests")
             }
             token = try await authService.getAccessToken()
         } else {
@@ -133,7 +133,7 @@ public actor APIClient: NetworkService {
         let token: String?
         if requiresAuth {
             guard let authService = authService else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("Authentication service is required for authenticated GET requests")
             }
             token = try await authService.getAccessToken()
         } else {

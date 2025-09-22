@@ -20,19 +20,28 @@ class ModelListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private var cancellables = Set<AnyCancellable>()
+    private var lastModelFetch: Date?
+    private let modelCacheDuration: TimeInterval = 60 // Cache for 60 seconds
 
     // MARK: - Initialization
 
     init() {
-        Task {
-            await loadModelsFromRegistry()
-        }
+        // Don't auto-load on init to prevent duplicate calls
+        // Models will be loaded when needed
     }
 
     // MARK: - Methods
 
     /// Load models from SDK registry (no more hard-coded models)
     func loadModelsFromRegistry() async {
+        // Check cache first
+        if let lastFetch = lastModelFetch,
+           Date().timeIntervalSince(lastFetch) < modelCacheDuration,
+           !availableModels.isEmpty {
+            print("📦 Using cached models (fetched \(Int(Date().timeIntervalSince(lastFetch)))s ago)")
+            return
+        }
+
         isLoading = true
         errorMessage = nil
 
@@ -59,6 +68,7 @@ class ModelListViewModel: ObservableObject {
             }
 
             availableModels = filteredModels
+            lastModelFetch = Date() // Update cache timestamp
             print("Loaded \(availableModels.count) models from registry")
 
             for model in availableModels {
@@ -86,6 +96,12 @@ class ModelListViewModel: ObservableObject {
 
     /// Alias for loadModelsFromRegistry to match view calls
     func loadModels() async {
+        await loadModelsFromRegistry()
+    }
+
+    /// Force refresh models (bypasses cache)
+    func forceRefreshModels() async {
+        lastModelFetch = nil
         await loadModelsFromRegistry()
     }
 

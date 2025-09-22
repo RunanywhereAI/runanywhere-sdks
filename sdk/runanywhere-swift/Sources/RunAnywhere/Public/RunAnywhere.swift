@@ -40,11 +40,11 @@ public enum RunAnywhere {
     /// Call this after SDK initialization to enable backend connectivity
     public static func initializeNetworkServices() async throws {
         guard isInitialized else {
-            throw SDKError.notInitialized
+            throw SDKError.notInitialized("SDK must be initialized before initializing network services")
         }
 
         guard let params = initParams else {
-            throw SDKError.notInitialized
+            throw SDKError.notInitialized("SDK initialization parameters are missing")
         }
 
         if params.environment != .development {
@@ -201,7 +201,7 @@ public enum RunAnywhere {
 
             // Ensure we have network services initialized
             guard let params = initParams else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("SDK initialization parameters are missing for device registration")
             }
 
             // Initialize API client and auth service if needed
@@ -314,7 +314,7 @@ public enum RunAnywhere {
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("SDK must be initialized before generating text")
             }
 
             // Lazy device registration on first API call
@@ -362,7 +362,7 @@ public enum RunAnywhere {
                 do {
                     // Ensure initialized
                     guard isInitialized else {
-                        throw SDKError.notInitialized
+                        throw SDKError.notInitialized("SDK must be initialized before streaming text generation")
                     }
 
                     // Lazy device registration on first API call
@@ -409,7 +409,7 @@ public enum RunAnywhere {
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("SDK must be initialized before generating structured output")
             }
 
             // For now, structured output generation is not fully implemented
@@ -432,7 +432,7 @@ public enum RunAnywhere {
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("SDK must be initialized before transcribing audio")
             }
 
             // Lazy device registration on first API call
@@ -465,7 +465,7 @@ public enum RunAnywhere {
         do {
             // Ensure initialized
             guard isInitialized else {
-                throw SDKError.notInitialized
+                throw SDKError.notInitialized("SDK must be initialized before loading models")
             }
 
             // Lazy device registration on first API call
@@ -487,7 +487,7 @@ public enum RunAnywhere {
     /// - Returns: Array of available models
     public static func availableModels() async throws -> [ModelInfo] {
         guard isInitialized else {
-            throw SDKError.notInitialized
+            throw SDKError.notInitialized("SDK must be initialized before retrieving available models")
         }
 
         // Use print statements for debugging since logger isn't working

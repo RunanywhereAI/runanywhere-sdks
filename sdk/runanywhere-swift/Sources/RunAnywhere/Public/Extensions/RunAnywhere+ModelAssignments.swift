@@ -121,6 +121,9 @@ extension RunAnywhere {
 /// Event published when model assignments are successfully fetched
 public struct ModelAssignmentsFetchedEvent: SDKEvent {
     public let models: [ModelInfo]
+    public let timestamp: Date = Date()
+    public let eventType: SDKEventType = .model
+
     public var description: String {
         "Model assignments fetched: \(models.count) models"
     }
@@ -129,6 +132,9 @@ public struct ModelAssignmentsFetchedEvent: SDKEvent {
 /// Event published when model assignments fetch fails
 public struct ModelAssignmentsFetchFailedEvent: SDKEvent {
     public let error: Error
+    public let timestamp: Date = Date()
+    public let eventType: SDKEventType = .error
+
     public var description: String {
         "Model assignments fetch failed: \(error.localizedDescription)"
     }

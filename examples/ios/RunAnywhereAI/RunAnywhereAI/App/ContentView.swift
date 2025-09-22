@@ -55,6 +55,13 @@ struct ContentView: View {
                     Label("Voice", systemImage: "mic")
                 }
                 .tag(4)
+
+            MerchantAssistantView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Merchant", systemImage: "indianrupeesign.circle")
+                }
+                .tag(5)
         }
         #if os(macOS)
         .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity,

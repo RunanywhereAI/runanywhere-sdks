@@ -98,17 +98,31 @@ struct RunAnywhereAIApp: App {
             let startTime = Date()
             logger.info("🚀 Starting SDK initialization...")
 
-            // Production credentials for testing
-            let apiKey = "testing_api_keu"
-            let baseURL = "backend-prod.com"
+            // Force clear stored device ID to trigger new registration (temporary for testing)
+            UserDefaults.standard.removeObject(forKey: "com.runanywhere.sdk.device.id")
+            UserDefaults.standard.synchronize()
+
+            // Production credentials
+            let apiKey = "api_key"
+            let baseURL = "link"
 
             logger.debug("📋 Configuration: API Key: \(String(apiKey.prefix(10)))..., URL: \(baseURL)")
+            logger.debug("🔄 Cleared stored device ID to force new registration")
 
             try RunAnywhere.initialize(
                 apiKey: apiKey,
                 baseURL: baseURL,
                 environment: .production // Using production environment with real credentials
             )
+
+            // Enable debug mode to see all logs even in production
+            RunAnywhere.setDebugMode(true)
+            logger.info("🐛 Debug mode enabled for troubleshooting")
+
+            // Initialize network services (API client) for production
+            logger.info("🌐 Initializing network services...")
+            try await RunAnywhere.initializeNetworkServices()
+            logger.info("✅ Network services initialized")
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized !")
@@ -153,6 +167,12 @@ struct RunAnywhereAIApp: App {
     private func autoLoadFirstModel() async {
         logger.info("🤖 Auto-loading first available model...")
 
+        // Check if ModelListViewModel already has a loaded model
+        if let currentModel = await ModelListViewModel.shared.currentModel {
+            logger.info("✅ Model already loaded: \(currentModel.name, privacy: .public)")
+            return
+        }
+
         do {
             // Get available models from SDK
             let availableModels = try await RunAnywhere.availableModels()
@@ -173,7 +193,9 @@ struct RunAnywhereAIApp: App {
                 logger.info("🎉 Successfully auto-loaded model: \(model.name, privacy: .public)")
 
                 // Update ModelListViewModel to reflect the loaded model
-                await ModelListViewModel.shared.setCurrentModel(model)
+                await MainActor.run {
+                    ModelListViewModel.shared.setCurrentModel(model)
+                }
 
                 // Notify the app that a model was loaded
                 NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
