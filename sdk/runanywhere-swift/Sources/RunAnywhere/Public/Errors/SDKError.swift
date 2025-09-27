@@ -23,6 +23,7 @@ public enum SDKError: LocalizedError {
     case timeout(String)
     case serverError(String)
     case storageError(String)
+    case invalidConfiguration(String)
 
     public var errorDescription: String? {
         switch self {
@@ -68,6 +69,8 @@ public enum SDKError: LocalizedError {
             return "Server error: \(reason)"
         case .storageError(let reason):
             return "Storage error: \(reason)"
+        case .invalidConfiguration(let reason):
+            return "Invalid configuration: \(reason)"
         }
     }
 }
