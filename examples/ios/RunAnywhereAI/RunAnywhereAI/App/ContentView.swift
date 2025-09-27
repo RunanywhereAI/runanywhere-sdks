@@ -19,12 +19,19 @@ struct ContentView: View {
                 }
                 .tag(0)
 
+            PaytmVoicePaymentView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Pay", systemImage: "indianrupeesign.circle.fill")
+                }
+                .tag(1)
+
             StorageView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Storage", systemImage: "externaldrive")
                 }
-                .tag(1)
+                .tag(2)
 
             Group {
                 #if os(macOS)
@@ -40,19 +47,12 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(2)
+            .tag(3)
 
             QuizView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Quiz", systemImage: "questionmark.circle")
-                }
-                .tag(3)
-
-            VoiceAssistantView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tabItem {
-                    Label("Voice", systemImage: "mic")
                 }
                 .tag(4)
         }

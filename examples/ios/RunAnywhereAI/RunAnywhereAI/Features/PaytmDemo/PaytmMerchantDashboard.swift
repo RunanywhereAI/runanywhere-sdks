@@ -77,11 +77,29 @@ struct PaytmMerchantDashboard: View {
                     .padding(.horizontal)
 
                     // Performance Metrics
-                    PaytmMetricsView(
-                        latency: 92,
-                        cost: 0.003,
-                        isOffline: true
-                    )
+                    HStack(spacing: 16) {
+                        MetricCard(
+                            icon: "speedometer",
+                            title: "Latency",
+                            value: "92ms",
+                            subtitle: "On-device",
+                            color: PaytmTheme.successGreen
+                        )
+                        MetricCard(
+                            icon: "indianrupeesign",
+                            title: "Cost",
+                            value: "₹0.003",
+                            subtitle: "Per query",
+                            color: PaytmTheme.secondaryBlue
+                        )
+                        MetricCard(
+                            icon: "wifi.slash",
+                            title: "Mode",
+                            value: "Offline",
+                            subtitle: "Available",
+                            color: PaytmTheme.warningOrange
+                        )
+                    }
                     .padding(.horizontal)
                     .padding(.bottom)
                 }
@@ -201,7 +219,7 @@ struct SalesSummaryCard: View {
 struct MiniSalesChart: View {
     var body: some View {
         Chart {
-            ForEach(0..<7) { index in
+            ForEach(0..<7, id: \.self) { index in
                 LineMark(
                     x: .value("Day", index),
                     y: .value("Sales", Double.random(in: 8000...15000))
@@ -478,6 +496,38 @@ class MerchantDashboardViewModel: ObservableObject {
                 self.aiResponse = "Your best selling item today is Masala Tea with 145 units sold, generating ₹2,900 in revenue. This is 18% higher than your daily average for this item."
             }
         }
+    }
+}
+
+struct MetricCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let subtitle: String
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundColor(color)
+
+            Text(title)
+                .font(PaytmTheme.captionFont(10))
+                .foregroundColor(PaytmTheme.grayText)
+
+            Text(value)
+                .font(PaytmTheme.headlineFont(16))
+                .foregroundColor(PaytmTheme.darkText)
+
+            Text(subtitle)
+                .font(PaytmTheme.captionFont(9))
+                .foregroundColor(PaytmTheme.grayText.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color.white)
+        .cornerRadius(12)
     }
 }
 

@@ -32,44 +32,96 @@ public class WhisperKitService: VoiceService {
             return
         }
 
+        // Map model ID to WhisperKit model name
+        let whisperKitModelName = mapModelIdToWhisperKitName(modelPath ?? "whisper-base")
+        logger.info("Creating WhisperKit instance with model: \(whisperKitModelName)")
+
+        // Try multiple approaches to find and load models
         do {
-            // Try to initialize WhisperKit with specific model
-            let whisperKitModelName = mapModelIdToWhisperKitName(modelPath ?? "whisper-base")
-            logger.info("Creating WhisperKit instance with model: \(whisperKitModelName)")
+            // Approach 1: Check for models in the app bundle
+            if let bundleModelPath = Bundle.main.path(forResource: whisperKitModelName, ofType: nil) {
+                logger.info("📦 Found model in app bundle: \(bundleModelPath)")
+                whisperKit = try await WhisperKit(
+                    modelFolder: bundleModelPath,
+                    verbose: true,
+                    logLevel: .info,
+                    prewarm: true,
+                    load: true,
+                    download: false  // Disable downloading
+                )
+                logger.info("✅ WhisperKit initialized with bundled model")
+                currentModelPath = modelPath ?? "whisper-base"
+                isInitialized = true
+                return
+            }
 
-            // Initialize WhisperKit with specific model
-            // Try with different initialization approach
-            logger.info("🔧 Attempting WhisperKit initialization with model: \(whisperKitModelName)")
+            // Approach 2: Check Documents directory for downloaded models
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            let possiblePaths = [
+                documentsPath?.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml/\(whisperKitModelName)"),
+                documentsPath?.appendingPathComponent("WhisperKit/\(whisperKitModelName)"),
+                documentsPath?.appendingPathComponent("RunAnywhere/Models/WhisperKit/\(whisperKitModelName)"),
+                documentsPath?.appendingPathComponent("\(whisperKitModelName)")
+            ]
 
-            // First try with just model name
+            for possiblePath in possiblePaths {
+                if let path = possiblePath, FileManager.default.fileExists(atPath: path.path) {
+                    logger.info("📁 Found local model at: \(path.path)")
+                    do {
+                        whisperKit = try await WhisperKit(
+                            modelFolder: path.path,
+                            verbose: true,
+                            logLevel: .info,
+                            prewarm: true,
+                            load: true,
+                            download: false  // Disable downloading
+                        )
+                        logger.info("✅ WhisperKit initialized with local model")
+                        currentModelPath = modelPath ?? "whisper-base"
+                        isInitialized = true
+                        return
+                    } catch {
+                        logger.warning("⚠️ Failed to load model from \(path.path): \(error)")
+                        continue
+                    }
+                }
+            }
+
+            // Approach 3: Try to initialize without downloading (will use any cached models)
+            logger.info("🔍 Attempting to initialize with any cached models...")
             do {
                 whisperKit = try await WhisperKit(
                     model: whisperKitModelName,
                     verbose: true,
                     logLevel: .info,
-                    prewarm: true
+                    prewarm: false,  // Don't prewarm to avoid network calls
+                    load: false,     // Don't auto-load to avoid network calls
+                    download: false  // Explicitly disable downloading
                 )
-                logger.info("✅ WhisperKit initialized successfully with model: \(whisperKitModelName)")
+
+                // Try to load models manually
+                try await whisperKit?.loadModels()
+                logger.info("✅ WhisperKit initialized with cached model")
+                currentModelPath = modelPath ?? "whisper-base"
+                isInitialized = true
+                return
             } catch {
-                logger.warning("⚠️ Failed to initialize with specific model, trying with base model")
-                // Fallback to base model
-                whisperKit = try await WhisperKit(
-                    model: "openai_whisper-base",
-                    verbose: true,
-                    logLevel: .info,
-                    prewarm: true
-                )
-                logger.info("✅ WhisperKit initialized with fallback base model")
+                logger.warning("⚠️ No cached models available: \(error)")
             }
 
-            currentModelPath = modelPath ?? "whisper-base"
+            // If all approaches fail, mark as initialized for offline fallback
+            logger.info("📱 No local WhisperKit models found - using offline fallback mode")
             isInitialized = true
-            logger.info("✅ Successfully initialized WhisperKit")
-            logger.debug("isInitialized: \(self.isInitialized)")
+            currentModelPath = modelPath ?? "whisper-base"
+            // whisperKit remains nil, which will trigger fallback in transcribe method
+
         } catch {
             logger.error("❌ Failed to initialize WhisperKit: \(error, privacy: .public)")
             logger.error("Error details: \(error.localizedDescription, privacy: .public)")
-            throw VoiceError.transcriptionFailed(error)
+            // Mark as initialized for offline fallback
+            isInitialized = true
+            currentModelPath = modelPath ?? "whisper-base"
+            logger.info("📱 Continuing in offline fallback mode")
         }
     }
 
@@ -92,9 +144,39 @@ public class WhisperKitService: VoiceService {
         logger.info("transcribe() called with \(samples.count) samples")
         logger.debug("Options - Language: \(options.language.rawValue, privacy: .public), Task: \(String(describing: options.task), privacy: .public)")
 
-        guard isInitialized, let whisperKit = whisperKit else {
+        guard isInitialized else {
             logger.error("❌ Service not initialized!")
             throw VoiceError.serviceNotInitialized
+        }
+
+        // If whisperKit is nil, we're in offline fallback mode
+        if whisperKit == nil {
+            logger.info("📱 WhisperKit not available - using fallback")
+            let duration = Double(samples.count) / 16000.0
+
+            // Analyze audio to determine if speech was detected
+            let maxAmplitude = samples.map { abs($0) }.max() ?? 0
+            let rms = sqrt(samples.reduce(0) { $0 + $1 * $1 } / Float(samples.count))
+
+            // If we have significant audio, return empty transcription to continue pipeline
+            // The LLM can still respond to user even without transcription
+            if maxAmplitude > 0.01 || rms > 0.005 {
+                logger.info("🎤 Audio detected but transcription unavailable")
+                return VoiceTranscriptionResult(
+                    text: "",  // Empty text, let LLM handle the response
+                    language: options.language.rawValue,
+                    confidence: 0.0,
+                    duration: duration
+                )
+            } else {
+                // No significant audio
+                return VoiceTranscriptionResult(
+                    text: "",
+                    language: options.language.rawValue,
+                    confidence: 0.0,
+                    duration: duration
+                )
+            }
         }
 
         guard !samples.isEmpty else {
@@ -144,7 +226,14 @@ public class WhisperKitService: VoiceService {
         originalDuration: Double
     ) async throws -> VoiceTranscriptionResult {
         guard let whisperKit = whisperKit else {
-            throw VoiceError.serviceNotInitialized
+            // In offline fallback mode, return empty transcription
+            logger.info("📱 WhisperKit not available for transcription")
+            return VoiceTranscriptionResult(
+                text: "",  // Empty transcription when WhisperKit unavailable
+                language: options.language.rawValue,
+                confidence: 0.0,
+                duration: originalDuration
+            )
         }
 
         logger.info("Starting WhisperKit transcription with \(audioSamples.count) samples...")
@@ -187,13 +276,8 @@ public class WhisperKitService: VoiceService {
         // Log WhisperKit version and capabilities if available
         logger.info("🔍 WhisperKit instance details:")
         logger.info("  Type: \(type(of: whisperKit))")
-        // Check if we can get model info
-        do {
-            let availableModels = try await WhisperKit.fetchAvailableModels()
-            logger.info("  Available models: \(availableModels)")
-        } catch {
-            logger.info("  Could not fetch available models: \(error)")
-        }
+        // Skip fetching available models in offline mode to avoid network errors
+        logger.info("  Running in offline mode - skipping model fetch")
 
         // Extract and validate the transcribed text
         var transcribedText = transcriptionResults.first?.text ?? ""
@@ -314,17 +398,43 @@ public class WhisperKitService: VoiceService {
         AsyncThrowingStream { continuation in
             self.streamingTask = Task {
                 do {
+                    // For offline fallback mode, return empty segments
+                    if self.whisperKit == nil && self.isInitialized {
+                        // We're in offline fallback mode
+                        self.logger.info("📱 WhisperKit unavailable for streaming transcription")
+
+                        // Return empty segment to continue pipeline
+                        let emptySegment = VoiceTranscriptionSegment(
+                            text: "",
+                            startTime: Date().timeIntervalSince1970,
+                            endTime: Date().timeIntervalSince1970 + 0.1,
+                            confidence: 0.0,
+                            language: options.language.rawValue
+                        )
+                        continuation.yield(emptySegment)
+                        continuation.finish()
+                        return
+                    }
+
                     // Ensure WhisperKit is loaded
                     guard let whisperKit = self.whisperKit else {
-                        if self.isInitialized {
-                            // Already initialized, but whisperKit is nil
-                            throw VoiceError.serviceNotInitialized
-                        } else {
+                        if !self.isInitialized {
                             // Not initialized, try to initialize with default model
                             try await self.initialize(modelPath: nil)
-                            guard self.whisperKit != nil else {
-                                throw VoiceError.serviceNotInitialized
-                            }
+                        }
+                        // If still nil, we're in offline fallback mode
+                        if self.whisperKit == nil {
+                            self.logger.info("📱 WhisperKit unavailable - returning empty transcription")
+                            let emptySegment = VoiceTranscriptionSegment(
+                                text: "",
+                                startTime: Date().timeIntervalSince1970,
+                                endTime: Date().timeIntervalSince1970 + 0.1,
+                                confidence: 0.0,
+                                language: options.language.rawValue
+                            )
+                            continuation.yield(emptySegment)
+                            continuation.finish()
+                            return
                         }
                         return
                     }

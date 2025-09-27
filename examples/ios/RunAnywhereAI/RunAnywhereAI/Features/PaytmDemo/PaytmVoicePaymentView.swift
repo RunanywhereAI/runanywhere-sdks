@@ -3,328 +3,381 @@
 //  RunAnywhereAI
 //
 //  Created for VSS Demo on 7/22/25.
+//  Conversational Voice Payment Interface with Paytm Branding
 //
 
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
+import AVFoundation
 
 struct PaytmVoicePaymentView: View {
-    @StateObject private var viewModel = PaytmVoicePaymentViewModel()
-    @State private var isListening = false
-    @State private var showingSuccess = false
+    @StateObject private var voiceModel = PaytmVoiceAssistantViewModel()
     @State private var pulseAnimation = false
 
     var body: some View {
         ZStack {
-            // Background gradient
-            PaytmTheme.primaryGradient
-                .ignoresSafeArea()
+            // Paytm gradient background
+            LinearGradient(
+                gradient: Gradient(colors: [
+                    PaytmTheme.lightBlue.opacity(0.1),
+                    Color.white
+                ]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                // Header
-                PaytmHeaderView()
+            VStack(spacing: 0) {
+                // Paytm Header with dynamic balance
+                PaytmHeaderBar(balance: voiceModel.currentBalance)
 
-                // Balance Card
-                PaytmBalanceCard(balance: "₹24,567")
-                    .padding(.horizontal)
+                // Conversation Area
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Welcome message
+                            if voiceModel.currentTranscript.isEmpty &&
+                               voiceModel.assistantResponse.isEmpty &&
+                               voiceModel.transactionHistory.isEmpty {
+                                WelcomeCard()
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 20)
+                            }
 
-                // Voice Command Section
-                VStack(spacing: 16) {
-                    Text("Say a command")
-                        .font(PaytmTheme.captionFont())
-                        .foregroundColor(.white.opacity(0.8))
+                            // Transaction History
+                            if !voiceModel.transactionHistory.isEmpty {
+                                TransactionHistorySection(transactions: voiceModel.transactionHistory)
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 20)
+                            }
 
-                    // Voice Button
-                    Button(action: {
-                        isListening.toggle()
-                        if isListening {
-                            viewModel.startListening()
-                        } else {
-                            viewModel.stopListening()
-                        }
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 120, height: 120)
-                                .shadow(color: PaytmTheme.primaryBlue.opacity(0.3), radius: 20)
-                                .scaleEffect(pulseAnimation ? 1.2 : 1.0)
-                                .opacity(pulseAnimation ? 0.7 : 1.0)
+                            // User message
+                            if !voiceModel.currentTranscript.isEmpty {
+                                PaytmChatBubble(
+                                    message: voiceModel.currentTranscript,
+                                    isUser: true
+                                )
+                                .id("user")
+                                .padding(.horizontal, 20)
+                            }
 
-                            Circle()
-                                .fill(isListening ? PaytmTheme.secondaryBlue : PaytmTheme.primaryBlue)
-                                .frame(width: 100, height: 100)
+                            // Assistant response
+                            if !voiceModel.assistantResponse.isEmpty {
+                                PaytmChatBubble(
+                                    message: voiceModel.assistantResponse,
+                                    isUser: false
+                                )
+                                .id("assistant")
+                                .padding(.horizontal, 20)
+                            }
 
-                            Image(systemName: isListening ? "mic.fill" : "mic")
-                                .font(.system(size: 40))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .animation(.easeInOut(duration: 0.3), value: isListening)
-
-                    if !viewModel.transcribedText.isEmpty {
-                        Text(viewModel.transcribedText)
-                            .font(PaytmTheme.bodyFont(18))
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.white.opacity(0.2))
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                    }
-
-                    // Example commands
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Try saying:")
-                            .font(PaytmTheme.captionFont(12))
-                            .foregroundColor(.white.opacity(0.6))
-
-                        ForEach(viewModel.exampleCommands, id: \.self) { command in
-                            HStack {
-                                Image(systemName: "mic.circle.fill")
-                                    .foregroundColor(PaytmTheme.secondaryBlue)
-                                    .font(.system(size: 16))
-                                Text(command)
-                                    .font(PaytmTheme.bodyFont(14))
-                                    .foregroundColor(.white.opacity(0.9))
+                            // Processing indicator
+                            if voiceModel.isProcessing && voiceModel.assistantResponse.isEmpty {
+                                ProcessingIndicator()
+                                    .padding(.horizontal, 20)
                             }
                         }
+                        .padding(.vertical, 20)
                     }
-                    .padding()
-                    .background(Color.white.opacity(0.1))
-                    .cornerRadius(12)
-                    .padding(.horizontal)
+                    .onChange(of: voiceModel.assistantResponse) { _ in
+                        withAnimation {
+                            proxy.scrollTo("assistant", anchor: .bottom)
+                        }
+                    }
                 }
 
                 Spacer()
 
-                // Performance Metrics
-                PaytmMetricsView(
-                    latency: viewModel.latency,
-                    cost: viewModel.cost,
-                    isOffline: viewModel.isOffline
-                )
-                .padding()
+                // Voice Control Area - Simplified
+                VStack(spacing: 16) {
+                    // Status text
+                    Text(statusText)
+                        .font(PaytmTheme.captionFont())
+                        .foregroundColor(PaytmTheme.grayText)
+
+                    // Mic Button
+                    Button(action: {
+                        Task {
+                            if voiceModel.sessionState == .listening ||
+                               voiceModel.sessionState == .speaking ||
+                               voiceModel.sessionState == .processing ||
+                               voiceModel.sessionState == .connecting {
+                                await voiceModel.stopConversation()
+                            } else {
+                                await voiceModel.startConversation()
+                            }
+                        }
+                    }) {
+                        ZStack {
+                            // Outer pulsing circle
+                            if voiceModel.isSpeechDetected {
+                                Circle()
+                                    .stroke(PaytmTheme.primaryBlue.opacity(0.3), lineWidth: 2)
+                                    .scaleEffect(pulseAnimation ? 1.5 : 1.0)
+                                    .opacity(pulseAnimation ? 0 : 1)
+                                    .animation(
+                                        .easeOut(duration: 1.5).repeatForever(autoreverses: false),
+                                        value: pulseAnimation
+                                    )
+                            }
+
+                            // Main button
+                            Circle()
+                                .fill(micButtonGradient)
+                                .frame(width: 80, height: 80)
+                                .shadow(color: PaytmTheme.primaryBlue.opacity(0.3), radius: 10)
+
+                            // Icon or spinner
+                            if voiceModel.sessionState == .connecting ||
+                               (voiceModel.isProcessing && !voiceModel.isListening) {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.2)
+                            } else {
+                                Image(systemName: micIcon)
+                                    .font(.system(size: 32))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 30)
             }
         }
         .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            Task {
+                await voiceModel.initialize()
+            }
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: false)) {
                 pulseAnimation = true
             }
         }
-        .sheet(isPresented: $showingSuccess) {
-            PaytmSuccessView(
-                amount: viewModel.lastTransactionAmount,
-                recipient: viewModel.lastRecipient
-            )
+    }
+
+    private var statusText: String {
+        switch voiceModel.sessionState {
+        case .listening:
+            return "Listening... Say 'Send money to...' or ask a question"
+        case .processing:
+            return "Processing your request..."
+        case .speaking:
+            return "Assistant is responding..."
+        case .connecting:
+            return "Connecting..."
+        default:
+            return "Tap to speak"
         }
+    }
+
+    private var micIcon: String {
+        switch voiceModel.sessionState {
+        case .listening: return "mic.fill"
+        case .speaking: return "speaker.wave.2.fill"
+        case .processing: return "waveform"
+        default: return "mic"
+        }
+    }
+
+    private var micButtonGradient: LinearGradient {
+        let colors: [Color] = switch voiceModel.sessionState {
+        case .listening: [PaytmTheme.secondaryBlue, PaytmTheme.primaryBlue]
+        case .speaking: [PaytmTheme.successGreen, PaytmTheme.successGreen.opacity(0.8)]
+        case .processing: [PaytmTheme.primaryBlue, PaytmTheme.secondaryBlue]
+        default: [PaytmTheme.primaryBlue, PaytmTheme.primaryBlue.opacity(0.9)]
+        }
+
+        return LinearGradient(
+            gradient: Gradient(colors: colors),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 }
 
-struct PaytmHeaderView: View {
+struct PaytmHeaderBar: View {
+    let balance: Double
+
     var body: some View {
         HStack {
             // Paytm Logo
             HStack(spacing: 0) {
                 Text("pay")
-                    .font(PaytmTheme.headlineFont(28))
+                    .font(PaytmTheme.headlineFont(24))
                     .foregroundColor(PaytmTheme.primaryBlue)
                 Text("tm")
-                    .font(PaytmTheme.headlineFont(28))
+                    .font(PaytmTheme.headlineFont(24))
                     .foregroundColor(PaytmTheme.secondaryBlue)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(Color.white)
-            .cornerRadius(8)
+
+            Text("Voice Pay")
+                .font(PaytmTheme.bodyFont())
+                .foregroundColor(PaytmTheme.grayText)
 
             Spacer()
 
-            // QR Scanner Icon
-            Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 24))
-                .foregroundColor(.white)
-                .padding()
-        }
-        .padding(.horizontal)
-    }
-}
-
-struct PaytmBalanceCard: View {
-    let balance: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Wallet Balance")
-                .font(PaytmTheme.captionFont())
-                .foregroundColor(PaytmTheme.grayText)
-
-            Text(balance)
-                .font(PaytmTheme.headlineFont(32))
-                .foregroundColor(PaytmTheme.primaryBlue)
-
-            HStack {
-                Label("UPI ID: yourname@paytm", systemImage: "at")
-                    .font(PaytmTheme.captionFont(12))
+            // Balance indicator - Dynamic
+            VStack(alignment: .trailing, spacing: 2) {
+                Text("Balance")
+                    .font(PaytmTheme.captionFont(10))
                     .foregroundColor(PaytmTheme.grayText)
-
-                Spacer()
-
-                Image(systemName: "indianrupeesign.circle.fill")
-                    .font(.system(size: 30))
-                    .foregroundColor(PaytmTheme.secondaryBlue)
+                Text("₹\(Int(balance))")
+                    .font(PaytmTheme.headlineFont(16))
+                    .foregroundColor(PaytmTheme.primaryBlue)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .paytmCard()
-    }
-}
-
-struct PaytmMetricsView: View {
-    let latency: Int
-    let cost: Double
-    let isOffline: Bool
-
-    var body: some View {
-        HStack(spacing: 16) {
-            // Latency
-            MetricCard(
-                icon: "speedometer",
-                title: "Latency",
-                value: "\(latency)ms",
-                subtitle: "vs Cloud: 450ms",
-                color: PaytmTheme.successGreen
-            )
-
-            // Cost
-            MetricCard(
-                icon: "indianrupeesign.circle",
-                title: "Cost",
-                value: "₹\(String(format: "%.3f", cost))",
-                subtitle: "vs Cloud: ₹0.15",
-                color: PaytmTheme.secondaryBlue
-            )
-
-            // Status
-            MetricCard(
-                icon: isOffline ? "wifi.slash" : "wifi",
-                title: "Mode",
-                value: isOffline ? "Offline" : "Online",
-                subtitle: "On-device AI",
-                color: isOffline ? PaytmTheme.warningOrange : PaytmTheme.successGreen
-            )
-        }
-    }
-}
-
-struct MetricCard: View {
-    let icon: String
-    let title: String
-    let value: String
-    let subtitle: String
-    let color: Color
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(color)
-
-            Text(title)
-                .font(PaytmTheme.captionFont(10))
-                .foregroundColor(PaytmTheme.grayText)
-
-            Text(value)
-                .font(PaytmTheme.headlineFont(16))
-                .foregroundColor(PaytmTheme.darkText)
-
-            Text(subtitle)
-                .font(PaytmTheme.captionFont(9))
-                .foregroundColor(PaytmTheme.grayText.opacity(0.7))
-        }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(Color.white)
-        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, y: 2)
     }
 }
 
-struct PaytmSuccessView: View {
-    let amount: String
-    let recipient: String
-    @Environment(\.dismiss) var dismiss
-
+struct WelcomeCard: View {
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(PaytmTheme.successGreen)
-
-            Text("Payment Successful!")
-                .font(PaytmTheme.headlineFont())
-                .foregroundColor(PaytmTheme.darkText)
-
-            VStack(spacing: 8) {
-                Text(amount)
-                    .font(PaytmTheme.headlineFont(36))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "hand.wave.fill")
+                    .font(.title2)
                     .foregroundColor(PaytmTheme.primaryBlue)
-
-                Text("sent to \(recipient)")
-                    .font(PaytmTheme.bodyFont())
-                    .foregroundColor(PaytmTheme.grayText)
+                Text("Welcome to Voice Pay!")
+                    .font(PaytmTheme.headlineFont(18))
+                    .foregroundColor(PaytmTheme.darkText)
             }
 
-            Button(action: { dismiss() }) {
-                Text("Done")
-                    .font(PaytmTheme.bodyFont(18))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(PaytmTheme.primaryGradient)
-                    .cornerRadius(12)
+            Text("Try saying commands like:")
+                .font(PaytmTheme.bodyFont())
+                .foregroundColor(PaytmTheme.grayText)
+
+            VStack(alignment: .leading, spacing: 8) {
+                CommandExample(icon: "indianrupeesign.circle", text: "Send ₹500 to Vijay")
+                CommandExample(icon: "globe", text: "पांच सौ रुपये विजय को भेजो")
+                CommandExample(icon: "chart.line.uptrend.xyaxis", text: "What's my balance?")
+                CommandExample(icon: "clock", text: "Show recent transactions")
             }
-            .padding(.horizontal)
         }
         .padding()
-        .presentationDetents([.height(400)])
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(PaytmTheme.lightBlue.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(PaytmTheme.primaryBlue.opacity(0.2), lineWidth: 1)
+                )
+        )
     }
 }
 
-class PaytmVoicePaymentViewModel: ObservableObject {
-    @Published var transcribedText = ""
-    @Published var isProcessing = false
-    @Published var latency = 87
-    @Published var cost = 0.002
-    @Published var isOffline = true
-    @Published var lastTransactionAmount = ""
-    @Published var lastRecipient = ""
+struct TransactionHistorySection: View {
+    let transactions: [PaytmVoiceAssistantViewModel.Transaction]
 
-    let exampleCommands = [
-        "Send ₹500 to Raj",
-        "पांच सौ रुपये राज को भेजो",
-        "Pay ₹200 for tea"
-    ]
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Recent Transactions")
+                .font(PaytmTheme.headlineFont(14))
+                .foregroundColor(PaytmTheme.darkText)
 
-    func startListening() {
-        // Simulate voice recognition
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.transcribedText = "Send ₹500 to Raj"
-            self.processCommand()
+            ForEach(transactions.prefix(3)) { transaction in
+                HStack {
+                    Image(systemName: transaction.type == .sent ? "arrow.up.circle.fill" : "arrow.down.circle.fill")
+                        .foregroundColor(transaction.type == .sent ? PaytmTheme.secondaryBlue : PaytmTheme.successGreen)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(transaction.type == .sent ? "Sent to" : "Received from") \(transaction.recipient)")
+                            .font(PaytmTheme.bodyFont(13))
+                            .foregroundColor(PaytmTheme.darkText)
+                        Text(transaction.timestamp, style: .time)
+                            .font(PaytmTheme.captionFont(11))
+                            .foregroundColor(PaytmTheme.grayText)
+                    }
+
+                    Spacer()
+
+                    Text("₹\(Int(transaction.amount))")
+                        .font(PaytmTheme.headlineFont(14))
+                        .foregroundColor(transaction.type == .sent ? PaytmTheme.secondaryBlue : PaytmTheme.successGreen)
+                }
+                .padding(.vertical, 6)
+            }
+        }
+        .padding()
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 3)
+        )
+    }
+}
+
+struct CommandExample: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(PaytmTheme.secondaryBlue)
+                .frame(width: 20)
+            Text(text)
+                .font(PaytmTheme.bodyFont(14))
+                .foregroundColor(PaytmTheme.darkText)
+        }
+    }
+}
+
+struct PaytmChatBubble: View {
+    let message: String
+    let isUser: Bool
+
+    var body: some View {
+        HStack {
+            if isUser { Spacer(minLength: 60) }
+
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+                Text(isUser ? "You" : "Assistant")
+                    .font(PaytmTheme.captionFont(11))
+                    .foregroundColor(PaytmTheme.grayText)
+
+                Text(message)
+                    .font(PaytmTheme.bodyFont())
+                    .foregroundColor(isUser ? .white : PaytmTheme.darkText)
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(isUser ? AnyShapeStyle(PaytmTheme.primaryGradient) : AnyShapeStyle(Color.white))
+                            .shadow(color: Color.black.opacity(0.05), radius: 3, y: 2)
+                    )
+            }
+
+            if !isUser { Spacer(minLength: 60) }
+        }
+    }
+}
+
+struct ProcessingIndicator: View {
+    @State private var dotScale: [CGFloat] = [1, 1, 1]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(PaytmTheme.primaryBlue)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(dotScale[index])
+            }
+        }
+        .onAppear {
+            animateDots()
         }
     }
 
-    func stopListening() {
-        // Stop voice recognition
-    }
-
-    private func processCommand() {
-        isProcessing = true
-
-        // Simulate processing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.lastTransactionAmount = "₹500"
-            self.lastRecipient = "Raj"
-            self.isProcessing = false
+    func animateDots() {
+        for index in 0..<3 {
+            withAnimation(.easeInOut(duration: 0.6).repeatForever().delay(Double(index) * 0.2)) {
+                dotScale[index] = 1.5
+            }
         }
     }
 }
