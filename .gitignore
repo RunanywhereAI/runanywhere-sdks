@@ -79,30 +79,47 @@ iOSInjectionProject/
 .DS_Store
 
 # IDE - IntelliJ IDEA / Android Studio
-# Ignore all .idea files by default
-.idea/*
-
-# But keep only essential shared configurations:
-!.idea/runConfigurations/
-!.idea/gradle.xml
-!.idea/vcs.xml
-!.idea/misc.xml
-
-# Explicitly ignore personal and generated files
+# User-specific stuff
 .idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries
+.idea/shelf
 .idea/ChatHistory*.xml
-.idea/caches/
-.idea/artifacts/
 .idea/discord.xml
+
+# Generated files
+.idea/caches/
+.idea/libraries/
+.idea/artifacts/
+.idea/compiler.xml
+.idea/jarRepositories.xml
+.idea/modules.xml
 .idea/*.iml
-.idea/.name
+.idea/modules
+*.iml
+*.ipr
+
+# Gradle and JDK specific (contain machine-specific paths)
+.idea/gradle.xml
+.idea/misc.xml
+
+# Keep shared configurations
+!.idea/runConfigurations/
+!.idea/vcs.xml
+
+# Android Studio specific
 .idea/AndroidProjectSystem.xml
 .idea/appInsightsSettings.xml
-.idea/compiler.xml
 .idea/deploymentTargetSelector.xml
 .idea/kotlinc.xml
 .idea/migrations.xml
-.idea/runConfigurations.xml
+
+# Local gradle properties (machine-specific)
+gradle.properties
+
+# But keep project-level gradle properties if needed
+!gradle.properties.example
 
 # Also ignore .idea folders in subdirectories
 examples/intellij-plugin-demo/plugin/.idea/

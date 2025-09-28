@@ -18,12 +18,19 @@ expect fun getPlatformAPILevel(): Int
  * GPU Type enumeration
  * Equivalent to iOS GPUType enum (adapted for Android)
  */
+@Serializable
 enum class GPUType {
+    @SerialName("adreno")
     ADRENO,
+    @SerialName("mali")
     MALI,
+    @SerialName("power_vr")
     POWER_VR,
+    @SerialName("tegra")
     TEGRA,
+    @SerialName("vivante")
     VIVANTE,
+    @SerialName("unknown")
     UNKNOWN
 }
 
@@ -31,10 +38,15 @@ enum class GPUType {
  * Battery state enumeration
  * Equivalent to iOS BatteryState enum
  */
+@Serializable
 enum class BatteryState {
+    @SerialName("unknown")
     UNKNOWN,
+    @SerialName("unplugged")
     UNPLUGGED,
+    @SerialName("charging")
     CHARGING,
+    @SerialName("full")
     FULL
 }
 
@@ -42,10 +54,15 @@ enum class BatteryState {
  * Thermal state enumeration
  * Equivalent to iOS ThermalState enum
  */
+@Serializable
 enum class ThermalState {
+    @SerialName("nominal")
     NOMINAL,
+    @SerialName("fair")
     FAIR,
+    @SerialName("serious")
     SERIOUS,
+    @SerialName("critical")
     CRITICAL
 }
 
@@ -59,6 +76,36 @@ data class DeviceInfoData(
     val deviceId: String,
     @SerialName("device_name")
     val deviceName: String,
+    @SerialName("device_model")
+    val deviceModel: String? = null,
+    @SerialName("platform")
+    val platform: String? = null, // "ios", "android", "macos", "windows", "linux", "web"
+    @SerialName("os_version")
+    val osVersion: String? = null,
+    @SerialName("form_factor")
+    val formFactor: String? = null, // "phone", "tablet", "desktop", "laptop", "watch", "tv"
+    @SerialName("architecture")
+    val architecture: String? = null,
+    @SerialName("chip_name")
+    val chipName: String? = null,
+    @SerialName("core_count")
+    val coreCount: Int? = null,
+    @SerialName("performance_cores")
+    val performanceCores: Int? = null,
+    @SerialName("efficiency_cores")
+    val efficiencyCores: Int? = null,
+    @SerialName("total_memory")
+    val totalMemory: Long? = null, // in bytes
+    @SerialName("available_memory")
+    val availableMemory: Long? = null, // in bytes
+    @SerialName("has_neural_engine")
+    val hasNeuralEngine: Boolean? = null,
+    @SerialName("neural_engine_cores")
+    val neuralEngineCores: Int? = null,
+    @SerialName("gpu_family")
+    val gpuFamily: String? = null,
+
+    // Keep existing fields for backward compatibility
     @SerialName("system_name")
     val systemName: String = "Android",
     @SerialName("system_version")
@@ -104,7 +151,7 @@ data class DeviceInfoData(
 
     // Power and thermal
     @SerialName("battery_level")
-    val batteryLevel: Float? = null, // 0.0 to 1.0
+    val batteryLevel: Float? = null, // 0.0 to 1.0 (not 0-100)
     @SerialName("battery_state")
     val batteryState: BatteryState = BatteryState.UNKNOWN,
     @SerialName("thermal_state")
