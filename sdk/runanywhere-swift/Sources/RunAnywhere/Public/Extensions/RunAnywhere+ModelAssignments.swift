@@ -14,7 +14,7 @@ extension RunAnywhere {
 
         // Ensure SDK is initialized
         guard isSDKInitialized else {
-            throw SDKError.notInitialized("SDK must be initialized before fetching model assignments")
+            throw SDKError.notInitialized
         }
 
         // Ensure network services are initialized (lazy initialization)
@@ -30,7 +30,7 @@ extension RunAnywhere {
             // Create new service
             guard let networkService = serviceContainer.networkService else {
                 logger.error("Network service not available")
-                throw SDKError.serviceUnavailable("Network service not initialized")
+                throw SDKError.invalidState("Network service not initialized")
             }
 
             let modelInfoService = await serviceContainer.modelInfoService
@@ -72,7 +72,7 @@ extension RunAnywhere {
             // Now get the service
             guard let service = serviceContainer.getModelAssignmentService() as? ModelAssignmentService else {
                 logger.error("Model assignment service not available")
-                throw SDKError.serviceUnavailable("Model assignment service not initialized")
+                throw SDKError.invalidState("Model assignment service not initialized")
             }
             return try await service.getModelsForFramework(framework)
         }
@@ -94,7 +94,7 @@ extension RunAnywhere {
             // Now get the service
             guard let service = serviceContainer.getModelAssignmentService() as? ModelAssignmentService else {
                 logger.error("Model assignment service not available")
-                throw SDKError.serviceUnavailable("Model assignment service not initialized")
+                throw SDKError.invalidState("Model assignment service not initialized")
             }
             return try await service.getModelsForCategory(category)
         }
@@ -120,6 +120,8 @@ extension RunAnywhere {
 
 /// Event published when model assignments are successfully fetched
 public struct ModelAssignmentsFetchedEvent: SDKEvent {
+    public let timestamp = Date()
+    public let eventType = SDKEventType.generation
     public let models: [ModelInfo]
     public var description: String {
         "Model assignments fetched: \(models.count) models"
@@ -128,6 +130,8 @@ public struct ModelAssignmentsFetchedEvent: SDKEvent {
 
 /// Event published when model assignments fetch fails
 public struct ModelAssignmentsFetchFailedEvent: SDKEvent {
+    public let timestamp = Date()
+    public let eventType = SDKEventType.generation
     public let error: Error
     public var description: String {
         "Model assignments fetch failed: \(error.localizedDescription)"
