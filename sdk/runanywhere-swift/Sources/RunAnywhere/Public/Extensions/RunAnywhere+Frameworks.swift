@@ -10,6 +10,9 @@ public extension RunAnywhere {
         // Access service container directly
         RunAnywhere.serviceContainer.adapterRegistry.register(adapter)
 
+        // Refresh download strategies to pick up the newly registered adapter's strategy
+        RunAnywhere.serviceContainer.downloadService.refreshStrategies()
+
         Task {
             events.publish(SDKFrameworkEvent.adapterRegistered(
                 framework: adapter.framework,
@@ -42,6 +45,9 @@ public extension RunAnywhere {
             framework: adapter.framework,
             name: String(describing: adapter)
         ))
+
+        // Refresh download strategies to pick up the newly registered adapter's strategy
+        RunAnywhere.serviceContainer.downloadService.refreshStrategies()
 
         logger.info("Registered adapter for \(adapter.framework) with \(models.count) custom models")
 
