@@ -43,7 +43,7 @@ object SDKConstants {
 
     // Platform-specific constants matching iOS SDKConstants
     const val version = VERSION
-    const val platform = "kotlin"
+    val platform: String get() = PlatformUtils.getPlatformName()
 
     // MARK: - Environment Configuration
     enum class Environment {
