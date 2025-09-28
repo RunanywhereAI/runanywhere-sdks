@@ -86,7 +86,7 @@ struct RunAnywhereAIApp: App {
             if environment == .development {
                 // Development Mode - No API key needed!
                 try RunAnywhere.initialize(
-                    apiKey: "dev",  // Any string works
+                    apiKey: "dev",  // Any string works in dev mode
                     baseURL: "localhost",  // Not used in dev mode
                     environment: .development
                 )
@@ -127,8 +127,8 @@ struct RunAnywhereAIApp: App {
                 isSDKInitialized = true
             }
 
-            // Auto-load first available model
-            await autoLoadFirstModel()
+            // Don't auto-load models - let user select
+            logger.info("💡 Models registered, user can now download and select models")
         } catch {
             logger.error("❌ SDK initialization failed!")
             logger.error("🔍 Error: \(error, privacy: .public)")
@@ -153,57 +153,73 @@ struct RunAnywhereAIApp: App {
         do {
             // Register LLMSwift with custom GGUF models
             LLMSwiftServiceProvider.register()
+
+            // Create custom adapter registration options with lazy loading
+            let lazyOptions = AdapterRegistrationOptions(
+                validateModels: false,
+                autoDownloadInDev: false,  // Don't auto-download
+                showProgress: true,
+                fallbackToMockModels: true,
+                downloadTimeout: 600
+            )
+
             try await RunAnywhere.registerFrameworkAdapter(
                 LLMSwiftAdapter(),
                 models: [
-                    // Small, fast model for quick testing
+                    // SmolLM2 360M - smallest and fastest
                     try! ModelRegistration(
-                        url: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+                        url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
                         framework: .llamaCpp,
-                        id: "tinyllama-1b",
-                        name: "TinyLlama 1.1B Chat"
+                        id: "smollm2-360m-q8-0",
+                        name: "SmolLM2 360M Q8_0",
+                        memoryRequirement: 500_000_000
                     ),
-                    // Medium model for better quality
+                    // Qwen 2.5 0.5B - small but capable
                     try! ModelRegistration(
-                        url: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                        url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
                         framework: .llamaCpp,
-                        id: "llama2-7b-chat",
-                        name: "Llama 2 7B Chat"
+                        id: "qwen-2.5-0.5b-instruct-q6-k",
+                        name: "Qwen 2.5 0.5B Instruct Q6_K",
+                        memoryRequirement: 600_000_000
                     ),
-                    // Code generation model
+                    // Llama 3.2 1B - good quality
                     try! ModelRegistration(
-                        url: "https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF/resolve/main/codellama-7b-instruct.Q4_K_M.gguf",
+                        url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
                         framework: .llamaCpp,
-                        id: "codellama-7b",
-                        name: "CodeLlama 7B Instruct"
+                        id: "llama-3.2-1b-instruct-q6-k",
+                        name: "Llama 3.2 1B Instruct Q6_K",
+                        memoryRequirement: 1_200_000_000
                     )
                 ],
-                options: .development  // Auto-download, show progress, etc.
+                options: lazyOptions  // Use lazy loading options
             )
-            logger.info("✅ LLMSwift registered with custom models")
+            logger.info("✅ LLMSwift registered with custom models (lazy loading)")
 
             // Register WhisperKit with custom models
             WhisperKitServiceProvider.register()
             try await RunAnywhere.registerFrameworkAdapter(
                 WhisperKitAdapter.shared,
                 models: [
-                    // Whisper models for speech-to-text
+                    // Whisper Tiny - smallest and fastest
                     try! ModelRegistration(
-                        url: "https://huggingface.co/openai/whisper-base/resolve/main/pytorch_model.bin",
+                        url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
+                        framework: .whisperKit,
+                        id: "whisper-tiny",
+                        name: "Whisper Tiny",
+                        memoryRequirement: 39_000_000
+                    ),
+                    // Whisper Base - better quality
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
                         framework: .whisperKit,
                         id: "whisper-base",
-                        name: "Whisper Base"
-                    ),
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/openai/whisper-small/resolve/main/pytorch_model.bin",
-                        framework: .whisperKit,
-                        id: "whisper-small",
-                        name: "Whisper Small"
+                        name: "Whisper Base",
+                        memoryRequirement: 74_000_000
                     )
                 ],
-                options: .development
+                options: lazyOptions  // Use lazy loading options
             )
-            logger.info("✅ WhisperKit registered with custom models")
+            logger.info("✅ WhisperKit registered with custom models (lazy loading)")
 
             // Register FluidAudioDiarization
             FluidAudioDiarizationProvider.register()
@@ -215,7 +231,7 @@ struct RunAnywhereAIApp: App {
                 logger.info("✅ Foundation Models registered")
             }
 
-            logger.info("🎉 All adapters registered with custom models for development")
+            logger.info("🎉 All adapters registered with custom models for development (lazy loading enabled)")
 
         } catch {
             logger.error("❌ Failed to register adapters: \(error)")
@@ -224,21 +240,24 @@ struct RunAnywhereAIApp: App {
 
     private func registerAdaptersForProduction() async {
         logger.info("📦 Registering adapters for PRODUCTION mode")
+        logger.info("📡 Models will be fetched from backend console via API")
 
         // Register WhisperKit for Speech-to-Text
+        // No hardcoded models - they come from backend
         WhisperKitServiceProvider.register()
         do {
             try await RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKit registered")
+            logger.info("✅ WhisperKit registered (models from backend)")
         } catch {
             logger.error("Failed to register WhisperKit: \(error)")
         }
 
         // Register LLMSwift for Language Models
+        // No hardcoded models - they come from backend
         LLMSwiftServiceProvider.register()
         do {
             try await RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
-            logger.info("✅ LLMSwift registered")
+            logger.info("✅ LLMSwift registered (models from backend)")
         } catch {
             logger.error("Failed to register LLMSwift: \(error)")
         }
@@ -262,45 +281,6 @@ struct RunAnywhereAIApp: App {
 
     private func initializeBundledModels() async {
         // Bundled models functionality removed - models are downloaded on demand
-    }
-
-    private func autoLoadFirstModel() async {
-        logger.info("🤖 Auto-loading first available model...")
-
-        do {
-            // Get available models from SDK
-            let availableModels = try await RunAnywhere.availableModels()
-
-            // Filter for Llama CPP compatible models first, then any model
-            let llamaCppModels = availableModels.filter { $0.compatibleFrameworks.contains(.llamaCpp) && $0.localPath != nil }
-            let anyDownloadedModels = availableModels.filter { $0.localPath != nil }
-
-            // Prefer Llama CPP models, fallback to any downloaded model
-            let modelToLoad = llamaCppModels.first ?? anyDownloadedModels.first
-
-            if let model = modelToLoad {
-                logger.info("✅ Found model to auto-load: \(model.name, privacy: .public) (Framework: \(model.compatibleFrameworks.first?.displayName ?? "Unknown", privacy: .public))")
-
-                // Load the model
-                _ = try await RunAnywhere.loadModel(model.id)
-
-                logger.info("🎉 Successfully auto-loaded model: \(model.name, privacy: .public)")
-
-                // Update ModelListViewModel to reflect the loaded model
-                await ModelListViewModel.shared.setCurrentModel(model)
-
-                // Notify the app that a model was loaded
-                NotificationCenter.default.post(name: Notification.Name("ModelLoaded"), object: model)
-
-            } else {
-                logger.info("ℹ️ No downloaded models available for auto-loading")
-                logger.info("💡 User will need to download and select a model manually")
-            }
-
-        } catch {
-            logger.warning("⚠️ Failed to auto-load model: \(error, privacy: .public)")
-            logger.info("💡 User will need to select a model manually")
-        }
     }
 
     // User settings are now stored locally and applied per-request

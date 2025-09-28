@@ -696,15 +696,15 @@ class ChatViewModel: ObservableObject {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
+                self.logger.info("✅ Model status updated: '\(currentModel.name)' is loaded")
 
-                // Ensure the model is actually loaded in the SDK
+                // Ensure the model is actually loaded in the SDK (but don't block the UI update)
                 Task {
                     do {
                         try await RunAnywhere.loadModel(currentModel.id)
-                        logger.info("Verified model '\(currentModel.name)' is loaded in SDK")
-
+                        self.logger.info("✅ Verified model '\(currentModel.name)' is loaded in SDK")
                     } catch {
-                        logger.error("Failed to verify model is loaded: \(error)")
+                        self.logger.error("❌ Failed to verify model is loaded: \(error)")
                         await MainActor.run {
                             self.isModelLoaded = false
                             self.loadedModelName = nil
@@ -714,14 +714,16 @@ class ChatViewModel: ObservableObject {
             } else {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
-
+                self.logger.info("❌ No current model in ModelListViewModel")
             }
 
-            // Update system message
+            // Update system message to reflect current state
             if self.messages.first?.role == .system {
                 self.messages.removeFirst()
             }
-            self.addSystemMessage()
+            if self.isModelLoaded {
+                self.addSystemMessage()
+            }
         }
     }
 

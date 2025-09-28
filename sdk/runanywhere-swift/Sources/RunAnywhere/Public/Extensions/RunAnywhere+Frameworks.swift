@@ -61,9 +61,15 @@ public extension RunAnywhere {
                 }
             }
 
-            // Register the model
-            RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo)
-            logger.info("Registered model: \(modelInfo.id) for framework: \(modelReg.framework)")
+            // Register the model persistently (both in memory and database)
+            if let registryService = RunAnywhere.serviceContainer.modelRegistry as? RegistryService {
+                await registryService.registerModelPersistently(modelInfo)
+                logger.info("Registered and saved model: \(modelInfo.id) for framework: \(modelReg.framework)")
+            } else {
+                // Fallback to memory-only registration
+                RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo)
+                logger.warning("Model \(modelInfo.id) registered in memory only (persistence not available)")
+            }
 
             // Auto-download in development mode if enabled
             if currentEnvironment == .development && registrationOptions.autoDownloadInDev {

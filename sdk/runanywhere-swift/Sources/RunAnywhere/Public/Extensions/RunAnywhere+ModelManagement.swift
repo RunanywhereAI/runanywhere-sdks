@@ -76,11 +76,16 @@ public extension RunAnywhere {
             let downloadService = serviceContainer.downloadService
             let downloadTask = try await downloadService.downloadModel(modelInfo)
 
-            // Wait for download completion
-            _ = try await downloadTask.result.value
+            // Wait for download completion and get the local path
+            let localPath = try await downloadTask.result.value
 
             // Update model info with local path after successful download
-            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true)
+            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true, localPath: localPath)
+
+            // Also update the model in the registry with the new local path
+            if let updatedModel = try await modelService.getModel(by: modelIdentifier) {
+                serviceContainer.modelRegistry.updateModel(updatedModel)
+            }
 
             events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
         } catch {

@@ -113,7 +113,7 @@ public struct AdapterRegistrationOptions {
 
     public init(
         validateModels: Bool = true,
-        autoDownloadInDev: Bool = true,
+        autoDownloadInDev: Bool = false,  // Default to false for lazy loading
         showProgress: Bool = true,
         fallbackToMockModels: Bool = false,
         downloadTimeout: TimeInterval = 300
@@ -129,7 +129,7 @@ public struct AdapterRegistrationOptions {
     public static var development: AdapterRegistrationOptions {
         return AdapterRegistrationOptions(
             validateModels: false,
-            autoDownloadInDev: true,
+            autoDownloadInDev: false,  // Changed to false for lazy loading
             showProgress: true,
             fallbackToMockModels: true,
             downloadTimeout: 600
