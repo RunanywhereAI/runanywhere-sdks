@@ -204,6 +204,25 @@ public struct ModelAssignmentMetadata: Codable, Sendable {
 // MARK: - Conversion Extension
 
 extension ModelAssignment {
+    /// Convert to APIModelInfo for compatibility
+    public func toAPIModelInfo() -> APIModelInfo {
+        return APIModelInfo(
+            id: id,
+            name: name,
+            description: metadata?.description,
+            version: version,
+            size: size,
+            format: format,
+            downloadUrl: downloadUrl,
+            checksum: nil,
+            compatibleFrameworks: compatibleFrameworks,
+            requirements: nil,
+            metadata: nil,
+            createdAt: nil,
+            updatedAt: nil
+        )
+    }
+
     /// Convert API model assignment to SDK ModelInfo
     public func toModelInfo() -> ModelInfo {
         // Convert string category to ModelCategory enum
