@@ -17,6 +17,7 @@ import kotlinx.serialization.json.Json
  * Mock network service for development mode
  * Returns predefined JSON responses without making actual network calls
  * Equivalent to iOS MockNetworkService
+ * Enhanced to support generic type methods
  */
 class MockNetworkService : NetworkService {
 
@@ -31,6 +32,29 @@ class MockNetworkService : NetworkService {
 
     init {
         logger.info("MockNetworkService initialized - all network calls will return mock data")
+    }
+
+    /**
+     * POST request with JSON payload and typed response
+     * Note: This implementation requires extension functions with reified types for actual usage
+     */
+    override suspend fun <T : Any, R : Any> post(
+        endpoint: APIEndpoint,
+        payload: T,
+        requiresAuth: Boolean
+    ): R {
+        throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
+    }
+
+    /**
+     * GET request with typed response
+     * Note: This implementation requires extension functions with reified types for actual usage
+     */
+    override suspend fun <R : Any> get(
+        endpoint: APIEndpoint,
+        requiresAuth: Boolean
+    ): R {
+        throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
     }
 
     override suspend fun postRaw(
@@ -67,7 +91,7 @@ class MockNetworkService : NetworkService {
 
     private fun getProgrammaticMockData(endpoint: APIEndpoint, method: String): ByteArray {
         return when (endpoint) {
-            APIEndpoint.AUTHENTICATE -> {
+            APIEndpoint.authenticate -> {
                 // Mock authentication response
                 val response = mapOf(
                     "accessToken" to "mock-access-token-${System.currentTimeMillis()}",
@@ -78,7 +102,18 @@ class MockNetworkService : NetworkService {
                 json.encodeToString(response).toByteArray()
             }
 
-            APIEndpoint.HEALTH_CHECK -> {
+            APIEndpoint.refreshToken -> {
+                // Mock refresh token response
+                val response = mapOf(
+                    "accessToken" to "mock-new-access-token-${System.currentTimeMillis()}",
+                    "refreshToken" to "mock-new-refresh-token-${System.currentTimeMillis()}",
+                    "expiresIn" to 3600,
+                    "tokenType" to "Bearer"
+                )
+                json.encodeToString(response).toByteArray()
+            }
+
+            APIEndpoint.healthCheck -> {
                 // Mock health check response
                 val response = mapOf(
                     "status" to "healthy",
@@ -88,33 +123,39 @@ class MockNetworkService : NetworkService {
                 json.encodeToString(response).toByteArray()
             }
 
-            APIEndpoint.CONFIGURATION -> {
+            APIEndpoint.registerDevice -> {
+                // Mock device registration response
+                val response = mapOf(
+                    "deviceId" to "mock-device-${System.currentTimeMillis()}",
+                    "registered" to true,
+                    "message" to "Device registered successfully"
+                )
+                json.encodeToString(response).toByteArray()
+            }
+
+            APIEndpoint.deviceInfo -> {
+                // Mock device info update response
+                val response = mapOf(
+                    "deviceId" to "mock-device-${System.currentTimeMillis()}",
+                    "updated" to true,
+                    "message" to "Device information updated successfully"
+                )
+                json.encodeToString(response).toByteArray()
+            }
+
+            APIEndpoint.configuration -> {
                 // Mock configuration response - use the default configuration
                 val config = ConfigurationData.defaultConfiguration("dev-mode")
                 json.encodeToString(config).toByteArray()
             }
 
-            APIEndpoint.MODELS -> {
+            APIEndpoint.models -> {
                 // Return mock models for development mode
                 val models = createMockModels()
                 json.encodeToString(models).toByteArray()
             }
 
-            APIEndpoint.DEVICE_INFO -> {
-                // Mock device info response
-                val deviceInfo = mapOf(
-                    "model" to "Desktop",
-                    "osVersion" to System.getProperty("os.version"),
-                    "architecture" to System.getProperty("os.arch"),
-                    "totalMemory" to 8_000_000_000L,
-                    "availableMemory" to 4_000_000_000L,
-                    "hasNeuralEngine" to false,
-                    "gpuFamily" to "Unknown"
-                )
-                json.encodeToString(deviceInfo).toByteArray()
-            }
-
-            APIEndpoint.TELEMETRY -> {
+            APIEndpoint.telemetry -> {
                 // Return simple success response
                 val response = mapOf(
                     "success" to true,
@@ -123,13 +164,13 @@ class MockNetworkService : NetworkService {
                 json.encodeToString(response).toByteArray()
             }
 
-            APIEndpoint.GENERATION_HISTORY -> {
+            APIEndpoint.history -> {
                 // Return empty array for generation history
                 val emptyHistory: List<String> = emptyList()
                 json.encodeToString(emptyHistory).toByteArray()
             }
 
-            APIEndpoint.USER_PREFERENCES -> {
+            APIEndpoint.preferences -> {
                 // Return basic preferences
                 val preferences = mapOf(
                     "preferOnDevice" to true,

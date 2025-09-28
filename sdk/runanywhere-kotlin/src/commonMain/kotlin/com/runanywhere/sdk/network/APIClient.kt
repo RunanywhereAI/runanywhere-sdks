@@ -4,6 +4,7 @@ import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.services.AuthenticationService
+import com.runanywhere.sdk.config.SDKConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,7 +21,7 @@ import kotlin.random.Random
  * Provides parity with iOS APIClient functionality
  */
 class APIClient(
-    val baseURL: String,
+    baseURL: String?,
     val apiKey: String,
     val httpClient: HttpClient,
     val authenticationService: AuthenticationService? = null,
@@ -28,6 +29,10 @@ class APIClient(
     private val maxRetryAttempts: Int = 3,
     private val baseDelayMs: Long = 1000
 ) : NetworkService {
+
+    // Ensure baseURL is provided
+    val baseURL: String = baseURL?.takeIf { it.isNotBlank() }
+        ?: throw IllegalArgumentException("Base URL is required. Initialize the SDK with RunAnywhere.initialize(baseURL = \"your-url\")")
 
     /**
      * Network request interceptor for modifying requests before sending
@@ -74,7 +79,7 @@ class APIClient(
     init {
         logger.info("APIClient initialized with baseURL: $baseURL")
         httpClient.setDefaultHeaders(defaultHeaders)
-        httpClient.setDefaultTimeout(30000) // 30 second default timeout
+        httpClient.setDefaultTimeout(SDKConfig.DEFAULT_TIMEOUT_MS)
     }
 
     private val jsonSerializer = Json {
@@ -232,6 +237,8 @@ class APIClient(
      * Check network connectivity
      */
     override suspend fun isNetworkAvailable(): Boolean {
+        // If no network checker is provided, assume network is available
+        // This prevents false negatives when network checking isn't configured
         return networkChecker?.isNetworkAvailable() ?: true
     }
 
@@ -302,7 +309,14 @@ class APIClient(
                     logger.debug("$method request successful: $endpoint")
                     return networkResponse.body
                 } else {
-                    val error = handleHttpError(networkResponse.statusCode, endpoint, method)
+                    // Try to get response body for error details
+                    val errorBody = try {
+                        networkResponse.body?.decodeToString()
+                    } catch (e: Exception) {
+                        null
+                    }
+
+                    val error = handleHttpError(networkResponse.statusCode, endpoint, method, errorBody)
 
                     // Retry only on specific error conditions
                     if (shouldRetry(networkResponse.statusCode, attempt)) {
@@ -375,26 +389,35 @@ class APIClient(
 
     /**
      * Add authentication header to request
+     * Enhanced to handle new authentication endpoints from APIEndpoint enum
      */
     private suspend fun addAuthHeader(headers: MutableMap<String, String>, endpoint: String) {
         try {
             when {
+                // Authentication endpoints - DO NOT add Authorization header
+                // The API key is sent in the request body for these endpoints
+                endpoint.contains("/auth/sdk/authenticate") ||
+                endpoint.contains("/auth/sdk/refresh") ||
                 endpoint.contains("/auth/token") -> {
-                    // For authentication endpoint, use API key
-                    headers["Authorization"] = "Bearer $apiKey"
+                    // No Authorization header for authentication endpoints
+                    logger.debug("Skipping Authorization header for authentication endpoint: $endpoint")
                 }
+                // All other endpoints - use access token
                 else -> {
-                    // For other endpoints, use access token
                     val token = authenticationService?.getAccessToken()
                     if (token != null) {
                         headers["Authorization"] = "Bearer $token"
+                        logger.debug("Using access token for endpoint: $endpoint")
                     } else {
-                        logger.warn("No access token available for authenticated request")
+                        logger.warn("No access token available for authenticated request to: $endpoint")
+                        // Fall back to API key if no access token is available
+                        headers["Authorization"] = "Bearer $apiKey"
+                        logger.debug("Falling back to API key for endpoint: $endpoint")
                     }
                 }
             }
         } catch (e: Exception) {
-            logger.warn("Failed to add auth header: ${e.message}")
+            logger.warn("Failed to add auth header for $endpoint: ${e.message}")
             // Continue without auth - the server will handle the unauthorized request
         }
     }
@@ -411,12 +434,18 @@ class APIClient(
     /**
      * Handle HTTP errors and create appropriate SDKError
      */
-    private fun handleHttpError(statusCode: Int, endpoint: String, method: String): SDKError {
+    private fun handleHttpError(statusCode: Int, endpoint: String, method: String, responseBody: String? = null): SDKError {
+        // Log the response body for 422 errors to help debug validation issues
+        if (statusCode == 422 && responseBody != null) {
+            logger.error("Validation error (422) for $method $endpoint. Response: $responseBody")
+        }
+
         return when (statusCode) {
             401 -> SDKError.InvalidAPIKey("Authentication failed for $method $endpoint")
             403 -> SDKError.InvalidAPIKey("Access forbidden for $method $endpoint")
             404 -> SDKError.NetworkError("Endpoint not found: $method $endpoint")
             408 -> SDKError.NetworkError("Request timeout for $method $endpoint")
+            422 -> SDKError.NetworkError("Validation error for $method $endpoint${if (responseBody != null) ": $responseBody" else ""}")
             429 -> SDKError.NetworkError("Rate limit exceeded for $method $endpoint")
             in 500..599 -> SDKError.NetworkError("Server error $statusCode for $method $endpoint")
             else -> SDKError.NetworkError("HTTP $statusCode for $method $endpoint")

@@ -9,15 +9,16 @@ import com.runanywhere.sdk.models.QuantizationLevel
 import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
-import com.runanywhere.sdk.utils.SDKConstants
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.delay
 import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 /**
  * Mock implementation of NetworkService for development mode
  * Matches iOS MockNetworkService - returns predefined responses without making actual network calls
+ * Enhanced to support generic type methods
  */
 class MockNetworkService : NetworkService {
 
@@ -30,7 +31,38 @@ class MockNetworkService : NetworkService {
     /**
      * Simulated network delay in milliseconds
      */
-    private val mockDelay = SDKConstants.Development.MOCK_DELAY_MS
+    private val mockDelay = 500L // 0.5 seconds to simulate network delay
+
+    /**
+     * POST request with JSON payload and typed response
+     */
+    override suspend fun <T : Any, R : Any> post(
+        endpoint: APIEndpoint,
+        payload: T,
+        requiresAuth: Boolean
+    ): R {
+        logger.debug("Mock POST with typed payload to ${endpoint.url}")
+
+        // Simulate network delay
+        delay(mockDelay)
+
+        throw UnsupportedOperationException("Use postTyped extension function with reified types instead")
+    }
+
+    /**
+     * GET request with typed response
+     */
+    override suspend fun <R : Any> get(
+        endpoint: APIEndpoint,
+        requiresAuth: Boolean
+    ): R {
+        logger.debug("Mock GET with typed response from ${endpoint.url}")
+
+        // Simulate network delay
+        delay(mockDelay)
+
+        throw UnsupportedOperationException("Use getTyped extension function with reified types instead")
+    }
 
     override suspend fun postRaw(
         endpoint: APIEndpoint,
@@ -43,13 +75,7 @@ class MockNetworkService : NetworkService {
         logger.debug("Mock POST to ${endpoint.url}")
 
         // Return mock response based on endpoint
-        return when (endpoint) {
-            APIEndpoint.MODELS -> getMockModelsResponse()
-            APIEndpoint.CONFIGURATION -> getMockConfigurationResponse()
-            APIEndpoint.TELEMETRY -> ByteArray(0) // Empty response for telemetry
-            APIEndpoint.HEALTH_CHECK -> getMockStatusResponse()
-            else -> ByteArray(0)
-        }
+        return getMockResponse(endpoint, "POST")
     }
 
     override suspend fun getRaw(
@@ -62,13 +88,71 @@ class MockNetworkService : NetworkService {
         logger.debug("Mock GET to ${endpoint.url}")
 
         // Return mock response based on endpoint
+        return getMockResponse(endpoint, "GET")
+    }
+
+    /**
+     * Get mock response for any endpoint
+     */
+    private fun getMockResponse(endpoint: APIEndpoint, method: String): ByteArray {
         return when (endpoint) {
-            APIEndpoint.MODELS -> getMockModelsResponse()
-            APIEndpoint.CONFIGURATION -> getMockConfigurationResponse()
-            APIEndpoint.HEALTH_CHECK -> getMockStatusResponse()
-            APIEndpoint.DEVICE_INFO -> getMockDeviceInfoResponse()
-            else -> ByteArray(0)
+            APIEndpoint.models -> getMockModelsResponse()
+            APIEndpoint.configuration -> getMockConfigurationResponse()
+            APIEndpoint.telemetry -> ByteArray(0) // Empty response for telemetry
+            APIEndpoint.healthCheck -> getMockStatusResponse()
+            APIEndpoint.registerDevice -> getMockDeviceInfoResponse()
+            APIEndpoint.deviceInfo -> getMockDeviceInfoResponse()
+            APIEndpoint.authenticate -> getMockAuthResponse()
+            APIEndpoint.refreshToken -> getMockRefreshTokenResponse()
+            APIEndpoint.history -> getMockHistoryResponse()
+            APIEndpoint.preferences -> getMockPreferencesResponse()
         }
+    }
+
+    /**
+     * Get mock auth response
+     */
+    private fun getMockAuthResponse(): ByteArray {
+        val response = mapOf(
+            "accessToken" to "mock-access-token-${System.currentTimeMillis()}",
+            "refreshToken" to "mock-refresh-token-${System.currentTimeMillis()}",
+            "expiresIn" to 3600,
+            "tokenType" to "Bearer"
+        )
+        return json.encodeToString(response).encodeToByteArray()
+    }
+
+    /**
+     * Get mock refresh token response
+     */
+    private fun getMockRefreshTokenResponse(): ByteArray {
+        val response = mapOf(
+            "accessToken" to "mock-new-access-token-${System.currentTimeMillis()}",
+            "refreshToken" to "mock-new-refresh-token-${System.currentTimeMillis()}",
+            "expiresIn" to 3600,
+            "tokenType" to "Bearer"
+        )
+        return json.encodeToString(response).encodeToByteArray()
+    }
+
+    /**
+     * Get mock history response
+     */
+    private fun getMockHistoryResponse(): ByteArray {
+        val emptyHistory: List<String> = emptyList()
+        return json.encodeToString(emptyHistory).encodeToByteArray()
+    }
+
+    /**
+     * Get mock preferences response
+     */
+    private fun getMockPreferencesResponse(): ByteArray {
+        val preferences = mapOf(
+            "preferOnDevice" to true,
+            "maxCostPerRequest" to 0.01,
+            "preferredModels" to emptyList<String>()
+        )
+        return json.encodeToString(preferences).encodeToByteArray()
     }
 
     /**

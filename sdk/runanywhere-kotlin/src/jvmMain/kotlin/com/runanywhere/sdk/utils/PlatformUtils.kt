@@ -34,7 +34,14 @@ actual object PlatformUtils {
     }
 
     actual fun getPlatformName(): String {
-        return "jvm"
+        // Return the actual OS platform that the backend expects
+        val osName = System.getProperty("os.name", "").lowercase()
+        return when {
+            osName.contains("mac") || osName.contains("darwin") -> "macos"
+            osName.contains("win") -> "windows"
+            osName.contains("nix") || osName.contains("nux") || osName.contains("aix") -> "linux"
+            else -> "linux" // Default to linux for other Unix-like systems
+        }
     }
 
     actual fun getDeviceInfo(): Map<String, String> {
