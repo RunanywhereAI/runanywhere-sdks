@@ -69,46 +69,47 @@ struct RunAnywhereAIApp: App {
             // Clear any previous error
             await MainActor.run { initializationError = nil }
 
-            // SUPER SIMPLE MODULE REGISTRATION
-            // Just import the modules and call register() - that's it!
+            logger.info("🎯 Initializing SDK...")
 
-            logger.info("🎯 Registering AI modules with the SDK...")
-
-            // Register WhisperKit for Speech-to-Text
-            WhisperKitServiceProvider.register()
-            RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKit registered for Speech-to-Text")
-
-            // Register LLMSwift for Language Models (llama.cpp)
-            LLMSwiftServiceProvider.register()
-            RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
-            logger.info("✅ LLMSwift registered for Language Models")
-
-            // Register FluidAudioDiarization for Speaker Diarization
-            FluidAudioDiarizationProvider.register()
-            logger.info("✅ FluidAudioDiarization registered for Speaker Diarization")
-
-            // Register Foundation Models adapter for iOS 26+ and macOS 26+
-            if #available(iOS 26.0, macOS 26.0, *) {
-                RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
-                logger.info("✅ Foundation Models registered")
-            }
-
-            // Initialize the SDK with just API key
             let startTime = Date()
-            logger.info("🚀 Starting SDK initialization...")
 
-            // Production credentials for testing
-            let apiKey = "testing_api_keu"
-            let baseURL = "backend-prod.com"
+            // Determine environment based on build configuration
+            #if DEBUG
+            let environment = SDKEnvironment.development
+            logger.info("🛠️ Using DEVELOPMENT mode - No API key required!")
+            #else
+            let environment = SDKEnvironment.production
+            logger.info("🚀 Using PRODUCTION mode")
+            #endif
 
-            logger.debug("📋 Configuration: API Key: \(String(apiKey.prefix(10)))..., URL: \(baseURL)")
+            // Initialize SDK based on environment
+            if environment == .development {
+                // Development Mode - No API key needed!
+                try RunAnywhere.initialize(
+                    apiKey: "dev",  // Any string works
+                    baseURL: "localhost",  // Not used in dev mode
+                    environment: .development
+                )
+                logger.info("✅ SDK initialized in DEVELOPMENT mode")
 
-            try RunAnywhere.initialize(
-                apiKey: apiKey,
-                baseURL: baseURL,
-                environment: .production // Using production environment with real credentials
-            )
+                // Register adapters WITH custom models for development
+                await registerAdaptersForDevelopment()
+
+            } else {
+                // Production Mode - Real API key required
+                let apiKey = "testing_api_key"  // TODO: Get from secure storage
+                let baseURL = "https://api.runanywhere.ai"
+
+                try RunAnywhere.initialize(
+                    apiKey: apiKey,
+                    baseURL: baseURL,
+                    environment: .production
+                )
+                logger.info("✅ SDK initialized in PRODUCTION mode")
+
+                // Register adapters without custom models (uses console-managed models)
+                await registerAdaptersForProduction()
+            }
 
             let initTime = Date().timeIntervalSince(startTime)
             logger.info("✅ SDK successfully initialized !")
@@ -144,6 +145,119 @@ struct RunAnywhereAIApp: App {
         }
         await initializeSDK()
         await initializeBundledModels()
+    }
+
+    private func registerAdaptersForDevelopment() async {
+        logger.info("📦 Registering adapters with custom models for DEVELOPMENT mode")
+
+        do {
+            // Register LLMSwift with custom GGUF models
+            LLMSwiftServiceProvider.register()
+            try await RunAnywhere.registerFrameworkAdapter(
+                LLMSwiftAdapter(),
+                models: [
+                    // Small, fast model for quick testing
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+                        framework: .llamaCpp,
+                        id: "tinyllama-1b",
+                        name: "TinyLlama 1.1B Chat"
+                    ),
+                    // Medium model for better quality
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+                        framework: .llamaCpp,
+                        id: "llama2-7b-chat",
+                        name: "Llama 2 7B Chat"
+                    ),
+                    // Code generation model
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/TheBloke/CodeLlama-7B-Instruct-GGUF/resolve/main/codellama-7b-instruct.Q4_K_M.gguf",
+                        framework: .llamaCpp,
+                        id: "codellama-7b",
+                        name: "CodeLlama 7B Instruct"
+                    )
+                ],
+                options: .development  // Auto-download, show progress, etc.
+            )
+            logger.info("✅ LLMSwift registered with custom models")
+
+            // Register WhisperKit with custom models
+            WhisperKitServiceProvider.register()
+            try await RunAnywhere.registerFrameworkAdapter(
+                WhisperKitAdapter.shared,
+                models: [
+                    // Whisper models for speech-to-text
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/openai/whisper-base/resolve/main/pytorch_model.bin",
+                        framework: .whisperKit,
+                        id: "whisper-base",
+                        name: "Whisper Base"
+                    ),
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/openai/whisper-small/resolve/main/pytorch_model.bin",
+                        framework: .whisperKit,
+                        id: "whisper-small",
+                        name: "Whisper Small"
+                    )
+                ],
+                options: .development
+            )
+            logger.info("✅ WhisperKit registered with custom models")
+
+            // Register FluidAudioDiarization
+            FluidAudioDiarizationProvider.register()
+            logger.info("✅ FluidAudioDiarization registered")
+
+            // Register Foundation Models adapter for iOS 26+ and macOS 26+
+            if #available(iOS 26.0, macOS 26.0, *) {
+                try await RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
+                logger.info("✅ Foundation Models registered")
+            }
+
+            logger.info("🎉 All adapters registered with custom models for development")
+
+        } catch {
+            logger.error("❌ Failed to register adapters: \(error)")
+        }
+    }
+
+    private func registerAdaptersForProduction() async {
+        logger.info("📦 Registering adapters for PRODUCTION mode")
+
+        // Register WhisperKit for Speech-to-Text
+        WhisperKitServiceProvider.register()
+        do {
+            try await RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
+            logger.info("✅ WhisperKit registered")
+        } catch {
+            logger.error("Failed to register WhisperKit: \(error)")
+        }
+
+        // Register LLMSwift for Language Models
+        LLMSwiftServiceProvider.register()
+        do {
+            try await RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
+            logger.info("✅ LLMSwift registered")
+        } catch {
+            logger.error("Failed to register LLMSwift: \(error)")
+        }
+
+        // Register FluidAudioDiarization
+        FluidAudioDiarizationProvider.register()
+        logger.info("✅ FluidAudioDiarization registered")
+
+        // Register Foundation Models adapter for iOS 26+ and macOS 26+
+        if #available(iOS 26.0, macOS 26.0, *) {
+            do {
+                try await RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
+                logger.info("✅ Foundation Models registered")
+            } catch {
+                logger.error("Failed to register Foundation Models: \(error)")
+            }
+        }
+
+        logger.info("🎉 All adapters registered for production")
     }
 
     private func initializeBundledModels() async {
