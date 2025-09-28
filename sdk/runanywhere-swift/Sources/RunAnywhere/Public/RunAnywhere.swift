@@ -152,6 +152,11 @@ public enum RunAnywhere {
     private static var _isRegistering: Bool = false
     private static let registrationLock = NSLock()
 
+    /// Maximum number of registration retry attempts
+    private static let maxRegistrationRetries = 3
+    /// Delay between retry attempts (in nanoseconds)
+    private static let retryDelayNanoseconds: UInt64 = 2_000_000_000 // 2 seconds
+
     /// Ensure device is registered with backend (lazy registration)
     /// Only registers if device ID doesn't exist locally
     /// - Throws: SDKError if registration fails
@@ -161,9 +166,19 @@ public enum RunAnywhere {
         // Check if we're already registering
         if _isRegistering {
             registrationLock.unlock()
-            // Wait for registration to complete
-            while _isRegistering {
+            // Wait for registration to complete with timeout
+            var waitAttempts = 0
+            let maxWaitAttempts = 50 // 5 seconds total timeout
+            while _isRegistering && waitAttempts < maxWaitAttempts {
                 try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                waitAttempts += 1
+            }
+
+            // Check if we have a device ID after waiting
+            if let deviceId = _cachedDeviceId, !deviceId.isEmpty {
+                return
+            } else if waitAttempts >= maxWaitAttempts {
+                throw SDKError.timeout("Device registration timeout")
             }
             return
         }
@@ -188,51 +203,112 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Registration")
         logger.info("Starting device registration...")
 
-        do {
-            // Skip registration in development mode
-            if currentEnvironment == .development {
-                let mockDeviceId = "dev-" + generateDeviceIdentifier()
+        // Defer cleanup to ensure _isRegistering is always reset
+        defer {
+            _isRegistering = false
+        }
+
+        // Skip registration in development mode
+        if currentEnvironment == .development {
+            let mockDeviceId = "dev-" + generateDeviceIdentifier()
+            do {
                 try storeDeviceId(mockDeviceId)
                 _cachedDeviceId = mockDeviceId
                 logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
-                _isRegistering = false
                 return
+            } catch {
+                logger.error("Failed to store mock device ID: \(error.localizedDescription)")
+                throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
             }
-
-            // Ensure we have network services initialized
-            guard let params = initParams else {
-                throw SDKError.notInitialized
-            }
-
-            // Initialize API client and auth service if needed
-            if serviceContainer.authenticationService == nil {
-                print("🔧 DeviceRegistration: Initializing network services...")
-                try await serviceContainer.initializeNetworkServices(with: params)
-                print("✅ DeviceRegistration: Network services initialized")
-            }
-
-            guard let authService = serviceContainer.authenticationService else {
-                throw SDKError.invalidState("Authentication service not available")
-            }
-
-            // Register device with backend
-            let deviceRegistration = try await authService.registerDevice()
-
-            // Store device ID locally
-            try storeDeviceId(deviceRegistration.deviceId)
-            _cachedDeviceId = deviceRegistration.deviceId
-
-            logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
-
-        } catch {
-            logger.error("Device registration failed: \(error.localizedDescription)")
-            _isRegistering = false
-            throw error
         }
 
-        // Mark registration as complete
-        _isRegistering = false
-        logger.debug("Device registration completed")
+        // Ensure we have network services initialized
+        guard let params = initParams else {
+            throw SDKError.notInitialized
+        }
+
+        // Registration with retry logic
+        var lastError: Error?
+
+        for attempt in 1...maxRegistrationRetries {
+            do {
+                logger.info("Device registration attempt \(attempt) of \(maxRegistrationRetries)")
+
+                // Initialize API client and auth service if needed
+                if serviceContainer.authenticationService == nil {
+                    try await serviceContainer.initializeNetworkServices(with: params)
+                }
+
+                guard let authService = serviceContainer.authenticationService else {
+                    throw SDKError.invalidState("Authentication service not available")
+                }
+
+                // Register device with backend
+                let deviceRegistration = try await authService.registerDevice()
+
+                // Store device ID locally
+                try storeDeviceId(deviceRegistration.deviceId)
+                _cachedDeviceId = deviceRegistration.deviceId
+
+                logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
+                logger.debug("Device registration completed")
+                return // Success!
+
+            } catch {
+                lastError = error
+                logger.error("Device registration attempt \(attempt) failed: \(error.localizedDescription)")
+
+                // Check if error is retryable
+                if !isRetryableError(error) {
+                    logger.error("Non-retryable error, stopping registration attempts")
+                    throw error
+                }
+
+                // Wait before retrying (except on last attempt)
+                if attempt < maxRegistrationRetries {
+                    logger.info("Waiting \(retryDelayNanoseconds / 1_000_000_000) seconds before retry...")
+                    try? await Task.sleep(nanoseconds: retryDelayNanoseconds)
+                }
+            }
+        }
+
+        // All retries exhausted
+        let finalError = lastError ?? SDKError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
+        logger.error("Device registration failed after all retries: \(finalError.localizedDescription)")
+        throw finalError
+    }
+
+    /// Determine if an error is retryable
+    /// - Parameter error: The error to check
+    /// - Returns: true if the error is retryable (network issues, timeouts, etc.)
+    private static func isRetryableError(_ error: Error) -> Bool {
+        // Check for common retryable errors
+        if let sdkError = error as? SDKError {
+            switch sdkError {
+            case .networkError, .timeout, .serverError:
+                return true
+            case .invalidAPIKey, .notInitialized, .invalidState, .validationFailed, .storageError:
+                return false
+            default:
+                return false
+            }
+        }
+
+        // Check for NSError codes
+        if let nsError = error as NSError? {
+            // Common network error codes that are retryable
+            let retryableCodes = [
+                NSURLErrorTimedOut,
+                NSURLErrorCannotFindHost,
+                NSURLErrorCannotConnectToHost,
+                NSURLErrorNetworkConnectionLost,
+                NSURLErrorNotConnectedToInternet,
+                NSURLErrorDNSLookupFailed
+            ]
+            return retryableCodes.contains(nsError.code)
+        }
+
+        return false
     }
 
     // MARK: - Device ID Management
