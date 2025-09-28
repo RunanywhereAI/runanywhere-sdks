@@ -315,11 +315,11 @@ struct ModelSelectionSheet: View {
             // Wait a moment to show success message
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
+            // Update the shared view model first to ensure state consistency
+            await viewModel.selectModel(model)
+
             // Call the callback with the loaded model
             await onModelSelected(model)
-
-            // Update the shared view model
-            await viewModel.selectModel(model)
 
             await MainActor.run {
                 dismiss()
