@@ -495,8 +495,11 @@ public class ServiceContainer {
         logger.debug("Memory threshold configured")
 
         // Step 2: Initialize model registry for local discovery
-        // (No API key needed for local model discovery)
-        logger.debug("Model registry ready for lazy initialization")
+        // This needs to happen even in fast initialization to discover cached models
+        Task {
+            await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+            logger.debug("Model registry initialized for local discovery")
+        }
 
         // Step 3: Setup analytics for local queuing (no network submission yet)
         // Analytics will be initialized when network services are available

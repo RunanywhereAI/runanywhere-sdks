@@ -144,10 +144,15 @@ public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
                                     updatedModel.localPath = url
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-                                    // Save metadata persistently
+                                    // Save metadata persistently in a Task
                                     Task {
-                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                                        try? await modelInfoService.saveModel(updatedModel)
+                                        do {
+                                            let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                            try await modelInfoService.saveModel(updatedModel)
+                                            self.logger.info("Model metadata saved successfully for: \(model.id)")
+                                        } catch {
+                                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                                        }
                                     }
 
                                     self.logger.info("Download completed", metadata: [
@@ -279,6 +284,16 @@ public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
                     var updatedModel = model
                     updatedModel.localPath = resultURL
                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                    // Save metadata persistently
+                    do {
+                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                        try await modelInfoService.saveModel(updatedModel)
+                        self.logger.info("Model metadata saved successfully for: \(model.id)")
+                    } catch {
+                        self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                        // Continue with download completion, but log the error
+                    }
 
                     self.logger.info("Custom strategy download completed", metadata: [
                         "modelId": model.id,
@@ -448,10 +463,15 @@ extension AlamofireDownloadService {
                                     updatedModel.localPath = url
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-                                    // Save metadata persistently
+                                    // Save metadata persistently in a Task
                                     Task {
-                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                                        try? await modelInfoService.saveModel(updatedModel)
+                                        do {
+                                            let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                            try await modelInfoService.saveModel(updatedModel)
+                                            self.logger.info("Model metadata saved successfully for: \(model.id)")
+                                        } catch {
+                                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                                        }
                                     }
 
                                     continuation.resume(returning: url)
