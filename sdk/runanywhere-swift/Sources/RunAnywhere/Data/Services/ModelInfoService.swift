@@ -76,9 +76,9 @@ public actor ModelInfoService {
     /// Update download status
     public func updateDownloadStatus(
         _ modelId: String,
-        isDownloaded: Bool
+        isDownloaded: Bool,
+        localPath: URL? = nil
     ) async throws {
-        let localPath = isDownloaded ? URL(fileURLWithPath: "/path/to/model") : nil
         try await modelInfoRepository.updateDownloadStatus(modelId, localPath: localPath)
         logger.info("Updated download status for model \(modelId): \(isDownloaded)")
     }
