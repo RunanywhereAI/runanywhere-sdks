@@ -206,6 +206,7 @@ struct RunAnywhereAIApp: App {
                         framework: .whisperKit,
                         id: "whisper-tiny",
                         name: "Whisper Tiny",
+                        format: .mlmodel,  // Explicitly specify Core ML format
                         memoryRequirement: 39_000_000
                     ),
                     // Whisper Base - better quality
@@ -214,6 +215,7 @@ struct RunAnywhereAIApp: App {
                         framework: .whisperKit,
                         id: "whisper-base",
                         name: "Whisper Base",
+                        format: .mlmodel,  // Explicitly specify Core ML format
                         memoryRequirement: 74_000_000
                     )
                 ],
