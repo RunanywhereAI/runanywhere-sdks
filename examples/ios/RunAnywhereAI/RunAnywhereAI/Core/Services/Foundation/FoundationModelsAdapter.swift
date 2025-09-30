@@ -258,15 +258,15 @@ class FoundationModelsService: LLMService {
 
             // Stream tokens as they arrive
             var previousContent = ""
-            for try await partialResponse in responseStream {
-                // partialResponse contains the aggregated response so far
-                // We need to send only the new tokens
-                if partialResponse.count > previousContent.count {
-                    let newTokens = String(partialResponse.dropFirst(previousContent.count))
-                    onToken(newTokens)
-                    previousContent = partialResponse
-                }
-            }
+//            for try await partialResponse in responseStream {
+//                // partialResponse contains the aggregated response so far
+//                // We need to send only the new tokens
+//                if partialResponse.count > previousContent.count {
+//                    let newTokens = String(partialResponse.dropFirst(previousContent.count))
+//                    onToken(newTokens)
+//                    previousContent = partialResponse
+//                }
+//            }
 
             logger.debug("Streaming generation completed successfully")
         } catch let error as LanguageModelSession.GenerationError {

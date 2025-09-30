@@ -26,12 +26,19 @@ struct ContentView: View {
                 }
                 .tag(1)
 
+            BabyAGIChatView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Agent", systemImage: "brain")
+                }
+                .tag(2)
+
             StorageView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Storage", systemImage: "externaldrive")
                 }
-                .tag(2)
+                .tag(3)
 
             Group {
                 #if os(macOS)
@@ -47,14 +54,14 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(3)
+            .tag(4)
 
             QuizView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
                     Label("Quiz", systemImage: "questionmark.circle")
                 }
-                .tag(4)
+                .tag(5)
         }
         #if os(macOS)
         .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity,
