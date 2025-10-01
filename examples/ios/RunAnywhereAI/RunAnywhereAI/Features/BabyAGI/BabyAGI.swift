@@ -2,9 +2,6 @@
 //  BabyAGI.swift
 //  RunAnywhereAI
 //
-//  Created for BabyAGI Demo
-//  Fully local autonomous agent implementation
-//
 
 import Foundation
 import SwiftUI
@@ -14,14 +11,17 @@ import os
 @MainActor
 class BabyAGI: ObservableObject {
     @Published var tasks: [AgentTask] = []
-    @Published var executionLog: [ExecutionLogEntry] = []
     @Published var isProcessing = false
     @Published var currentObjective = ""
     @Published var currentStatus = "Ready"
     @Published var error: String?
+    @Published var currentPhase: AgentPhase = .idle
+    @Published var executionStartTime: Date?
+    @Published var executionEndTime: Date?
+    @Published var taskBreakdownResponse: String?
+    @Published var updateTrigger: Int = 0
 
     private let llmService: LocalLLMService
-    private let taskQueue = TaskQueue()
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "BabyAGI")
 
     init() {
@@ -31,157 +31,161 @@ class BabyAGI: ObservableObject {
     func processObjective(_ objective: String) async {
         guard !objective.isEmpty else { return }
 
-        await MainActor.run {
-            self.isProcessing = true
-            self.currentObjective = objective
-            self.currentStatus = "Initializing BabyAGI..."
-            self.tasks = []
-            self.executionLog = []
-            self.error = nil
-            self.addLog("🎯 New objective: \(objective)", type: .info)
-        }
+        executionStartTime = Date()
+        executionEndTime = nil
+        isProcessing = true
+        currentObjective = objective
+        tasks = []
+        error = nil
+        taskBreakdownResponse = nil
 
-        // Check if a model is loaded (like ChatViewModel does)
         guard ModelListViewModel.shared.currentModel != nil else {
-            await MainActor.run {
-                self.error = "No model loaded. Please select and load a model from the Settings tab first."
-                self.currentStatus = "No model loaded"
-                self.isProcessing = false
-                self.addLog("❌ No model loaded. Please go to Settings > Models to load one.", type: .error)
-            }
+            error = "No model loaded. Load a model from Settings."
+            currentStatus = "No model loaded"
+            currentPhase = .idle
+            isProcessing = false
             return
         }
 
-        await MainActor.run {
-            self.addLog("✅ Model loaded: \(ModelListViewModel.shared.currentModel?.name ?? "Unknown")", type: .success)
+        // Phase 1: Analyze objective
+        currentPhase = .analyzing
+        currentStatus = "🧠 Analyzing objective..."
+        try? await Task.sleep(nanoseconds: 500_000_000)
+
+        // Phase 2: Generate tasks
+        currentPhase = .generating
+        currentStatus = "⚙️ Breaking down into tasks..."
+        let (generatedTasks, breakdownText) = await generateTasks(objective)
+        tasks = generatedTasks
+        taskBreakdownResponse = breakdownText
+
+        guard !tasks.isEmpty else {
+            error = "Failed to generate tasks"
+            currentStatus = "❌ Failed to generate tasks"
+            currentPhase = .idle
+            isProcessing = false
+            executionEndTime = Date()
+            return
         }
 
-        // Step 1: Break down the objective into tasks
-        await MainActor.run {
-            self.currentStatus = "Generating tasks..."
-        }
-        let generatedTasks = await breakDownObjective(objective)
+        currentStatus = "✅ Generated \(tasks.count) tasks"
+        try? await Task.sleep(nanoseconds: 500_000_000)
 
-        await MainActor.run {
-            self.tasks = generatedTasks
-            self.addLog("📝 Generated \(generatedTasks.count) tasks", type: .success)
-        }
+        // Phase 3: Execute tasks (generate suggestions)
+        currentPhase = .executing
+        for index in tasks.indices {
+            let taskNumber = index + 1
+            let task = tasks[index]
+            currentStatus = "💡 Generating suggestion \(taskNumber)/\(tasks.count): \(task.name)"
 
-        // Step 2: Prioritize and order tasks
-        await MainActor.run {
-            self.currentStatus = "Prioritizing tasks..."
-        }
-        let prioritizedTasks = await prioritizeTasks(generatedTasks)
+            logger.info("Starting task \(taskNumber): \(task.name)")
 
-        await MainActor.run {
-            self.tasks = prioritizedTasks
-            self.addLog("🔄 Tasks prioritized by importance", type: .info)
-        }
+            // Update to in-progress
+            var currentTask = task
+            currentTask.status = .inProgress
+            currentTask.startTime = Date()
 
-        // Step 3: Execute each task (simulation for demo)
-        for (index, task) in prioritizedTasks.enumerated() {
-            await MainActor.run {
-                self.currentStatus = "Executing task \(index + 1) of \(prioritizedTasks.count)..."
-                if let taskIndex = self.tasks.firstIndex(where: { $0.id == task.id }) {
-                    self.tasks[taskIndex].status = .inProgress
-                }
-            }
+            var newTasks = tasks
+            newTasks[index] = currentTask
+            tasks = newTasks
+            updateTrigger += 1
 
+            // Generate suggestion
             let result = await executeTask(task)
 
-            await MainActor.run {
-                if let taskIndex = self.tasks.firstIndex(where: { $0.id == task.id }) {
-                    self.tasks[taskIndex].status = .completed
-                    self.tasks[taskIndex].result = result
-                }
-                self.addLog("✅ Completed: \(task.name)", type: .success)
+            logger.info("Got result for task \(taskNumber): '\(result)' (length: \(result.count) chars)")
+
+            // Update with result
+            currentTask.status = .completed
+            currentTask.result = result
+            currentTask.endTime = Date()
+
+            newTasks = tasks
+            newTasks[index] = currentTask
+            tasks = newTasks
+            updateTrigger += 1
+
+            let elapsed = currentTask.executionTime
+            logger.info("Task \(taskNumber) completed with result in \(elapsed, format: .fixed(precision: 1))s")
+
+            if taskNumber < tasks.count {
+                try? await Task.sleep(nanoseconds: 300_000_000)
             }
-
-            // Small delay for demo visibility
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         }
 
-        await MainActor.run {
-            self.isProcessing = false
-            self.currentStatus = "All tasks completed!"
-            self.addLog("🎉 Objective completed successfully!", type: .success)
-        }
+        // Phase 4: Complete
+        currentPhase = .completed
+        executionEndTime = Date()
+        let totalTime = executionEndTime!.timeIntervalSince(executionStartTime!)
+        currentStatus = "✅ Generated \(tasks.count) suggestions in \(String(format: "%.1f", totalTime))s"
+        isProcessing = false
+
+        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        currentPhase = .idle
     }
 
-    private func breakDownObjective(_ objective: String) async -> [AgentTask] {
+    private func generateTasks(_ objective: String) async -> ([AgentTask], String?) {
         let prompt = PromptTemplates.taskBreakdown(objective: objective)
 
         do {
-            let response = try await llmService.generateTasks(from: objective, prompt: prompt)
-            return response
+            let (generatedTasks, rawResponse) = try await llmService.generateTasks(from: objective, prompt: prompt)
+            return (generatedTasks.sorted { $0.priority.rawValue > $1.priority.rawValue }, rawResponse)
         } catch {
-            await MainActor.run {
-                self.addLog("⚠️ Error generating tasks: \(error.localizedDescription)", type: .error)
-            self.error = "Failed to generate tasks. Please check your model is loaded."
-            }
-            return createFallbackTasks(for: objective)
-        }
-    }
-
-    private func prioritizeTasks(_ tasks: [AgentTask]) async -> [AgentTask] {
-        // Simple priority-based sorting for MVP
-        // In future, can use LLM to determine dependencies
-        return tasks.sorted { task1, task2 in
-            task1.priority.rawValue > task2.priority.rawValue
+            logger.error("Task generation failed: \(error.localizedDescription)")
+            self.error = "Failed to generate tasks"
+            return ([], nil)
         }
     }
 
     private func executeTask(_ task: AgentTask) async -> String {
-        // Simulate task execution with LLM
         do {
-            let result = try await llmService.executeTaskWithLLM(task)
-            return result
+            return try await llmService.executeTaskWithLLM(task)
         } catch {
-            return "Task completed (simulated)"
+            logger.error("Task execution failed: \(error.localizedDescription)")
+            return "Failed to execute task"
         }
-    }
-
-    private func createFallbackTasks(for objective: String) -> [AgentTask] {
-        // Fallback tasks if LLM fails
-        return [
-            AgentTask(
-                name: "Research",
-                description: "Gather information about: \(objective)",
-                priority: .high,
-                status: .pending
-            ),
-            AgentTask(
-                name: "Plan",
-                description: "Create a detailed plan",
-                priority: .high,
-                status: .pending
-            ),
-            AgentTask(
-                name: "Execute",
-                description: "Implement the plan",
-                priority: .medium,
-                status: .pending
-            ),
-            AgentTask(
-                name: "Review",
-                description: "Review and refine results",
-                priority: .low,
-                status: .pending
-            )
-        ]
-    }
-
-    private func addLog(_ message: String, type: LogType) {
-        let entry = ExecutionLogEntry(
-            timestamp: Date(),
-            message: message,
-            type: type
-        )
-        executionLog.append(entry)
     }
 }
 
-// MARK: - Supporting Types
+// MARK: - Models
+
+enum AgentPhase {
+    case idle
+    case analyzing
+    case generating
+    case executing
+    case completed
+
+    var description: String {
+        switch self {
+        case .idle: return "Ready"
+        case .analyzing: return "Analyzing"
+        case .generating: return "Planning"
+        case .executing: return "Executing"
+        case .completed: return "Complete"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .idle: return "brain"
+        case .analyzing: return "magnifyingglass"
+        case .generating: return "list.bullet.clipboard"
+        case .executing: return "bolt.fill"
+        case .completed: return "checkmark.circle.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .idle: return .secondary
+        case .analyzing: return .blue
+        case .generating: return .orange
+        case .executing: return .purple
+        case .completed: return .green
+        }
+    }
+}
 
 struct AgentTask: Identifiable, Equatable {
     let id = UUID()
@@ -189,16 +193,20 @@ struct AgentTask: Identifiable, Equatable {
     var description: String
     var priority: TaskPriority
     var status: TaskStatus
-    var subtasks: [AgentTask] = []
     var result: String?
-    var dependencies: [UUID] = []
-    var estimatedTime: String?
+    var startTime: Date?
+    var endTime: Date?
 
     init(name: String, description: String, priority: TaskPriority, status: TaskStatus = .pending) {
         self.name = name
         self.description = description
         self.priority = priority
         self.status = status
+    }
+
+    var executionTime: TimeInterval {
+        guard let start = startTime, let end = endTime else { return 0 }
+        return end.timeIntervalSince(start)
     }
 
     static func == (lhs: AgentTask, rhs: AgentTask) -> Bool {
@@ -256,114 +264,35 @@ enum TaskStatus: Codable {
     }
 }
 
-struct ExecutionLogEntry: Identifiable {
-    let id = UUID()
-    let timestamp: Date
-    let message: String
-    let type: LogType
-}
-
-enum LogType {
-    case info
-    case success
-    case warning
-    case error
-
-    var color: Color {
-        switch self {
-        case .info: return .blue
-        case .success: return .green
-        case .warning: return .orange
-        case .error: return .red
-        }
-    }
-}
-
-// MARK: - Task Queue
-
-class TaskQueue {
-    private var queue: [AgentTask] = []
-    private let lock = NSLock()
-
-    func add(_ tasks: [AgentTask]) {
-        lock.withLock {
-            queue.append(contentsOf: tasks)
-        }
-    }
-
-    func next() -> AgentTask? {
-        lock.withLock {
-            guard !queue.isEmpty else { return nil }
-            return queue.removeFirst()
-        }
-    }
-
-    var isEmpty: Bool {
-        lock.withLock {
-            return queue.isEmpty
-        }
-    }
-
-    func clear() {
-        lock.withLock {
-            queue.removeAll()
-        }
-    }
-}
-
-// MARK: - Prompt Templates
+// MARK: - Prompts
 
 struct PromptTemplates {
     static func taskBreakdown(objective: String) -> String {
         return """
-        You are an AI task planner. Break down this objective into specific, actionable tasks.
+        Break down this objective into specific, actionable tasks.
 
         Objective: \(objective)
 
-        Return a JSON array of tasks with this EXACT structure:
+        Return a JSON array with this structure:
         [
             {
-                "name": "Short task name",
-                "description": "Detailed description of what needs to be done",
+                "name": "Task name",
+                "description": "What needs to be done",
                 "priority": "critical/high/medium/low",
-                "estimatedTime": "time estimate (e.g., '10 minutes', '1 hour')"
+                "estimatedTime": "time estimate"
             }
         ]
 
-        Requirements:
-        - Be specific and practical
-        - Create 4-7 main tasks maximum
-        - Tasks should be actionable and measurable
-        - Order tasks logically
-        - Keep names concise (3-5 words)
-        - Make descriptions clear and detailed
-
-        Return ONLY the JSON array, no other text.
+        Create 3-5 tasks. Be specific and practical. Return ONLY the JSON array.
         """
     }
 
     static func executeTask(task: AgentTask) -> String {
         return """
-        You are executing this task: \(task.name)
+        For this task: \(task.name)
         Description: \(task.description)
 
-        Provide a brief, actionable result or recommendation for this task.
-        Be specific and practical. Limit response to 2-3 sentences.
-        """
-    }
-
-    static func prioritizeTasks(tasks: String) -> String {
-        return """
-        Given these tasks, analyze their dependencies and suggest the optimal execution order:
-
-        Tasks: \(tasks)
-
-        Consider:
-        - Logical dependencies
-        - Time efficiency
-        - Resource requirements
-
-        Return the reordered task list.
+        Provide a brief, actionable suggestion or recommendation on how to complete this task. 2-3 sentences maximum.
         """
     }
 }

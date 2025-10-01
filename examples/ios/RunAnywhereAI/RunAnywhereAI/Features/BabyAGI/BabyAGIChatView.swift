@@ -2,134 +2,94 @@
 //  BabyAGIChatView.swift
 //  RunAnywhereAI
 //
-//  Chat interface for BabyAGI autonomous agent
-//
 
 import SwiftUI
 
 struct BabyAGIChatView: View {
     @StateObject private var agent = BabyAGI()
     @State private var inputText = ""
-    @State private var selectedUseCase: UseCase = .custom
-    @State private var showingExplanation = false
+    @State private var showingInfo = false
+    @State private var showingBreakdown = false
     @FocusState private var isInputFocused: Bool
-
-    enum UseCase: String, CaseIterable {
-        case custom = "Custom"
-        case tripPlanning = "🧳 Trip Planning"
-        case recipe = "🍳 Recipe Ideas"
-        case brainstorm = "💡 Brainstorming"
-
-        var placeholder: String {
-            switch self {
-            case .custom:
-                return "Enter your objective..."
-            case .tripPlanning:
-                return "e.g., Help me prepare for my trip to Japan next week"
-            case .recipe:
-                return "e.g., I have chicken, rice, and vegetables. What can I make?"
-            case .brainstorm:
-                return "e.g., Ideas for my daughter's 8th birthday party"
-            }
-        }
-
-        var exampleObjective: String {
-            switch self {
-            case .custom:
-                return ""
-            case .tripPlanning:
-                return "Help me prepare for my 5-day trip to Tokyo next month"
-            case .recipe:
-                return "I have chicken breast, brown rice, bell peppers, and onions. Suggest healthy dinner recipes"
-            case .brainstorm:
-                return "Help me plan a memorable 10th birthday party for my son who loves science"
-            }
-        }
-    }
 
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Header with status
-                headerView
+                // Status bar
+                statusBar
 
-                // Use case selector
-                useCaseSelector
-
-                // Main content area
+                // Main content
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 16) {
-                            // Error display
                             if let error = agent.error {
-                                errorCard(error: error)
+                                errorView(error)
                             }
 
-                            // Current objective display
                             if !agent.currentObjective.isEmpty {
-                                objectiveCard
+                                objectiveView
                             }
 
-                            // Task visualization
+                            if let breakdown = agent.taskBreakdownResponse {
+                                taskBreakdownView(breakdown: breakdown)
+                            }
+
                             if !agent.tasks.isEmpty {
-                                taskListView
+                                tasksView
                             }
 
-                            // Execution log
-                            if !agent.executionLog.isEmpty {
-                                executionLogView
-                            }
-
-                            // Welcome message when empty
-                            if agent.tasks.isEmpty && agent.executionLog.isEmpty {
-                                welcomeView
+                            if agent.tasks.isEmpty && agent.currentObjective.isEmpty {
+                                emptyStateView
                             }
                         }
                         .padding()
                         .id("bottom")
                     }
-                    .onChange(of: agent.executionLog.count) { _ in
+                    .onChange(of: agent.tasks.count) { _ in
                         withAnimation {
                             proxy.scrollTo("bottom", anchor: .bottom)
                         }
                     }
                 }
 
-                // Input area
-                inputArea
+                // Input
+                inputView
             }
-            .navigationTitle("BabyAGI Agent")
+            .navigationTitle("BabyAGI")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showingInfo = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.blue)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingInfo) {
+                infoSheet
+            }
         }
     }
 
-    // MARK: - View Components
+    // MARK: - Components
 
-    private var headerView: some View {
-        VStack(spacing: 8) {
-            // Agent status bar
-            HStack {
-                // Animated brain icon when processing
-                if agent.isProcessing {
-                    Image(systemName: "brain")
-                        .foregroundColor(.blue)
-                        .symbolEffect(.pulse.byLayer, options: .repeating)
-                } else {
-                    Image(systemName: "brain")
-                        .foregroundColor(.gray)
-                }
+    private var statusBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: agent.currentPhase.icon)
+                    .foregroundColor(agent.currentPhase.color)
+                    .font(.title3)
+                    .symbolEffect(.pulse, options: .repeating, isActive: agent.isProcessing)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("BabyAGI Autonomous Agent")
+                    Text(agent.currentStatus)
                         .font(.caption)
-                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
 
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(agent.isProcessing ? Color.orange : (ModelListViewModel.shared.currentModel != nil ? Color.green : Color.red))
-                            .frame(width: 8, height: 8)
-
-                        Text(agent.currentStatus)
+                    if let model = ModelListViewModel.shared.currentModel {
+                        Text(model.name)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -137,496 +97,356 @@ struct BabyAGIChatView: View {
 
                 Spacer()
 
-                // Info button
-                Button(action: { showingExplanation = true }) {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.blue)
-                }
-
                 if agent.isProcessing {
                     ProgressView()
-                        .scaleEffect(0.7)
+                        .scaleEffect(0.8)
                 }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding()
 
-            // Model status
-            if let model = ModelListViewModel.shared.currentModel {
-                HStack {
-                    Image(systemName: "cpu")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Text("Model: \(model.name)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal)
+            if agent.currentPhase != .idle {
+                phaseIndicator
             }
         }
         .background(Color(UIColor.secondarySystemBackground))
-        .sheet(isPresented: $showingExplanation) {
-            BabyAGIExplanationView()
-        }
     }
 
-    private var useCaseSelector: some View {
-        Picker("Use Case", selection: $selectedUseCase) {
-            ForEach(UseCase.allCases, id: \.self) { useCase in
-                Text(useCase.rawValue).tag(useCase)
+    private var phaseIndicator: some View {
+        HStack(spacing: 8) {
+            ForEach([AgentPhase.analyzing, .generating, .executing, .completed], id: \.description) { phase in
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(agent.currentPhase == phase || isPhasePassed(phase) ? phase.color : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+
+                    Text(phase.description)
+                        .font(.caption2)
+                        .foregroundColor(agent.currentPhase == phase || isPhasePassed(phase) ? .primary : .secondary)
+                }
+
+                if phase != .completed {
+                    Rectangle()
+                        .fill(isPhasePassed(phase) ? Color.blue : Color.gray.opacity(0.3))
+                        .frame(height: 2)
+                }
             }
         }
-        .pickerStyle(SegmentedPickerStyle())
-        .padding()
-        .onChange(of: selectedUseCase) { newValue in
-            if newValue != .custom && !newValue.exampleObjective.isEmpty {
-                inputText = newValue.exampleObjective
-            }
-        }
+        .padding(.horizontal)
+        .padding(.bottom, 12)
     }
 
-    private func errorCard(error: String) -> some View {
-        HStack {
-            Image(systemName: "exclamationmark.triangle.fill")
+    private func isPhasePassed(_ phase: AgentPhase) -> Bool {
+        let phases: [AgentPhase] = [.analyzing, .generating, .executing, .completed]
+        guard let currentIndex = phases.firstIndex(of: agent.currentPhase),
+              let targetIndex = phases.firstIndex(of: phase) else {
+            return false
+        }
+        return currentIndex > targetIndex
+    }
+
+    private func errorView(_ error: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.circle.fill")
                 .foregroundColor(.orange)
-
             Text(error)
-                .font(.footnote)
+                .font(.callout)
                 .foregroundColor(.primary)
-
             Spacer()
         }
         .padding()
         .background(Color.orange.opacity(0.1))
-        .cornerRadius(8)
-        .padding(.horizontal)
+        .cornerRadius(12)
     }
 
-    private var objectiveCard: some View {
+    private var objectiveView: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Objective", systemImage: "target")
+                Text("Objective")
                     .font(.headline)
-                    .foregroundColor(.blue)
-
                 Spacer()
-
                 if !agent.tasks.isEmpty {
-                    Text("\(agent.tasks.filter { $0.status == .completed }.count)/\(agent.tasks.count) tasks")
+                    Text("\(agent.tasks.filter { $0.status == .completed }.count)/\(agent.tasks.count)")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(6)
                 }
             }
 
             Text(agent.currentObjective)
                 .font(.body)
-                .padding()
+                .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    LinearGradient(
-                        gradient: Gradient(colors: [Color.blue.opacity(0.05), Color.blue.opacity(0.02)]),
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
-                )
+                .background(Color(UIColor.secondarySystemBackground))
                 .cornerRadius(8)
 
-            // Progress bar
             if !agent.tasks.isEmpty {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(height: 8)
-
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.blue)
-                            .frame(
-                                width: geometry.size.width * (Double(agent.tasks.filter { $0.status == .completed }.count) / Double(agent.tasks.count)),
-                                height: 8
-                            )
-                            .animation(.spring(), value: agent.tasks)
-                    }
-                }
-                .frame(height: 8)
+                ProgressView(value: Double(agent.tasks.filter { $0.status == .completed }.count),
+                           total: Double(agent.tasks.count))
+                    .tint(.blue)
             }
         }
+    }
+
+    private func taskBreakdownView(breakdown: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    showingBreakdown.toggle()
+                }
+            }) {
+                HStack {
+                    Image(systemName: "brain.head.profile")
+                        .foregroundColor(.purple)
+
+                    Text("How Tasks Were Generated")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.primary)
+
+                    Spacer()
+
+                    Image(systemName: showingBreakdown ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if showingBreakdown {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("LLM Response")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                        .textCase(.uppercase)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        Text(breakdown)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(UIColor.tertiarySystemBackground))
+                            .cornerRadius(8)
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+
+    private var tasksView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tasks")
+                .font(.headline)
+
+            ForEach(agent.tasks) { task in
+                TaskRow(task: task)
+            }
+            .id(agent.updateTrigger)
+        }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 24) {
+            Image(systemName: "brain")
+                .font(.system(size: 48))
+                .foregroundColor(.blue)
+
+            VStack(spacing: 8) {
+                Text("BabyAGI")
+                    .font(.title)
+                    .fontWeight(.bold)
+
+                Text("Autonomous Task Agent")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text("1")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Analyze Objective")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("Break down your goal into actionable tasks")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 12) {
+                    Text("2")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Prioritize Tasks")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("Order tasks by importance and dependencies")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                HStack(alignment: .top, spacing: 12) {
+                    Text("3")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                        .background(Color.blue)
+                        .clipShape(Circle())
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Execute Autonomously")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Text("Complete each task using local AI")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding()
+            .background(Color(UIColor.secondarySystemBackground))
+            .cornerRadius(12)
+        }
+        .padding(.vertical, 40)
         .padding(.horizontal)
     }
 
-    private var taskListView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("Generated Tasks", systemImage: "checklist")
-                .font(.headline)
-                .padding(.horizontal)
-
-            ForEach(agent.tasks) { task in
-                TaskCardView(task: task)
-                    .padding(.horizontal)
-            }
-        }
-    }
-
-    private var executionLogView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Execution Log", systemImage: "terminal")
-                .font(.headline)
-                .padding(.horizontal)
-
-            VStack(alignment: .leading, spacing: 4) {
-                ForEach(agent.executionLog) { entry in
-                    LogEntryView(entry: entry)
-                }
-            }
-            .padding(.horizontal)
-        }
-    }
-
-    private var welcomeView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "brain")
-                .font(.system(size: 60))
-                .foregroundColor(.blue)
-                .padding(.top, 40)
-
-            Text("Welcome to BabyAGI")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("I'm an autonomous agent that breaks down your objectives into actionable tasks and executes them locally on your device.")
-                .font(.body)
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 40)
-
-            VStack(alignment: .leading, spacing: 12) {
-                FeatureRow(icon: "lock.fill", text: "100% Private - No data leaves your device", color: .green)
-                FeatureRow(icon: "bolt.fill", text: "Fast local AI models", color: .orange)
-                FeatureRow(icon: "checklist", text: "Intelligent task decomposition", color: .blue)
-                FeatureRow(icon: "arrow.triangle.circlepath", text: "Autonomous execution", color: .purple)
-            }
-            .padding(.top, 20)
-
-            Text("Try an example above or enter your own objective below!")
-                .font(.footnote)
-                .foregroundColor(.secondary)
-                .padding(.top, 10)
-        }
-        .padding()
-    }
-
-    private var inputArea: some View {
+    private var inputView: some View {
         VStack(spacing: 0) {
             Divider()
 
             HStack(spacing: 12) {
-                TextField(selectedUseCase.placeholder, text: $inputText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                TextField("Enter your objective...", text: $inputText, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
                     .focused($isInputFocused)
-                    .onSubmit {
-                        processObjective()
-                    }
+                    .lineLimit(1...3)
+                    .onSubmit(send)
 
-                Button(action: processObjective) {
-                    if agent.isProcessing {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .frame(width: 24, height: 24)
-                    } else {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                    }
+                Button(action: send) {
+                    Image(systemName: agent.isProcessing ? "stop.circle.fill" : "arrow.up.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(canSend ? .blue : .gray)
                 }
-                .disabled(inputText.isEmpty || agent.isProcessing)
-                .foregroundColor(inputText.isEmpty || agent.isProcessing ? .gray : .blue)
+                .disabled(!canSend)
             }
             .padding()
-            .background(Color(UIColor.systemBackground))
         }
     }
 
-    // MARK: - Actions
-
-    private func processObjective() {
-        guard !inputText.isEmpty else { return }
-
-        let objective = inputText
-        inputText = ""
-        isInputFocused = false
-
-        Task {
-            await agent.processObjective(objective)
-        }
-    }
-}
-
-// MARK: - Supporting Views
-
-struct TaskCardView: View {
-    let task: AgentTask
-    @State private var isExpanded = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                // Animated status icon
-                ZStack {
-                    if task.status == .inProgress {
-                        Circle()
-                            .stroke(Color.blue.opacity(0.3), lineWidth: 2)
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Image(systemName: task.status.icon)
-                                    .foregroundColor(task.status.color)
-                                    .font(.system(size: 16))
-                            )
-                            .rotationEffect(.degrees(isExpanded ? 360 : 0))
-                            .animation(.linear(duration: 2).repeatForever(autoreverses: false), value: task.status)
-                    } else {
-                        Circle()
-                            .fill(task.status.color.opacity(0.1))
-                            .frame(width: 32, height: 32)
-                            .overlay(
-                                Image(systemName: task.status.icon)
-                                    .foregroundColor(task.status.color)
-                                    .font(.system(size: 16))
-                            )
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text(task.name)
-                            .font(.system(.subheadline, design: .rounded))
-                            .fontWeight(.semibold)
-                            .foregroundColor(task.status == .completed ? .secondary : .primary)
-
-                        Spacer()
-
-                        HStack(spacing: 4) {
-                            if task.status == .inProgress {
-                                Text("Executing...")
-                                    .font(.caption2)
-                                    .foregroundColor(.blue)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.1))
-                                    .cornerRadius(4)
-                            }
-
-                            Text(task.priority.label)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(task.priority.color.opacity(0.15))
-                                .foregroundColor(task.priority.color)
-                                .cornerRadius(4)
-                        }
-                    }
-
-                    Text(task.description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(isExpanded ? nil : 2)
-
-                    if let result = task.result {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.green)
-                                Text("Result:")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.green)
-                            }
-                            Text(result)
-                                .font(.caption)
-                                .foregroundColor(.primary)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Color.green.opacity(0.05))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(Color.green.opacity(0.2), lineWidth: 1)
-                                )
-                                .cornerRadius(6)
-                        }
-                        .padding(.top, 4)
-                    }
-                }
-
-                if task.description.count > 50 {
-                    Button(action: { withAnimation { isExpanded.toggle() } }) {
-                        Image(systemName: isExpanded ? "chevron.up.circle" : "chevron.down.circle")
-                            .foregroundColor(.blue)
-                            .font(.system(size: 16))
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(task.status == .inProgress ?
-                     Color.blue.opacity(0.05) :
-                     Color(UIColor.secondarySystemBackground))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            task.status == .inProgress ?
-                            Color.blue.opacity(0.3) :
-                            Color.clear,
-                            lineWidth: 1
-                        )
-                )
-        )
-        .scaleEffect(task.status == .inProgress ? 1.02 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: task.status)
-    }
-}
-
-struct LogEntryView: View {
-    let entry: ExecutionLogEntry
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(entry.type.color)
-                .frame(width: 6, height: 6)
-
-            Text(entry.message)
-                .font(.footnote)
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            Text(entry.timestamp, style: .time)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 2)
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let text: String
-    let color: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .frame(width: 24)
-
-            Text(text)
-                .font(.footnote)
-                .foregroundColor(.primary)
-
-            Spacer()
-        }
-    }
-}
-
-// MARK: - Preview
-
-// MARK: - Explanation View
-
-struct BabyAGIExplanationView: View {
-    @Environment(\.dismiss) var dismiss
-
-    var body: some View {
+    private var infoSheet: some View {
         NavigationView {
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 24) {
                     // Header
-                    VStack(alignment: .center, spacing: 12) {
+                    VStack(spacing: 12) {
                         Image(systemName: "brain")
                             .font(.system(size: 60))
                             .foregroundColor(.blue)
-                            .symbolEffect(.pulse)
 
-                        Text("BabyAGI Autonomous Agent")
-                            .font(.title2)
+                        Text("BabyAGI")
+                            .font(.largeTitle)
                             .fontWeight(.bold)
 
-                        Text("Powered by Local AI Models")
+                        Text("Autonomous Task Management Agent")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical)
 
-                    // What is BabyAGI?
+                    // What is BabyAGI
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("What is BabyAGI?", systemImage: "questionmark.circle.fill")
-                            .font(.headline)
-                            .foregroundColor(.blue)
+                        Text("What is BabyAGI?")
+                            .font(.title2)
+                            .fontWeight(.semibold)
 
-                        Text("BabyAGI is an autonomous AI agent that breaks down complex objectives into actionable tasks and executes them independently. It demonstrates how AI can plan, prioritize, and complete multi-step workflows without human intervention.")
+                        Text("BabyAGI is an autonomous AI agent that breaks down complex objectives into manageable tasks, prioritizes them, and executes them autonomously using a local language model.")
                             .font(.body)
                             .foregroundColor(.primary)
                     }
-                    .padding()
-                    .background(Color.blue.opacity(0.05))
-                    .cornerRadius(12)
 
                     // How it works
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("How It Works", systemImage: "gearshape.2.fill")
-                            .font(.headline)
-                            .foregroundColor(.green)
+                        Text("How It Works")
+                            .font(.title2)
+                            .fontWeight(.semibold)
 
-                        VStack(alignment: .leading, spacing: 12) {
-                            StepRow(number: "1", title: "Objective Analysis", description: "Understands your goal and context")
-                            StepRow(number: "2", title: "Task Generation", description: "Creates specific, actionable tasks")
-                            StepRow(number: "3", title: "Prioritization", description: "Orders tasks by importance and dependencies")
-                            StepRow(number: "4", title: "Execution", description: "Completes each task using local LLM")
-                            StepRow(number: "5", title: "Result Synthesis", description: "Combines results to achieve objective")
-                        }
+                        workflowStep(
+                            number: 1,
+                            title: "Analyze",
+                            description: "Understands your objective and identifies key requirements",
+                            icon: "magnifyingglass.circle.fill",
+                            color: .blue
+                        )
+
+                        workflowStep(
+                            number: 2,
+                            title: "Plan",
+                            description: "Breaks down the objective into specific, actionable tasks",
+                            icon: "list.bullet.clipboard.fill",
+                            color: .orange
+                        )
+
+                        workflowStep(
+                            number: 3,
+                            title: "Prioritize",
+                            description: "Orders tasks by importance and dependencies",
+                            icon: "arrow.up.arrow.down.circle.fill",
+                            color: .purple
+                        )
+
+                        workflowStep(
+                            number: 4,
+                            title: "Execute",
+                            description: "Completes each task autonomously using local AI",
+                            icon: "bolt.circle.fill",
+                            color: .green
+                        )
                     }
-                    .padding()
-                    .background(Color.green.opacity(0.05))
-                    .cornerRadius(12)
 
-                    // Key Features
+                    // Origins
                     VStack(alignment: .leading, spacing: 12) {
-                        Label("Key Features", systemImage: "star.fill")
-                            .font(.headline)
-                            .foregroundColor(.orange)
+                        Text("Origins")
+                            .font(.title2)
+                            .fontWeight(.semibold)
 
-                        VStack(alignment: .leading, spacing: 8) {
-                            FeatureRow(icon: "lock.shield.fill", text: "100% on-device processing", color: .green)
-                            FeatureRow(icon: "bolt.fill", text: "No internet required", color: .orange)
-                            FeatureRow(icon: "brain", text: "Autonomous task execution", color: .blue)
-                            FeatureRow(icon: "arrow.triangle.circlepath", text: "Adaptive planning", color: .purple)
-                        }
+                        Text("Based on the original BabyAGI project by Yohei Nakajima, this implementation showcases autonomous task management with on-device AI models.")
+                            .font(.body)
+                            .foregroundColor(.primary)
                     }
-                    .padding()
-                    .background(Color.orange.opacity(0.05))
-                    .cornerRadius(12)
 
-                    // Privacy Note
-                    HStack {
-                        Image(systemName: "lock.fill")
-                            .foregroundColor(.green)
-                        Text("All processing happens locally on your device. Your data never leaves your phone.")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
+                    // Features
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Key Features")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+
+                        featureRow(icon: "lock.shield.fill", title: "Privacy First", description: "All processing happens locally on your device")
+                        featureRow(icon: "cpu.fill", title: "On-Device AI", description: "Uses locally running language models")
+                        featureRow(icon: "arrow.triangle.branch", title: "Task Prioritization", description: "Intelligently orders tasks by importance")
+                        featureRow(icon: "clock.fill", title: "Real-Time Progress", description: "Watch tasks being analyzed and executed")
                     }
-                    .padding()
-                    .background(Color(UIColor.tertiarySystemBackground))
-                    .cornerRadius(8)
                 }
                 .padding()
             }
@@ -635,42 +455,204 @@ struct BabyAGIExplanationView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        dismiss()
+                        showingInfo = false
                     }
                 }
             }
         }
     }
-}
 
-struct StepRow: View {
-    let number: String
-    let title: String
-    let description: String
+    private func workflowStep(number: Int, title: String, description: String, icon: String, color: Color) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.15))
+                    .frame(width: 48, height: 48)
 
-    var body: some View {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundColor(color)
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("\(number).")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+
+                    Text(title)
+                        .font(.headline)
+                }
+
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    private func featureRow(icon: String, title: String, description: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Text(number)
-                .font(.system(.caption, design: .rounded))
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(Color.blue))
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(.blue)
+                .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
+
                 Text(description)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
     }
+
+    // MARK: - Helpers
+
+    private var canSend: Bool {
+        !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || agent.isProcessing
+    }
+
+    private func send() {
+        guard !inputText.isEmpty else { return }
+        let objective = inputText
+        inputText = ""
+        isInputFocused = false
+        Task {
+            await agent.processObjective(objective)
+        }
+    }
 }
 
-struct BabyAGIChatView_Previews: PreviewProvider {
-    static var previews: some View {
-        BabyAGIChatView()
+// MARK: - Task Row
+
+struct TaskRow: View {
+    let task: AgentTask
+    @State private var isExpanded = false
+
+    var body: some View {
+        Button(action: {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                isExpanded.toggle()
+            }
+        }) {
+            VStack(spacing: 0) {
+                // Main row (always visible)
+                HStack(spacing: 12) {
+                    Image(systemName: task.status.icon)
+                        .foregroundColor(task.status.color)
+                        .font(.title3)
+                        .frame(width: 24)
+                        .symbolEffect(.pulse, options: .repeating, isActive: task.status == .inProgress)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.name)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+
+                        if task.status == .completed, task.executionTime > 0 {
+                            Text("Generated in \(String(format: "%.1f", task.executionTime))s")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(spacing: 4) {
+                        Text(task.priority.label)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(task.priority.color.opacity(0.15))
+                            .foregroundColor(task.priority.color)
+                            .cornerRadius(4)
+
+                        Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+
+                // Expanded content
+                if isExpanded {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Divider()
+
+                        // Full description
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("TASK DESCRIPTION")
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.secondary)
+
+                            Text(task.description)
+                                .font(.callout)
+                                .foregroundColor(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.horizontal)
+
+                        // AI Suggestion
+                        if task.status == .completed {
+                            if let result = task.result, !result.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "lightbulb.fill")
+                                            .foregroundColor(.orange)
+                                            .font(.caption)
+
+                                        Text("AI SUGGESTION")
+                                            .font(.caption2)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.secondary)
+                                    }
+
+                                    Text(result)
+                                        .font(.callout)
+                                        .foregroundColor(.primary)
+                                        .padding(12)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [Color.orange.opacity(0.08), Color.yellow.opacity(0.08)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(Color.orange.opacity(0.25), lineWidth: 1.5)
+                                        )
+                                        .cornerRadius(8)
+                                }
+                                .padding(.horizontal)
+                            }
+                        } else if task.status == .inProgress {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                Text("Generating AI suggestion...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                    .padding(.bottom, 12)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .background(Color(UIColor.secondarySystemBackground))
+        .cornerRadius(12)
     }
 }
