@@ -189,6 +189,38 @@ struct RunAnywhereAIApp: App {
                         id: "llama-3.2-1b-instruct-q6-k",
                         name: "Llama 3.2 1B Instruct Q6_K",
                         memoryRequirement: 1_200_000_000
+                    ),
+                    // SmolLM2 1.7B - larger but capable
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
+                        framework: .llamaCpp,
+                        id: "smollm2-1.7b-instruct-q6-k-l",
+                        name: "SmolLM2 1.7B Instruct Q6_K_L",
+                        memoryRequirement: 1_800_000_000
+                    ),
+                    // Qwen 2.5 1.5B - good for longer context
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
+                        framework: .llamaCpp,
+                        id: "qwen-2.5-1.5b-instruct-q6-k",
+                        name: "Qwen 2.5 1.5B Instruct Q6_K",
+                        memoryRequirement: 1_600_000_000
+                    ),
+                    // LiquidAI LFM2 350M Q4_K_M - smallest and fastest
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                        framework: .llamaCpp,
+                        id: "lfm2-350m-q4-k-m",
+                        name: "LiquidAI LFM2 350M Q4_K_M",
+                        memoryRequirement: 250_000_000
+                    ),
+                    // LiquidAI LFM2 350M Q8_0 - highest quality
+                    try! ModelRegistration(
+                        url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                        framework: .llamaCpp,
+                        id: "lfm2-350m-q8-0",
+                        name: "LiquidAI LFM2 350M Q8_0",
+                        memoryRequirement: 400_000_000
                     )
                 ],
                 options: lazyOptions  // Use lazy loading options

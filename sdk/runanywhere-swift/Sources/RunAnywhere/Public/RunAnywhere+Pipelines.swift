@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // MARK: - Pipeline Extensions
 
@@ -49,7 +50,14 @@ public struct ModularPipelineConfig {
         // Convert simplified configs to full configurations
         self.vadConfig = vad.map { VADConfiguration(energyThreshold: $0.energyThreshold) }
         self.sttConfig = stt.map { STTConfiguration(modelId: $0.modelId, language: $0.language) }
-        self.llmConfig = llm.map { LLMConfiguration(modelId: $0.modelId, systemPrompt: $0.systemPrompt) }
+        self.llmConfig = llm.map {
+            LLMConfiguration(
+                modelId: $0.modelId,
+                temperature: 0.3,  // Lower temperature for more consistent responses
+                maxTokens: 200,    // Increased from default 100 for better responses
+                systemPrompt: $0.systemPrompt
+            )
+        }
         self.ttsConfig = tts.map { TTSConfiguration(voice: $0.voice) }
     }
 
@@ -181,6 +189,7 @@ public class ModularVoicePipeline {
     public func initializeComponents() -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
             Task { @MainActor in
+                let logger = Logger(subsystem: "com.runanywhere.sdk", category: "ModularVoicePipeline")
                 do {
                     // Initialize VAD
                     if let vad = vadComponent {
@@ -234,6 +243,7 @@ public class ModularVoicePipeline {
     public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
         AsyncThrowingStream { continuation in
             Task { @MainActor in
+                let logger = Logger(subsystem: "com.runanywhere.sdk", category: "ModularVoicePipeline")
                 do {
                     var currentSpeaker: SpeakerInfo?
                     var audioBuffer: [Float] = []  // Accumulate audio samples
@@ -252,44 +262,60 @@ public class ModularVoicePipeline {
 
                             if speechDetected && !isSpeaking {
                                 // Speech just started
+                                logger.info("🎙️ Speech started")
                                 continuation.yield(.vadSpeechStart)
                                 isSpeaking = true
                                 audioBuffer = []  // Clear buffer for new speech
                             } else if !speechDetected && isSpeaking {
                                 // Speech just ended
+                                logger.info("🎙️ Speech ended with \(audioBuffer.count) samples")
                                 continuation.yield(.vadSpeechEnd)
                                 isSpeaking = false
 
                                 // Now transcribe the accumulated audio
                                 if let stt = sttComponent, !audioBuffer.isEmpty {
-                                    // Convert accumulated float samples to Data
-                                    let accumulatedData = audioBuffer.withUnsafeBytes { bytes in
-                                        Data(bytes)
-                                    }
+                                    // Check minimum audio duration (at least 0.5 second = 8000 samples at 16kHz)
+                                    let minimumSamples = 8000
 
-                                    let transcript = try await stt.transcribe(accumulatedData)
-
-                                    // Only emit if we got actual text
-                                    if !transcript.text.isEmpty {
-                                        // Emit transcript with or without speaker info
-                                        if enableDiarization, let speaker = currentSpeaker {
-                                            continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
-                                        } else {
-                                            continuation.yield(.sttFinalTranscript(transcript.text))
+                                    if audioBuffer.count >= minimumSamples {
+                                        logger.info("📤 Sending \(audioBuffer.count) samples to STT")
+                                        // Convert accumulated float samples to Data
+                                        let accumulatedData = audioBuffer.withUnsafeBytes { bytes in
+                                            Data(bytes)
                                         }
 
-                                        // Process through LLM if available
-                                        if let llm = llmComponent {
-                                            continuation.yield(.llmThinking)
-                                            let response = try await llm.generate(prompt: transcript.text)
-                                            continuation.yield(.llmFinalResponse(response.text))
+                                        let transcript = try await stt.transcribe(accumulatedData)
 
-                                            // Process through TTS if available
-                                            if let tts = ttsComponent {
-                                                continuation.yield(.ttsStarted)
-                                                _ = try await tts.synthesize(response.text)
-                                                continuation.yield(.ttsCompleted)
+                                        // Only emit if we got actual text
+                                        if !transcript.text.isEmpty {
+                                            logger.info("📝 Got transcript: '\(transcript.text)'")
+
+                                            // Emit transcript with or without speaker info
+                                            if enableDiarization, let speaker = currentSpeaker {
+                                                continuation.yield(.sttFinalTranscriptWithSpeaker(transcript.text, speaker))
+                                            } else {
+                                                continuation.yield(.sttFinalTranscript(transcript.text))
                                             }
+
+                                            // Process through LLM if available
+                                            if let llm = llmComponent {
+                                                logger.info("🤖 Sending to LLM: '\(transcript.text)'")
+                                                continuation.yield(.llmThinking)
+                                                let response = try await llm.generate(prompt: transcript.text)
+                                                logger.info("💬 LLM Response: '\(response.text)'")
+                                                continuation.yield(.llmFinalResponse(response.text))
+
+                                                // Process through TTS if available
+                                                if let tts = ttsComponent {
+                                                    logger.info("🔊 Starting TTS for: '\(response.text.prefix(50))...'")
+                                                    continuation.yield(.ttsStarted)
+                                                    _ = try await tts.synthesize(response.text)
+                                                    logger.info("✅ TTS completed")
+                                                    continuation.yield(.ttsCompleted)
+                                                }
+                                            }
+                                        } else {
+                                            logger.debug("⚠️ Empty transcript, skipping")
                                         }
                                     }
 
