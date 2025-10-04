@@ -248,12 +248,13 @@ class FoundationModelsService: LLMService {
             // Stream tokens as they arrive
             var previousContent = ""
             for try await partialResponse in responseStream {
-                // partialResponse contains the aggregated response so far
+                // partialResponse.content contains the aggregated response so far
                 // We need to send only the new tokens
-                if partialResponse.count > previousContent.count {
-                    let newTokens = String(partialResponse.dropFirst(previousContent.count))
+                let currentContent = partialResponse.content
+                if currentContent.count > previousContent.count {
+                    let newTokens = String(currentContent.dropFirst(previousContent.count))
                     onToken(newTokens)
-                    previousContent = partialResponse
+                    previousContent = currentContent
                 }
             }
 
