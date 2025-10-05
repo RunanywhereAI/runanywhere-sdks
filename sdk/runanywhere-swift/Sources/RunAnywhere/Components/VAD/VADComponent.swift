@@ -41,6 +41,21 @@ public protocol VADService: AnyObject {
     /// Process audio samples
     @discardableResult
     func processAudioData(_ audioData: [Float]) -> Bool
+
+    /// Pause VAD processing (optional, not all implementations may support)
+    func pause()
+
+    /// Resume VAD processing (optional, not all implementations may support)
+    func resume()
+}
+
+/// Extension with default implementations for optional methods
+public extension VADService {
+    /// Default implementation does nothing
+    func pause() {}
+
+    /// Default implementation does nothing
+    func resume() {}
 }
 
 /// Speech activity events
@@ -99,9 +114,9 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters 
         }
 
         // Warn if threshold is too low or too high
-        if energyThreshold < 0.005 {
+        if energyThreshold < 0.002 {
             // This is just validation, can't log here, but the value is suspicious
-            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.005")
+            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002")
         }
         if energyThreshold > 0.1 {
             // This might be intentional for very noisy environments
@@ -230,6 +245,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
 
     private let vadConfiguration: VADConfiguration
     private var lastSpeechState: Bool = false
+    private var isPaused: Bool = false
 
     // MARK: - Initialization
 
@@ -247,6 +263,20 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Send
         // Fallback to default adapter (SimpleEnergyVAD)
         let defaultAdapter = DefaultVADAdapter()
         return try await defaultAdapter.createVADService(configuration: vadConfiguration)
+    }
+
+    // MARK: - Pause and Resume
+
+    /// Pause VAD processing
+    public func pause() {
+        isPaused = true
+        service?.pause()
+    }
+
+    /// Resume VAD processing
+    public func resume() {
+        isPaused = false
+        service?.resume()
     }
 
     // MARK: - Public API

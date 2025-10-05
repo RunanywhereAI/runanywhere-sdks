@@ -362,7 +362,7 @@ public enum RunAnywhere {
     /// Text generation with options
     /// - Parameters:
     ///   - prompt: The text prompt
-    ///   - options: Generation options (optional)
+    ///   - options: Generation options (optional, defaults to maxTokens: 100)
     /// - Returns: Generated response
     public static func generate(
         _ prompt: String,

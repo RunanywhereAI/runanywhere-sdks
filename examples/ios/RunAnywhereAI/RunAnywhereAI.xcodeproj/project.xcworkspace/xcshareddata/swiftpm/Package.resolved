@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/eastriverlee/LLM.swift",
       "state" : {
-        "branch" : "main",
-        "revision" : "4c4e909ac4758c628c9cd263a0c25b6edff5526d"
+        "revision" : "4c4e909ac4758c628c9cd263a0c25b6edff5526d",
+        "version" : "2.0.1"
       }
     },
     {

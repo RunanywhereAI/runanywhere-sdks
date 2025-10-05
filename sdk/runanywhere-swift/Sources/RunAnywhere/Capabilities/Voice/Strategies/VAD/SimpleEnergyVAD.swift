@@ -31,10 +31,12 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var isCurrentlySpeaking = false
     private var consecutiveSilentFrames = 0
     private var consecutiveVoiceFrames = 0
+    private var isPaused = false  // Track paused state
+    private var cooldownFrames = 0  // Frames to ignore after resuming
 
     // Hysteresis parameters to prevent rapid on/off switching
-    private let voiceStartThreshold = 2  // frames of voice to start
-    private let voiceEndThreshold = 5   // frames of silence to end (0.5 seconds at 100ms frames) - balanced for continuity
+    private let voiceStartThreshold = 1  // frames of voice to start - more responsive
+    private let voiceEndThreshold = 8   // frames of silence to end (0.8 seconds at 100ms frames) - more forgiving for pauses
 
     // Calibration properties
     private var isCalibrating = false
@@ -42,7 +44,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var calibrationFrameCount = 0
     private let calibrationFramesNeeded = 20  // ~2 seconds at 100ms frames
     private var ambientNoiseLevel: Float = 0.0
-    private var calibrationMultiplier: Float = 4.0  // Threshold = ambientNoise * multiplier - lower for better speech detection
+    private var calibrationMultiplier: Float = 2.2  // Threshold = ambientNoise * multiplier - balanced for speech detection
 
     // Debug statistics
     private var recentEnergyValues: [Float] = []
@@ -132,6 +134,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
     /// - Parameter buffer: AVAudioPCMBuffer containing audio data
     public func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         guard isActive else { return }
+        guard !isPaused else {
+            // Completely skip processing when paused - don't even look at the audio
+            return
+        }
 
         // Convert buffer to float array
         let audioData = convertBufferToFloatArray(buffer)
@@ -147,6 +153,13 @@ public class SimpleEnergyVAD: NSObject, VADService {
         if isCalibrating {
             handleCalibrationFrame(energy: energy)
             return  // Don't process voice activity during calibration
+        }
+
+        // Handle cooldown period - ignore audio but still process it
+        if cooldownFrames > 0 {
+            cooldownFrames -= 1
+            logger.debug("🧊 Cooldown active, ignoring frame (\\(self.cooldownFrames) frames remaining)")
+            return  // Skip voice detection during cooldown
         }
 
         let hasVoice = energy > energyThreshold
@@ -180,6 +193,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
     @discardableResult
     public func processAudioData(_ audioData: [Float]) -> Bool {
         guard isActive else { return false }
+        guard !isPaused else { return false }  // Skip processing when paused
         guard !audioData.isEmpty else { return false }
 
         // Calculate energy
@@ -192,6 +206,13 @@ public class SimpleEnergyVAD: NSObject, VADService {
         if isCalibrating {
             handleCalibrationFrame(energy: energy)
             return false  // Don't process voice activity during calibration
+        }
+
+        // Handle cooldown period
+        if cooldownFrames > 0 {
+            cooldownFrames -= 1
+            logger.debug("🧊 Cooldown active, ignoring frame (\\(self.cooldownFrames) frames remaining)")
+            return false  // Skip voice detection during cooldown
         }
 
         let hasVoice = energy > energyThreshold
@@ -334,16 +355,17 @@ public class SimpleEnergyVAD: NSObject, VADService {
         let oldThreshold = energyThreshold
         // Ensure minimum threshold is high enough to avoid false positives
         // but low enough to detect actual speech
-        let minimumThreshold: Float = 0.008  // Balanced for better speech detection
+        // Use dynamic minimum based on ambient noise level
+        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.0, 0.003)  // At least 2x ambient or 0.003
         let calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
 
         // Apply threshold with sensible bounds
         energyThreshold = Swift.max(calculatedThreshold, minimumThreshold)
 
-        // Cap at reasonable maximum
-        if energyThreshold > 0.05 {
-            energyThreshold = 0.05
-            logger.warning("⚠️ Calibration detected high ambient noise. Capping threshold at 0.05")
+        // Cap at reasonable maximum - much lower than before for better speech detection
+        if energyThreshold > 0.015 {
+            energyThreshold = 0.015
+            logger.warning("⚠️ Calibration detected high ambient noise. Capping threshold at 0.015 for better speech detection")
         }
 
         logger.info("✅ VAD Calibration Complete:")
@@ -357,8 +379,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     }
 
     /// Manually set calibration parameters
-    public func setCalibrationParameters(multiplier: Float = 4.0) {
-        calibrationMultiplier = Swift.max(3.0, Swift.min(8.0, multiplier))  // Clamp between 3x and 8x for better speech detection
+    public func setCalibrationParameters(multiplier: Float = 1.8) {
+        calibrationMultiplier = Swift.max(1.5, Swift.min(3.0, multiplier))  // Clamp between 1.5x and 3x for better speech detection
         logger.info("📝 Calibration multiplier set to \(self.calibrationMultiplier)x")
     }
 
@@ -369,6 +391,40 @@ public class SimpleEnergyVAD: NSObject, VADService {
         let current = recentEnergyValues.last ?? 0
 
         return (current: current, threshold: energyThreshold, ambient: ambientNoiseLevel, recentAvg: recent, recentMax: maxValue)
+    }
+
+    // MARK: - Pause and Resume
+
+    /// Pause VAD processing
+    public func pause() {
+        guard !isPaused else { return }
+        isPaused = true
+        logger.info("⏸️ VAD paused")
+
+        // If currently speaking, send end event
+        if isCurrentlySpeaking {
+            isCurrentlySpeaking = false
+            onSpeechActivity?(.ended)
+        }
+
+        // Clear recent energy values to avoid false positives when resuming
+        recentEnergyValues.removeAll()
+    }
+
+    /// Resume VAD processing
+    public func resume() {
+        guard isPaused else { return }
+        isPaused = false
+        // Reset state for clean resumption
+        isCurrentlySpeaking = false
+        consecutiveSilentFrames = 0
+        consecutiveVoiceFrames = 0
+        // Clear any accumulated energy values to start fresh
+        recentEnergyValues.removeAll()
+        debugFrameCount = 0
+        // Set cooldown to ignore initial frames after resume (10 frames = 1 second at 100ms frames)
+        cooldownFrames = 10
+        logger.info("▶️ VAD resumed - state fully reset with \\(self.cooldownFrames) frame cooldown")
     }
 
     // MARK: - Debug Helpers

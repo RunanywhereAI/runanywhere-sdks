@@ -95,7 +95,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
         cacheSize: Int = 100,
         preloadContext: String? = nil,
         temperature: Double = 0.7,
-        maxTokens: Int = 100,
+        maxTokens: Int = 100,  // Default to 100 tokens
         systemPrompt: String? = nil,
         streamingEnabled: Bool = true
     ) {
@@ -515,24 +515,21 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     // MARK: - Private Helpers
 
     private func buildPrompt(from messages: [Message], systemPrompt: String?) -> String {
+        // For LLMSwiftService, we should NOT add role markers as it handles its own templating
+        // Just concatenate the messages with newlines
         var prompt = ""
 
+        // Add system prompt first if available
         if let system = systemPrompt {
-            prompt += "System: \(system)\n\n"
+            prompt += "\(system)\n\n"
         }
 
+        // Add messages without role markers - let LLMSwiftService handle formatting
         for message in messages {
-            switch message.role {
-            case .user:
-                prompt += "User: \(message.content)\n"
-            case .assistant:
-                prompt += "Assistant: \(message.content)\n"
-            case .system:
-                prompt += "System: \(message.content)\n"
-            }
+            prompt += "\(message.content)\n"
         }
 
-        prompt += "Assistant: "
-        return prompt
+        // Don't add trailing "Assistant: " - LLMSwiftService handles this
+        return prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

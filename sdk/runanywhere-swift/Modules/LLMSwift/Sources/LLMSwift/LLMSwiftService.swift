@@ -140,6 +140,7 @@ public class LLMSwiftService: LLMService {
 
     public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         logger.info("🔧 Starting generation for prompt: \(prompt.prefix(50))...")
+        logger.info("📏 Max tokens limit: \(options.maxTokens)")
 
         guard let llm = llm else {
             logger.error("❌ LLM not initialized")
@@ -230,9 +231,11 @@ public class LLMSwiftService: LLMService {
                 // For responses with thinking content, we count tokens excluding tags
                 let tokens = finalResponse.split(separator: " ")
                 if tokens.count > options.maxTokens {
+                    logger.info("⚠️ Response exceeded maxTokens limit (\(tokens.count) > \(options.maxTokens)), truncating...")
                     // This is a simple approximation - in practice, token counting
                     // should be done by the tokenizer
                     finalResponse = tokens.prefix(options.maxTokens).joined(separator: " ")
+                    logger.info("✂️ Truncated response to \(options.maxTokens) tokens")
                 }
             }
 
