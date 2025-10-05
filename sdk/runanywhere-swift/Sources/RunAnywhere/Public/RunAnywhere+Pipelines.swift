@@ -262,17 +262,16 @@ public class ModularVoicePipeline {
 
                         // Check if we can process audio based on state
                         let currentState = await stateManager.state
-                        let canProcessAudio = await stateManager.canActivateMicrophone()
 
-                        // Be extra strict - skip audio during TTS, cooldown, and generating response
-                        if !canProcessAudio || currentState == .playingTTS || currentState == .cooldown || currentState == .generatingResponse {
-                            // Aggressively clear the audio buffer during these states
-                            audioBuffer.removeAll()  // Clear buffer to prevent any accumulation
-                            if currentState == .playingTTS || currentState == .cooldown {
-                                // Extra clearing for TTS and cooldown states
-                                audioBuffer = []
+                        // Block audio during TTS, generation, AND cooldown to prevent feedback
+                        if currentState == .playingTTS || currentState == .generatingResponse || currentState == .cooldown {
+                            // Clear buffer during these critical states
+                            audioBuffer.removeAll()
+                            if currentState == .cooldown {
+                                print("🛡️ Blocking audio during cooldown - preventing feedback")
+                            } else {
+                                print("🚫 Blocking audio - state: \(currentState), buffer cleared")
                             }
-                            print("🚫 Blocking audio - state: \(currentState), buffer cleared")
                             continue
                         }
 
@@ -298,9 +297,9 @@ public class ModularVoicePipeline {
 
                                 // Now transcribe the accumulated audio
                                 if let stt = sttComponent, !audioBuffer.isEmpty {
-                                    // Check minimum audio duration (at least 1.0 second = 16000 samples at 16kHz)
-                                    // WhisperKit performs better with longer audio segments
-                                    let minimumSamples = 16000
+                                    // Check minimum audio duration (at least 0.8 seconds = 12800 samples at 16kHz)
+                                    // This reduces "Audio too short" errors while maintaining responsiveness
+                                    let minimumSamples = 12800
 
                                     if audioBuffer.count >= minimumSamples {
                                         print("📤 Sending \(audioBuffer.count) samples to STT")
@@ -360,24 +359,23 @@ public class ModularVoicePipeline {
                                                         vad.notifyTTSWillStart()
                                                     }
 
-                                                    // Configure audio session for playback only (disable mic)
+                                                    // Keep audio session as-is since we're already in playAndRecord mode
+                                                    // Just ensure speaker output for TTS
                                                     #if os(iOS) || os(tvOS) || os(watchOS)
                                                     let audioSession = AVAudioSession.sharedInstance()
-                                                    let savedCategory = audioSession.category
-                                                    let savedMode = audioSession.mode
-                                                    let savedOptions = audioSession.categoryOptions
+                                                    
                                                     do {
-                                                        // Switch to playback-only mode to completely disable microphone
-                                                        try audioSession.setCategory(.playback, mode: .spokenAudio, options: [])
-                                                        try audioSession.setActive(true, options: [])
-                                                        print("🔇 Microphone disabled at system level for TTS")
+                                                        // Simply ensure speaker output without changing category
+                                                        try audioSession.overrideOutputAudioPort(.speaker)
+                                                        print("🔊 Audio routed to speaker for TTS")
                                                     } catch {
-                                                        print("⚠️ Failed to configure audio session for TTS: \(error)")
+                                                        // Non-critical if we can't override port
+                                                        print("⚠️ Could not route audio to speaker: \(error)")
                                                     }
                                                     #endif
 
-                                                    // Add a small delay to ensure VAD has blocked and audio session is configured
-                                                    try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+                                                    // Small delay for audio configuration
+                                                    try await Task.sleep(nanoseconds: 20_000_000) // 20ms
 
                                                     // Transition to TTS playback
                                                     let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
@@ -411,18 +409,13 @@ public class ModularVoicePipeline {
                                                         print("⚠️ Failed to transition to playingTTS state, skipping TTS")
                                                     }
 
-                                                    // Restore audio session for recording
+                                                    // Audio session stays in playAndRecord mode
+                                                    // Just add a small delay to ensure TTS audio has cleared
                                                     #if os(iOS) || os(tvOS) || os(watchOS)
-                                                    do {
-                                                        // Wait before re-enabling mic to ensure TTS audio has finished
-                                                        try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                                                        // Restore to recording mode
-                                                        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
-                                                        try audioSession.setActive(true, options: [])
-                                                        print("🎤 Microphone re-enabled at system level after 1s delay")
-                                                    } catch {
-                                                        print("⚠️ Failed to restore audio session: \(error)")
-                                                    }
+                                                    // Smaller delay since we're not switching modes
+                                                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                                                    
+                                                    print("🎤 Ready for recording - Sample rate: \(audioSession.sampleRate)Hz")
                                                     #endif
                                                 }
 
@@ -434,13 +427,17 @@ public class ModularVoicePipeline {
                                                 // Clear any buffered audio before resuming
                                                 audioBuffer.removeAll()
                                                 isSpeaking = false  // Reset speaking state
-
-                                                // Clear audio buffer immediately after TTS
-                                                audioBuffer.removeAll()
-
+                                                
+                                                // Wait for state manager cooldown to complete
+                                                // The AudioPipelineStateManager already handles 800ms cooldown
+                                                while await stateManager.state == .cooldown {
+                                                    try await Task.sleep(nanoseconds: 50_000_000) // Check every 50ms
+                                                }
+                                                
                                                 // Clear buffer and resume VAD
                                                 audioBuffer.removeAll()
                                                 await vadComponent?.resume()
+                                                print("▶️ VAD resumed")
                                                 print("🎤 VAD resumed, ready for next input")
                                             } else {
                                                 // No LLM, just transition back to idle
