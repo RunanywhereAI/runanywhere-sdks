@@ -136,8 +136,9 @@ public class WhisperKitService: STTService {
         // For short audio, don't pad with zeros - WhisperKit handles it better
         var processedSamples = samples
 
-        // Only pad if extremely short (less than 0.5 seconds)
-        let minRequiredSamples = 8000 // 0.5 seconds minimum
+        // Only pad if extremely short (less than 1.0 second)
+        // WhisperKit performs much better with at least 1 second of audio
+        let minRequiredSamples = 16000 // 1.0 seconds minimum
         if samples.count < minRequiredSamples {
             logger.info("📏 Audio too short (\(samples.count) samples), padding to \(minRequiredSamples)")
             // Pad with very low noise instead of zeros to avoid silence detection
@@ -161,17 +162,26 @@ public class WhisperKitService: STTService {
 
         logger.info("Starting WhisperKit transcription with \(audioSamples.count) samples...")
 
-        // Use simple, conservative decoding options for reliable transcription
+        // Adaptive configuration based on audio length for better transcription
+        let audioLengthSeconds = Float(audioSamples.count) / 16000.0  // Assuming 16kHz sample rate
+
+        // Adjust noSpeechThreshold based on audio length - shorter audio needs lower threshold
+        let adaptiveNoSpeechThreshold: Float = audioLengthSeconds < 2.0 ? 0.3 : 0.4
+
+        // Use more conservative settings to avoid garbled output
         let decodingOptions = DecodingOptions(
             task: .transcribe,
             language: "en",  // Force English
             temperature: 0.0,  // Conservative - no randomness
-            temperatureFallbackCount: 1,  // Minimal fallbacks
+            temperatureFallbackCount: 1,  // Reduce fallbacks to prevent garbled output
             sampleLength: 224,  // Standard length
             usePrefillPrompt: false,  // Disable prefill to avoid artifacts
             detectLanguage: false,  // Force English instead of auto-detect
             skipSpecialTokens: true,  // Skip special tokens to get clean text
-            withoutTimestamps: true  // No timestamps for cleaner output
+            withoutTimestamps: true,  // No timestamps for cleaner output
+            compressionRatioThreshold: 1.8,  // Lower threshold to catch more repetitive patterns
+            logProbThreshold: -1.0,  // More conservative probability threshold
+            noSpeechThreshold: adaptiveNoSpeechThreshold  // Adaptive threshold based on audio length
         )
 
         logger.info("🚀 Calling WhisperKit.transcribe() with \(audioSamples.count) samples...")
@@ -410,6 +420,37 @@ public class WhisperKitService: STTService {
         // Empty text is not garbled, just empty
         guard !trimmedText.isEmpty else { return false }
 
+        // Check for repetitive word patterns (like "you you you you" or "he said he said")
+        let words = trimmedText.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+
+        if words.count > 3 {
+            // Check for excessive word repetition
+            let wordCounts = Dictionary(words.map { ($0, 1) }, uniquingKeysWith: +)
+            for (word, count) in wordCounts {
+                // If any single word appears more than 40% of total words, it's likely garbled
+                if Double(count) / Double(words.count) > 0.4 {
+                    logger.warning("⚠️ Detected excessive word repetition: '\(word)' appears \(count) times in \(words.count) words")
+                    return true
+                }
+            }
+
+            // Check for repeating short phrases (2-3 word patterns)
+            if words.count >= 6 {
+                // Check 2-word patterns
+                var twoWordPatterns: [String: Int] = [:]
+                for i in 0..<(words.count - 1) {
+                    let pattern = "\(words[i]) \(words[i + 1])"
+                    twoWordPatterns[pattern, default: 0] += 1
+                }
+                for (pattern, count) in twoWordPatterns {
+                    if count > 3 && Double(count * 2) / Double(words.count) > 0.5 {
+                        logger.warning("⚠️ Detected repeating phrase pattern: '\(pattern)' repeats \(count) times")
+                        return true
+                    }
+                }
+            }
+        }
+
         // Check for non-Latin scripts (Hebrew, Arabic, Chinese, etc.)
         // We expect English output, so non-Latin scripts indicate wrong language detection
         let nonLatinRanges: [ClosedRange<UInt32>] = [
@@ -442,7 +483,7 @@ public class WhisperKitService: STTService {
         let garbledPatterns = [
             // Repetitive characters
             "^[\\(\\)\\-\\.\\s]+$",  // Only parentheses, dashes, dots, spaces
-            "^[\\-]{10,}",          // Many consecutive dashes
+            "^[\\-\\s]{10,}",        // Many consecutive dashes or spaces
             "^[\\(]{5,}",           // Many consecutive opening parentheses
             "^[\\)]{5,}",           // Many consecutive closing parentheses
             "^[\\.,]{5,}",          // Many consecutive dots/commas
@@ -458,7 +499,7 @@ public class WhisperKitService: STTService {
         }
 
         // Check character composition - if more than 70% is punctuation, likely garbled
-        let punctuationCount = trimmedText.filter { $0.isPunctuation }.count
+        let punctuationCount = trimmedText.filter { $0.isPunctuation || $0 == "-" }.count
         let totalCount = trimmedText.count
         if totalCount > 5 && Double(punctuationCount) / Double(totalCount) > 0.7 {
             return true
@@ -466,8 +507,9 @@ public class WhisperKitService: STTService {
 
         // Check for excessive repetition of the same character
         let charCounts = Dictionary(trimmedText.map { ($0, 1) }, uniquingKeysWith: +)
-        for (_, count) in charCounts {
-            if count > max(10, trimmedText.count / 2) {
+        for (char, count) in charCounts {
+            // Ignore spaces and dashes for this check
+            if char != " " && char != "-" && count > max(10, trimmedText.count / 2) {
                 return true
             }
         }
