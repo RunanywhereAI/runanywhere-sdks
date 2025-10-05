@@ -34,7 +34,20 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
     // Hysteresis parameters to prevent rapid on/off switching
     private let voiceStartThreshold = 2  // frames of voice to start
-    private let voiceEndThreshold = 10   // frames of silence to end
+    private let voiceEndThreshold = 5   // frames of silence to end (0.5 seconds at 100ms frames) - balanced for continuity
+
+    // Calibration properties
+    private var isCalibrating = false
+    private var calibrationSamples: [Float] = []
+    private var calibrationFrameCount = 0
+    private let calibrationFramesNeeded = 20  // ~2 seconds at 100ms frames
+    private var ambientNoiseLevel: Float = 0.0
+    private var calibrationMultiplier: Float = 4.0  // Threshold = ambientNoise * multiplier - lower for better speech detection
+
+    // Debug statistics
+    private var recentEnergyValues: [Float] = []
+    private let maxRecentValues = 50
+    private var debugFrameCount = 0
 
     // MARK: - Initialization
 
@@ -61,6 +74,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     /// Initialize the VAD service
     public func initialize() async throws {
         start()
+        // Start automatic calibration
+        await startCalibration()
     }
 
     /// Current speech activity state
@@ -124,10 +139,31 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Calculate energy of the entire buffer
         let energy = calculateAverageEnergy(of: audioData)
+
+        // Update debug statistics
+        updateDebugStatistics(energy: energy)
+
+        // Handle calibration if active
+        if isCalibrating {
+            handleCalibrationFrame(energy: energy)
+            return  // Don't process voice activity during calibration
+        }
+
         let hasVoice = energy > energyThreshold
 
+        // Enhanced logging with more context
         let energyStr = String(format: "%.6f", energy)
-        logger.debug("Audio buffer: \(audioData.count) samples, energy: \(energyStr), threshold: \(self.energyThreshold), hasVoice: \(hasVoice)")
+        let thresholdStr = String(format: "%.6f", energyThreshold)
+        let percentAboveThreshold = ((energy - energyThreshold) / energyThreshold) * 100
+
+        if debugFrameCount % 10 == 0 {  // Log every 10th frame to reduce noise
+            let avgRecent = recentEnergyValues.isEmpty ? 0 : recentEnergyValues.reduce(0, +) / Float(recentEnergyValues.count)
+            let maxRecent = recentEnergyValues.max() ?? 0
+            let minRecent = recentEnergyValues.min() ?? 0
+
+            logger.info("📊 VAD Stats - Current: \(energyStr) | Threshold: \(thresholdStr) | Voice: \(hasVoice ? "✅" : "❌") | %Above: \(String(format: "%.1f%%", percentAboveThreshold)) | Avg: \(String(format: "%.6f", avgRecent)) | Range: [\(String(format: "%.6f", minRecent))-\(String(format: "%.6f", maxRecent))]")
+        }
+        debugFrameCount += 1
 
         // Update state based on voice detection
         updateVoiceActivityState(hasVoice: hasVoice)
@@ -148,10 +184,21 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Calculate energy
         let energy = calculateAverageEnergy(of: audioData)
+
+        // Update debug statistics
+        updateDebugStatistics(energy: energy)
+
+        // Handle calibration if active
+        if isCalibrating {
+            handleCalibrationFrame(energy: energy)
+            return false  // Don't process voice activity during calibration
+        }
+
         let hasVoice = energy > energyThreshold
 
-        // Log with threshold comparison for debugging
-        logger.debug("VAD: \(audioData.count) samples, energy: \(String(format: "%.6f", energy)) \(hasVoice ? ">" : "≤") threshold: \(String(format: "%.6f", self.energyThreshold)), voice: \(hasVoice ? "YES" : "no")")
+        // Enhanced debug logging
+        let ratio = energy / energyThreshold
+        logger.debug("🎤 VAD: Energy=\(String(format: "%.6f", energy)) | Threshold=\(String(format: "%.6f", self.energyThreshold)) | Ratio=\(String(format: "%.2fx", ratio)) | Voice=\(hasVoice ? "YES✅" : "NO❌") | Ambient=\(String(format: "%.6f", self.ambientNoiseLevel))")
 
         // Update state
         updateVoiceActivityState(hasVoice: hasVoice)
@@ -230,6 +277,107 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         return samples.withUnsafeBufferPointer { bufferPointer in
             Data(buffer: bufferPointer)
+        }
+    }
+
+    // MARK: - Calibration Methods
+
+    /// Start automatic calibration to determine ambient noise level
+    public func startCalibration() async {
+        logger.info("🎯 Starting VAD calibration - measuring ambient noise for \(Float(self.calibrationFramesNeeded) * self.frameLength) seconds...")
+
+        isCalibrating = true
+        calibrationSamples.removeAll()
+        calibrationFrameCount = 0
+
+        // Wait for calibration to complete (this is a simplified approach)
+        // In production, you'd want a more sophisticated async approach
+        let timeoutSeconds = Float(calibrationFramesNeeded) * frameLength + 2.0
+        try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+
+        if isCalibrating {
+            // Force complete calibration if still running
+            completeCalibration()
+        }
+    }
+
+    /// Handle a frame during calibration
+    private func handleCalibrationFrame(energy: Float) {
+        guard isCalibrating else { return }
+
+        calibrationSamples.append(energy)
+        calibrationFrameCount += 1
+
+        logger.debug("📏 Calibration frame \(self.calibrationFrameCount)/\(self.calibrationFramesNeeded): energy=\(String(format: "%.6f", energy))")
+
+        if calibrationFrameCount >= calibrationFramesNeeded {
+            completeCalibration()
+        }
+    }
+
+    /// Complete the calibration process
+    private func completeCalibration() {
+        guard isCalibrating, !calibrationSamples.isEmpty else { return }
+
+        // Calculate statistics from calibration samples
+        let sortedSamples = calibrationSamples.sorted()
+        let mean = calibrationSamples.reduce(0, +) / Float(calibrationSamples.count)
+        let median = sortedSamples[sortedSamples.count / 2]
+        let percentile75 = sortedSamples[min(sortedSamples.count - 1, Int(Float(sortedSamples.count) * 0.75))]
+        let percentile90 = sortedSamples[min(sortedSamples.count - 1, Int(Float(sortedSamples.count) * 0.90))]
+        let max = sortedSamples.last ?? 0
+
+        // Use 90th percentile as ambient noise level (robust to occasional spikes)
+        ambientNoiseLevel = percentile90
+
+        // Calculate dynamic threshold with better minimum
+        let oldThreshold = energyThreshold
+        // Ensure minimum threshold is high enough to avoid false positives
+        // but low enough to detect actual speech
+        let minimumThreshold: Float = 0.008  // Balanced for better speech detection
+        let calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
+
+        // Apply threshold with sensible bounds
+        energyThreshold = Swift.max(calculatedThreshold, minimumThreshold)
+
+        // Cap at reasonable maximum
+        if energyThreshold > 0.05 {
+            energyThreshold = 0.05
+            logger.warning("⚠️ Calibration detected high ambient noise. Capping threshold at 0.05")
+        }
+
+        logger.info("✅ VAD Calibration Complete:")
+        logger.info("  📊 Statistics: Mean=\(String(format: "%.6f", mean)), Median=\(String(format: "%.6f", median))")
+        logger.info("  📊 Percentiles: 75th=\(String(format: "%.6f", percentile75)), 90th=\(String(format: "%.6f", percentile90)), Max=\(String(format: "%.6f", max))")
+        logger.info("  🎯 Ambient Noise Level: \(String(format: "%.6f", self.ambientNoiseLevel))")
+        logger.info("  🔧 Threshold: \(String(format: "%.6f", oldThreshold)) → \(String(format: "%.6f", self.energyThreshold))")
+
+        isCalibrating = false
+        calibrationSamples.removeAll()
+    }
+
+    /// Manually set calibration parameters
+    public func setCalibrationParameters(multiplier: Float = 4.0) {
+        calibrationMultiplier = Swift.max(3.0, Swift.min(8.0, multiplier))  // Clamp between 3x and 8x for better speech detection
+        logger.info("📝 Calibration multiplier set to \(self.calibrationMultiplier)x")
+    }
+
+    /// Get current VAD statistics for debugging
+    public func getStatistics() -> (current: Float, threshold: Float, ambient: Float, recentAvg: Float, recentMax: Float) {
+        let recent = recentEnergyValues.isEmpty ? 0 : recentEnergyValues.reduce(0, +) / Float(recentEnergyValues.count)
+        let maxValue = recentEnergyValues.max() ?? 0
+        let current = recentEnergyValues.last ?? 0
+
+        return (current: current, threshold: energyThreshold, ambient: ambientNoiseLevel, recentAvg: recent, recentMax: maxValue)
+    }
+
+    // MARK: - Debug Helpers
+
+    /// Update debug statistics with new energy value
+    private func updateDebugStatistics(energy: Float) {
+        recentEnergyValues.append(energy)
+        if recentEnergyValues.count > maxRecentValues {
+            recentEnergyValues.removeFirst()
         }
     }
 }
