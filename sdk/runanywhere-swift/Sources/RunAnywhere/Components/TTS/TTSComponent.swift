@@ -272,11 +272,26 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
 
     public func initialize() async throws {
         #if os(iOS) || os(tvOS) || os(watchOS)
-        // Configure audio session for playback on iOS/tvOS/watchOS
+        // Configure audio session for playback with echo cancellation
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+
+        // Check if headphones are connected
+        let isHeadphonesConnected = audioSession.currentRoute.outputs.contains { output in
+            output.portType == .headphones || output.portType == .bluetoothA2DP
+        }
+
+        if isHeadphonesConnected {
+            // Use playAndRecord with headphones (no feedback risk)
+            try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth])
+            logger.info("System TTS initialized with headphones detected")
+        } else {
+            // Use playback category when using speaker to prevent feedback
+            // We'll switch back to playAndRecord after TTS completes
+            try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            logger.info("System TTS initialized with speaker output (feedback prevention mode)")
+        }
+
         try audioSession.setActive(true)
-        logger.info("System TTS initialized with playback configuration")
         #else
         // macOS doesn't require audio session configuration
         logger.info("System TTS initialized for macOS")
@@ -286,8 +301,42 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {
         // For system TTS, we can't easily get raw audio data
         // Instead, we'll play it directly and return empty data
+
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // Switch to playback mode to prevent microphone from picking up TTS
+        let audioSession = AVAudioSession.sharedInstance()
+        let previousCategory = audioSession.category
+        let previousMode = audioSession.mode
+        let previousOptions = audioSession.categoryOptions
+
+        do {
+            // Switch to playback-only mode during TTS
+            try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+            try audioSession.setActive(true)
+            logger.info("Switched to playback-only mode for TTS")
+        } catch {
+            logger.error("Failed to configure audio session for TTS: \(error)")
+        }
+        #endif
+
         await withCheckedContinuation { continuation in
-            completionHandler = {
+            completionHandler = { [weak self] in
+                #if os(iOS) || os(tvOS) || os(watchOS)
+                // Restore previous audio session configuration after TTS completes
+                Task { @MainActor in
+                    do {
+                        // Add a small delay to ensure audio has fully stopped
+                        try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+
+                        // Restore previous configuration
+                        try audioSession.setCategory(previousCategory, mode: previousMode, options: previousOptions)
+                        try audioSession.setActive(true)
+                        self?.logger.info("Restored audio session after TTS")
+                    } catch {
+                        self?.logger.error("Failed to restore audio session: \(error)")
+                    }
+                }
+                #endif
                 continuation.resume()
             }
 
