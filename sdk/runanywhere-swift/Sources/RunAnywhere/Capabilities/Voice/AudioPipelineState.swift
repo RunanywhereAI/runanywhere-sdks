@@ -161,6 +161,10 @@ public actor AudioPipelineStateManager {
         // From idle
         case (.idle, .listening):
             return true
+        case (.idle, .cooldown):
+            // Allow idle to cooldown for cases where TTS completes quickly
+            // or when we need to enforce cooldown after other operations
+            return true
 
         // From listening
         case (.listening, .idle),
@@ -175,11 +179,15 @@ public actor AudioPipelineStateManager {
 
         // From generating response
         case (.generatingResponse, .playingTTS),
-             (.generatingResponse, .idle):
+             (.generatingResponse, .idle),
+             (.generatingResponse, .cooldown):
+            // Allow direct transition to cooldown if TTS is skipped
             return true
 
         // From playing TTS
-        case (.playingTTS, .cooldown):
+        case (.playingTTS, .cooldown),
+             (.playingTTS, .idle):
+            // Allow transition to idle if cooldown is not needed
             return true
 
         // From cooldown

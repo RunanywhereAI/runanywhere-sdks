@@ -380,16 +380,36 @@ public class ModularVoicePipeline {
                                                     try await Task.sleep(nanoseconds: 200_000_000) // 200ms
 
                                                     // Transition to TTS playback
-                                                    await stateManager.transition(to: .playingTTS)
+                                                    let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
 
-                                                    print("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
-                                                    continuation.yield(.ttsStarted)
-                                                    _ = try await tts.synthesize(fullResponse)
-                                                    print("✅ TTS completed")
-                                                    continuation.yield(.ttsCompleted)
+                                                    if transitionedToPlaying {
+                                                        print("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
+                                                        continuation.yield(.ttsStarted)
 
-                                                    // Transition to cooldown
-                                                    await stateManager.transition(to: .cooldown)
+                                                        do {
+                                                            _ = try await tts.synthesize(fullResponse)
+                                                            print("✅ TTS completed")
+                                                            continuation.yield(.ttsCompleted)
+
+                                                            // Only transition to cooldown if we're still in playingTTS state
+                                                            // This prevents invalid transitions if state was changed elsewhere
+                                                            let currentState = await stateManager.state
+                                                            if currentState == .playingTTS {
+                                                                await stateManager.transition(to: .cooldown)
+                                                            } else {
+                                                                print("⚠️ State changed during TTS (now \(currentState.rawValue)), skipping cooldown transition")
+                                                            }
+                                                        } catch {
+                                                            print("⚠️ TTS synthesis failed: \(error)")
+                                                            // Ensure we transition out of playingTTS state even on error
+                                                            let currentState = await stateManager.state
+                                                            if currentState == .playingTTS {
+                                                                await stateManager.transition(to: .cooldown)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        print("⚠️ Failed to transition to playingTTS state, skipping TTS")
+                                                    }
 
                                                     // Restore audio session for recording
                                                     #if os(iOS) || os(tvOS) || os(watchOS)
@@ -418,25 +438,10 @@ public class ModularVoicePipeline {
                                                 // Clear audio buffer immediately after TTS
                                                 audioBuffer.removeAll()
 
-                                                // Wait for cooldown to complete with much longer delay
-                                                // This ensures TTS audio has fully cleared from hardware buffers
-                                                var cooldownIterations = 0
-                                                while await stateManager.state == .cooldown && cooldownIterations < 30 {  // Up to 3 seconds
-                                                    // Keep clearing buffer during cooldown
-                                                    audioBuffer.removeAll()
-                                                    try await Task.sleep(nanoseconds: 100_000_000)  // Check every 100ms
-                                                    cooldownIterations += 1
-                                                }
-
-                                                // Add substantial extra delay before resuming VAD
-                                                try await Task.sleep(nanoseconds: 2_000_000_000)  // 2 second extra delay
-
-                                                // Final buffer clear before resuming
+                                                // Clear buffer and resume VAD
                                                 audioBuffer.removeAll()
-
-                                                // Resume VAD after all delays
                                                 await vadComponent?.resume()
-                                                print("🎤 VAD resumed after extended cooldown (total ~5s), ready for next input")
+                                                print("🎤 VAD resumed, ready for next input")
                                             } else {
                                                 // No LLM, just transition back to idle
                                                 await stateManager.transition(to: .idle)
