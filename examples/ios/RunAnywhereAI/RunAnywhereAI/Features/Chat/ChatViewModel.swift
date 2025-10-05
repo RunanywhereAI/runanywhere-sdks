@@ -303,8 +303,15 @@ class ChatViewModel: ObservableObject {
                 logger.info("📝 Sending new message only: \(fullPrompt)")
 
                 // Get SDK configuration for generation options
-                // Use default settings for now
-                let effectiveSettings = (temperature: 0.7, maxTokens: 1000)
+                // Use settings from UserDefaults with fallback to 1000 tokens for chat
+                let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+                let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+
+                let effectiveSettings = (
+                    temperature: savedTemperature != 0 ? savedTemperature : 0.7,
+                    maxTokens: savedMaxTokens != 0 ? savedMaxTokens : 1000  // Default to 1000 tokens for chat
+                )
+
                 let options = RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature)
