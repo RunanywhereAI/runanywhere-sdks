@@ -44,7 +44,7 @@ public actor AudioPipelineStateManager {
         public let maxTTSDuration: TimeInterval
 
         public init(
-            cooldownDuration: TimeInterval = 2.0,  // Increased from 0.5 to 2.0 seconds
+            cooldownDuration: TimeInterval = 0.8,  // 800ms - better feedback prevention while maintaining responsiveness
             strictTransitions: Bool = true,
             maxTTSDuration: TimeInterval = 30.0
         ) {
@@ -119,14 +119,8 @@ public actor AudioPipelineStateManager {
         // Handle special state actions
         switch newState {
         case .playingTTS:
-            // Start TTS timeout timer
-            Task {
-                try? await Task.sleep(nanoseconds: UInt64(configuration.maxTTSDuration * 1_000_000_000))
-                if self.currentState == .playingTTS {
-                    logger.warning("TTS timeout reached, forcing transition to cooldown")
-                    await self.transition(to: .cooldown)
-                }
-            }
+            // Don't use timeout for System TTS as it manages its own completion
+            break
 
         case .cooldown:
             lastTTSEndTime = Date()
@@ -134,7 +128,7 @@ public actor AudioPipelineStateManager {
             Task {
                 try? await Task.sleep(nanoseconds: UInt64(cooldownDuration * 1_000_000_000))
                 if self.currentState == .cooldown {
-                    await self.transition(to: .idle)
+                    _ = self.transition(to: .idle)
                 }
             }
 

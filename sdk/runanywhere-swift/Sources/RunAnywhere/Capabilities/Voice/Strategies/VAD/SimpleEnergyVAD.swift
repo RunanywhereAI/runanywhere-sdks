@@ -12,10 +12,10 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
     /// Energy threshold for voice activity detection (0.0 to 1.0)
     /// Values above this threshold indicate voice activity
-    public var energyThreshold: Float = 0.022
+    public var energyThreshold: Float = 0.005  // Even lower threshold for better short phrase detection
 
     /// Base threshold before any adjustments
-    private var baseEnergyThreshold: Float = 0.022
+    private var baseEnergyThreshold: Float = 0.005
 
     /// Multiplier applied during TTS playback to prevent feedback
     private var ttsThresholdMultiplier: Float = 3.0
@@ -41,12 +41,12 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var isTTSActive = false  // Track if TTS is currently playing
 
     // Hysteresis parameters to prevent rapid on/off switching
-    private let voiceStartThreshold = 1  // frames of voice to start - more responsive
-    private let voiceEndThreshold = 8   // frames of silence to end (0.8 seconds at 100ms frames) - more forgiving for pauses
+    private let voiceStartThreshold = 1  // frames of voice to start - reduced to 1 frame for better short phrase detection
+    private let voiceEndThreshold = 8   // frames of silence to end (0.8 seconds at 100ms frames) - shorter for quicker responsiveness
 
     // Enhanced hysteresis for TTS mode
-    private let ttsVoiceStartThreshold = 3  // More frames needed during TTS
-    private let ttsVoiceEndThreshold = 5    // Quicker end during TTS
+    private let ttsVoiceStartThreshold = 10  // Much more frames needed during TTS to prevent feedback
+    private let ttsVoiceEndThreshold = 5     // Quicker end during TTS
 
     // Calibration properties
     private var isCalibrating = false
@@ -54,7 +54,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var calibrationFrameCount = 0
     private let calibrationFramesNeeded = 20  // ~2 seconds at 100ms frames
     private var ambientNoiseLevel: Float = 0.0
-    private var calibrationMultiplier: Float = 2.2  // Threshold = ambientNoise * multiplier - balanced for speech detection
+    private var calibrationMultiplier: Float = 2.5  // Threshold = ambientNoise * multiplier - higher to reduce false positives
 
     // Debug statistics
     private var recentEnergyValues: [Float] = []
@@ -71,7 +71,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
     public init(
         sampleRate: Int = 16000,
         frameLength: Float = 0.1,
-        energyThreshold: Float = 0.022
+        energyThreshold: Float = 0.005
     ) {
         self.sampleRate = sampleRate
         self.frameLengthSamples = Int(frameLength * Float(sampleRate))
@@ -147,7 +147,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Complete audio blocking during TTS - don't process at all
         if isTTSActive {
-            logger.debug("🚫 Audio completely blocked during TTS")
+            // Silently drop frames during TTS without logging to reduce noise
             return
         }
 
@@ -207,7 +207,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Complete audio blocking during TTS - don't process at all
         if isTTSActive {
-            logger.debug("🚫 Audio completely blocked during TTS")
+            // Silently drop frames during TTS without logging to reduce noise
             return false
         }
 
@@ -378,16 +378,16 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Ensure minimum threshold is high enough to avoid false positives
         // but low enough to detect actual speech
         // Use dynamic minimum based on ambient noise level
-        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.0, 0.003)  // At least 2x ambient or 0.003
+        let minimumThreshold: Float = Swift.max(ambientNoiseLevel * 2.5, 0.006)  // At least 2.5x ambient or 0.006
         let calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
 
         // Apply threshold with sensible bounds
         energyThreshold = Swift.max(calculatedThreshold, minimumThreshold)
 
-        // Cap at reasonable maximum - much lower than before for better speech detection
-        if energyThreshold > 0.015 {
-            energyThreshold = 0.015
-            logger.warning("⚠️ Calibration detected high ambient noise. Capping threshold at 0.015 for better speech detection")
+        // Cap at reasonable maximum - balanced for speech detection without false positives
+        if energyThreshold > 0.020 {
+            energyThreshold = 0.020
+            logger.warning("⚠️ Calibration detected high ambient noise. Capping threshold at 0.020")
         }
 
         logger.info("✅ VAD Calibration Complete:")
@@ -401,8 +401,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     }
 
     /// Manually set calibration parameters
-    public func setCalibrationParameters(multiplier: Float = 1.8) {
-        calibrationMultiplier = Swift.max(1.5, Swift.min(3.0, multiplier))  // Clamp between 1.5x and 3x for better speech detection
+    public func setCalibrationParameters(multiplier: Float = 2.5) {
+        calibrationMultiplier = Swift.max(2.0, Swift.min(4.0, multiplier))  // Clamp between 2.0x and 4.0x to reduce false positives
         logger.info("📝 Calibration multiplier set to \(self.calibrationMultiplier)x")
     }
 
@@ -483,15 +483,19 @@ public class SimpleEnergyVAD: NSObject, VADService {
     public func notifyTTSDidFinish() {
         isTTSActive = false
 
-        // Gradually restore threshold
+        // Immediately restore threshold for instant response
         energyThreshold = baseEnergyThreshold
 
         logger.info("🔇 TTS finished - VAD threshold restored to \(String(format: "%.6f", self.energyThreshold))")
 
-        // Clear energy values to start fresh
+        // Reset state for immediate readiness
         recentEnergyValues.removeAll()
         consecutiveSilentFrames = 0
         consecutiveVoiceFrames = 0
+        isCurrentlySpeaking = false
+        
+        // Prime the VAD to be ready for immediate detection
+        debugFrameCount = 0
     }
 
     /// Set TTS threshold multiplier for feedback prevention
