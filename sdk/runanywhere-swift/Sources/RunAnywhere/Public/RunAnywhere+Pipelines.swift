@@ -319,15 +319,32 @@ public class ModularVoicePipeline {
 
                                                 logger.info("🤖 Sending to LLM: '\(transcript.text)'")
                                                 continuation.yield(.llmThinking)
-                                                let response = try await llm.generate(prompt: transcript.text)
-                                                logger.info("💬 LLM Response: '\(response.text)'")
-                                                continuation.yield(.llmFinalResponse(response.text))
+
+                                                // Use streaming for better UX - user sees response as it's generated
+                                                var fullResponse = ""
+                                                var lastYieldTime = Date()
+                                                let yieldInterval: TimeInterval = 0.1  // Yield every 100ms for smooth updates
+
+                                                for try await token in llm.streamGenerate(transcript.text) {
+                                                    fullResponse += token
+
+                                                    // Yield partial responses at regular intervals for smooth UI updates
+                                                    let now = Date()
+                                                    if now.timeIntervalSince(lastYieldTime) >= yieldInterval {
+                                                        continuation.yield(.llmPartialResponse(fullResponse))
+                                                        lastYieldTime = now
+                                                    }
+                                                }
+
+                                                // Always yield the final complete response
+                                                logger.info("💬 LLM Response: '\(fullResponse)'")
+                                                continuation.yield(.llmFinalResponse(fullResponse))
 
                                                 // Process through TTS if available
                                                 if let tts = ttsComponent {
-                                                    logger.info("🔊 Starting TTS for: '\(response.text.prefix(50))...'")
+                                                    logger.info("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
                                                     continuation.yield(.ttsStarted)
-                                                    _ = try await tts.synthesize(response.text)
+                                                    _ = try await tts.synthesize(fullResponse)
                                                     logger.info("✅ TTS completed")
                                                     continuation.yield(.ttsCompleted)
                                                 }
