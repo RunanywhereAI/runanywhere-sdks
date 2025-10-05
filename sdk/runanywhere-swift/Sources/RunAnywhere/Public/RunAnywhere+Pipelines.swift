@@ -54,8 +54,9 @@ public struct ModularPipelineConfig {
             LLMConfiguration(
                 modelId: $0.modelId,
                 temperature: 0.3,  // Lower temperature for more consistent responses
-                maxTokens: 200,    // Increased from default 100 for better responses
-                systemPrompt: $0.systemPrompt
+                maxTokens: $0.maxTokens ?? 100,  // Use provided or default to 100
+                systemPrompt: $0.systemPrompt,
+                streamingEnabled: true  // Enable streaming for real-time feedback
             )
         }
         self.ttsConfig = tts.map { TTSConfiguration(voice: $0.voice) }
@@ -100,10 +101,12 @@ public struct VoiceSTTConfig {
 public struct VoiceLLMConfig {
     public let modelId: String
     public let systemPrompt: String?
+    public let maxTokens: Int?  // Optional - let model decide if not specified
 
-    public init(modelId: String, systemPrompt: String? = nil) {
+    public init(modelId: String, systemPrompt: String? = nil, maxTokens: Int? = nil) {
         self.modelId = modelId
         self.systemPrompt = systemPrompt
+        self.maxTokens = maxTokens
     }
 }
 
@@ -248,11 +251,21 @@ public class ModularVoicePipeline {
                     var currentSpeaker: SpeakerInfo?
                     var audioBuffer: [Float] = []  // Accumulate audio samples
                     var isSpeaking = false
+                    var isProcessingResponse = false  // Track LLM/TTS processing state
+                    var consecutiveSilentFrames = 0
+                    var consecutiveVoiceFrames = 0
 
                     for await voiceChunk in audioStream {
                         // Extract float samples from VoiceAudioChunk
                         let floatSamples = voiceChunk.samples
                         let audioChunk = voiceChunk.data
+
+                        // Skip VAD processing during LLM/TTS to avoid feedback loop
+                        if isProcessingResponse {
+                            // Completely ignore audio during response generation and playback
+                            // Don't even accumulate it
+                            continue
+                        }
 
                         // Process through VAD if available
                         var speechDetected = false
@@ -274,8 +287,9 @@ public class ModularVoicePipeline {
 
                                 // Now transcribe the accumulated audio
                                 if let stt = sttComponent, !audioBuffer.isEmpty {
-                                    // Check minimum audio duration (at least 0.5 second = 8000 samples at 16kHz)
-                                    let minimumSamples = 8000
+                                    // Check minimum audio duration (at least 1.0 second = 16000 samples at 16kHz)
+                                    // WhisperKit performs better with longer audio segments
+                                    let minimumSamples = 16000
 
                                     if audioBuffer.count >= minimumSamples {
                                         logger.info("📤 Sending \(audioBuffer.count) samples to STT")
@@ -299,20 +313,60 @@ public class ModularVoicePipeline {
 
                                             // Process through LLM if available
                                             if let llm = llmComponent {
+                                                // Start processing response - disable VAD
+                                                isProcessingResponse = true
+                                                vadComponent?.pause()  // Pause VAD during response generation
+
                                                 logger.info("🤖 Sending to LLM: '\(transcript.text)'")
                                                 continuation.yield(.llmThinking)
-                                                let response = try await llm.generate(prompt: transcript.text)
-                                                logger.info("💬 LLM Response: '\(response.text)'")
-                                                continuation.yield(.llmFinalResponse(response.text))
+
+                                                // Use streaming for better UX - user sees response as it's generated
+                                                var fullResponse = ""
+                                                var lastYieldTime = Date()
+                                                let yieldInterval: TimeInterval = 0.1  // Yield every 100ms for smooth updates
+
+                                                for try await token in llm.streamGenerate(transcript.text) {
+                                                    fullResponse += token
+
+                                                    // Yield partial responses at regular intervals for smooth UI updates
+                                                    let now = Date()
+                                                    if now.timeIntervalSince(lastYieldTime) >= yieldInterval {
+                                                        continuation.yield(.llmPartialResponse(fullResponse))
+                                                        lastYieldTime = now
+                                                    }
+                                                }
+
+                                                // Always yield the final complete response
+                                                logger.info("💬 LLM Response: '\(fullResponse)'")
+                                                continuation.yield(.llmFinalResponse(fullResponse))
 
                                                 // Process through TTS if available
                                                 if let tts = ttsComponent {
-                                                    logger.info("🔊 Starting TTS for: '\(response.text.prefix(50))...'")
+                                                    logger.info("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
                                                     continuation.yield(.ttsStarted)
-                                                    _ = try await tts.synthesize(response.text)
+                                                    _ = try await tts.synthesize(fullResponse)
                                                     logger.info("✅ TTS completed")
                                                     continuation.yield(.ttsCompleted)
                                                 }
+
+                                                // Add longer delay before resuming VAD to ensure TTS audio has completely dissipated
+                                                // This prevents the microphone from picking up the tail end of TTS output
+                                                try await Task.sleep(nanoseconds: 2_500_000_000)  // 2.5 second delay
+
+                                                // Clear any buffered audio before resuming
+                                                audioBuffer.removeAll()
+                                                isSpeaking = false  // Reset speaking state
+                                                consecutiveSilentFrames = 0
+                                                consecutiveVoiceFrames = 0
+
+                                                // Resume VAD after response is complete
+                                                isProcessingResponse = false
+                                                vadComponent?.resume()  // Resume VAD after TTS
+
+                                                // Additional brief delay to let VAD stabilize after resume
+                                                try await Task.sleep(nanoseconds: 500_000_000)  // 0.5s stabilization
+
+                                                logger.info("🎤 VAD fully resumed and stabilized, ready for next input")
                                             }
                                         } else {
                                             logger.debug("⚠️ Empty transcript, skipping")
@@ -328,8 +382,8 @@ public class ModularVoicePipeline {
                             speechDetected = true
                         }
 
-                        // Accumulate audio if speaking
-                        if speechDetected {
+                        // Accumulate audio if we're currently in a speech segment
+                        if isSpeaking {
                             audioBuffer.append(contentsOf: floatSamples)
                         }
 

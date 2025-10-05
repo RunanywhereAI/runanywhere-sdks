@@ -142,9 +142,13 @@ class VoiceAssistantViewModel: ObservableObject {
         // Always include LLM component for complete pipeline flow
         let config = ModularPipelineConfig(
             components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.015), // Balanced threshold to avoid false positives
+            vad: VADConfig(energyThreshold: 0.006), // Optimized threshold for normal speaking voice
             stt: VoiceSTTConfig(modelId: whisperModelName),
-            llm: VoiceLLMConfig(modelId: "default", systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational."),
+            llm: VoiceLLMConfig(
+                modelId: "default",
+                systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational.",
+                maxTokens: 100  // Limit response to 100 tokens for concise voice interactions
+            ),
             // llm: VoiceLLMConfig(modelId: "default", systemPrompt: "INSTRUCTION: Give a direct answer. Do not write dialogue. Do not write User: or Assistant:. Just answer."),
             tts: VoiceTTSConfig(voice: "system")
         )
