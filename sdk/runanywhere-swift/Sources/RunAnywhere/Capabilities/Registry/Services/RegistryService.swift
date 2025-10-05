@@ -73,10 +73,21 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        logger.debug("Registering model: \(model.id) - \(model.name)")
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file if localPath is not already set
+        if updatedModel.localPath == nil {
+            if let modelFile = fileManager.findModelFile(modelId: model.id) {
+                updatedModel.localPath = modelFile
+                logger.info("Found local file for model \(model.id): \(modelFile.path)")
+            }
+        }
+
+        logger.debug("Registering model: \(updatedModel.id) - \(updatedModel.name)")
         accessQueue.async(flags: .barrier) {
-            self.models[model.id] = model
-            self.logger.info("Successfully registered model: \(model.id)")
+            self.models[updatedModel.id] = updatedModel
+            self.logger.info("Successfully registered model: \(updatedModel.id)")
         }
     }
 
@@ -89,25 +100,38 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        // First register in memory
-        registerModel(model)
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file
+        if let modelFile = fileManager.findModelFile(modelId: model.id) {
+            updatedModel.localPath = modelFile
+            logger.info("Found local file for model \(model.id): \(modelFile.path)")
+        } else {
+            // Clear localPath if file doesn't exist
+            updatedModel.localPath = nil
+            logger.debug("No local file found for model \(model.id)")
+        }
+
+        // Register the updated model in memory
+        registerModel(updatedModel)
 
         // Check if model already exists in database to avoid unnecessary saves
         do {
             let modelInfoService = await ServiceContainer.shared.modelInfoService
-            let existingModel = try await modelInfoService.getModel(by: model.id)
+            let existingModel = try await modelInfoService.getModel(by: updatedModel.id)
 
             if existingModel == nil {
                 // Model doesn't exist in database, save it
-                try await modelInfoService.saveModel(model)
-                logger.info("Registered and saved new model persistently: \(model.id)")
+                try await modelInfoService.saveModel(updatedModel)
+                logger.info("Registered and saved new model persistently: \(updatedModel.id)")
             } else {
-                // Model exists, but let's update it with any new information
-                try await modelInfoService.saveModel(model)
-                logger.debug("Updated existing model in database: \(model.id)")
+                // Model exists, but let's update it with any new information (including localPath)
+                try await modelInfoService.saveModel(updatedModel)
+                logger.debug("Updated existing model in database: \(updatedModel.id)")
             }
         } catch {
-            logger.error("Failed to save model \(model.id) to database: \(error)")
+            logger.error("Failed to save model \(updatedModel.id) to database: \(error)")
             // Model is still registered in memory even if database save fails
         }
     }
