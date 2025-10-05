@@ -59,10 +59,11 @@ public class LLMSwiftService: LLMService {
                 logger.info("🚀 Creating LLM instance...")
 
                 // Create LLM instance with proper configuration
+                // Maintain reasonable history for context continuity
                 self.llm = LLM(
                     from: actualModelURL,  // Use the URL directly
                     template: template,
-                    historyLimit: 6,  // Limit conversation history to prevent context overflow
+                    historyLimit: 6,  // Keep 6 messages for context (3 exchanges)
                     maxTokenCount: Int32(maxTokens)
                 )
 
@@ -106,10 +107,11 @@ public class LLMSwiftService: LLMService {
             logger.info("🚀 Creating LLM instance...")
 
             // Create LLM instance with proper configuration
+            // Maintain reasonable history for context continuity
             self.llm = LLM(
                 from: URL(fileURLWithPath: modelPath),
                 template: template,
-                historyLimit: 6,  // Limit conversation history to prevent context overflow
+                historyLimit: 6,  // Keep 6 messages for context (3 exchanges)
                 maxTokenCount: Int32(maxTokens)
             )
 
@@ -165,11 +167,22 @@ public class LLMSwiftService: LLMService {
 
         // Generate response with timeout protection
         do {
-            logger.info("🚀 Calling llm.getCompletion() with 60-second timeout")
+            logger.info("🚀 Calling llm.getCompletion() with 10-second timeout")
             logger.info("📝 Full prompt being sent to LLM:")
             logger.info("---START PROMPT---")
             logger.info("\(fullPrompt)")
             logger.info("---END PROMPT---")
+
+            // Log LLM state
+            logger.info("📊 LLM History Count: \(llm.history.count)")
+            if !llm.history.isEmpty {
+                logger.warning("⚠️ LLM has existing history - this should be 0 for voice!")
+                for (index, chat) in llm.history.enumerated() {
+                    let roleStr = chat.role == .user ? "user" : "bot"
+                    let contentPreview = String(chat.content.prefix(500))
+                    logger.info("History[\(index)]: \(roleStr) - \(contentPreview)...")
+                }
+            }
 
             // Use the simpler getCompletion method which is more reliable
             logger.info("🔄 Using getCompletion method for generation...")
@@ -183,7 +196,7 @@ public class LLMSwiftService: LLMService {
                 }
 
                 group.addTask {
-                    // Timeout task
+                    // Timeout task - 60 seconds to allow for slower models on device
                     try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
                     self.logger.error("❌ Generation timed out after 60 seconds")
                     throw TimeoutError(message: "Generation timed out after 60 seconds")
@@ -337,6 +350,12 @@ public class LLMSwiftService: LLMService {
     public func cleanup() async {
         llm = nil
         modelPath = nil
+    }
+
+    /// Clear conversation history - useful for voice interactions
+    public func clearHistory() {
+        llm?.history.removeAll()
+        logger.info("🧹 Conversation history cleared")
     }
 
     public func getModelMemoryUsage() async throws -> Int64 {
