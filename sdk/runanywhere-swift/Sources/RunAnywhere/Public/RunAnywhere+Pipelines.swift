@@ -1,5 +1,6 @@
 import Foundation
 import os
+import AVFoundation
 
 // MARK: - Pipeline Extensions
 
@@ -7,13 +8,15 @@ public extension RunAnywhere {
 
     /// Create a modular voice pipeline for the sample app
     /// This uses individual components in a modular way
-    @MainActor
     static func createVoicePipeline(config: ModularPipelineConfig) async throws -> ModularVoicePipeline {
         return try await ModularVoicePipeline(config: config)
     }
 }
 
 // MARK: - Modular Pipeline Configuration
+
+// Type alias to help with type inference
+public typealias PipelineEventStream = AsyncThrowingStream<ModularPipelineEvent, Error>
 
 /// Configuration for the modular voice pipeline
 public struct ModularPipelineConfig {
@@ -129,7 +132,6 @@ public protocol ModularPipelineDelegate: AnyObject {
 // MARK: - Modular Voice Pipeline
 
 /// Modular voice pipeline that orchestrates individual components
-@MainActor
 public class ModularVoicePipeline {
     private var vadComponent: VADComponent?
     private var sttComponent: STTComponent?
@@ -140,6 +142,9 @@ public class ModularVoicePipeline {
 
     private let config: ModularPipelineConfig
     public weak var delegate: ModularPipelineDelegate?
+
+    // State management for feedback prevention
+    private let stateManager = AudioPipelineStateManager()
 
     // Diarization state
     private var enableDiarization = false
@@ -189,10 +194,9 @@ public class ModularVoicePipeline {
     }
 
     /// Initialize all components
-    public func initializeComponents() -> AsyncThrowingStream<ModularPipelineEvent, Error> {
-        AsyncThrowingStream { continuation in
-            Task { @MainActor in
-                let logger = Logger(subsystem: "com.runanywhere.sdk", category: "ModularVoicePipeline")
+    public func initializeComponents() -> PipelineEventStream {
+        return AsyncThrowingStream<ModularPipelineEvent, Error> { continuation in
+            Task {
                 do {
                     // Initialize VAD
                     if let vad = vadComponent {
@@ -243,27 +247,31 @@ public class ModularVoicePipeline {
     }
 
     /// Process audio stream through the pipeline
-    public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
+    public func process(audioStream: AsyncStream<VoiceAudioChunk>) -> PipelineEventStream {
         AsyncThrowingStream { continuation in
-            Task { @MainActor in
-                let logger = Logger(subsystem: "com.runanywhere.sdk", category: "ModularVoicePipeline")
+            Task {
                 do {
                     var currentSpeaker: SpeakerInfo?
                     var audioBuffer: [Float] = []  // Accumulate audio samples
                     var isSpeaking = false
-                    var isProcessingResponse = false  // Track LLM/TTS processing state
-                    var consecutiveSilentFrames = 0
-                    var consecutiveVoiceFrames = 0
 
                     for await voiceChunk in audioStream {
                         // Extract float samples from VoiceAudioChunk
                         let floatSamples = voiceChunk.samples
                         let audioChunk = voiceChunk.data
 
-                        // Skip VAD processing during LLM/TTS to avoid feedback loop
-                        if isProcessingResponse {
-                            // Completely ignore audio during response generation and playback
-                            // Don't even accumulate it
+                        // Check if we can process audio based on state
+                        let currentState = await stateManager.state
+
+                        // Block audio during TTS, generation, AND cooldown to prevent feedback
+                        if currentState == .playingTTS || currentState == .generatingResponse || currentState == .cooldown {
+                            // Clear buffer during these critical states
+                            audioBuffer.removeAll()
+                            if currentState == .cooldown {
+                                print("🛡️ Blocking audio during cooldown - preventing feedback")
+                            } else {
+                                print("🚫 Blocking audio - state: \(currentState), buffer cleared")
+                            }
                             continue
                         }
 
@@ -275,24 +283,26 @@ public class ModularVoicePipeline {
 
                             if speechDetected && !isSpeaking {
                                 // Speech just started
-                                logger.info("🎙️ Speech started")
+                                await stateManager.transition(to: .listening)
+                                print("🎙️ Speech started")
                                 continuation.yield(.vadSpeechStart)
                                 isSpeaking = true
                                 audioBuffer = []  // Clear buffer for new speech
                             } else if !speechDetected && isSpeaking {
                                 // Speech just ended
-                                logger.info("🎙️ Speech ended with \(audioBuffer.count) samples")
+                                await stateManager.transition(to: .processingSpeech)
+                                print("🎙️ Speech ended with \(audioBuffer.count) samples")
                                 continuation.yield(.vadSpeechEnd)
                                 isSpeaking = false
 
                                 // Now transcribe the accumulated audio
                                 if let stt = sttComponent, !audioBuffer.isEmpty {
-                                    // Check minimum audio duration (at least 1.0 second = 16000 samples at 16kHz)
-                                    // WhisperKit performs better with longer audio segments
-                                    let minimumSamples = 16000
+                                    // Check minimum audio duration (at least 0.8 seconds = 12800 samples at 16kHz)
+                                    // This reduces "Audio too short" errors while maintaining responsiveness
+                                    let minimumSamples = 12800
 
                                     if audioBuffer.count >= minimumSamples {
-                                        logger.info("📤 Sending \(audioBuffer.count) samples to STT")
+                                        print("📤 Sending \(audioBuffer.count) samples to STT")
                                         // Convert accumulated float samples to Data
                                         let accumulatedData = audioBuffer.withUnsafeBytes { bytes in
                                             Data(bytes)
@@ -302,7 +312,7 @@ public class ModularVoicePipeline {
 
                                         // Only emit if we got actual text
                                         if !transcript.text.isEmpty {
-                                            logger.info("📝 Got transcript: '\(transcript.text)'")
+                                            print("📝 Got transcript: '\(transcript.text)'")
 
                                             // Emit transcript with or without speaker info
                                             if enableDiarization, let speaker = currentSpeaker {
@@ -313,11 +323,13 @@ public class ModularVoicePipeline {
 
                                             // Process through LLM if available
                                             if let llm = llmComponent {
-                                                // Start processing response - disable VAD
-                                                isProcessingResponse = true
-                                                vadComponent?.pause()  // Pause VAD during response generation
+                                                // Transition to generating response
+                                                await stateManager.transition(to: .generatingResponse)
 
-                                                logger.info("🤖 Sending to LLM: '\(transcript.text)'")
+                                                // Pause VAD IMMEDIATELY when starting LLM generation
+                                                await vadComponent?.pause()  // Pause VAD during response generation
+
+                                                print("🤖 Sending to LLM: '\(transcript.text)'")
                                                 continuation.yield(.llmThinking)
 
                                                 // Use streaming for better UX - user sees response as it's generated
@@ -325,7 +337,7 @@ public class ModularVoicePipeline {
                                                 var lastYieldTime = Date()
                                                 let yieldInterval: TimeInterval = 0.1  // Yield every 100ms for smooth updates
 
-                                                for try await token in llm.streamGenerate(transcript.text) {
+                                                for try await token in await llm.streamGenerate(transcript.text) {
                                                     fullResponse += token
 
                                                     // Yield partial responses at regular intervals for smooth UI updates
@@ -337,44 +349,115 @@ public class ModularVoicePipeline {
                                                 }
 
                                                 // Always yield the final complete response
-                                                logger.info("💬 LLM Response: '\(fullResponse)'")
+                                                print("💬 LLM Response: '\(fullResponse)'")
                                                 continuation.yield(.llmFinalResponse(fullResponse))
 
                                                 // Process through TTS if available
                                                 if let tts = ttsComponent {
-                                                    logger.info("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
-                                                    continuation.yield(.ttsStarted)
-                                                    _ = try await tts.synthesize(fullResponse)
-                                                    logger.info("✅ TTS completed")
-                                                    continuation.yield(.ttsCompleted)
+                                                    // Notify VAD BEFORE starting TTS that it should block
+                                                    if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                                        vad.notifyTTSWillStart()
+                                                    }
+
+                                                    // Keep audio session as-is since we're already in playAndRecord mode
+                                                    // Just ensure speaker output for TTS
+                                                    #if os(iOS) || os(tvOS) || os(watchOS)
+                                                    let audioSession = AVAudioSession.sharedInstance()
+
+                                                    do {
+                                                        // Simply ensure speaker output without changing category
+                                                        try audioSession.overrideOutputAudioPort(.speaker)
+                                                        print("🔊 Audio routed to speaker for TTS")
+                                                    } catch {
+                                                        // Non-critical if we can't override port
+                                                        print("⚠️ Could not route audio to speaker: \(error)")
+                                                    }
+                                                    #endif
+
+                                                    // Small delay for audio configuration
+                                                    try await Task.sleep(nanoseconds: 20_000_000) // 20ms
+
+                                                    // Transition to TTS playback
+                                                    let transitionedToPlaying = await stateManager.transition(to: .playingTTS)
+
+                                                    if transitionedToPlaying {
+                                                        print("🔊 Starting TTS for: '\(fullResponse.prefix(50))...'")
+                                                        continuation.yield(.ttsStarted)
+
+                                                        do {
+                                                            _ = try await tts.synthesize(fullResponse)
+                                                            print("✅ TTS completed")
+                                                            continuation.yield(.ttsCompleted)
+
+                                                            // Only transition to cooldown if we're still in playingTTS state
+                                                            // This prevents invalid transitions if state was changed elsewhere
+                                                            let currentState = await stateManager.state
+                                                            if currentState == .playingTTS {
+                                                                await stateManager.transition(to: .cooldown)
+                                                            } else {
+                                                                print("⚠️ State changed during TTS (now \(currentState.rawValue)), skipping cooldown transition")
+                                                            }
+                                                        } catch {
+                                                            print("⚠️ TTS synthesis failed: \(error)")
+                                                            // Ensure we transition out of playingTTS state even on error
+                                                            let currentState = await stateManager.state
+                                                            if currentState == .playingTTS {
+                                                                await stateManager.transition(to: .cooldown)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        print("⚠️ Failed to transition to playingTTS state, skipping TTS")
+                                                    }
+
+                                                    // Audio session stays in playAndRecord mode
+                                                    // Just add a small delay to ensure TTS audio has cleared
+                                                    #if os(iOS) || os(tvOS) || os(watchOS)
+                                                    // Smaller delay since we're not switching modes
+                                                    try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
+                                                    print("🎤 Ready for recording - Sample rate: \(audioSession.sampleRate)Hz")
+                                                    #endif
                                                 }
 
-                                                // Add longer delay before resuming VAD to ensure TTS audio has completely dissipated
-                                                // This prevents the microphone from picking up the tail end of TTS output
-                                                try await Task.sleep(nanoseconds: 2_500_000_000)  // 2.5 second delay
+                                                // Notify VAD that TTS finished
+                                                if let vad = await vadComponent?.service as? SimpleEnergyVAD {
+                                                    vad.notifyTTSDidFinish()
+                                                }
 
                                                 // Clear any buffered audio before resuming
                                                 audioBuffer.removeAll()
                                                 isSpeaking = false  // Reset speaking state
-                                                consecutiveSilentFrames = 0
-                                                consecutiveVoiceFrames = 0
 
-                                                // Resume VAD after response is complete
-                                                isProcessingResponse = false
-                                                vadComponent?.resume()  // Resume VAD after TTS
+                                                // Wait for state manager cooldown to complete
+                                                // The AudioPipelineStateManager already handles 800ms cooldown
+                                                while await stateManager.state == .cooldown {
+                                                    try await Task.sleep(nanoseconds: 50_000_000) // Check every 50ms
+                                                }
 
-                                                // Additional brief delay to let VAD stabilize after resume
-                                                try await Task.sleep(nanoseconds: 500_000_000)  // 0.5s stabilization
-
-                                                logger.info("🎤 VAD fully resumed and stabilized, ready for next input")
+                                                // Clear buffer and resume VAD
+                                                audioBuffer.removeAll()
+                                                await vadComponent?.resume()
+                                                print("▶️ VAD resumed")
+                                                print("🎤 VAD resumed, ready for next input")
+                                            } else {
+                                                // No LLM, just transition back to idle
+                                                await stateManager.transition(to: .idle)
                                             }
                                         } else {
-                                            logger.debug("⚠️ Empty transcript, skipping")
+                                            print("⚠️ Empty transcript, skipping")
+                                            await stateManager.transition(to: .idle)
                                         }
+                                    } else {
+                                        // Audio too short, return to idle
+                                        print("Audio too short for transcription")
+                                        await stateManager.transition(to: .idle)
                                     }
 
                                     // Clear buffer after processing
                                     audioBuffer = []
+                                } else {
+                                    // No STT component, return to idle
+                                    await stateManager.transition(to: .idle)
                                 }
                             }
                         } else {

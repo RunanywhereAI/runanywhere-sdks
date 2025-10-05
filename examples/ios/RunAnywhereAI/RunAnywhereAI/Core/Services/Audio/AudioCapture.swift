@@ -154,7 +154,7 @@ public class AudioCapture: NSObject {
         #if os(iOS) || os(tvOS) || os(watchOS)
         // Configure audio session for both recording and playback
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .mixWithOthers])
         try audioSession.setActive(true)
         #endif
 

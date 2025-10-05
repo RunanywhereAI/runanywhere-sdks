@@ -142,7 +142,7 @@ class VoiceAssistantViewModel: ObservableObject {
         // Always include LLM component for complete pipeline flow
         let config = ModularPipelineConfig(
             components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.006), // Optimized threshold for normal speaking voice
+            vad: VADConfig(energyThreshold: 0.005), // Lower threshold for better short phrase detection
             stt: VoiceSTTConfig(modelId: whisperModelName),
             llm: VoiceLLMConfig(
                 modelId: "default",
@@ -385,6 +385,7 @@ extension VoiceAssistantViewModel: @preconcurrency ModularPipelineDelegate {
 
     nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
         Task { @MainActor in
+
             errorMessage = error.localizedDescription
             sessionState = .error(error.localizedDescription)
             isListening = false
