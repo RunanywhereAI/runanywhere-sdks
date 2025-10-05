@@ -284,10 +284,10 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
             self.speechQueue.async { [weak self] in
                 self?.speechContinuation = continuation
             }
-            
+
             // Create and configure utterance
             let utterance = AVSpeechUtterance(string: text)
-            
+
             // Configure voice
             if options.voice == "system" {
                 utterance.voice = AVSpeechSynthesisVoice(language: options.language)
@@ -296,16 +296,16 @@ public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
             } else {
                 utterance.voice = AVSpeechSynthesisVoice(language: options.language)
             }
-            
+
             // Configure speech parameters
             utterance.rate = options.rate * AVSpeechUtteranceDefaultSpeechRate
             utterance.pitchMultiplier = options.pitch
             utterance.volume = options.volume
             utterance.preUtteranceDelay = 0.0
             utterance.postUtteranceDelay = 0.0
-            
+
             logger.info("Speaking text: '\(text.prefix(50))...' with voice: \(options.voice ?? options.language)")
-            
+
             // Speak on main queue (required by AVSpeechSynthesizer)
             DispatchQueue.main.async { [weak self] in
                 self?._isSynthesizing = true

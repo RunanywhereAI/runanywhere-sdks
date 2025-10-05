@@ -363,7 +363,7 @@ public class ModularVoicePipeline {
                                                     // Just ensure speaker output for TTS
                                                     #if os(iOS) || os(tvOS) || os(watchOS)
                                                     let audioSession = AVAudioSession.sharedInstance()
-                                                    
+
                                                     do {
                                                         // Simply ensure speaker output without changing category
                                                         try audioSession.overrideOutputAudioPort(.speaker)
@@ -414,7 +414,7 @@ public class ModularVoicePipeline {
                                                     #if os(iOS) || os(tvOS) || os(watchOS)
                                                     // Smaller delay since we're not switching modes
                                                     try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                                                    
+
                                                     print("🎤 Ready for recording - Sample rate: \(audioSession.sampleRate)Hz")
                                                     #endif
                                                 }
@@ -427,13 +427,13 @@ public class ModularVoicePipeline {
                                                 // Clear any buffered audio before resuming
                                                 audioBuffer.removeAll()
                                                 isSpeaking = false  // Reset speaking state
-                                                
+
                                                 // Wait for state manager cooldown to complete
                                                 // The AudioPipelineStateManager already handles 800ms cooldown
                                                 while await stateManager.state == .cooldown {
                                                     try await Task.sleep(nanoseconds: 50_000_000) // Check every 50ms
                                                 }
-                                                
+
                                                 // Clear buffer and resume VAD
                                                 audioBuffer.removeAll()
                                                 await vadComponent?.resume()

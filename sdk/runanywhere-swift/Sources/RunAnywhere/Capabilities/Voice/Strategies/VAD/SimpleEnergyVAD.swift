@@ -493,7 +493,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
         consecutiveSilentFrames = 0
         consecutiveVoiceFrames = 0
         isCurrentlySpeaking = false
-        
+
         // Prime the VAD to be ready for immediate detection
         debugFrameCount = 0
     }
