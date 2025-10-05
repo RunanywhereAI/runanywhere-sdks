@@ -385,6 +385,7 @@ extension VoiceAssistantViewModel: @preconcurrency ModularPipelineDelegate {
 
     nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
         Task { @MainActor in
+
             errorMessage = error.localizedDescription
             sessionState = .error(error.localizedDescription)
             isListening = false
