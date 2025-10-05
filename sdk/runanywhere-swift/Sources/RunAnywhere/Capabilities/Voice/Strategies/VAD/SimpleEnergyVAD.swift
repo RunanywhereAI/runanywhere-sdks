@@ -14,6 +14,12 @@ public class SimpleEnergyVAD: NSObject, VADService {
     /// Values above this threshold indicate voice activity
     public var energyThreshold: Float = 0.022
 
+    /// Base threshold before any adjustments
+    private var baseEnergyThreshold: Float = 0.022
+
+    /// Multiplier applied during TTS playback to prevent feedback
+    private var ttsThresholdMultiplier: Float = 3.0
+
     /// Sample rate of the audio (typically 16000 Hz)
     public let sampleRate: Int
 
@@ -33,10 +39,16 @@ public class SimpleEnergyVAD: NSObject, VADService {
     private var consecutiveVoiceFrames = 0
     private var isPaused = false  // Track paused state
     private var cooldownFrames = 0  // Frames to ignore after resuming
+    private var isTTSActive = false  // Track if TTS is currently playing
+    private var hardBlock = false  // Complete block of audio processing during TTS
 
     // Hysteresis parameters to prevent rapid on/off switching
     private let voiceStartThreshold = 1  // frames of voice to start - more responsive
     private let voiceEndThreshold = 8   // frames of silence to end (0.8 seconds at 100ms frames) - more forgiving for pauses
+
+    // Enhanced hysteresis for TTS mode
+    private let ttsVoiceStartThreshold = 3  // More frames needed during TTS
+    private let ttsVoiceEndThreshold = 5    // Quicker end during TTS
 
     // Calibration properties
     private var isCalibrating = false
@@ -134,6 +146,13 @@ public class SimpleEnergyVAD: NSObject, VADService {
     /// - Parameter buffer: AVAudioPCMBuffer containing audio data
     public func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         guard isActive else { return }
+
+        // Complete audio blocking during TTS - don't process at all
+        if hardBlock || isTTSActive {
+            logger.debug("🚫 Audio completely blocked during TTS")
+            return
+        }
+
         guard !isPaused else {
             // Completely skip processing when paused - don't even look at the audio
             return
@@ -158,7 +177,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Handle cooldown period - ignore audio but still process it
         if cooldownFrames > 0 {
             cooldownFrames -= 1
-            logger.debug("🧊 Cooldown active, ignoring frame (\\(self.cooldownFrames) frames remaining)")
+            logger.debug("🧊 Cooldown active, ignoring frame (\(self.cooldownFrames) frames remaining)")
             return  // Skip voice detection during cooldown
         }
 
@@ -193,6 +212,13 @@ public class SimpleEnergyVAD: NSObject, VADService {
     @discardableResult
     public func processAudioData(_ audioData: [Float]) -> Bool {
         guard isActive else { return false }
+
+        // Complete audio blocking during TTS - don't process at all
+        if hardBlock || isTTSActive {
+            logger.debug("🚫 Audio completely blocked during TTS")
+            return false
+        }
+
         guard !isPaused else { return false }  // Skip processing when paused
         guard !audioData.isEmpty else { return false }
 
@@ -211,7 +237,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Handle cooldown period
         if cooldownFrames > 0 {
             cooldownFrames -= 1
-            logger.debug("🧊 Cooldown active, ignoring frame (\\(self.cooldownFrames) frames remaining)")
+            logger.debug("🧊 Cooldown active, ignoring frame (\(self.cooldownFrames) frames remaining)")
             return false  // Skip voice detection during cooldown
         }
 
@@ -243,12 +269,22 @@ public class SimpleEnergyVAD: NSObject, VADService {
     /// Update voice activity state with hysteresis to prevent rapid switching
     /// - Parameter hasVoice: Whether voice was detected in current frame
     private func updateVoiceActivityState(hasVoice: Bool) {
+        // Use different thresholds based on TTS state
+        let startThreshold = isTTSActive ? ttsVoiceStartThreshold : voiceStartThreshold
+        let endThreshold = isTTSActive ? ttsVoiceEndThreshold : voiceEndThreshold
+
         if hasVoice {
             consecutiveVoiceFrames += 1
             consecutiveSilentFrames = 0
 
             // Start speaking if we have enough consecutive voice frames
-            if !isCurrentlySpeaking && consecutiveVoiceFrames >= voiceStartThreshold {
+            if !isCurrentlySpeaking && consecutiveVoiceFrames >= startThreshold {
+                // Extra validation during TTS to prevent false positives
+                if isTTSActive {
+                    logger.warning("⚠️ Voice detected during TTS playback - likely feedback! Ignoring.")
+                    return
+                }
+
                 isCurrentlySpeaking = true
                 logger.info("🎙️ VAD: SPEECH STARTED (energy above threshold for \(self.consecutiveVoiceFrames) frames)")
                 DispatchQueue.main.async { [weak self] in
@@ -260,7 +296,7 @@ public class SimpleEnergyVAD: NSObject, VADService {
             consecutiveVoiceFrames = 0
 
             // Stop speaking if we have enough consecutive silent frames
-            if isCurrentlySpeaking && consecutiveSilentFrames >= voiceEndThreshold {
+            if isCurrentlySpeaking && consecutiveSilentFrames >= endThreshold {
                 isCurrentlySpeaking = false
                 logger.info("🎙️ VAD: SPEECH ENDED (silence for \(self.consecutiveSilentFrames) frames)")
                 DispatchQueue.main.async { [weak self] in
@@ -399,7 +435,8 @@ public class SimpleEnergyVAD: NSObject, VADService {
     public func pause() {
         guard !isPaused else { return }
         isPaused = true
-        logger.info("⏸️ VAD paused")
+        hardBlock = true  // Enable hard blocking
+        logger.info("⏸️ VAD paused with hard block")
 
         // If currently speaking, send end event
         if isCurrentlySpeaking {
@@ -409,12 +446,17 @@ public class SimpleEnergyVAD: NSObject, VADService {
 
         // Clear recent energy values to avoid false positives when resuming
         recentEnergyValues.removeAll()
+        consecutiveSilentFrames = 0
+        consecutiveVoiceFrames = 0
     }
 
     /// Resume VAD processing
     public func resume() {
         guard isPaused else { return }
+
+        // Keep hard block active during extended cooldown
         isPaused = false
+
         // Reset state for clean resumption
         isCurrentlySpeaking = false
         consecutiveSilentFrames = 0
@@ -422,9 +464,72 @@ public class SimpleEnergyVAD: NSObject, VADService {
         // Clear any accumulated energy values to start fresh
         recentEnergyValues.removeAll()
         debugFrameCount = 0
-        // Set cooldown to ignore initial frames after resume (10 frames = 1 second at 100ms frames)
-        cooldownFrames = 10
-        logger.info("▶️ VAD resumed - state fully reset with \\(self.cooldownFrames) frame cooldown")
+        // Set much longer cooldown to ignore initial frames after resume (80 frames = 8 seconds at 100ms frames)
+        cooldownFrames = 80
+
+        // DO NOT remove hard block here - let notifyTTSDidFinish handle it with proper timing
+        // The hard block will remain active until explicitly removed
+
+        logger.info("▶️ VAD resumed - state fully reset with \(self.cooldownFrames) frame cooldown, hard block still active")
+    }
+
+    // MARK: - TTS Feedback Prevention
+
+    /// Notify VAD that TTS is about to start playing
+    public func notifyTTSWillStart() {
+        isTTSActive = true
+        hardBlock = true  // Enable complete blocking during TTS
+
+        // Save base threshold
+        baseEnergyThreshold = energyThreshold
+
+        // Increase threshold significantly to prevent TTS audio from triggering VAD
+        let newThreshold = energyThreshold * ttsThresholdMultiplier
+        energyThreshold = Swift.min(newThreshold, 0.1) // Cap at 0.1 to prevent complete deafness
+
+        logger.info("🔊 TTS starting - VAD completely blocked and threshold increased from \(String(format: "%.6f", self.baseEnergyThreshold)) to \(String(format: "%.6f", self.energyThreshold))")
+
+        // End any current speech detection
+        if isCurrentlySpeaking {
+            isCurrentlySpeaking = false
+            onSpeechActivity?(.ended)
+        }
+
+        // Reset counters
+        consecutiveSilentFrames = 0
+        consecutiveVoiceFrames = 0
+    }
+
+    /// Notify VAD that TTS has finished playing
+    public func notifyTTSDidFinish() {
+        isTTSActive = false
+
+        // Gradually restore threshold
+        energyThreshold = baseEnergyThreshold
+
+        logger.info("🔇 TTS finished - VAD threshold restored to \(String(format: "%.6f", self.energyThreshold))")
+
+        // Set much longer cooldown period (80 frames = 8 seconds at 100ms frames)
+        cooldownFrames = 80
+
+        // Clear energy values to start fresh
+        recentEnergyValues.removeAll()
+        consecutiveSilentFrames = 0
+        consecutiveVoiceFrames = 0
+
+        // Schedule hard block removal after much longer delay to ensure complete audio clearance
+        Task { @MainActor in
+            // Wait 3 seconds to ensure TTS audio is completely cleared from hardware buffers
+            try? await Task.sleep(nanoseconds: 3_000_000_000)  // 3 second delay
+            self.hardBlock = false
+            self.logger.info("🔓 TTS hard block removed after 3s delay, VAD can process audio again")
+        }
+    }
+
+    /// Set TTS threshold multiplier for feedback prevention
+    public func setTTSThresholdMultiplier(_ multiplier: Float) {
+        ttsThresholdMultiplier = Swift.max(2.0, Swift.min(5.0, multiplier))
+        logger.info("📝 TTS threshold multiplier set to \(self.ttsThresholdMultiplier)x")
     }
 
     // MARK: - Debug Helpers
