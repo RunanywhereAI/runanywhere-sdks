@@ -112,27 +112,78 @@ public enum SDKModelEvent: SDKEvent {
     public var eventType: SDKEventType { .model }
 }
 
-/// Voice Events
+/// Voice Events - Unified event system for all voice pipeline operations
 public enum SDKVoiceEvent: SDKEvent {
-    case listeningStarted
-    case listeningEnded
-    case speechDetected
+    // MARK: - Pipeline Lifecycle
+    case pipelineStarted
+    case pipelineCompleted
+    case pipelineError(Error)
+
+    // MARK: - VAD (Voice Activity Detection) Events
+    case vadStarted
+    case vadSpeechStart
+    case vadSpeechEnd
+    case vadDetected
+    case vadEnded
+    case vadAudioLevel(Float)
+
+    // MARK: - STT (Speech-to-Text) Events
     case transcriptionStarted
     case transcriptionPartial(text: String)
     case transcriptionFinal(text: String)
+    case languageDetected(String)
+    case sttProcessing
+
+    // MARK: - STT with Speaker Diarization
+    case transcriptionPartialWithSpeaker(text: String, speaker: SpeakerInfo)
+    case transcriptionFinalWithSpeaker(text: String, speaker: SpeakerInfo)
+    case newSpeakerDetected(SpeakerInfo)
+    case speakerChanged(from: SpeakerInfo?, to: SpeakerInfo)
+
+    // MARK: - LLM (Language Model) Events
+    case llmStarted
+    case llmThinking
+    case llmStreamStarted
+    case llmStreamToken(String)
+    case llmPartialResponse(String)
+    case llmFinalResponse(String)
+    case llmProcessing
     case responseGenerated(text: String)
+
+    // MARK: - TTS (Text-to-Speech) Events
     case synthesisStarted
+    case ttsAudioChunk(Data)
     case audioGenerated(data: Data)
     case synthesisCompleted
-    case pipelineError(Error)
-    case pipelineStarted
-    case pipelineCompleted
-    case vadStarted
-    case vadDetected
-    case vadEnded
-    case sttProcessing
-    case llmProcessing
     case ttsProcessing
+
+    // MARK: - Component Initialization Events
+    case componentInitializing(String)
+    case componentInitialized(String)
+    case componentInitializationFailed(String, Error)
+    case allComponentsInitialized
+
+    // MARK: - Session and Conversation Events
+    case conversationInitialized
+    case conversationTranscribing
+    case conversationTranscribed(String)
+    case conversationGenerating
+    case conversationGenerated(String)
+    case conversationSynthesizing
+    case conversationSynthesized(Data)
+    case conversationError(Error)
+
+    // MARK: - Legacy Compatibility Events
+    case listeningStarted
+    case listeningEnded
+    case speechDetected
+
+    // MARK: - Voice Agent Events
+    case voiceAgentProcessed(result: VoiceAgentResult)
+    case voiceAgentTriggered(Bool)
+    case voiceAgentTranscriptionAvailable(String)
+    case voiceAgentResponseGenerated(String)
+    case voiceAgentAudioSynthesized(Data)
 
     public var timestamp: Date { Date() }
     public var eventType: SDKEventType { .voice }

@@ -1,6 +1,8 @@
 import Foundation
 import os
 
+/// Import required for SDKVoiceEvent and EventBus integration
+
 /// Represents the current state of the audio pipeline to prevent feedback loops
 public enum AudioPipelineState: String, CaseIterable {
     /// System is idle, ready to start listening
@@ -31,6 +33,7 @@ public actor AudioPipelineStateManager {
     private var lastTTSEndTime: Date?
     private let cooldownDuration: TimeInterval
     private var stateChangeHandler: ((AudioPipelineState, AudioPipelineState) -> Void)?
+    private let eventBus: EventBus
 
     /// Configuration for feedback prevention
     public struct Configuration {
@@ -57,9 +60,10 @@ public actor AudioPipelineStateManager {
     private let configuration: Configuration
     private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "AudioPipelineState")
 
-    public init(configuration: Configuration = Configuration()) {
+    public init(configuration: Configuration = Configuration(), eventBus: EventBus = EventBus.shared) {
         self.configuration = configuration
         self.cooldownDuration = configuration.cooldownDuration
+        self.eventBus = eventBus
     }
 
     /// Get the current state
@@ -116,6 +120,12 @@ public actor AudioPipelineStateManager {
         currentState = newState
         logger.debug("State transition: \(oldState.rawValue) → \(newState.rawValue)")
 
+        // Publish state transition event
+        let stateEvent = mapStateToEvent(newState)
+        Task { @MainActor in
+            eventBus.publish(stateEvent)
+        }
+
         // Handle special state actions
         switch newState {
         case .playingTTS:
@@ -147,6 +157,26 @@ public actor AudioPipelineStateManager {
         logger.info("Force resetting audio pipeline state to idle")
         currentState = .idle
         lastTTSEndTime = nil
+    }
+
+    /// Map AudioPipelineState to corresponding SDKVoiceEvent
+    private func mapStateToEvent(_ state: AudioPipelineState) -> SDKVoiceEvent {
+        switch state {
+        case .idle:
+            return .pipelineCompleted
+        case .listening:
+            return .listeningStarted
+        case .processingSpeech:
+            return .transcriptionStarted
+        case .generatingResponse:
+            return .llmThinking
+        case .playingTTS:
+            return .synthesisStarted
+        case .cooldown:
+            return .listeningEnded
+        case .error:
+            return .pipelineError(SDKError.invalidState("Audio pipeline in error state"))
+        }
     }
 
     /// Check if a state transition is valid

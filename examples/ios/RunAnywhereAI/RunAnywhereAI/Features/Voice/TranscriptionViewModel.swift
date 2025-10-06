@@ -29,7 +29,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var enableSpeakerDiarization: Bool = true
 
     // MARK: - Transcription State
-    private var voicePipeline: ModularVoicePipeline?
+    private var voicePipeline: ModularVoicePipelineService?
     private let whisperModelName: String = "whisper-base"
     private var audioStreamContinuation: AsyncStream<VoiceAudioChunk>.Continuation?
     private var pipelineTask: Task<Void, Never>?
@@ -107,40 +107,36 @@ class TranscriptionViewModel: ObservableObject {
 
         logger.info("Starting transcription with modular pipeline...")
 
-        // Create a simple transcription-only pipeline config
-        // Lower VAD threshold from 0.02 to 0.01 for better voice detection
-        let config = ModularPipelineConfig.transcriptionWithVAD(
-            sttModel: whisperModelName,
-            vadThreshold: 0.01  // Lowered for more sensitive voice detection
-        )
+        // Create a transcription-only configuration using unified VoiceConfiguration
+        do {
+            let config = try VoiceConfigurationBuilder()
+                .vad(VADConfiguration(energyThreshold: 0.01))  // Lowered for more sensitive voice detection
+                .stt(STTConfiguration(modelId: whisperModelName, language: "en"))
+                .enableSpeakerDiarization(enableSpeakerDiarization)
+                .build()
 
-        // Create the pipeline with optional diarization
-        if enableSpeakerDiarization {
-            logger.info("Creating pipeline with FluidAudio diarization")
-            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(config: config)
-            if voicePipeline == nil {
-                // Fallback to standard pipeline if diarization fails
-                do {
+            // Create the pipeline with the unified configuration
+            if enableSpeakerDiarization {
+                logger.info("Creating pipeline with speaker diarization enabled")
+                // Try with FluidAudio first if available
+                let modularConfig = ModularPipelineConfig(voiceConfig: config)
+                voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(config: modularConfig)
+
+                if voicePipeline == nil {
+                    // Fallback to standard pipeline if diarization fails
                     voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
                     logger.info("Created standard voice pipeline (diarization unavailable)")
-                } catch {
-                    errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
-                    currentStatus = "Error"
-                    logger.error("Failed to create voice pipeline: \(error)")
-                    return
                 }
-            }
-        } else {
-            // Create standard pipeline without diarization
-            do {
+            } else {
+                // Create standard pipeline without diarization
                 voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
                 logger.info("Created voice pipeline without diarization")
-            } catch {
-                errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
-                currentStatus = "Error"
-                logger.error("Failed to create voice pipeline: \(error)")
-                return
             }
+        } catch {
+            errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
+            currentStatus = "Error"
+            logger.error("Failed to create voice pipeline: \(error)")
+            return
         }
 
         // ModularVoicePipeline uses events, not delegates
@@ -282,7 +278,7 @@ class TranscriptionViewModel: ObservableObject {
 
     // MARK: - Pipeline Event Handling
 
-    private func handlePipelineEvent(_ event: ModularPipelineEvent) async {
+    private func handlePipelineEvent(_ event: SDKVoiceEvent) async {
         await MainActor.run {
             switch event {
             case .vadSpeechStart:
@@ -292,11 +288,11 @@ class TranscriptionViewModel: ObservableObject {
             case .vadSpeechEnd:
                 logger.info("Speech ended")
 
-            case .sttPartialTranscript(let text):
+            case .transcriptionPartial(let text):
                 partialTranscript = text
                 logger.info("Partial transcript: '\(text)'")
 
-            case .sttFinalTranscript(let text):
+            case .transcriptionFinal(let text):
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     finalTranscripts.append(TranscriptSegment(
                         text: text,
@@ -309,7 +305,7 @@ class TranscriptionViewModel: ObservableObject {
                 }
                 logger.info("Final transcript: '\(text)'")
 
-            case .sttFinalTranscriptWithSpeaker(let text, let speaker):
+            case .transcriptionFinalWithSpeaker(let text, let speaker):
                 if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     finalTranscripts.append(TranscriptSegment(
                         text: text,
@@ -328,18 +324,18 @@ class TranscriptionViewModel: ObservableObject {
                 }
                 logger.info("Final transcript from \(speaker.name ?? speaker.id): '\(text)'")
 
-            case .sttPartialTranscriptWithSpeaker(let text, let speaker):
+            case .transcriptionPartialWithSpeaker(let text, let speaker):
                 partialTranscript = text
                 currentSpeaker = speaker
                 logger.info("Partial transcript from \(speaker.name ?? speaker.id): '\(text)'")
 
-            case .sttNewSpeakerDetected(let speaker):
+            case .newSpeakerDetected(let speaker):
                 if !detectedSpeakers.contains(where: { $0.id == speaker.id }) {
                     detectedSpeakers.append(speaker)
                 }
                 logger.info("New speaker detected: \(speaker.name ?? speaker.id)")
 
-            case .sttSpeakerChanged(let from, let to):
+            case .speakerChanged(let from, let to):
                 currentSpeaker = to
                 logger.info("Speaker changed from \(from?.name ?? from?.id ?? "unknown") to \(to.name ?? to.id)")
 

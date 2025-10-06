@@ -51,7 +51,7 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var isSpeechDetected: Bool = false
 
     // MARK: - Pipeline State
-    private var voicePipeline: ModularVoicePipeline?
+    private var voicePipeline: ModularVoicePipelineService?
     private var pipelineTask: Task<Void, Never>?
     private let whisperModelName: String = "whisper-base"
 
@@ -138,23 +138,24 @@ class VoiceAssistantViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Initializing components..."
 
-        // Create pipeline configuration with balanced VAD threshold
-        // Always include LLM component for complete pipeline flow
-        let config = ModularPipelineConfig(
-            components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.005), // Lower threshold for better short phrase detection
-            stt: VoiceSTTConfig(modelId: whisperModelName),
-            llm: VoiceLLMConfig(
-                modelId: "default",
-                systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational.",
-                maxTokens: 100  // Limit response to 100 tokens for concise voice interactions
-            ),
-            // llm: VoiceLLMConfig(modelId: "default", systemPrompt: "INSTRUCTION: Give a direct answer. Do not write dialogue. Do not write User: or Assistant:. Just answer."),
-            tts: VoiceTTSConfig(voice: "system")
-        )
-
-        // Create the pipeline
+        // Create pipeline configuration using unified VoiceConfiguration
         do {
+            let config = try VoiceConfigurationBuilder()
+                .vad(VADConfiguration(energyThreshold: 0.005)) // Lower threshold for better short phrase detection
+                .stt(STTConfiguration(modelId: whisperModelName))
+                .llm(LLMConfiguration(
+                    modelId: "default",
+                    temperature: 0.3,
+                    maxTokens: 100,
+                    systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational."
+                ))
+                .tts(TTSConfiguration(
+                    voice: "system",
+                    volume: 1.0  // Explicit maximum volume
+                ))
+                .build()
+
+            // Create the pipeline using the unified configuration
             voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
         } catch {
             sessionState = .error("Failed to create pipeline: \(error.localizedDescription)")
@@ -244,10 +245,23 @@ class VoiceAssistantViewModel: ObservableObject {
         await stopConversation()
     }
 
+    // MARK: - Audio Session Configuration
+
+    private func configureAudioSessionForPlayback() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setActive(true)
+            logger.info("Audio session configured for loud TTS playback")
+        } catch {
+            logger.error("Failed to configure audio session for playback: \(error)")
+        }
+    }
+
     // MARK: - Initialization Event Handling
 
     @MainActor
-    private func handleInitializationEvent(_ event: ModularPipelineEvent) {
+    private func handleInitializationEvent(_ event: SDKVoiceEvent) {
         switch event {
         case .componentInitializing(let componentName):
             currentStatus = "Initializing \(componentName)..."
@@ -274,7 +288,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
     // MARK: - Pipeline Event Handling
 
-    private func handlePipelineEvent(_ event: ModularPipelineEvent) async {
+    private func handlePipelineEvent(_ event: SDKVoiceEvent) async {
         await MainActor.run {
             switch event {
             case .vadSpeechStart:
@@ -287,11 +301,11 @@ class VoiceAssistantViewModel: ObservableObject {
                 isSpeechDetected = false
                 logger.info("Speech ended")
 
-            case .sttPartialTranscript(let text):
+            case .transcriptionPartial(let text):
                 currentTranscript = text
                 logger.info("Partial transcript: '\(text)'")
 
-            case .sttFinalTranscript(let text):
+            case .transcriptionFinal(let text):
                 currentTranscript = text
                 sessionState = .processing
                 currentStatus = "Thinking..."
@@ -303,6 +317,15 @@ class VoiceAssistantViewModel: ObservableObject {
                 currentStatus = "Thinking..."
                 assistantResponse = ""
 
+            case .llmStreamStarted:
+                sessionState = .processing
+                currentStatus = "Generating response..."
+                assistantResponse = ""
+
+            case .llmStreamToken(let token):
+                assistantResponse += token
+                logger.debug("Streaming token: '\(token)'")
+
             case .llmPartialResponse(let text):
                 assistantResponse = text
 
@@ -312,11 +335,13 @@ class VoiceAssistantViewModel: ObservableObject {
                 currentStatus = "Speaking..."
                 logger.info("AI Response: '\(text.prefix(50))...'")
 
-            case .ttsStarted:
+            case .synthesisStarted:
                 sessionState = .speaking
                 currentStatus = "Speaking..."
+                // Ensure audio session is optimized for playback
+                configureAudioSessionForPlayback()
 
-            case .ttsCompleted:
+            case .synthesisCompleted:
                 sessionState = .listening
                 currentStatus = "Listening..."
                 isProcessing = false
@@ -355,9 +380,11 @@ class VoiceAssistantViewModel: ObservableObject {
         return VoicePipelineResult(
             transcription: STTResult(
                 text: currentTranscript,
+                segments: [],
                 language: "en",
                 confidence: 0.95,
-                duration: 0
+                duration: 0.0,
+                alternatives: []
             ),
             llmResponse: assistantResponse,
             audioOutput: nil,
