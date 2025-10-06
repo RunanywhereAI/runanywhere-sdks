@@ -45,7 +45,6 @@ struct RunAnywhereAIApp: App {
             .task {
                 logger.info("🏁 App launched, initializing SDK...")
                 await initializeSDK()
-                await initializeBundledModels()
             }
             #if os(iOS)
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
@@ -144,7 +143,6 @@ struct RunAnywhereAIApp: App {
             initializationError = nil
         }
         await initializeSDK()
-        await initializeBundledModels()
     }
 
     private func registerAdaptersForDevelopment() async {
@@ -152,7 +150,7 @@ struct RunAnywhereAIApp: App {
 
         do {
             // Register LLMSwift with custom GGUF models
-            LLMSwiftServiceProvider.register()
+            await LLMSwiftServiceProvider.register()
 
             // Create custom adapter registration options with lazy loading
             let lazyOptions = AdapterRegistrationOptions(
@@ -228,7 +226,7 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ LLMSwift registered with custom models (lazy loading)")
 
             // Register WhisperKit with custom models
-            WhisperKitServiceProvider.register()
+            await WhisperKitServiceProvider.register()
             try await RunAnywhere.registerFrameworkAdapter(
                 WhisperKitAdapter.shared,
                 models: [
@@ -256,7 +254,7 @@ struct RunAnywhereAIApp: App {
             logger.info("✅ WhisperKit registered with custom models (lazy loading)")
 
             // Register FluidAudioDiarization
-            FluidAudioDiarizationProvider.register()
+            await FluidAudioDiarizationProvider.register()
             logger.info("✅ FluidAudioDiarization registered")
 
             // Register Foundation Models adapter for iOS 26+ and macOS 26+
@@ -278,7 +276,7 @@ struct RunAnywhereAIApp: App {
 
         // Register WhisperKit for Speech-to-Text
         // No hardcoded models - they come from backend
-        WhisperKitServiceProvider.register()
+        await WhisperKitServiceProvider.register()
         do {
             try await RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
             logger.info("✅ WhisperKit registered (models from backend)")
@@ -288,7 +286,7 @@ struct RunAnywhereAIApp: App {
 
         // Register LLMSwift for Language Models
         // No hardcoded models - they come from backend
-        LLMSwiftServiceProvider.register()
+        await LLMSwiftServiceProvider.register()
         do {
             try await RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
             logger.info("✅ LLMSwift registered (models from backend)")
@@ -297,7 +295,7 @@ struct RunAnywhereAIApp: App {
         }
 
         // Register FluidAudioDiarization
-        FluidAudioDiarizationProvider.register()
+        await FluidAudioDiarizationProvider.register()
         logger.info("✅ FluidAudioDiarization registered")
 
         // Register Foundation Models adapter for iOS 26+ and macOS 26+
@@ -312,13 +310,6 @@ struct RunAnywhereAIApp: App {
 
         logger.info("🎉 All adapters registered for production")
     }
-
-    private func initializeBundledModels() async {
-        // Bundled models functionality removed - models are downloaded on demand
-    }
-
-    // User settings are now stored locally and applied per-request
-    // This method is no longer needed with the new event-based architecture
 }
 
 // MARK: - Loading Views

@@ -454,32 +454,6 @@ public enum RunAnywhere {
         }
     }
 
-    /// Structured output generation
-    /// - Parameters:
-    ///   - type: The type to generate
-    ///   - prompt: The text prompt
-    /// - Returns: Generated structured data
-    public static func generateStructured<T: Generatable>(
-        _ type: T.Type,
-        prompt: String
-    ) async throws -> T {
-        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
-
-        do {
-            // Ensure initialized
-            guard isInitialized else {
-                throw SDKError.notInitialized
-            }
-
-            // For now, structured output generation is not fully implemented
-            // This would need proper JSON schema generation and parsing
-            throw SDKError.notImplemented
-        } catch {
-            EventBus.shared.publish(SDKGenerationEvent.failed(error))
-            throw error
-        }
-    }
-
     // MARK: - Voice Operations
 
     /// Simple voice transcription
