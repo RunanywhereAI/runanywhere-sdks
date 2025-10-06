@@ -512,20 +512,39 @@ private struct SelectableModelRow: View {
         }
 
         do {
-            // Use the download model method from RunAnywhere
-            _ = try await RunAnywhere.downloadModel(model.id)
+            // Use the progress-enabled download API
+            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
 
-            // Simulate progress completion (progress tracking not available in simplified API)
-            await MainActor.run {
-                self.downloadProgress = 1.0
-            }
+            // Process progress updates
+            for await progress in progressStream {
+                await MainActor.run {
+                    self.downloadProgress = progress.percentage
+                    print("Download progress for \(model.name): \(Int(progress.percentage * 100))%")
+                }
 
-            print("Model \(model.name) downloaded successfully")
+                // Check if download completed or failed
+                switch progress.state {
+                case .completed:
+                    await MainActor.run {
+                        self.downloadProgress = 1.0
+                        self.isDownloading = false
+                        onDownloadCompleted()
+                        print("Model \(model.name) downloaded successfully")
+                    }
+                    return
 
-            await MainActor.run {
-                onDownloadCompleted()
-                isDownloading = false
-                downloadProgress = 1.0
+                case .failed(let error):
+                    await MainActor.run {
+                        self.downloadProgress = 0.0
+                        self.isDownloading = false
+                        print("Download failed for \(model.name): \(error.localizedDescription)")
+                    }
+                    return
+
+                default:
+                    // Continue processing progress updates
+                    continue
+                }
             }
 
         } catch {
