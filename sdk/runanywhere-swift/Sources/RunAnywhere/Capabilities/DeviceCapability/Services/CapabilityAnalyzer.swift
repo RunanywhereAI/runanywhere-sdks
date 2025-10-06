@@ -235,44 +235,4 @@ public class CapabilityAnalyzer: @unchecked Sendable {
 
         return max(1, Int(Double(processorCount) * 0.75))
     }
-
-    private func selectQuantizationSettings(
-        for model: ModelInfo,
-        capabilities: DeviceCapabilities
-    ) -> (use: Bool, bits: Int) {
-        // Check if model already quantized
-        if let quantLevel = model.metadata?.quantizationLevel {
-            switch quantLevel {
-            case .int4, .q4v0, .q4KS, .q4KM:
-                return (true, 4)
-            case .int8, .q8v0:
-                return (true, 8)
-            case .half, .f16:
-                return (true, 16)
-            case .full, .f32:
-                return (false, 32)
-            case .int2, .q2K:
-                return (true, 2)
-            case .q3KS, .q3KM, .q3KL:
-                return (true, 3)
-            case .q5v0, .q5KS, .q5KM:
-                return (true, 5)
-            case .q6K:
-                return (true, 6)
-            case .mixed:
-                return (true, 8)
-            }
-        }
-
-        // Enable quantization for low memory devices
-        if capabilities.totalMemory < 4_000_000_000 {
-            return (true, 4)
-        }
-
-        if capabilities.totalMemory < 8_000_000_000 && model.memoryRequired ?? 0 > 1_000_000_000 {
-            return (true, 8)
-        }
-
-        return (false, 8)
-    }
 }

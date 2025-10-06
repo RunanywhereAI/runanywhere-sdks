@@ -32,7 +32,6 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
     /// Capability analyzer
     private let capabilityAnalyzer: CapabilityAnalyzer
 
-
     /// Registered hardware detector (for backward compatibility)
     private var registeredHardwareDetector: HardwareDetector?
     private let detectorLock = NSLock()

@@ -4,18 +4,6 @@ import RunAnywhere
 import os
 import Combine
 
-// Temporary stub types until SDK provides them
-struct GenerationHints {
-    let temperature: Float
-    let maxTokens: Int
-    let systemRole: String
-}
-
-struct StreamToken: Identifiable {
-    let id = UUID()
-    let text: String
-}
-
 // MARK: - Quiz Generation Errors
 
 enum QuizGenerationError: LocalizedError {
@@ -156,7 +144,7 @@ class QuizViewModel: ObservableObject {
     // Streaming UI State
     @Published var showGenerationProgress = false
     @Published var generationText = ""
-    @Published var streamingTokens: [StreamToken] = []
+    @Published var streamingTokens: [String] = []
 
     private var currentSession: QuizSession?
     private var questionStartTime: Date?
@@ -298,33 +286,23 @@ class QuizViewModel: ObservableObject {
                     preferredExecutionTarget: .onDevice  // Force on-device execution
                 )
 
-                // Build a proper prompt that includes all required fields
-                let quizPrompt = """
-                Generate a quiz based on the following content.
-
-                The quiz should:
-                - Have 3-5 true/false questions
-                - Be at a medium difficulty level
-                - Include clear explanations for each answer
-                - Extract the main topic from the content
-
-                Content to create quiz from:
-                \(inputText)
-                """
-
-                // For now, use regular generation since structured streaming isn't implemented
-                // Generate the quiz as JSON text
-                let jsonText = try await RunAnywhere.generate(
-                    quizPrompt + "\n\nProvide the response as valid JSON matching the quiz schema.",
+                // Use the new streaming structured output API
+                let streamResult = RunAnywhere.generateStructuredStream(
+                    QuizGeneration.self,
+                    content: inputText,
                     options: options
                 )
 
-                // Parse the JSON response
-                guard let jsonData = jsonText.data(using: .utf8) else {
-                    throw QuizGenerationError.invalidJSONFormat
+                // Stream tokens to UI
+                for try await token in streamResult.tokenStream {
+                    await MainActor.run {
+                        self.generationText += token.text
+                        self.streamingTokens.append(token.text)
+                    }
                 }
 
-                let generatedQuiz = try JSONDecoder().decode(QuizGeneration.self, from: jsonData)
+                // Wait for the final parsed result
+                let generatedQuiz = try await streamResult.result.value
 
                 // Validate we have questions
                 guard !generatedQuiz.questions.isEmpty else {
