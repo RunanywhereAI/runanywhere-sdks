@@ -4,8 +4,8 @@ import AVFoundation
 import os
 
 /// iOS-specific audio session management for voice processing
-public class iOSAudioSession {
-    private let logger = SDKLogger(category: "iOSAudioSession")
+public class IOSAudioSession {
+    private let logger = SDKLogger(category: "IOSAudioSession")
     private let audioSession = AVAudioSession.sharedInstance()
 
     // Audio session state

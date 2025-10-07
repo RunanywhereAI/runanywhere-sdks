@@ -1,10 +1,17 @@
 import Foundation
 
 /// API endpoints
-public enum APIEndpoint {
+public enum APIEndpoint: Equatable {
     // Authentication & Health
     case authenticate
+    case refreshToken
     case healthCheck
+
+    // Device Management
+    case registerDevice
+
+    // Model Management
+    case modelAssignments(deviceType: String, platform: String)
 
     // Core endpoints
     case configuration
@@ -18,9 +25,19 @@ public enum APIEndpoint {
         switch self {
         // Authentication & Health
         case .authenticate:
-            return "/v1/auth/token"
+            return "/api/v1/auth/sdk/authenticate"
+        case .refreshToken:
+            return "/api/v1/auth/sdk/refresh"
         case .healthCheck:
             return "/v1/health"
+
+        // Device Management
+        case .registerDevice:
+            return "/api/v1/devices/register"
+
+        // Model Management
+        case .modelAssignments(let deviceType, let platform):
+            return "/api/v1/model-assignments/for-sdk?device_type=\(deviceType)&platform=\(platform)"
 
         // Core endpoints
         case .configuration:

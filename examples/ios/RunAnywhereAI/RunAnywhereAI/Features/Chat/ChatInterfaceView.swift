@@ -417,7 +417,14 @@ struct ChatInterfaceView: View {
 
     private func handleModelSelected(_ model: ModelInfo) async {
         // The model loading is already handled in the ModelSelectionSheet
-        // Just update our view model to reflect the change
+        // Now we need to ensure our view model state is properly updated
+
+        // First, ensure the ModelListViewModel has the current model set
+        await MainActor.run {
+            ModelListViewModel.shared.setCurrentModel(model)
+        }
+
+        // Then update our ChatViewModel to reflect the change
         await viewModel.checkModelStatus()
     }
 

@@ -1,5 +1,5 @@
 import Foundation
-import AVFoundation
+@preconcurrency import AVFoundation
 
 // MARK: - VAD Service Protocol
 
@@ -41,6 +41,21 @@ public protocol VADService: AnyObject {
     /// Process audio samples
     @discardableResult
     func processAudioData(_ audioData: [Float]) -> Bool
+
+    /// Pause VAD processing (optional, not all implementations may support)
+    func pause()
+
+    /// Resume VAD processing (optional, not all implementations may support)
+    func resume()
+}
+
+/// Extension with default implementations for optional methods
+public extension VADService {
+    /// Default implementation does nothing
+    func pause() {}
+
+    /// Default implementation does nothing
+    func resume() {}
 }
 
 /// Speech activity events
@@ -72,25 +87,52 @@ public struct VADConfiguration: ComponentConfiguration, ComponentInitParameters 
     /// Frame length in seconds
     public let frameLength: Float
 
+    /// Enable automatic calibration
+    public let enableAutoCalibration: Bool
+
+    /// Calibration multiplier (threshold = ambient noise * multiplier)
+    public let calibrationMultiplier: Float
+
     public init(
-        energyThreshold: Float = 0.022,
+        energyThreshold: Float = 0.015,  // Changed default to more reasonable value
         sampleRate: Int = 16000,
-        frameLength: Float = 0.1
+        frameLength: Float = 0.1,
+        enableAutoCalibration: Bool = false,
+        calibrationMultiplier: Float = 2.0
     ) {
         self.energyThreshold = energyThreshold
         self.sampleRate = sampleRate
         self.frameLength = frameLength
+        self.enableAutoCalibration = enableAutoCalibration
+        self.calibrationMultiplier = calibrationMultiplier
     }
 
     public func validate() throws {
+        // Validate threshold range with better guidance
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
-            throw SDKError.validationFailed("Energy threshold must be between 0 and 1.0")
+            throw SDKError.validationFailed("Energy threshold must be between 0 and 1.0. Recommended range: 0.01-0.05")
         }
+
+        // Warn if threshold is too low or too high
+        if energyThreshold < 0.002 {
+            // This is just validation, can't log here, but the value is suspicious
+            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very low and may cause false positives. Recommended minimum: 0.002")
+        }
+        if energyThreshold > 0.1 {
+            // This might be intentional for very noisy environments
+            throw SDKError.validationFailed("Energy threshold \(energyThreshold) is very high and may miss speech. Recommended maximum: 0.1")
+        }
+
         guard sampleRate > 0 && sampleRate <= 48000 else {
             throw SDKError.validationFailed("Sample rate must be between 1 and 48000 Hz")
         }
         guard frameLength > 0 && frameLength <= 1.0 else {
             throw SDKError.validationFailed("Frame length must be between 0 and 1 second")
+        }
+
+        // Validate calibration multiplier
+        guard calibrationMultiplier >= 1.5 && calibrationMultiplier <= 5.0 else {
+            throw SDKError.validationFailed("Calibration multiplier must be between 1.5 and 5.0")
         }
     }
 }
@@ -195,7 +237,7 @@ public final class DefaultVADAdapter: ComponentAdapter {
 
 /// Voice Activity Detection component following the clean architecture
 @MainActor
-public final class VADComponent: BaseComponent<SimpleEnergyVAD> {
+public final class VADComponent: BaseComponent<SimpleEnergyVAD>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -203,6 +245,7 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD> {
 
     private let vadConfiguration: VADConfiguration
     private var lastSpeechState: Bool = false
+    private var isPaused: Bool = false
 
     // MARK: - Initialization
 
@@ -220,6 +263,20 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD> {
         // Fallback to default adapter (SimpleEnergyVAD)
         let defaultAdapter = DefaultVADAdapter()
         return try await defaultAdapter.createVADService(configuration: vadConfiguration)
+    }
+
+    // MARK: - Pause and Resume
+
+    /// Pause VAD processing
+    public func pause() {
+        isPaused = true
+        service?.pause()
+    }
+
+    /// Resume VAD processing
+    public func resume() {
+        isPaused = false
+        service?.resume()
     }
 
     // MARK: - Public API
@@ -335,5 +392,35 @@ public final class VADComponent: BaseComponent<SimpleEnergyVAD> {
     /// Get the underlying VAD service
     public func getService() -> VADService? {
         return service
+    }
+
+    /// Start calibration of the VAD
+    public func startCalibration() async throws {
+        try ensureReady()
+
+        guard let vadService = service as? SimpleEnergyVAD else {
+            throw SDKError.componentNotReady("VAD service does not support calibration")
+        }
+
+        // Start calibration
+        await vadService.startCalibration()
+    }
+
+    /// Get current VAD statistics for debugging
+    public func getStatistics() -> (current: Float, threshold: Float, ambient: Float, recentAvg: Float, recentMax: Float)? {
+        guard let vadService = service as? SimpleEnergyVAD else {
+            return nil
+        }
+
+        return vadService.getStatistics()
+    }
+
+    /// Set calibration parameters
+    public func setCalibrationParameters(multiplier: Float) {
+        guard let vadService = service as? SimpleEnergyVAD else {
+            return
+        }
+
+        vadService.setCalibrationParameters(multiplier: multiplier)
     }
 }

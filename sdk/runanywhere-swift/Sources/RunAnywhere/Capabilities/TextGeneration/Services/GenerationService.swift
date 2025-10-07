@@ -42,7 +42,7 @@ public class GenerationService {
         _ = Date() // Will be used for performance metrics in future
 
         // Get remote configuration
-        let remoteConfig = RunAnywhere._configurationData?.generation
+        let remoteConfig = RunAnywhere.configurationData?.generation
 
         // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
         let resolvedOptions = optionsResolver.resolve(

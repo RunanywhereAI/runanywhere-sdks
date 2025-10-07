@@ -13,15 +13,15 @@ public enum SDKConstants {
 
     /// Platform identifier
     #if os(iOS)
-    public static let platform = "iOS"
+    public static let platform = "ios"
     #elseif os(macOS)
-    public static let platform = "macOS"
+    public static let platform = "macos"
     #elseif os(tvOS)
-    public static let platform = "tvOS"
+    public static let platform = "tvos"
     #elseif os(watchOS)
-    public static let platform = "watchOS"
+    public static let platform = "watchos"
     #else
-    public static let platform = "Unknown"
+    public static let platform = "unknown"
     #endif
 
     /// Default API timeout in seconds
@@ -204,7 +204,7 @@ public enum SDKConstants {
     /// Platform constants
     public enum PlatformDefaults {
         /// Default supported platforms
-        public static let defaultSupportedPlatforms = ["iOS", "macOS"]
+        public static let defaultSupportedPlatforms = ["ios", "macos"]
     }
 
     // MARK: - Routing Policies

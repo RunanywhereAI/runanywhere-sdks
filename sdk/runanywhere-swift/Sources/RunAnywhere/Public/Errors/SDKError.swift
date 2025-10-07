@@ -20,6 +20,10 @@ public enum SDKError: LocalizedError {
     case networkError(String)
     case invalidState(String)
     case componentNotInitialized(String)
+    case timeout(String)
+    case serverError(String)
+    case storageError(String)
+    case invalidConfiguration(String)
 
     public var errorDescription: String? {
         switch self {
@@ -59,6 +63,14 @@ public enum SDKError: LocalizedError {
             return "Invalid state: \(reason)"
         case .componentNotInitialized(let component):
             return "Component not initialized: \(component)"
+        case .timeout(let reason):
+            return "Operation timed out: \(reason)"
+        case .serverError(let reason):
+            return "Server error: \(reason)"
+        case .storageError(let reason):
+            return "Storage error: \(reason)"
+        case .invalidConfiguration(let reason):
+            return "Invalid configuration: \(reason)"
         }
     }
 }

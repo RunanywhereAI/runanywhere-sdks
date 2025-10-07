@@ -135,7 +135,7 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     /// Calculate cosine similarity between two embeddings
     private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
-        guard a.count == b.count, a.count > 0 else { return 0.0 }
+        guard a.count == b.count, !a.isEmpty else { return 0.0 }
 
         var dotProduct: Float = 0
         var normA: Float = 0

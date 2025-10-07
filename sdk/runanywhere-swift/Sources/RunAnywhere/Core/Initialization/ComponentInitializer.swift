@@ -4,7 +4,7 @@ import Combine
 /// Manages component initialization - delegates to UnifiedComponentInitializer
 /// Kept for backward compatibility with existing API
 public actor ComponentInitializer {
-    private let logger = SDKLogger(category: "ComponentInitializer")
+    private let logger: SDKLogger = SDKLogger(category: "ComponentInitializer")
     private let unifiedInitializer: UnifiedComponentInitializer
 
     // Services
@@ -19,30 +19,28 @@ public actor ComponentInitializer {
 
     /// Initialize components with unified configurations
     public func initialize(_ configs: [UnifiedComponentConfig]) async -> InitializationResult {
-        return await unifiedInitializer.initialize(configs)
+        await unifiedInitializer.initialize(configs)
     }
 
     /// Get all component statuses
     public func getAllStatuses() async -> [ComponentStatus] {
-        return await unifiedInitializer.getAllStatuses()
+        await unifiedInitializer.getAllStatuses()
     }
 
     /// Get status of a specific component
     public func getStatus(for component: SDKComponent) async -> ComponentStatus {
-        return await unifiedInitializer.getStatus(for: component)
+        await unifiedInitializer.getStatus(for: component)
     }
 
     /// Check if a component is ready
     public func isReady(_ component: SDKComponent) async -> Bool {
-        return await unifiedInitializer.isReady(component)
+        await unifiedInitializer.isReady(component)
     }
 
     /// Check if all components in list are ready
     public func areReady(_ components: [SDKComponent]) async -> Bool {
-        for component in components {
-            if !(await unifiedInitializer.isReady(component)) {
-                return false
-            }
+        for component in components where !(await unifiedInitializer.isReady(component)) {
+            return false
         }
         return true
     }
@@ -58,6 +56,6 @@ public actor ComponentInitializer {
     /// Get initialization parameters for a component
     public func getParameters(for component: SDKComponent) -> (any ComponentInitParameters)? {
         // This would need to be implemented in UnifiedComponentInitializer if needed
-        return nil
+        nil
     }
 }

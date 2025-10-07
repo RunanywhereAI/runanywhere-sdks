@@ -61,13 +61,13 @@ extension RunAnywhere {
     /// Enable verbose debugging mode
     /// - Parameter enabled: Whether to enable verbose mode
     public static func setDebugMode(_ enabled: Bool) {
-        guard var config = _configurationData else {
+        guard var config = configurationData else {
             SDKLogger(category: "RunAnywhere").warning("Cannot set debug mode - SDK not initialized")
             return
         }
 
         config.debugMode = enabled
-        _configurationData = config
+        configurationData = config
 
         // Update log level based on debug mode
         setLogLevel(enabled ? .debug : .info)

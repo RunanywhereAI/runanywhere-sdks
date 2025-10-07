@@ -303,8 +303,15 @@ class ChatViewModel: ObservableObject {
                 logger.info("📝 Sending new message only: \(fullPrompt)")
 
                 // Get SDK configuration for generation options
-                // Use default settings for now
-                let effectiveSettings = (temperature: 0.7, maxTokens: 1000)
+                // Use settings from UserDefaults with fallback to 1000 tokens for chat
+                let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+                let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+
+                let effectiveSettings = (
+                    temperature: savedTemperature != 0 ? savedTemperature : 0.7,
+                    maxTokens: savedMaxTokens != 0 ? savedMaxTokens : 1000  // Default to 1000 tokens for chat
+                )
+
                 let options = RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature)
@@ -696,15 +703,15 @@ class ChatViewModel: ObservableObject {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
+                self.logger.info("✅ Model status updated: '\(currentModel.name)' is loaded")
 
-                // Ensure the model is actually loaded in the SDK
+                // Ensure the model is actually loaded in the SDK (but don't block the UI update)
                 Task {
                     do {
                         try await RunAnywhere.loadModel(currentModel.id)
-                        logger.info("Verified model '\(currentModel.name)' is loaded in SDK")
-
+                        self.logger.info("✅ Verified model '\(currentModel.name)' is loaded in SDK")
                     } catch {
-                        logger.error("Failed to verify model is loaded: \(error)")
+                        self.logger.error("❌ Failed to verify model is loaded: \(error)")
                         await MainActor.run {
                             self.isModelLoaded = false
                             self.loadedModelName = nil
@@ -714,14 +721,16 @@ class ChatViewModel: ObservableObject {
             } else {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
-
+                self.logger.info("❌ No current model in ModelListViewModel")
             }
 
-            // Update system message
+            // Update system message to reflect current state
             if self.messages.first?.role == .system {
                 self.messages.removeFirst()
             }
-            self.addSystemMessage()
+            if self.isModelLoaded {
+                self.addSystemMessage()
+            }
         }
     }
 

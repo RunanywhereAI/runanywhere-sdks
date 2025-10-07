@@ -74,7 +74,7 @@ public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
         try databaseManager.write { db in
             for id in ids {
                 if var data = try ConfigurationData.fetchOne(db, key: id) {
-                    _ = data.markSynced()
+                    data.markSynced()
                     try data.update(db)
                 }
             }

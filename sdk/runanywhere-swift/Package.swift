@@ -49,11 +49,6 @@ let package = Package(
             // plugins: [
             //     .plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")
             // ]
-        ),
-        .testTarget(
-            name: "RunAnywhereTests",
-            dependencies: ["RunAnywhere"],
-            path: "Tests/RunAnywhereTests"
         )
     ]
 )

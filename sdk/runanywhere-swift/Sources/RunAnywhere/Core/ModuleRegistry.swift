@@ -20,7 +20,6 @@ import Foundation
 /// ```
 @MainActor
 public final class ModuleRegistry {
-
     // MARK: - Singleton
 
     public static let shared = ModuleRegistry()
@@ -162,11 +161,7 @@ public protocol SpeakerDiarizationServiceProvider {
 
 
 // MARK: - SDK Component Extension
-
-extension SDKComponent {
-    /// Wake word detection component
-    public static let wakeWord = SDKComponent(rawValue: "wakeWord")!
-}
+// Note: SDKComponent.wakeWord is now defined in the enum itself
 
 // MARK: - Module Auto-Registration
 

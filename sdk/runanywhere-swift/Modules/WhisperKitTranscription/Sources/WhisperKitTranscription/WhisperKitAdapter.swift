@@ -115,7 +115,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - Model Registration
 
     // Store storage strategy (handles download and file management)
-    private let storageStrategy: ModelStorageStrategy
+    private let storageStrategy: WhisperKitStorageStrategy
 
     /// Called when adapter is registered with the SDK
     /// This method will be called automatically by the SDK when the adapter is registered

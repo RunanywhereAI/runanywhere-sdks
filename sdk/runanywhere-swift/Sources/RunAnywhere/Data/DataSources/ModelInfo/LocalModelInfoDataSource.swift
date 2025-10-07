@@ -45,6 +45,9 @@ public actor LocalModelInfoDataSource: LocalDataSource {
     public func loadAll() async throws -> [ModelInfo] {
         logger.debug("Loading all models")
 
+        // Ensure table exists before loading
+        try await ensureModelsTableExists()
+
         let data = try databaseManager.read { db in
             try ModelInfo
                 .order(ModelInfo.Columns.updatedAt.desc)
@@ -57,6 +60,9 @@ public actor LocalModelInfoDataSource: LocalDataSource {
 
     public func store(_ entity: ModelInfo) async throws {
         logger.debug("Storing model: \(entity.id)")
+
+        // Ensure table exists before storing
+        try await ensureModelsTableExists()
 
         var entityToSave = entity
         entityToSave.markUpdated()
@@ -176,6 +182,57 @@ public actor LocalModelInfoDataSource: LocalDataSource {
                 model.markUpdated()
                 try model.update(db)
             }
+        }
+    }
+
+    // MARK: - Table Management
+
+    /// Ensure the models table exists, creating it if necessary
+    private func ensureModelsTableExists() async throws {
+        let tableExists = try databaseManager.read { db in
+            try db.tableExists("models")
+        }
+
+        if !tableExists {
+            logger.info("Models table doesn't exist, creating it...")
+            try databaseManager.write { db in
+                try db.create(table: "models", ifNotExists: true) { t in
+                    t.primaryKey("id", .text)
+                    t.column("name", .text).notNull()
+                    t.column("category", .text).notNull()
+
+                    // Format and location
+                    t.column("format", .text).notNull()
+                    t.column("downloadURL", .text)
+                    t.column("localPath", .text)
+
+                    // Size information
+                    t.column("downloadSize", .integer)
+                    t.column("memoryRequired", .integer)
+
+                    // Framework compatibility
+                    t.column("compatibleFrameworks", .blob).notNull()
+                    t.column("preferredFramework", .text)
+
+                    // Model-specific capabilities
+                    t.column("contextLength", .integer)
+                    t.column("supportsThinking", .boolean).notNull().defaults(to: false)
+
+                    // Metadata
+                    t.column("metadata", .blob)
+
+                    // Tracking fields
+                    t.column("source", .text).notNull().defaults(to: "remote")
+                    t.column("createdAt", .datetime).notNull()
+                    t.column("updatedAt", .datetime).notNull()
+                    t.column("syncPending", .boolean).notNull().defaults(to: false)
+
+                    // Usage tracking
+                    t.column("lastUsed", .datetime)
+                    t.column("usageCount", .integer).notNull().defaults(to: 0)
+                }
+            }
+            logger.info("✅ Models table created successfully")
         }
     }
 }

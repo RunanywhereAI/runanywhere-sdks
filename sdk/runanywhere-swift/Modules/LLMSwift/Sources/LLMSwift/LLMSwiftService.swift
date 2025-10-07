@@ -14,6 +14,73 @@ public class LLMSwiftService: LLMService {
     public init() {}
 
     public func initialize(modelPath: String?) async throws {
+        // Handle "default" case - use the already loaded model in the SDK
+        if modelPath == nil || modelPath == "default" || modelPath?.isEmpty == true {
+            logger.info("🚀 Using default/already loaded model in SDK")
+
+            // Get the current model from the SDK
+            guard let currentModel = RunAnywhere.currentModel else {
+                logger.error("❌ No model currently loaded in SDK")
+                throw LLMServiceError.modelNotFound("No model loaded in SDK to use as default")
+            }
+
+            // Get the actual model path from the ModelInfo
+            guard let actualModelURL = currentModel.localPath else {
+                logger.error("❌ Current model has no local path: \(currentModel.name)")
+                throw LLMServiceError.modelNotFound("Current model '\(currentModel.name)' has no local path")
+            }
+
+            // Convert URL to path string
+            let actualModelPath = actualModelURL.path
+
+            logger.info("📂 Using model from SDK: \(currentModel.name) at path: \(actualModelPath)")
+
+            // Now initialize with the actual model path
+            self.modelPath = actualModelPath
+
+            // Continue with normal initialization using the actual path
+            // Check if model file exists
+            let fileManager = FileManager.default
+            guard fileManager.fileExists(atPath: actualModelPath) else {
+                logger.error("❌ Model file does not exist at path: \(actualModelPath)")
+                throw LLMServiceError.notInitialized
+            }
+
+            let fileSize = (try? fileManager.attributesOfItem(atPath: actualModelPath)[.size] as? Int64) ?? 0
+            logger.info("📊 Model file size: \(fileSize) bytes")
+
+            // Configure LLM with hardware settings
+            let maxTokens = 2048 // Default context length
+            let template = LLMSwiftTemplateResolver.determineTemplate(from: actualModelPath, systemPrompt: nil)
+            logger.info("📝 Using template: \(String(describing: template)), maxTokens: \(maxTokens)")
+
+            // Initialize LLM instance
+            do {
+                logger.info("🚀 Creating LLM instance...")
+
+                // Create LLM instance with proper configuration
+                // Maintain reasonable history for context continuity
+                self.llm = LLM(
+                    from: actualModelURL,  // Use the URL directly
+                    template: template,
+                    historyLimit: 6,  // Keep 6 messages for context (3 exchanges)
+                    maxTokenCount: Int32(maxTokens)
+                )
+
+                guard self.llm != nil else {
+                    throw LLMServiceError.notInitialized
+                }
+
+                logger.info("✅ LLM instance created from SDK's loaded model")
+                logger.info("✅ Model initialized successfully")
+            } catch {
+                logger.error("❌ Failed to initialize model: \(error)")
+                throw LLMServiceError.notInitialized
+            }
+
+            return
+        }
+
         guard let modelPath = modelPath else {
             throw LLMServiceError.modelNotFound("No model path provided")
         }
@@ -40,10 +107,11 @@ public class LLMSwiftService: LLMService {
             logger.info("🚀 Creating LLM instance...")
 
             // Create LLM instance with proper configuration
+            // Maintain reasonable history for context continuity
             self.llm = LLM(
                 from: URL(fileURLWithPath: modelPath),
                 template: template,
-                historyLimit: 6,  // Limit conversation history to prevent context overflow
+                historyLimit: 6,  // Keep 6 messages for context (3 exchanges)
                 maxTokenCount: Int32(maxTokens)
             )
 
@@ -72,6 +140,7 @@ public class LLMSwiftService: LLMService {
 
     public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         logger.info("🔧 Starting generation for prompt: \(prompt.prefix(50))...")
+        logger.info("📏 Max tokens limit: \(options.maxTokens)")
 
         guard let llm = llm else {
             logger.error("❌ LLM not initialized")
@@ -99,11 +168,22 @@ public class LLMSwiftService: LLMService {
 
         // Generate response with timeout protection
         do {
-            logger.info("🚀 Calling llm.getCompletion() with 60-second timeout")
+            logger.info("🚀 Calling llm.getCompletion() with 10-second timeout")
             logger.info("📝 Full prompt being sent to LLM:")
             logger.info("---START PROMPT---")
             logger.info("\(fullPrompt)")
             logger.info("---END PROMPT---")
+
+            // Log LLM state
+            logger.info("📊 LLM History Count: \(llm.history.count)")
+            if !llm.history.isEmpty {
+                logger.warning("⚠️ LLM has existing history - this should be 0 for voice!")
+                for (index, chat) in llm.history.enumerated() {
+                    let roleStr = chat.role == .user ? "user" : "bot"
+                    let contentPreview = String(chat.content.prefix(500))
+                    logger.info("History[\(index)]: \(roleStr) - \(contentPreview)...")
+                }
+            }
 
             // Use the simpler getCompletion method which is more reliable
             logger.info("🔄 Using getCompletion method for generation...")
@@ -117,7 +197,7 @@ public class LLMSwiftService: LLMService {
                 }
 
                 group.addTask {
-                    // Timeout task
+                    // Timeout task - 60 seconds to allow for slower models on device
                     try await Task.sleep(nanoseconds: 60_000_000_000) // 60 seconds
                     self.logger.error("❌ Generation timed out after 60 seconds")
                     throw TimeoutError(message: "Generation timed out after 60 seconds")
@@ -151,9 +231,11 @@ public class LLMSwiftService: LLMService {
                 // For responses with thinking content, we count tokens excluding tags
                 let tokens = finalResponse.split(separator: " ")
                 if tokens.count > options.maxTokens {
+                    logger.info("⚠️ Response exceeded maxTokens limit (\(tokens.count) > \(options.maxTokens)), truncating...")
                     // This is a simple approximation - in practice, token counting
                     // should be done by the tokenizer
                     finalResponse = tokens.prefix(options.maxTokens).joined(separator: " ")
+                    logger.info("✂️ Truncated response to \(options.maxTokens) tokens")
                 }
             }
 
@@ -271,6 +353,12 @@ public class LLMSwiftService: LLMService {
     public func cleanup() async {
         llm = nil
         modelPath = nil
+    }
+
+    /// Clear conversation history - useful for voice interactions
+    public func clearHistory() {
+        llm?.history.removeAll()
+        logger.info("🧹 Conversation history cleared")
     }
 
     public func getModelMemoryUsage() async throws -> Int64 {

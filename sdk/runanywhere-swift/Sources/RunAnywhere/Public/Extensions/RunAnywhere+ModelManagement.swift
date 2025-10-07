@@ -68,7 +68,33 @@ public extension RunAnywhere {
         do {
             // Get the model info first
             let modelService = await serviceContainer.modelInfoService
+
+            // Log available models for debugging
+            let allModels = try await modelService.loadStoredModels()
+            print("[DEBUG] Available models in database: \(allModels.map { $0.id })")
+            print("[DEBUG] Looking for model: \(modelIdentifier)")
+
             guard let modelInfo = try await modelService.getModel(by: modelIdentifier) else {
+                print("[ERROR] Model not found in database: \(modelIdentifier)")
+                // Try to find in registry as fallback
+                if let registryModel = serviceContainer.modelRegistry.getModel(by: modelIdentifier) {
+                    print("[DEBUG] Found model in registry, saving to database")
+                    try await modelService.saveModel(registryModel)
+                    // Now try again
+                    guard let savedModel = try await modelService.getModel(by: modelIdentifier) else {
+                        throw SDKError.modelNotFound(modelIdentifier)
+                    }
+                    // Use the saved model
+                    let downloadService = serviceContainer.downloadService
+                    let downloadTask = try await downloadService.downloadModel(savedModel)
+                    let localPath = try await downloadTask.result.value
+                    try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true, localPath: localPath)
+                    if let updatedModel = try await modelService.getModel(by: modelIdentifier) {
+                        serviceContainer.modelRegistry.updateModel(updatedModel)
+                    }
+                    events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
+                    return
+                }
                 throw SDKError.modelNotFound(modelIdentifier)
             }
 
@@ -76,11 +102,16 @@ public extension RunAnywhere {
             let downloadService = serviceContainer.downloadService
             let downloadTask = try await downloadService.downloadModel(modelInfo)
 
-            // Wait for download completion
-            _ = try await downloadTask.result.value
+            // Wait for download completion and get the local path
+            let localPath = try await downloadTask.result.value
 
             // Update model info with local path after successful download
-            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true)
+            try await modelService.updateDownloadStatus(modelIdentifier, isDownloaded: true, localPath: localPath)
+
+            // Also update the model in the registry with the new local path
+            if let updatedModel = try await modelService.getModel(by: modelIdentifier) {
+                serviceContainer.modelRegistry.updateModel(updatedModel)
+            }
 
             events.publish(SDKModelEvent.downloadCompleted(modelId: modelIdentifier))
         } catch {

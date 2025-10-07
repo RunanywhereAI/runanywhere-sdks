@@ -109,9 +109,8 @@ class MemoryService: MemoryManager {
     func getLoadedModels() -> [LoadedModel] {
         let memoryModels = allocationManager.getLoadedModels()
         return memoryModels
-            .filter { $0.service != nil }
-            .map { memModelInfo in
-                let service = memModelInfo.service!
+            .compactMap { memModelInfo in
+                guard let service = memModelInfo.service else { return nil }
 
                 // Create a ModelInfo from the MemoryLoadedModel
                 let modelInfo = ModelInfo(
