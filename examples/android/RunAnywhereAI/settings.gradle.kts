@@ -14,12 +14,23 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        mavenLocal() // Add Maven Local to use the published SDK
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") } // For android-vad and other JitPack libraries
+    }
+    versionCatalogs {
+        create("libs") {
+            from(files("../../../gradle/libs.versions.toml"))
+        }
     }
 }
 
 rootProject.name = "RunAnywhereAI"
 include(":app")
-include(":sdk:runanywhere-android")
-project(":sdk:runanywhere-android").projectDir = file("../../../sdk/runanywhere-android")
+
+// Commented out - now using SDK from Maven Local
+// include(":sdk:runanywhere-kotlin")
+// project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
+// include(":sdk:runanywhere-kotlin:jni")
+// project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")

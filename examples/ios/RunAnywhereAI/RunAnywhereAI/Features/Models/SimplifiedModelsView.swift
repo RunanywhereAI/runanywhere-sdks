@@ -98,7 +98,7 @@ struct SimplifiedModelsView: View {
             Label(label, systemImage: systemImage)
             Spacer()
             Text(value)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 
@@ -107,7 +107,7 @@ struct SimplifiedModelsView: View {
             Label("Neural Engine", systemImage: "brain")
             Spacer()
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
+                .foregroundColor(AppColors.statusGreen)
         }
     }
 
@@ -115,24 +115,24 @@ struct SimplifiedModelsView: View {
         HStack {
             ProgressView()
             Text("Loading device info...")
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 
     private var frameworksSection: some View {
         Section("Available Frameworks") {
             if availableFrameworks.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                     HStack {
                         ProgressView()
                         Text("Loading frameworks...")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(AppColors.textSecondary)
                     }
 
                     Text("No framework adapters are currently registered. Register framework adapters to see available frameworks.")
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.top, 4)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.statusOrange)
+                        .padding(.top, AppSpacing.xSmall)
                 }
             } else {
                 ForEach(availableFrameworks, id: \.self) { framework in
@@ -178,14 +178,14 @@ struct SimplifiedModelsView: View {
                 }
 
                 if filteredModels.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         Text("No models available for this framework")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                            .font(AppTypography.caption)
 
                         Text("Tap 'Add Model' to add a model from URL")
-                            .foregroundColor(.blue)
-                            .font(.caption2)
+                            .foregroundColor(AppColors.statusBlue)
+                            .font(AppTypography.caption2)
                     }
                 }
             }
@@ -224,43 +224,43 @@ private struct ModelRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                 Text(model.name)
-                    .font(.subheadline)
+                    .font(AppTypography.subheadline)
                     .fontWeight(isSelected ? .semibold : .regular)
 
-                HStack(spacing: 8) {
+                HStack(spacing: AppSpacing.smallMedium) {
                     let size = model.memoryRequired ?? 0
                     if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
                         )
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
                     }
 
                     let format = model.format
                     Text(format.rawValue.uppercased())
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(4)
+                        .font(AppTypography.caption2)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(AppColors.badgeGray)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                     // Show thinking indicator if model supports thinking
                     if model.supportsThinking {
-                        HStack(spacing: 2) {
+                        HStack(spacing: AppSpacing.xxSmall) {
                             Image(systemName: "brain")
-                                .font(.caption2)
+                                .font(AppTypography.caption2)
                             Text("THINKING")
-                                .font(.caption2)
+                                .font(AppTypography.caption2)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.2))
-                        .foregroundColor(.purple)
-                        .cornerRadius(4)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(AppColors.badgePurple)
+                        .foregroundColor(AppColors.primaryPurple)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                     } else if model.localPath != nil {
                         // For downloaded models without thinking support, show option to enable it
                         Button(action: {
@@ -271,17 +271,17 @@ private struct ModelRow: View {
                                 onModelUpdated()
                             }
                         }) {
-                            HStack(spacing: 2) {
+                            HStack(spacing: AppSpacing.xxSmall) {
                                 Image(systemName: "brain")
-                                    .font(.caption2)
+                                    .font(AppTypography.caption2)
                                 Text("ENABLE")
-                                    .font(.caption2)
+                                    .font(AppTypography.caption2)
                             }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.2))
-                            .foregroundColor(.orange)
-                            .cornerRadius(4)
+                            .padding(.horizontal, AppSpacing.small)
+                            .padding(.vertical, AppSpacing.xxSmall)
+                            .background(AppColors.badgeOrange)
+                            .foregroundColor(AppColors.statusOrange)
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -290,27 +290,27 @@ private struct ModelRow: View {
                 // Show download status
                 if let _ = model.downloadURL {
                     if model.localPath == nil {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             if isDownloading {
                                 ProgressView(value: downloadProgress)
                                     .progressViewStyle(LinearProgressViewStyle())
                                 Text("\(Int(downloadProgress * 100))%")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             } else {
                                 Text("Available for download")
-                                    .font(.caption2)
-                                    .foregroundColor(.blue)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.statusBlue)
                             }
                         }
                     } else {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.caption2)
+                                .foregroundColor(AppColors.statusGreen)
+                                .font(AppTypography.caption2)
                             Text("Downloaded")
-                                .font(.caption2)
-                                .foregroundColor(.green)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.statusGreen)
                         }
                     }
                 }
@@ -319,17 +319,17 @@ private struct ModelRow: View {
             Spacer()
 
             // Action buttons based on model state
-            HStack(spacing: 8) {
+            HStack(spacing: AppSpacing.smallMedium) {
                 if let _ = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
-                        VStack(spacing: 4) {
+                        VStack(spacing: AppSpacing.xSmall) {
                             ProgressView()
                                 .scaleEffect(0.8)
                             if downloadProgress > 0 {
                                 Text("\(Int(downloadProgress * 100))%")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
                     } else {
@@ -338,32 +338,32 @@ private struct ModelRow: View {
                                 await downloadModel()
                             }
                         }
-                        .font(.caption)
+                        .font(AppTypography.caption)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                     }
                 } else if model.localPath != nil {
                     // Model is downloaded - show select and load options
                     if isSelected {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(AppColors.statusGreen)
                             Text("Loaded")
-                                .font(.caption2)
-                                .foregroundColor(.green)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.statusGreen)
                         }
                     } else {
                         Button("Load") {
                             onSelectModel()
                         }
-                        .font(.caption)
+                        .font(AppTypography.caption)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppSpacing.xSmall)
     }
 
     private func downloadModel() async {

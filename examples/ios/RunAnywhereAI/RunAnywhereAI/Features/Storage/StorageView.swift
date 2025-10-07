@@ -15,18 +15,17 @@ struct StorageView: View {
         #if os(macOS)
         // macOS: Custom layout without List
         ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
+            VStack(alignment: .leading, spacing: AppSpacing.xxLarge) {
                 Text("Storage Management")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.bottom, 10)
+                    .font(AppTypography.largeTitleBold)
+                    .padding(.bottom, AppSpacing.medium)
 
                 // Storage Overview Card
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     HStack {
                         Text("Storage Overview")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.headline)
+                            .foregroundColor(AppColors.textSecondary)
 
                         Spacer()
 
@@ -43,46 +42,46 @@ struct StorageView: View {
                     VStack(spacing: 0) {
                         storageOverviewContent
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // Downloaded Models Card
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("Downloaded Models")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
                     VStack(spacing: 0) {
                         storedModelsContent
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // Storage Management Card
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("Storage Management")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
                     VStack(spacing: 0) {
                         cacheManagementContent
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
-                Spacer(minLength: 30)
+                Spacer(minLength: AppSpacing.xxLarge)
             }
-            .padding(30)
-            .frame(maxWidth: 1000, alignment: .leading)
+            .padding(AppSpacing.xxLarge)
+            .frame(maxWidth: AppLayout.maxContentWidthLarge, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppColors.backgroundPrimary)
         .task {
             await viewModel.loadData()
         }
@@ -113,13 +112,13 @@ struct StorageView: View {
 
     #if os(macOS)
     private var storageOverviewContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppSpacing.large) {
                 // Total storage usage
                 HStack {
                     Label("Total Usage", systemImage: "externaldrive")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.totalStorageSize, countStyle: .file))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 // Available space
@@ -127,7 +126,7 @@ struct StorageView: View {
                     Label("Available Space", systemImage: "externaldrive.badge.plus")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.availableSpace, countStyle: .file))
-                        .foregroundColor(.green)
+                        .foregroundColor(AppColors.primaryGreen)
                 }
 
                 // Models storage
@@ -135,7 +134,7 @@ struct StorageView: View {
                     Label("Models Storage", systemImage: "cpu")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.modelStorageSize, countStyle: .file))
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primaryBlue)
                 }
 
                 // Models count
@@ -143,7 +142,7 @@ struct StorageView: View {
                     Label("Downloaded Models", systemImage: "number")
                     Spacer()
                     Text("\(viewModel.storedModels.count)")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppColors.textSecondary)
                 }
             }
         }
@@ -151,13 +150,13 @@ struct StorageView: View {
 
     private var storageOverviewSection: some View {
         Section("Storage Overview") {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                 // Total storage usage
                 HStack {
                     Label("Total Usage", systemImage: "externaldrive")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.totalStorageSize, countStyle: .file))
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 // Available space
@@ -165,7 +164,7 @@ struct StorageView: View {
                     Label("Available Space", systemImage: "externaldrive.badge.plus")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.availableSpace, countStyle: .file))
-                        .foregroundColor(.green)
+                        .foregroundColor(AppColors.primaryGreen)
                 }
 
                 // Models storage
@@ -173,7 +172,7 @@ struct StorageView: View {
                     Label("Models Storage", systemImage: "cpu")
                     Spacer()
                     Text(ByteCountFormatter.string(fromByteCount: viewModel.modelStorageSize, countStyle: .file))
-                        .foregroundColor(.blue)
+                        .foregroundColor(AppColors.primaryBlue)
                 }
 
                 // Models count
@@ -181,28 +180,28 @@ struct StorageView: View {
                     Label("Downloaded Models", systemImage: "number")
                     Spacer()
                     Text("\(viewModel.storedModels.count)")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppColors.textSecondary)
                 }
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, AppSpacing.xSmall)
         }
     }
 
     #if os(macOS)
     private var storedModelsContent: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
             if viewModel.storedModels.isEmpty {
                 HStack {
                     Spacer()
-                    VStack(spacing: 12) {
+                    VStack(spacing: AppSpacing.mediumLarge) {
                         Image(systemName: "cube")
-                            .font(.system(size: 48))
-                            .foregroundColor(.secondary.opacity(0.5))
+                            .font(AppTypography.system48)
+                            .foregroundColor(AppColors.textSecondary.opacity(0.5))
                         Text("No models downloaded yet")
-                            .foregroundColor(.secondary)
-                            .font(.callout)
+                            .foregroundColor(AppColors.textSecondary)
+                            .font(AppTypography.callout)
                     }
-                    .padding(.vertical, 30)
+                    .padding(.vertical, AppSpacing.xxLarge)
                     Spacer()
                 }
             } else {
@@ -212,7 +211,7 @@ struct StorageView: View {
                     }
                     if model.id != viewModel.storedModels.last?.id {
                         Divider()
-                            .padding(.vertical, 4)
+                            .padding(.vertical, AppSpacing.xSmall)
                     }
                 }
             }
@@ -224,8 +223,8 @@ struct StorageView: View {
         Section("Downloaded Models") {
             if viewModel.storedModels.isEmpty {
                 Text("No models downloaded yet")
-                    .foregroundColor(.secondary)
-                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .font(AppTypography.caption)
             } else {
                 ForEach(viewModel.storedModels, id: \.id) { model in
                     StoredModelRow(model: model) {
@@ -238,7 +237,7 @@ struct StorageView: View {
 
     #if os(macOS)
     private var cacheManagementContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: AppSpacing.large) {
             Button(action: {
                 Task {
                     await viewModel.clearCache()
@@ -246,22 +245,22 @@ struct StorageView: View {
             }) {
                 HStack {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundColor(AppColors.primaryRed)
                     Text("Clear Cache")
                     Spacer()
                     Text("Free up space by clearing cached data")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
-            .padding(12)
-            .background(Color.red.opacity(0.1))
-            .cornerRadius(8)
+            .padding(AppSpacing.mediumLarge)
+            .background(AppColors.badgeRed)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusRegular)
+                    .stroke(AppColors.primaryRed.opacity(0.3), lineWidth: AppSpacing.strokeRegular)
             )
 
             Button(action: {
@@ -271,22 +270,22 @@ struct StorageView: View {
             }) {
                 HStack {
                     Image(systemName: "trash")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.primaryOrange)
                     Text("Clean Temporary Files")
                     Spacer()
                     Text("Remove temporary files and logs")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
-            .padding(12)
-            .background(Color.orange.opacity(0.1))
-            .cornerRadius(8)
+            .padding(AppSpacing.mediumLarge)
+            .background(AppColors.badgeOrange)
+            .cornerRadius(AppSpacing.cornerRadiusRegular)
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusRegular)
+                    .stroke(AppColors.primaryOrange.opacity(0.3), lineWidth: AppSpacing.strokeRegular)
             )
         }
     }
@@ -301,9 +300,9 @@ struct StorageView: View {
             }) {
                 HStack {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundColor(AppColors.primaryRed)
                     Text("Clear Cache")
-                        .foregroundColor(.red)
+                        .foregroundColor(AppColors.primaryRed)
                     Spacer()
                 }
             }
@@ -315,9 +314,9 @@ struct StorageView: View {
             }) {
                 HStack {
                     Image(systemName: "trash")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.primaryOrange)
                     Text("Clean Temporary Files")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.primaryOrange)
                     Spacer()
                 }
             }
@@ -335,46 +334,44 @@ private struct StoredModelRow: View {
     @State private var isDeleting = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                     Text(model.name)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                        .font(AppTypography.subheadlineMedium)
 
-                    HStack(spacing: 8) {
+                    HStack(spacing: AppSpacing.smallMedium) {
                         Text(model.format.rawValue.uppercased())
-                            .font(.caption2)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.2))
-                            .cornerRadius(4)
+                            .font(AppTypography.caption2)
+                            .padding(.horizontal, AppSpacing.small)
+                            .padding(.vertical, AppSpacing.xxSmall)
+                            .background(AppColors.badgeBlue)
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                         if let framework = model.framework {
                             Text(framework.displayName)
-                                .font(.caption2)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.green.opacity(0.2))
-                                .cornerRadius(4)
+                                .font(AppTypography.caption2)
+                                .padding(.horizontal, AppSpacing.small)
+                                .padding(.vertical, AppSpacing.xxSmall)
+                                .background(AppColors.badgeGreen)
+                                .cornerRadius(AppSpacing.cornerRadiusSmall)
                         }
                     }
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: AppSpacing.xSmall) {
                     Text(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .file))
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(AppTypography.captionMedium)
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: AppSpacing.xSmall) {
                         Button(showingDetails ? "Hide" : "Details") {
                             withAnimation {
                                 showingDetails.toggle()
                             }
                         }
-                        .font(.caption2)
+                        .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
 
@@ -382,9 +379,9 @@ private struct StoredModelRow: View {
                             showingDeleteConfirmation = true
                         }) {
                             Image(systemName: "trash")
-                                .foregroundColor(.red)
+                                .foregroundColor(AppColors.primaryRed)
                         }
-                        .font(.caption2)
+                        .font(AppTypography.caption2)
                         .buttonStyle(.bordered)
                         .controlSize(.mini)
                         .disabled(isDeleting)
@@ -393,25 +390,23 @@ private struct StoredModelRow: View {
             }
 
             if showingDetails {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppSpacing.small) {
                     // Model Format and Framework
                     HStack {
                         Text("Format:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                            .font(AppTypography.caption2Medium)
                         Text(model.format.rawValue.uppercased())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
                     }
 
                     if let framework = model.framework {
                         HStack {
                             Text("Framework:")
-                                .font(.caption2)
-                                .fontWeight(.medium)
+                                .font(AppTypography.caption2Medium)
                             Text(framework.displayName)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
 
@@ -419,11 +414,10 @@ private struct StoredModelRow: View {
                     if let contextLength = model.contextLength {
                         HStack {
                             Text("Context Length:")
-                                .font(.caption2)
-                                .fontWeight(.medium)
+                                .font(AppTypography.caption2Medium)
                             Text("\(contextLength) tokens")
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
 
@@ -432,50 +426,46 @@ private struct StoredModelRow: View {
                         if let author = metadata.author {
                             HStack {
                                 Text("Author:")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
+                                    .font(AppTypography.caption2Medium)
                                 Text(author)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
 
                         if let license = metadata.license {
                             HStack {
                                 Text("License:")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
+                                    .font(AppTypography.caption2Medium)
                                 Text(license)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
 
                         if let description = metadata.description {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                                 Text("Description:")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
+                                    .font(AppTypography.caption2Medium)
                                 Text(description)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
 
                         if !metadata.tags.isEmpty {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                                 Text("Tags:")
-                                    .font(.caption2)
-                                    .fontWeight(.medium)
-                                HStack(spacing: 4) {
+                                    .font(AppTypography.caption2Medium)
+                                HStack(spacing: AppSpacing.xSmall) {
                                     ForEach(metadata.tags, id: \.self) { tag in
                                         Text(tag)
-                                            .font(.caption2)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.blue.opacity(0.2))
-                                            .cornerRadius(4)
+                                            .font(AppTypography.caption2)
+                                            .padding(.horizontal, AppSpacing.small)
+                                            .padding(.vertical, AppSpacing.xxSmall)
+                                            .background(AppColors.badgeBlue)
+                                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                                     }
                                 }
                             }
@@ -485,24 +475,22 @@ private struct StoredModelRow: View {
                     Divider()
 
                     // File Information
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                         Text("Path:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                            .font(AppTypography.caption2Medium)
                         Text(model.path.path)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
                     if let checksum = model.checksum {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                             Text("Checksum:")
-                                .font(.caption2)
-                                .fontWeight(.medium)
+                                .font(AppTypography.caption2Medium)
                             Text(checksum)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                         }
@@ -510,32 +498,30 @@ private struct StoredModelRow: View {
 
                     HStack {
                         Text("Created:")
-                            .font(.caption2)
-                            .fontWeight(.medium)
+                            .font(AppTypography.caption2Medium)
                         Text(model.createdDate, style: .date)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.textSecondary)
                     }
 
                     if let lastUsed = model.lastUsed {
                         HStack {
                             Text("Last used:")
-                                .font(.caption2)
-                                .fontWeight(.medium)
+                                .font(AppTypography.caption2Medium)
                             Text(lastUsed, style: .relative)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.textSecondary)
                         }
                     }
                 }
-                .padding(.top, 4)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
+                .padding(.top, AppSpacing.xSmall)
+                .padding(.horizontal, AppSpacing.smallMedium)
+                .padding(.vertical, AppSpacing.small)
+                .background(AppColors.backgroundTertiary)
+                .cornerRadius(AppSpacing.cornerRadiusRegular)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppSpacing.xSmall)
         .alert("Delete Model", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {

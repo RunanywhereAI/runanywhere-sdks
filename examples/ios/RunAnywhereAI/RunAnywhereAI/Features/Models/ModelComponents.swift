@@ -18,21 +18,21 @@ struct FrameworkRow: View {
             HStack {
                 Image(systemName: frameworkIcon)
                     .foregroundColor(frameworkColor)
-                    .frame(width: 30)
+                    .frame(width: AppSpacing.xxLarge)
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                     Text(framework.displayName)
-                        .font(.headline)
+                        .font(AppTypography.headline)
                     Text(frameworkDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 Spacer()
 
                 Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .foregroundColor(.secondary)
-                    .font(.caption)
+                    .foregroundColor(AppColors.textSecondary)
+                    .font(AppTypography.caption)
             }
             .contentShape(Rectangle())
         }
@@ -53,11 +53,11 @@ struct FrameworkRow: View {
     private var frameworkColor: Color {
         switch framework {
         case .foundationModels:
-            return .black
+            return AppColors.textPrimary
         case .mediaPipe:
-            return .blue
+            return AppColors.statusBlue
         default:
-            return .gray
+            return AppColors.statusGray
         }
     }
 

@@ -1,0 +1,56 @@
+plugins {
+    id("org.jetbrains.intellij") version "1.17.4"
+    kotlin("jvm") version "2.1.21"
+}
+
+group = "com.runanywhere"
+version = "1.0.0"
+
+intellij {
+    version.set("2023.3")
+    type.set("IC")
+    plugins.set(listOf("java"))
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    // RunAnywhere KMP SDK
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+}
+
+tasks {
+    patchPluginXml {
+        sinceBuild.set("233")
+        untilBuild.set("251.*")
+        changeNotes.set(
+            """
+            <h2>1.0.0</h2>
+            <ul>
+                <li>Initial release</li>
+                <li>Voice command support</li>
+                <li>Voice dictation mode</li>
+                <li>Whisper-based transcription</li>
+            </ul>
+        """.trimIndent()
+        )
+    }
+
+    buildPlugin {
+        archiveFileName.set("runanywhere-voice-${project.version}.zip")
+    }
+
+    publishPlugin {
+        token.set(System.getenv("JETBRAINS_TOKEN"))
+    }
+}
+
+kotlin {
+    jvmToolchain(17)
+}

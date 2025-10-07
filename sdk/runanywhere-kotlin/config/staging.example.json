@@ -1,0 +1,38 @@
+{
+  "environment": "STAGING",
+  "apiBaseUrl": "https://staging-api.runanywhere.ai",
+  "cdnBaseUrl": "https://staging-cdn.runanywhere.ai",
+  "telemetryUrl": "https://staging-telemetry.runanywhere.ai",
+  "analyticsUrl": "https://staging-analytics.runanywhere.ai",
+  "defaultApiKey": "",
+  "enableVerboseLogging": false,
+  "enableMockServices": false,
+  "modelUrls": {
+    "llama32_1b": "https://staging-cdn.runanywhere.ai/models/llama-3.2-1b-instruct-q6k.gguf",
+    "llama32_3b": "https://staging-cdn.runanywhere.ai/models/llama-3.2-3b-instruct-q6k.gguf",
+    "smollm2_17b": "https://staging-cdn.runanywhere.ai/models/smollm2-1.7b-instruct-q6k.gguf",
+    "smollm2_360m": "https://staging-cdn.runanywhere.ai/models/smollm2-360m-q8.gguf",
+    "qwen25_05b": "https://staging-cdn.runanywhere.ai/models/qwen2.5-0.5b-instruct-q6k.gguf",
+    "qwen25_15b": "https://staging-cdn.runanywhere.ai/models/qwen2.5-1.5b-instruct-q6k.gguf",
+    "lfm2_350m_q4": "https://staging-cdn.runanywhere.ai/models/lfm2-350m-q4k.gguf",
+    "lfm2_350m_q8": "https://staging-cdn.runanywhere.ai/models/lfm2-350m-q8.gguf",
+    "whisperTiny": "https://staging-cdn.runanywhere.ai/models/whisper-tiny.bin",
+    "whisperBase": "https://staging-cdn.runanywhere.ai/models/whisper-base.bin",
+    "whisperSmall": "https://staging-cdn.runanywhere.ai/models/whisper-small.bin",
+    "whisperMedium": "https://staging-cdn.runanywhere.ai/models/whisper-medium.bin",
+    "whisperLarge": "https://staging-cdn.runanywhere.ai/models/whisper-large.bin"
+  },
+  "features": {
+    "onDeviceInference": true,
+    "cloudFallback": true,
+    "telemetry": true,
+    "analytics": true,
+    "debugLogging": true,
+    "performanceMonitoring": true,
+    "crashReporting": false,
+    "vad": true,
+    "sttAnalytics": true,
+    "realTimeStt": true,
+    "sttConfidenceScoring": true
+  }
+}
