@@ -43,28 +43,43 @@
 
 ### Swift Package Manager (GitHub-based Distribution)
 
-Add RunAnywhere to your project directly from GitHub - no package registry needed:
+Add RunAnywhere to your project directly from GitHub - no package registry needed.
+
+> **🏆 Recommended**: Check [releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for the most current version.
 
 #### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
-3. Select version rule: **Up to Next Major** from `1.0.0`
+3. **Select version rule:**
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.13.0`
+   - **Specific Version**: Choose **Exact** and enter `0.13.0`
+   - **Development Branch**: Choose **Branch** and enter `main`
 4. Select the `runanywhere-swift` product
 5. Click **Add Package**
 
 #### Via Package.swift
+
+**Latest Release (Recommended):**
 ```swift
 dependencies: [
-    // Latest stable version (recommended)
-    .package(url: "https://github.com/runanywhere/ios-sdk", from: "1.0.0")
-
-    // Or pin to specific version
-    .package(url: "https://github.com/runanywhere/ios-sdk", exact: "1.0.0")
-
-    // For beta/pre-release versions
-    .package(url: "https://github.com/runanywhere/ios-sdk", .branch("main"))
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
 ]
 ```
+
+**Specific Version:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.13.0")
+]
+```
+
+**Development Branch:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", .branch("main"))
+]
+```
+
 
 #### For Private Repository Access
 If the repository is private, configure your GitHub access token:
