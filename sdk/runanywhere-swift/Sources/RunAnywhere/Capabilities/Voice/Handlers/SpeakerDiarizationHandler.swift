@@ -15,13 +15,11 @@ public class SpeakerDiarizationHandler {
     /// - Returns: Detected speaker information
     public func detectSpeaker(
         from samples: [Float],
-        service: SpeakerDiarizationProtocol,
+        service: SpeakerDiarizationService,
         sampleRate: Int = 16000
     ) -> SpeakerInfo {
-        return service.detectSpeaker(
-            from: samples,
-            sampleRate: sampleRate
-        )
+        // Process audio to identify speaker
+        return service.processAudio(samples)
     }
 
     /// Handle speaker change detection and notification

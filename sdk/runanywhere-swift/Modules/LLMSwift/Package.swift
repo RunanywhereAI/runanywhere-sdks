@@ -16,8 +16,8 @@ let package = Package(
         ),
     ],
     dependencies: [
-        // LLM.swift dependency - using latest from GitHub main branch
-        .package(url: "https://github.com/eastriverlee/LLM.swift", branch: "main"),
+        // LLM.swift dependency - using release version v2.0.1
+        .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
         // Reference to main SDK for protocols
         .package(path: "../../"),
     ],
@@ -26,7 +26,7 @@ let package = Package(
             name: "LLMSwift",
             dependencies: [
                 .product(name: "LLM", package: "LLM.swift"),
-                .product(name: "RunAnywhereSDK", package: "runanywhere-swift")
+                .product(name: "RunAnywhere", package: "runanywhere-swift")
             ]
         ),
         .testTarget(

@@ -1,7 +1,8 @@
 import SwiftUI
 import Foundation
-import RunAnywhereSDK
+import RunAnywhere
 import os
+import Combine
 
 // MARK: - Quiz Generation Errors
 
@@ -143,12 +144,12 @@ class QuizViewModel: ObservableObject {
     // Streaming UI State
     @Published var showGenerationProgress = false
     @Published var generationText = ""
-    @Published var streamingTokens: [StreamToken] = []
+    @Published var streamingTokens: [String] = []
 
     private var currentSession: QuizSession?
     private var questionStartTime: Date?
     private var generationTask: Task<Void, Never>?
-    private let sdk = RunAnywhereSDK.shared
+    private var cancellables = Set<AnyCancellable>()
     private let logger = Logger(subsystem: "com.runanywhere.example", category: "QuizViewModel")
 
     // Constants
@@ -272,45 +273,35 @@ class QuizViewModel: ObservableObject {
 
                 logger.info("✅ Using already loaded model: \(self.loadedModelName ?? "unknown")")
 
-                // Get SDK configuration for generation options
-                let effectiveSettings = await sdk.getGenerationSettings()
+                // Get user preferences from UserDefaults (now applied per-request)
+                let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
+                let temperature = savedTemperature != 0 ? savedTemperature : 0.7
+                let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
+                let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
+
                 let options = RunAnywhereGenerationOptions(
-                    maxTokens: effectiveSettings.maxTokens,
-                    temperature: Float(effectiveSettings.temperature),
+                    maxTokens: maxTokens,
+                    temperature: Float(temperature),
                     topP: 0.9,
                     preferredExecutionTarget: .onDevice  // Force on-device execution
                 )
 
-                // Build a proper prompt that includes all required fields
-                let quizPrompt = """
-                Generate a quiz based on the following content.
-
-                The quiz should:
-                - Have 3-5 true/false questions
-                - Be at a medium difficulty level
-                - Include clear explanations for each answer
-                - Extract the main topic from the content
-
-                Content to create quiz from:
-                \(inputText)
-                """
-
-                // Get streaming result from SDK
-                let streamResult = sdk.generateStructuredStream(
+                // Use the new streaming structured output API
+                let streamResult = RunAnywhere.generateStructuredStream(
                     QuizGeneration.self,
-                    content: quizPrompt,
+                    content: inputText,
                     options: options
                 )
 
-                // Stream tokens for UI display
+                // Stream tokens to UI
                 for try await token in streamResult.tokenStream {
                     await MainActor.run {
-                        self.streamingTokens.append(token)
                         self.generationText += token.text
+                        self.streamingTokens.append(token.text)
                     }
                 }
 
-                // Get final parsed quiz
+                // Wait for the final parsed result
                 let generatedQuiz = try await streamResult.result.value
 
                 // Validate we have questions

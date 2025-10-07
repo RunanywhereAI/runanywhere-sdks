@@ -6,7 +6,8 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
+import Combine
 
 struct SimplifiedSettingsView: View {
     @State private var routingPolicy = RoutingPolicy.automatic
@@ -14,6 +15,7 @@ struct SimplifiedSettingsView: View {
     @State private var defaultMaxTokens = 10000
     @State private var showApiKeyEntry = false
     @State private var apiKey = ""
+    @State private var analyticsLogToLocal = false
 
     var body: some View {
         Group {
@@ -25,13 +27,13 @@ struct SimplifiedSettingsView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .padding(.bottom, 10)
-                
+
                 // SDK Configuration Section
                 VStack(alignment: .leading, spacing: 20) {
                     Text("SDK Configuration")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {
                             Text("Routing Policy")
@@ -50,13 +52,13 @@ struct SimplifiedSettingsView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 // Generation Settings Section
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Generation Settings")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(alignment: .leading, spacing: 20) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -73,7 +75,7 @@ struct SimplifiedSettingsView: View {
                                     .frame(maxWidth: 400)
                             }
                         }
-                        
+
                         HStack {
                             Text("Max Tokens")
                                 .frame(width: 150, alignment: .leading)
@@ -85,18 +87,18 @@ struct SimplifiedSettingsView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 // API Configuration Section
                 VStack(alignment: .leading, spacing: 20) {
                     Text("API Configuration")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {
                             Text("API Key")
                                 .frame(width: 150, alignment: .leading)
-                            
+
                             if !apiKey.isEmpty {
                                 Text("Configured")
                                     .foregroundColor(.green)
@@ -106,9 +108,9 @@ struct SimplifiedSettingsView: View {
                                     .foregroundColor(.orange)
                                     .font(.caption)
                             }
-                            
+
                             Spacer()
-                            
+
                             Button("Configure") {
                                 showApiKeyEntry = true
                             }
@@ -119,13 +121,47 @@ struct SimplifiedSettingsView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
+                // Logging Configuration Section
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Logging Configuration")
+                        .font(.headline)
+                        .foregroundColor(.secondary)
+
+                    VStack(alignment: .leading, spacing: 15) {
+                        HStack {
+                            Text("Log Analytics Locally")
+                                .frame(width: 150, alignment: .leading)
+
+                            Toggle("", isOn: $analyticsLogToLocal)
+                                .onChange(of: analyticsLogToLocal) { _, newValue in
+                                    // Save to keychain for persistence
+                                    KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
+                                    // Note: Analytics settings are now applied per-request in the new architecture
+                                }
+
+                            Spacer()
+
+                            Text(analyticsLogToLocal ? "Enabled" : "Disabled")
+                                .font(.caption)
+                                .foregroundColor(analyticsLogToLocal ? .green : .secondary)
+                        }
+
+                        Text("When enabled, analytics events will be logged locally instead of being sent to the server.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding()
+                    .background(Color(NSColor.controlBackgroundColor))
+                    .cornerRadius(10)
+                }
+
                 // About Section
                 VStack(alignment: .leading, spacing: 20) {
                     Text("About")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {
                             Image(systemName: "cube")
@@ -138,7 +174,7 @@ struct SimplifiedSettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
-                        
+
                         Link(destination: URL(string: "https://docs.runanywhere.ai")!) {
                             HStack {
                                 Image(systemName: "book")
@@ -151,7 +187,7 @@ struct SimplifiedSettingsView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 Spacer()
             }
             .padding(30)
@@ -201,6 +237,19 @@ struct SimplifiedSettingsView: View {
                         }
                     }
                 }
+            }
+
+            Section("Logging Configuration") {
+                Toggle("Log Analytics Locally", isOn: $analyticsLogToLocal)
+                    .onChange(of: analyticsLogToLocal) { _, newValue in
+                        // Save to keychain for persistence
+                        KeychainHelper.save(key: "analyticsLogToLocal", data: newValue)
+                        // Note: Analytics settings are now applied per-request in the new architecture
+                    }
+
+                Text("When enabled, analytics events will be logged locally for debugging purposes.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Section {
@@ -298,18 +347,13 @@ struct SimplifiedSettingsView: View {
     }
 
     private func updateSDKConfiguration() {
-        Task {
-            // Update SDK generation settings
-            await RunAnywhereSDK.shared.setTemperature(Float(defaultTemperature))
-            await RunAnywhereSDK.shared.setMaxTokens(defaultMaxTokens)
-
-            // Save to UserDefaults for persistence
+        // Note: In the new architecture, settings are applied per-request
+        // Save to UserDefaults for persistence
             UserDefaults.standard.set(routingPolicy.rawValue, forKey: "routingPolicy")
             UserDefaults.standard.set(defaultTemperature, forKey: "defaultTemperature")
             UserDefaults.standard.set(defaultMaxTokens, forKey: "defaultMaxTokens")
 
-            print("SDK Configuration updated - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
-        }
+            print("Configuration saved - Temperature: \(defaultTemperature), MaxTokens: \(defaultMaxTokens)")
     }
 
     private func loadCurrentConfiguration() {
@@ -331,19 +375,15 @@ struct SimplifiedSettingsView: View {
 
         defaultMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
         if defaultMaxTokens == 0 { defaultMaxTokens = 10000 }
+
+        // Load analytics logging setting from keychain
+        analyticsLogToLocal = KeychainHelper.loadBool(key: "analyticsLogToLocal", defaultValue: false)
     }
 
     private func syncWithSDKSettings() {
-        Task {
-            // Get current settings from SDK to ensure UI shows actual values
-            let currentSettings = await RunAnywhereSDK.shared.getGenerationSettings()
-
-            await MainActor.run {
-                // Update UI with current SDK values
-                self.defaultTemperature = currentSettings.temperature
-                self.defaultMaxTokens = currentSettings.maxTokens
-            }
-        }
+        // Load settings from UserDefaults
+        // In the new architecture, these settings are applied per-request
+        // No need to get them from SDK anymore
     }
 
     private func saveApiKey() {

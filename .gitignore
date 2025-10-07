@@ -142,3 +142,14 @@ hs_err_pid*
 EXTERNAL/
 thoughts
 local/
+examples/web/
+sdk/runanywhere-web/
+
+# Configuration files with real values
+sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
+sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
+sdk/runanywhere-swift/Configuration/*.private.json
+sdk/runanywhere-swift/Configuration/Private/
+
+# Keep example files
+!sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json

@@ -14,48 +14,53 @@ public class RegistryService: ModelRegistry {
     }
 
     /// Initialize registry with configuration
-    public func initialize(with configuration: Configuration) async {
+    public func initialize(with apiKey: String) async {
         logger.info("Initializing registry with configuration")
 
         // Load pre-configured models
         await loadPreconfiguredModels()
 
         // Discover local models that are already downloaded
-        logger.debug("Discovering local models")
+        logger.debug("Discovering local models from cache")
         let localModels = await modelDiscovery.discoverLocalModels()
-        logger.info("Found \(localModels.count) local models")
-        for model in localModels {
-            registerModel(model)
+        logger.info("Found \(localModels.count) cached models on disk")
+
+        // Update existing registered models with discovered local paths
+        // This ensures cached downloads are recognized after app restart
+        logger.debug("Comparing discovered models with registered models:")
+        logger.debug("Registered model IDs: \(Array(models.keys).sorted())")
+
+        for discoveredModel in localModels {
+            logger.debug("Processing discovered model: '\(discoveredModel.id)' at \(discoveredModel.localPath?.path ?? "unknown")")
+
+            if let existingModel = getModel(by: discoveredModel.id) {
+                // Model already registered - just update its localPath if needed
+                if existingModel.localPath == nil && discoveredModel.localPath != nil {
+                    var updatedModel = existingModel
+                    updatedModel.localPath = discoveredModel.localPath
+                    updateModel(updatedModel)
+                    logger.info("✅ Updated registered model '\(discoveredModel.id)' with cached localPath: \(discoveredModel.localPath?.lastPathComponent ?? "unknown")")
+                } else if existingModel.localPath != nil {
+                    logger.debug("Model '\(discoveredModel.id)' already has localPath: \(existingModel.localPath?.lastPathComponent ?? "unknown")")
+                }
+            } else {
+                // New model found on disk - register it
+                logger.info("➕ Registering new cached model: \(discoveredModel.id)")
+                registerModel(discoveredModel)
+            }
         }
 
-        // Discover models from providers
-        for provider in configuration.modelProviders where provider.enabled {
-            logger.debug("Discovering models from provider")
-            await discoverModelsFromProvider(provider)
-        }
+        // Model provider discovery will be handled via configuration service
+        // once the configuration is loaded from the network
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
         logger.info("Registry initialization complete")
     }
 
-    private func getModelMetadataRepository() async -> (any ModelMetadataRepository)? {
-        // Access through DataSyncService
-        guard let dataSyncService = await ServiceContainer.shared.dataSyncService else {
-            return nil
-        }
-
-        // Return the repository directly if we have access to it
-        // For now, we'll need to go through DataSyncService methods
-        return nil
-    }
-
     public func discoverModels() async -> [ModelInfo] {
-        // Discover local models from disk and register them
-        let localModels = await modelDiscovery.discoverLocalModels()
-        for model in localModels {
-            registerModel(model)
-        }
-
-        // Return all registered models (both pre-configured and discovered)
+        // Simply return all registered models
+        // Don't auto-discover local models as it causes confusion with download status
+        // Models should only be marked as downloaded when explicitly downloaded via the app
         return accessQueue.sync {
             Array(models.values)
         }
@@ -68,10 +73,66 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        logger.debug("Registering model: \(model.id) - \(model.name)")
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file if localPath is not already set
+        if updatedModel.localPath == nil {
+            if let modelFile = fileManager.findModelFile(modelId: model.id) {
+                updatedModel.localPath = modelFile
+                logger.info("Found local file for model \(model.id): \(modelFile.path)")
+            }
+        }
+
+        logger.debug("Registering model: \(updatedModel.id) - \(updatedModel.name)")
         accessQueue.async(flags: .barrier) {
-            self.models[model.id] = model
-            self.logger.info("Successfully registered model: \(model.id)")
+            self.models[updatedModel.id] = updatedModel
+            self.logger.info("Successfully registered model: \(updatedModel.id)")
+        }
+    }
+
+    /// Register model and save to database for persistence
+    /// - Parameter model: The model to register and persist
+    public func registerModelPersistently(_ model: ModelInfo) async {
+        // Validate model before registering
+        guard !model.id.isEmpty else {
+            logger.error("Attempted to register model with empty ID")
+            return
+        }
+
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file
+        if let modelFile = fileManager.findModelFile(modelId: model.id) {
+            updatedModel.localPath = modelFile
+            logger.info("Found local file for model \(model.id): \(modelFile.path)")
+        } else {
+            // Clear localPath if file doesn't exist
+            updatedModel.localPath = nil
+            logger.debug("No local file found for model \(model.id)")
+        }
+
+        // Register the updated model in memory
+        registerModel(updatedModel)
+
+        // Check if model already exists in database to avoid unnecessary saves
+        do {
+            let modelInfoService = await ServiceContainer.shared.modelInfoService
+            let existingModel = try await modelInfoService.getModel(by: updatedModel.id)
+
+            if existingModel == nil {
+                // Model doesn't exist in database, save it
+                try await modelInfoService.saveModel(updatedModel)
+                logger.info("Registered and saved new model persistently: \(updatedModel.id)")
+            } else {
+                // Model exists, but let's update it with any new information (including localPath)
+                try await modelInfoService.saveModel(updatedModel)
+                logger.debug("Updated existing model in database: \(updatedModel.id)")
+            }
+        } catch {
+            logger.error("Failed to save model \(updatedModel.id) to database: \(error)")
+            // Model is still registered in memory even if database save fails
         }
     }
 
@@ -103,43 +164,20 @@ public class RegistryService: ModelRegistry {
                 return false
             }
 
-            // Context length filters
+            // Context length filters (only for models that have context length)
             if let minContext = criteria.minContextLength,
-               model.contextLength < minContext {
+               let modelContext = model.contextLength,
+               modelContext < minContext {
                 return false
             }
 
             if let maxContext = criteria.maxContextLength,
-               model.contextLength > maxContext {
+               let modelContext = model.contextLength,
+               modelContext > maxContext {
                 return false
             }
 
-            // Hardware requirements
-            if let requiresNeuralEngine = criteria.requiresNeuralEngine,
-               requiresNeuralEngine {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresNeuralEngine = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
-
-            if let requiresGPU = criteria.requiresGPU,
-               requiresGPU {
-                let hasRequirement = model.hardwareRequirements.contains { req in
-                    if case .requiresGPU = req {
-                        return true
-                    }
-                    return false
-                }
-                if !hasRequirement {
-                    return false
-                }
-            }
+            // Hardware requirements removed for simplicity
 
             // Tag filter
             if !criteria.tags.isEmpty {
@@ -194,35 +232,33 @@ public class RegistryService: ModelRegistry {
         url: URL,
         framework: LLMFramework,
         estimatedSize: Int64? = nil,
-        supportsThinking: Bool = false,
-        thinkingTagPattern: ThinkingTagPattern? = nil
+        supportsThinking: Bool = false
     ) -> ModelInfo {
         let modelId = generateModelId(from: url)
 
         // Detect format from URL
         let format = detectFormatFromURL(url)
 
+        // Determine category based on framework
+        let category = ModelCategory.from(framework: framework)
+
         let modelInfo = ModelInfo(
             id: modelId,
             name: name,
+            category: category,
             format: format,
             downloadURL: url,
             localPath: nil,
-            estimatedMemory: estimatedSize ?? estimateMemoryFromURL(url),
-            contextLength: 2048, // Default context length
             downloadSize: nil, // Will be determined during download
-            checksum: nil,
+            memoryRequired: estimatedSize ?? estimateMemoryFromURL(url),
             compatibleFrameworks: [framework],
             preferredFramework: framework,
-            hardwareRequirements: [],
-            tokenizerFormat: nil,
+            contextLength: category == .language ? 2048 : nil, // Only for language models
+            supportsThinking: supportsThinking,
             metadata: ModelInfoMetadata(
                 tags: ["user-added", framework.rawValue.lowercased()],
                 description: "User-added model"
-            ),
-            alternativeDownloadURLs: [],
-            supportsThinking: supportsThinking,
-            thinkingTagPattern: thinkingTagPattern
+            )
         )
 
         registerModel(modelInfo)
@@ -234,16 +270,23 @@ public class RegistryService: ModelRegistry {
     private func loadPreconfiguredModels() async {
         logger.debug("Loading pre-configured models")
 
-        // Load models from repository
-        // Only load models for frameworks that have registered adapters
-        let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
-        logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+        // First, try to load models from configuration (remote or cached)
+        _ = await ServiceContainer.shared.configurationService.getConfiguration()
 
-        // Load stored models from repository
-        if let dataSyncService = await ServiceContainer.shared.dataSyncService {
+        // Model catalog removed from configuration for simplicity
+        do {
+            logger.debug("No models in configuration, falling back to stored models")
+
+            // Fallback: Load models from repository
+            // Only load models for frameworks that have registered adapters
+            let availableFrameworks = ServiceContainer.shared.adapterRegistry.getAvailableFrameworks()
+            logger.debug("Available frameworks: \(availableFrameworks.map { $0.rawValue }.joined(separator: ", "))")
+
+            // Load stored models from service
+            let modelInfoService = await ServiceContainer.shared.modelInfoService
             do {
                 // Load all stored models and filter later
-                var storedModels = try await dataSyncService.loadStoredModels()
+                var storedModels = try await modelInfoService.loadStoredModels()
 
                 if !availableFrameworks.isEmpty {
                     // Filter for available frameworks
@@ -256,6 +299,7 @@ public class RegistryService: ModelRegistry {
                 }
 
                 for model in storedModels {
+                    logger.debug("Registering stored model: \(model.id) with localPath: \(model.localPath?.path ?? "nil")")
                     registerModel(model)
                 }
             } catch {
@@ -264,10 +308,7 @@ public class RegistryService: ModelRegistry {
         }
     }
 
-    private func discoverModelsFromProvider(_ provider: ModelProviderConfig) async {
-        // Placeholder for provider-specific discovery
-        // Would connect to HuggingFace, Kaggle, etc.
-    }
+    // Provider discovery removed - no longer needed
 
     // MARK: - URL Helper Methods
 

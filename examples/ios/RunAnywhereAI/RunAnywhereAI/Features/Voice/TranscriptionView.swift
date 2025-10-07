@@ -1,5 +1,5 @@
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 #if canImport(UIKit)
 import UIKit
 #else
