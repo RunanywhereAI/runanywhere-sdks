@@ -4,8 +4,8 @@ import AVFoundation
 import os
 
 /// iOS-specific audio session management for voice processing
-public class iOSAudioSession {
-    private let logger = SDKLogger(category: "iOSAudioSession")
+public class IOSAudioSession {
+    private let logger = SDKLogger(category: "IOSAudioSession")
     private let audioSession = AVAudioSession.sharedInstance()
 
     // Audio session state
@@ -53,7 +53,7 @@ public class iOSAudioSession {
     /// Activate the audio session
     public func activate() throws {
         guard isConfigured else {
-            throw VoiceError.audioSessionNotConfigured
+            throw STTError.audioSessionNotConfigured
         }
 
         try audioSession.setActive(true)

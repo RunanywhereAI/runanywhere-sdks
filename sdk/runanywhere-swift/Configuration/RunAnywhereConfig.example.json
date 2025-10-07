@@ -1,0 +1,11 @@
+{
+  "api": {
+    "development": "https://demo-api.example.com",
+    "staging": "https://demo-api.example.com",
+    "production": "https://demo-api.example.com"
+  },
+  "features": {
+    "telemetry": false,
+    "debugLogging": true
+  }
+}

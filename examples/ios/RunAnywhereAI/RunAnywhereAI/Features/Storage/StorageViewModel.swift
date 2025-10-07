@@ -7,7 +7,8 @@
 
 import Foundation
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
+import Combine
 
 @MainActor
 class StorageViewModel: ObservableObject {
@@ -18,14 +19,14 @@ class StorageViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
 
-    private let sdk = RunAnywhereSDK.shared
+    private var cancellables = Set<AnyCancellable>()
 
     func loadData() async {
         isLoading = true
         errorMessage = nil
 
         // Use public API to get storage info
-        let storageInfo = await sdk.getStorageInfo()
+        let storageInfo = await RunAnywhere.getStorageInfo()
 
         // Update storage sizes from the public API
         totalStorageSize = storageInfo.appStorage.totalSize
@@ -44,7 +45,7 @@ class StorageViewModel: ObservableObject {
 
     func clearCache() async {
         do {
-            try await sdk.clearCache()
+            try await RunAnywhere.clearCache()
             await refreshData()
         } catch {
             errorMessage = "Failed to clear cache: \(error.localizedDescription)"
@@ -53,7 +54,7 @@ class StorageViewModel: ObservableObject {
 
     func cleanTempFiles() async {
         do {
-            try await sdk.cleanTempFiles()
+            try await RunAnywhere.cleanTempFiles()
             await refreshData()
         } catch {
             errorMessage = "Failed to clean temporary files: \(error.localizedDescription)"
@@ -62,7 +63,7 @@ class StorageViewModel: ObservableObject {
 
     func deleteModel(_ modelId: String) async {
         do {
-            try await sdk.deleteStoredModel(modelId)
+            try await RunAnywhere.deleteStoredModel(modelId)
             await refreshData()
         } catch {
             errorMessage = "Failed to delete model: \(error.localizedDescription)"

@@ -4,7 +4,6 @@ import Foundation
 public class ModelLoadingService {
     private let registry: ModelRegistry
     private let adapterRegistry: AdapterRegistry
-    private let validationService: ValidationService
     private let memoryService: MemoryManager // Using MemoryManager protocol for now
     private let logger = SDKLogger(category: "ModelLoadingService")
 
@@ -13,12 +12,10 @@ public class ModelLoadingService {
     public init(
         registry: ModelRegistry,
         adapterRegistry: AdapterRegistry,
-        validationService: ValidationService,
         memoryService: MemoryManager
     ) {
         self.registry = registry
         self.adapterRegistry = adapterRegistry
-        self.validationService = validationService
         self.memoryService = memoryService
     }
 
@@ -44,22 +41,17 @@ public class ModelLoadingService {
         let isBuiltIn = modelInfo.localPath?.scheme == "builtin"
 
         if !isBuiltIn {
-            // Validate model file exists for non-built-in models
-            guard let localPath = modelInfo.localPath else {
+            // Check model file exists for non-built-in models
+            guard modelInfo.localPath != nil else {
                 throw SDKError.modelNotFound("Model '\(modelId)' not downloaded")
             }
-
-            // Validate model
-            let validationResult = try await validationService.validate(localPath)
-            if !validationResult.errors.isEmpty {
-                throw SDKError.validationFailed(validationResult.errors.first!)
-            }
         } else {
-            logger.info("🏗️ Built-in model detected, skipping file validation")
+            logger.info("🏗️ Built-in model detected, skipping file check")
         }
 
         // Check memory availability
-        let canAllocate = try await memoryService.canAllocate(modelInfo.estimatedMemory)
+        let memoryRequired = modelInfo.memoryRequired ?? 1024 * 1024 * 1024 // Default 1GB if not specified
+        let canAllocate = try await memoryService.canAllocate(memoryRequired)
         if !canAllocate {
             throw SDKError.loadingFailed("Insufficient memory")
         }
@@ -96,7 +88,7 @@ public class ModelLoadingService {
         // Register loaded model
         memoryService.registerLoadedModel(
             loaded,
-            size: modelInfo.estimatedMemory,
+            size: modelInfo.memoryRequired ?? memoryRequired,
             service: llmService
         )
         loadedModels[modelId] = loaded

@@ -13,7 +13,7 @@ import UIKit
 #endif
 
 /// Device information for compatibility checking
-public struct DeviceInfo {
+public struct DeviceInfo: Codable {
     public let model: String
     public let osVersion: String
     public let architecture: String

@@ -53,7 +53,7 @@ public enum ModularPipelineEvent {
 /// Complete result from voice pipeline
 public struct VoicePipelineResult {
     /// The transcription result from STT
-    public let transcription: VoiceTranscriptionResult
+    public let transcription: STTResult
 
     /// The LLM generated response text
     public let llmResponse: String
@@ -68,7 +68,7 @@ public struct VoicePipelineResult {
     public let stageTiming: [PipelineStage: TimeInterval]
 
     public init(
-        transcription: VoiceTranscriptionResult,
+        transcription: STTResult,
         llmResponse: String,
         audioOutput: Data? = nil,
         processingTime: TimeInterval = 0,

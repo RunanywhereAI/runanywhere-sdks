@@ -147,12 +147,6 @@ BUNDLE_ID="com.runanywhere.RunAnywhereAI"
 # Always use project file now (no CocoaPods workspace)
 USE_PROJECT=true
 
-# Function no longer needed - CocoaPods removed
-fix_pods_script() {
-    # CocoaPods has been removed - using Swift Package Manager only
-    return 0
-}
-
 # Function to get device destination
 get_destination() {
     if [ "$TARGET_TYPE" = "mac" ]; then
@@ -339,9 +333,6 @@ if [ "$ADD_MODELS" = true ]; then
     fi
 fi
 
-# Fix Pods script
-fix_pods_script
-
 # Get destination
 DESTINATION=$(get_destination)
 print_status "Building for destination: $DESTINATION"
@@ -356,9 +347,9 @@ else
 fi
 
 if eval "$BUILD_CMD" \
-    -scheme "$SCHEME" \
-    -configuration "$CONFIGURATION" \
-    -destination "$DESTINATION" \
+    -scheme \"$SCHEME\" \
+    -configuration \"$CONFIGURATION\" \
+    -destination \"$DESTINATION\" \
     -allowProvisioningUpdates \
     build > /tmp/xcodebuild.log 2>&1; then
     print_status "Build succeeded!"

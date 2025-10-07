@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 
 struct ModelSelectionSheet: View {
     @StateObject private var viewModel = ModelListViewModel.shared
@@ -40,36 +40,27 @@ struct ModelSelectionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                #if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    #if os(iOS)
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isLoadingModel)
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add Model") {
-                        showingAddModelSheet = true
-                    }
-                    .disabled(isLoadingModel)
-                }
-                #else
-                ToolbarItem(placement: .cancellationAction) {
+                    #else
                     Button("Cancel") {
                         dismiss()
                     }
                     .disabled(isLoadingModel)
                     .keyboardShortcut(.escape)
+                    #endif
                 }
 
-                ToolbarItem(placement: .primaryAction) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Add Model") {
                         showingAddModelSheet = true
                     }
                     .disabled(isLoadingModel)
                 }
-                #endif
             }
         }
         #if os(macOS)
@@ -131,7 +122,7 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
+        let frameworks = RunAnywhere.getAvailableFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
         }
@@ -241,7 +232,7 @@ struct ModelSelectionSheet: View {
                     }
                     .padding(.vertical, 4)
                 }
-                
+
                 // Show models
                 ForEach(filteredModels, id: \.id) { model in
                     SelectableModelRow(
@@ -315,7 +306,7 @@ struct ModelSelectionSheet: View {
             }
 
             // This is where we actually wait for the model to load
-            try await RunAnywhereSDK.shared.loadModel(model.id)
+            try await RunAnywhere.loadModel(model.id)
 
             await MainActor.run {
                 loadingProgress = "Model loaded successfully!"
@@ -324,11 +315,11 @@ struct ModelSelectionSheet: View {
             // Wait a moment to show success message
             try await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
 
+            // Update the shared view model first to ensure state consistency
+            await viewModel.selectModel(model)
+
             // Call the callback with the loaded model
             await onModelSelected(model)
-
-            // Update the shared view model
-            await viewModel.selectModel(model)
 
             await MainActor.run {
                 dismiss()
@@ -368,7 +359,7 @@ private struct SelectableModelRow: View {
                     .fontWeight(isSelected ? .semibold : .regular)
 
                 HStack(spacing: 8) {
-                    let size = model.estimatedMemory
+                    let size = model.memoryRequired ?? 0
                     if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
@@ -402,11 +393,8 @@ private struct SelectableModelRow: View {
                     } else if model.localPath != nil {
                         Button(action: {
                             Task {
-                                await RunAnywhereSDK.shared.updateModelThinkingSupport(
-                                    modelId: model.id,
-                                    supportsThinking: true,
-                                    thinkingTagPattern: ThinkingTagPattern.defaultPattern
-                                )
+                                // Thinking support update not available in new API
+                                // Will be enabled when the model is loaded
                                 onModelUpdated()
                             }
                         }) {
@@ -478,7 +466,7 @@ private struct SelectableModelRow: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
-                } else if let downloadURL = model.downloadURL, model.localPath == nil {
+                } else if let _ = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
                         VStack(spacing: 4) {
@@ -524,34 +512,39 @@ private struct SelectableModelRow: View {
         }
 
         do {
-            let downloadTask = try await RunAnywhereSDK.shared.downloadModel(model.id)
+            // Use the progress-enabled download API
+            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
 
-            // Track progress
-            Task {
-                for await progress in downloadTask.progress {
-                    await MainActor.run {
-                        switch progress.state {
-                        case .downloading:
-                            self.downloadProgress = Double(progress.bytesDownloaded) / Double(progress.totalBytes)
-                        case .completed:
-                            self.downloadProgress = 1.0
-                        case .failed:
-                            self.downloadProgress = 0.0
-                        default:
-                            break
-                        }
-                    }
+            // Process progress updates
+            for await progress in progressStream {
+                await MainActor.run {
+                    self.downloadProgress = progress.percentage
+                    print("Download progress for \(model.name): \(Int(progress.percentage * 100))%")
                 }
-            }
 
-            // Wait for download to complete
-            let url = try await downloadTask.result.value
-            print("Model \(model.name) downloaded successfully to: \(url)")
+                // Check if download completed or failed
+                switch progress.state {
+                case .completed:
+                    await MainActor.run {
+                        self.downloadProgress = 1.0
+                        self.isDownloading = false
+                        onDownloadCompleted()
+                        print("Model \(model.name) downloaded successfully")
+                    }
+                    return
 
-            await MainActor.run {
-                onDownloadCompleted()
-                isDownloading = false
-                downloadProgress = 1.0
+                case .failed(let error):
+                    await MainActor.run {
+                        self.downloadProgress = 0.0
+                        self.isDownloading = false
+                        print("Download failed for \(model.name): \(error.localizedDescription)")
+                    }
+                    return
+
+                default:
+                    // Continue processing progress updates
+                    continue
+                }
             }
 
         } catch {

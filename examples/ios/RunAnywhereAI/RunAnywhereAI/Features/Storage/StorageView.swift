@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 
 struct StorageView: View {
     @StateObject private var viewModel = StorageViewModel()
@@ -20,16 +20,16 @@ struct StorageView: View {
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .padding(.bottom, 10)
-                
+
                 // Storage Overview Card
                 VStack(alignment: .leading, spacing: 20) {
                     HStack {
                         Text("Storage Overview")
                             .font(.headline)
                             .foregroundColor(.secondary)
-                        
+
                         Spacer()
-                        
+
                         Button(action: {
                             Task {
                                 await viewModel.refreshData()
@@ -39,7 +39,7 @@ struct StorageView: View {
                         }
                         .buttonStyle(.bordered)
                     }
-                    
+
                     VStack(spacing: 0) {
                         storageOverviewContent
                     }
@@ -47,13 +47,13 @@ struct StorageView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 // Downloaded Models Card
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Downloaded Models")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(spacing: 0) {
                         storedModelsContent
                     }
@@ -61,13 +61,13 @@ struct StorageView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 // Storage Management Card
                 VStack(alignment: .leading, spacing: 20) {
                     Text("Storage Management")
                         .font(.headline)
                         .foregroundColor(.secondary)
-                    
+
                     VStack(spacing: 0) {
                         cacheManagementContent
                     }
@@ -75,7 +75,7 @@ struct StorageView: View {
                     .background(Color(NSColor.controlBackgroundColor))
                     .cornerRadius(10)
                 }
-                
+
                 Spacer(minLength: 30)
             }
             .padding(30)
@@ -148,7 +148,7 @@ struct StorageView: View {
             }
         }
     #endif
-    
+
     private var storageOverviewSection: some View {
         Section("Storage Overview") {
             VStack(alignment: .leading, spacing: 12) {
@@ -219,7 +219,7 @@ struct StorageView: View {
         }
     }
     #endif
-    
+
     private var storedModelsSection: some View {
         Section("Downloaded Models") {
             if viewModel.storedModels.isEmpty {
@@ -291,7 +291,7 @@ struct StorageView: View {
         }
     }
     #endif
-    
+
     private var cacheManagementSection: some View {
         Section("Storage Management") {
             Button(action: {

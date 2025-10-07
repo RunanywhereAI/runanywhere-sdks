@@ -1,7 +1,7 @@
 import Foundation
 
 /// Privacy mode settings
-public enum PrivacyMode: String, Codable {
+public enum PrivacyMode: String, Codable, Sendable {
     /// Standard privacy protection
     case standard
 

@@ -1,20 +1,24 @@
 import Foundation
 import os
 
-/// Main capability coordinator for voice processing
-public class VoiceCapabilityService {
+/// Main capability coordinator for voice processing using the new component system
+public class VoiceCapabilityService: @unchecked Sendable {
     private let logger = SDKLogger(category: "VoiceCapabilityService")
 
     // Services
     private let sessionManager: VoiceSessionManager
-    private let analyticsService: VoiceAnalyticsService
+    private var analyticsService: VoiceAnalyticsService?
+    private var sttAnalyticsService: STTAnalyticsService?
 
     // State
     private var isInitialized = false
 
+    // Active voice agents
+    private var activeAgents: [UUID: VoiceAgentComponent] = [:]
+    private let agentQueue = DispatchQueue(label: "com.runanywhere.voiceagents", attributes: .concurrent)
+
     public init() {
         self.sessionManager = VoiceSessionManager()
-        self.analyticsService = VoiceAnalyticsService()
     }
 
     /// Initialize the voice capability
@@ -26,137 +30,196 @@ public class VoiceCapabilityService {
 
         logger.info("Initializing voice capability")
 
+        // Get analytics services from container
+        analyticsService = await ServiceContainer.shared.voiceAnalytics
+        sttAnalyticsService = await ServiceContainer.shared.sttAnalytics
+
         // Initialize sub-services
         await sessionManager.initialize()
-        await analyticsService.initialize()
 
         isInitialized = true
         logger.info("Voice capability initialized successfully")
     }
 
-    /// Create a voice pipeline with the given configuration
-    /// - Parameter config: Pipeline configuration
-    /// - Returns: Configured voice pipeline manager
-    public func createPipeline(config: ModularPipelineConfig) -> VoicePipelineManager {
-        logger.debug("Creating voice pipeline with config: \(config.components)")
+    /// Create a voice agent with the given parameters
+    /// - Parameters:
+    ///   - vadParams: VAD parameters (optional)
+    ///   - sttParams: STT parameters (optional)
+    ///   - llmParams: LLM parameters (optional)
+    ///   - ttsParams: TTS parameters (optional)
+    /// - Returns: Configured voice agent component
+    @MainActor
+    public func createVoiceAgent(
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
+    ) async throws -> VoiceAgentComponent {
+        logger.debug("Creating voice agent with custom parameters")
 
-        // Track pipeline creation
-        analyticsService.trackPipelineCreation(config: config)
+        // Create agent configuration (all components are required, use defaults if not provided)
+        let agentConfig = VoiceAgentConfiguration(
+            vadConfig: vadParams ?? VADConfiguration(),
+            sttConfig: sttParams ?? STTConfiguration(),
+            llmConfig: llmParams ?? LLMConfiguration(),
+            ttsConfig: ttsParams ?? TTSConfiguration()
+        )
 
-        // Create and return pipeline
-        return VoicePipelineManager(
-            config: config,
-            vadService: nil,
-            voiceService: findVoiceService(for: config.stt?.modelId),
-            llmService: findLLMService(for: config.llm?.modelId),
-            ttsService: findTTSService(),
-            speakerDiarization: nil,
-            segmentationStrategy: nil
+        // Create and initialize agent
+        let agent = await VoiceAgentComponent(
+            configuration: agentConfig,
+            serviceContainer: ServiceContainer.shared
+        )
+
+        try await agent.initialize()
+
+        // Track agent
+        let agentId = UUID()
+        agentQueue.async(flags: .barrier) { [weak self] in
+            self?.activeAgents[agentId] = agent
+        }
+
+        // Track analytics
+        Task {
+            await analyticsService?.trackPipelineCreation(
+                stages: [
+                    vadParams != nil ? "vad" : nil,
+                    sttParams != nil ? "stt" : nil,
+                    llmParams != nil ? "llm" : nil,
+                    ttsParams != nil ? "tts" : nil
+                ].compactMap { $0 }
+            )
+        }
+
+        return agent
+    }
+
+    /// Create a full voice pipeline with all components
+    public func createFullPipeline(
+        sttModelId: String? = nil,
+        llmModelId: String? = nil
+    ) async throws -> VoiceAgentComponent {
+        return try await createVoiceAgent(
+            vadParams: VADConfiguration(),
+            sttParams: STTConfiguration(modelId: sttModelId),
+            llmParams: LLMConfiguration(modelId: llmModelId),
+            ttsParams: TTSConfiguration()
         )
     }
 
-    /// Process voice with the given configuration
-    /// - Parameters:
-    ///   - audioStream: Stream of audio chunks
-    ///   - config: Pipeline configuration
-    /// - Returns: Stream of pipeline events
+    /// Process voice with a custom pipeline configuration
     public func processVoice(
         audioStream: AsyncStream<VoiceAudioChunk>,
-        config: ModularPipelineConfig
-    ) -> AsyncThrowingStream<ModularPipelineEvent, Error> {
-        let pipeline = createPipeline(config: config)
-        return pipeline.process(audioStream: audioStream)
-    }
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
+    ) -> AsyncThrowingStream<VoiceAgentEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    // Create agent
+                    let agent = try await createVoiceAgent(
+                        vadParams: vadParams,
+                        sttParams: sttParams,
+                        llmParams: llmParams,
+                        ttsParams: ttsParams
+                    )
 
-    /// Check if the voice capability is healthy
-    /// - Returns: True if healthy, false otherwise
-    public func isHealthy() -> Bool {
-        return isInitialized && sessionManager.isHealthy() && analyticsService.isHealthy()
-    }
+                    // Convert audio chunks to Data stream
+                    let dataStream = AsyncStream<Data> { dataContinuation in
+                        Task {
+                            for await chunk in audioStream {
+                                dataContinuation.yield(chunk.data)
+                            }
+                            dataContinuation.finish()
+                        }
+                    }
 
-    /// Get current metrics for voice processing
-    /// - Returns: Voice metrics
-    public func getMetrics() -> VoiceMetrics {
-        return analyticsService.getMetrics()
-    }
+                    // Process through agent
+                    let eventStream = await agent.processStream(dataStream)
 
-    // MARK: - Service Discovery
+                    for try await event in eventStream {
+                        continuation.yield(event)
+                    }
 
-    /// Find voice service for the given model ID
-    public func findVoiceService(for modelId: String?) -> VoiceService? {
-        guard let modelId = modelId else { return nil }
-
-        logger.debug("Finding voice service for model: \(modelId)")
-
-        // Access ServiceContainer through shared instance
-        let container = ServiceContainer.shared
-
-        // Try to find a model info for this modelId
-        if let model = try? container.modelRegistry.getModel(by: modelId) {
-            // Find adapter that can handle this model
-            if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
-               unifiedAdapter.supportedModalities.contains(FrameworkModality.voiceToText) {
-                // Create a voice service from the unified adapter
-                if let voiceService = unifiedAdapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                    return voiceService
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
                 }
             }
         }
+    }
 
-        // Fallback: Find any framework that supports voice-to-text
-        let voiceFrameworks = container.adapterRegistry.getFrameworks(for: FrameworkModality.voiceToText)
-        if let firstVoiceFramework = voiceFrameworks.first,
-           let adapter = container.adapterRegistry.getAdapter(for: firstVoiceFramework) {
-            if let voiceService = adapter.createService(for: FrameworkModality.voiceToText) as? VoiceService {
-                return voiceService
+    /// Find voice service for a specific model
+    @MainActor
+    public func findVoiceService(for modelId: String?) async -> STTService? {
+        // Check if any active agent has STT with the specified model
+        let agents = agentQueue.sync { Array(activeAgents.values) }
+        for agent in agents {
+            if let stt = agent.sttComponent?.getService() {
+                return stt
             }
         }
-
         return nil
     }
 
-    /// Find LLM service for the given model ID
-    private func findLLMService(for modelId: String?) -> LLMService? {
-        let container = ServiceContainer.shared
-
-        // First, check if there's already a loaded model in the GenerationService
-        if let currentModel = container.generationService.getCurrentModel() {
-            return currentModel.service
-        }
-
-        // If no model is loaded and a specific modelId is requested
-        guard let modelId = modelId else { return nil }
-
-        logger.debug("Finding LLM service for model: \(modelId)")
-
-        if let model = try? container.modelRegistry.getModel(by: modelId) {
-            // Find adapter that can handle this model
-            if let unifiedAdapter = container.adapterRegistry.findBestAdapter(for: model),
-               unifiedAdapter.supportedModalities.contains(FrameworkModality.textToText) {
-                // Create an LLM service from the unified adapter
-                if let llmService = unifiedAdapter.createService(for: FrameworkModality.textToText) as? LLMService {
-                    return llmService
-                }
+    /// Find LLM service for a specific model
+    @MainActor
+    public func findLLMService(for modelId: String?) async -> LLMService? {
+        // Check if any active agent has LLM with the specified model
+        let agents = agentQueue.sync { Array(activeAgents.values) }
+        for agent in agents {
+            if let llm = agent.llmComponent?.getService() {
+                return llm
             }
         }
-
-        // Fallback: Find any framework that supports text generation
-        let textFrameworks = container.adapterRegistry.getFrameworks(for: FrameworkModality.textToText)
-        if let firstTextFramework = textFrameworks.first,
-           let adapter = container.adapterRegistry.getAdapter(for: firstTextFramework) {
-            if let llmService = adapter.createService(for: FrameworkModality.textToText) as? LLMService {
-                return llmService
-            }
-        }
-
         return nil
     }
 
     /// Find TTS service
-    public func findTTSService() -> TextToSpeechService? {
-        logger.debug("Finding TTS service")
+    @MainActor
+    public func findTTSService() async -> TTSService? {
+        // Check if any active agent has TTS
+        let agents = agentQueue.sync { Array(activeAgents.values) }
+        for agent in agents {
+            if let tts = agent.ttsComponent?.getService() {
+                return tts
+            }
+        }
+        return nil
+    }
 
-        // Return system TTS service by default
-        return SystemTextToSpeechService()
+    /// Clean up all active agents
+    public func cleanup() async throws {
+        let agents = agentQueue.sync { Array(activeAgents.values) }
+
+        for agent in agents {
+            try await agent.cleanup()
+        }
+
+        agentQueue.async(flags: .barrier) { [weak self] in
+            self?.activeAgents.removeAll()
+        }
+    }
+}
+
+// MARK: - Backward Compatibility
+
+extension VoiceCapabilityService {
+    /// Create a voice pipeline using the new architecture
+    public func createPipeline(
+        vadParams: VADConfiguration? = nil,
+        sttParams: STTConfiguration? = nil,
+        llmParams: LLMConfiguration? = nil,
+        ttsParams: TTSConfiguration? = nil
+    ) async throws -> VoiceAgentComponent {
+        // Use the new VoiceAgent component which is the modern pipeline
+        return try await createVoiceAgent(
+            vadParams: vadParams,
+            sttParams: sttParams,
+            llmParams: llmParams,
+            ttsParams: ttsParams
+        )
     }
 }
