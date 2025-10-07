@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 541C59D92E63772A00DD7839 /* RunAnywhere */; };
+		541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */ = {isa = PBXBuildFile; productRef = 541E22712E3BE21300EBF8FA /* RunAnywhereSDK */; };
 		543028462E442716008361DD /* LLM in Frameworks */ = {isa = PBXBuildFile; productRef = 543028452E442716008361DD /* LLM */; };
 		54760D392E57E06100A03191 /* WhisperKitTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 54760D382E57E06100A03191 /* WhisperKitTranscription */; };
 		5479377E2E57DF7600CB9251 /* LLMSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5479377D2E57DF7600CB9251 /* LLMSwift */; };
@@ -74,7 +74,6 @@
 				548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */,
 				54F596172E39C32A0057B6CE /* backend_mps in Frameworks */,
 				547F70B12E35CE270061BAED /* Transformers in Frameworks */,
-				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				54760D392E57E06100A03191 /* WhisperKitTranscription in Frameworks */,
 				54F596192E39C32A0057B6CE /* backend_xnnpack in Frameworks */,
 				54F5961F2E39C32A0057B6CE /* kernels_optimized in Frameworks */,
@@ -83,6 +82,7 @@
 				5479377E2E57DF7600CB9251 /* LLMSwift in Frameworks */,
 				54F596152E39C32A0057B6CE /* backend_coreml in Frameworks */,
 				547F7D7E2E3735100061BAED /* ZIPFoundation in Frameworks */,
+				541E22722E3BE21300EBF8FA /* RunAnywhereSDK in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,20 +103,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		547A6C002E6374D1005EF0C7 /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		5480A1E72E2F250200337F2F = {
 			isa = PBXGroup;
 			children = (
 				5480A1F22E2F250200337F2F /* RunAnywhereAI */,
 				5480A2012E2F250400337F2F /* RunAnywhereAITests */,
 				5480A20B2E2F250400337F2F /* RunAnywhereAIUITests */,
-				547A6C002E6374D1005EF0C7 /* Frameworks */,
 				5480A1F12E2F250200337F2F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -160,11 +152,11 @@
 				54F5961C2E39C32A0057B6CE /* kernels_custom */,
 				54F5961E2E39C32A0057B6CE /* kernels_optimized */,
 				54F596202E39C32A0057B6CE /* kernels_quantized */,
+				541E22712E3BE21300EBF8FA /* RunAnywhereSDK */,
 				543028452E442716008361DD /* LLM */,
 				548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */,
 				5479377D2E57DF7600CB9251 /* LLMSwift */,
 				54760D382E57E06100A03191 /* WhisperKitTranscription */,
-				541C59D92E63772A00DD7839 /* RunAnywhere */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -752,10 +744,9 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		541C59D92E63772A00DD7839 /* RunAnywhere */ = {
+		541E22712E3BE21300EBF8FA /* RunAnywhereSDK */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 58E021172E52A86000B722EF /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift" */;
-			productName = RunAnywhere;
+			productName = RunAnywhereSDK;
 		};
 		543028452E442716008361DD /* LLM */ = {
 			isa = XCSwiftPackageProductDependency;

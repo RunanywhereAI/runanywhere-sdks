@@ -11,6 +11,9 @@ public struct FrameworkAvailability {
     /// Reason why the framework is not available (if applicable)
     public let unavailabilityReason: String?
 
+    /// Hardware requirements for optimal performance
+    public let requirements: [HardwareRequirement]
+
     /// Recommended use cases for this framework
     public let recommendedFor: [String]
 
@@ -21,12 +24,14 @@ public struct FrameworkAvailability {
         framework: LLMFramework,
         isAvailable: Bool,
         unavailabilityReason: String? = nil,
+        requirements: [HardwareRequirement] = [],
         recommendedFor: [String] = [],
         supportedFormats: [ModelFormat] = []
     ) {
         self.framework = framework
         self.isAvailable = isAvailable
         self.unavailabilityReason = unavailabilityReason
+        self.requirements = requirements
         self.recommendedFor = recommendedFor
         self.supportedFormats = supportedFormats
     }

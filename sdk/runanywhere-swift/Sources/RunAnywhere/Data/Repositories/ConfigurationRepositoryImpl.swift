@@ -2,108 +2,184 @@ import Foundation
 import GRDB
 
 /// Repository for managing SDK configuration data
-/// Implements both Repository for basic CRUD and ConfigurationRepository for config-specific operations
 public actor ConfigurationRepositoryImpl: Repository, ConfigurationRepository {
     public typealias Entity = ConfigurationData
-    public typealias RemoteDS = RemoteConfigurationDataSource
 
-    // Core dependencies
     private let databaseManager: DatabaseManager
     private let apiClient: APIClient?
     private let logger = SDKLogger(category: "ConfigurationRepository")
-
-    // Data sources for configuration-specific operations
-    private let _remoteDataSource: RemoteConfigurationDataSource
-    private let localDataSource: LocalConfigurationDataSource
-
-    // Expose remote data source for sync coordinator
-    public nonisolated var remoteDataSource: RemoteConfigurationDataSource? {
-        return _remoteDataSource
-    }
 
     // MARK: - Initialization
 
     public init(databaseManager: DatabaseManager, apiClient: APIClient?) {
         self.databaseManager = databaseManager
         self.apiClient = apiClient
-        self._remoteDataSource = RemoteConfigurationDataSource(apiClient: apiClient)
-        self.localDataSource = LocalConfigurationDataSource(databaseManager: databaseManager)
     }
 
-    // MARK: - Repository Protocol Implementation
+    // MARK: - Repository Implementation
 
     public func save(_ entity: ConfigurationData) async throws {
+        let record = mapToRecord(entity)
+
         try databaseManager.write { db in
-            try entity.save(db)
+            try record.save(db)
         }
-        logger.debug("Saved configuration: \(entity.id)")
+
+        logger.info("Configuration saved: \(entity.id)")
     }
 
     public func fetch(id: String) async throws -> ConfigurationData? {
-        return try databaseManager.read { db in
-            try ConfigurationData.fetchOne(db, key: id)
+        let record = try databaseManager.read { db in
+            try ConfigurationRecord.fetchOne(db, key: id)
         }
+
+        return try record.map { try mapToEntity($0) }
     }
 
     public func fetchAll() async throws -> [ConfigurationData] {
-        return try databaseManager.read { db in
-            try ConfigurationData
-                .order(Column("updatedAt").desc)
+        let records = try databaseManager.read { db in
+            try ConfigurationRecord
+                .order(ConfigurationRecord.Columns.updatedAt.desc)
                 .fetchAll(db)
         }
+
+        logger.info("Found \(records.count) configurations in database")
+
+        return try records.map { try mapToEntity($0) }
     }
 
     public func delete(id: String) async throws {
         try databaseManager.write { db in
-            _ = try ConfigurationData.deleteOne(db, key: id)
+            _ = try ConfigurationRecord.deleteOne(db, key: id)
         }
-        logger.debug("Deleted configuration: \(id)")
+
+        logger.info("Configuration deleted: \(id)")
     }
 
-    // MARK: - Sync Support (for Repository protocol)
-
     public func fetchPendingSync() async throws -> [ConfigurationData] {
-        return try databaseManager.read { db in
-            try ConfigurationData
-                .filter(Column("syncPending") == true)
+        let records = try databaseManager.read { db in
+            try ConfigurationRecord
+                .filter(ConfigurationRecord.Columns.syncPending == true)
                 .fetchAll(db)
         }
+
+        return try records.map { try mapToEntity($0) }
     }
 
     public func markSynced(_ ids: [String]) async throws {
         try databaseManager.write { db in
             for id in ids {
-                if var data = try ConfigurationData.fetchOne(db, key: id) {
-                    data.markSynced()
-                    try data.update(db)
+                if var record = try ConfigurationRecord.fetchOne(db, key: id) {
+                    record.syncPending = false
+                    record.updatedAt = Date()
+                    try record.update(db)
                 }
             }
         }
+
+        logger.info("Marked \(ids.count) configurations as synced")
     }
 
-    // MARK: - ConfigurationRepository Protocol Implementation
-
-    public func fetchRemoteConfiguration(apiKey: String) async throws -> ConfigurationData? {
-        do {
-            return try await _remoteDataSource.fetchConfiguration(apiKey: apiKey)
-        } catch {
-            logger.debug("Remote configuration fetch failed: \(error)")
-            return nil
+    public func sync() async throws {
+        guard let apiClient = apiClient else {
+            logger.warning("API client not available for sync")
+            return
         }
+
+        let pending = try await fetchPendingSync()
+        guard !pending.isEmpty else {
+            return
+        }
+
+        // For now, just log - actual sync would be implemented later
+        logger.info("Would sync \(pending.count) configurations")
+
+        // Example sync implementation:
+        // let response = try await apiClient.post(.syncConfiguration, pending)
+        // try await markSynced(response.syncedIds)
     }
 
-    public func setConsumerConfiguration(_ config: ConfigurationData) async throws {
-        try await localDataSource.saveConsumerOverride(config)
+    // MARK: - ConfigurationRepository Protocol Methods
+
+    public func fetchByKey(_ key: String) async throws -> ConfigurationData? {
+        // For now, just return the default configuration if key matches
+        if key == "default" {
+            return try await fetch(id: "default")
+        }
+        return nil
     }
 
-    public func getConsumerConfiguration() async throws -> ConfigurationData? {
-        return try await localDataSource.loadConsumerOverride()
+    public func updatePartial(_ id: String, updates: (ConfigurationData) -> ConfigurationData) async throws {
+        guard let existing = try await fetch(id: id) else {
+            throw RepositoryError.entityNotFound(id)
+        }
+
+        let updated = updates(existing)
+        try await save(updated.markUpdated())
     }
 
-    nonisolated public func getSDKDefaultConfiguration() -> ConfigurationData {
+    // MARK: - Mapping Functions
+
+    private func mapToRecord(_ entity: ConfigurationData) -> ConfigurationRecord {
+        // Map the composed configuration to flat record structure
+        let privacyMode = entity.routing.privacyMode.rawValue
+        let telemetryConsent = entity.analytics.enabled ?
+            (entity.analytics.level == .detailed ? SDKConstants.TelemetryDefaults.consentDetailed : SDKConstants.TelemetryDefaults.consentAnonymous) :
+            SDKConstants.TelemetryDefaults.consentNone
+
+        return ConfigurationRecord(
+            id: entity.id,
+            apiKey: entity.apiKey,
+            baseURL: SDKConstants.DatabaseDefaults.apiBaseURL,
+            modelCacheSize: SDKConstants.ModelDefaults.defaultModelCacheSize,
+            maxMemoryUsageMB: SDKConstants.ModelDefaults.defaultMaxMemoryUsageMB,
+            privacyMode: privacyMode,
+            telemetryConsent: telemetryConsent,
+            createdAt: entity.createdAt,
+            updatedAt: entity.updatedAt,
+            syncPending: entity.syncPending
+        )
+    }
+
+    private func mapToEntity(_ record: ConfigurationRecord) throws -> ConfigurationData {
+        // Map flat record structure back to composed configuration
+        let privacyMode = PrivacyMode(rawValue: record.privacyMode) ?? .standard
+        let analyticsEnabled = record.telemetryConsent != SDKConstants.TelemetryDefaults.consentNone
+        let analyticsLevel: AnalyticsLevel = record.telemetryConsent == SDKConstants.TelemetryDefaults.consentDetailed ? .detailed : .basic
+
+        // Create routing configuration
+        let routing = RoutingConfiguration(
+            policy: .automatic, // Default for now, could be stored separately
+            cloudEnabled: true,
+            privacyMode: privacyMode
+        )
+
+        // Create analytics configuration
+        let analytics = AnalyticsConfiguration(
+            enabled: analyticsEnabled,
+            level: analyticsLevel,
+            liveMetricsEnabled: true
+        )
+
+        // Create generation configuration with defaults
+        let generation = GenerationConfiguration()
+
+        // Create storage configuration with defaults
+        let storage = StorageConfiguration(
+            maxCacheSize: Int64(record.maxMemoryUsageMB) * 1024 * 1024
+        )
+
         return ConfigurationData(
-            id: SDKConstants.ConfigurationDefaults.configurationId,
-            source: .defaults
+            id: record.id,
+            routing: routing,
+            analytics: analytics,
+            generation: generation,
+            storage: storage,
+            apiKey: record.apiKey,
+            allowUserOverride: true,
+            createdAt: record.createdAt,
+            updatedAt: record.updatedAt,
+            syncPending: record.syncPending
         )
     }
 }

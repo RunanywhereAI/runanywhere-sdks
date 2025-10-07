@@ -2,24 +2,28 @@ import Foundation
 
 /// Service responsible for discovering models from various sources
 class ModelDiscovery {
-    // Provider registration removed - no longer needed
+    private let formatDetector: FormatDetector
+    private let metadataExtractor: MetadataExtractor
+    private var registeredProviders: [ModelProvider] = []
     private let logger = SDKLogger(category: "ModelDiscovery")
 
-    init() {
+    init(
+        formatDetector: FormatDetector = ServiceContainer.shared.formatDetector,
+        metadataExtractor: MetadataExtractor = ServiceContainer.shared.metadataExtractor
+    ) {
+        self.formatDetector = formatDetector
+        self.metadataExtractor = metadataExtractor
     }
 
-    // Provider registration removed - no longer needed
+    func registerProvider(_ provider: ModelProvider) {
+        registeredProviders.append(provider)
+    }
 
     func discoverLocalModels() async -> [ModelInfo] {
-        logger.info("Starting local model discovery...")
         var models: [ModelInfo] = []
         let modelExtensions = ["mlmodel", "mlmodelc", "mlpackage", "tflite", "onnx", "gguf", "ggml", "mlx", "pte", "safetensors"]
 
-        let directories = getDefaultModelDirectories()
-        logger.info("Searching in \(directories.count) directories for cached models")
-
-        for directory in directories {
-            logger.debug("Checking directory: \(directory.path)")
+        for directory in getDefaultModelDirectories() {
             // Search for model files recursively
             await searchForModelsRecursively(in: directory, modelExtensions: modelExtensions) { model in
                 models.append(model)
@@ -28,13 +32,7 @@ class ModelDiscovery {
 
         // Also check for models in app bundle
         if let bundleModels = discoverBundleModels() {
-            logger.info("Found \(bundleModels.count) models in app bundle")
             models.append(contentsOf: bundleModels)
-        }
-
-        logger.info("Local model discovery completed. Found \(models.count) total models")
-        for model in models {
-            logger.debug("Discovered model: \(model.id) at \(model.localPath?.path ?? "unknown path")")
         }
 
         return models
@@ -55,7 +53,7 @@ class ModelDiscovery {
             return
         }
 
-        while let fileURL = enumerator.nextObject() as? URL {
+        for case let fileURL as URL in enumerator {
             // Check if it's a file with a model extension
             let fileExtension = fileURL.pathExtension.lowercased()
             if modelExtensions.contains(fileExtension) {
@@ -68,43 +66,83 @@ class ModelDiscovery {
         }
     }
 
+    func discoverOnlineModels() async -> [ModelInfo] {
+        var models: [ModelInfo] = []
+
+        // Query each registered provider
+        await withTaskGroup(of: [ModelInfo].self) { group in
+            for provider in registeredProviders {
+                group.addTask { [weak self] in
+                    do {
+                        return try await provider.listAvailableModels(limit: 100)
+                    } catch {
+                        self?.logger.error("Failed to query provider \(provider.name): \(error)")
+                        return []
+                    }
+                }
+            }
+
+            for await providerModels in group {
+                models.append(contentsOf: providerModels)
+            }
+        }
+
+        return models
+    }
+
     private func detectModel(at url: URL) async -> ModelInfo? {
         // Skip hidden files and directories
         if url.lastPathComponent.hasPrefix(".") {
             return nil
         }
 
-        // Detect format from file extension
-        guard let format = detectFormatFromExtension(url.pathExtension) else {
+        // Detect format
+        guard let format = formatDetector.detectFormat(at: url) else {
             return nil
         }
 
+        // Extract metadata
+        let metadata: ModelMetadata
+        do {
+            metadata = await metadataExtractor.extractMetadata(from: url, format: format)
+        } catch {
+            // Create minimal metadata if extraction fails
+            metadata = ModelMetadata(
+                author: nil,
+                description: url.deletingPathExtension().lastPathComponent,
+                version: nil,
+                modelType: nil,
+                architecture: nil,
+                quantization: nil,
+                contextLength: nil,
+                inputShapes: nil,
+                outputShapes: nil
+            )
+        }
+
         // Determine compatible frameworks
-        let frameworks = detectCompatibleFrameworks(format: format)
+        let frameworks = detectCompatibleFrameworks(format: format, metadata: metadata)
 
         // Get file size
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
 
         // Create model info
         let modelId = generateModelId(from: url)
-        let modelName = generateModelName(from: url)
-
-        // Determine category based on format and frameworks
-        let category = ModelCategory.from(format: format, frameworks: frameworks)
+        let modelName = generateModelName(from: url, metadata: metadata)
 
         return ModelInfo(
             id: modelId,
             name: modelName,
-            category: category,
             format: format,
             localPath: url,
+            estimatedMemory: estimateMemoryUsage(fileSize: fileSize, format: format),
+            contextLength: metadata.contextLength ?? 2048,
             downloadSize: fileSize,
-            memoryRequired: estimateMemoryUsage(fileSize: fileSize, format: format),
             compatibleFrameworks: frameworks,
             preferredFramework: frameworks.first,
-            contextLength: category == .language ? 2048 : nil,
-            supportsThinking: false,
-            metadata: nil
+            hardwareRequirements: detectHardwareRequirements(format: format, metadata: metadata),
+            tokenizerFormat: detectTokenizerFormat(at: url),
+            metadata: convertToModelInfoMetadata(metadata)
         )
     }
 
@@ -148,7 +186,7 @@ class ModelDiscovery {
         return models.isEmpty ? nil : models
     }
 
-    private func detectCompatibleFrameworks(format: ModelFormat) -> [LLMFramework] {
+    private func detectCompatibleFrameworks(format: ModelFormat, metadata: ModelMetadata) -> [LLMFramework] {
         var frameworks: [LLMFramework] = []
 
         switch format {
@@ -171,6 +209,53 @@ class ModelDiscovery {
         return frameworks
     }
 
+    private func detectHardwareRequirements(format: ModelFormat, metadata: ModelMetadata) -> [HardwareRequirement] {
+        var requirements: [HardwareRequirement] = []
+
+        if let minMemory = metadata.requirements?.minMemory {
+            requirements.append(.minimumMemory(minMemory))
+        }
+
+        switch format {
+        case .mlmodel, .mlpackage:
+            requirements.append(.requiresNeuralEngine)
+        case .tflite:
+            requirements.append(.requiresGPU)
+        case .safetensors:
+            requirements.append(.specificChip("A17"))
+        default:
+            break
+        }
+
+        return requirements
+    }
+
+    private func detectTokenizerFormat(at url: URL) -> TokenizerFormat? {
+        let directory = url.hasDirectoryPath ? url : url.deletingLastPathComponent()
+
+        do {
+            let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+
+            for file in contents {
+                let filename = file.lastPathComponent
+
+                if filename == "tokenizer.json" {
+                    return .huggingFace
+                } else if filename.contains("sentencepiece") {
+                    return .sentencePiece
+                } else if filename == "vocab.txt" {
+                    return .wordPiece
+                } else if file.pathExtension == "bpe" {
+                    return .bpe
+                }
+            }
+        } catch {
+            // Ignore errors
+        }
+
+        return nil
+    }
+
     private func generateModelId(from url: URL) -> String {
         // For models in our storage structure, use the parent folder name as ID
         // This ensures consistency with how models are stored
@@ -178,7 +263,7 @@ class ModelDiscovery {
 
         // Check if this is a model in our framework structure
         if let modelsIndex = pathComponents.firstIndex(of: "Models"),
-           modelsIndex + 3 < pathComponents.count {  // Need at least Models/Framework/ModelId/file.gguf
+           modelsIndex + 2 < pathComponents.count {
             // Path is like: .../Models/frameworkName/modelId/file.gguf
             // or: .../Models/modelId/file.gguf
             let nextComponent = pathComponents[modelsIndex + 1]
@@ -186,23 +271,25 @@ class ModelDiscovery {
             // Check if next component is a framework name
             if LLMFramework.allCases.contains(where: { $0.rawValue == nextComponent }) {
                 // Framework structure: use the model folder name
-                let modelId = pathComponents[modelsIndex + 2]
-                logger.debug("Generated model ID from framework structure: '\(modelId)' from path: \(url.path)")
-                return modelId
-            } else if modelsIndex + 2 < pathComponents.count {
+                if modelsIndex + 2 < pathComponents.count {
+                    return pathComponents[modelsIndex + 2]
+                }
+            } else {
                 // Direct model folder structure
-                logger.debug("Generated model ID from direct structure: '\(nextComponent)' from path: \(url.path)")
                 return nextComponent
             }
         }
 
         // Fallback to filename-based ID for other cases
         let filename = url.deletingPathExtension().lastPathComponent
-        logger.debug("Generated model ID from filename fallback: '\(filename)' from path: \(url.path)")
         return filename
     }
 
-    private func generateModelName(from url: URL) -> String {
+    private func generateModelName(from url: URL, metadata: ModelMetadata) -> String {
+        if let name = metadata.description {
+            return name
+        }
+
         return url.deletingPathExtension().lastPathComponent
             .replacingOccurrences(of: "_", with: " ")
             .replacingOccurrences(of: "-", with: " ")
@@ -223,20 +310,20 @@ class ModelDiscovery {
         }
     }
 
-    private func detectFormatFromExtension(_ ext: String) -> ModelFormat? {
-        switch ext.lowercased() {
-        case "mlmodel": return .mlmodel
-        case "mlmodelc": return .mlmodel
-        case "mlpackage": return .mlpackage
-        case "tflite": return .tflite
-        case "onnx": return .onnx
-        case "ort": return .ort
-        case "gguf": return .gguf
-        case "ggml": return .ggml
-        case "mlx": return .mlx
-        case "pte": return .pte
-        case "safetensors": return .safetensors
-        default: return nil
-        }
+    private func convertToModelInfoMetadata(_ metadata: ModelMetadata) -> ModelInfoMetadata {
+        let quantLevel: QuantizationLevel? = {
+            guard let q = metadata.quantization else { return nil }
+            return QuantizationLevel(rawValue: q)
+        }()
+
+        return ModelInfoMetadata(
+            author: metadata.author,
+            license: nil,
+            tags: [],
+            description: metadata.description,
+            trainingDataset: nil,
+            baseModel: nil,
+            quantizationLevel: quantLevel
+        )
     }
 }

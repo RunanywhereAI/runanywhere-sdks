@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents the various states in a model's lifecycle
-public enum ModelLifecycleState: String, CaseIterable, Sendable {
+public enum ModelLifecycleState: String, CaseIterable {
     case uninitialized
     case discovered
     case downloading

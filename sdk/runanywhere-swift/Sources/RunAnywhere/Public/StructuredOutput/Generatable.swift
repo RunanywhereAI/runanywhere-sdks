@@ -22,18 +22,55 @@ public extension Generatable {
 }
 
 /// Structured output configuration
-public struct StructuredOutputConfig: Sendable {
+public struct StructuredOutputConfig {
     /// The type to generate
     public let type: Generatable.Type
+
+    /// Validation mode
+    public let validationMode: SchemaValidationMode
+
+    /// Generation strategy
+    public let strategy: StructuredOutputStrategy
 
     /// Whether to include schema in prompt
     public let includeSchemaInPrompt: Bool
 
     public init(
         type: Generatable.Type,
+        validationMode: SchemaValidationMode = .strict,
+        strategy: StructuredOutputStrategy = .automatic,
         includeSchemaInPrompt: Bool = true
     ) {
         self.type = type
+        self.validationMode = validationMode
+        self.strategy = strategy
         self.includeSchemaInPrompt = includeSchemaInPrompt
     }
+}
+
+/// Schema validation modes
+public enum SchemaValidationMode {
+    /// Fail if output doesn't match schema exactly
+    case strict
+
+    /// Allow minor deviations (extra fields, etc)
+    case lenient
+
+    /// Extract what's possible from the output
+    case bestEffort
+}
+
+/// Structured output generation strategies
+public enum StructuredOutputStrategy {
+    /// Let the SDK choose the best strategy
+    case automatic
+
+    /// Include JSON schema in the prompt
+    case jsonSchemaInPrompt
+
+    /// Use framework-specific constraints (if supported)
+    case frameworkConstraints
+
+    /// Post-process and validate after generation
+    case postProcessing
 }

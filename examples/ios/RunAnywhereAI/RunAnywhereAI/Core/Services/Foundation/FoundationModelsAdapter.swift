@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 import OSLog
 
 // Import FoundationModels with conditional compilation
@@ -45,7 +45,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
         guard modality == .textToText else {
-            throw LLMServiceError.modelNotFound("modality not supported")
+            throw LLMServiceError.modelNotLoaded
         }
         // Foundation Models doesn't need to load external models
         // It uses Apple's built-in models
@@ -75,8 +75,11 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
         return HardwareConfiguration(
             primaryAccelerator: .neuralEngine,
+            fallbackAccelerator: .gpu,
             memoryMode: .balanced,
-            threadCount: 2
+            threadCount: 2,
+            useQuantization: true,
+            quantizationBits: 8
         )
     }
 }
@@ -85,7 +88,7 @@ public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
 @available(iOS 26.0, macOS 26.0, *)
 class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
-    private var _currentModel: String?
+    private var _modelInfo: LoadedModelInfo?
     private var _isReady = false
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FoundationModels")
 
@@ -96,19 +99,19 @@ class FoundationModelsService: LLMService {
     #endif
 
     var isReady: Bool { _isReady }
-    var currentModel: String? { _currentModel }
+    var modelInfo: LoadedModelInfo? { _modelInfo }
 
     init(hardwareConfig: HardwareConfiguration?) {
         self.hardwareConfig = hardwareConfig
     }
 
-    func initialize(modelPath: String?) async throws {
+    func initialize(modelPath: String) async throws {
         logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
         #if canImport(FoundationModels)
         guard #available(iOS 26.0, macOS 26.0, *) else {
             logger.error("iOS 26.0+ or macOS 26.0+ not available")
-            throw LLMServiceError.notInitialized
+            throw LLMServiceError.modelNotLoaded
         }
 
         logger.info("FoundationModels framework is available, proceeding with initialization")
@@ -137,32 +140,40 @@ class FoundationModelsService: LLMService {
 
             case .unavailable(.deviceNotEligible):
                 logger.error("Device not eligible for Apple Intelligence")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.modelNotLoaded
             case .unavailable(.appleIntelligenceNotEnabled):
                 logger.error("Apple Intelligence not enabled. Please enable it in Settings.")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.modelNotLoaded
             case .unavailable(.modelNotReady):
                 logger.error("Model not ready. It may be downloading or initializing.")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.modelNotLoaded
             case .unavailable(let other):
                 logger.error("Foundation Models unavailable: \(String(describing: other))")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.modelNotLoaded
             @unknown default:
                 logger.error("Unknown availability status")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.modelNotLoaded
             }
 
-            _currentModel = "foundation-models-native"
+            _modelInfo = LoadedModelInfo(
+                id: "foundation-models-native",
+                name: "Apple Foundation Model",
+                framework: .foundationModels,
+                format: .mlmodel,
+                memoryUsage: 500_000_000, // 500MB estimate
+                contextLength: 4096, // 4096 tokens as per documentation
+                configuration: hardwareConfig ?? HardwareConfiguration()
+            )
             _isReady = true
             logger.info("Foundation Models initialized successfully")
         } catch {
             logger.error("Failed to initialize Foundation Models: \(error)")
-            throw LLMServiceError.notInitialized
+            throw LLMServiceError.modelNotLoaded
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available")
-        throw LLMServiceError.notInitialized
+        throw LLMServiceError.modelNotLoaded
         #endif
     }
 
@@ -248,13 +259,12 @@ class FoundationModelsService: LLMService {
             // Stream tokens as they arrive
             var previousContent = ""
             for try await partialResponse in responseStream {
-                // partialResponse.content contains the aggregated response so far
+                // partialResponse contains the aggregated response so far
                 // We need to send only the new tokens
-                let currentContent = partialResponse.content
-                if currentContent.count > previousContent.count {
-                    let newTokens = String(currentContent.dropFirst(previousContent.count))
+                if partialResponse.count > previousContent.count {
+                    let newTokens = String(partialResponse.dropFirst(previousContent.count))
                     onToken(newTokens)
-                    previousContent = currentContent
+                    previousContent = partialResponse
                 }
             }
 
@@ -290,10 +300,10 @@ class FoundationModelsService: LLMService {
         #endif
 
         _isReady = false
-        _currentModel = nil
+        _modelInfo = nil
     }
 
     func getModelMemoryUsage() async throws -> Int64 {
-        return 500_000_000 // 500MB estimate for Foundation Models
+        return _modelInfo?.memoryUsage ?? 0
     }
 }

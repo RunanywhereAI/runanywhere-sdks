@@ -7,6 +7,7 @@
 //  - Infrastructure/Hardware/Detectors/NeuralEngineDetector.swift
 //  - Infrastructure/Hardware/Detectors/GPUDetector.swift
 //  - Infrastructure/Hardware/Capability/CapabilityAnalyzer.swift
+//  - Infrastructure/Hardware/Capability/RequirementMatcher.swift
 //  - Infrastructure/Hardware/Models/DeviceCapabilities.swift
 //  - Infrastructure/Hardware/Models/ProcessorInfo.swift
 //
@@ -22,7 +23,7 @@ import AppKit
 #endif
 
 /// Manager for hardware capability detection and configuration
-public final class HardwareCapabilityManager: @unchecked Sendable {
+public class HardwareCapabilityManager {
 
     // MARK: - Properties
 
@@ -31,6 +32,9 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     /// Capability analyzer
     private let capabilityAnalyzer: CapabilityAnalyzer
+
+    /// Requirement matcher
+    private let requirementMatcher: RequirementMatcher
 
     /// Registered hardware detector (for backward compatibility)
     private var registeredHardwareDetector: HardwareDetector?
@@ -56,6 +60,7 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     private init() {
         self.capabilityAnalyzer = CapabilityAnalyzer()
+        self.requirementMatcher = RequirementMatcher()
     }
 
     // MARK: - Public API
@@ -114,6 +119,11 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
         )
     }
 
+    /// Check model compatibility
+    public func checkCompatibility(for model: ModelInfo) -> CompatibilityResult {
+        let capabilities = self.capabilities
+        return requirementMatcher.checkCompatibility(model: model, capabilities: capabilities)
+    }
 
     /// Refresh cached capabilities
     public func refreshCapabilities() {

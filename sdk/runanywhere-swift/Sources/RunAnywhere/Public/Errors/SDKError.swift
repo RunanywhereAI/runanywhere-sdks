@@ -4,26 +4,16 @@ import Foundation
 public enum SDKError: LocalizedError {
     case notInitialized
     case notImplemented
-    case invalidAPIKey(String)
     case modelNotFound(String)
     case loadingFailed(String)
     case generationFailed(String)
     case generationTimeout(String)
     case frameworkNotAvailable(LLMFramework)
     case downloadFailed(Error)
-    case validationFailed(String)
+    case validationFailed(ValidationError)
     case routingFailed(String)
     case databaseInitializationFailed(Error)
     case unsupportedModality(String)
-    case invalidResponse(String)
-    case authenticationFailed(String)
-    case networkError(String)
-    case invalidState(String)
-    case componentNotInitialized(String)
-    case timeout(String)
-    case serverError(String)
-    case storageError(String)
-    case invalidConfiguration(String)
 
     public var errorDescription: String? {
         switch self {
@@ -31,8 +21,6 @@ public enum SDKError: LocalizedError {
             return "SDK not initialized. Call initialize(with:) first."
         case .notImplemented:
             return "This feature is not yet implemented."
-        case .invalidAPIKey(let reason):
-            return "Invalid API key: \(reason)"
         case .modelNotFound(let model):
             return "Model '\(model)' not found."
         case .loadingFailed(let reason):
@@ -46,31 +34,13 @@ public enum SDKError: LocalizedError {
         case .downloadFailed(let error):
             return "Download failed: \(error.localizedDescription)"
         case .validationFailed(let error):
-            return "Validation failed: \(error)"
+            return "Validation failed: \(error.localizedDescription)"
         case .routingFailed(let reason):
             return "Routing failed: \(reason)"
         case .databaseInitializationFailed(let error):
             return "Database initialization failed: \(error.localizedDescription)"
         case .unsupportedModality(let modality):
             return "Unsupported modality: \(modality)"
-        case .invalidResponse(let reason):
-            return "Invalid response: \(reason)"
-        case .authenticationFailed(let reason):
-            return "Authentication failed: \(reason)"
-        case .networkError(let reason):
-            return "Network error: \(reason)"
-        case .invalidState(let reason):
-            return "Invalid state: \(reason)"
-        case .componentNotInitialized(let component):
-            return "Component not initialized: \(component)"
-        case .timeout(let reason):
-            return "Operation timed out: \(reason)"
-        case .serverError(let reason):
-            return "Server error: \(reason)"
-        case .storageError(let reason):
-            return "Storage error: \(reason)"
-        case .invalidConfiguration(let reason):
-            return "Invalid configuration: \(reason)"
         }
     }
 }

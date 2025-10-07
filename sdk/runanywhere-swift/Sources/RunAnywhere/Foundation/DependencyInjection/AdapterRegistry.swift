@@ -9,26 +9,8 @@ public final class AdapterRegistry {
 
     /// Register a unified framework adapter
     func register(_ adapter: UnifiedFrameworkAdapter) {
-        // First, register the adapter in the concurrent queue
         queue.async(flags: .barrier) {
             self.adapters[adapter.framework] = adapter
-        }
-
-        // Then call external services outside of the queue to prevent deadlocks
-        Task {
-            // Call the adapter's onRegistration method
-            adapter.onRegistration()
-
-            // Register models provided by the adapter
-            let models = adapter.getProvidedModels()
-            for model in models {
-                ServiceContainer.shared.modelRegistry.registerModel(model)
-            }
-
-            // Register download strategy if provided
-            if let downloadStrategy = adapter.getDownloadStrategy() {
-                ServiceContainer.shared.downloadService.registerStrategy(downloadStrategy)
-            }
         }
     }
 
@@ -94,12 +76,15 @@ public final class AdapterRegistry {
             return LLMFramework.allCases.map { framework in
                 let isAvailable = registeredFrameworks.contains(framework)
                 let adapter = adapters[framework]
+                let capability = FrameworkCapabilities.getCapability(for: framework)
+
                 return FrameworkAvailability(
                     framework: framework,
                     isAvailable: isAvailable,
                     unavailabilityReason: isAvailable ? nil : "Framework adapter not registered",
+                    requirements: getFrameworkRequirements(framework),
                     recommendedFor: getRecommendedUseCases(framework, adapter: adapter),
-                    supportedFormats: adapter?.supportedFormats ?? []
+                    supportedFormats: capability?.supportedFormats.map { $0 } ?? []
                 )
             }
         }
@@ -107,6 +92,20 @@ public final class AdapterRegistry {
 
     // MARK: - Private Helper Methods
 
+    private func getFrameworkRequirements(_ framework: LLMFramework) -> [HardwareRequirement] {
+        switch framework {
+        case .coreML, .foundationModels:
+            return [.requiresNeuralEngine]
+        case .tensorFlowLite, .mediaPipe:
+            return [.requiresGPU]
+        case .mlx:
+            return [.requiresGPU, .requiresAppleSilicon]
+        case .whisperKit:
+            return [.requiresNeuralEngine]
+        default:
+            return []
+        }
+    }
 
     private func getRecommendedUseCases(_ framework: LLMFramework, adapter: UnifiedFrameworkAdapter?) -> [String] {
         var useCases: [String] = []

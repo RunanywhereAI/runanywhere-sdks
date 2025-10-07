@@ -114,7 +114,7 @@ public class VoiceSessionManager {
     /// - Parameters:
     ///   - sessionId: Session ID
     ///   - transcript: Transcript to add
-    public func addTranscript(_ sessionId: String, transcript: STTResult) {
+    public func addTranscript(_ sessionId: String, transcript: VoiceTranscriptionResult) {
         sessionQueue.async(flags: .barrier) {
             if var session = self.sessions[sessionId] {
                 session.transcripts.append(transcript)

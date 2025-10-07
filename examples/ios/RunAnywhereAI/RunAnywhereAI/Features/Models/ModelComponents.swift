@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
 
 struct FrameworkRow: View {
     let framework: LLMFramework

@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 import LLM
 
 public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
@@ -9,7 +9,7 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
     public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
 
-    private let logger = SDKLogger(category: "LLMSwiftAdapter")
+    private var hardwareConfig: HardwareConfiguration?
 
     public init() {}
 
@@ -24,52 +24,71 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
         // Check memory requirements
         let availableMemory = ProcessInfo.processInfo.physicalMemory
-        return model.memoryRequired ?? 0 < Int64(Double(availableMemory) * 0.7)
+        return model.estimatedMemory < Int64(Double(availableMemory) * 0.7)
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
         guard modality == .textToText else { return nil }
-        return LLMSwiftService()
+        return LLMSwiftService(hardwareConfig: hardwareConfig)
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
         guard modality == .textToText else {
             throw SDKError.unsupportedModality(modality.rawValue)
         }
-        logger.info("Loading model: \(model.name)")
+        print("🚀 [LLMSwiftAdapter] Loading model: \(model.name) (ID: \(model.id))")
 
         guard let localPath = model.localPath else {
-            logger.error("Model has no local path - not downloaded")
-            throw LLMServiceError.modelNotFound("Model not downloaded at expected path")
+            print("❌ [LLMSwiftAdapter] Model has no local path - not downloaded")
+            throw FrameworkError(
+                framework: framework,
+                underlying: LLMServiceError.modelNotLoaded,
+                context: "Model not downloaded at expected path"
+            )
         }
 
-        logger.debug("Creating LLMSwiftService with model path")
+        print("📝 [LLMSwiftAdapter] Model local path: \(localPath.path)")
+        print("🚀 [LLMSwiftAdapter] Creating LLMSwiftService")
 
-        let service = LLMSwiftService()
-        logger.debug("Initializing service with model")
+        let service = LLMSwiftService(hardwareConfig: hardwareConfig)
+        print("🚀 [LLMSwiftAdapter] Initializing service with model path")
         try await service.initialize(modelPath: localPath.path)
-        logger.info("Service initialized successfully")
+        print("✅ [LLMSwiftAdapter] Service initialized successfully")
         return service
     }
 
+    public func configure(with hardware: HardwareConfiguration) async {
+        self.hardwareConfig = hardware
+    }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
         // GGUF models use approximately their file size in memory
         // Add 20% overhead for context and processing
-        let baseSize = model.memoryRequired ?? 0
+        let baseSize = model.estimatedMemory
         let overhead = Int64(Double(baseSize) * 0.2)
         return baseSize + overhead
     }
 
-    public func configure(with hardware: HardwareConfiguration) async {
-        // Configuration handled internally by LLMSwift
-    }
-
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        // Return default configuration - LLMSwift handles optimization internally
+        // Determine optimal configuration based on model size
+        let hasGPU = HardwareCapabilityManager.shared.isAcceleratorAvailable(.gpu)
+        let modelSize = model.estimatedMemory
+
+        let preferredAccelerator: HardwareAcceleration = {
+            if hasGPU && modelSize < 4_000_000_000 { // 4GB
+                return .gpu
+            } else {
+                return .cpu
+            }
+        }()
+
         return HardwareConfiguration(
-            primaryAccelerator: .cpu,
-            memoryMode: .balanced
+            primaryAccelerator: preferredAccelerator,
+            fallbackAccelerator: .cpu,
+            memoryMode: .balanced,
+            threadCount: 4,
+            useQuantization: true,
+            quantizationBits: 4
         )
     }
 

@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
 
 struct SimplifiedModelsView: View {
     @StateObject private var viewModel = ModelListViewModel.shared
@@ -64,7 +64,7 @@ struct SimplifiedModelsView: View {
 
     private func loadAvailableFrameworks() async {
         // Get available frameworks from SDK
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks
         }
@@ -230,7 +230,7 @@ private struct ModelRow: View {
                     .fontWeight(isSelected ? .semibold : .regular)
 
                 HStack(spacing: 8) {
-                    let size = model.memoryRequired ?? 0
+                    let size = model.estimatedMemory
                     if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
@@ -266,8 +266,11 @@ private struct ModelRow: View {
                         Button(action: {
                             // Enable thinking support for this model
                             Task {
-                                // Thinking support update not available in new API
-                                // Will be enabled when the model is loaded
+                                await RunAnywhereSDK.shared.updateModelThinkingSupport(
+                                    modelId: model.id,
+                                    supportsThinking: true,
+                                    thinkingTagPattern: ThinkingTagPattern.defaultPattern
+                                )
                                 onModelUpdated()
                             }
                         }) {
@@ -320,7 +323,7 @@ private struct ModelRow: View {
 
             // Action buttons based on model state
             HStack(spacing: 8) {
-                if let _ = model.downloadURL, model.localPath == nil {
+                if let downloadURL = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
                         VStack(spacing: 4) {
@@ -373,39 +376,37 @@ private struct ModelRow: View {
         }
 
         do {
-            // Use the progress-enabled download API
-            let progressStream = try await RunAnywhere.downloadModelWithProgress(model.id)
+            let downloadTask = try await RunAnywhereSDK.shared.downloadModel(model.id)
 
-            // Process progress updates
-            for await progress in progressStream {
-                await MainActor.run {
-                    self.downloadProgress = progress.percentage
-                    print("Download progress for \(model.name): \(Int(progress.percentage * 100))%")
-                }
-
-                // Check if download completed or failed
-                switch progress.state {
-                case .completed:
+            // Track progress
+            Task {
+                for await progress in downloadTask.progress {
                     await MainActor.run {
-                        self.downloadProgress = 1.0
-                        self.isDownloading = false
-                        onDownloadCompleted()
-                        print("Model \(model.name) downloaded successfully")
+                        switch progress.state {
+                        case .downloading:
+                            self.downloadProgress = Double(progress.bytesDownloaded) / Double(progress.totalBytes)
+                        case .completed:
+                            self.downloadProgress = 1.0
+                        case .failed:
+                            self.downloadProgress = 0.0
+                        default:
+                            break
+                        }
                     }
-                    return
-
-                case .failed(let error):
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        print("Download failed for \(model.name): \(error.localizedDescription)")
-                    }
-                    return
-
-                default:
-                    // Continue processing progress updates
-                    continue
                 }
+            }
+
+            // Wait for download to complete
+            let url = try await downloadTask.result.value
+
+            print("Model \(model.name) downloaded successfully to: \(url)")
+
+            // Notify parent that download completed so it can refresh
+            await MainActor.run {
+                onDownloadCompleted()
+                // Reset download state
+                isDownloading = false
+                downloadProgress = 1.0
             }
 
         } catch {

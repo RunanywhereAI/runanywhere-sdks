@@ -6,8 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhere
-import Combine
+import RunAnywhereSDK
 
 struct AddModelFromURLView: View {
     @Environment(\.dismiss) private var dismiss
@@ -29,7 +28,7 @@ struct AddModelFromURLView: View {
         NavigationStack {
             Form {
                 formContent
-
+                
                 Section {
                     Button("Add Model") {
                         Task {
@@ -85,7 +84,7 @@ struct AddModelFromURLView: View {
             await loadAvailableFrameworks()
         }
     }
-
+    
     @ViewBuilder
     private var formContent: some View {
         Section("Model Information") {
@@ -159,7 +158,7 @@ struct AddModelFromURLView: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = RunAnywhere.getAvailableFrameworks()
+        let frameworks = RunAnywhereSDK.shared.getAvailableFrameworks()
         await MainActor.run {
             self.availableFrameworks = frameworks.isEmpty ? [.llamaCpp] : frameworks
             // Set default selection to first available framework
@@ -178,16 +177,36 @@ struct AddModelFromURLView: View {
         isAdding = true
         errorMessage = nil
 
-        // Use the simplified addModelFromURL API which doesn't throw
-        let modelInfo = await RunAnywhere.addModelFromURL(
-            url,
-            name: modelName,
-            type: selectedFramework.rawValue
-        )
+        do {
+            let estimatedSizeBytes: Int64? = {
+                guard !estimatedSize.isEmpty, let size = Int64(estimatedSize) else {
+                    return nil
+                }
+                return size
+            }()
 
-        await MainActor.run {
-            onModelAdded(modelInfo)
-            dismiss()
+            // Create thinking tag pattern if custom tags are specified
+            let thinkingPattern: ThinkingTagPattern? = supportsThinking && useCustomThinkingTags ?
+                ThinkingTagPattern(openingTag: thinkingOpenTag, closingTag: thinkingCloseTag) : nil
+
+            let modelInfo = RunAnywhereSDK.shared.addModelFromURL(
+                name: modelName,
+                url: url,
+                framework: selectedFramework,
+                estimatedSize: estimatedSizeBytes,
+                supportsThinking: supportsThinking,
+                thinkingTagPattern: thinkingPattern
+            )
+
+            await MainActor.run {
+                onModelAdded(modelInfo)
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to add model: \(error.localizedDescription)"
+                isAdding = false
+            }
         }
     }
 }

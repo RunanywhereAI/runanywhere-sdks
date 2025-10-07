@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 import AVFoundation
 import Combine
 import os
@@ -12,8 +12,8 @@ import AppKit
 @MainActor
 class TranscriptionViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "TranscriptionViewModel")
+    private let sdk = RunAnywhereSDK.shared
     private let audioCapture = AudioCapture()
-    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties
     @Published var transcriptionText: String = ""
@@ -29,7 +29,7 @@ class TranscriptionViewModel: ObservableObject {
     @Published var enableSpeakerDiarization: Bool = true
 
     // MARK: - Transcription State
-    private var voicePipeline: ModularVoicePipeline?
+    private var voicePipeline: VoicePipelineManager?
     private let whisperModelName: String = "whisper-base"
     private var audioStreamContinuation: AsyncStream<VoiceAudioChunk>.Continuation?
     private var pipelineTask: Task<Void, Never>?
@@ -114,36 +114,29 @@ class TranscriptionViewModel: ObservableObject {
             vadThreshold: 0.01  // Lowered for more sensitive voice detection
         )
 
-        // Create the pipeline with optional diarization
+        // Create the pipeline with FluidAudio diarization if enabled
         if enableSpeakerDiarization {
-            logger.info("Creating pipeline with FluidAudio diarization")
-            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(config: config)
-            if voicePipeline == nil {
-                // Fallback to standard pipeline if diarization fails
-                do {
-                    voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
-                    logger.info("Created standard voice pipeline (diarization unavailable)")
-                } catch {
-                    errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
-                    currentStatus = "Error"
-                    logger.error("Failed to create voice pipeline: \(error)")
-                    return
-                }
-            }
+            logger.info("Using FluidAudioDiarization for speaker detection")
+            voicePipeline = await FluidAudioIntegration.createVoicePipelineWithDiarization(
+                sdk: sdk,
+                config: config
+            )
+            voicePipeline?.enableSpeakerDiarization(true)
+            voicePipeline?.enableContinuousMode(true)
         } else {
-            // Create standard pipeline without diarization
-            do {
-                voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
-                logger.info("Created voice pipeline without diarization")
-            } catch {
-                errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
-                currentStatus = "Error"
-                logger.error("Failed to create voice pipeline: \(error)")
-                return
+            // Create standard pipeline
+            voicePipeline = sdk.createVoicePipeline(config: config)
+            voicePipeline?.delegate = self
+
+            // Enable speaker diarization with default implementation
+            if enableSpeakerDiarization {
+                voicePipeline?.enableSpeakerDiarization(true)
+                voicePipeline?.enableContinuousMode(true)
+                logger.info("Enabled speaker diarization with default implementation")
             }
         }
 
-        // ModularVoicePipeline uses events, not delegates
+        voicePipeline?.delegate = self
 
         // Initialize components first (VAD and STT only for transcription)
         guard let pipeline = voicePipeline else {
@@ -356,4 +349,21 @@ class TranscriptionViewModel: ObservableObject {
     }
 }
 
-// Delegate no longer needed - ModularVoicePipeline uses events
+// MARK: - VoicePipelineManagerDelegate
+
+extension TranscriptionViewModel: @preconcurrency VoicePipelineManagerDelegate {
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
+        Task { @MainActor in
+            await handlePipelineEvent(event)
+        }
+    }
+
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error) {
+        Task { @MainActor in
+            errorMessage = error.localizedDescription
+            isTranscribing = false
+            currentStatus = "Error"
+        }
+        logger.error("Pipeline error: \(error)")
+    }
+}

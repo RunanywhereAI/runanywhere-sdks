@@ -24,7 +24,7 @@ let package = Package(
             name: "FluidAudioDiarization",
             dependencies: [
                 .product(name: "FluidAudio", package: "FluidAudio"),
-                .product(name: "RunAnywhere", package: "runanywhere-swift")
+                .product(name: "RunAnywhereSDK", package: "runanywhere-swift")
             ]
         ),
     ]

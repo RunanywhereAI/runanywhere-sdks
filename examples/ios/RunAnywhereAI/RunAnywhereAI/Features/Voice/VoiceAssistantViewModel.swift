@@ -1,5 +1,5 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 import AVFoundation
 import Combine
 import os
@@ -7,8 +7,8 @@ import os
 @MainActor
 class VoiceAssistantViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "VoiceAssistantViewModel")
+    private let sdk = RunAnywhereSDK.shared
     private let audioCapture = AudioCapture()
-    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Published Properties
     @Published var currentTranscript: String = ""
@@ -51,7 +51,7 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var isSpeechDetected: Bool = false
 
     // MARK: - Pipeline State
-    private var voicePipeline: ModularVoicePipeline?
+    private var voicePipeline: VoicePipelineManager?
     private var pipelineTask: Task<Void, Never>?
     private let whisperModelName: String = "whisper-base"
 
@@ -138,32 +138,19 @@ class VoiceAssistantViewModel: ObservableObject {
         sessionState = .connecting
         currentStatus = "Initializing components..."
 
-        // Create pipeline configuration with balanced VAD threshold
+        // Create pipeline configuration
         // Always include LLM component for complete pipeline flow
         let config = ModularPipelineConfig(
             components: [.vad, .stt, .llm, .tts],
-            vad: VADConfig(energyThreshold: 0.005), // Lower threshold for better short phrase detection
+            vad: VADConfig(),
             stt: VoiceSTTConfig(modelId: whisperModelName),
-            llm: VoiceLLMConfig(
-                modelId: "default",
-                systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational.",
-                maxTokens: 100  // Limit response to 100 tokens for concise voice interactions
-            ),
-            // llm: VoiceLLMConfig(modelId: "default", systemPrompt: "INSTRUCTION: Give a direct answer. Do not write dialogue. Do not write User: or Assistant:. Just answer."),
+            llm: VoiceLLMConfig(modelId: "default", systemPrompt: "You are a helpful voice assistant. Keep responses concise and conversational."),
             tts: VoiceTTSConfig(voice: "system")
         )
 
         // Create the pipeline
-        do {
-            voicePipeline = try await RunAnywhere.createVoicePipeline(config: config)
-        } catch {
-            sessionState = .error("Failed to create pipeline: \(error.localizedDescription)")
-            currentStatus = "Error"
-            errorMessage = "Failed to create voice pipeline: \(error.localizedDescription)"
-            logger.error("Failed to create voice pipeline: \(error)")
-            return
-        }
-        // ModularVoicePipeline uses events, not delegates
+        voicePipeline = sdk.createVoicePipeline(config: config)
+        voicePipeline?.delegate = self
 
         // Initialize components first
         guard let pipeline = voicePipeline else {
@@ -176,7 +163,7 @@ class VoiceAssistantViewModel: ObservableObject {
         // Initialize all components
         do {
             for try await event in pipeline.initializeComponents() {
-                handleInitializationEvent(event)
+                await handleInitializationEvent(event)
             }
         } catch {
             sessionState = .error("Initialization failed: \(error.localizedDescription)")
@@ -353,7 +340,7 @@ class VoiceAssistantViewModel: ObservableObject {
 
         // Return a mock result for compatibility
         return VoicePipelineResult(
-            transcription: STTResult(
+            transcription: VoiceTranscriptionResult(
                 text: currentTranscript,
                 language: "en",
                 confidence: 0.95,
@@ -374,24 +361,20 @@ class VoiceAssistantViewModel: ObservableObject {
 
 // MARK: - VoicePipelineManagerDelegate
 
-// Delegate no longer needed - ModularVoicePipeline uses events
-/*
-extension VoiceAssistantViewModel: @preconcurrency ModularPipelineDelegate {
-    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didReceiveEvent event: ModularPipelineEvent) {
+extension VoiceAssistantViewModel: @preconcurrency VoicePipelineManagerDelegate {
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didReceiveEvent event: ModularPipelineEvent) {
         Task { @MainActor in
             await handlePipelineEvent(event)
         }
     }
 
-    nonisolated func pipeline(_ pipeline: ModularVoicePipeline, didEncounterError error: Error) {
+    nonisolated func pipeline(_ pipeline: VoicePipelineManager, didEncounterError error: Error) {
         Task { @MainActor in
-
             errorMessage = error.localizedDescription
             sessionState = .error(error.localizedDescription)
             isListening = false
             isProcessing = false
             logger.error("Pipeline error: \(error)")
         }
-    }K
+    }
 }
-*/

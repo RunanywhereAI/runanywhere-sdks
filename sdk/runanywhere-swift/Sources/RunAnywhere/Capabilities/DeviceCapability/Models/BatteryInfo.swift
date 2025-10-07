@@ -1,7 +1,7 @@
 import Foundation
 
 /// Battery information for device power status
-public struct BatteryInfo: Codable, Sendable {
+public struct BatteryInfo: Codable {
     /// Battery level from 0.0 to 1.0 (nil if unknown)
     public let level: Float?
     /// Current battery state
@@ -33,7 +33,7 @@ public struct BatteryInfo: Codable, Sendable {
 }
 
 /// Battery charging state
-public enum BatteryState: String, Codable, Sendable {
+public enum BatteryState: String, Codable {
     case unknown
     case unplugged
     case charging

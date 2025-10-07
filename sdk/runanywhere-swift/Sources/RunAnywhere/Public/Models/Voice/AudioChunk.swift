@@ -36,7 +36,7 @@ public struct VoiceAudioChunk {
         self.isFinal = isFinal
     }
 
-    /// Convert Float samples to Data
+    /// Legacy Data property for backward compatibility (converts from Float samples)
     public var data: Data {
         return samples.withUnsafeBytes { bytes in
             Data(bytes)

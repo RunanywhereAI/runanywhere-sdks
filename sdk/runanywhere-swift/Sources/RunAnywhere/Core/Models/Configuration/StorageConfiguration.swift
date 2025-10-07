@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for storage behavior
-public struct StorageConfiguration: Codable, Sendable {
+public struct StorageConfiguration: Codable {
     /// Maximum cache size in bytes
     public var maxCacheSize: Int64
 
@@ -43,7 +43,7 @@ public struct StorageConfiguration: Codable, Sendable {
 }
 
 /// Cache eviction policy
-public enum CacheEvictionPolicy: String, Codable, CaseIterable, Sendable {
+public enum CacheEvictionPolicy: String, Codable, CaseIterable {
     /// Least recently used items are evicted first
     case leastRecentlyUsed = "lru"
 

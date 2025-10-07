@@ -11,7 +11,7 @@ public enum RunAnywhereError: LocalizedError {
     // Model errors
     case modelNotFound(String)
     case modelLoadFailed(String, Error?)
-    case modelValidationFailed(String, [String])
+    case modelValidationFailed(String, [ValidationError])
     case modelIncompatible(String, String) // model, reason
 
     // Generation errors
@@ -60,7 +60,7 @@ public enum RunAnywhereError: LocalizedError {
             }
             return "Failed to load model '\(identifier)'"
         case .modelValidationFailed(let identifier, let errors):
-            let errorList = errors.joined(separator: ", ")
+            let errorList = errors.map { $0.localizedDescription }.joined(separator: ", ")
             return "Model '\(identifier)' validation failed: \(errorList)"
         case .modelIncompatible(let identifier, let reason):
             return "Model '\(identifier)' is incompatible: \(reason)"
@@ -117,7 +117,7 @@ public enum RunAnywhereError: LocalizedError {
     public var recoverySuggestion: String? {
         switch self {
         case .notInitialized:
-            return "Call RunAnywhere.initialize() before using the SDK."
+            return "Call RunAnywhereSDK.shared.initialize() before using the SDK."
         case .alreadyInitialized:
             return "The SDK is already initialized. You can use it directly."
         case .invalidConfiguration:
