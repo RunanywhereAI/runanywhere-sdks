@@ -21,11 +21,33 @@ public class RegistryService: ModelRegistry {
         await loadPreconfiguredModels()
 
         // Discover local models that are already downloaded
-        logger.debug("Discovering local models")
+        logger.debug("Discovering local models from cache")
         let localModels = await modelDiscovery.discoverLocalModels()
-        logger.info("Found \(localModels.count) local models")
-        for model in localModels {
-            registerModel(model)
+        logger.info("Found \(localModels.count) cached models on disk")
+
+        // Update existing registered models with discovered local paths
+        // This ensures cached downloads are recognized after app restart
+        logger.debug("Comparing discovered models with registered models:")
+        logger.debug("Registered model IDs: \(Array(models.keys).sorted())")
+
+        for discoveredModel in localModels {
+            logger.debug("Processing discovered model: '\(discoveredModel.id)' at \(discoveredModel.localPath?.path ?? "unknown")")
+
+            if let existingModel = getModel(by: discoveredModel.id) {
+                // Model already registered - just update its localPath if needed
+                if existingModel.localPath == nil && discoveredModel.localPath != nil {
+                    var updatedModel = existingModel
+                    updatedModel.localPath = discoveredModel.localPath
+                    updateModel(updatedModel)
+                    logger.info("✅ Updated registered model '\(discoveredModel.id)' with cached localPath: \(discoveredModel.localPath?.lastPathComponent ?? "unknown")")
+                } else if existingModel.localPath != nil {
+                    logger.debug("Model '\(discoveredModel.id)' already has localPath: \(existingModel.localPath?.lastPathComponent ?? "unknown")")
+                }
+            } else {
+                // New model found on disk - register it
+                logger.info("➕ Registering new cached model: \(discoveredModel.id)")
+                registerModel(discoveredModel)
+            }
         }
 
         // Model provider discovery will be handled via configuration service
@@ -36,13 +58,9 @@ public class RegistryService: ModelRegistry {
     }
 
     public func discoverModels() async -> [ModelInfo] {
-        // Discover local models from disk and register them
-        let localModels = await modelDiscovery.discoverLocalModels()
-        for model in localModels {
-            registerModel(model)
-        }
-
-        // Return all registered models (both pre-configured and discovered)
+        // Simply return all registered models
+        // Don't auto-discover local models as it causes confusion with download status
+        // Models should only be marked as downloaded when explicitly downloaded via the app
         return accessQueue.sync {
             Array(models.values)
         }
@@ -55,10 +73,66 @@ public class RegistryService: ModelRegistry {
             return
         }
 
-        logger.debug("Registering model: \(model.id) - \(model.name)")
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file if localPath is not already set
+        if updatedModel.localPath == nil {
+            if let modelFile = fileManager.findModelFile(modelId: model.id) {
+                updatedModel.localPath = modelFile
+                logger.info("Found local file for model \(model.id): \(modelFile.path)")
+            }
+        }
+
+        logger.debug("Registering model: \(updatedModel.id) - \(updatedModel.name)")
         accessQueue.async(flags: .barrier) {
-            self.models[model.id] = model
-            self.logger.info("Successfully registered model: \(model.id)")
+            self.models[updatedModel.id] = updatedModel
+            self.logger.info("Successfully registered model: \(updatedModel.id)")
+        }
+    }
+
+    /// Register model and save to database for persistence
+    /// - Parameter model: The model to register and persist
+    public func registerModelPersistently(_ model: ModelInfo) async {
+        // Validate model before registering
+        guard !model.id.isEmpty else {
+            logger.error("Attempted to register model with empty ID")
+            return
+        }
+
+        // Check if model file exists locally and update localPath
+        var updatedModel = model
+        let fileManager = ServiceContainer.shared.fileManager
+        // Try to find the model file
+        if let modelFile = fileManager.findModelFile(modelId: model.id) {
+            updatedModel.localPath = modelFile
+            logger.info("Found local file for model \(model.id): \(modelFile.path)")
+        } else {
+            // Clear localPath if file doesn't exist
+            updatedModel.localPath = nil
+            logger.debug("No local file found for model \(model.id)")
+        }
+
+        // Register the updated model in memory
+        registerModel(updatedModel)
+
+        // Check if model already exists in database to avoid unnecessary saves
+        do {
+            let modelInfoService = await ServiceContainer.shared.modelInfoService
+            let existingModel = try await modelInfoService.getModel(by: updatedModel.id)
+
+            if existingModel == nil {
+                // Model doesn't exist in database, save it
+                try await modelInfoService.saveModel(updatedModel)
+                logger.info("Registered and saved new model persistently: \(updatedModel.id)")
+            } else {
+                // Model exists, but let's update it with any new information (including localPath)
+                try await modelInfoService.saveModel(updatedModel)
+                logger.debug("Updated existing model in database: \(updatedModel.id)")
+            }
+        } catch {
+            logger.error("Failed to save model \(updatedModel.id) to database: \(error)")
+            // Model is still registered in memory even if database save fails
         }
     }
 
@@ -225,6 +299,7 @@ public class RegistryService: ModelRegistry {
                 }
 
                 for model in storedModels {
+                    logger.debug("Registering stored model: \(model.id) with localPath: \(model.localPath?.path ?? "nil")")
                     registerModel(model)
                 }
             } catch {

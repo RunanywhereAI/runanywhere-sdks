@@ -11,28 +11,10 @@
 
 **Privacy-first, on-device AI SDKs** that bring powerful language models directly to your iOS and Android applications. RunAnywhere enables intelligent AI execution with automatic optimization for performance, privacy, and user experience.
 
-## 💰 Why RunAnywhere?
-
-| Feature | RunAnywhere | OpenAI API | Claude API |
-|---------|------------|------------|------------|
-| **Cost** | $0 (on-device) | $15-60/million tokens | $15-75/million tokens |
-| **Privacy** | 100% Private | Data sent to servers | Data sent to servers |
-| **Latency** | <100ms | 500-2000ms | 500-2000ms |
-| **Offline** | ✅ Works offline | ❌ Requires internet | ❌ Requires internet |
-| **Data Residency** | On-device | US/EU servers | US servers |
-
-**Real Example**: Processing 1000 customer support chats/day.
-Cost Spend on LLM inference:
-- **OpenAI**: ~$450/month
-- **Claude**: ~$380/month  
-- **RunAnywhere**: $0/month (after one-time setup)
-
-💡 **Save thousands of dollars annually while keeping user data 100% private!**
-
 ## 🚀 Current Status
 
 ### ✅ iOS SDK - **Available**
-The iOS SDK provides on-device text generation, voice AI capabilities, and structured outputs for privacy-first AI applications. [View iOS SDK →](sdk/runanywhere-swift/)
+The iOS SDK provides high-performance on-device text generation, complete voice AI pipeline with VAD/STT/LLM/TTS, structured outputs with type-safe JSON generation, and thinking model support for privacy-first AI applications. [View iOS SDK →](sdk/runanywhere-swift/)
 
 ### 🏗️ Android SDK - **Coming Soon**
 The Android SDK is under active development. We're bringing the same powerful on-device AI capabilities to Android.
@@ -72,17 +54,20 @@ The Android SDK is under active development. We're bringing the same powerful on
 
 ### Core Capabilities
 - **💬 Text Generation** - High-performance on-device text generation with streaming support
-- **🎙️ Voice AI Workflow** - Real-time voice conversations with transcription and synthesis (Experimental)
-- **📋 Structured Outputs** - Type-safe JSON generation with schema validation (Experimental)
-- **🏗️ Model Management** - Automatic model downloading, caching, and lifecycle management
-- **📊 Performance Analytics** - Real-time metrics for latency, throughput, and resource usage
+- **🎙️ Voice AI Pipeline** - Complete voice workflow with VAD, STT, LLM, and TTS components
+- **📋 Structured Outputs** - Type-safe JSON generation with schema validation using `Generatable` protocol
+- **🧠 Thinking Models** - Support for models with thinking tags (`<think>...</think>`)
+- **🏗️ Model Management** - Automatic model discovery, downloading, and lifecycle management
+- **📊 Performance Analytics** - Real-time metrics with comprehensive event system
+- **🎯 Intelligent Routing** - Automatic on-device vs cloud decision making
 
 ### Technical Highlights
-- **🔒 Privacy-First Architecture** - All processing happens on-device by default
-- **🚀 Multi-Framework Support** - GGUF models via llama.cpp, Apple Foundation Models (iOS 18+)
-- **⚡ Native Performance** - Optimized for Apple Silicon with Metal acceleration
-- **🧠 Smart Memory Management** - Automatic memory optimization and cleanup
-- **📱 Cross-Platform** - iOS 13.0+, macOS 10.15+, tvOS 13.0+, watchOS 6.0+
+- **🔒 Privacy-First** - All processing happens on-device by default with intelligent cloud routing
+- **🚀 Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
+- **⚡ Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
+- **🧠 Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
+- **📱 Cross-Platform** - iOS 14.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
+- **🎛️ Component Architecture** - Modular components for flexible AI pipeline construction
 
 ## 🗺️ Roadmap
 
@@ -105,29 +90,45 @@ The Android SDK is under active development. We're bringing the same powerful on
 
 ```swift
 import RunAnywhere
+import LLMSwift
+import WhisperKitTranscription
 
-// Initialize the SDK
-let sdk = RunAnywhereSDK.shared
-try await sdk.initialize(
-    apiKey: "your-api-key",
-    configuration: SDKConfiguration(
-        privacyMode: .strict,  // On-device only
-        debugMode: true
-    )
+// 1. Initialize the SDK
+try await RunAnywhere.initialize(
+    apiKey: "dev",           // Any string works in dev mode
+    baseURL: "localhost",    // Not used in dev mode
+    environment: .development
 )
 
-// Generate text
-let result = try await sdk.generateText(
+// 2. Register framework adapters
+await LLMSwiftServiceProvider.register()
+try await RunAnywhere.registerFrameworkAdapter(
+    LLMSwiftAdapter(),
+    models: [
+        try! ModelRegistration(
+            url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+            framework: .llamaCpp,
+            id: "smollm2-360m",
+            name: "SmolLM2 360M",
+            memoryRequirement: 500_000_000
+        )
+    ]
+)
+
+// 3. Download and load model
+try await RunAnywhere.downloadModel("smollm2-360m")
+try await RunAnywhere.loadModel("smollm2-360m")
+
+// 4. Generate text
+let result = try await RunAnywhere.generate(
     "Explain quantum computing in simple terms",
-    options: GenerationOptions(
+    options: RunAnywhereGenerationOptions(
         maxTokens: 100,
-        temperature: 0.7,
-        stream: true
+        temperature: 0.7
     )
 )
 
 print("Generated: \(result.text)")
-print("Tokens/sec: \(result.performance.tokensPerSecond)")
 ```
 
 [View full iOS documentation →](sdk/runanywhere-swift/)
@@ -142,10 +143,9 @@ print("Tokens/sec: \(result.performance.tokensPerSecond)")
 ## 📋 System Requirements
 
 ### iOS SDK
-- **Platforms**: iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
+- **Platforms**: iOS 14.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
 - **Development**: Xcode 15.0+, Swift 5.9+
 - **Recommended**: iOS 17.0+ for full feature support
-- **Foundation Models**: iOS 26.0+ with Apple Intelligence
 
 ### Android SDK (Coming Soon)
 - **Minimum SDK**: 24 (Android 7.0)
@@ -161,28 +161,56 @@ print("Tokens/sec: \(result.performance.tokensPerSecond)")
 
 Add RunAnywhere to your project:
 
+#### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
-3. Select the latest version
+3. **Select version rule:**
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.13.0`
+   - **Specific Version**: Choose **Exact** and enter `0.13.0`
+   - **Development Branch**: Choose **Branch** and enter `main`
+4. Select the `runanywhere-swift` product
+5. Click **Add Package**
 
-Or add to your `Package.swift`:
+#### Via Package.swift
 
+**Latest Release (Recommended):**
 ```swift
 dependencies: [
     .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
 ]
 ```
 
+**Specific Version:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.13.0")
+]
+```
+
+**Development Branch:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", .branch("main"))
+]
+```
+
+
 #### CocoaPods
 
+**Latest Release (Recommended):**
 ```ruby
 pod 'RunAnywhere', '~> 0.13'
+```
+
+**Specific Version:**
+```ruby
+pod 'RunAnywhere', '0.13.0'
 ```
 
 ### Android SDK (Coming Soon)
 
 ```gradle
-// Coming soon
+// Coming soon - Latest release will be available here
 dependencies {
     implementation 'ai.runanywhere:sdk:0.13.0'
 }
@@ -193,33 +221,51 @@ dependencies {
 ### Privacy-First Chat Application
 ```swift
 // All processing stays on-device
-let sdk = RunAnywhereSDK.shared
-let result = try await sdk.generateText(
+let result = try await RunAnywhere.generate(
     userMessage,
-    options: GenerationOptions(privacyMode: .strict)
+    options: RunAnywhereGenerationOptions(maxTokens: 150)
 )
 ```
 
 ### Voice Assistant
 ```swift
-// Real-time voice conversations (Experimental)
-let voiceSession = try await sdk.startVoiceSession()
-voiceSession.delegate = self
-try await voiceSession.startListening()
+// Voice pipeline with VAD, STT, LLM, TTS
+let config = ModularPipelineConfig(
+    components: [.vad, .stt, .llm, .tts],
+    stt: VoiceSTTConfig(modelId: "whisper-base"),
+    llm: VoiceLLMConfig(modelId: "default", maxTokens: 100)
+)
+
+let pipeline = try await RunAnywhere.createVoicePipeline(config: config)
+for try await event in pipeline.process(audioStream: audioStream) {
+    // Handle voice events
+}
 ```
 
 ### Structured Data Generation
 ```swift
-// Type-safe JSON generation (Experimental)
-struct QuizQuestion: Generatable {
-    let question: String
-    let options: [String]
-    let correctAnswer: Int
+// Type-safe JSON generation with Generatable protocol
+struct Quiz: Codable, Generatable {
+    let title: String
+    let questions: [Question]
+
+    static var jsonSchema: String {
+        return """
+        {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "questions": {"type": "array"}
+            }
+        }
+        """
+    }
 }
 
-let quiz: QuizQuestion = try await sdk.generateStructuredOutput(
-    prompt: "Create a quiz question about space",
-    type: QuizQuestion.self
+let quiz = try await RunAnywhere.generateStructured(
+    Quiz.self,
+    prompt: "Create a quiz about Swift programming",
+    options: options
 )
 ```
 

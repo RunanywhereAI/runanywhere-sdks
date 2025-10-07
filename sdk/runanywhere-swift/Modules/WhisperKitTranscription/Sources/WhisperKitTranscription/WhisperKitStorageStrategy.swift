@@ -3,7 +3,7 @@ import RunAnywhere
 import os
 
 /// Custom storage strategy for WhisperKit models that handles downloading and file management
-public class WhisperKitStorageStrategy: ModelStorageStrategy {
+public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
     // WhisperKit model structure: mlmodelc directories contain multiple files
     // Note: Not all models have all files, we'll check existence before downloading
     private let mlmodelcFiles = [

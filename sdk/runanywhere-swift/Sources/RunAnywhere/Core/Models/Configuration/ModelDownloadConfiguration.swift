@@ -14,7 +14,6 @@ public enum DownloadPolicy: String, Codable, Sendable {
 
 /// Simple configuration for model downloads
 public struct ModelDownloadConfiguration: Codable, Sendable {
-
     /// Download policy
     public var policy: DownloadPolicy
 
@@ -48,7 +47,6 @@ public struct ModelDownloadConfiguration: Codable, Sendable {
 // MARK: - Simple Helper
 
 extension ModelDownloadConfiguration {
-
     /// Check if download is allowed
     public func shouldAllowDownload(isWiFi: Bool = false, userConfirmed: Bool = false) -> Bool {
         switch policy {

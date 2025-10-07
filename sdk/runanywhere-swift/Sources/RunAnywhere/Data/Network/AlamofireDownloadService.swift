@@ -4,7 +4,7 @@ import Files
 import Pulse
 
 /// Simplified download service using Alamofire
-public class AlamofireDownloadService: DownloadManager {
+public class AlamofireDownloadService: DownloadManager, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -47,12 +47,19 @@ public class AlamofireDownloadService: DownloadManager {
 
     public func downloadModel(_ model: ModelInfo) async throws -> DownloadTask {
         // Check if any custom strategy can handle this model
-        for strategy in customStrategies {
-            if strategy.canHandle(model: model) {
+        logger.info("[DEBUG] Checking strategies for model \(model.id), framework: \(model.preferredFramework?.rawValue ?? "none")")
+        logger.info("[DEBUG] Available custom strategies: \(customStrategies.count)")
+
+        for (index, strategy) in customStrategies.enumerated() {
+            let canHandle = strategy.canHandle(model: model)
+            logger.info("[DEBUG] Strategy \(index): \(type(of: strategy)) canHandle=\(canHandle)")
+            if canHandle {
+                logger.info("[DEBUG] Using custom strategy \(type(of: strategy)) for model \(model.id)")
                 return try await downloadModelWithCustomStrategy(model, strategy: strategy)
             }
         }
 
+        logger.info("[DEBUG] No custom strategy found for model \(model.id), using default download")
         // No custom strategy found, use default download
         guard let downloadURL = model.downloadURL else {
             throw DownloadError.invalidURL
@@ -144,10 +151,15 @@ public class AlamofireDownloadService: DownloadManager {
                                     updatedModel.localPath = url
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-                                    // Save metadata persistently
+                                    // Save metadata persistently in a Task
                                     Task {
-                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                                        try? await modelInfoService.saveModel(updatedModel)
+                                        do {
+                                            let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                            try await modelInfoService.saveModel(updatedModel)
+                                            self.logger.info("Model metadata saved successfully for: \(model.id)")
+                                        } catch {
+                                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                                        }
                                     }
 
                                     self.logger.info("Download completed", metadata: [
@@ -217,22 +229,33 @@ public class AlamofireDownloadService: DownloadManager {
         logger.info("Registered custom download strategy")
     }
 
+    /// Refresh strategies from framework adapters (call after registering new adapters)
+    public func refreshStrategies() {
+        autoRegisterStrategies()
+    }
+
     /// Auto-discover and register strategies from framework adapters
     private func autoRegisterStrategies() {
         let adapters = ServiceContainer.shared.adapterRegistry.getRegisteredAdapters()
         var registeredCount = 0
+
+        logger.info("[DEBUG] Auto-registering strategies from \(adapters.count) adapters")
 
         for (framework, adapter) in adapters {
             if let strategy = adapter.getDownloadStrategy() {
                 // Auto-discovered strategies go after manually registered ones
                 customStrategies.append(strategy)
                 registeredCount += 1
-                logger.debug("Auto-registered download strategy from \(framework.rawValue) adapter")
+                logger.info("[DEBUG] Auto-registered download strategy \(type(of: strategy)) from \(framework.rawValue) adapter")
+            } else {
+                logger.info("[DEBUG] No download strategy from \(framework.rawValue) adapter")
             }
         }
 
         if registeredCount > 0 {
             logger.info("Auto-registered \(registeredCount) download strategies from adapters")
+        } else {
+            logger.info("[DEBUG] No strategies auto-registered")
         }
     }
 
@@ -279,6 +302,16 @@ public class AlamofireDownloadService: DownloadManager {
                     var updatedModel = model
                     updatedModel.localPath = resultURL
                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                    // Save metadata persistently
+                    do {
+                        let modelInfoService = await ServiceContainer.shared.modelInfoService
+                        try await modelInfoService.saveModel(updatedModel)
+                        self.logger.info("Model metadata saved successfully for: \(model.id)")
+                    } catch {
+                        self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                        // Continue with download completion, but log the error
+                    }
 
                     self.logger.info("Custom strategy download completed", metadata: [
                         "modelId": model.id,
@@ -448,10 +481,15 @@ extension AlamofireDownloadService {
                                     updatedModel.localPath = url
                                     ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
-                                    // Save metadata persistently
+                                    // Save metadata persistently in a Task
                                     Task {
-                                        let modelInfoService = await ServiceContainer.shared.modelInfoService
-                                        try? await modelInfoService.saveModel(updatedModel)
+                                        do {
+                                            let modelInfoService = await ServiceContainer.shared.modelInfoService
+                                            try await modelInfoService.saveModel(updatedModel)
+                                            self.logger.info("Model metadata saved successfully for: \(model.id)")
+                                        } catch {
+                                            self.logger.error("Failed to save model metadata for \(model.id): \(error)")
+                                        }
                                     }
 
                                     continuation.resume(returning: url)

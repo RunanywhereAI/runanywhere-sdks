@@ -70,8 +70,8 @@ public actor APIClient: NetworkService {
         if let token = token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         } else if endpoint == .authenticate {
-            // For authentication endpoint, use API key
-            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            // For authentication endpoint, API key is in the request body, not header
+            // No authorization header needed for authentication endpoint
         }
 
         logger.debug("POST request to: \(endpoint.path)")
@@ -82,14 +82,30 @@ public actor APIClient: NetworkService {
             throw RepositoryError.syncFailure("Invalid response")
         }
 
-        guard httpResponse.statusCode == 200 else {
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            // Try to parse error response
+            var errorMessage = "HTTP \(httpResponse.statusCode)"
+
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let detail = errorData["detail"] as? String {
+                    errorMessage = detail
+                } else if let detail = errorData["detail"] as? [[String: Any]] {
+                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
+                    errorMessage = errors.isEmpty ? errorMessage : errors
+                } else if let message = errorData["message"] as? String {
+                    errorMessage = message
+                } else if let error = errorData["error"] as? String {
+                    errorMessage = error
+                }
+            }
+
             logger.error("API error: \(httpResponse.statusCode)", metadata: [
                 "url": url.absoluteString,
                 "method": "POST",
                 "statusCode": httpResponse.statusCode,
                 "endpoint": endpoint.path
             ])
-            throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
+            throw RepositoryError.syncFailure(errorMessage)
         }
 
         return data
@@ -128,13 +144,24 @@ public actor APIClient: NetworkService {
         }
 
         guard httpResponse.statusCode == 200 else {
+            // Try to parse error response
+            var errorMessage = "HTTP \(httpResponse.statusCode)"
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let detail = errorData["detail"] as? String {
+                    errorMessage = detail
+                } else if let detail = errorData["detail"] as? [[String: Any]] {
+                    let errors = detail.compactMap { $0["msg"] as? String }.joined(separator: ", ")
+                    errorMessage = errors.isEmpty ? errorMessage : errors
+                }
+            }
+
             logger.error("API error: \(httpResponse.statusCode)", metadata: [
                 "url": url.absoluteString,
                 "method": "GET",
                 "statusCode": httpResponse.statusCode,
                 "endpoint": endpoint.path
             ])
-            throw RepositoryError.syncFailure("HTTP \(httpResponse.statusCode)")
+            throw RepositoryError.syncFailure(errorMessage)
         }
 
         return data

@@ -51,7 +51,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
 
     /// Whether this model is available for use (downloaded and locally accessible)
     public var isAvailable: Bool {
-        return isDownloaded
+        isDownloaded
     }
 
     private enum CodingKeys: String, CodingKey {

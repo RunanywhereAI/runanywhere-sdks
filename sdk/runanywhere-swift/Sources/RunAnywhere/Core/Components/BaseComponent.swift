@@ -44,16 +44,15 @@ public final class AnyServiceWrapper<T>: ServiceWrapper {
 /// Using @unchecked Sendable as we manage thread safety with @MainActor
 @MainActor
 open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
-
     // MARK: - Core Properties
 
     /// Component type identifier
-    open class var componentType: SDKComponent {
+    nonisolated open class var componentType: SDKComponent {
         fatalError("Override componentType in subclass")
     }
 
     /// Current state (protected by MainActor) - required by Component protocol
-    public private(set) var state: ComponentState = .notInitialized
+    nonisolated(unsafe) public private(set) var state: ComponentState = .notInitialized
 
     /// The service that performs the actual work (protected by MainActor)
     public private(set) var service: TService?
@@ -62,7 +61,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     public let configuration: any ComponentConfiguration
 
     /// Parameters for Component protocol (bridge to configuration)
-    public var parameters: any ComponentInitParameters {
+    nonisolated public var parameters: any ComponentInitParameters {
         // Bridge configuration to parameters if it conforms
         configuration as? any ComponentInitParameters ?? EmptyComponentParameters()
     }
@@ -71,7 +70,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     public weak var serviceContainer: ServiceContainer?
 
     /// Event bus for publishing events
-    public let eventBus = EventBus.shared
+    public let eventBus: EventBus = EventBus.shared
 
     /// Current processing stage
     public private(set) var currentStage: String?
@@ -176,7 +175,7 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     // MARK: - State Management
 
     /// Check if component is ready
-    public var isReady: Bool {
+    nonisolated public var isReady: Bool {
         state == .ready
     }
 
@@ -199,11 +198,6 @@ open class BaseComponent<TService: AnyObject>: Component, @unchecked Sendable {
     }
 
     // MARK: - Component Protocol Requirements
-
-    /// Health check implementation
-    public func healthCheck() async -> ComponentHealth {
-        ComponentHealth(isHealthy: isReady, details: "Component state: \(state.rawValue)")
-    }
 
     /// State transition handler
     public func transitionTo(state: ComponentState) async {

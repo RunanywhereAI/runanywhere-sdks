@@ -101,7 +101,7 @@ public class ServiceContainer {
     public private(set) var networkService: (any NetworkService)?
 
     /// Authentication service
-    private var authenticationService: AuthenticationService?
+    public private(set) var authenticationService: AuthenticationService?
 
     /// API client for sync operations
     private var apiClient: APIClient?
@@ -179,6 +179,19 @@ public class ServiceContainer {
             _modelInfoService = service
             return service
         }
+    }
+
+    /// Model assignment service storage (using Any to avoid circular dependency)
+    private var _modelAssignmentService: Any?
+
+    /// Set the model assignment service (called from extension)
+    public func setModelAssignmentService(_ service: Any) {
+        _modelAssignmentService = service
+    }
+
+    /// Get the stored model assignment service
+    public func getModelAssignmentService() -> Any? {
+        return _modelAssignmentService
     }
 
     /// Device info service
@@ -465,5 +478,103 @@ public class ServiceContainer {
 
         // Return the default configuration
         return defaultConfig
+    }
+
+    // MARK: - Local Setup
+
+    /// Setup only local services (no network calls)
+    /// Called during fast initialization
+    /// - Parameter params: SDK initialization parameters
+    /// - Throws: SDKError if local setup fails
+    public func setupLocalServices(with params: SDKInitParams) throws {
+        let logger = SDKLogger(category: "ServiceContainer.LocalSetup")
+        logger.info("Setting up local services...")
+
+        // Step 1: Configure memory management
+        memoryService.setMemoryThreshold(500_000_000) // 500MB default
+        logger.debug("Memory threshold configured")
+
+        // Step 2: Initialize model registry for local discovery
+        // This needs to happen even in fast initialization to discover cached models
+        Task {
+            await (modelRegistry as? RegistryService)?.initialize(with: params.apiKey)
+            logger.debug("Model registry initialized for local discovery")
+        }
+
+        // Step 3: Setup analytics for local queuing (no network submission yet)
+        // Analytics will be initialized when network services are available
+        logger.debug("Analytics queue ready for lazy initialization")
+
+        logger.info("✅ Local services setup completed")
+    }
+
+    /// Initialize network services lazily when first needed
+    /// - Parameter params: SDK initialization parameters
+    /// - Throws: SDKError if network initialization fails
+    public func initializeNetworkServices(with params: SDKInitParams) async throws {
+        // Skip if already initialized
+        if authenticationService != nil {
+            return
+        }
+
+        let logger = SDKLogger(category: "ServiceContainer.NetworkSetup")
+        logger.info("Initializing network services...")
+
+        // Step 1: Create and store network service based on environment
+        self.networkService = NetworkServiceFactory.createNetworkService(
+            for: params.environment,
+            params: params
+        )
+
+        // Step 2: Create API client and authentication service for production/staging
+        if params.environment != .development {
+            guard let baseURL = params.baseURL else {
+                throw SDKError.validationFailed("Base URL is required for \(params.environment.description)")
+            }
+
+            let apiClient = APIClient(
+                baseURL: baseURL,
+                apiKey: params.apiKey
+            )
+
+            let authService = AuthenticationService(apiClient: apiClient)
+            await apiClient.setAuthenticationService(authService)
+
+            // Store for later use
+            self.authenticationService = authService
+            self.apiClient = apiClient
+
+            // Authenticate with backend
+            let authResponse = try await authService.authenticate(apiKey: params.apiKey)
+            logger.info("Authentication successful, token expires in \(authResponse.expiresIn) seconds")
+        }
+
+        // Step 3: Initialize analytics with API client
+        if let client = self.apiClient {
+            let telemetryRepo = TelemetryRepositoryImpl(
+                databaseManager: databaseManager,
+                apiClient: client
+            )
+            await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
+            logger.info("Analytics initialized")
+        }
+
+        logger.info("✅ Network services initialization completed")
+    }
+
+    /// Reset service container state (for testing)
+    public func reset() {
+        authenticationService = nil
+        apiClient = nil
+        networkService = nil
+        _syncCoordinator = nil
+        _configurationService = nil
+        _telemetryService = nil
+        _modelInfoService = nil
+        _modelAssignmentService = nil
+        _deviceInfoService = nil
+        _generationAnalytics = nil
+        _sttAnalytics = nil
+        _voiceAnalytics = nil
     }
 }

@@ -325,6 +325,8 @@ extension RunAnywhere {
             return SpeakerDiarizationConfiguration()
         case .embedding:
             return LLMConfiguration() // Use LLM config as default for embedding
+        case .wakeWord:
+            return WakeWordConfiguration()
         case .voiceAgent:
             // Voice agent is a composite component, use default configs
             return VoiceAgentConfiguration(

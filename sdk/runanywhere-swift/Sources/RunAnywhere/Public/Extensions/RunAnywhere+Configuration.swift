@@ -10,7 +10,7 @@ public extension RunAnywhere {
     static func getCurrentGenerationSettings() async -> DefaultGenerationSettings? {
         events.publish(SDKConfigurationEvent.settingsRequested)
 
-        let settings = RunAnywhere._configurationData?.generation.defaults
+        let settings = RunAnywhere.configurationData?.generation.defaults
 
         if let settings = settings {
             events.publish(SDKConfigurationEvent.settingsRetrieved(settings: settings))
@@ -23,7 +23,7 @@ public extension RunAnywhere {
     static func getCurrentRoutingPolicy() async -> RoutingPolicy {
         events.publish(SDKConfigurationEvent.routingPolicyRequested)
 
-        let policy = RunAnywhere._configurationData?.routing.policy ?? .automatic
+        let policy = RunAnywhere.configurationData?.routing.policy ?? .automatic
 
         events.publish(SDKConfigurationEvent.routingPolicyRetrieved(policy: policy))
         return policy

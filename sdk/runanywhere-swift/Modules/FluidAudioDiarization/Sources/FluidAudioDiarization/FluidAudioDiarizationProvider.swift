@@ -19,10 +19,9 @@ public final class FluidAudioDiarizationProvider: SpeakerDiarizationServiceProvi
     public static let shared = FluidAudioDiarizationProvider()
 
     /// Super simple registration - just call this in your app
+    @MainActor
     public static func register() {
-        Task { @MainActor in
-            ModuleRegistry.shared.registerSpeakerDiarization(shared)
-        }
+        ModuleRegistry.shared.registerSpeakerDiarization(shared)
     }
 
     // MARK: - SpeakerDiarizationServiceProvider Protocol
@@ -65,6 +64,7 @@ public final class FluidAudioDiarizationProvider: SpeakerDiarizationServiceProvi
 /// Automatic registration when module is imported
 public enum FluidAudioDiarizationModule {
     /// Call this to automatically register FluidAudioDiarization with the SDK
+    @MainActor
     public static func autoRegister() {
         FluidAudioDiarizationProvider.register()
     }

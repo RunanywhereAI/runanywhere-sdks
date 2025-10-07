@@ -55,7 +55,7 @@ public struct DefaultGenerationSettings: Codable, Sendable {
     public var repetitionPenalty: Double?
 
     /// Default stop sequences
-    public var stopSequences: [String]?
+    public var stopSequences: [String]
 
     public init(
         temperature: Double = 0.7,
@@ -63,7 +63,7 @@ public struct DefaultGenerationSettings: Codable, Sendable {
         topP: Double = 0.9,
         topK: Int? = nil,
         repetitionPenalty: Double? = nil,
-        stopSequences: [String]? = nil
+        stopSequences: [String] = []
     ) {
         self.temperature = temperature
         self.maxTokens = maxTokens

@@ -108,10 +108,9 @@ class MemoryMonitor {
         let cutoffTime = Date().addingTimeInterval(-duration)
         let recentHistory = memoryHistory.filter { $0.timestamp >= cutoffTime }
 
-        guard recentHistory.count >= 2 else { return nil }
-
-        let firstEntry = recentHistory.first!
-        let lastEntry = recentHistory.last!
+        guard recentHistory.count >= 2,
+              let firstEntry = recentHistory.first,
+              let lastEntry = recentHistory.last else { return nil }
 
         let memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory
         let timeDelta = lastEntry.timestamp.timeIntervalSince(firstEntry.timestamp)
@@ -157,7 +156,7 @@ class MemoryMonitor {
         let usedString = ByteCountFormatter.string(fromByteCount: stats.usedMemory, countStyle: .memory)
         let usagePercent = String(format: "%.1f", stats.usedMemoryPercentage)
 
-        let pressureInfo = stats.pressureLevel != nil ? " [PRESSURE: \(stats.pressureLevel!)]" : ""
+        let pressureInfo = stats.pressureLevel.map { " [PRESSURE: \($0)]" } ?? ""
 
         logger.debug("Memory: \(usedString) used, \(availableString) available (\(usagePercent)%)\(pressureInfo)")
 

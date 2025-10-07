@@ -4,11 +4,10 @@ import Foundation
 
 /// Unified initializer that works with existing adapters and services
 public actor UnifiedComponentInitializer {
-
     // MARK: - Properties
 
-    private let logger = SDKLogger(category: "UnifiedComponentInitializer")
-    private let eventBus = EventBus.shared
+    private let logger: SDKLogger = SDKLogger(category: "UnifiedComponentInitializer")
+    private let eventBus: EventBus = EventBus.shared
     // Component factory no longer needed - create components directly
     private weak var serviceContainer: ServiceContainer?
 
@@ -26,46 +25,77 @@ public actor UnifiedComponentInitializer {
     /// Initialize components using existing adapters
     public func initialize(_ configs: [UnifiedComponentConfig]) async -> InitializationResult {
         let startTime = Date()
+        eventBus.publish(SDKInitializationEvent.started)
+
+        let sortedConfigs = configs.sorted { $0.priority > $1.priority }
+        let (successful, failed) = await initializeAllComponents(sortedConfigs)
+
+        return createInitializationResult(
+            successful: successful,
+            failed: failed,
+            startTime: startTime
+        )
+    }
+
+    /// Initialize all components in parallel and sequential groups
+    private func initializeAllComponents(_ configs: [UnifiedComponentConfig]) async -> ([SDKComponent], [(SDKComponent, Error)]) {
+        let parallel = configs.filter { canParallelize($0.component) }
+        let sequential = configs.filter { !canParallelize($0.component) }
+
         var successful: [SDKComponent] = []
         var failed: [(SDKComponent, Error)] = []
 
-        // Sort by priority
-        let sortedConfigs = configs.sorted { $0.priority > $1.priority }
-
-        // Emit start event
-        eventBus.publish(SDKInitializationEvent.started)
-
-        // Group by parallelization capability
-        let parallel = sortedConfigs.filter { canParallelize($0.component) }
-        let sequential = sortedConfigs.filter { !canParallelize($0.component) }
-
         // Initialize parallel components
-        if !parallel.isEmpty {
-            await withTaskGroup(of: (SDKComponent, Result<Void, Error>).self) { group in
-                for config in parallel {
-                    group.addTask { [weak self] in
-                        do {
-                            try await self?.initializeComponent(config)
-                            return (config.component, .success(()))
-                        } catch {
-                            return (config.component, .failure(error))
-                        }
+        let parallelResults = await initializeParallelComponents(parallel)
+        successful.append(contentsOf: parallelResults.successful)
+        failed.append(contentsOf: parallelResults.failed)
+
+        // Initialize sequential components
+        let sequentialResults = await initializeSequentialComponents(sequential)
+        successful.append(contentsOf: sequentialResults.successful)
+        failed.append(contentsOf: sequentialResults.failed)
+
+        return (successful, failed)
+    }
+
+    /// Initialize components that can run in parallel
+    private func initializeParallelComponents(_ configs: [UnifiedComponentConfig]) async -> (successful: [SDKComponent], failed: [(SDKComponent, Error)]) {
+        guard !configs.isEmpty else { return ([], []) }
+
+        var successful: [SDKComponent] = []
+        var failed: [(SDKComponent, Error)] = []
+
+        await withTaskGroup(of: (SDKComponent, Result<Void, Error>).self) { group in
+            for config in configs {
+                group.addTask { [weak self] in
+                    do {
+                        try await self?.initializeComponent(config)
+                        return (config.component, .success(()))
+                    } catch {
+                        return (config.component, .failure(error))
                     }
                 }
+            }
 
-                for await (component, result) in group {
-                    switch result {
-                    case .success:
-                        successful.append(component)
-                    case .failure(let error):
-                        failed.append((component, error))
-                    }
+            for await (component, result) in group {
+                switch result {
+                case .success:
+                    successful.append(component)
+                case .failure(let error):
+                    failed.append((component, error))
                 }
             }
         }
 
-        // Initialize sequential components
-        for config in sequential {
+        return (successful, failed)
+    }
+
+    /// Initialize components sequentially
+    private func initializeSequentialComponents(_ configs: [UnifiedComponentConfig]) async -> (successful: [SDKComponent], failed: [(SDKComponent, Error)]) {
+        var successful: [SDKComponent] = []
+        var failed: [(SDKComponent, Error)] = []
+
+        for config in configs {
             do {
                 try await initializeComponent(config)
                 successful.append(config.component)
@@ -74,7 +104,15 @@ public actor UnifiedComponentInitializer {
             }
         }
 
-        // Create result
+        return (successful, failed)
+    }
+
+    /// Create the final initialization result
+    private func createInitializationResult(
+        successful: [SDKComponent],
+        failed: [(SDKComponent, Error)],
+        startTime: Date
+    ) -> InitializationResult {
         let result = InitializationResult(
             successful: successful,
             failed: failed,
@@ -82,7 +120,6 @@ public actor UnifiedComponentInitializer {
             timestamp: Date()
         )
 
-        // Emit completion
         if failed.isEmpty {
             eventBus.publish(SDKInitializationEvent.completed)
         } else {
@@ -101,44 +138,47 @@ public actor UnifiedComponentInitializer {
             throw SDKError.notInitialized
         }
 
-        let component: Component
-
         // Check if component already exists
         if let existing = activeComponents[config.component] {
-            // Re-initialize with new parameters if needed
-            if !parametersMatch(existing.parameters, config.parameters) {
-                try await existing.initialize(with: config.parameters)
-            }
+            try await reinitializeIfNeeded(existing, with: config.parameters)
             return
         }
 
-        // Create component based on type using existing adapters
+        // Create new component
+        let component = try await createComponent(config, container: container)
+        activeComponents[config.component] = component
+        try await component.initialize(with: config.parameters)
+    }
+
+    /// Reinitialize existing component if parameters changed
+    private func reinitializeIfNeeded(_ component: Component, with parameters: any ComponentInitParameters) async throws {
+        if !parametersMatch(component.parameters, parameters) {
+            try await component.initialize(with: parameters)
+        }
+    }
+
+    /// Create component based on type
+    private func createComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
         switch config.component {
         case .llm:
-            component = try await createLLMComponent(config, container: container)
+            return try await createLLMComponent(config, container: container)
         case .stt:
-            component = try await createSTTComponent(config, container: container)
+            return try await createSTTComponent(config, container: container)
         case .tts:
-            component = try await createTTSComponent(config, container: container)
+            return try await createTTSComponent(config, container: container)
         case .vad:
-            component = try await createVADComponent(config, container: container)
+            return try await createVADComponent(config, container: container)
         case .vlm:
-            component = try await createVLMComponent(config, container: container)
+            return try await createVLMComponent(config, container: container)
         case .embedding:
-            component = try await createEmbeddingComponent(config, container: container)
+            return try await createEmbeddingComponent(config, container: container)
         case .speakerDiarization:
-            component = try await createSpeakerDiarizationComponent(config, container: container)
+            return try await createSpeakerDiarizationComponent(config, container: container)
         case .wakeWord:
             throw SDKError.componentNotInitialized("Wake word component not yet implemented")
         case .voiceAgent:
             throw SDKError.componentNotInitialized("Voice agent should be created through createVoiceAgent method")
         }
-
-        // Store component
-        activeComponents[config.component] = component
-
-        // Initialize component
-        try await component.initialize(with: config.parameters)
     }
 
     // MARK: - Component Creation Using Existing Adapters
@@ -180,7 +220,7 @@ public actor UnifiedComponentInitializer {
     }
 
     private func createVLMComponent(_ config: UnifiedComponentConfig, container: ServiceContainer) async throws -> Component {
-        guard let params = config.parameters as? VLMConfiguration else {
+        guard config.parameters is VLMConfiguration else {
             throw SDKError.validationFailed("Invalid VLM parameters")
         }
 

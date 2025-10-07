@@ -78,11 +78,11 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
     public let streamingEnabled: Bool
 
     public enum QuantizationLevel: String, Sendable {
-        case q4_0 = "Q4_0"
-        case q4_k_m = "Q4_K_M"
-        case q5_k_m = "Q5_K_M"
-        case q6_k = "Q6_K"
-        case q8_0 = "Q8_0"
+        case q4v0 = "Q4_0"
+        case q4KM = "Q4_K_M"
+        case q5KM = "Q5_K_M"
+        case q6K = "Q6_K"
+        case q8v0 = "Q8_0"
         case f16 = "F16"
         case f32 = "F32"
     }
@@ -95,7 +95,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
         cacheSize: Int = 100,
         preloadContext: String? = nil,
         temperature: Double = 0.7,
-        maxTokens: Int = 100,
+        maxTokens: Int = 100,  // Default to 100 tokens
         systemPrompt: String? = nil,
         streamingEnabled: Bool = true
     ) {
@@ -276,7 +276,7 @@ public final class LLMServiceWrapper: ServiceWrapper {
 
 /// Language Model component following the clean architecture
 @MainActor
-public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
+public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -327,7 +327,12 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
         }
 
         // Try to get a registered LLM provider from central registry
-        guard let provider = ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId) else {
+        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
+        let provider = await MainActor.run {
+            ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId)
+        }
+
+        guard let provider = provider else {
             throw SDKError.componentNotInitialized(
                 "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.shared.registerLLM(provider)."
             )
@@ -510,24 +515,21 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
     // MARK: - Private Helpers
 
     private func buildPrompt(from messages: [Message], systemPrompt: String?) -> String {
+        // For LLMSwiftService, we should NOT add role markers as it handles its own templating
+        // Just concatenate the messages with newlines
         var prompt = ""
 
+        // Add system prompt first if available
         if let system = systemPrompt {
-            prompt += "System: \(system)\n\n"
+            prompt += "\(system)\n\n"
         }
 
+        // Add messages without role markers - let LLMSwiftService handle formatting
         for message in messages {
-            switch message.role {
-            case .user:
-                prompt += "User: \(message.content)\n"
-            case .assistant:
-                prompt += "Assistant: \(message.content)\n"
-            case .system:
-                prompt += "System: \(message.content)\n"
-            }
+            prompt += "\(message.content)\n"
         }
 
-        prompt += "Assistant: "
-        return prompt
+        // Don't add trailing "Assistant: " - LLMSwiftService handles this
+        return prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

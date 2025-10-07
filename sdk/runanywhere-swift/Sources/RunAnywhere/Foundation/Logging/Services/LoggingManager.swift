@@ -46,7 +46,7 @@ public class LoggingManager {
 
     private init() {
         // Get environment from RunAnywhere initialization
-        self.environment = RunAnywhere._currentEnvironment ?? .production
+        self.environment = RunAnywhere.currentEnvironment ?? .production
 
         // Apply environment-based configuration
         applyEnvironmentConfiguration()

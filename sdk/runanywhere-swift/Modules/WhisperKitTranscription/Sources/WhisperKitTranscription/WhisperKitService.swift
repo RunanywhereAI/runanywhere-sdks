@@ -136,8 +136,9 @@ public class WhisperKitService: STTService {
         // For short audio, don't pad with zeros - WhisperKit handles it better
         var processedSamples = samples
 
-        // Only pad if extremely short (less than 0.5 seconds)
-        let minRequiredSamples = 8000 // 0.5 seconds minimum
+        // Only pad if extremely short (less than 1.0 second)
+        // WhisperKit performs much better with at least 1 second of audio
+        let minRequiredSamples = 16000 // 1.0 seconds minimum
         if samples.count < minRequiredSamples {
             logger.info("📏 Audio too short (\(samples.count) samples), padding to \(minRequiredSamples)")
             // Pad with very low noise instead of zeros to avoid silence detection
@@ -161,100 +162,66 @@ public class WhisperKitService: STTService {
 
         logger.info("Starting WhisperKit transcription with \(audioSamples.count) samples...")
 
-        // Use conservative decoding options to prevent garbled output
-        // Adjust noSpeechThreshold based on audio length
-        let noSpeechThresh: Float = audioSamples.count < 32000 ? 0.3 : 0.6  // Lower for short audio
+        // Adaptive configuration based on audio length for better transcription
+        let audioLengthSeconds = Float(audioSamples.count) / 16000.0  // Assuming 16kHz sample rate
 
+        // Adjust noSpeechThreshold based on audio length - shorter audio needs lower threshold
+        let adaptiveNoSpeechThreshold: Float = audioLengthSeconds < 2.0 ? 0.3 : 0.4
+
+        // Use more conservative settings to avoid garbled output
         let decodingOptions = DecodingOptions(
             task: .transcribe,
-            language: "en",  // Force English to avoid language detection issues
-            temperature: 0.0,  // Start conservative
-            temperatureFallbackCount: 1,  // Minimal fallbacks to prevent garbled output
+            language: "en",  // Force English
+            temperature: 0.0,  // Conservative - no randomness
+            temperatureFallbackCount: 1,  // Reduce fallbacks to prevent garbled output
             sampleLength: 224,  // Standard length
-            usePrefillPrompt: false,  // Disable prefill to reduce special tokens
+            usePrefillPrompt: false,  // Disable prefill to avoid artifacts
             detectLanguage: false,  // Force English instead of auto-detect
-            skipSpecialTokens: true,  // Skip special tokens for cleaner output
-            withoutTimestamps: true,  // Remove timestamps for cleaner text
-            compressionRatioThreshold: 2.4,  // Stricter compression ratio
-            logProbThreshold: -1.0,  // More conservative log probability
-            noSpeechThreshold: noSpeechThresh  // Adaptive threshold based on audio length
+            skipSpecialTokens: true,  // Skip special tokens to get clean text
+            withoutTimestamps: true,  // No timestamps for cleaner output
+            compressionRatioThreshold: 1.8,  // Lower threshold to catch more repetitive patterns
+            logProbThreshold: -1.0,  // More conservative probability threshold
+            noSpeechThreshold: adaptiveNoSpeechThreshold  // Adaptive threshold based on audio length
         )
-
-        logger.info("Using decoding options:")
-        logger.info("  Task: \(decodingOptions.task)")
-        logger.info("  Language: \(decodingOptions.language ?? "auto-detect")")
-        logger.info("  Temperature: \(decodingOptions.temperature)")
-        logger.info("  TemperatureFallbackCount: \(decodingOptions.temperatureFallbackCount)")
-        logger.info("  SampleLength: \(decodingOptions.sampleLength)")
-        logger.info("  DetectLanguage: \(decodingOptions.detectLanguage)")
 
         logger.info("🚀 Calling WhisperKit.transcribe() with \(audioSamples.count) samples...")
         let transcriptionResults = try await whisperKit.transcribe(
             audioArray: audioSamples,
             decodeOptions: decodingOptions
         )
-        logger.info("✅ WhisperKit.transcribe() completed")
-        logger.info("📊 Results count: \(transcriptionResults.count)")
+        logger.info("✅ WhisperKit.transcribe() completed with \(transcriptionResults.count) results")
 
-        // Log WhisperKit version and capabilities if available
-        logger.info("🔍 WhisperKit instance details:")
-        logger.info("  Type: \(type(of: whisperKit))")
-        // Check if we can get model info
-        do {
-            let availableModels = try await WhisperKit.fetchAvailableModels()
-            logger.info("  Available models: \(availableModels)")
-        } catch {
-            logger.info("  Could not fetch available models: \(error)")
+        // Extract and clean the transcribed text
+        var transcribedText = ""
+        if let firstResult = transcriptionResults.first {
+            // Get clean text without timestamps or special tokens
+            transcribedText = firstResult.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Remove any remaining special tokens that might have slipped through
+            transcribedText = transcribedText.replacingOccurrences(of: "[", with: "")
+                .replacingOccurrences(of: "]", with: "")
+                .replacingOccurrences(of: "<", with: "")
+                .replacingOccurrences(of: ">", with: "")
+                .replacingOccurrences(of: ">>", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         }
-
-        // Extract and validate the transcribed text
-        var transcribedText = transcriptionResults.first?.text ?? ""
 
         // Validate result to reject garbled output
         if isGarbledOutput(transcribedText) {
-            logger.warning("⚠️ Detected garbled output: '\(transcribedText.prefix(50))...'")
-            transcribedText = "" // Treat as empty/failed transcription
+            logger.warning("⚠️ Detected garbled output, rejecting transcription")
+            transcribedText = ""
         }
 
-        // Log very detailed results for debugging
-        if transcriptionResults.isEmpty {
-            logger.error("❌ WhisperKit returned empty results array!")
+        // Simple logging
+        if !transcribedText.isEmpty {
+            logger.info("✅ Transcribed: '\(transcribedText)'")
+        } else if transcriptionResults.isEmpty {
+            logger.warning("⚠️ No transcription results returned")
         } else {
-            for (resultIndex, result) in transcriptionResults.enumerated() {
-                logger.info("Result \(resultIndex):")
-                logger.info("  Text: '\(result.text)'")
-                logger.info("  Language: \(result.language)")
-                logger.info("  Segments count: \(result.segments.count)")
-
-                for (segmentIndex, segment) in result.segments.enumerated() {
-                    logger.info("  Segment \(segmentIndex):")
-                    logger.info("    Text: '\(segment.text)'")
-                    logger.info("    Start: \(segment.start), End: \(segment.end)")
-                    logger.info("    Tokens: \(segment.tokens)")
-                }
-
-                if result.text.isEmpty {
-                    logger.warning("⚠️ Result \(resultIndex) has empty text!")
-                }
-            }
-        }
-
-        logger.info("Final transcribed text: '\(transcribedText)'")
-
-        // If transcription is empty or garbled, provide diagnostic information
-        if transcribedText.isEmpty {
-            let maxAmplitude = audioSamples.map { abs($0) }.max() ?? 0
-            let avgAmplitude = audioSamples.map { abs($0) }.reduce(0, +) / Float(audioSamples.count)
+            logger.warning("⚠️ Empty or invalid transcription")
+            // Log basic audio stats for debugging
             let rms = sqrt(audioSamples.reduce(0) { $0 + $1 * $1 } / Float(audioSamples.count))
-
-            logger.warning("⚠️ WhisperKit transcription was empty or rejected")
-            logger.info("  Audio duration: \(Double(audioSamples.count) / 16000.0) seconds")
-            logger.info("  Audio amplitude: max=\(maxAmplitude), avg=\(avgAmplitude), rms=\(rms)")
-            logger.info("  Audio samples: \(audioSamples.count)")
-            logger.info("  Results array: \(transcriptionResults.count) items")
-
-            // No fallback to prevent garbled output - return empty result
-            logger.info("📝 Returning empty result to prevent garbled output")
+            logger.info("  Audio: \(Double(audioSamples.count) / 16000.0)s, RMS: \(String(format: "%.4f", rms))")
         }
 
         // Return the result (even if empty)
@@ -453,11 +420,70 @@ public class WhisperKitService: STTService {
         // Empty text is not garbled, just empty
         guard !trimmedText.isEmpty else { return false }
 
+        // Check for repetitive word patterns (like "you you you you" or "he said he said")
+        let words = trimmedText.lowercased().components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+
+        if words.count > 3 {
+            // Check for excessive word repetition
+            let wordCounts = Dictionary(words.map { ($0, 1) }, uniquingKeysWith: +)
+            for (word, count) in wordCounts {
+                // If any single word appears more than 40% of total words, it's likely garbled
+                if Double(count) / Double(words.count) > 0.4 {
+                    logger.warning("⚠️ Detected excessive word repetition: '\(word)' appears \(count) times in \(words.count) words")
+                    return true
+                }
+            }
+
+            // Check for repeating short phrases (2-3 word patterns)
+            if words.count >= 6 {
+                // Check 2-word patterns
+                var twoWordPatterns: [String: Int] = [:]
+                for i in 0..<(words.count - 1) {
+                    let pattern = "\(words[i]) \(words[i + 1])"
+                    twoWordPatterns[pattern, default: 0] += 1
+                }
+                for (pattern, count) in twoWordPatterns {
+                    if count > 3 && Double(count * 2) / Double(words.count) > 0.5 {
+                        logger.warning("⚠️ Detected repeating phrase pattern: '\(pattern)' repeats \(count) times")
+                        return true
+                    }
+                }
+            }
+        }
+
+        // Check for non-Latin scripts (Hebrew, Arabic, Chinese, etc.)
+        // We expect English output, so non-Latin scripts indicate wrong language detection
+        let nonLatinRanges: [ClosedRange<UInt32>] = [
+            0x0590...0x05FF,  // Hebrew
+            0x0600...0x06FF,  // Arabic
+            0x0700...0x074F,  // Syriac
+            0x0750...0x077F,  // Arabic Supplement
+            0x0E00...0x0E7F,  // Thai
+            0x1000...0x109F,  // Myanmar
+            0x1100...0x11FF,  // Hangul Jamo
+            0x3040...0x309F,  // Hiragana
+            0x30A0...0x30FF,  // Katakana
+            0x4E00...0x9FFF,  // CJK Unified Ideographs
+            0xAC00...0xD7AF,  // Hangul Syllables
+        ]
+
+        let nonLatinCount = trimmedText.unicodeScalars.filter { scalar in
+            nonLatinRanges.contains { range in
+                range.contains(scalar.value)
+            }
+        }.count
+
+        // If more than 30% of characters are non-Latin, it's likely wrong language
+        if Double(nonLatinCount) / Double(trimmedText.count) > 0.3 {
+            logger.warning("⚠️ Detected non-Latin script in output (\(nonLatinCount)/\(trimmedText.count) characters)")
+            return true
+        }
+
         // Check for common garbled patterns
         let garbledPatterns = [
             // Repetitive characters
             "^[\\(\\)\\-\\.\\s]+$",  // Only parentheses, dashes, dots, spaces
-            "^[\\-]{10,}",          // Many consecutive dashes
+            "^[\\-\\s]{10,}",        // Many consecutive dashes or spaces
             "^[\\(]{5,}",           // Many consecutive opening parentheses
             "^[\\)]{5,}",           // Many consecutive closing parentheses
             "^[\\.,]{5,}",          // Many consecutive dots/commas
@@ -473,7 +499,7 @@ public class WhisperKitService: STTService {
         }
 
         // Check character composition - if more than 70% is punctuation, likely garbled
-        let punctuationCount = trimmedText.filter { $0.isPunctuation }.count
+        let punctuationCount = trimmedText.filter { $0.isPunctuation || $0 == "-" }.count
         let totalCount = trimmedText.count
         if totalCount > 5 && Double(punctuationCount) / Double(totalCount) > 0.7 {
             return true
@@ -481,8 +507,9 @@ public class WhisperKitService: STTService {
 
         // Check for excessive repetition of the same character
         let charCounts = Dictionary(trimmedText.map { ($0, 1) }, uniquingKeysWith: +)
-        for (_, count) in charCounts {
-            if count > max(10, trimmedText.count / 2) {
+        for (char, count) in charCounts {
+            // Ignore spaces and dashes for this check
+            if char != " " && char != "-" && count > max(10, trimmedText.count / 2) {
                 return true
             }
         }

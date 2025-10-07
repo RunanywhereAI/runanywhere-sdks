@@ -1,6 +1,6 @@
 # RunAnywhere Swift SDK
 
-**Privacy-first, on-device AI SDK for iOS** that brings powerful language models directly to your applications. RunAnywhere enables high-performance text generation, voice AI capabilities, and structured outputs - all while keeping user data private and secure on-device.
+**Privacy-first, on-device AI SDK for iOS** that brings powerful language models directly to your applications. RunAnywhere enables high-performance text generation, voice AI workflows, and structured outputs - all while keeping user data private and secure on-device with intelligent cloud routing.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=GG100ijJHl4">
@@ -18,22 +18,24 @@
 
 ### Core Capabilities
 - 💬 **Text Generation** - High-performance on-device text generation with streaming support
-- 🎙️ **Voice AI Workflow** - Real-time voice conversations with WhisperKit transcription (Experimental)
-- 📋 **Structured Outputs** - Type-safe JSON generation with schema validation (Experimental)
+- 🎙️ **Voice AI Pipeline** - Complete voice workflow with VAD, STT, LLM, and TTS components
+- 📋 **Structured Outputs** - Type-safe JSON generation with schema validation using `Generatable` protocol
 - 🧠 **Thinking Models** - Support for models with thinking tags (`<think>...</think>`)
-- 🏗️ **Model Management** - Automatic downloading, caching, and lifecycle management
-- 📊 **Performance Analytics** - Real-time metrics for latency, throughput, and resource usage
+- 🏗️ **Model Management** - Automatic model discovery, downloading, and lifecycle management
+- 📊 **Performance Analytics** - Real-time metrics with comprehensive event system
+- 🎯 **Intelligent Routing** - Automatic on-device vs cloud decision making
 
 ### Technical Highlights
-- 🔒 **Privacy-First** - All processing happens on-device by default
-- 🚀 **Multi-Framework** - GGUF models via llama.cpp, Apple Foundation Models (iOS 18+)
-- ⚡ **Native Performance** - Optimized for Apple Silicon with Metal acceleration
-- 🧠 **Smart Memory** - Automatic memory optimization and cleanup
-- 📱 **Cross-Platform** - iOS 13.0+, macOS 10.15+, tvOS 13.0+, watchOS 6.0+
+- 🔒 **Privacy-First** - All processing happens on-device by default with intelligent cloud routing
+- 🚀 **Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
+- ⚡ **Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
+- 🧠 **Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
+- 📱 **Cross-Platform** - iOS 14.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
+- 🎛️ **Component Architecture** - Modular components for flexible AI pipeline construction
 
 ## Requirements
 
-- iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
+- iOS 14.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
 - Xcode 15.0+
 - Swift 5.9+
 
@@ -41,27 +43,43 @@
 
 ### Swift Package Manager (GitHub-based Distribution)
 
-Add RunAnywhere to your project directly from GitHub - no package registry needed:
+Add RunAnywhere to your project directly from GitHub - no package registry needed.
+
+> **🏆 Recommended**: Check [releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for the most current version.
 
 #### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
-2. Enter the repository URL: `https://github.com/runanywhere/ios-sdk`
-3. Select version rule: **Up to Next Major** from `1.0.0`
-4. Click **Add Package**
+2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
+3. **Select version rule:**
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.13.0`
+   - **Specific Version**: Choose **Exact** and enter `0.13.0`
+   - **Development Branch**: Choose **Branch** and enter `main`
+4. Select the `runanywhere-swift` product
+5. Click **Add Package**
 
 #### Via Package.swift
+
+**Latest Release (Recommended):**
 ```swift
 dependencies: [
-    // Latest stable version (recommended)
-    .package(url: "https://github.com/runanywhere/ios-sdk", from: "1.0.0")
-
-    // Or pin to specific version
-    .package(url: "https://github.com/runanywhere/ios-sdk", exact: "1.0.0")
-
-    // For beta/pre-release versions
-    .package(url: "https://github.com/runanywhere/ios-sdk", .branch("main"))
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
 ]
 ```
+
+**Specific Version:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.13.0")
+]
+```
+
+**Development Branch:**
+```swift
+dependencies: [
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", .branch("main"))
+]
+```
+
 
 #### For Private Repository Access
 If the repository is private, configure your GitHub access token:
@@ -79,127 +97,229 @@ password YOUR_GITHUB_TOKEN
 ```swift
 import RunAnywhere
 
-// Initialize with your API key
-try await RunAnywhereSDK.shared.initialize(
-    apiKey: "your-api-key",
-    configuration: SDKConfiguration(
-        privacyMode: .strict,      // On-device only
-        debugMode: true,
-        telemetryLevel: .minimal   // Privacy-conscious telemetry
-    )
+// Development mode (recommended for getting started)
+try await RunAnywhere.initialize(
+    apiKey: "dev",           // Any string works in dev mode
+    baseURL: "localhost",    // Not used in dev mode
+    environment: .development
 )
 ```
 
-### 2. Load a Model
+> **For Production**: Contact RunAnywhere team for production API keys and base URLs to enable analytics, observability, OTA model updates, and other additional features available for Production.
+
+### 2. Import Required Modules
+
+Currently, you need to import the adapter modules separately (we'll consolidate this in a future update):
 
 ```swift
-// Load a model from the registry
-try await RunAnywhereSDK.shared.loadModel(
-    "llama-3.2-1b-instruct",
-    framework: .llmSwift  // Uses llama.cpp under the hood
-)
-
-// Or use Apple's Foundation Models (iOS 18+)
-try await RunAnywhereSDK.shared.loadModel(
-    "system",
-    framework: .foundationModels
-)
+import RunAnywhere
+import LLMSwift
+import WhisperKitTranscription
+import FluidAudioDiarization
 ```
 
-### 3. Generate Text
+> **Note**: We're working on consolidating these into a single `import RunAnywhere` for better developer experience.
+
+### 3. Register Framework Adapters
+
+Before using any AI features, register the required adapters:
 
 ```swift
-// Simple generation
-let result = try await RunAnywhereSDK.shared.generateText(
+// Register LLM adapter for text generation
+await LLMSwiftServiceProvider.register()
+try await RunAnywhere.registerFrameworkAdapter(
+    LLMSwiftAdapter(),
+    models: [
+        // Register models you want to use
+        try! ModelRegistration(
+            url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+            framework: .llamaCpp,
+            id: "smollm2-360m",           // This becomes your model ID
+            name: "SmolLM2 360M",
+            memoryRequirement: 500_000_000
+        )
+    ]
+)
+
+// Register WhisperKit for voice features
+await WhisperKitServiceProvider.register()
+try await RunAnywhere.registerFrameworkAdapter(
+    WhisperKitAdapter.shared,
+    models: [
+        try! ModelRegistration(
+            url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
+            framework: .whisperKit,
+            id: "whisper-base",           // This becomes your model ID
+            name: "Whisper Base",
+            format: .mlmodel,
+            memoryRequirement: 74_000_000
+        )
+    ]
+)
+
+// Register FluidAudio for speaker diarization (optional)
+await FluidAudioDiarizationProvider.register()
+```
+
+### 4. Download and Load Models
+
+After registration, download and load the models:
+
+```swift
+// See what models are available (from your registrations)
+let models = try await RunAnywhere.availableModels()
+print("Available models: \(models.map { $0.name })")
+
+// Download a model (uses the URL from registration)
+try await RunAnywhere.downloadModel("smollm2-360m")
+
+// Load the model for use
+try await RunAnywhere.loadModel("smollm2-360m")
+```
+
+### 5. Generate Text
+
+Now you can use the loaded model:
+
+```swift
+// Simple chat
+let response = try await RunAnywhere.chat("Hello, how are you?")
+print(response)
+
+// Generation with options
+let options = RunAnywhereGenerationOptions(
+    maxTokens: 150,
+    temperature: 0.7
+)
+
+let result = try await RunAnywhere.generate(
     "Explain quantum computing in simple terms",
-    options: GenerationOptions(
-        maxTokens: 100,
-        temperature: 0.7,
-        stream: false
-    )
+    options: options
 )
 
-print(result.text)
-print("Tokens/sec: \(result.performance.tokensPerSecond)")
-print("Latency: \(result.performance.firstTokenLatency)ms")
+print("Response: \(result.text)")
 ```
 
-### 4. Streaming Generation
+### 6. Streaming Generation
 
 ```swift
-// Stream tokens as they're generated
-for try await chunk in RunAnywhereSDK.shared.generateTextStream(
+// Stream tokens in real-time
+let stream = RunAnywhere.generateStream(
     "Write a short story about AI",
-    options: GenerationOptions(maxTokens: 500)
-) {
-    print(chunk.text, terminator: "")
-    // Update UI with partial results
+    options: options
+)
+
+for try await token in stream {
+    print(token, terminator: "")
 }
 ```
 
 ## Advanced Features
 
-### Voice AI Conversations (Experimental)
+### Voice AI Pipeline
+
+Create voice pipelines using your registered models. The `modelId` refers to the IDs you used during registration:
 
 ```swift
-// Start a voice session with real-time transcription
-let voiceSession = try await RunAnywhereSDK.shared.startVoiceSession(
-    delegate: self
+// Voice pipeline configuration
+let config = ModularPipelineConfig(
+    components: [.vad, .stt, .llm, .tts],
+    vad: VADConfig(energyThreshold: 0.005),
+    stt: VoiceSTTConfig(modelId: "whisper-base"),  // Uses registered whisper-base
+    llm: VoiceLLMConfig(
+        modelId: "default",  // Uses currently loaded LLM model
+        systemPrompt: "You are a helpful voice assistant.",
+        maxTokens: 100
+    ),
+    tts: VoiceTTSConfig(voice: "system")
 )
 
-// Start listening
-try await voiceSession.startListening()
+let pipeline = try await RunAnywhere.createVoicePipeline(config: config)
 
-// Handle voice session events
-func voiceSession(_ session: VoiceSession, didTranscribe text: String) {
-    print("User said: \(text)")
-}
-
-func voiceSession(_ session: VoiceSession, didGenerate response: String) {
-    print("AI response: \(response)")
+// Process audio with real-time events
+for try await event in pipeline.process(audioStream: audioStream) {
+    switch event {
+    case .vadSpeechStart:
+        print("Speech detected")
+    case .sttPartialTranscript(let text):
+        print("Partial: \(text)")
+    case .sttFinalTranscript(let text):
+        print("Final transcription: \(text)")
+    case .llmFinalResponse(let response):
+        print("AI response: \(response)")
+    case .ttsCompleted:
+        print("Speech synthesis complete")
+    }
 }
 ```
 
-### Structured Output Generation (Experimental)
+### Structured Output Generation
+
+Define structures that conform to `Generatable`:
 
 ```swift
-// Define your output structure
-struct QuizQuestion: Generatable {
-    let question: String
+struct Quiz: Codable, Generatable {
+    let title: String
+    let questions: [Question]
+
+    static var jsonSchema: String {
+        return """
+        {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "questions": {"type": "array"}
+            }
+        }
+        """
+    }
+}
+
+struct Question: Codable {
+    let text: String
     let options: [String]
-    let correctAnswer: Int
-    let explanation: String
+    let correctIndex: Int
 }
 
 // Generate structured data
-let quiz: QuizQuestion = try await RunAnywhereSDK.shared.generateStructuredOutput(
-    prompt: "Create a quiz question about Swift programming",
-    type: QuizQuestion.self,
-    options: StructuredOutputOptions(
-        validationMode: .strict,
-        maxRetries: 3
-    )
+let quiz = try await RunAnywhere.generateStructured(
+    Quiz.self,
+    prompt: "Create a quiz about Swift programming",
+    options: options
 )
 
-print("Question: \(quiz.question)")
-print("Options: \(quiz.options)")
+print("Generated quiz: \(quiz.title)")
+print("Number of questions: \(quiz.questions.count)")
 ```
 
-### Thinking Models Support
+### Adding Custom Models
+
+Add your own models to the registry:
 
 ```swift
-// Use models with thinking capabilities
-let result = try await RunAnywhereSDK.shared.generateText(
-    "Solve this step by step: What is 15% of 240?",
-    options: GenerationOptions(
-        parseThinking: true  // Separates thinking from final answer
-    )
+// Add a custom model from any URL
+let customModel = await RunAnywhere.addModelFromURL(
+    URL(string: "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/model.gguf")!,
+    name: "My Custom Model",
+    type: "gguf"
 )
 
-if let thinking = result.thinking {
-    print("Model's thought process: \(thinking)")
+// Then download and use it
+try await RunAnywhere.downloadModel(customModel.id)
+try await RunAnywhere.loadModel(customModel.id)
+```
+
+### Model Management
+
+```swift
+// List all available models
+let models = try await RunAnywhere.availableModels()
+for model in models {
+    print("Model: \(model.name), ID: \(model.id), Size: \(model.memoryRequired)MB")
 }
-print("Final answer: \(result.text)")
+
+// Delete models to free space
+try await RunAnywhere.deleteModel("unused-model-id")
 ```
 
 ## Supported Models & Frameworks

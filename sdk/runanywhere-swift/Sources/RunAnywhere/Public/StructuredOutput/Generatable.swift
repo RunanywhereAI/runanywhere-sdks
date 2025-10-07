@@ -22,7 +22,7 @@ public extension Generatable {
 }
 
 /// Structured output configuration
-public struct StructuredOutputConfig {
+public struct StructuredOutputConfig: Sendable {
     /// The type to generate
     public let type: Generatable.Type
 
