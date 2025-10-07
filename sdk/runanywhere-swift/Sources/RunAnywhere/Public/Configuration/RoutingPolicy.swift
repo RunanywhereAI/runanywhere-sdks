@@ -1,7 +1,7 @@
 import Foundation
 
 /// Routing policy determines how requests are routed between device and cloud
-public enum RoutingPolicy: String, Codable {
+public enum RoutingPolicy: String, Codable, Sendable {
     /// Automatically determine best execution target
     case automatic
 

@@ -1,63 +1,151 @@
 import Foundation
+import GRDB
 
-/// Information about a model
-public struct ModelInfo {
+/// Information about a model - database entity with sync support
+public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
+    // Essential identifiers
     public let id: String
     public let name: String
+    public let category: ModelCategory  // Type of model (language, speech, vision, etc.)
+
+    // Format and location
     public let format: ModelFormat
     public let downloadURL: URL?
     public var localPath: URL?
-    public let estimatedMemory: Int64
-    public let contextLength: Int
-    public let downloadSize: Int64?
-    public let checksum: String?
+
+    // Size information (in bytes)
+    public let downloadSize: Int64?  // Size when downloading
+    public let memoryRequired: Int64?  // RAM needed to run the model
+
+    // Framework compatibility
     public let compatibleFrameworks: [LLMFramework]
     public let preferredFramework: LLMFramework?
-    public let hardwareRequirements: [HardwareRequirement]
-    public let tokenizerFormat: TokenizerFormat?
+
+    // Model-specific capabilities (optional based on category)
+    public let contextLength: Int?  // For language models
+    public let supportsThinking: Bool  // For reasoning models
+
+    // Optional metadata
     public let metadata: ModelInfoMetadata?
-    public let alternativeDownloadURLs: [URL]?
-    public let supportsThinking: Bool  // Whether model supports thinking/reasoning tags
-    public let thinkingTagPattern: ThinkingTagPattern?  // Pattern for extracting thinking content
-    public var additionalProperties: [String: Any] = [:]
+
+    // Tracking fields for sync and database
+    public let source: ConfigurationSource
+    public let createdAt: Date
+    public var updatedAt: Date
+    public var syncPending: Bool
+
+    // Usage tracking
+    public var lastUsed: Date?
+    public var usageCount: Int
+
+    // Non-Codable runtime properties (Sendable-compatible)
+    public var additionalProperties: [String: String] = [:]
+
+    // MARK: - Computed Properties
+
+    /// Whether this model is downloaded and available locally
+    public var isDownloaded: Bool {
+        guard let localPath = localPath else { return false }
+        return FileManager.default.fileExists(atPath: localPath.path)
+    }
+
+    /// Whether this model is available for use (downloaded and locally accessible)
+    public var isAvailable: Bool {
+        isDownloaded
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, category, format, downloadURL, localPath
+        case downloadSize, memoryRequired
+        case compatibleFrameworks, preferredFramework
+        case contextLength, supportsThinking
+        case metadata
+        case source, createdAt, updatedAt, syncPending
+        case lastUsed, usageCount
+    }
 
     public init(
         id: String,
         name: String,
+        category: ModelCategory,
         format: ModelFormat,
         downloadURL: URL? = nil,
         localPath: URL? = nil,
-        estimatedMemory: Int64 = 1_000_000_000, // 1GB default
-        contextLength: Int = 2048,
         downloadSize: Int64? = nil,
-        checksum: String? = nil,
+        memoryRequired: Int64? = nil,
         compatibleFrameworks: [LLMFramework] = [],
         preferredFramework: LLMFramework? = nil,
-        hardwareRequirements: [HardwareRequirement] = [],
-        tokenizerFormat: TokenizerFormat? = nil,
-        metadata: ModelInfoMetadata? = nil,
-        alternativeDownloadURLs: [URL]? = nil,
+        contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        thinkingTagPattern: ThinkingTagPattern? = nil,
-        additionalProperties: [String: Any] = [:]
+        metadata: ModelInfoMetadata? = nil,
+        source: ConfigurationSource = .remote,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        syncPending: Bool = false,
+        lastUsed: Date? = nil,
+        usageCount: Int = 0,
+        additionalProperties: [String: String] = [:]
     ) {
         self.id = id
         self.name = name
+        self.category = category
         self.format = format
         self.downloadURL = downloadURL
         self.localPath = localPath
-        self.estimatedMemory = estimatedMemory
-        self.contextLength = contextLength
         self.downloadSize = downloadSize
-        self.checksum = checksum
+        self.memoryRequired = memoryRequired
         self.compatibleFrameworks = compatibleFrameworks
-        self.preferredFramework = preferredFramework
-        self.hardwareRequirements = hardwareRequirements
-        self.tokenizerFormat = tokenizerFormat
+        self.preferredFramework = preferredFramework ?? compatibleFrameworks.first
+
+        // Set contextLength based on category if not provided
+        if category.requiresContextLength {
+            self.contextLength = contextLength ?? 2048
+        } else {
+            self.contextLength = contextLength
+        }
+
+        // Set supportsThinking based on category
+        self.supportsThinking = category.supportsThinking ? supportsThinking : false
+
         self.metadata = metadata
-        self.alternativeDownloadURLs = alternativeDownloadURLs
-        self.supportsThinking = supportsThinking
-        self.thinkingTagPattern = thinkingTagPattern
+        self.source = source
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.syncPending = syncPending
+        self.lastUsed = lastUsed
+        self.usageCount = usageCount
         self.additionalProperties = additionalProperties
+    }
+
+    // MARK: - Sync methods provided by RepositoryEntity protocol extension
+
+    // MARK: - GRDB
+
+    public static var databaseTableName: String { "models" }
+}
+
+// MARK: - Database Columns
+
+extension ModelInfo {
+    public enum Columns: String, ColumnExpression {
+        case id
+        case name
+        case category
+        case format
+        case downloadURL
+        case localPath
+        case downloadSize
+        case memoryRequired
+        case compatibleFrameworks
+        case preferredFramework
+        case contextLength
+        case supportsThinking
+        case metadata
+        case source
+        case createdAt
+        case updatedAt
+        case syncPending
+        case lastUsed
+        case usageCount
     }
 }

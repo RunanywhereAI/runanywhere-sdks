@@ -11,6 +11,19 @@ public enum SDKConstants {
     /// User agent string
     public static let userAgent = "\(name)/\(version) (Swift)"
 
+    /// Platform identifier
+    #if os(iOS)
+    public static let platform = "ios"
+    #elseif os(macOS)
+    public static let platform = "macos"
+    #elseif os(tvOS)
+    public static let platform = "tvos"
+    #elseif os(watchOS)
+    public static let platform = "watchos"
+    #else
+    public static let platform = "unknown"
+    #endif
+
     /// Default API timeout in seconds
     public static let defaultAPITimeout: TimeInterval = 60
 
@@ -65,7 +78,6 @@ public enum SDKConstants {
 
         // Analytics configuration - hardcoded to be fully enabled
         public static let analyticsEnabled: Bool = true
-        public static let analyticsLevel = AnalyticsLevel.verbose  // Changed to verbose for complete analytics
         public static let enableLiveMetrics: Bool = true   // Enable live metrics for better real-time tracking
 
         // Configuration ID
@@ -86,7 +98,7 @@ public enum SDKConstants {
         public static let modelVersion = "1.0"
 
         /// Default base URL for API
-        public static let apiBaseURL = "https://api.runanywhere.ai"
+        public static let apiBaseURL = RunAnywhereConstants.apiURLs.current
     }
 
     // MARK: - Telemetry Constants
@@ -192,7 +204,7 @@ public enum SDKConstants {
     /// Platform constants
     public enum PlatformDefaults {
         /// Default supported platforms
-        public static let defaultSupportedPlatforms = ["iOS", "macOS"]
+        public static let defaultSupportedPlatforms = ["ios", "macos"]
     }
 
     // MARK: - Routing Policies

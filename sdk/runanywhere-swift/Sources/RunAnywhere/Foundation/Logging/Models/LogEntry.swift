@@ -16,7 +16,7 @@ internal struct LogEntry: Encodable {
     let metadata: [String: String]?
     let deviceInfo: DeviceInfo?
 
-    init(timestamp: Date, level: LogLevel, category: String, message: String, metadata: [String: Any]?, deviceInfo: DeviceInfo?) {
+    init(timestamp: Date, level: LogLevel, category: String, message: String, metadata: [String: Any]?, deviceInfo: DeviceInfo? = nil) {
         self.timestamp = timestamp
         self.level = level
         self.category = category
@@ -38,6 +38,9 @@ internal struct LogEntry: Encodable {
         if let metadata = metadata {
             try container.encode(metadata, forKey: .metadata)
         }
-        // Skip deviceInfo encoding for now to avoid circular dependency
+        // Include deviceInfo if present (it's already Codable)
+        if let deviceInfo = deviceInfo {
+            try container.encode(deviceInfo, forKey: .deviceInfo)
+        }
     }
 }

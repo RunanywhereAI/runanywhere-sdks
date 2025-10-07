@@ -179,8 +179,12 @@ The RunAnywhere Swift SDK is a sophisticated on-device AI platform that provides
   - Performance comparison and metrics collection
 - **Monitoring**: `/Capabilities/Monitoring/` (12 files)
   - Real-time performance monitoring with alert management
-- **GenerationAnalytics**: `/Capabilities/GenerationAnalytics/` (10 files)
-  - Detailed generation metrics tracking with live metrics support
+- **Analytics**: `/Capabilities/Analytics/` (structured by domain)
+  - Generation: `/Capabilities/Analytics/Generation/` - Text generation analytics
+  - STT: `/Capabilities/Analytics/STT/` - Speech-to-text analytics
+  - Voice: `/Capabilities/Analytics/Voice/` - Voice pipeline analytics
+  - Monitoring: `/Capabilities/Analytics/Monitoring/` - System monitoring analytics
+  - Unified analytics architecture with centralized queue management
 - **Benchmarking**: `/Capabilities/Benchmarking/` (18 files)
   - Comprehensive benchmarking suite with multiple export formats
 

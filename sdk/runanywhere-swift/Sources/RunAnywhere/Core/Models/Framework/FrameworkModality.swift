@@ -1,7 +1,7 @@
 import Foundation
 
 /// Defines the input/output modalities a framework supports
-public enum FrameworkModality: String, CaseIterable, Codable {
+public enum FrameworkModality: String, CaseIterable, Codable, Sendable {
     case textToText = "text-to-text"           // Traditional LLM text generation
     case voiceToText = "voice-to-text"         // Speech recognition/transcription
     case textToVoice = "text-to-voice"         // Text-to-speech synthesis
