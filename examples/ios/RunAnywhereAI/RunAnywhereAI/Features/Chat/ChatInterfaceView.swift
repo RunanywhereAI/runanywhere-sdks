@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import RunAnywhereSDK
+import RunAnywhere
 import os.log
 #if canImport(UIKit)
 import UIKit
@@ -52,22 +52,22 @@ struct ChatInterfaceView: View {
                         Label("Conversations", systemImage: "list.bullet")
                     }
                     .buttonStyle(.bordered)
-                    
+
                     Spacer()
-                    
+
                     Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
                         .font(.headline)
-                    
+
                     Spacer()
-                    
+
                     toolbarButtons
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
                 .background(Color(NSColor.windowBackgroundColor))
-                
+
                 Divider()
-                
+
                 chatMessagesView
                 inputArea
             }
@@ -431,7 +431,14 @@ struct ChatInterfaceView: View {
 
     private func handleModelSelected(_ model: ModelInfo) async {
         // The model loading is already handled in the ModelSelectionSheet
-        // Just update our view model to reflect the change
+        // Now we need to ensure our view model state is properly updated
+
+        // First, ensure the ModelListViewModel has the current model set
+        await MainActor.run {
+            ModelListViewModel.shared.setCurrentModel(model)
+        }
+
+        // Then update our ChatViewModel to reflect the change
         await viewModel.checkModelStatus()
     }
 
@@ -467,7 +474,7 @@ struct ChatInterfaceView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "internaldrive")
                             .font(.system(size: 8))
-                        Text(formatModelSize(currentModel.estimatedMemory))
+                        Text(formatModelSize(currentModel.memoryRequired ?? 0))
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                     }
                     .foregroundColor(.secondary)
@@ -476,7 +483,7 @@ struct ChatInterfaceView: View {
                     HStack(spacing: 3) {
                         Image(systemName: "text.alignleft")
                             .font(.system(size: 8))
-                        Text("\(formatNumber(currentModel.contextLength))")
+                        Text("\(formatNumber(currentModel.contextLength ?? 0))")
                             .font(.system(size: 10, weight: .medium, design: .rounded))
                     }
                     .foregroundColor(.secondary)

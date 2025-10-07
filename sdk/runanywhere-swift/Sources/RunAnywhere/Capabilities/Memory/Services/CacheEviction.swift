@@ -2,11 +2,11 @@ import Foundation
 
 /// Manages cache eviction strategies and model selection for memory cleanup
 class CacheEviction {
-    private let logger = SDKLogger(category: "CacheEviction")
-    private var config = MemoryService.Config()
+    private let logger: SDKLogger = SDKLogger(category: "CacheEviction")
+    private weak var allocationManager: AllocationManager?
 
-    func configure(_ config: MemoryService.Config) {
-        self.config = config
+    func setAllocationManager(_ manager: AllocationManager) {
+        self.allocationManager = manager
     }
 
     // MARK: - Model Selection for Eviction
@@ -41,16 +41,8 @@ class CacheEviction {
     // MARK: - Eviction Strategies
 
     private func selectModelsUsingStrategy(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
-        switch config.unloadStrategy {
-        case .leastRecentlyUsed:
-            return selectByLeastRecentlyUsed(models: models, targetMemory: targetMemory, aggressive: aggressive)
-        case .largestFirst:
-            return selectByLargestFirst(models: models, targetMemory: targetMemory, aggressive: aggressive)
-        case .oldestFirst:
-            return selectByOldestFirst(models: models, targetMemory: targetMemory, aggressive: aggressive)
-        case .priorityBased:
-            return selectByPriority(models: models, targetMemory: targetMemory, aggressive: aggressive)
-        }
+        // Default to least recently used strategy
+        return selectByLeastRecentlyUsed(models: models, targetMemory: targetMemory, aggressive: aggressive)
     }
 
     private func selectByLeastRecentlyUsed(models: [MemoryLoadedModelInfo], targetMemory: Int64, aggressive: Bool) -> [String] {
@@ -93,14 +85,16 @@ class CacheEviction {
             modelsToEvict.append(model.model.id)
             freedMemory += model.size
 
-            logger.debug("Selected model '\(model.model.name)' for eviction (size: \(ByteCountFormatter.string(fromByteCount: model.size, countStyle: .memory)))")
+            let sizeString = ByteCountFormatter.string(fromByteCount: model.size, countStyle: .memory)
+            logger.debug("Selected model '\(model.model.name)' for eviction (size: \(sizeString))")
 
             if freedMemory >= targetMemory {
                 break
             }
         }
 
-        logger.info("Selected \(modelsToEvict.count) models for eviction, target memory: \(ByteCountFormatter.string(fromByteCount: targetMemory, countStyle: .memory))")
+        let targetMemoryString = ByteCountFormatter.string(fromByteCount: targetMemory, countStyle: .memory)
+        logger.info("Selected \(modelsToEvict.count) models for eviction, target memory: \(targetMemoryString)")
 
         return modelsToEvict
     }
@@ -187,9 +181,8 @@ class CacheEviction {
     // MARK: - Private Implementation
 
     private func getCurrentModels() -> [MemoryLoadedModelInfo] {
-        // In real implementation, this would get models from AllocationManager
-        // For now, return empty array
-        return []
+        // Get models from allocation manager
+        return allocationManager?.getLoadedModels() ?? []
     }
 }
 

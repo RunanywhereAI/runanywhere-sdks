@@ -41,6 +41,25 @@ public protocol UnifiedFrameworkAdapter {
     /// - Parameter model: The model to configure for
     /// - Returns: Optimal hardware configuration
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration
+
+    /// Called when the adapter is registered with the SDK
+    /// Adapters can use this to perform initialization tasks
+    func onRegistration()
+
+    /// Get models provided by this adapter
+    /// - Returns: Array of models this adapter provides
+    func getProvidedModels() -> [ModelInfo]
+
+    /// Get download strategy provided by this adapter (if any)
+    /// - Returns: Download strategy or nil if none
+    func getDownloadStrategy() -> DownloadStrategy?
+
+    /// Initialize adapter with component parameters
+    /// - Parameters:
+    ///   - parameters: Component initialization parameters
+    ///   - modality: The modality to initialize for
+    /// - Returns: Initialized service ready for use
+    func initializeComponent(with parameters: any ComponentInitParameters, for modality: FrameworkModality) async throws -> Any?
 }
 
 /// Extension to provide default implementations
@@ -48,5 +67,36 @@ public extension UnifiedFrameworkAdapter {
     /// Default implementation that returns the framework's supported modalities
     var supportedModalities: Set<FrameworkModality> {
         return framework.supportedModalities
+    }
+
+    /// Default implementation - does nothing
+    func onRegistration() {
+        // Default: no-op
+    }
+
+    /// Default implementation - returns empty array
+    func getProvidedModels() -> [ModelInfo] {
+        return []
+    }
+
+    /// Default implementation - returns nil
+    func getDownloadStrategy() -> DownloadStrategy? {
+        return nil
+    }
+
+    /// Default implementation - creates service and initializes with parameters
+    func initializeComponent(with parameters: any ComponentInitParameters, for modality: FrameworkModality) async throws -> Any? {
+        // Default implementation: create service and initialize if model is specified
+        guard let service = createService(for: modality) else {
+            return nil
+        }
+
+        // If there's a model ID, try to load it
+        if let modelId = parameters.modelId,
+           let modelRegistry = ServiceContainer.shared.modelRegistry.getModel(by: modelId) {
+            return try await loadModel(modelRegistry, for: modality)
+        }
+
+        return service
     }
 }

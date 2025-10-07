@@ -15,8 +15,8 @@ public class TTSHandler {
     ///   - continuation: Event stream continuation
     public func speakText(
         text: String,
-        service: TextToSpeechService,
-        config: VoiceTTSConfig?,
+        service: TTSService,
+        config: TTSConfiguration?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws {
 
@@ -30,7 +30,8 @@ public class TTSHandler {
         let ttsOptions = createTTSOptions(config: config)
 
         do {
-            try await service.speak(text: text, options: ttsOptions)
+            // Synthesize the text to audio
+            _ = try await service.synthesize(text: text, options: ttsOptions)
             continuation.yield(.ttsCompleted)
             logger.info("TTS completed for text: \(text.prefix(50))...")
         } catch {
@@ -42,11 +43,11 @@ public class TTSHandler {
     /// Create TTS options from configuration
     /// - Parameter config: TTS configuration
     /// - Returns: TTS options
-    public func createTTSOptions(config: VoiceTTSConfig?) -> TTSOptions {
+    public func createTTSOptions(config: TTSConfiguration?) -> TTSOptions {
         return TTSOptions(
             voice: config?.voice,
-            language: "en",
-            rate: config?.rate ?? 1.0,
+            language: config?.language ?? "en",
+            rate: config?.speakingRate ?? 1.0,
             pitch: config?.pitch ?? 1.0,
             volume: config?.volume ?? 1.0
         )

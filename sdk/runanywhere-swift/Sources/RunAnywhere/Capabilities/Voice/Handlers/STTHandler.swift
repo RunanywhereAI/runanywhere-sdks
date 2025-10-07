@@ -4,22 +4,30 @@ import os
 /// Handles Speech-to-Text processing in the voice pipeline
 public class STTHandler {
     private let logger = SDKLogger(category: "STTHandler")
+    private let voiceAnalytics: VoiceAnalyticsService?
+    private let sttAnalytics: STTAnalyticsService?
 
-    public init() {}
+    public init(
+        voiceAnalytics: VoiceAnalyticsService? = nil,
+        sttAnalytics: STTAnalyticsService? = nil
+    ) {
+        self.voiceAnalytics = voiceAnalytics
+        self.sttAnalytics = sttAnalytics
+    }
 
     /// Transcribe audio samples to text
     /// - Parameters:
     ///   - samples: Audio samples to transcribe
-    ///   - service: Voice service to use for transcription
+    ///   - service: STT service to use for transcription
     ///   - options: Transcription options
     ///   - speakerDiarization: Optional speaker diarization service
     ///   - continuation: Event stream continuation
     /// - Returns: Transcription result
     public func transcribeAudio(
         samples: [Float],
-        service: VoiceService,
-        options: VoiceTranscriptionOptions,
-        speakerDiarization: SpeakerDiarizationProtocol?,
+        service: STTService,
+        options: STTOptions,
+        speakerDiarization: SpeakerDiarizationService?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) async throws -> String {
 
@@ -30,6 +38,15 @@ public class STTHandler {
 
         logger.debug("Starting transcription with \(samples.count) samples")
 
+        // Calculate audio length
+        let audioLength = TimeInterval(samples.count) / 16000.0 // Assuming 16kHz sample rate
+
+        // Track transcription start
+        await sttAnalytics?.trackTranscriptionStarted(audioLength: audioLength)
+        await voiceAnalytics?.trackTranscriptionStarted(audioLength: audioLength)
+
+        let startTime = Date()
+
         do {
             // Get transcription result based on service's preferred format
             let result = try await performTranscription(
@@ -38,13 +55,37 @@ public class STTHandler {
                 options: options
             )
 
+            let endTime = Date()
+            let duration = endTime.timeIntervalSince(startTime)
+
             let transcript = result.text
             logger.info("STT transcription result: '\(transcript)'")
 
             if !transcript.isEmpty {
+                // Track successful transcription completion
+                let wordCount = transcript.split(separator: " ").count
+                let confidence = result.confidence
+
+                await sttAnalytics?.trackTranscription(
+                    text: transcript,
+                    confidence: confidence,
+                    duration: duration,
+                    audioLength: audioLength
+                )
+
+                await voiceAnalytics?.trackTranscription(
+                    duration: duration,
+                    wordCount: wordCount,
+                    audioLength: audioLength
+                )
+
+                await sttAnalytics?.trackFinalTranscript(
+                    text: transcript,
+                    confidence: confidence
+                )
                 // Handle speaker diarization if available
                 if let diarizationService = speakerDiarization,
-                   options.enableSpeakerDiarization {
+                   options.enableDiarization {
                     handleSpeakerDiarization(
                         samples: samples,
                         transcript: transcript,
@@ -62,6 +103,11 @@ public class STTHandler {
             }
         } catch {
             logger.error("STT transcription failed: \(error)")
+
+            // Track transcription error
+            await sttAnalytics?.trackError(error: error, context: .transcription)
+            await voiceAnalytics?.trackError(error: error, context: .transcription)
+
             throw error
         }
     }
@@ -70,30 +116,45 @@ public class STTHandler {
 
     private func performTranscription(
         samples: [Float],
-        service: VoiceService,
-        options: VoiceTranscriptionOptions
-    ) async throws -> VoiceTranscriptionResult {
+        service: STTService,
+        options: STTOptions
+    ) async throws -> STTResult {
 
-        let preferredFormat = service.preferredAudioFormat
-        logger.debug("STT service prefers \(preferredFormat) format")
+        // Convert Float array to Data for STT service
+        logger.debug("Converting \(samples.count) float samples to Data")
+        let audioData = convertAudioFormat(samples: samples)
+        logger.debug("Calling STT.transcribe with \(audioData.count) bytes")
 
-        if preferredFormat == .floatArray {
-            // Service prefers Float arrays - pass directly
-            logger.debug("Using Float array transcription with \(samples.count) samples")
-            return try await service.transcribe(
-                samples: samples,
-                options: options
+        let result = try await service.transcribe(
+            audioData: audioData,
+            options: options
+        )
+
+        // Convert STTTranscriptionResult to STTResult
+        let segments: [STTSegment] = result.timestamps?.map { timestamp in
+            STTSegment(
+                text: timestamp.word,
+                startTime: timestamp.startTime,
+                endTime: timestamp.endTime,
+                confidence: timestamp.confidence ?? 0.95
             )
-        } else {
-            // Service prefers Data - convert Float array to Data
-            logger.debug("Converting \(samples.count) float samples to Data")
-            let audioData = convertAudioFormat(samples: samples)
-            logger.debug("Calling STT.transcribe with \(audioData.count) bytes")
-            return try await service.transcribe(
-                audio: audioData,
-                options: options
+        } ?? []
+
+        let alternatives: [STTAlternative] = result.alternatives?.map { alt in
+            STTAlternative(
+                text: alt.transcript,
+                confidence: alt.confidence
             )
-        }
+        } ?? []
+
+        return STTResult(
+            text: result.transcript,
+            segments: segments,
+            language: result.language,
+            confidence: result.confidence ?? 0.95,
+            duration: segments.last?.endTime ?? 0,
+            alternatives: alternatives
+        )
     }
 
     private func convertAudioFormat(samples: [Float]) -> Data {
@@ -105,19 +166,33 @@ public class STTHandler {
     private func handleSpeakerDiarization(
         samples: [Float],
         transcript: String,
-        service: SpeakerDiarizationProtocol,
+        service: SpeakerDiarizationService,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation
     ) {
-        // Detect speaker from audio features
-        let speaker = service.detectSpeaker(
-            from: samples,
-            sampleRate: 16000
-        )
+        // Process audio to identify speaker
+        let speaker = service.processAudio(samples)
 
-        // Check if speaker changed
-        let previousSpeaker = service.getCurrentSpeaker()
+        // Track speaker detection
+        Task {
+            await sttAnalytics?.trackSpeakerDetection(
+                speaker: speaker.id,
+                confidence: speaker.confidence ?? 0.8
+            )
+        }
+
+        // Get all speakers to check if speaker changed
+        let allSpeakers = service.getAllSpeakers()
+        let previousSpeaker = allSpeakers.count > 1 ? allSpeakers[allSpeakers.count - 2] : nil
         if previousSpeaker?.id != speaker.id {
             continuation.yield(.sttSpeakerChanged(from: previousSpeaker, to: speaker))
+
+            // Track speaker change
+            Task {
+                await sttAnalytics?.trackSpeakerChange(
+                    from: previousSpeaker?.id,
+                    to: speaker.id
+                )
+            }
         }
 
         // Emit transcript with speaker info
