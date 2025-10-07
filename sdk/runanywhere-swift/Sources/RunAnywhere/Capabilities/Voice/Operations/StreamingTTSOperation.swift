@@ -4,7 +4,7 @@ import os
 /// Handles progressive TTS for streaming text generation
 /// Speaks complete sentences as they become available during streaming
 public class StreamingTTSHandler {
-    private let ttsService: TTSService
+    private let ttsService: TextToSpeechService
     private let logger = SDKLogger(category: "StreamingTTSHandler")
 
     // State tracking
@@ -16,7 +16,7 @@ public class StreamingTTSHandler {
     private let sentenceDelimiters: CharacterSet = CharacterSet(charactersIn: ".!?")
     private let minSentenceLength = 3 // Minimum characters for a valid sentence
 
-    public init(ttsService: TTSService) {
+    public init(ttsService: TextToSpeechService) {
         self.ttsService = ttsService
     }
 
@@ -125,7 +125,7 @@ public class StreamingTTSHandler {
                 pitch: 1.0,
                 volume: 1.0
             )
-            _ = try await ttsService.synthesize(text: sentence, options: ttsOptions)
+            try await ttsService.speak(text: sentence, options: ttsOptions)
             continuation?.yield(.ttsCompleted)
         } catch {
             logger.error("TTS failed for sentence: \(error)")
@@ -170,13 +170,13 @@ extension StreamingTTSHandler {
     /// Process streaming text with default TTS options from config
     public func processStreamingText(
         _ text: String,
-        config: TTSConfiguration?,
+        config: VoiceTTSConfig?,
         continuation: AsyncThrowingStream<ModularPipelineEvent, Error>.Continuation? = nil
     ) async {
         let options = TTSOptions(
             voice: config?.voice,
-            language: config?.language ?? "en",
-            rate: config?.speakingRate ?? 1.0,
+            language: "en",
+            rate: config?.rate ?? 1.0,
             pitch: config?.pitch ?? 1.0,
             volume: config?.volume ?? 1.0
         )

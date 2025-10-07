@@ -2,16 +2,15 @@ import Foundation
 
 /// Watches memory thresholds and triggers callbacks when crossed
 class ThresholdWatcher {
-    private let logger: SDKLogger = SDKLogger(category: "ThresholdWatcher")
-    private var memoryThreshold: Int64 = 500_000_000 // 500MB
-    private var criticalThreshold: Int64 = 200_000_000 // 200MB
+    private let logger = SDKLogger(category: "ThresholdWatcher")
+    private var config = MemoryService.Config()
     private weak var memoryMonitor: MemoryMonitor?
 
     // Threshold state tracking
     private var thresholdStates: [MemoryThreshold: Bool] = [:]
     private var thresholdCallbacks: [MemoryThreshold: () -> Void] = [:]
     private var lastThresholdCheck: Date = Date()
-    private var isWatching: Bool = false
+    private var isWatching = false
 
     // Hysteresis to prevent threshold flapping
     private let thresholdHysteresis: Double = 0.1 // 10% buffer
@@ -23,9 +22,8 @@ class ThresholdWatcher {
         }
     }
 
-    func configure(memoryThreshold: Int64, criticalThreshold: Int64) {
-        self.memoryThreshold = memoryThreshold
-        self.criticalThreshold = criticalThreshold
+    func configure(_ config: MemoryService.Config) {
+        self.config = config
     }
 
     func setMemoryMonitor(_ monitor: MemoryMonitor) {
@@ -80,7 +78,7 @@ class ThresholdWatcher {
     }
 
     func checkThreshold(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
+        let thresholdValue = threshold.threshold(for: config)
         let currentState = thresholdStates[threshold] ?? false
         let hysteresisBuffer = Int64(Double(thresholdValue) * thresholdHysteresis)
 
@@ -108,7 +106,7 @@ class ThresholdWatcher {
     // MARK: - Threshold Events
 
     private func handleThresholdCrossed(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
+        let thresholdValue = threshold.threshold(for: config)
         let availableString = ByteCountFormatter.string(fromByteCount: stats.availableMemory, countStyle: .memory)
         let thresholdString = ByteCountFormatter.string(fromByteCount: thresholdValue, countStyle: .memory)
 
@@ -130,7 +128,7 @@ class ThresholdWatcher {
     }
 
     private func handleThresholdUncrossed(_ threshold: MemoryThreshold, stats: MemoryMonitoringStats, checkTime: Date) {
-        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
+        let thresholdValue = threshold.threshold(for: config)
         let availableString = ByteCountFormatter.string(fromByteCount: stats.availableMemory, countStyle: .memory)
         let thresholdString = ByteCountFormatter.string(fromByteCount: thresholdValue, countStyle: .memory)
 
@@ -163,7 +161,7 @@ class ThresholdWatcher {
     func getThresholdMargin(_ threshold: MemoryThreshold) -> Int64? {
         guard let monitor = memoryMonitor else { return nil }
 
-        let thresholdValue = threshold.threshold(memoryThreshold: memoryThreshold, criticalThreshold: criticalThreshold)
+        let thresholdValue = threshold.threshold(for: config)
         let availableMemory = monitor.getAvailableMemory()
 
         return availableMemory - thresholdValue
@@ -172,7 +170,7 @@ class ThresholdWatcher {
     // MARK: - Threshold History
 
     private var thresholdEvents: [ThresholdEvent] = []
-    private let maxHistoryEntries: Int = 100
+    private let maxHistoryEntries = 100
 
     private func recordThresholdEvent(threshold: MemoryThreshold, crossed: Bool, stats: MemoryMonitoringStats, timestamp: Date) {
         let event = ThresholdEvent(
@@ -233,15 +231,11 @@ class ThresholdWatcher {
     // MARK: - Notifications
 
     private func postThresholdNotification(threshold: MemoryThreshold, crossed: Bool, stats: MemoryMonitoringStats) {
-        let thresholdInfo = ThresholdNotificationInfo(
-            threshold: threshold,
-            crossed: crossed,
-            availableMemory: stats.availableMemory,
-            timestamp: Date()
-        )
-
         let userInfo: [String: Any] = [
-            "thresholdInfo": thresholdInfo
+            "threshold": threshold,
+            "crossed": crossed,
+            "availableMemory": stats.availableMemory,
+            "timestamp": Date()
         ]
 
         let notificationName: Notification.Name = crossed ? .memoryThresholdCrossed : .memoryThresholdUncrossed
@@ -256,20 +250,8 @@ class ThresholdWatcher {
 
 // MARK: - Threshold Event
 
-/// Information for threshold crossing notifications
-struct ThresholdNotificationInfo: Sendable {
-    let threshold: MemoryThreshold
-    let crossed: Bool
-    let availableMemory: Int64
-    let timestamp: Date
-
-    var availableMemoryString: String {
-        ByteCountFormatter.string(fromByteCount: availableMemory, countStyle: .memory)
-    }
-}
-
 /// Record of a threshold crossing event
-struct ThresholdEvent: Sendable {
+struct ThresholdEvent {
     let threshold: MemoryThreshold
     let crossed: Bool // true = crossed, false = uncrossed
     let availableMemory: Int64
@@ -281,7 +263,7 @@ struct ThresholdEvent: Sendable {
 }
 
 /// Statistics about threshold behavior
-struct ThresholdStatistics: Sendable {
+struct ThresholdStatistics {
     let currentlyCrossedThresholds: [MemoryThreshold]
     let crossingsLast24Hours: [MemoryThreshold: Int]
     let totalEventsRecorded: Int
@@ -299,6 +281,6 @@ struct ThresholdStatistics: Sendable {
 // MARK: - Notification Names
 
 extension Notification.Name {
-    static let memoryThresholdCrossed: Notification.Name = Notification.Name("MemoryThresholdCrossed")
-    static let memoryThresholdUncrossed: Notification.Name = Notification.Name("MemoryThresholdUncrossed")
+    static let memoryThresholdCrossed = Notification.Name("MemoryThresholdCrossed")
+    static let memoryThresholdUncrossed = Notification.Name("MemoryThresholdUncrossed")
 }

@@ -11,7 +11,7 @@ import UIKit
 #endif
 
 /// Analyzes hardware capabilities and makes optimization recommendations
-public class CapabilityAnalyzer: @unchecked Sendable {
+public class CapabilityAnalyzer {
 
     // MARK: - Properties
 
@@ -79,6 +79,12 @@ public class CapabilityAnalyzer: @unchecked Sendable {
             capabilities: capabilities
         )
 
+        // Set fallback accelerator
+        config.fallbackAccelerator = selectFallbackAccelerator(
+            primary: config.primaryAccelerator,
+            capabilities: capabilities
+        )
+
         // Configure memory mode
         config.memoryMode = selectMemoryMode(
             for: model,
@@ -90,6 +96,14 @@ public class CapabilityAnalyzer: @unchecked Sendable {
             for: model,
             capabilities: capabilities
         )
+
+        // Determine quantization settings
+        let quantizationSettings = selectQuantizationSettings(
+            for: model,
+            capabilities: capabilities
+        )
+        config.useQuantization = quantizationSettings.use
+        config.quantizationBits = quantizationSettings.bits
 
         return config
     }
@@ -155,14 +169,14 @@ public class CapabilityAnalyzer: @unchecked Sendable {
         capabilities: DeviceCapabilities
     ) -> HardwareAcceleration {
         // Large models with Neural Engine support
-        if model.memoryRequired ?? 0 > 3_000_000_000 && capabilities.hasNeuralEngine {
+        if model.estimatedMemory > 3_000_000_000 && capabilities.hasNeuralEngine {
             if model.format == .mlmodel || model.format == .mlpackage {
                 return .neuralEngine
             }
         }
 
         // GPU for medium to large models
-        if capabilities.hasGPU && model.memoryRequired ?? 0 > 1_000_000_000 {
+        if capabilities.hasGPU && model.estimatedMemory > 1_000_000_000 {
             return .gpu
         }
 
@@ -206,7 +220,7 @@ public class CapabilityAnalyzer: @unchecked Sendable {
         capabilities: DeviceCapabilities
     ) -> HardwareConfiguration.MemoryMode {
         let availableMemory = capabilities.availableMemory
-        let modelMemory = model.memoryRequired ?? 0
+        let modelMemory = model.estimatedMemory
 
         if availableMemory < modelMemory * 2 {
             return .conservative
@@ -225,14 +239,54 @@ public class CapabilityAnalyzer: @unchecked Sendable {
     ) -> Int {
         let processorCount = capabilities.processorCount
 
-        if model.memoryRequired ?? 0 > 2_000_000_000 {
+        if model.estimatedMemory > 2_000_000_000 {
             return processorCount
         }
 
-        if model.memoryRequired ?? 0 < 500_000_000 {
+        if model.estimatedMemory < 500_000_000 {
             return max(1, processorCount / 2)
         }
 
         return max(1, Int(Double(processorCount) * 0.75))
+    }
+
+    private func selectQuantizationSettings(
+        for model: ModelInfo,
+        capabilities: DeviceCapabilities
+    ) -> (use: Bool, bits: Int) {
+        // Check if model already quantized
+        if let quantLevel = model.metadata?.quantizationLevel {
+            switch quantLevel {
+            case .int4, .q4_0, .q4_K_S, .q4_K_M:
+                return (true, 4)
+            case .int8, .q8_0:
+                return (true, 8)
+            case .half, .f16:
+                return (true, 16)
+            case .full, .f32:
+                return (false, 32)
+            case .int2, .q2_K:
+                return (true, 2)
+            case .q3_K_S, .q3_K_M, .q3_K_L:
+                return (true, 3)
+            case .q5_0, .q5_K_S, .q5_K_M:
+                return (true, 5)
+            case .q6_K:
+                return (true, 6)
+            case .mixed:
+                return (true, 8)
+            }
+        }
+
+        // Enable quantization for low memory devices
+        if capabilities.totalMemory < 4_000_000_000 {
+            return (true, 4)
+        }
+
+        if capabilities.totalMemory < 8_000_000_000 && model.estimatedMemory > 1_000_000_000 {
+            return (true, 8)
+        }
+
+        return (false, 8)
     }
 }

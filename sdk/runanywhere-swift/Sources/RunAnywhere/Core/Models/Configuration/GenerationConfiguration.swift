@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for text generation behavior
-public struct GenerationConfiguration: Codable, Sendable {
+public struct GenerationConfiguration: Codable {
     /// Default generation settings
     public var defaults: DefaultGenerationSettings
 
@@ -38,7 +38,7 @@ public struct GenerationConfiguration: Codable, Sendable {
 }
 
 /// Default settings for text generation
-public struct DefaultGenerationSettings: Codable, Sendable {
+public struct DefaultGenerationSettings: Codable {
     /// Default temperature for generation
     public var temperature: Double
 
@@ -55,7 +55,7 @@ public struct DefaultGenerationSettings: Codable, Sendable {
     public var repetitionPenalty: Double?
 
     /// Default stop sequences
-    public var stopSequences: [String]
+    public var stopSequences: [String]?
 
     public init(
         temperature: Double = 0.7,
@@ -63,7 +63,7 @@ public struct DefaultGenerationSettings: Codable, Sendable {
         topP: Double = 0.9,
         topK: Int? = nil,
         repetitionPenalty: Double? = nil,
-        stopSequences: [String] = []
+        stopSequences: [String]? = nil
     ) {
         self.temperature = temperature
         self.maxTokens = maxTokens
@@ -75,7 +75,7 @@ public struct DefaultGenerationSettings: Codable, Sendable {
 }
 
 /// Token budget configuration for managing usage
-public struct TokenBudgetConfiguration: Codable, Sendable {
+public struct TokenBudgetConfiguration: Codable {
     /// Maximum tokens per request
     public var maxTokensPerRequest: Int?
 

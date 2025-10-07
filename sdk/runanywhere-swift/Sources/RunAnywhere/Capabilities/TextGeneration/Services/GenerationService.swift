@@ -3,19 +3,24 @@ import Foundation
 /// Main service for text generation
 public class GenerationService {
     private let routingService: RoutingService
+    private let performanceMonitor: PerformanceMonitor
     private let modelLoadingService: ModelLoadingService
-    private let optionsResolver = GenerationOptionsResolver()
-    private let logger: SDKLogger = SDKLogger(category: "GenerationService")
+    private let structuredOutputHandler: StructuredOutputHandler
+    private let logger = SDKLogger(category: "GenerationService")
 
     // Current loaded model
     private var currentLoadedModel: LoadedModel?
 
     public init(
         routingService: RoutingService,
-        modelLoadingService: ModelLoadingService? = nil
+        performanceMonitor: PerformanceMonitor,
+        modelLoadingService: ModelLoadingService? = nil,
+        structuredOutputHandler: StructuredOutputHandler? = nil
     ) {
         self.routingService = routingService
+        self.performanceMonitor = performanceMonitor
         self.modelLoadingService = modelLoadingService ?? ServiceContainer.shared.modelLoadingService
+        self.structuredOutputHandler = structuredOutputHandler ?? StructuredOutputHandler()
     }
 
     /// Set the current loaded model for generation
@@ -29,11 +34,6 @@ public class GenerationService {
     }
 
     /// Generate text using the loaded model
-    ///
-    /// Priority for settings resolution:
-    /// 1. Runtime Options (highest priority) - User knows best for their specific request
-    /// 2. Remote Configuration - Organization-wide defaults from console
-    /// 3. SDK Defaults (lowest priority) - Fallback values when nothing else is specified
     public func generate(
         prompt: String,
         options: RunAnywhereGenerationOptions
@@ -41,23 +41,22 @@ public class GenerationService {
         // Start performance tracking
         _ = Date() // Will be used for performance metrics in future
 
-        // Get remote configuration
-        let remoteConfig = RunAnywhere.configurationData?.generation
-
-        // Apply remote constraints to options (respecting priority: Runtime > Remote > SDK Defaults)
-        let resolvedOptions = optionsResolver.resolve(
-            options: options,
-            remoteConfig: remoteConfig
-        )
-
-        // Prepare prompt with system prompt and structured output formatting
-        let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
+        // Prepare prompt with structured output if needed
+        let effectivePrompt: String
+        if let structuredConfig = options.structuredOutput {
+            effectivePrompt = structuredOutputHandler.preparePrompt(
+                originalPrompt: prompt,
+                config: structuredConfig
+            )
+        } else {
+            effectivePrompt = prompt
+        }
 
         // Get routing decision
         let routingDecision = try await routingService.determineRouting(
             prompt: effectivePrompt,
             context: nil,
-            options: resolvedOptions
+            options: options
         )
 
         // Generate based on routing decision
@@ -67,29 +66,29 @@ public class GenerationService {
         case .onDevice(let framework, _):
             result = try await generateOnDevice(
                 prompt: effectivePrompt,
-                options: resolvedOptions,
+                options: options,
                 framework: framework
             )
 
         case .cloud(let provider, _):
             result = try await generateInCloud(
                 prompt: effectivePrompt,
-                options: resolvedOptions,
+                options: options,
                 provider: provider
             )
 
         case .hybrid(let devicePortion, let framework, _):
             result = try await generateHybrid(
                 prompt: effectivePrompt,
-                options: resolvedOptions,
+                options: options,
                 devicePortion: devicePortion,
                 framework: framework
             )
         }
 
         // Validate structured output if configured
-        if let structuredConfig = resolvedOptions.structuredOutput {
-            let validation = StructuredOutputHandler().validateStructuredOutput(
+        if let structuredConfig = options.structuredOutput {
+            let validation = structuredOutputHandler.validateStructuredOutput(
                 text: result.text,
                 config: structuredConfig
             )
@@ -139,7 +138,7 @@ public class GenerationService {
                 logger.warning("🔄 Framework error detected: \(frameworkError)")
 
                 // For timeout errors, check the error message for timeout indicators
-                let errorMessage = frameworkError.localizedDescription.lowercased()
+                let errorMessage = frameworkError.underlying.localizedDescription.lowercased()
                 if errorMessage.contains("timeout") || errorMessage.contains("timed out") {
                     throw SDKError.generationTimeout("Text generation timed out. The model may be too large for this device or the prompt too complex. Try using a smaller model or simpler prompt.")
                 }
@@ -155,7 +154,7 @@ public class GenerationService {
 
         logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
         if modelInfo.supportsThinking {
-            let pattern = ThinkingTagPattern.defaultPattern
+            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
             logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
             logger.debug("Raw generated text: \(generatedText)")
 
@@ -175,8 +174,8 @@ public class GenerationService {
         let estimatedTokens = finalText.split(separator: " ").count
         let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
-        // Get memory usage (placeholder - actual implementation depends on service)
-        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
+        // Get memory usage from the service
+        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
 
         return GenerationResult(
             text: finalText,
@@ -242,15 +241,15 @@ public class GenerationService {
         let estimatedTokens = generatedText.split(separator: " ").count
         let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
-        // Get memory usage (placeholder - actual implementation depends on service)
-        let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
+        // Get memory usage from the service
+        let memoryUsage = try await loadedModel.service.getModelMemoryUsage()
 
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
 
         if modelInfo.supportsThinking {
-            let pattern = ThinkingTagPattern.defaultPattern
+            let pattern = modelInfo.thinkingTagPattern ?? ThinkingTagPattern.defaultPattern
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent

@@ -24,7 +24,7 @@ let package = Package(
             name: "WhisperKitTranscription",
             dependencies: [
                 "WhisperKit",
-                .product(name: "RunAnywhere", package: "runanywhere-swift"),
+                .product(name: "RunAnywhereSDK", package: "runanywhere-swift"),
             ]
         ),
         .testTarget(

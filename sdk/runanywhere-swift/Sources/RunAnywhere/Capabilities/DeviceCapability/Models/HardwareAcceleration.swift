@@ -1,7 +1,7 @@
 import Foundation
 
 /// Hardware acceleration options
-public enum HardwareAcceleration: String, CaseIterable, Codable, Sendable {
+public enum HardwareAcceleration: String, CaseIterable {
     case cpu = "CPU"
     case gpu = "GPU"
     case neuralEngine = "NeuralEngine"

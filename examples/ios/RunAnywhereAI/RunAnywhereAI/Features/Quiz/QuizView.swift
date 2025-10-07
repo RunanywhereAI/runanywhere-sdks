@@ -1,5 +1,5 @@
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
 
 struct QuizView: View {
     @StateObject private var viewModel = QuizViewModel()

@@ -11,7 +11,7 @@ class MemoryService: MemoryManager {
     private let pressureHandler: PressureHandler
     private let cacheEviction: CacheEviction
     private let memoryMonitor: MemoryMonitor
-    private let logger: SDKLogger = SDKLogger(category: "MemoryService")
+    private let logger = SDKLogger(category: "MemoryService")
 
     init(
         allocationManager: AllocationManager = AllocationManager(),
@@ -27,9 +27,30 @@ class MemoryService: MemoryManager {
         setupIntegration()
     }
 
-    // Memory thresholds
-    private var memoryThreshold: Int64 = 500_000_000 // 500MB
-    private var criticalThreshold: Int64 = 200_000_000 // 200MB
+    /// Configuration for memory service
+    struct Config {
+        var memoryThreshold: Int64 = 500_000_000 // 500MB
+        var criticalThreshold: Int64 = 200_000_000 // 200MB
+        var monitoringInterval: TimeInterval = 5.0
+        var unloadStrategy: UnloadStrategy = .leastRecentlyUsed
+
+        enum UnloadStrategy {
+            case leastRecentlyUsed
+            case largestFirst
+            case oldestFirst
+            case priorityBased
+        }
+    }
+
+    private var config = Config()
+
+    func configure(_ config: Config) {
+        self.config = config
+        allocationManager.configure(config)
+        pressureHandler.configure(config)
+        cacheEviction.configure(config)
+        memoryMonitor.configure(config)
+    }
 
     // MARK: - Model Memory Management
 
@@ -72,7 +93,7 @@ class MemoryService: MemoryManager {
     // MARK: - MemoryManager Protocol
 
     func registerLoadedModel(_ model: LoadedModel, size: Int64, service: LLMService) {
-        let framework = model.model.preferredFramework ?? .coreML
+        let framework = service.modelInfo?.framework ?? model.model.preferredFramework ?? .coreML
         let memoryModel = MemoryLoadedModel(
             id: model.model.id,
             name: model.model.name,
@@ -103,20 +124,20 @@ class MemoryService: MemoryManager {
     }
 
     func setMemoryThreshold(_ threshold: Int64) {
-        self.memoryThreshold = threshold
+        config.memoryThreshold = threshold
     }
 
     func getLoadedModels() -> [LoadedModel] {
         let memoryModels = allocationManager.getLoadedModels()
         return memoryModels
-            .compactMap { memModelInfo in
-                guard let service = memModelInfo.service else { return nil }
+            .filter { $0.service != nil }
+            .map { memModelInfo in
+                let service = memModelInfo.service!
 
                 // Create a ModelInfo from the MemoryLoadedModel
                 let modelInfo = ModelInfo(
                     id: memModelInfo.model.id,
                     name: memModelInfo.model.name,
-                    category: .language, // Default category - ideally this should be determined from the model
                     format: .gguf, // Default format - ideally this should be stored in MemoryLoadedModel
                     compatibleFrameworks: [memModelInfo.model.framework]
                 )
@@ -137,7 +158,7 @@ class MemoryService: MemoryManager {
         let availableMemory = memoryMonitor.getAvailableMemory()
         let modelMemory = allocationManager.getTotalModelMemory()
         let loadedModelCount = allocationManager.getLoadedModelCount()
-        let memoryPressure = availableMemory < memoryThreshold
+        let memoryPressure = availableMemory < config.memoryThreshold
 
         return MemoryStatistics(
             totalMemory: totalMemory,
@@ -162,14 +183,21 @@ class MemoryService: MemoryManager {
 
     // MARK: - Memory Monitoring
 
-    // Monitoring removed - memory checks are now on-demand only
+    func startMonitoring() {
+        memoryMonitor.startMonitoring { [weak self] stats in
+            Task {
+                await self?.handleMonitoringUpdate(stats)
+            }
+        }
+    }
+
+    func stopMonitoring() {
+        memoryMonitor.stopMonitoring()
+    }
 
     // MARK: - Private Implementation
 
     private func setupIntegration() {
-        // Connect cache eviction with allocation manager
-        cacheEviction.setAllocationManager(allocationManager)
-
         // Connect pressure handler with cache eviction
         pressureHandler.setEvictionHandler(cacheEviction)
 
@@ -184,9 +212,9 @@ class MemoryService: MemoryManager {
     private func checkMemoryConditions() async {
         let availableMemory = memoryMonitor.getAvailableMemory()
 
-        if availableMemory < criticalThreshold {
+        if availableMemory < config.criticalThreshold {
             await handleMemoryPressure(level: .critical)
-        } else if availableMemory < memoryThreshold {
+        } else if availableMemory < config.memoryThreshold {
             await handleMemoryPressure(level: .warning)
         }
     }
@@ -194,16 +222,23 @@ class MemoryService: MemoryManager {
     private func calculateTargetMemory(for level: MemoryPressureLevel) -> Int64 {
         switch level {
         case .low, .medium:
-            return memoryThreshold
+            return config.memoryThreshold
         case .high:
-            return Int64(Double(memoryThreshold) * 1.5)
+            return Int64(Double(config.memoryThreshold) * 1.5)
         case .warning:
-            return memoryThreshold * 2
+            return config.memoryThreshold * 2
         case .critical:
-            return memoryThreshold * 3
+            return config.memoryThreshold * 3
         }
     }
 
+    private func handleMonitoringUpdate(_ stats: MemoryMonitoringStats) async {
+        if stats.availableMemory < config.criticalThreshold {
+            await handleMemoryPressure(level: .critical)
+        } else if stats.availableMemory < config.memoryThreshold {
+            await handleMemoryPressure(level: .warning)
+        }
+    }
 }
 
 

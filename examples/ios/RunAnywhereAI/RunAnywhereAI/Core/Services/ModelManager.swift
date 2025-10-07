@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 
 @MainActor
 class ModelManager: ObservableObject {
@@ -14,6 +14,8 @@ class ModelManager: ObservableObject {
 
     @Published var isLoading = false
     @Published var error: Error?
+
+    private let sdk = RunAnywhereSDK.shared
 
     private init() {}
 
@@ -24,8 +26,8 @@ class ModelManager: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // Use SDK's model loading with new API
-            try await RunAnywhere.loadModel(modelInfo.id)
+            // Use SDK's model loading
+            try await sdk.loadModel(modelInfo.id)
         } catch {
             self.error = error
             throw error
@@ -36,9 +38,9 @@ class ModelManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        // Use SDK's model unloading with new API
+        // Use SDK's model unloading
         do {
-            try await RunAnywhere.unloadModel()
+            try await sdk.unloadModel()
         } catch {
             self.error = error
             print("Failed to unload model: \(error)")
@@ -47,7 +49,7 @@ class ModelManager: ObservableObject {
 
     func getAvailableModels() async -> [ModelInfo] {
         do {
-            return try await RunAnywhere.listAvailableModels()
+            return try await sdk.listAvailableModels()
         } catch {
             print("Failed to get available models: \(error)")
             return []
@@ -56,7 +58,7 @@ class ModelManager: ObservableObject {
 
     func getCurrentModel() -> ModelInfo? {
         // Use the SDK's public method to get the current model
-        return RunAnywhere.currentModel
+        return sdk.getCurrentModel()
     }
 
     func isModelLoaded(_ modelId: String) -> Bool {

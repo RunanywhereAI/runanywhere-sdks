@@ -1,6 +1,6 @@
 import Foundation
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
 
 // Note: MessageAnalytics and ConversationAnalytics are defined in ChatViewModel.swift
 

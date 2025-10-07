@@ -1,11 +1,8 @@
 import Foundation
 
-/// Configuration-specific repository methods
-/// ConfigurationRepositoryImpl will implement both this AND Repository<ConfigurationData>
-public protocol ConfigurationRepository {
-    // Configuration-specific operations
-    func fetchRemoteConfiguration(apiKey: String) async throws -> ConfigurationData?
-    func setConsumerConfiguration(_ config: ConfigurationData) async throws
-    func getConsumerConfiguration() async throws -> ConfigurationData?
-    func getSDKDefaultConfiguration() -> ConfigurationData
+/// Repository protocol for configuration data persistence
+public protocol ConfigurationRepository: Repository where Entity == ConfigurationData {
+    // Additional configuration-specific methods if needed
+    func fetchByKey(_ key: String) async throws -> ConfigurationData?
+    func updatePartial(_ id: String, updates: (ConfigurationData) -> ConfigurationData) async throws
 }

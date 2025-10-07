@@ -5,22 +5,70 @@ import UIKit
 import AppKit
 #endif
 
-/// Provides memory usage statistics on-demand
+/// Monitors system memory usage and provides real-time statistics
 class MemoryMonitor {
-    private let logger: SDKLogger = SDKLogger(category: "MemoryMonitor")
-    private var memoryThreshold: Int64 = 500_000_000 // 500MB
-    private var criticalThreshold: Int64 = 200_000_000 // 200MB
+    private let logger = SDKLogger(category: "MemoryMonitor")
+    private var monitoringTimer: Timer?
+    private var thresholdWatcher: ThresholdWatcher?
+    private var isMonitoring = false
+    private var config = MemoryService.Config()
+
+    // Monitoring callbacks
+    private var statisticsCallback: ((MemoryMonitoringStats) -> Void)?
+    private var thresholdCallbacks: [MemoryThreshold: () -> Void] = [:]
 
     init() {
-        // Simple init - no monitoring tasks
+        thresholdWatcher = ThresholdWatcher()
+        setupThresholdWatcher()
     }
 
-    func configure(memoryThreshold: Int64, criticalThreshold: Int64) {
-        self.memoryThreshold = memoryThreshold
-        self.criticalThreshold = criticalThreshold
+    deinit {
+        stopMonitoring()
     }
 
-    // MARK: - Configuration
+    func configure(_ config: MemoryService.Config) {
+        self.config = config
+        thresholdWatcher?.configure(config)
+    }
+
+    // MARK: - Monitoring Control
+
+    func startMonitoring(callback: @escaping (MemoryMonitoringStats) -> Void) {
+        guard !isMonitoring else {
+            logger.warning("Memory monitoring already active")
+            return
+        }
+
+        statisticsCallback = callback
+        isMonitoring = true
+
+        logger.info("Starting memory monitoring with \(config.monitoringInterval)s interval")
+
+        monitoringTimer = Timer.scheduledTimer(withTimeInterval: config.monitoringInterval, repeats: true) { [weak self] _ in
+            self?.performMonitoringCheck()
+        }
+
+        thresholdWatcher?.startWatching()
+
+        // Perform initial check
+        performMonitoringCheck()
+    }
+
+    func stopMonitoring() {
+        guard isMonitoring else { return }
+
+        isMonitoring = false
+        monitoringTimer?.invalidate()
+        monitoringTimer = nil
+        thresholdWatcher?.stopWatching()
+
+        logger.info("Stopped memory monitoring")
+    }
+
+    func setThresholdCallback(threshold: MemoryThreshold, callback: @escaping () -> Void) {
+        thresholdCallbacks[threshold] = callback
+        thresholdWatcher?.setThresholdCallback(threshold: threshold, callback: callback)
+    }
 
     // MARK: - Memory Information
 
@@ -70,9 +118,9 @@ class MemoryMonitor {
     func getMemoryPressureLevel() -> MemoryPressureLevel? {
         let available = getAvailableMemory()
 
-        if available < criticalThreshold {
+        if available < config.criticalThreshold {
             return .critical
-        } else if available < memoryThreshold {
+        } else if available < config.memoryThreshold {
             return .warning
         }
 
@@ -85,32 +133,28 @@ class MemoryMonitor {
         let usedMemory = getUsedMemory()
         let pressureLevel = getMemoryPressureLevel()
 
-        let stats = MemoryMonitoringStats(
+        return MemoryMonitoringStats(
             totalMemory: totalMemory,
             availableMemory: availableMemory,
             usedMemory: usedMemory,
             pressureLevel: pressureLevel,
             timestamp: Date()
         )
-
-        // Record stats for history/trends
-        recordStats(stats)
-
-        return stats
     }
 
     // MARK: - Memory Trends
 
     private var memoryHistory: [MemoryMonitoringStats] = []
-    private let maxHistoryEntries: Int = 100
+    private let maxHistoryEntries = 100
 
     func getMemoryTrend(duration: TimeInterval) -> MemoryUsageTrend? {
         let cutoffTime = Date().addingTimeInterval(-duration)
         let recentHistory = memoryHistory.filter { $0.timestamp >= cutoffTime }
 
-        guard recentHistory.count >= 2,
-              let firstEntry = recentHistory.first,
-              let lastEntry = recentHistory.last else { return nil }
+        guard recentHistory.count >= 2 else { return nil }
+
+        let firstEntry = recentHistory.first!
+        let lastEntry = recentHistory.last!
 
         let memoryDelta = lastEntry.availableMemory - firstEntry.availableMemory
         let timeDelta = lastEntry.timestamp.timeIntervalSince(firstEntry.timestamp)
@@ -138,17 +182,27 @@ class MemoryMonitor {
 
     // MARK: - Private Implementation
 
-    private func recordStats(_ stats: MemoryMonitoringStats) {
-        // Store in history for trend analysis
+    private func performMonitoringCheck() {
+        let stats = getCurrentStats()
+
+        // Store in history
         memoryHistory.append(stats)
         if memoryHistory.count > maxHistoryEntries {
             memoryHistory.removeFirst()
         }
 
-        // Log if there's memory pressure
-        if stats.pressureLevel != nil {
-            logMemoryStatus(stats)
-        }
+        // Log memory status
+        logMemoryStatus(stats)
+
+        // Notify callback
+        statisticsCallback?(stats)
+
+        // Check thresholds
+        thresholdWatcher?.checkThresholds(stats: stats)
+    }
+
+    private func setupThresholdWatcher() {
+        thresholdWatcher?.setMemoryMonitor(self)
     }
 
     private func logMemoryStatus(_ stats: MemoryMonitoringStats) {
@@ -156,7 +210,7 @@ class MemoryMonitor {
         let usedString = ByteCountFormatter.string(fromByteCount: stats.usedMemory, countStyle: .memory)
         let usagePercent = String(format: "%.1f", stats.usedMemoryPercentage)
 
-        let pressureInfo = stats.pressureLevel.map { " [PRESSURE: \($0)]" } ?? ""
+        let pressureInfo = stats.pressureLevel != nil ? " [PRESSURE: \(stats.pressureLevel!)]" : ""
 
         logger.debug("Memory: \(usedString) used, \(availableString) available (\(usagePercent)%)\(pressureInfo)")
 
@@ -229,16 +283,16 @@ enum MemoryThreshold: CaseIterable {
     case low
     case veryLow
 
-    func threshold(memoryThreshold: Int64, criticalThreshold: Int64) -> Int64 {
+    func threshold(for config: MemoryService.Config) -> Int64 {
         switch self {
         case .warning:
-            return memoryThreshold
+            return config.memoryThreshold
         case .critical:
-            return criticalThreshold
+            return config.criticalThreshold
         case .low:
-            return memoryThreshold / 2
+            return config.memoryThreshold / 2
         case .veryLow:
-            return criticalThreshold / 2
+            return config.criticalThreshold / 2
         }
     }
 }

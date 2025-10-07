@@ -33,7 +33,7 @@ public class macOSAudioSession {
         )
 
         guard let audioFormat = format else {
-            throw STTError.audioSessionActivationFailed
+            throw VoiceError.audioSessionActivationFailed
         }
 
         // Configure based on mode
@@ -55,7 +55,7 @@ public class macOSAudioSession {
     /// Start the audio engine
     public func start() throws {
         guard isConfigured else {
-            throw STTError.audioSessionNotConfigured
+            throw VoiceError.audioSessionNotConfigured
         }
 
         // Prepare the engine
@@ -101,33 +101,13 @@ public class macOSAudioSession {
 
     /// Get available audio input devices
     public var availableInputDevices: [AudioDevice] {
-        if #available(macOS 14.0, *) {
-            let discoverySession = AVCaptureDevice.DiscoverySession(
-                deviceTypes: [.microphone, .builtInMicrophone],
-                mediaType: .audio,
-                position: .unspecified
+        let devices = AVCaptureDevice.devices(for: .audio)
+        return devices.map { device in
+            AudioDevice(
+                id: device.uniqueID,
+                name: device.localizedName,
+                isDefault: device == AVCaptureDevice.default(for: .audio)
             )
-            return discoverySession.devices.map { device in
-                AudioDevice(
-                    id: device.uniqueID,
-                    name: device.localizedName,
-                    isDefault: device == AVCaptureDevice.default(for: .audio)
-                )
-            }
-        } else {
-            // Fallback for older macOS versions
-            let discoverySession = AVCaptureDevice.DiscoverySession(
-                deviceTypes: [.builtInMicrophone],
-                mediaType: .audio,
-                position: .unspecified
-            )
-            return discoverySession.devices.map { device in
-                AudioDevice(
-                    id: device.uniqueID,
-                    name: device.localizedName,
-                    isDefault: device == AVCaptureDevice.default(for: .audio)
-                )
-            }
         }
     }
 
@@ -147,7 +127,7 @@ public class macOSAudioSession {
     /// Set the audio input device
     public func setInputDevice(_ deviceID: String) throws {
         guard let device = AVCaptureDevice(uniqueID: deviceID) else {
-            throw STTError.audioSessionActivationFailed
+            throw VoiceError.audioSessionActivationFailed
         }
 
         // In a real implementation, we'd configure the audio engine's input
@@ -157,7 +137,7 @@ public class macOSAudioSession {
 
     /// Get current input level (0.0 to 1.0)
     public var inputLevel: Float {
-        guard isRunning, let _ = inputNode else { return 0 }
+        guard isRunning, let input = inputNode else { return 0 }
 
         // Install tap to measure level if needed
         // This is a simplified implementation
@@ -178,7 +158,7 @@ public class macOSAudioSession {
 
     private func configureForPlayback(format: AVAudioFormat) {
         // Configure output node for playback
-        guard outputNode != nil else { return }
+        guard let output = outputNode else { return }
 
         logger.debug("Configured audio engine for playback")
     }

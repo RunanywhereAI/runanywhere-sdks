@@ -3,7 +3,7 @@ import Accelerate
 
 /// Default implementation of speaker diarization using simple audio features
 /// This provides basic speaker tracking functionality without external dependencies
-public class DefaultSpeakerDiarization: SpeakerDiarizationService {
+public class DefaultSpeakerDiarization: SpeakerDiarizationProtocol {
 
     /// Manages detected speakers and their profiles
     private var speakers: [String: SpeakerInfo] = [:]
@@ -36,12 +36,12 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     // MARK: - SpeakerDiarizationProtocol Implementation
 
-    public func processAudio(_ samples: [Float]) -> SpeakerInfo {
+    public func detectSpeaker(from audioBuffer: [Float], sampleRate: Int) -> SpeakerInfo {
         lock.lock()
         defer { lock.unlock() }
 
         // Create a simple embedding from audio features
-        let embedding = createSimpleEmbedding(from: samples)
+        let embedding = createSimpleEmbedding(from: audioBuffer)
 
         // Try to match with existing speakers
         if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
@@ -74,15 +74,11 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
         return Array(speakers.values)
     }
 
+    public func getCurrentSpeaker() -> SpeakerInfo? {
+        lock.lock()
+        defer { lock.unlock() }
 
-    public func initialize() async throws {
-        // No initialization needed for default implementation
-    }
-
-    public var isReady: Bool { true }
-
-    public func cleanup() async {
-        reset()
+        return currentSpeaker
     }
 
     public func reset() {
@@ -135,7 +131,7 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
 
     /// Calculate cosine similarity between two embeddings
     private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Float {
-        guard a.count == b.count, !a.isEmpty else { return 0.0 }
+        guard a.count == b.count, a.count > 0 else { return 0.0 }
 
         var dotProduct: Float = 0
         var normA: Float = 0

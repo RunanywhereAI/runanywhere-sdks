@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 
 // MARK: - System Device Info
 

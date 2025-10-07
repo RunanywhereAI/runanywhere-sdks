@@ -11,7 +11,7 @@ import UIKit
 #else
 import AppKit
 #endif
-import RunAnywhere
+import RunAnywhereSDK
 
 @MainActor
 class DeviceInfoService: ObservableObject {
@@ -20,7 +20,7 @@ class DeviceInfoService: ObservableObject {
     @Published var deviceInfo: SystemDeviceInfo?
     @Published var isLoading = false
 
-    // SDK reference removed - use RunAnywhere static methods directly
+    private let sdk = RunAnywhereSDK.shared
 
     private init() {
         Task {

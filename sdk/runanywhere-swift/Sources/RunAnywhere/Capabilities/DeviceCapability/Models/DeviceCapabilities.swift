@@ -60,12 +60,46 @@ public struct DeviceCapabilities {
 
     /// Whether the device has sufficient resources for a given model
     public func canRun(model: ModelInfo) -> Bool {
-        return availableMemory >= model.memoryRequired ?? 0
+        return availableMemory >= model.estimatedMemory
+    }
+
+    /// Check if a hardware requirement is supported
+    public func supports(_ requirement: HardwareRequirement) -> Bool {
+        switch requirement {
+        case .minimumMemory(let required):
+            return totalMemory >= required
+        case .requiresNeuralEngine:
+            return hasNeuralEngine
+        case .requiresGPU:
+            return hasGPU
+        case .minimumOSVersion(let version):
+            return ProcessInfo.processInfo.isOperatingSystemAtLeast(
+                OperatingSystemVersion(
+                    majorVersion: Int(version.split(separator: ".")[0]) ?? 0,
+                    minorVersion: Int(version.split(separator: ".")[1]) ?? 0,
+                    patchVersion: 0
+                )
+            )
+        case .specificChip(let chip):
+            return modelIdentifier.contains(chip)
+        case .minimumCompute(let compute):
+            // Simplified check based on processor type
+            switch processorType {
+            case .a17Pro, .a18, .a18Pro, .m3, .m3Pro, .m3Max, .m4, .m4Pro, .m4Max:
+                return compute <= "high"
+            case .a15Bionic, .a16Bionic, .m1, .m1Pro, .m1Max, .m1Ultra, .m2, .m2Pro, .m2Max, .m2Ultra:
+                return compute <= "medium"
+            default:
+                return compute <= "low"
+            }
+        case .requiresAppleSilicon:
+            return processorType.isAppleSilicon
+        }
     }
 }
 
 /// Memory pressure levels
-public enum MemoryPressureLevel: Sendable {
+public enum MemoryPressureLevel {
     case low
     case medium
     case high

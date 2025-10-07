@@ -7,63 +7,68 @@ public protocol LifecycleAware {
 }
 
 /// Manages the lifecycle of services
-public actor ServiceLifecycle {
+public class ServiceLifecycle {
     private var services: [String: LifecycleAware] = [:]
     private var startedServices: Set<String> = []
+    private let queue = DispatchQueue(label: "com.runanywhere.service-lifecycle", attributes: .concurrent)
 
     /// Register a service for lifecycle management
     public func register(_ service: LifecycleAware, name: String) {
-        services[name] = service
+        queue.async(flags: .barrier) { [weak self] in
+            self?.services[name] = service
+        }
     }
 
     /// Start all registered services
     public func startAll() async throws {
-        for (name, service) in services {
-            if !startedServices.contains(name) {
+        let servicesToStart = queue.sync { services }
+
+        for (name, service) in servicesToStart {
+            if !isStarted(name) {
                 try await service.start()
-                startedServices.insert(name)
+                markAsStarted(name)
             }
         }
     }
 
     /// Stop all registered services
     public func stopAll() async throws {
-        let servicesToStop = services.filter { startedServices.contains($0.key) }
+        let servicesToStop = queue.sync { services.filter { startedServices.contains($0.key) } }
 
         // Stop in reverse order of starting
         for (name, service) in servicesToStop.reversed() {
             try await service.stop()
-            startedServices.remove(name)
+            markAsStopped(name)
         }
     }
 
     /// Start a specific service
     public func start(_ name: String) async throws {
-        guard let service = services[name] else {
+        guard let service = queue.sync(execute: { services[name] }) else {
             throw ServiceLifecycleError.serviceNotFound(name)
         }
 
-        if !startedServices.contains(name) {
+        if !isStarted(name) {
             try await service.start()
-            startedServices.insert(name)
+            markAsStarted(name)
         }
     }
 
     /// Stop a specific service
     public func stop(_ name: String) async throws {
-        guard let service = services[name] else {
+        guard let service = queue.sync(execute: { services[name] }) else {
             throw ServiceLifecycleError.serviceNotFound(name)
         }
 
-        if startedServices.contains(name) {
+        if isStarted(name) {
             try await service.stop()
-            startedServices.remove(name)
+            markAsStopped(name)
         }
     }
 
     /// Check if a service is started
     public func isStarted(_ name: String) -> Bool {
-        startedServices.contains(name)
+        queue.sync { startedServices.contains(name) }
     }
 
     /// Restart a service
@@ -72,14 +77,28 @@ public actor ServiceLifecycle {
         try await start(name)
     }
 
+    // MARK: - Private Methods
+
+    private func markAsStarted(_ name: String) {
+        queue.async(flags: .barrier) { [weak self] in
+            self?.startedServices.insert(name)
+        }
+    }
+
+    private func markAsStopped(_ name: String) {
+        queue.async(flags: .barrier) { [weak self] in
+            self?.startedServices.remove(name)
+        }
+    }
+
     /// Get all registered service names
     public var registeredServices: [String] {
-        Array(services.keys)
+        queue.sync { Array(services.keys) }
     }
 
     /// Get all started service names
     public var activeServices: [String] {
-        Array(startedServices)
+        queue.sync { Array(startedServices) }
     }
 }
 

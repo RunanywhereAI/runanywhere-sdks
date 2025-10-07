@@ -9,9 +9,6 @@ public enum RepositoryError: LocalizedError {
     case databaseNotInitialized
     case entityNotFound(String)
     case networkUnavailable
-    case networkNotAvailable
-    case networkError(Error)
-    case networkTimeout
 
     public var errorDescription: String? {
         switch self {
@@ -27,12 +24,8 @@ public enum RepositoryError: LocalizedError {
             return "Database not initialized"
         case .entityNotFound(let id):
             return "Entity not found: \(id)"
-        case .networkUnavailable, .networkNotAvailable:
+        case .networkUnavailable:
             return "Network unavailable for sync"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .networkTimeout:
-            return "Network request timed out"
         }
     }
 }

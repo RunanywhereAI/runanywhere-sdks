@@ -1,10 +1,10 @@
 import Foundation
-import RunAnywhere
+import RunAnywhereSDK
 import os
 
 /// WhisperKit adapter for voice transcription
 public class WhisperKitAdapter: UnifiedFrameworkAdapter {
-    private let logger: Logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitAdapter")
+    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitAdapter")
 
     // Singleton instance to ensure caching works across the app
     public static let shared = WhisperKitAdapter()
@@ -27,9 +27,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - UnifiedFrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
-        // Check if model is for speech recognition and compatible with WhisperKit
-        let canHandle = model.category == .speechRecognition &&
-                       model.compatibleFrameworks.contains(.whisperKit)
+        let canHandle = model.compatibleFrameworks.contains(.whisperKit)
         logger.debug("canHandle(\(model.name, privacy: .public)): \(canHandle)")
         return canHandle
     }
@@ -94,7 +92,7 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     }
 
     public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
-        return model.memoryRequired ?? 0
+        return model.estimatedMemory
     }
 
     public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
@@ -104,41 +102,10 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - Initialization
 
     public init() {
-        // Initialize storage strategy (handles both download and file management)
-        self.storageStrategy = WhisperKitStorageStrategy()
-
         logger.info("WhisperKitAdapter initialized")
         logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
         logger.info("Supported formats: \(self.supportedFormats.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
-    }
-
-    // MARK: - Model Registration
-
-    // Store storage strategy (handles download and file management)
-    private let storageStrategy: WhisperKitStorageStrategy
-
-    /// Called when adapter is registered with the SDK
-    /// This method will be called automatically by the SDK when the adapter is registered
-    public func onRegistration() {
-        logger.info("✅ WhisperKitAdapter registered")
-        // Models will come from remote configuration or be added by users
-        // We only provide the download strategy for WhisperKit models
-    }
-
-    /// Get models provided by this adapter
-    /// Returns empty array since models come from configuration
-    public func getProvidedModels() -> [ModelInfo] {
-        return []
-    }
-
-    /// Get storage strategy for WhisperKit models
-    public func getDownloadStrategy() -> DownloadStrategy? {
-        return storageStrategy
-    }
-
-    /// Get storage strategy for WhisperKit models
-    public func getStorageStrategy() -> ModelStorageStrategy? {
-        return storageStrategy
+        // No initialization needed for basic adapter
     }
 
     // MARK: - Cache Management

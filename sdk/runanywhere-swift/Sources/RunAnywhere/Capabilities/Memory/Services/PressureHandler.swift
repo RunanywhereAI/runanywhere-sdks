@@ -7,10 +7,10 @@ import AppKit
 
 /// Handles memory pressure situations and coordinates response actions
 class PressureHandler {
-    private let logger: SDKLogger = SDKLogger(category: "PressureHandler")
+    private let logger = SDKLogger(category: "PressureHandler")
     private var evictionHandler: CacheEviction?
     private var memoryPressureObserver: NSObjectProtocol?
-    private var memoryThreshold: Int64 = 500_000_000 // 500MB
+    private var config = MemoryService.Config()
 
     init() {
         setupSystemPressureHandling()
@@ -22,8 +22,8 @@ class PressureHandler {
         }
     }
 
-    func configure(memoryThreshold: Int64) {
-        self.memoryThreshold = memoryThreshold
+    func configure(_ config: MemoryService.Config) {
+        self.config = config
     }
 
     func setEvictionHandler(_ handler: CacheEviction) {
@@ -176,25 +176,21 @@ class PressureHandler {
         case .low, .medium:
             return 0
         case .high:
-            return memoryThreshold / 2
+            return config.memoryThreshold / 2
         case .warning:
-            return memoryThreshold
+            return config.memoryThreshold
         case .critical:
-            return memoryThreshold * 2
+            return config.memoryThreshold * 2
         }
     }
 
     // MARK: - Notifications
 
     private func postPressureHandlingNotification(level: MemoryPressureLevel, freedMemory: Int64, duration: TimeInterval) {
-        let response = MemoryPressureNotificationInfo(
-            level: level,
-            freedMemory: freedMemory,
-            duration: duration
-        )
-
         let userInfo: [String: Any] = [
-            "response": response
+            "level": level,
+            "freedMemory": freedMemory,
+            "duration": duration
         ]
 
         NotificationCenter.default.post(
@@ -208,24 +204,13 @@ class PressureHandler {
 // MARK: - Notification Names
 
 extension Notification.Name {
-    static let memoryPressureHandled: Notification.Name = Notification.Name("MemoryPressureHandled")
+    static let memoryPressureHandled = Notification.Name("MemoryPressureHandled")
 }
 
 // MARK: - Memory Pressure Response
 
-/// Information about memory pressure notification
-struct MemoryPressureNotificationInfo: Sendable {
-    let level: MemoryPressureLevel
-    let freedMemory: Int64
-    let duration: TimeInterval
-
-    var freedMemoryString: String {
-        ByteCountFormatter.string(fromByteCount: freedMemory, countStyle: .memory)
-    }
-}
-
 /// Information about memory pressure response
-struct MemoryPressureResponse: Sendable {
+struct MemoryPressureResponse {
     let level: MemoryPressureLevel
     let freedMemory: Int64
     let duration: TimeInterval

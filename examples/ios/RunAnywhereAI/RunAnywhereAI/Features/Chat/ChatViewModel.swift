@@ -7,7 +7,7 @@
 
 import Foundation
 import SwiftUI
-import RunAnywhere
+import RunAnywhereSDK
 import os.log
 
 // MARK: - Analytics Models
@@ -169,7 +169,7 @@ class ChatViewModel: ObservableObject {
     @Published var loadedModelName: String?
     @Published var useStreaming = true  // Enable streaming for real-time token display
 
-    // SDK reference removed - use RunAnywhere static methods directly
+    private let sdk = RunAnywhereSDK.shared
     private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
     @Published var currentConversation: Conversation?
@@ -276,7 +276,7 @@ class ChatViewModel: ObservableObject {
                     if let model = ModelListViewModel.shared.currentModel {
                         do {
                             // This will reload the model if it's not already loaded
-                            try await RunAnywhere.loadModel(model.id)
+                            _ = try await sdk.loadModel(model.id)
                             logger.info("✅ Ensured model '\(model.name)' is loaded in SDK")
                         } catch {
                             logger.error("Failed to ensure model is loaded: \(error)")
@@ -303,15 +303,7 @@ class ChatViewModel: ObservableObject {
                 logger.info("📝 Sending new message only: \(fullPrompt)")
 
                 // Get SDK configuration for generation options
-                // Use settings from UserDefaults with fallback to 1000 tokens for chat
-                let savedTemperature = UserDefaults.standard.double(forKey: "defaultTemperature")
-                let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
-
-                let effectiveSettings = (
-                    temperature: savedTemperature != 0 ? savedTemperature : 0.7,
-                    maxTokens: savedMaxTokens != 0 ? savedMaxTokens : 1000  // Default to 1000 tokens for chat
-                )
-
+                let effectiveSettings = await sdk.getGenerationSettings()
                 let options = RunAnywhereGenerationOptions(
                     maxTokens: effectiveSettings.maxTokens,
                     temperature: Float(effectiveSettings.temperature)
@@ -339,7 +331,7 @@ class ChatViewModel: ObservableObject {
                     var wasInterrupted = false
 
                     logger.info("📤 Sending prompt to SDK.generateStream")
-                    let stream = RunAnywhere.generateStream(fullPrompt, options: options)
+                    let stream = sdk.generateStream(prompt: fullPrompt, options: options)
 
                     // Stream tokens as they arrive
                     for try await token in stream {
@@ -539,10 +531,10 @@ class ChatViewModel: ObservableObject {
                     // Use non-streaming generation to get thinking content
                     let startTime = Date()
                     let wasInterrupted = false
-                    let resultText = try await RunAnywhere.generate(fullPrompt, options: options)
+                    let result = try await sdk.generate(prompt: fullPrompt, options: options)
                     let endTime = Date()
 
-                    logger.info("Generation completed with result: \(resultText)")
+                    logger.info("Generation completed with result: \(result.text)")
 
                     // Update the assistant message with the complete response
                     await MainActor.run {
@@ -550,8 +542,8 @@ class ChatViewModel: ObservableObject {
                             let currentMessage = self.messages[messageIndex]
                             let updatedMessage = Message(
                                 role: currentMessage.role,
-                                content: resultText,
-                                thinkingContent: nil, // No thinking content in simple generation
+                                content: result.text,
+                                thinkingContent: result.thinkingContent,
                                 timestamp: currentMessage.timestamp
                             )
                             self.messages[messageIndex] = updatedMessage
@@ -570,8 +562,8 @@ class ChatViewModel: ObservableObject {
                             thinkingStartTime: nil, // Not tracked separately in non-streaming
                             thinkingEndTime: nil,
                             inputText: prompt,
-                            outputText: resultText,
-                            thinkingText: nil, // No thinking content in simple generation
+                            outputText: result.text,
+                            thinkingText: result.thinkingContent,
                             tokensPerSecondHistory: [], // Not applicable for non-streaming
                             wasInterrupted: wasInterrupted,
                             options: options
@@ -675,7 +667,7 @@ class ChatViewModel: ObservableObject {
 
     func loadModel(_ modelInfo: ModelInfo) async {
         do {
-            try await RunAnywhere.loadModel(modelInfo.id)
+            _ = try await sdk.loadModel(modelInfo.id)
             await MainActor.run {
                 self.isModelLoaded = true
                 self.loadedModelName = modelInfo.name
@@ -703,15 +695,15 @@ class ChatViewModel: ObservableObject {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
-                self.logger.info("✅ Model status updated: '\(currentModel.name)' is loaded")
 
-                // Ensure the model is actually loaded in the SDK (but don't block the UI update)
+                // Ensure the model is actually loaded in the SDK
                 Task {
                     do {
-                        try await RunAnywhere.loadModel(currentModel.id)
-                        self.logger.info("✅ Verified model '\(currentModel.name)' is loaded in SDK")
+                        _ = try await sdk.loadModel(currentModel.id)
+                        logger.info("Verified model '\(currentModel.name)' is loaded in SDK")
+
                     } catch {
-                        self.logger.error("❌ Failed to verify model is loaded: \(error)")
+                        logger.error("Failed to verify model is loaded: \(error)")
                         await MainActor.run {
                             self.isModelLoaded = false
                             self.loadedModelName = nil
@@ -721,16 +713,14 @@ class ChatViewModel: ObservableObject {
             } else {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
-                self.logger.info("❌ No current model in ModelListViewModel")
+
             }
 
-            // Update system message to reflect current state
+            // Update system message
             if self.messages.first?.role == .system {
                 self.messages.removeFirst()
             }
-            if self.isModelLoaded {
-                self.addSystemMessage()
-            }
+            self.addSystemMessage()
         }
     }
 
@@ -797,10 +787,8 @@ class ChatViewModel: ObservableObject {
         let maxTokens = savedMaxTokens != 0 ? savedMaxTokens : 10000
 
         // Apply settings to SDK (this is idempotent, so safe to call multiple times)
-        // Settings are now passed per-request, not globally
-        // Store in UserDefaults for persistence
-        UserDefaults.standard.set(temperature, forKey: "defaultTemperature")
-        UserDefaults.standard.set(maxTokens, forKey: "defaultMaxTokens")
+        await sdk.setTemperature(Float(temperature))
+        await sdk.setMaxTokens(maxTokens)
 
         logger.info("🔧 Ensured settings are applied - Temperature: \(temperature), MaxTokens: \(maxTokens)")
     }
@@ -965,10 +953,10 @@ class ChatViewModel: ObservableObject {
 
         // Create generation parameters
         let generationParameters = MessageAnalytics.GenerationParameters(
-            temperature: Double(options.temperature ?? 0.7),
-            maxTokens: options.maxTokens ?? 10000,
-            topP: nil,
-            topK: nil
+            temperature: Double(options.temperature),
+            maxTokens: options.maxTokens,
+            topP: Double(options.topP),
+            topK: nil // topK not available in currentRunAnywhereGenerationOptions
         )
 
         return MessageAnalytics(
