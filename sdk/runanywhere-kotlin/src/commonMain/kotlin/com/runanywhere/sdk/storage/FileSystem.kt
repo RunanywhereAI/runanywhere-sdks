@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.storage
 
+import kotlinx.coroutines.runBlocking
+
 /**
  * Platform-agnostic file system abstraction
  * Provides common file operations that are implemented differently on each platform
@@ -21,9 +23,19 @@ interface FileSystem {
     suspend fun exists(path: String): Boolean
 
     /**
+     * Check if a file or directory exists (synchronous version)
+     */
+    fun existsSync(path: String): Boolean = runBlocking { exists(path) }
+
+    /**
      * Delete a file or directory
      */
     suspend fun delete(path: String): Boolean
+
+    /**
+     * Delete a directory and all its contents recursively
+     */
+    suspend fun deleteRecursively(path: String): Boolean
 
     /**
      * Create a directory (including parent directories if needed)

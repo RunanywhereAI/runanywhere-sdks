@@ -3,11 +3,10 @@ package com.runanywhere.sdk.data.network
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.network.services.MockNetworkService
 import com.runanywhere.sdk.data.network.NetworkService
-import com.runanywhere.sdk.data.network.NetworkServiceImpl
+import com.runanywhere.sdk.data.network.RealNetworkService
 import com.runanywhere.sdk.data.network.models.APIEndpoint
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.config.SDKConfig
-import com.runanywhere.sdk.network.APIClient
 import com.runanywhere.sdk.network.NetworkConfiguration
 import com.runanywhere.sdk.network.createHttpClient
 import com.runanywhere.sdk.services.AuthenticationService
@@ -67,7 +66,7 @@ object NetworkServiceFactory {
     }
 
     /**
-     * Create production APIClient with proper configuration
+     * Create production NetworkService with real HTTP networking and circuit breaker protection
      */
     private fun createProductionAPIClient(
         baseURL: String,
@@ -82,18 +81,25 @@ object NetworkServiceFactory {
 
         val httpClient = createHttpClient(config)
 
-        val apiClient = APIClient(
-            baseURL = baseURL,
-            apiKey = apiKey,
+        // Create circuit breaker for this service
+        val circuitBreaker = com.runanywhere.sdk.network.CircuitBreakerRegistry.getOrCreate(
+            name = "NetworkService",
+            failureThreshold = 5,
+            recoveryTimeoutMs = 30_000,
+            halfOpenMaxCalls = 3
+        )
+
+        // Use the new RealNetworkService that makes actual HTTP calls
+        val realNetworkService = RealNetworkService(
             httpClient = httpClient,
+            baseURL = baseURL,
             authenticationService = authenticationService,
-            networkChecker = createNetworkChecker(),
             maxRetryAttempts = config.maxRetryAttempts,
             baseDelayMs = config.baseRetryDelayMs
         )
 
-        // Use the new NetworkServiceImpl that implements all methods including generic types
-        return NetworkServiceImpl(apiClient)
+        // Wrap with circuit breaker protection
+        return CircuitBreakerNetworkService(realNetworkService, circuitBreaker)
     }
 
     /**

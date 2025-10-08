@@ -23,6 +23,10 @@ abstract class SharedFileSystem : FileSystem {
     }
 
     override suspend fun delete(path: String): Boolean = withContext(Dispatchers.IO) {
+        File(path).delete()
+    }
+
+    override suspend fun deleteRecursively(path: String): Boolean = withContext(Dispatchers.IO) {
         File(path).deleteRecursively()
     }
 

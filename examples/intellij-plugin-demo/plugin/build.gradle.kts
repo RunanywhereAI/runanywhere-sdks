@@ -1,13 +1,14 @@
 plugins {
     id("org.jetbrains.intellij") version "1.17.4"
     kotlin("jvm") version "2.1.21"
+    java
 }
 
 group = "com.runanywhere"
 version = "1.0.0"
 
 intellij {
-    version.set("2023.3")
+    version.set("2024.1")   // Use 2024.1 to avoid compatibility warnings with plugin 1.x
     type.set("IC")
     plugins.set(listOf("java"))
 }
@@ -15,19 +16,23 @@ intellij {
 repositories {
     mavenLocal()
     mavenCentral()
+    gradlePluginPortal()
+    google()
 }
 
 dependencies {
-    // RunAnywhere KMP SDK
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
-
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    // RunAnywhere KMP SDK (adjust version/coords if your repo uses a different name)
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0") {
+        // Exclude Kotlin stdlib to avoid conflicts with IntelliJ Platform's version
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-common")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    }
 }
 
 tasks {
     patchPluginXml {
-        sinceBuild.set("233")
+        sinceBuild.set("241")
         untilBuild.set("251.*")
         changeNotes.set(
             """
@@ -38,7 +43,7 @@ tasks {
                 <li>Voice dictation mode</li>
                 <li>Whisper-based transcription</li>
             </ul>
-        """.trimIndent()
+            """.trimIndent()
         )
     }
 
@@ -46,11 +51,24 @@ tasks {
         archiveFileName.set("runanywhere-voice-${project.version}.zip")
     }
 
+    // Skip generating searchable options (faster CI and avoids headless issues)
+    buildSearchableOptions {
+        enabled = false
+    }
+
     publishPlugin {
         token.set(System.getenv("JETBRAINS_TOKEN"))
     }
 }
 
+// Use JDK 17 for compilation (matches IntelliJ 2024.2 runtime)
 kotlin {
     jvmToolchain(17)
 }
+
+// If you prefer Java toolchain style instead of the kotlin{} helper, you can use:
+// java {
+//     toolchain {
+//         languageVersion.set(JavaLanguageVersion.of(17))
+//     }
+// }

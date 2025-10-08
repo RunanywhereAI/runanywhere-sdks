@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.flow
 class ModelDownloader(
     private val fileSystem: FileSystem,
     private val downloadService: DownloadService,
-    private val modelsDirectory: String = "${getPlatformBaseDir()}/models"
+    private val modelsDirectory: String = "${fileSystem.getDataDirectory()}/models"
 ) {
     private val logger = SDKLogger("ModelDownloader")
 

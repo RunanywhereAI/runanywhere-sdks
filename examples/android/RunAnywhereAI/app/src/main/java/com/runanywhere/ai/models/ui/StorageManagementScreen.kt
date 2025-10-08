@@ -13,20 +13,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.ui.platform.LocalContext
 import com.runanywhere.ai.models.data.ModelInfo
 import com.runanywhere.ai.models.data.StorageInfo
 import com.runanywhere.ai.models.data.StoredModel
+import com.runanywhere.ai.models.repository.ModelRepository
 import com.runanywhere.ai.models.viewmodel.ModelManagementViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StorageManagementScreen(
-    viewModel: ModelManagementViewModel = hiltViewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val viewModel: ModelManagementViewModel = viewModel {
+        ModelManagementViewModel(ModelRepository(context))
+    }
     var storageInfo by remember { mutableStateOf<StorageInfo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf<StoredModel?>(null) }

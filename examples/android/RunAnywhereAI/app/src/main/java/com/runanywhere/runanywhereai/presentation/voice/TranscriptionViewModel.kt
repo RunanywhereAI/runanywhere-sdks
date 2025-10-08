@@ -112,7 +112,9 @@ class TranscriptionViewModel(application: Application) : AndroidViewModel(applic
                 )
 
                 val vadConfig = VADConfiguration(
-                    aggressiveness = 2
+                    energyThreshold = 0.5f,
+                    sampleRate = 16000,
+                    frameLength = 0.5f
                 )
 
                 // Simulate starting recording

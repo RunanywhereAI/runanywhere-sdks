@@ -33,7 +33,7 @@
     ]]></change-notes>
 
     <!-- Minimum IDE version -->
-    <idea-version since-build="233.0" until-build="241.*" />
+    <idea-version since-build="242.0" until-build="251.*" />
 
     <!-- Dependencies -->
     <depends>com.intellij.modules.platform</depends>
