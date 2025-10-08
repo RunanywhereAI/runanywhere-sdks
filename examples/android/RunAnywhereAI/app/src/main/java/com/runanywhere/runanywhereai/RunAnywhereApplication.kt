@@ -2,13 +2,9 @@ package com.runanywhere.runanywhereai
 
 import android.app.Application
 import android.util.Log
-// import androidx.lifecycle.ProcessLifecycleOwner
-// import androidx.lifecycle.lifecycleScope
-// KMP SDK imports
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.addModelFromURL
-// import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -16,7 +12,6 @@ import kotlinx.coroutines.launch
  * Application class for RunAnywhere AI sample app
  * Enhanced to match iOS functionality with proper KMP SDK initialization
  */
-// @HiltAndroidApp
 class RunAnywhereApplication : Application() {
 
     private var isSDKInitialized = false

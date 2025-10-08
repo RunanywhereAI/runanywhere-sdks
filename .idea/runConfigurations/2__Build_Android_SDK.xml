@@ -1,5 +1,13 @@
+<!--
+    Run Android App
+
+    Builds and launches the Android app on connected device/emulator.
+    The SDK is automatically built as a local module.
+
+    Requirements: Android device or emulator must be connected (check with 'adb devices')
+-->
 <component name="ProjectRunConfigurationManager">
-    <configuration default="false" name="Publish SDK to Maven Local" type="GradleRunConfiguration"
+    <configuration default="false" name="2️⃣ Run Android App" type="GradleRunConfiguration"
         factoryName="Gradle">
         <ExternalSystemSettings>
             <option name="executionName" />
@@ -11,15 +19,15 @@
             </option>
             <option name="taskNames">
                 <list>
-                    <option value="publishSdkToMavenLocal" />
+                    <option value="runAndroidApp" />
                 </list>
             </option>
-            <option name="vmOptions" value="" />
+            <option name="vmOptions" />
         </ExternalSystemSettings>
         <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
         <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
         <DebugAllEnabled>false</DebugAllEnabled>
-        <ForceTestExec>false</ForceTestExec>
+        <RunAsTest>false</RunAsTest>
         <method v="2" />
     </configuration>
 </component>

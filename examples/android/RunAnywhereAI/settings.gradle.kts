@@ -29,8 +29,8 @@ dependencyResolutionManagement {
 rootProject.name = "RunAnywhereAI"
 include(":app")
 
-// Commented out - now using SDK from Maven Local
-// include(":sdk:runanywhere-kotlin")
-// project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
-// include(":sdk:runanywhere-kotlin:jni")
-// project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
+// Include SDK as local project module
+include(":sdk:runanywhere-kotlin")
+project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
+include(":sdk:runanywhere-kotlin:jni")
+project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
