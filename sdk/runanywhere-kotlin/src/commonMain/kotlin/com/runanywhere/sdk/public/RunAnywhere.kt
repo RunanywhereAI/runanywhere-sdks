@@ -142,6 +142,12 @@ interface RunAnywhereSDK {
     suspend fun loadModel(modelId: String): Boolean
 
     /**
+     * Unload the currently loaded model from memory.
+     * Matches Swift SDK's unloadModel() API.
+     */
+    suspend fun unloadModel()
+
+    /**
      * Get currently loaded model
      */
     val currentModel: ModelInfo?
@@ -227,6 +233,10 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     private var _isRegistering = false
     private val _isDeviceRegistered = MutableStateFlow(false)
     private val registrationMutex = Mutex()
+
+    // MARK: - Current Model Tracking (matches Swift SDK)
+
+    private var _currentModel: ModelInfo? = null
 
     companion object {
         private const val MAX_REGISTRATION_RETRIES = 3
@@ -941,10 +951,41 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     }
 
     /**
-     * Get current model
+     * Get current model (matches Swift SDK)
      */
     override val currentModel: ModelInfo?
-        get() = null // Model manager not implemented yet
+        get() = _currentModel
+
+    /**
+     * Unload the currently loaded model from memory.
+     * Matches Swift SDK's unloadModel() API.
+     */
+    override suspend fun unloadModel() {
+        requireInitialized()
+        ensureDeviceRegistered()
+
+        if (_currentModel == null) {
+            logger.warn("No model loaded to unload")
+            return
+        }
+
+        val modelId = _currentModel?.id ?: "unknown"
+        logger.info("Unloading model: $modelId")
+
+        try {
+            // Get LLM component and unload model
+            val llmComponent = serviceContainer.llmComponent
+            llmComponent?.unloadModel()
+
+            // Clear current model reference
+            _currentModel = null
+
+            logger.info("✅ Model unloaded successfully: $modelId")
+        } catch (e: Exception) {
+            logger.error("Failed to unload model: $modelId", e)
+            throw SDKError.ComponentNotReady("Failed to unload model: ${e.message}")
+        }
+    }
 
     /**
      * Initialize components

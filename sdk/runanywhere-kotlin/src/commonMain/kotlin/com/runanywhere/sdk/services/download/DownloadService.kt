@@ -25,7 +25,8 @@ data class DownloadProgress(
     val bytesDownloaded: Long,
     val totalBytes: Long,
     val state: DownloadState,
-    val estimatedTimeRemaining: Double? = null
+    val estimatedTimeRemaining: Double? = null, // TimeInterval in seconds
+    val speed: Double? = null // bytes per second
 ) {
     val percentage: Double
         get() = if (totalBytes > 0) bytesDownloaded.toDouble() / totalBytes else 0.0
@@ -230,6 +231,8 @@ class KtorDownloadService(
                     var bytesDownloaded = 0L
                     val buffer = ByteArray(configuration.chunkSize)
                     var lastProgressTime = System.currentTimeMillis()
+                    var lastBytesDownloaded = 0L
+                    val downloadStartTime = System.currentTimeMillis()
 
                     // Create temporary file for downloading
                     val tempPath = "$destinationPath.tmp"
@@ -248,10 +251,21 @@ class KtorDownloadService(
                         // Report progress (matching iOS progress reporting)
                         val currentTime = System.currentTimeMillis()
                         if (currentTime - lastProgressTime >= 100) { // Report every 100ms
+                            // Calculate speed (bytes per second)
+                            val elapsedTime = (currentTime - lastProgressTime) / 1000.0 // seconds
+                            val bytesInInterval = bytesDownloaded - lastBytesDownloaded
+                            val speed = if (elapsedTime > 0) bytesInInterval / elapsedTime else null
+
+                            // Calculate ETA (seconds remaining)
+                            val remainingBytes = contentLength - bytesDownloaded
+                            val eta = if (speed != null && speed > 0) remainingBytes / speed else null
+
                             val progress = DownloadProgress(
                                 bytesDownloaded = bytesDownloaded,
                                 totalBytes = contentLength,
-                                state = DownloadState.Downloading
+                                state = DownloadState.Downloading,
+                                estimatedTimeRemaining = eta,
+                                speed = speed
                             )
                             progressChannel.trySend(progress)
 
@@ -259,10 +273,11 @@ class KtorDownloadService(
                             val progressPercent = if (contentLength > 0) (bytesDownloaded.toDouble() / contentLength) * 100 else 0.0
                             if (progressPercent.toInt() % 10 == 0) {
                                 logger.debug(
-                                    "Download progress - modelId: ${model.id}, progress: $progressPercent%, bytesDownloaded: $bytesDownloaded, totalBytes: $contentLength, speed: ${calculateDownloadSpeed(bytesDownloaded, currentTime - lastProgressTime)}"
+                                    "Download progress - modelId: ${model.id}, progress: $progressPercent%, bytesDownloaded: $bytesDownloaded, totalBytes: $contentLength, speed: ${formatSpeed(speed)}, eta: ${formatETA(eta)}"
                                 )
                             }
                             lastProgressTime = currentTime
+                            lastBytesDownloaded = bytesDownloaded
                         }
                     }
 
@@ -481,6 +496,25 @@ class KtorDownloadService(
             bytesPerSecond < 1024 -> String.format("%.0f B/s", bytesPerSecond)
             bytesPerSecond < 1024 * 1024 -> String.format("%.1f KB/s", bytesPerSecond / 1024)
             else -> String.format("%.1f MB/s", bytesPerSecond / (1024 * 1024))
+        }
+    }
+
+    private fun formatSpeed(speed: Double?): String {
+        if (speed == null) return "N/A"
+        return when {
+            speed < 1024 -> String.format("%.0f B/s", speed)
+            speed < 1024 * 1024 -> String.format("%.1f KB/s", speed / 1024)
+            else -> String.format("%.1f MB/s", speed / (1024 * 1024))
+        }
+    }
+
+    private fun formatETA(eta: Double?): String {
+        if (eta == null) return "N/A"
+        val seconds = eta.toInt()
+        return when {
+            seconds < 60 -> "${seconds}s"
+            seconds < 3600 -> "${seconds / 60}m ${seconds % 60}s"
+            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
         }
     }
 
