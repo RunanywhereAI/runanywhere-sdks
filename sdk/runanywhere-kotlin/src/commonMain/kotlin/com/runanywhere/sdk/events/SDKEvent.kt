@@ -1,8 +1,5 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.runanywhere.sdk.events
 
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import com.runanywhere.sdk.foundation.currentTimeMillis
 
@@ -11,7 +8,7 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
  * Mirrors iOS SDKEvent protocol
  */
 interface SDKEvent {
-    val timestamp: Instant
+    val timestamp: Long  // Use epoch millis instead of Instant to avoid kotlin.time issues
     val eventType: SDKEventType
 }
 
@@ -38,7 +35,7 @@ enum class SDKEventType {
  */
 abstract class BaseSDKEvent(
     override val eventType: SDKEventType,
-    override val timestamp: Instant = Instant.fromEpochMilliseconds(currentTimeMillis())
+    override val timestamp: Long = currentTimeMillis()
 ) : SDKEvent
 
 /**

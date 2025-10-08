@@ -187,6 +187,29 @@ class ServiceContainer {
     }
 
     /**
+     * Initialize network services lazily when first needed (matches Swift SDK)
+     * Called during device registration, not during initialization
+     */
+    suspend fun initializeNetworkServices(params: SDKInitParams) {
+        // Skip if already initialized
+        if (::networkService.isInitialized) {
+            logger.debug("Network services already initialized")
+            return
+        }
+
+        logger.info("Initializing network services lazily...")
+
+        // Create network service based on environment
+        networkService = NetworkServiceFactory.create(
+            environment = params.environment,
+            baseURL = params.baseURL,
+            apiKey = params.apiKey
+        )
+
+        logger.info("✅ Network services initialized")
+    }
+
+    /**
      * Enhanced 8-step bootstrap process for production mode matching iOS implementation
      */
     suspend fun bootstrap(params: SDKInitParams): ConfigurationData {

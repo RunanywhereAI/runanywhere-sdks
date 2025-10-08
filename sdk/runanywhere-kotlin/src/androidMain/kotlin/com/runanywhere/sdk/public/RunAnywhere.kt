@@ -58,6 +58,43 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     // Store the Android context
     private var androidContext: Context? = null
 
+    // Device ID storage key
+    private const val DEVICE_ID_KEY = "com.runanywhere.sdk.deviceId"
+
+    // MARK: - Device Registration Storage (Platform-Specific)
+
+    override suspend fun getStoredDeviceId(): String? {
+        androidLogger.debug("Getting stored device ID from secure storage")
+        return try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            val deviceId = secureStorage.getSecureString(DEVICE_ID_KEY)
+            if (!deviceId.isNullOrEmpty()) {
+                androidLogger.debug("Found stored device ID: ${deviceId.take(8)}...")
+            }
+            deviceId
+        } catch (e: Exception) {
+            androidLogger.warn("Failed to get stored device ID: ${e.message}")
+            null
+        }
+    }
+
+    override suspend fun storeDeviceId(deviceId: String) {
+        androidLogger.debug("Storing device ID in secure storage")
+        try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            secureStorage.setSecureString(DEVICE_ID_KEY, deviceId)
+            androidLogger.info("Device ID stored successfully")
+        } catch (e: Exception) {
+            androidLogger.error("Failed to store device ID: ${e.message}")
+            throw com.runanywhere.sdk.data.models.SDKError.StorageError("Failed to store device ID: ${e.message}")
+        }
+    }
+
+    override fun generateDeviceIdentifier(): String {
+        // Use Java UUID for device identifier (same as JVM)
+        return java.util.UUID.randomUUID().toString()
+    }
+
     /**
      * Android-specific initialization with Context
      */
@@ -94,39 +131,35 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             "Android context not provided. Use RunAnywhere.initialize(context, ...) on Android"
         )
 
-        // Android uses Room database
-        androidLogger.info("Initializing Room database for Android")
-
-        // Initialize FileManager with Android context
-        // FileManager.setContext(context) // TODO: Fix this - FileManager doesn't have setContext method
+        // Android uses Room database (local only, no network)
+        androidLogger.info("Initializing local database for Android")
 
         // Initialize audio capture with context
         audioCapture = AndroidAudioCapture(context)
 
         // Initialize Android-specific services
         val platformContext = com.runanywhere.sdk.foundation.PlatformContext(context)
-        ServiceContainer.shared.initialize(platformContext)
+        val apiKey = _initParams?.apiKey
+        val baseURL = _initParams?.baseURL
+        ServiceContainer.shared.initialize(platformContext, currentEnvironment, apiKey, baseURL)
 
-        // Initialize model downloader
-        // modelDownloader = ModelDownloader(modelStorage) // TODO: Fix constructor parameters
+        androidLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
     }
 
-    override suspend fun authenticateWithBackend(params: SDKInitParams) {
-        // Skip authentication in development mode
-        if (currentEnvironment == SDKEnvironment.DEVELOPMENT) {
-            androidLogger.info("Skipping authentication in development mode")
-            return
-        }
+    // These methods are no longer called during initialization (Phase 1)
+    // They're kept for backward compatibility but are now unused
+    // Authentication and device registration happen lazily via ensureDeviceRegistered()
 
-        androidLogger.info("Authenticating with backend API")
-        // Authentication is handled by ServiceContainer.bootstrap()
-        serviceContainer.authenticationService.authenticate(params.apiKey)
+    override suspend fun authenticateWithBackend(params: SDKInitParams) {
+        // This method is no longer called during initialization
+        // Authentication happens lazily during ensureDeviceRegistered()
+        androidLogger.debug("authenticateWithBackend() called (unused in Phase 1)")
     }
 
     override suspend fun performHealthCheck() {
-        androidLogger.info("Performing health check")
-        // Health check would be implemented here
-        // For now, we assume healthy if authentication succeeded
+        // This method is no longer called during initialization
+        // Health check is optional and can be done after initialization
+        androidLogger.debug("performHealthCheck() called (unused in Phase 1)")
     }
 
     override suspend fun availableModels(): List<ModelInfo> {

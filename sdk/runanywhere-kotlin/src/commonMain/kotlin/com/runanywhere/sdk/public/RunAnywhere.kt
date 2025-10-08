@@ -13,6 +13,12 @@ import com.runanywhere.sdk.generation.StructuredOutputHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 /**
  * Enhanced main public API interface for RunAnywhere SDK
@@ -212,7 +218,27 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     protected var _initParams: SDKInitParams? = null
 
     private val logger = SDKLogger("RunAnywhere.Init")
+    private val registrationLogger = SDKLogger("RunAnywhere.Registration")
     protected val serviceContainer: ServiceContainer = ServiceContainer.shared
+
+    // MARK: - Lazy Device Registration State (matches Swift SDK)
+
+    private var _cachedDeviceId: String? = null
+    private var _isRegistering = false
+    private val _isDeviceRegistered = MutableStateFlow(false)
+    private val registrationMutex = Mutex()
+
+    companion object {
+        private const val MAX_REGISTRATION_RETRIES = 3
+        private const val RETRY_DELAY_MS = 2000L
+        private const val REGISTRATION_TIMEOUT_MS = 5000L
+        private const val POLLING_INTERVAL_MS = 100L
+
+        /**
+         * Check if device is registered (for testing/debugging)
+         */
+        fun isDeviceRegistered(): Boolean = false // Will be overridden by actual instance
+    }
 
     override val isInitialized: Boolean
         get() = _isInitialized
@@ -226,16 +252,16 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     /**
      * Initialize the RunAnywhere SDK
      *
-     * This method performs a comprehensive initialization sequence:
+     * This method performs LIGHTWEIGHT initialization (matches Swift SDK):
      *
-     * 1. **Validation**: Validate API key and parameters
+     * 1. **Validation**: Validate API key and parameters (skip in development)
      * 2. **Logging**: Initialize logging system based on environment
-     * 3. **Storage**: Store credentials securely in keychain/keystore
-     * 4. **Database**: Set up local database for caching
-     * 5. **Authentication**: Exchange API key for access token with backend
-     * 6. **Health Check**: Verify backend connectivity and service health
-     * 7. **Bootstrap**: Initialize all services and sync with backend
-     * 8. **Configuration**: Load and apply configuration
+     * 3. **Storage**: Store parameters locally (keychain for production, skip for dev)
+     * 4. **Database**: Initialize local SQLite database (migrations, schema setup)
+     * 5. **Local Services**: Setup local-only services (memory management, model registry)
+     *
+     * NO network calls during initialization!
+     * Device registration and backend communication happen lazily on first API call.
      *
      * The initialization is atomic - if any step fails, the entire process
      * is rolled back and the SDK remains uninitialized.
@@ -256,26 +282,25 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             environment = environment
         )
 
-        // Temporarily disable event publishing to fix kotlin.time.Instant ClassNotFoundException
         // EventBus.shared.publish(SDKInitializationEvent.Started)
 
         try {
             // Step 1: Validate API key (skip in development mode)
             if (environment != SDKEnvironment.DEVELOPMENT) {
-                logger.info("Step 1/8: Validating API key")
+                logger.info("Step 1/5: Validating API key")
                 if (apiKey.isEmpty()) {
                     throw SDKError.InvalidAPIKey("API key cannot be empty")
                 }
             } else {
-                logger.info("Step 1/8: Skipping API key validation in development mode")
+                logger.info("Step 1/5: Skipping API key validation in development mode")
             }
 
             // Step 2: Initialize logging system
-            logger.info("Step 2/8: Initializing logging system")
+            logger.info("Step 2/5: Initializing logging system")
             initializeLogging(environment)
 
-            // Step 3: Store parameters securely
-            logger.info("Step 3/8: Storing credentials securely")
+            // Step 3: Store parameters locally
+            logger.info("Step 3/5: Storing parameters locally")
             _initParams = params
             _currentEnvironment = environment
 
@@ -284,53 +309,18 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                 storeCredentialsSecurely(params)
             }
 
-            // Step 4: Initialize database
-            logger.info("Step 4/8: Initializing local database")
+            // Step 4: Initialize local database
+            logger.info("Step 4/5: Initializing local database")
             initializeDatabase()
 
-            // Development mode: Skip API authentication and use local/mock services
-            if (environment == SDKEnvironment.DEVELOPMENT) {
-                logger.info("🚀 Running in DEVELOPMENT mode - using local/mock services")
-                logger.info("Step 5/8: Skipping API authentication in development mode")
-                logger.info("Step 6/8: Skipping health check in development mode")
-                logger.info("Step 7/8: Bootstrapping SDK services with local data")
+            // Step 5: Setup local services only (NO network calls)
+            logger.info("Step 5/5: Setting up local services")
+            setupLocalServices()
 
-                // Bootstrap without API client for development mode
-                val loadedConfig = serviceContainer.bootstrapDevelopmentMode(params)
-
-                // Step 8: Store the configuration
-                logger.info("Step 8/8: Loading configuration")
-                _configurationData = loadedConfig
-
-                // Mark as initialized
-                _isInitialized = true
-                logger.info("✅ SDK initialization completed successfully (Development Mode)")
-                // EventBus.shared.publish(SDKInitializationEvent.Completed)
-
-            } else {
-                // Production/Staging mode: Full API authentication flow
-
-                // Step 5: Initialize API client and authentication service
-                logger.info("Step 5/8: Authenticating with backend")
-                authenticateWithBackend(params)
-
-                // Step 6: Perform health check
-                logger.info("Step 6/8: Performing health check")
-                performHealthCheck()
-
-                // Step 7: Bootstrap SDK services and sync with backend
-                logger.info("Step 7/8: Bootstrapping SDK services and syncing with backend")
-                val loadedConfig = serviceContainer.bootstrap(params)
-
-                // Step 8: Store the configuration
-                logger.info("Step 8/8: Loading configuration")
-                _configurationData = loadedConfig
-
-                // Mark as initialized
-                _isInitialized = true
-                logger.info("✅ SDK initialization completed successfully")
-                // EventBus.shared.publish(SDKInitializationEvent.Completed)
-            }
+            // Mark as initialized
+            _isInitialized = true
+            logger.info("✅ SDK initialization completed successfully (${environment.name} mode)")
+            // EventBus.shared.publish(SDKInitializationEvent.Completed)
 
         } catch (error: Exception) {
             logger.error("❌ SDK initialization failed: ${error.message}")
@@ -340,6 +330,16 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // EventBus.shared.publish(SDKInitializationEvent.Failed(error))
             throw error
         }
+    }
+
+    /**
+     * Setup local-only services (no network calls)
+     * Matches Swift SDK's setupLocalServices()
+     */
+    protected open suspend fun setupLocalServices() {
+        // Local services are initialized lazily by ServiceContainer
+        // No explicit setup needed here (services initialize on first use)
+        logger.debug("Local services ready for lazy initialization")
     }
 
     /**
@@ -413,6 +413,166 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     /**
      * Platform-specific cleanup to be implemented
      */
+    protected abstract suspend fun cleanupPlatform()
+
+    // MARK: - Device Registration Storage (Platform-Specific)
+
+    /**
+     * Get stored device ID from local persistence (platform-specific)
+     * Matches Swift SDK's getStoredDeviceId()
+     */
+    protected abstract suspend fun getStoredDeviceId(): String?
+
+    /**
+     * Store device ID in local persistence (platform-specific)
+     * Matches Swift SDK's storeDeviceId()
+     */
+    protected abstract suspend fun storeDeviceId(deviceId: String)
+
+    /**
+     * Generate a device identifier (platform-specific)
+     * Matches Swift SDK's generateDeviceIdentifier()
+     */
+    protected abstract fun generateDeviceIdentifier(): String
+
+    // MARK: - Lazy Device Registration Implementation
+
+    /**
+     * Ensure device is registered with backend (lazy registration)
+     * Only registers if device ID doesn't exist locally
+     * Matches Swift SDK's ensureDeviceRegistered() implementation exactly
+     *
+     * @throws SDKError if registration fails after retries
+     */
+    protected suspend fun ensureDeviceRegistered() {
+        // First check: Quick check without lock
+        if (_isDeviceRegistered.value && _cachedDeviceId?.isNotEmpty() == true) {
+            return
+        }
+
+        // Acquire registration lock
+        registrationMutex.withLock {
+            // Check if we have a cached device ID
+            if (_cachedDeviceId?.isNotEmpty() == true) {
+                _isDeviceRegistered.value = true
+                return
+            }
+
+            // Check if device is already registered in local storage
+            val storedDeviceId = getStoredDeviceId()
+            if (!storedDeviceId.isNullOrEmpty()) {
+                _cachedDeviceId = storedDeviceId
+                _isDeviceRegistered.value = true
+                return
+            }
+
+            // Check if already registering
+            if (_isRegistering) {
+                // Another coroutine is handling registration, wait for it
+                return
+            }
+
+            // Mark as registering
+            _isRegistering = true
+        }
+
+        registrationLogger.info("Starting device registration...")
+
+        try {
+            // Skip registration in development mode
+            if (_currentEnvironment == SDKEnvironment.DEVELOPMENT) {
+                val mockDeviceId = "dev-${generateDeviceIdentifier()}"
+                storeDeviceId(mockDeviceId)
+                _cachedDeviceId = mockDeviceId
+                _isDeviceRegistered.value = true
+                registrationLogger.info("Using mock device ID for development: ${mockDeviceId.take(8)}...")
+                return
+            }
+
+            // Ensure we have init params
+            val params = _initParams ?: throw SDKError.NotInitialized
+
+            // Registration with retry logic (matches Swift SDK)
+            var lastError: Exception? = null
+
+            for (attempt in 0 until MAX_REGISTRATION_RETRIES) {
+                try {
+                    registrationLogger.info("Device registration attempt ${attempt + 1} of $MAX_REGISTRATION_RETRIES")
+
+                    // Initialize network services if needed (lazy)
+                    serviceContainer.initializeNetworkServices(params)
+
+                    val authService = serviceContainer.authenticationService
+
+                    // Register device with backend
+                    val deviceRegistration = authService.registerDevice()
+
+                    // Store device ID locally
+                    storeDeviceId(deviceRegistration.deviceId)
+                    _cachedDeviceId = deviceRegistration.deviceId
+                    _isDeviceRegistered.value = true
+
+                    registrationLogger.info("Device registered successfully: ${deviceRegistration.deviceId.take(8)}...")
+                    registrationLogger.debug("Device registration completed")
+
+                    // Success! Exit retry loop
+                    return
+
+                } catch (e: Exception) {
+                    lastError = e
+                    registrationLogger.error("Device registration attempt ${attempt + 1} failed: ${e.message}")
+
+                    // Check if error is retryable
+                    if (!isRetryableError(e)) {
+                        registrationLogger.error("Non-retryable error, stopping registration attempts")
+                        throw e
+                    }
+
+                    // Wait before retrying (except on last attempt)
+                    if (attempt < MAX_REGISTRATION_RETRIES - 1) {
+                        registrationLogger.info("Waiting ${RETRY_DELAY_MS / 1000} seconds before retry...")
+                        delay(RETRY_DELAY_MS)
+                    }
+                }
+            }
+
+            // All retries exhausted
+            val finalError = lastError ?: SDKError.NetworkError(
+                "Device registration failed after $MAX_REGISTRATION_RETRIES attempts"
+            )
+            registrationLogger.error("Device registration failed after all retries: ${finalError.message}")
+            throw finalError
+
+        } finally {
+            // Always reset _isRegistering flag
+            _isRegistering = false
+        }
+    }
+
+    /**
+     * Determine if an error is retryable (matches Swift SDK logic)
+     */
+    private fun isRetryableError(error: Exception): Boolean {
+        return when (error) {
+            is SDKError.NetworkError,
+            is SDKError.Timeout,
+            is SDKError.ServerError -> true
+            is SDKError.InvalidAPIKey,
+            is SDKError.NotInitialized,
+            is SDKError.InvalidState,
+            is SDKError.ValidationFailed,
+            is SDKError.StorageError -> false
+            else -> {
+                // Check error message for common network errors
+                val message = error.message?.lowercase() ?: ""
+                message.contains("timeout") ||
+                        message.contains("connection") ||
+                        message.contains("network") ||
+                        message.contains("dns")
+            }
+        }
+    }
+
     // MARK: - Enhanced Interface Implementation
 
     /**
@@ -430,6 +590,9 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
     ): String {
         requireInitialized()
+
+        // ✨ Lazy device registration on first API call (matches Swift SDK)
+        ensureDeviceRegistered()
 
         // Try to use GenerationService first (preferred approach)
         if (serviceContainer.generationService.isReady()) {
@@ -597,6 +760,10 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         options: com.runanywhere.sdk.public.extensions.STTOptions
     ): com.runanywhere.sdk.public.extensions.STTResult {
         requireInitialized()
+
+        // ✨ Lazy device registration on first API call (matches Swift SDK)
+        ensureDeviceRegistered()
+
         // Use STT component for transcription
         val sttComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
             as? com.runanywhere.sdk.components.stt.STTComponent
@@ -710,6 +877,10 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
      */
     override suspend fun transcribe(audioData: ByteArray): String {
         requireInitialized()
+
+        // ✨ Lazy device registration on first API call (matches Swift SDK)
+        ensureDeviceRegistered()
+
         // Use STT component for transcription
         val sttComponent =
             serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.STT)
@@ -846,8 +1017,6 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         requireInitialized()
         // Extension functions not implemented yet
     }
-
-    protected abstract suspend fun cleanupPlatform()
 
     protected fun requireInitialized() {
         if (!_isInitialized) {
