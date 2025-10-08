@@ -1,6 +1,7 @@
 package com.runanywhere.sdk.core
 
 import com.runanywhere.sdk.components.base.SDKComponent
+import com.runanywhere.sdk.components.llm.LLMServiceProvider
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTService
 import com.runanywhere.sdk.components.vad.VADConfiguration
@@ -255,15 +256,7 @@ interface VADServiceProvider {
     val name: String
 }
 
-/**
- * Provider for Language Model services
- */
-interface LLMServiceProvider {
-    suspend fun generate(prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): String
-    fun generateStream(prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): kotlinx.coroutines.flow.Flow<String>
-    fun canHandle(modelId: String): Boolean = true
-    val name: String
-}
+// LLMServiceProvider is now imported from com.runanywhere.sdk.components.llm.LLMServiceProvider
 
 /**
  * Provider for Text-to-Speech services

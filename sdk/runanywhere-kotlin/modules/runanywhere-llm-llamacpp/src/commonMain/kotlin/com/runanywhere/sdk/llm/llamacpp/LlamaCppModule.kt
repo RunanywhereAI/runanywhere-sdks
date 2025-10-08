@@ -12,23 +12,22 @@ object LlamaCppModule : AutoRegisteringModule {
     private var provider: LlamaCppProvider? = null
 
     override fun register() {
-        if (isAvailable) {
+        if (checkNativeLibraryAvailable()) {
             provider = LlamaCppProvider()
             ModuleRegistry.shared.registerLLM(provider!!)
         }
     }
 
-    override val isAvailable: Boolean
+    val isAvailable: Boolean
         get() = checkNativeLibraryAvailable()
 
-    override val name: String = "llama.cpp"
+    val name: String = "llama.cpp"
 
-    override val version: String = "0.1.0"
+    val version: String = "0.1.0"
 
-    override val description: String = "On-device LLM inference using llama.cpp"
+    val description: String = "On-device LLM inference using llama.cpp"
 
-    override fun cleanup() {
-        provider?.cleanup()
+    fun cleanup() {
         provider = null
     }
 }

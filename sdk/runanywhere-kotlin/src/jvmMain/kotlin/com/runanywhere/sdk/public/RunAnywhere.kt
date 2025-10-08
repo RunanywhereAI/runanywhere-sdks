@@ -38,8 +38,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     private lateinit var modelDownloader: ModelDownloader
     private var sttComponent: STTComponent? = null
     private var vadComponent: VADComponent? = null
-    private val modelStorage = JvmModelStorage()
-    private val audioCapture = com.runanywhere.sdk.audio.JvmAudioCapture()
+    private val modelStorage by lazy { JvmModelStorage() }
+    private val audioCapture by lazy { com.runanywhere.sdk.audio.JvmAudioCapture() }
 
     // SDK's own coroutine scope for background operations
     private val sdkScope = CoroutineScope(Dispatchers.IO + SupervisorJob())

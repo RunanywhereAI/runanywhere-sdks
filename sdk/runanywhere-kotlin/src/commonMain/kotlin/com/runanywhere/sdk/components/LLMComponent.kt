@@ -12,7 +12,7 @@ import com.runanywhere.sdk.generation.GenerationOptions
 import com.runanywhere.sdk.generation.GenerationService
 import com.runanywhere.sdk.generation.StreamingService
 import com.runanywhere.sdk.core.ModuleRegistry
-import com.runanywhere.sdk.core.LLMServiceProvider
+import com.runanywhere.sdk.components.llm.LLMServiceProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.Serializable
 
@@ -226,11 +226,51 @@ class LLMServiceAdapter(
     private val provider: LLMServiceProvider
 ) : LLMService {
     override suspend fun generate(prompt: String, options: GenerationOptions): String {
-        return provider.generate(prompt, options)
+        // Convert GenerationOptions to RunAnywhereGenerationOptions
+        val llmOptions = com.runanywhere.sdk.models.RunAnywhereGenerationOptions(
+            maxTokens = options.maxTokens,
+            temperature = options.temperature,
+            streamingEnabled = false
+        )
+        
+        // Create a basic LLM service from the provider
+        val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
+            modelId = options.model ?: "default",
+            temperature = options.temperature.toDouble(),
+            maxTokens = options.maxTokens
+        )
+        
+        val llmService = provider.createLLMService(llmConfig)
+        return llmService.generate(prompt, llmOptions)
     }
 
     override fun generateStream(prompt: String, options: GenerationOptions): Flow<String> {
-        return provider.generateStream(prompt, options)
+        // Convert GenerationOptions to RunAnywhereGenerationOptions
+        val llmOptions = com.runanywhere.sdk.models.RunAnywhereGenerationOptions(
+            maxTokens = options.maxTokens,
+            temperature = options.temperature,
+            streamingEnabled = true
+        )
+        
+        return flow {
+            // Create a basic LLM service from the provider
+            val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
+                modelId = options.model ?: "default",
+                temperature = options.temperature.toDouble(),
+                maxTokens = options.maxTokens
+            )
+            
+            val llmService = provider.createLLMService(llmConfig)
+            val tokens = mutableListOf<String>()
+            
+            llmService.streamGenerate(prompt, llmOptions) { token ->
+                tokens.add(token)
+            }
+            
+            for (token in tokens) {
+                emit(token)
+            }
+        }
     }
 
     override suspend fun loadModel(modelInfo: ModelInfo) {

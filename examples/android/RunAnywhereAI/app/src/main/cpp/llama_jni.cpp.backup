@@ -4,19 +4,32 @@
 #include <memory>
 #include <android/log.h>
 
+// Real llama.cpp includes
+#include "llama.h"
+#include "ggml.h"
+
 #define TAG "LlamaCppJNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-// Simplified llama.cpp model structure for demonstration
-// In a real implementation, this would use the actual llama.cpp library
+// Real llama.cpp model structure
 struct LlamaModel {
+    llama_model* model;
+    llama_context* ctx;
+    std::vector<llama_token> tokens;
     std::string model_path;
-    size_t vocab_size;
-    size_t context_size;
     bool loaded;
 
-    LlamaModel(const std::string& path) : model_path(path), vocab_size(32000), context_size(2048), loaded(false) {}
+    LlamaModel(const std::string& path) : model(nullptr), ctx(nullptr), model_path(path), loaded(false) {}
+    
+    ~LlamaModel() {
+        if (ctx) {
+            llama_free(ctx);
+        }
+        if (model) {
+            llama_free_model(model);
+        }
+    }
 };
 
 extern "C" {
@@ -28,17 +41,44 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_LlamaCppService_00024Companion
     const char *path = env->GetStringUTFChars(modelPath, nullptr);
     LOGI("Loading model from: %s", path);
 
+    // Initialize llama.cpp backend
+    llama_backend_init();
+    
     // Create a new model instance
-    auto* model = new LlamaModel(path);
+    auto* wrapper = new LlamaModel(path);
 
-    // In a real implementation, this would load the actual GGUF model
-    // For now, we'll simulate success
-    model->loaded = true;
-
+    // Real llama.cpp model loading
+    llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = 0; // CPU only for Android compatibility
+    
+    wrapper->model = llama_load_model_from_file(path, model_params);
+    
+    if (!wrapper->model) {
+        LOGE("Failed to load model from: %s", path);
+        delete wrapper;
+        env->ReleaseStringUTFChars(modelPath, path);
+        return 0;
+    }
+    
+    // Create context
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = 2048;
+    ctx_params.n_threads = 4;
+    
+    wrapper->ctx = llama_new_context_with_model(wrapper->model, ctx_params);
+    
+    if (!wrapper->ctx) {
+        LOGE("Failed to create context for model: %s", path);
+        delete wrapper;
+        env->ReleaseStringUTFChars(modelPath, path);
+        return 0;
+    }
+    
+    wrapper->loaded = true;
     env->ReleaseStringUTFChars(modelPath, path);
 
-    LOGI("Model loaded successfully, ptr: %p", model);
-    return reinterpret_cast<jlong>(model);
+    LOGI("Model loaded successfully, ptr: %p", wrapper);
+    return reinterpret_cast<jlong>(wrapper);
 }
 
 JNIEXPORT jstring JNICALL
@@ -46,31 +86,77 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_LlamaCppService_00024Companion
     JNIEnv *env, jobject /* this */, jlong modelPtr, jstring prompt,
     jint maxTokens, jfloat temperature, jfloat topP, jint topK) {
 
-    auto* model = reinterpret_cast<LlamaModel*>(modelPtr);
-    if (!model || !model->loaded) {
+    auto* wrapper = reinterpret_cast<LlamaModel*>(modelPtr);
+    if (!wrapper || !wrapper->loaded) {
         LOGE("Invalid model pointer or model not loaded");
         return env->NewStringUTF("Error: Model not loaded");
     }
 
     const char *promptStr = env->GetStringUTFChars(prompt, nullptr);
-    LOGI("Generating with prompt: %s", promptStr);
+    LOGI("Generating with prompt: %s (max_tokens=%d, temp=%.2f)", promptStr, maxTokens, temperature);
 
-    // In a real implementation, this would:
-    // 1. Tokenize the prompt
-    // 2. Run inference with the model
-    // 3. Sample tokens based on temperature, topP, topK
-    // 4. Decode tokens back to text
-
-    // For demonstration, return a placeholder response
-    std::string response = "Generated response from llama.cpp model. ";
-    response += "This is a placeholder implementation. ";
-    response += "In a real implementation, this would use the actual llama.cpp library ";
-    response += "to generate text based on the GGUF model loaded from: ";
-    response += model->model_path;
-
-    env->ReleaseStringUTFChars(prompt, promptStr);
-
-    return env->NewStringUTF(response.c_str());
+    try {
+        // Tokenize the prompt
+        std::vector<llama_token> tokens = llama_tokenize(wrapper->ctx, promptStr, true, true);
+        
+        if (tokens.empty()) {
+            env->ReleaseStringUTFChars(prompt, promptStr);
+            return env->NewStringUTF("Error: Failed to tokenize prompt");
+        }
+        
+        // Clear previous state
+        llama_kv_cache_clear(wrapper->ctx);
+        
+        // Evaluate the prompt
+        int n_eval = tokens.size();
+        if (llama_decode(wrapper->ctx, llama_batch_get_one(tokens.data(), n_eval, 0, 0))) {
+            env->ReleaseStringUTFChars(prompt, promptStr);
+            return env->NewStringUTF("Error: Failed to evaluate prompt");
+        }
+        
+        // Generate tokens
+        std::string result;
+        int n_generated = 0;
+        
+        for (int i = 0; i < maxTokens && n_generated < maxTokens; ++i) {
+            // Sample next token
+            llama_token new_token = llama_sample_token_greedy(wrapper->ctx, nullptr);
+            
+            // Check for end of sequence
+            if (llama_token_is_eog(wrapper->model, new_token)) {
+                break;
+            }
+            
+            // Decode token to text
+            char piece[256];
+            int n = llama_token_to_piece(wrapper->model, new_token, piece, sizeof(piece), true);
+            if (n > 0) {
+                result.append(piece, n);
+            }
+            
+            // Add token to context for next iteration
+            if (llama_decode(wrapper->ctx, llama_batch_get_one(&new_token, 1, tokens.size() + i, 0))) {
+                LOGE("Failed to decode token at position %d", i);
+                break;
+            }
+            
+            n_generated++;
+        }
+        
+        env->ReleaseStringUTFChars(prompt, promptStr);
+        
+        if (result.empty()) {
+            return env->NewStringUTF("Generated text (empty result)");
+        }
+        
+        LOGI("Generated %d tokens, result length: %zu", n_generated, result.length());
+        return env->NewStringUTF(result.c_str());
+        
+    } catch (const std::exception& e) {
+        LOGE("Exception during generation: %s", e.what());
+        env->ReleaseStringUTFChars(prompt, promptStr);
+        return env->NewStringUTF("Error: Exception during generation");
+    }
 }
 
 JNIEXPORT void JNICALL

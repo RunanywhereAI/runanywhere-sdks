@@ -81,11 +81,7 @@ class QuizViewModel(application: Application) : AndroidViewModel(application) {
                 val quizPrompt = buildQuizPrompt(inputText)
 
                 // Generate quiz using SDK
-                val generationOptions = mapOf(
-                    "maxTokens" to 1500,
-                    "temperature" to 0.7f
-                )
-                val jsonResponse = RunAnywhere.generate(quizPrompt, generationOptions)
+                val jsonResponse = RunAnywhere.generate(quizPrompt)
 
                 // Parse JSON response
                 val generatedQuiz = parseQuizResponse(jsonResponse)
