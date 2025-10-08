@@ -584,26 +584,16 @@ class ServiceContainer {
 
     /**
      * Register LlamaCpp provider for development
+     *
+     * NOTE: LlamaCpp module is separate and auto-registers itself when included.
+     * The module uses object initializer to call ModuleRegistry.registerLLM() automatically.
+     * No explicit registration needed in ServiceContainer.
      */
     private fun registerLlamaCppProvider() {
-        logger.info("ℹ️ LlamaCpp provider registration skipped - module not available yet")
-        // TODO: Implement LlamaCpp module registration when module is ready
-        // try {
-        //     // Register the LlamaCpp module which will auto-register the provider
-        //     com.runanywhere.sdk.llm.llamacpp.LlamaCppModule.register()
-        //     logger.info("✅ LlamaCpp module registered")
-        // } catch (e: Exception) {
-        //     logger.warn("⚠️ LlamaCpp module registration failed: ${e.message}")
-        //
-        //     // Fallback: Try to register the provider directly
-        //     try {
-        //         val llamaCppProvider = com.runanywhere.sdk.llm.llamacpp.LlamaCppProvider()
-        //         ModuleRegistry.registerLLM(llamaCppProvider)
-        //         logger.info("✅ LlamaCpp provider registered as fallback")
-        //     } catch (fallbackError: Exception) {
-        //         logger.warn("⚠️ LlamaCpp provider fallback registration also failed: ${fallbackError.message}")
-        //     }
-        // }
+        // LlamaCpp module auto-registers via its object initializer
+        // If you want to manually register, add the module as a dependency and call:
+        // com.runanywhere.sdk.llm.llamacpp.LlamaCppModule.register()
+        logger.debug("LlamaCpp module will auto-register if available on classpath")
     }
 
     /**

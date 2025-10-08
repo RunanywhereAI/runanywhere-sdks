@@ -15,14 +15,14 @@ import kotlin.math.min
 /**
  * Actual implementation of LlamaCpp service for JVM and Android platforms
  */
-actual class LlamaCppService(private val configuration: LLMConfiguration) : EnhancedLLMService {
+actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) : EnhancedLLMService {
     private val logger = SDKLogger("LlamaCppService")
     private var contextHandle: Long = 0L
     private var modelPath: String? = null
     private var isInitialized = false
-    private var modelInfo: ModelInfo? = null
+    private var modelInfo: com.runanywhere.sdk.models.ModelInfo? = null
 
-    override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
+    actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         val actualModelPath = modelPath ?: configuration.modelId
             ?: throw IllegalArgumentException("No model path provided")
 
@@ -57,13 +57,13 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
 
         this@LlamaCppService.modelPath = actualModelPath
         isInitialized = true
-        modelInfo = LlamaCppNative.llamaGetModelInfo(contextHandle)
+        modelInfo = convertToSDKModelInfo(LlamaCppNative.llamaGetModelInfo(contextHandle), actualModelPath)
 
         logger.info("Initialized llama.cpp with model: ${modelInfo?.name}")
         logger.debug("Model info: $modelInfo")
     }
 
-    override suspend fun generate(
+    actual override suspend fun generate(
         prompt: String,
         options: RunAnywhereGenerationOptions
     ): String = withContext(Dispatchers.Default) {
@@ -93,7 +93,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         return@withContext nativeResult.text
     }
 
-    override suspend fun streamGenerate(
+    actual override suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
         onToken: (String) -> Unit
@@ -126,7 +126,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         }
     }
 
-    override suspend fun cleanup() = withContext(Dispatchers.IO) {
+    actual override suspend fun cleanup() = withContext(Dispatchers.IO) {
         if (LlamaCppNative.isLoaded() && contextHandle != 0L) {
             LlamaCppNative.llamaFree(contextHandle)
             contextHandle = 0L
@@ -137,14 +137,14 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
     }
 
     // Interface properties
-    override val isReady: Boolean
+    actual override val isReady: Boolean
         get() = isInitialized && (contextHandle != 0L || !LlamaCppNative.isLoaded())
 
-    override val currentModel: String?
+    actual override val currentModel: String?
         get() = modelInfo?.name ?: modelPath?.split("/")?.lastOrNull()
 
     // EnhancedLLMService implementation
-    override suspend fun process(input: LLMInput): LLMOutput {
+    actual override suspend fun process(input: LLMInput): LLMOutput {
         if (!isInitialized || contextHandle == 0L) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
@@ -190,7 +190,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         )
     }
 
-    override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
+    actual override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         if (!isInitialized || contextHandle == 0L) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
@@ -202,14 +202,14 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
             streamingEnabled = true
         )
 
-        var tokenCount = 0
+        var chunkCount = 0
         streamGenerate(prompt, options) { token ->
-            tokenCount++
+            chunkCount++
             // Emit as LLMGenerationChunk
             val chunk = LLMGenerationChunk(
-                delta = token,
+                text = token,
                 isComplete = false,
-                tokenIndex = tokenCount,
+                chunkIndex = chunkCount,
                 timestamp = com.runanywhere.sdk.foundation.currentTimeMillis()
             )
             // Note: This is a simplified approach. Real implementation would need coroutine channels
@@ -218,25 +218,25 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
 
         // Emit completion chunk
         emit(LLMGenerationChunk(
-            delta = "",
+            text = "",
             isComplete = true,
-            tokenIndex = tokenCount,
+            chunkIndex = chunkCount,
             timestamp = com.runanywhere.sdk.foundation.currentTimeMillis()
         ))
     }
 
-    override suspend fun loadModel(modelInfo: com.runanywhere.sdk.models.ModelInfo) {
+    actual override suspend fun loadModel(modelInfo: com.runanywhere.sdk.models.ModelInfo) {
         val localPath = modelInfo.localPath ?: throw IllegalArgumentException("Model has no local path")
         initialize(localPath)
     }
 
-    override fun cancelCurrent() {
+    actual override fun cancelCurrent() {
         // llama.cpp doesn't support cancellation directly
         // This would require implementing a cancellation mechanism in the native layer
         logger.info("Cancellation requested but not implemented in llama.cpp")
     }
 
-    override fun getTokenCount(text: String): Int {
+    actual override fun getTokenCount(text: String): Int {
         return if (isInitialized) {
             try {
                 LlamaCppNative.llamaGetTokenCount(contextHandle, text)
@@ -250,7 +250,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         }
     }
 
-    override fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
+    actual override fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
         val promptTokens = getTokenCount(prompt)
         val totalTokens = promptTokens + maxTokens
         return totalTokens <= configuration.contextLength
@@ -303,4 +303,58 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         if (!isInitialized) throw IllegalStateException("Service not initialized")
         LlamaCppNative.llamaTokenize(contextHandle, text)
     }
+
+    // Mock mode helpers for development/testing
+    private fun createMockModelInfo(): com.runanywhere.sdk.models.ModelInfo {
+        return com.runanywhere.sdk.models.ModelInfo(
+            id = modelPath ?: "mock-model",
+            name = "Mock LLM Model",
+            category = com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE,
+            format = com.runanywhere.sdk.models.enums.ModelFormat.GGUF,
+            downloadURL = null,
+            localPath = modelPath,
+            downloadSize = 0,
+            memoryRequired = 0,
+            compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP),
+            preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
+            contextLength = 4096,
+            supportsThinking = false,
+            metadata = null
+        )
+    }
+
+    private fun generateMockResponse(prompt: String): String {
+        return "Mock response for: ${prompt.take(50)}..."
+    }
+
+    private suspend fun streamMockResponse(prompt: String, onToken: (String) -> Unit) {
+        val response = generateMockResponse(prompt)
+        val words = response.split(" ")
+        for (word in words) {
+            onToken("$word ")
+            kotlinx.coroutines.delay(50) // Simulate streaming
+        }
+    }
+}
+
+// Converter helper
+private fun convertToSDKModelInfo(
+    nativeInfo: com.runanywhere.sdk.llm.llamacpp.ModelInfo,
+    modelPath: String
+): com.runanywhere.sdk.models.ModelInfo {
+    return com.runanywhere.sdk.models.ModelInfo(
+        id = modelPath,
+        name = nativeInfo.name,
+        category = com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE,
+        format = com.runanywhere.sdk.models.enums.ModelFormat.GGUF,
+        downloadURL = null,
+        localPath = modelPath,
+        downloadSize = nativeInfo.fileSize,
+        memoryRequired = nativeInfo.fileSize,
+        compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP),
+        preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
+        contextLength = nativeInfo.contextLength,
+        supportsThinking = false,
+        metadata = null
+    )
 }

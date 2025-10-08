@@ -20,7 +20,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(project(":modules:runanywhere-core"))
+                // Depend on core SDK for interfaces and models
+                api(project(":"))
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }

@@ -29,11 +29,13 @@ include(":jni")
 // WhisperKit module - standalone STT module using WhisperJNI
 include(":modules:runanywhere-whisperkit")
 
+// LlamaCpp module - provides LLM capabilities via llama.cpp
+include(":modules:runanywhere-llm-llamacpp")
+
 // Other modules temporarily disabled due to build issues
 // TODO: Fix module build configurations
 // include(":modules:runanywhere-core")
 // include(":modules:runanywhere-vad")
 // include(":modules:runanywhere-llm")
-// include(":modules:runanywhere-llm-llamacpp")
 // include(":modules:runanywhere-tts")
 // include(":modules:runanywhere-speaker-diarization")
