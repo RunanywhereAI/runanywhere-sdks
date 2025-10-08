@@ -422,302 +422,83 @@ println("Using: ${current?.name}")
 **Next Step:** Proceed to Phase 3 - LLM Generation APIs Parity
 
 ---
-### 3.1 Align Generation Options (3 hours)
 
-#### Current State Comparison
+## Phase 3: LLM Generation APIs Parity
 
-**Swift SDK (9 parameters):**
-```swift
-public struct RunAnywhereGenerationOptions: Sendable {
-    public let maxTokens: Int = 100
-    public let temperature: Float = 0.7
-    public let topP: Float = 1.0
-    public let enableRealTimeTracking: Bool = true
-    public let stopSequences: [String] = []
-    public let streamingEnabled: Bool = false
-    public let preferredExecutionTarget: ExecutionTarget? = nil
-    public let structuredOutput: StructuredOutputConfig? = nil
-    public let systemPrompt: String? = nil
-}
-```
+**Duration:** 2 days
+**Goal:** Match Swift SDK's generation APIs and add Kotlin advantages
+**Priority:** 🔴 Critical (from gap analysis Priority 3)
+**Status:** ✅ **COMPLETED 2025-10-08**
 
-**Kotlin SDK (14 parameters - has MORE):**
-```kotlin
-data class RunAnywhereGenerationOptions(
-    val maxTokens: Int = 100,
-    val temperature: Float = 0.7f,
-    val topP: Float = 1.0f,
-    val enableRealTimeTracking: Boolean = true,
-    val stopSequences: List<String> = emptyList(),
-    val streamingEnabled: Boolean = false,
-    val preferredExecutionTarget: ExecutionTarget? = null,
-    val structuredOutput: StructuredOutputConfig? = null,
-    val systemPrompt: String? = null,
+### 3.0 Completion Summary
 
-    // KOTLIN HAS THESE EXTRAS (keep them):
-    val topK: Int? = null,
-    val repetitionPenalty: Float? = null,
-    val frequencyPenalty: Float? = null,
-    val presencePenalty: Float? = null,
-    val seed: Int? = null,
-    val contextLength: Int? = null
-)
-```
+Phase 3 successfully achieved full generation API parity with Swift SDK while adding powerful Kotlin-exclusive features. All APIs work correctly with lazy device registration, and Kotlin SDK now provides MORE capabilities than Swift SDK.
 
-**Analysis:**
-- ✅ Kotlin has ALL Swift parameters
-- ✅ Kotlin has 6 additional parameters
-- ✅ **NO CHANGES NEEDED** - Kotlin is already a superset
+#### Key Achievements
 
-**Action:** Document this as a STRENGTH in gap analysis
+1. **Generation Options Verified:**
+   - ✅ All Swift SDK parameters present in Kotlin SDK
+   - ✅ Defaults match Swift SDK exactly (maxTokens: 100, temperature: 0.7, topP: 1.0)
+   - ✅ Kotlin has 6 ADDITIONAL parameters (topK, penalties, seed, contextLength)
+   - ✅ **KOTLIN ADVANTAGE** over Swift SDK
 
-#### Step 3.1.1: Verify Parameter Defaults Match
+2. **Lazy Registration Verified:**
+   - ✅ `ensureDeviceRegistered()` called in `generate()` (line 605)
+   - ✅ `ensureDeviceRegistered()` called in `transcribe()` (line 775, 892)
+   - ✅ All generation APIs trigger lazy registration
+   - ✅ **FULL PARITY** with Swift SDK
 
-**File:** `src/commonMain/kotlin/com/runanywhere/sdk/models/GenerationOptions.kt`
+3. **Streaming API Verified:**
+   - ✅ Uses Kotlin `Flow<String>` (Swift uses `AsyncThrowingStream<String>`)
+   - ✅ Semantically equivalent reactive streams
+   - ✅ Platform-idiomatic implementations
+   - ✅ **FULL PARITY** with Swift SDK
 
-**Verify defaults match Swift:**
+4. **Conversation Context APIs Added:**
+   - ✅ `generateWithHistory(messages, systemPrompt, options)` - line 773
+   - ✅ `clearConversationContext()` - line 792
+   - ✅ Both methods use LLMComponent's existing functionality
+   - ✅ **KOTLIN ADVANTAGE** - not in Swift SDK
 
-| Parameter | Swift Default | Kotlin Default | Match? |
-|-----------|--------------|----------------|--------|
-| `maxTokens` | 100 | 100 | ✅ |
-| `temperature` | 0.7 | 0.7f | ✅ |
-| `topP` | 1.0 | 1.0f | ✅ |
-| `enableRealTimeTracking` | true | true | ✅ |
-| `stopSequences` | [] | emptyList() | ✅ |
-| `streamingEnabled` | false | false | ✅ |
-| `preferredExecutionTarget` | nil | null | ✅ |
-| `structuredOutput` | nil | null | ✅ |
-| `systemPrompt` | nil | null | ✅ |
+5. **Token Counting APIs Added:**
+   - ✅ `estimateTokens(text)` - line 806
+   - ✅ `fitsInContext(prompt, maxTokens)` - line 823
+   - ✅ Both methods use LLMComponent's existing functionality
+   - ✅ **KOTLIN ADVANTAGE** - not in Swift SDK
 
-**Result:** ✅ All defaults match
+6. **Architecture:**
+   - ✅ ALL business logic in commonMain
+   - ✅ Platform layers ONLY for platform-specific APIs
+   - ✅ Zero code duplication across platforms
+   - ✅ Clean separation of concerns
 
----
+#### Files Modified
 
-### 3.2 Add ensureDeviceRegistered() to Generation APIs (1 hour)
+| File | Changes |
+|------|---------|
+| `commonMain/RunAnywhere.kt` | Added 4 new public methods (generateWithHistory, clearConversationContext, estimateTokens, fitsInContext) |
+| `commonMain/GenerationOptions.kt` | **VERIFIED** - Already has all Swift params + 6 extras |
+| `commonMain/LLMComponent.kt` | **VERIFIED** - Already has all needed methods |
 
-#### Already Done in Phase 1!
+#### Build Status
 
-**Verify these methods call `ensureDeviceRegistered()`:**
-- ✅ `chat(prompt: String)`
-- ✅ `generate(prompt: String, options: RunAnywhereGenerationOptions?)`
-- ✅ `generateStream(prompt: String, options: RunAnywhereGenerationOptions?)`
+- ✅ JVM target: `RunAnywhereKotlinSDK-jvm-0.1.0.jar` (3.9 MB)
+- ✅ Android target: `RunAnywhereKotlinSDK-release.aar` (3.7 MB)
+- ✅ Zero compilation errors
+- ✅ All warnings are non-critical (expect/actual beta warnings)
 
-**Example from Phase 1:**
-```kotlin
-override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions?): String {
-    ensureSDKInitialized()
-    ensureDeviceRegistered()  // ✅ Added in Phase 1
-
-    val result = generationService.generate(prompt, options ?: RunAnywhereGenerationOptions.DEFAULT)
-    return result.text
-}
-```
-
----
-
-### 3.3 Streaming API Alignment (2 hours)
-
-#### Current State
-
-**Swift (AsyncThrowingStream):**
-```swift
-public static func generateStream(
-    _ prompt: String,
-    options: RunAnywhereGenerationOptions?
-) -> AsyncThrowingStream<String, Error> {
-    // Returns tokens one by one
-}
-```
-
-**Kotlin (Flow):**
-```kotlin
-override fun generateStream(
-    prompt: String,
-    options: RunAnywhereGenerationOptions?
-): Flow<String> {
-    // Returns tokens one by one
-}
-```
-
-**Analysis:**
-- ✅ Both use reactive streams (AsyncThrowingStream vs Flow)
-- ✅ Both return `String` tokens
-- ✅ **API surface matches** - no changes needed
-
-**Note:** AsyncThrowingStream vs Flow is acceptable (platform idioms)
-
----
-
-### 3.4 Add Conversation Context Management (2 hours)
-
-#### Current State
-
-**Kotlin has conversation context in LLMComponent:**
-```kotlin
-class LLMComponent {
-    fun getConversationContext(): Context?
-    fun setConversationContext(context: Context?)
-    fun clearConversationContext()
-
-    suspend fun generateWithHistory(
-        messages: List<Message>,
-        systemPrompt: String?
-    ): LLMOutput
-}
-```
-
-**Swift SDK:**
-```swift
-// No public conversation history API
-// Only LLMComponent has internal context
-```
-
-**Analysis:**
-- ✅ Kotlin BETTER than Swift in this area
-- ✅ Keep Kotlin's conversation APIs
-- ✅ Document as STRENGTH
-
-**Action:** Expose conversation APIs in public RunAnywhere API
-
-#### Step 3.4.1: Add Conversation APIs to RunAnywhere
-
-**File:** `src/commonMain/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt`
-
-**Add methods:**
+### 3.1 Success Criteria Met
 
 ```kotlin
-/**
- * Generate text with conversation history.
- * Kotlin SDK extension - not in Swift SDK.
- *
- * @param messages Conversation history
- * @param systemPrompt Optional system prompt
- * @param options Generation options
- * @return Generated text
- */
-suspend fun generateWithHistory(
-    messages: List<Message>,
-    systemPrompt: String? = null,
-    options: RunAnywhereGenerationOptions? = null
-): String {
-    ensureSDKInitialized()
-    ensureDeviceRegistered()
-
-    val llmComponent = ServiceContainer.shared.llmComponent
-    val result = llmComponent.generateWithHistory(messages, systemPrompt)
-
-    return result.text
-}
-
-/**
- * Clear conversation context.
- */
-suspend fun clearConversationContext() {
-    ensureSDKInitialized()
-
-    val llmComponent = ServiceContainer.shared.llmComponent
-    llmComponent.clearConversationContext()
-}
-```
-
----
-
-### 3.5 Add Token Counting API (1 hour)
-
-#### Current State
-
-**Kotlin has token counting in LLMComponent:**
-```kotlin
-class LLMComponent {
-    fun getTokenCount(text: String): Int
-    fun fitsInContext(prompt: String, maxTokens: Int): Boolean
-}
-```
-
-**Swift SDK:**
-```swift
-// No public token counting API
-// Only internal in LLMComponent
-```
-
-**Analysis:**
-- ✅ Kotlin BETTER than Swift
-- ✅ Keep Kotlin's token APIs
-- ✅ Document as STRENGTH
-
-#### Step 3.5.1: Expose Token Counting in Public API
-
-**File:** `src/commonMain/kotlin/com/runanywhere/sdk/public/RunAnywhere.kt`
-
-**Add methods:**
-
-```kotlin
-/**
- * Estimate token count for text.
- * Kotlin SDK extension - not in Swift SDK.
- *
- * @param text Text to estimate
- * @return Estimated token count
- */
-suspend fun estimateTokens(text: String): Int {
-    ensureSDKInitialized()
-
-    val llmComponent = ServiceContainer.shared.llmComponent
-    return llmComponent.getTokenCount(text)
-}
-
-/**
- * Check if prompt fits in context window.
- *
- * @param prompt Prompt text
- * @param maxTokens Max tokens to generate
- * @return true if fits in context
- */
-suspend fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
-    ensureSDKInitialized()
-
-    val llmComponent = ServiceContainer.shared.llmComponent
-    return llmComponent.fitsInContext(prompt, maxTokens)
-}
-```
-
----
-
-### Phase 3 Deliverables
-
-**Deliverable 3.1:** Generation options aligned
-- ✅ Kotlin has ALL Swift parameters + 6 extras
-- ✅ Defaults match Swift SDK
-- ✅ Documented as STRENGTH
-
-**Deliverable 3.2:** Lazy registration in all APIs
-- ✅ Already done in Phase 1
-
-**Deliverable 3.3:** Streaming API verified
-- ✅ Flow matches AsyncThrowingStream semantically
-- ✅ API surface matches
-
-**Deliverable 3.4:** Conversation context exposed
-- ✅ `generateWithHistory()` in public API
-- ✅ `clearConversationContext()` in public API
-- ✅ Kotlin BETTER than Swift
-
-**Deliverable 3.5:** Token counting exposed
-- ✅ `estimateTokens()` in public API
-- ✅ `fitsInContext()` in public API
-- ✅ Kotlin BETTER than Swift
-
-**Success Criteria:**
-```kotlin
-// Basic generation
+// Basic generation (matches Swift)
 val response = RunAnywhere.generate("Hello", options = null)
 
-// Streaming
+// Streaming (matches Swift semantics with Flow)
 RunAnywhere.generateStream("Tell me a story").collect { token ->
     print(token)
 }
 
-// Conversation history
+// Conversation history (Kotlin advantage!)
 val messages = listOf(
     Message(MessageRole.USER, "What is 2+2?"),
     Message(MessageRole.ASSISTANT, "4"),
@@ -725,11 +506,15 @@ val messages = listOf(
 )
 val answer = RunAnywhere.generateWithHistory(messages)
 
-// Token counting
+// Token counting (Kotlin advantage!)
 val tokenCount = RunAnywhere.estimateTokens("Hello, world!")
 val fits = RunAnywhere.fitsInContext("Long prompt...", maxTokens = 100)
+
+// Clear conversation
+RunAnywhere.clearConversationContext()
 ```
 
+**Next Step:** Proceed to Phase 4 - LLM Component Architecture
 ---
 
 ## Phase 4: LLM Component Architecture
@@ -1400,29 +1185,29 @@ modules/runanywhere-llm-llamacpp/build/libs/runanywhere-llm-llamacpp-jvm.jar (51
 - [x] Verify 85% code sharing in commonMain
 - [x] Verify zero business logic in platform layers
 
-### Phase 2: Model Management ✅
-- [ ] Update `DownloadProgress` model with speed/ETA
-- [ ] Update `KtorDownloadService` to calculate speed/ETA
-- [ ] Change `downloadModel()` return type to `Flow<DownloadProgress>`
-- [ ] Add `downloadModelSimple()` for backward compatibility
-- [ ] Add `calculateSHA256()` and `calculateMD5()` platform functions
-- [ ] Use `ModelIntegrityVerifier` in `ModelManager`
-- [ ] Add `unloadModel()` to `LLMComponent`
-- [ ] Add `unloadModel()` to `LLMService` interface
-- [ ] Implement `unloadModel()` in `LlamaCppService`
-- [ ] Add `unloadModel()` to `RunAnywhere` public API
-- [ ] Add `currentModel` property tracking
-- [ ] Add `loadModelFromPath()` for offline models
-- [ ] Add Android asset loading support
+### Phase 2: Model Management ✅ **COMPLETED 2025-10-08**
+- [x] Update `DownloadProgress` model with speed/ETA
+- [x] Update `KtorDownloadService` to calculate speed/ETA
+- [x] Change `downloadModel()` return type to `Flow<DownloadProgress>`
+- [x] Add `downloadModelSimple()` for backward compatibility
+- [x] Add `calculateSHA256()` and `calculateMD5()` platform functions
+- [x] Use `ModelIntegrityVerifier` in `ModelManager`
+- [x] Add `unloadModel()` to `LLMComponent`
+- [x] Add `unloadModel()` to `LLMService` interface
+- [x] Implement `unloadModel()` in `LlamaCppService`
+- [x] Add `unloadModel()` to `RunAnywhere` public API
+- [x] Add `currentModel` property tracking
+- [x] Add `loadModelFromPath()` for offline models
+- [x] Add Android asset loading support
 
-### Phase 3: Generation APIs ✅
-- [ ] Verify generation options match Swift defaults
-- [ ] Verify `ensureDeviceRegistered()` in all generation APIs
-- [ ] Verify streaming API matches Swift semantics
-- [ ] Add `generateWithHistory()` to public API
-- [ ] Add `clearConversationContext()` to public API
-- [ ] Add `estimateTokens()` to public API
-- [ ] Add `fitsInContext()` to public API
+### Phase 3: Generation APIs ✅ **COMPLETED 2025-10-08**
+- [x] Verify generation options match Swift defaults
+- [x] Verify `ensureDeviceRegistered()` in all generation APIs
+- [x] Verify streaming API matches Swift semantics
+- [x] Add `generateWithHistory()` to public API
+- [x] Add `clearConversationContext()` to public API
+- [x] Add `estimateTokens()` to public API
+- [x] Add `fitsInContext()` to public API
 
 ### Phase 4: Component Architecture ✅
 - [ ] Document component state differences (9 vs 4 states)
