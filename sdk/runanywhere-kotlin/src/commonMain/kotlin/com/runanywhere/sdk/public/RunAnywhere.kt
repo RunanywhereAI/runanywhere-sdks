@@ -762,6 +762,74 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     }
 
     /**
+     * Generate text with conversation history.
+     * Kotlin SDK extension - not in Swift SDK.
+     *
+     * @param messages Conversation history
+     * @param systemPrompt Optional system prompt
+     * @param options Generation options
+     * @return Generated text
+     */
+    suspend fun generateWithHistory(
+        messages: List<com.runanywhere.sdk.models.Message>,
+        systemPrompt: String? = null,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions? = null
+    ): String {
+        requireInitialized()
+        ensureDeviceRegistered()
+
+        val llmComponent = serviceContainer.llmComponent
+            ?: throw SDKError.ComponentNotAvailable("LLM component not available")
+
+        val result = llmComponent.generateWithHistory(messages, systemPrompt)
+        return result.text
+    }
+
+    /**
+     * Clear conversation context.
+     * Kotlin SDK extension - not in Swift SDK.
+     */
+    suspend fun clearConversationContext() {
+        requireInitialized()
+
+        val llmComponent = serviceContainer.llmComponent
+        llmComponent?.clearConversationContext()
+    }
+
+    /**
+     * Estimate token count for text.
+     * Kotlin SDK extension - not in Swift SDK.
+     *
+     * @param text Text to estimate
+     * @return Estimated token count
+     */
+    suspend fun estimateTokens(text: String): Int {
+        requireInitialized()
+
+        val llmComponent = serviceContainer.llmComponent
+            ?: throw SDKError.ComponentNotAvailable("LLM component not available")
+
+        return llmComponent.getTokenCount(text)
+    }
+
+    /**
+     * Check if prompt fits in context window.
+     * Kotlin SDK extension - not in Swift SDK.
+     *
+     * @param prompt Prompt text
+     * @param maxTokens Max tokens to generate
+     * @return true if fits in context
+     */
+    suspend fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
+        requireInitialized()
+
+        val llmComponent = serviceContainer.llmComponent
+            ?: throw SDKError.ComponentNotAvailable("LLM component not available")
+
+        return llmComponent.fitsInContext(prompt, maxTokens)
+    }
+
+    /**
      * Enhanced transcription with rich options
      */
     override suspend fun transcribe(

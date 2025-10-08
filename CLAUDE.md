@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
+- Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
 ### Before starting work
 - Always in plan mode to make a plan refer to `thoughts/shared/plans/{descriptive_name}.md`.
 - After get the plan, make sure you Write the plan to the appropriate file as mentioned in the guide that you referred to.
