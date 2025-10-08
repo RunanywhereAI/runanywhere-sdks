@@ -2,5 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup" vcs="Git" />
   </component>
 </project>

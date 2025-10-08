@@ -26,6 +26,10 @@ data class ModelInfo(
     val downloadSize: Long? = null,
     val memoryRequired: Long? = null,
 
+    // Integrity verification
+    val sha256Checksum: String? = null,
+    val md5Checksum: String? = null,
+
     // Framework compatibility
     val compatibleFrameworks: List<LLMFramework> = emptyList(),
     val preferredFramework: LLMFramework? = null,

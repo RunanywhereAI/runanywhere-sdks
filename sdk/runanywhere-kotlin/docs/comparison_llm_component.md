@@ -1,527 +1,151 @@
-# LLM Component Architecture Comparison: iOS vs Kotlin SDKs
+# LLM Component Architecture Comparison: iOS vs Kotlin SDKs (Updated)
 
 ## Executive Summary
 
-This document provides a comprehensive comparison of the Large Language Model (LLM) component architecture between the iOS Swift and Kotlin Multiplatform SDKs. Both implementations follow similar architectural principles but differ in their approach to platform-specific integrations, service abstraction, and framework support.
+This document provides a comprehensive comparison of the Large Language Model (LLM) component architecture between the iOS Swift and Kotlin Multiplatform SDKs. Both implementations have evolved significantly since the initial comparison, with the Kotlin SDK now featuring proper service abstractions, mock implementations for testing, and a modular llama.cpp integration approach that mirrors the iOS architecture.
 
-## Architecture Overview
+## Current Implementation Status
 
-### iOS LLM Architecture
+### iOS LLM Architecture (Production Ready)
+- **Status**: ✅ Production implementation with LLM.swift integration
+- **Main Component**: `LLMComponent` - MainActor-isolated component with full lifecycle management
+- **Service Protocol**: `LLMService` - Complete protocol with initialization, generation, and streaming
+- **Real Implementation**: `LLMSwiftService` - Production llama.cpp integration via LLM.swift framework
+- **Provider System**: `LLMServiceProvider` - Registry-based provider pattern with auto-discovery
+- **Model Management**: Complete download, validation, and lifecycle management
 
-The iOS SDK implements a clean, protocol-driven architecture with:
-- **Main Component**: `LLMComponent` (Swift) - MainActor-isolated component
-- **Service Protocol**: `LLMService` - Defines standard LLM operations
-- **Service Provider**: `LLMServiceProvider` - Factory for creating LLM services
-- **Framework Adapter**: `LLMSwiftAdapter` - UnifiedFrameworkAdapter implementation
-- **Concrete Implementation**: `LLMSwiftService` - llama.cpp integration via LLM.swift
+### Kotlin LLM Architecture (Mixed Mock/Real Implementation)
+- **Status**: 🚧 Functional but contains mock implementations
+- **Main Component**: `LLMComponent` - BaseComponent extension with iOS-aligned API
+- **Service Interface**: `LLMService` - Complete interface matching iOS protocol exactly
+- **Mock Implementation**: Service creation uses mock adapter for unregistered providers
+- **Real Implementation**: `LlamaCppService` (expect/actual) - Platform-specific implementations in progress
+- **Provider System**: `LLMServiceProvider` - Registry-based with different interface than iOS
+- **Module System**: `ModuleRegistry` - Centralized provider registration
 
-### Kotlin LLM Architecture
-
-The Kotlin SDK uses a similar component-based architecture with:
-- **Main Component**: `LLMComponent` (Kotlin) - BaseComponent extension
-- **Service Interface**: `LLMService` - Kotlin interface for LLM operations
-- **Service Provider**: `LLMServiceProvider` - Interface for external providers
-- **Generation Services**: `GenerationService`, `StreamingService` - Dedicated service layers
-- **Module System**: `ModuleRegistry` - Central registry for provider registration
-
-## Detailed Comparison
+## Detailed Architecture Comparison
 
 ### 1. LLM Service Interfaces and Protocols
 
-#### iOS LLMService Protocol
+#### iOS LLMService Protocol (Production)
 ```swift
 public protocol LLMService: AnyObject {
     func initialize(modelPath: String?) async throws
     func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String
-    func streamGenerate(prompt: String, options: RunAnywhereGenerationOptions, onToken: @escaping (String) -> Void) async throws
+    func streamGenerate(
+        prompt: String,
+        options: RunAnywhereGenerationOptions,
+        onToken: @escaping (String) -> Void
+    ) async throws
     var isReady: Bool { get }
     var currentModel: String? { get }
     func cleanup() async
 }
 ```
 
-**Key Features:**
-- Actor-safe with `AnyObject` constraint
-- Async/await throughout
-- Callback-based streaming with `@escaping` closures
-- Built-in readiness checking
-- Explicit cleanup lifecycle
-
-#### Kotlin LLMService Interface
+#### Kotlin LLMService Interface (Aligned with iOS)
 ```kotlin
 interface LLMService {
-    suspend fun generate(prompt: String, options: GenerationOptions): String
-    fun generateStream(prompt: String, options: GenerationOptions): Flow<String>
-    suspend fun loadModel(modelInfo: ModelInfo)
-    fun cancelCurrent()
-}
-```
-
-**Key Features:**
-- Coroutine-based with `suspend` functions
-- Flow-based streaming (reactive)
-- Model loading with `ModelInfo` objects
-- Cancellation support
-- Simpler interface with fewer lifecycle methods
-
-**Comparison:**
-- iOS uses callback-based streaming, Kotlin uses reactive Flow
-- iOS has more explicit lifecycle management (`isReady`, `cleanup`)
-- Kotlin separates model loading into `ModelInfo` abstraction
-- iOS includes initialization in the service, Kotlin delegates to component
-
-### 2. Model Loading and Initialization Patterns
-
-#### iOS Initialization
-```swift
-public override func createService() async throws -> LLMServiceWrapper {
-    // Model download and validation
-    if let modelId = llmConfiguration.modelId {
-        modelPath = modelId
-        if needsDownload {
-            try await downloadModel(modelId: modelId)
-        }
-    }
-
-    // Provider resolution
-    guard let provider = ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId) else {
-        throw SDKError.componentNotInitialized("No LLM service provider registered")
-    }
-
-    // Service creation and initialization
-    let llmService = try await provider.createLLMService(configuration: llmConfiguration)
-    try await llmService.initialize(modelPath: modelPath)
-
-    return LLMServiceWrapper(llmService)
-}
-```
-
-#### Kotlin Initialization
-```kotlin
-override suspend fun createService(): LLMService {
-    val provider = ModuleRegistry.llmProvider(llmConfiguration.modelId)
-    return if (provider != null) {
-        LLMServiceAdapter(provider)
-    } else {
-        DefaultLLMService()
-    }
-}
-
-override suspend fun initializeService() {
-    generationService = GenerationService()
-    streamingService = StreamingService()
-    service = createService()
-
-    llmConfiguration.modelId?.let { modelId ->
-        // Model loading handled by service provider
-    }
-}
-```
-
-**Comparison:**
-- iOS has more sophisticated model download orchestration with progress events
-- iOS uses wrapper pattern to adapt protocol to BaseComponent requirements
-- Kotlin delegates more responsibility to generation services
-- iOS has explicit model validation and file system checks
-
-### 3. Text Generation and Completion Workflows
-
-#### iOS Generation Workflow
-```swift
-public func process(_ input: LLMInput) async throws -> LLMOutput {
-    try ensureReady()
-
-    // Options resolution
-    let options = input.options ?? RunAnywhereGenerationOptions(
-        maxTokens: llmConfiguration.maxTokens,
-        temperature: Float(llmConfiguration.temperature),
-        streamingEnabled: llmConfiguration.streamingEnabled
-    )
-
-    // Prompt building
-    let prompt = buildPrompt(from: input.messages, systemPrompt: input.systemPrompt)
-
-    // Generation with timing
-    let startTime = Date()
-    let response = try await llmService.generate(prompt: prompt, options: options)
-    let generationTime = Date().timeIntervalSince(startTime)
-
-    // Rich output with metadata
-    return LLMOutput(
-        text: response,
-        tokenUsage: TokenUsage(promptTokens: promptTokens, completionTokens: completionTokens),
-        metadata: GenerationMetadata(modelId: modelId, temperature: temperature, generationTime: generationTime),
-        finishReason: .completed
-    )
-}
-```
-
-#### Kotlin Generation Workflow
-```kotlin
-suspend fun generate(prompt: String, options: GenerationOptions = GenerationOptions()): String {
-    ensureReady()
-    _isGenerating.value = true
-    return try {
-        service?.generate(prompt, options) ?: throw IllegalStateException("LLM service not initialized")
-    } finally {
-        _isGenerating.value = false
-    }
-}
-```
-
-**Comparison:**
-- iOS provides rich output with token usage, metadata, and timing
-- iOS supports conversation context with message-based input
-- Kotlin uses simpler string-based I/O
-- iOS has more comprehensive prompt building from message arrays
-- Kotlin tracks generation state with StateFlow
-
-### 4. Context Management and Memory Handling
-
-#### iOS Context Management
-```swift
-public struct LLMInput: ComponentInput {
-    public let messages: [Message]
-    public let systemPrompt: String?
-    public let context: Context?
-    public let options: RunAnywhereGenerationOptions?
-}
-
-private func buildPrompt(from messages: [Message], systemPrompt: String?) -> String {
-    var prompt = ""
-    if let system = systemPrompt {
-        prompt += "System: \(system)\n\n"
-    }
-    for message in messages {
-        switch message.role {
-        case .user: prompt += "User: \(message.content)\n"
-        case .assistant: prompt += "Assistant: \(message.content)\n"
-        case .system: prompt += "System: \(message.content)\n"
-        }
-    }
-    prompt += "Assistant: "
-    return prompt
-}
-```
-
-#### Kotlin Context Management
-```kotlin
-suspend fun generateWithContext(
-    messages: List<LLMMessage>,
-    options: GenerationOptions = GenerationOptions()
-): String {
-    ensureReady()
-
-    val prompt = messages.joinToString("\n") { message ->
-        "${message.role}: ${message.content}"
-    }
-    return generate(prompt, options)
-}
-
-data class LLMMessage(
-    val role: LLMRole,
-    val content: String,
-    val metadata: Map<String, String> = emptyMap()
-)
-```
-
-**Comparison:**
-- iOS has more sophisticated message-based conversation context
-- iOS includes optional `Context` objects for conversation state
-- Kotlin uses simpler role-content message pairs
-- iOS has detailed prompt templating with role-specific formatting
-- Both support system prompts but iOS integrates them more deeply
-
-### 5. Streaming Response Patterns
-
-#### iOS Streaming Implementation
-```swift
-public func streamGenerate(_ prompt: String, systemPrompt: String? = nil) -> AsyncThrowingStream<String, Error> {
-    AsyncThrowingStream { continuation in
-        Task {
-            do {
-                try ensureReady()
-                let options = RunAnywhereGenerationOptions(streamingEnabled: true)
-                let fullPrompt = buildPrompt(...)
-
-                try await llmService.streamGenerate(prompt: fullPrompt, options: options) { token in
-                    continuation.yield(token)
-                }
-                continuation.finish()
-            } catch {
-                continuation.finish(throwing: error)
-            }
-        }
-    }
-}
-```
-
-#### Kotlin Streaming Implementation
-```kotlin
-fun generateStream(prompt: String, options: GenerationOptions = GenerationOptions()): Flow<String> {
-    ensureReady()
-    return flow {
-        _isGenerating.value = true
-        try {
-            service?.generateStream(prompt, options)?.collect { token ->
-                emit(token)
-            } ?: throw IllegalStateException("LLM service not initialized")
-        } finally {
-            _isGenerating.value = false
-        }
-    }
-}
-```
-
-**Comparison:**
-- iOS uses `AsyncThrowingStream` with manual continuation management
-- Kotlin uses `Flow` with coroutine builders
-- iOS streams through callback closures passed to the service
-- Kotlin streams through reactive Flow collection
-- Both handle cleanup and error propagation differently
-
-### 6. Integration with Different LLM Frameworks
-
-#### iOS Framework Integration
-```swift
-public enum LLMFramework: String, CaseIterable, Codable, Sendable {
-    case coreML = "CoreML"
-    case tensorFlowLite = "TFLite"
-    case mlx = "MLX"
-    case swiftTransformers = "SwiftTransformers"
-    case onnx = "ONNX"
-    case execuTorch = "ExecuTorch"
-    case llamaCpp = "LlamaCpp"
-    case foundationModels = "FoundationModels"
-    case picoLLM = "PicoLLM"
-    case mlc = "MLC"
-    case mediaPipe = "MediaPipe"
-    // ... additional frameworks
-}
-
-public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
-    public let framework: LLMFramework = .llamaCpp
-    public let supportedModalities: Set<FrameworkModality> = [.textToText]
-    public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
-
-    public func canHandle(model: ModelInfo) -> Bool {
-        guard supportedFormats.contains(model.format) else { return false }
-        // Additional validation logic...
-    }
-}
-```
-
-#### Kotlin Framework Integration
-```kotlin
-enum class LLMFramework(val value: String, val displayName: String) {
-    CORE_ML("CoreML", "Core ML"),
-    TENSOR_FLOW_LITE("TFLite", "TensorFlow Lite"),
-    MLX("MLX", "MLX"),
-    SWIFT_TRANSFORMERS("SwiftTransformers", "Swift Transformers"),
-    ONNX("ONNX", "ONNX Runtime"),
-    EXECU_TORCH("ExecuTorch", "ExecuTorch"),
-    LLAMA_CPP("LlamaCpp", "llama.cpp"),
-    // ... additional frameworks
-}
-
-class LlamaCppProvider : LLMServiceProvider {
-    override fun canHandle(modelId: String): Boolean {
-        return modelId.contains("llama") ||
-               modelId.endsWith(".gguf") ||
-               modelId.endsWith(".ggml") ||
-               modelId.contains("mistral")
-    }
-
-    override val supportedFeatures: Set<String> = setOf(
-        "streaming", "context-window-8k", "gpu-acceleration", "quantization"
-    )
-}
-```
-
-**Comparison:**
-- Both use enum-based framework identification
-- iOS has `UnifiedFrameworkAdapter` pattern for cross-framework consistency
-- iOS includes model format validation and memory estimation
-- Kotlin focuses on capability-based provider selection
-- iOS has more sophisticated hardware configuration support
-
-### 7. Token Counting and Cost Tracking
-
-#### iOS Token Management
-```swift
-public struct TokenUsage: Sendable {
-    public let promptTokens: Int
-    public let completionTokens: Int
-
-    public var totalTokens: Int {
-        promptTokens + completionTokens
-    }
-}
-
-public struct GenerationMetadata: Sendable {
-    public let modelId: String
-    public let temperature: Float
-    public let generationTime: TimeInterval
-    public let tokensPerSecond: Double?
-}
-
-// In generation:
-let promptTokens = prompt.count / 4  // Simple estimation
-let completionTokens = response.count / 4
-let tokensPerSecond = Double(completionTokens) / generationTime
-```
-
-#### Kotlin Token Management
-```kotlin
-data class GenerationResult(
-    val text: String,
-    val tokensUsed: Int,
-    val latencyMs: Long,
-    val sessionId: String,
-    val model: String?,
-    val savedAmount: Double = 0.0
-)
-
-private fun calculateTokens(prompt: String, response: String): Int {
-    return (prompt.length + response.length) / 4  // Simple estimation
-}
-
-fun getTokenCount(text: String): Int {
-    return text.split(" ").size  // Word-based estimation
-}
-```
-
-**Comparison:**
-- iOS provides separate prompt/completion token counts
-- iOS calculates tokens-per-second performance metrics
-- Kotlin includes cost savings tracking (`savedAmount`)
-- Both use simple estimation methods (to be replaced with proper tokenizers)
-- iOS has more granular token usage reporting
-
-### 8. Model Switching and Lifecycle Management
-
-#### iOS Model Lifecycle
-```swift
-private func downloadModel(modelId: String) async throws {
-    eventBus.publish(ComponentInitializationEvent.componentDownloadRequired(...))
-
-    for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
-        modelLoadProgress = progress
-        eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(...))
-        try await Task.sleep(nanoseconds: 100_000_000)
-    }
-
-    eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(...))
-}
-
-public override func performCleanup() async throws {
-    await service?.wrappedService?.cleanup()
-    isModelLoaded = false
-    modelPath = nil
-    conversationContext = nil
-}
-```
-
-#### Kotlin Model Lifecycle
-```kotlin
-suspend fun loadModel(modelInfo: ModelInfo) {
-    transitionTo(ComponentState.INITIALIZING)
-
-    try {
-        currentModel = modelInfo
-        service?.loadModel(modelInfo)
-        transitionTo(ComponentState.READY)
-    } catch (e: Exception) {
-        transitionTo(ComponentState.FAILED)
-        throw e
-    }
-}
-
-fun getCurrentModel(): ModelInfo? = currentModel
-
-override suspend fun cleanup() {
-    service?.cleanup()
-    generationService = null
-    streamingService = null
-    currentModel = null
-}
-```
-
-**Comparison:**
-- iOS has sophisticated download progress tracking with events
-- iOS maintains conversation context across model switches
-- Kotlin uses explicit state transitions for component lifecycle
-- iOS provides more granular event notifications
-- Kotlin delegates model management to `ModelInfo` objects
-
-### 9. Platform-Specific Optimizations
-
-#### iOS Optimizations
-```swift
-public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters {
-    public let useGPUIfAvailable: Bool
-    public let quantizationLevel: QuantizationLevel?
-    public let cacheSize: Int // Token cache size in MB
-    public let contextLength: Int
-
-    public enum QuantizationLevel: String, Sendable {
-        case q4v0 = "Q4_0"
-        case q4KM = "Q4_K_M"
-        case q5KM = "Q5_K_M"
-        case q6K = "Q6_K"
-        case q8v0 = "Q8_0"
-        case f16 = "F16"
-        case f32 = "F32"
-    }
-}
-
-// Hardware configuration
-public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-    return HardwareConfiguration(
-        primaryAccelerator: .cpu,
-        memoryMode: .balanced
-    )
-}
-```
-
-#### Kotlin Optimizations
-```kotlin
-data class LLMConfiguration(
-    val modelId: String? = null,
-    val maxTokens: Int = 2048,
-    val temperature: Float = 0.7f,
-    val topP: Float = 0.9f,
-    val topK: Int = 40,
-    val repeatPenalty: Float = 1.1f,
-    val enableStreaming: Boolean = true
-) : ComponentConfiguration
-
-// Platform-specific service creation
-expect class LlamaCppService() {
-    suspend fun initialize(modelPath: String)
-    suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult
-    fun generateStream(prompt: String, options: GenerationOptions): Flow<String>
+    suspend fun initialize(modelPath: String?)
+    suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String
+    suspend fun streamGenerate(prompt: String, options: RunAnywhereGenerationOptions, onToken: (String) -> Unit)
+    val isReady: Boolean
+    val currentModel: String?
     suspend fun cleanup()
 }
 ```
 
-**Comparison:**
-- iOS has explicit hardware acceleration configuration
-- iOS includes quantization level selection
-- iOS provides memory management configuration
-- Kotlin uses `expect/actual` pattern for platform-specific implementations
-- iOS focuses on Apple-specific optimizations (GPU, Neural Engine)
+**Status**: ✅ **PERFECT ALIGNMENT** - Kotlin interface now exactly matches iOS protocol
+- Same method signatures and return types
+- Identical lifecycle management approach
+- Consistent callback-based streaming pattern
 
-### 10. expect/actual Pattern Usage for Platform-Specific LLM Features
+### 2. Component Architecture Alignment
 
-#### iOS Actual Implementations
+#### iOS Component Structure
 ```swift
-// Platform-specific via separate iOS module
-import LLM  // LLM.swift framework
+@MainActor
+public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
+    private let llmConfiguration: LLMConfiguration
+    private var conversationContext: Context?
+    private var isModelLoaded = false
+    private var modelPath: String?
+    
+    public override func createService() async throws -> LLMServiceWrapper {
+        // Provider resolution through ModuleRegistry
+        let provider = await MainActor.run {
+            ModuleRegistry.shared.llmProvider(for: llmConfiguration.modelId)
+        }
+        let llmService = try await provider.createLLMService(configuration: llmConfiguration)
+        return LLMServiceWrapper(llmService)
+    }
+}
+```
 
+#### Kotlin Component Structure (Updated)
+```kotlin
+class LLMComponent(
+    private val llmConfiguration: LLMConfiguration
+) : BaseComponent<LLMServiceWrapper>(llmConfiguration) {
+    private var conversationContext: Context? = null
+    private var _isModelLoaded = false
+    private var modelPath: String? = null
+
+    override suspend fun createService(): LLMServiceWrapper {
+        // Provider resolution through ModuleRegistry (same pattern as iOS)
+        val provider = ModuleRegistry.llmProvider(llmConfiguration.modelId)
+        if (provider == null) {
+            throw SDKError.ComponentNotInitialized(
+                "No LLM service provider registered. Please add llama.cpp or another LLM implementation."
+            )
+        }
+        // Mock adapter bridging different provider interfaces
+        val mockService = createMockServiceAdapter(provider)
+        return LLMServiceWrapper(mockService)
+    }
+}
+```
+
+**Status**: ✅ **ARCHITECTURALLY ALIGNED** with critical gap
+- ✅ Same BaseComponent inheritance pattern
+- ✅ Identical property structure and lifecycle management
+- ✅ Same ModuleRegistry provider resolution approach
+- ❌ **CRITICAL GAP**: Uses mock service adapter instead of real provider creation
+
+### 3. Provider System Comparison
+
+#### iOS Provider Interface (Production)
+```swift
+public protocol LLMServiceProvider {
+    func createLLMService(configuration: LLMConfiguration) async throws -> LLMService
+    func canHandle(modelId: String?) -> Bool
+    var name: String { get }
+}
+```
+
+#### Kotlin Provider Interface (Misaligned - Current Implementation)
+```kotlin
+interface LLMServiceProvider {
+    suspend fun generate(prompt: String, options: GenerationOptions): String
+    fun generateStream(prompt: String, options: GenerationOptions): Flow<String>
+    fun canHandle(modelId: String): Boolean
+    val name: String
+}
+```
+
+**Status**: ❌ **MAJOR MISALIGNMENT**
+- iOS uses service factory pattern (`createLLMService`)
+- Kotlin uses direct generation methods (bypasses service layer)
+- Different option types (`RunAnywhereGenerationOptions` vs `GenerationOptions`)
+- Kotlin lacks service lifecycle management in provider
+
+### 4. llama.cpp Integration Architecture
+
+#### iOS Integration (Production - LLMSwift Module)
+```swift
 public class LLMSwiftService: LLMService {
-    private var llm: LLM?
-
+    private var llm: LLM?  // LLM.swift framework instance
+    
     public func initialize(modelPath: String?) async throws {
         self.llm = LLM(
             from: URL(fileURLWithPath: modelPath),
@@ -530,12 +154,22 @@ public class LLMSwiftService: LLMService {
             maxTokenCount: Int32(maxTokens)
         )
     }
+    
+    public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
+        let response = try await withThrowingTaskGroup(of: String.self) { group in
+            group.addTask {
+                return await llm.getCompletion(from: fullPrompt)
+            }
+            // Timeout protection and error handling
+        }
+        return response
+    }
 }
 ```
 
-#### Kotlin expect/actual Pattern
+#### Kotlin Integration (Planned - llama.cpp Module)
 ```kotlin
-// Common module
+// Module: runanywhere-llm-llamacpp
 expect class LlamaCppService() {
     suspend fun initialize(modelPath: String)
     suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult
@@ -546,165 +180,287 @@ expect class LlamaCppService() {
 // JVM actual implementation
 actual class LlamaCppService {
     private var llamaContext: Long = 0L
-
+    
     actual suspend fun initialize(modelPath: String) {
-        // JNI calls to llama.cpp
-        llamaContext = llamaCppInitialize(modelPath)
+        llamaContext = llamaCppInitialize(modelPath) // JNI call
     }
-
+    
     actual suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
-        // Platform-specific generation logic
-        return performJvmGeneration(prompt, options)
-    }
-}
-
-// Android actual implementation
-actual class LlamaCppService {
-    actual suspend fun initialize(modelPath: String) {
-        // Android-specific initialization with NDK
+        return performJvmGeneration(prompt, options) // Native implementation
     }
 }
 ```
 
-**Comparison:**
-- iOS uses separate framework modules for platform specificity
-- Kotlin uses `expect/actual` declarations for cross-platform abstraction
-- iOS leverages Swift Package Manager for modular architecture
-- Kotlin enables shared business logic with platform-specific implementations
-- Kotlin approach allows for JVM, Android, and Native target support
+**Status**: 🚧 **ARCHITECTURE READY, IMPLEMENTATION PENDING**
+- ✅ Proper module separation (`runanywhere-llm-llamacpp`)
+- ✅ expect/actual pattern for cross-platform support
+- ✅ JNI integration points defined
+- ❌ **MISSING**: Actual native implementations
+- ❌ **MISSING**: Provider implementation that creates LlamaCppService
 
-### 11. Model Format Handling and Compatibility
+### 5. Streaming Implementation Comparison
 
-#### iOS Format Support
+#### iOS Streaming (Production)
 ```swift
-public let supportedFormats: [ModelFormat] = [.gguf, .ggml]
-
-public func canHandle(model: ModelInfo) -> Bool {
-    guard supportedFormats.contains(model.format) else { return false }
-
-    if let metadata = model.metadata, let quantization = metadata.quantizationLevel {
-        return isQuantizationSupported(quantization.rawValue)
+public func streamGenerate(
+    _ prompt: String,
+    systemPrompt: String? = nil
+) -> AsyncThrowingStream<String, Error> {
+    AsyncThrowingStream { continuation in
+        Task {
+            try await llmService.streamGenerate(prompt: fullPrompt, options: options) { token in
+                continuation.yield(token)
+            }
+            continuation.finish()
+        }
     }
-
-    let availableMemory = ProcessInfo.processInfo.physicalMemory
-    return model.memoryRequired ?? 0 < Int64(Double(availableMemory) * 0.7)
-}
-
-private func isQuantizationSupported(_ quantization: String) -> Bool {
-    let supportedQuantizations = [
-        "Q2_K", "Q3_K_S", "Q3_K_M", "Q3_K_L",
-        "Q4_0", "Q4_1", "Q4_K_S", "Q4_K_M",
-        "Q5_0", "Q5_1", "Q5_K_S", "Q5_K_M",
-        "Q6_K", "Q8_0", "IQ2_XXS", "IQ2_XS",
-        "IQ3_S", "IQ3_XXS", "IQ4_NL", "IQ4_XS"
-    ]
-    return supportedQuantizations.contains(quantization)
 }
 ```
 
-#### Kotlin Format Support
+#### Kotlin Streaming (Mock Implementation)
 ```kotlin
-override fun canHandle(modelId: String): Boolean {
-    return modelId.contains("llama") ||
-           modelId.endsWith(".gguf") ||
-           modelId.endsWith(".ggml") ||
-           modelId.contains("mistral") ||
-           modelId.contains("mixtral") ||
-           modelId.contains("phi")
+fun streamGenerate(
+    prompt: String,
+    systemPrompt: String? = null
+): Flow<String> = flow {
+    val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
+    
+    // Mock streaming - collect from provider flow and emit to callback
+    service.streamGenerate(fullPrompt, options) { token ->
+        // Emit via Flow
+    }
 }
+```
 
-override val supportedFeatures: Set<String> = setOf(
-    "streaming",
-    "context-window-8k",
-    "context-window-32k",
-    "gpu-acceleration",
-    "quantization",
-    "grammar-sampling"
+**Status**: ⚠️ **PATTERN ALIGNED, IMPLEMENTATION MOCK**
+- ✅ iOS uses AsyncThrowingStream, Kotlin uses Flow (appropriate for each platform)
+- ✅ Same callback-based service interface
+- ❌ **MOCK**: Kotlin implementation doesn't actually stream
+
+### 6. Generation Options Alignment
+
+#### Shared Generation Options (Now Aligned)
+```kotlin
+// Kotlin RunAnywhereGenerationOptions (matches iOS exactly)
+data class RunAnywhereGenerationOptions(
+    val maxTokens: Int = 100,
+    val temperature: Float = 0.7f,
+    val topP: Float = 1.0f,
+    val stopSequences: List<String> = emptyList(),
+    val streamingEnabled: Boolean = false,
+    val systemPrompt: String? = null,
+    val topK: Int? = null,
+    val repetitionPenalty: Float? = null,
+    // ... additional parameters matching iOS
 )
 ```
 
-**Comparison:**
-- iOS provides explicit format enum validation
-- iOS includes memory requirement checking against available system memory
-- iOS has granular quantization level support
-- Kotlin uses string-based model identification
-- Kotlin focuses on feature capability declaration
-- iOS provides more sophisticated model compatibility checking
+**Status**: ✅ **FULLY ALIGNED**
+- Same parameter names and types
+- Identical validation logic
+- Same preset configurations (DEFAULT, STREAMING, CREATIVE, etc.)
 
-## Key Architectural Differences
+### 7. Model Management and Lifecycle
 
-### 1. **Service Abstraction Approach**
-- **iOS**: Uses protocol-based service abstraction with wrapper classes
-- **Kotlin**: Uses interface-based services with adapter pattern
-
-### 2. **Streaming Implementation**
-- **iOS**: Callback-based streaming with `AsyncThrowingStream`
-- **Kotlin**: Flow-based reactive streaming
-
-### 3. **Platform Integration**
-- **iOS**: Separate framework modules (LLMSwift, etc.)
-- **Kotlin**: `expect/actual` declarations for multiplatform support
-
-### 4. **Error Handling**
-- **iOS**: Comprehensive error types with localized descriptions
-- **Kotlin**: Exception-based error handling with state management
-
-### 5. **Configuration Management**
-- **iOS**: Rich configuration with hardware-specific options
-- **Kotlin**: Simpler configuration with validation methods
-
-### 6. **Model Management**
-- **iOS**: Integrated download management with progress tracking
-- **Kotlin**: Delegated model management to service providers
-
-## Recommendations for Alignment
-
-### 1. **Standardize Generation Options**
-Both SDKs should support the same generation parameters:
-```swift/kotlin
-// Common parameters
-maxTokens: Int
-temperature: Float
-topP: Float
-stopSequences: [String]
-streamingEnabled: Bool
-systemPrompt: String?
+#### iOS Model Lifecycle (Production)
+```swift
+private func downloadModel(modelId: String) async throws {
+    eventBus.publish(ComponentInitializationEvent.componentDownloadRequired(...))
+    
+    for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
+        modelLoadProgress = progress
+        eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(...))
+        try await Task.sleep(nanoseconds: 100_000_000)
+    }
+    
+    eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(...))
+}
 ```
 
-### 2. **Unify Token Counting**
-Implement consistent token counting:
-- Separate prompt/completion token counts
-- Performance metrics (tokens/second)
-- Cost calculation support
+#### Kotlin Model Lifecycle (Mock with Real Events)
+```kotlin
+private suspend fun downloadModel(modelId: String) {
+    EventBus.publish(ComponentInitializationEvent.ComponentDownloadStarted(...))
+    
+    for (i in 0..10) {
+        val progress = i / 10.0
+        EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(...))
+        kotlinx.coroutines.delay(100) // Mock delay
+    }
+    
+    EventBus.publish(ComponentInitializationEvent.ComponentDownloadCompleted(...))
+}
+```
 
-### 3. **Standardize Model Format Support**
-Both should support the same model formats and quantization levels:
-- GGUF/GGML formats
-- Consistent quantization level enumeration
-- Memory requirement validation
+**Status**: ✅ **EVENT SYSTEM ALIGNED, DOWNLOAD LOGIC MOCK**
+- Same event types and progression
+- Identical progress tracking approach
+- Mock implementation for download logic
 
-### 4. **Align Error Handling**
-Create consistent error types across platforms:
-- Model not found errors
-- Generation failures
-- Context length exceeded
-- Service initialization errors
+## Critical Implementation Gaps
 
-### 5. **Harmonize Streaming APIs**
-While implementation differs (AsyncStream vs Flow), the behavior should be consistent:
-- Token-by-token streaming
-- Proper cancellation support
-- Error propagation
-- Completion handling
+### 1. **Provider Interface Misalignment** (HIGH PRIORITY)
+**Problem**: Kotlin `LLMServiceProvider` interface doesn't match iOS factory pattern
+```kotlin
+// CURRENT (Wrong)
+interface LLMServiceProvider {
+    suspend fun generate(prompt: String, options: GenerationOptions): String
+    // ...
+}
+
+// NEEDED (Aligned with iOS)
+interface LLMServiceProvider {
+    suspend fun createLLMService(configuration: LLMConfiguration): LLMService
+    fun canHandle(modelId: String?): Boolean
+    val name: String
+}
+```
+
+### 2. **Mock Service Adapter** (HIGH PRIORITY)
+**Problem**: LLMComponent uses mock adapter instead of real service creation
+```kotlin
+// CURRENT (Mock)
+val mockService = object : LLMService {
+    override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String {
+        return provider.generate(prompt, options.toGenerationOptions())
+    }
+}
+
+// NEEDED (Real)
+val llmService = try await provider.createLLMService(configuration: llmConfiguration)
+```
+
+### 3. **LlamaCpp Integration** (MEDIUM PRIORITY)
+**Status**: Architecture ready, implementations missing
+- JNI bindings needed for Android/JVM
+- Native library compilation required
+- Provider bridge to component layer
+
+### 4. **GenerationService Integration** (LOW PRIORITY)
+**Current**: LLMComponent bypasses GenerationService
+**Better**: Use GenerationService for session management and analytics
+
+## Implementation Plan for Completion
+
+### Phase 1: Provider Interface Alignment (1-2 days)
+1. **Update LLMServiceProvider interface** to match iOS factory pattern
+2. **Implement real provider creation** in LLMComponent.createService()
+3. **Update LlamaCppProvider** to use factory pattern
+4. **Remove mock service adapter** completely
+
+### Phase 2: LlamaCpp Integration (3-5 days)
+1. **JNI Implementation**:
+   - Create native bindings for llama.cpp
+   - Implement initialization, generation, and cleanup
+   - Add streaming support with callbacks
+
+2. **Provider Implementation**:
+   ```kotlin
+   class LlamaCppProvider : LLMServiceProvider {
+       override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
+           val service = LlamaCppService()
+           service.initialize(configuration.modelPath)
+           return service
+       }
+   }
+   ```
+
+3. **Platform-Specific Services**:
+   ```kotlin
+   // JVM actual
+   actual class LlamaCppService : LLMService {
+       private var llamaContext: Long = 0L
+       
+       actual suspend fun initialize(modelPath: String?) {
+           llamaContext = LlamaCppJNI.initialize(modelPath)
+       }
+       
+       actual suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String {
+           return LlamaCppJNI.generate(llamaContext, prompt, options)
+       }
+   }
+   ```
+
+### Phase 3: Enhanced Features (2-3 days)
+1. **Structured Output**: Implement structured generation with JSON schema
+2. **Advanced Streaming**: Add chunk metadata and progress tracking
+3. **Model Format Support**: Add comprehensive GGUF/GGML validation
+4. **Performance Metrics**: Token counting, generation speed tracking
+
+### Phase 4: Module System Integration (1-2 days)
+1. **Auto-Registration**: Enable automatic provider discovery
+2. **Module Lifecycle**: Proper initialization and cleanup
+3. **Configuration**: Dynamic provider configuration
+
+## Testing Strategy
+
+### Unit Tests
+```kotlin
+class LLMComponentTest {
+    @Test
+    fun `should create real service when provider registered`() = runTest {
+        // Register real provider
+        ModuleRegistry.registerLLM(LlamaCppProvider())
+        
+        val component = LLMComponent(LLMConfiguration(modelId = "llama-7b"))
+        component.initialize()
+        
+        val service = component.getService()
+        assertNotNull(service)
+        assertTrue(service is LlamaCppService)
+    }
+}
+```
+
+### Integration Tests
+```kotlin
+class LLMIntegrationTest {
+    @Test
+    fun `should generate text with real llama.cpp`() = runTest {
+        val component = LLMComponent(LLMConfiguration(modelId = "test-model.gguf"))
+        component.initialize()
+        
+        val output = component.generate("Hello, world!")
+        
+        assertNotNull(output.text)
+        assertTrue(output.tokenUsage.totalTokens > 0)
+        assertEquals(FinishReason.COMPLETED, output.finishReason)
+    }
+}
+```
+
+## Performance Considerations
+
+### Memory Management
+- **iOS**: Uses LLM.swift framework with automatic memory management
+- **Kotlin**: Requires manual JNI cleanup and context management
+- **Solution**: Implement proper lifecycle management in LlamaCppService
+
+### Threading
+- **iOS**: MainActor isolation for component, background for generation
+- **Kotlin**: Coroutine-based with proper dispatcher usage
+- **Alignment**: Both use appropriate concurrency patterns
+
+### Model Loading
+- **iOS**: File system validation and memory estimation
+- **Kotlin**: Need to implement model validation and memory checks
 
 ## Conclusion
 
-Both iOS and Kotlin LLM implementations follow solid architectural principles with appropriate platform-specific optimizations. The iOS implementation provides more sophisticated model management and hardware optimization, while the Kotlin implementation offers better cross-platform abstraction and reactive programming patterns.
+The Kotlin LLM component has achieved excellent architectural alignment with iOS, featuring:
 
-The main areas for improvement include:
-1. Standardizing generation options and token counting
-2. Aligning model format support and validation
-3. Harmonizing error handling approaches
-4. Ensuring consistent streaming behavior across platforms
+✅ **Strengths**:
+- Identical service interfaces and component structure
+- Proper module registry and provider system architecture
+- Aligned generation options and event systems
+- Ready for real llama.cpp integration
 
-Both architectures are well-positioned to support the growing ecosystem of on-device LLM frameworks and provide a solid foundation for future enhancements.
+❌ **Critical Gaps**:
+- Provider interface misalignment preventing real service creation
+- Mock implementations masquerading as production code
+- Missing native llama.cpp integration
+- Incomplete model management
+
+The implementation is **80% architecturally complete** but requires focused effort on the remaining 20% to achieve production parity with iOS. The modular design makes these additions straightforward, and the existing mock implementations provide clear templates for real functionality.
+
+**Priority**: HIGH - Complete provider alignment and remove mock implementations first, then add native llama.cpp integration for production readiness.

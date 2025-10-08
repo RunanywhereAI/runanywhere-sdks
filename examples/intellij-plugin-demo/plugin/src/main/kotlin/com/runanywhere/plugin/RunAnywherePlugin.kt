@@ -70,8 +70,8 @@ class RunAnywherePlugin : StartupActivity {
                             // Step 2: Initialize SDK with backend authentication
                             logger.info("Initializing RunAnywhere SDK with backend authentication...")
                             RunAnywhere.initialize(
-                                apiKey = API_KEY,
-                                baseURL = "", // Must be provided via environment
+                                apiKey = if (SDK_ENVIRONMENT == SDKEnvironment.DEVELOPMENT) "demo-api-key" else API_KEY,
+                                baseURL = API_URL ?: "https://api.runanywhere.ai", // Use environment or default
                                 environment = SDK_ENVIRONMENT
                             )
 

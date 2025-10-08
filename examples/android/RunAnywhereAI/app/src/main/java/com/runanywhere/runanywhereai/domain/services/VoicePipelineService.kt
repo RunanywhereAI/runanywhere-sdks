@@ -2,7 +2,7 @@ package com.runanywhere.runanywhereai.domain.services
 
 import android.content.Context
 import com.runanywhere.runanywhereai.domain.models.*
-import com.runanywhere.sdk.RunAnywhere
+import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTInput
@@ -138,7 +138,7 @@ class VoicePipelineService(
         val audioFloats = bytesToFloats(audioData)
 
         // Process through VAD if available
-        val vadResult = vadComponent?.processAudioChunk(VADInput(audioFloats))
+        val vadResult = vadComponent?.processAudioChunk(audioFloats)
 
         when {
             vadResult?.isSpeechDetected == true -> {
@@ -175,13 +175,7 @@ class VoicePipelineService(
      */
     private suspend fun processSTT(audioData: ByteArray) {
         try {
-            val sttInput = STTInput(
-                audioData = audioData,
-                format = AudioFormat.PCM,
-                language = "en-US"
-            )
-
-            val transcriptionResult = sttComponent?.transcribe(sttInput)
+            val transcriptionResult = sttComponent?.transcribe(audioData, AudioFormat.PCM, "en-US")
 
             if (transcriptionResult != null && transcriptionResult.text.isNotBlank()) {
                 _pipelineEvents.emit(
@@ -204,25 +198,18 @@ class VoicePipelineService(
      */
     private suspend fun processLLM(userInput: String) {
         try {
-            val options = RunAnywhereGenerationOptions(
-                modelId = "llama3.2-3b",
-                maxTokens = 150,
-                temperature = 0.7,
-                stream = false
-            )
-
-            val response = RunAnywhere.generate(userInput, options)
+            val response = RunAnywhere.generate(userInput)
 
             _pipelineEvents.emit(
                 VoicePipelineEvent.LLMResponse(
-                    text = response.text,
-                    thinking = response.thinking
+                    text = response,
+                    thinking = null
                 )
             )
 
             // Process through TTS
-            if (response.text.isNotBlank()) {
-                processTTS(response.text)
+            if (response.isNotBlank()) {
+                processTTS(response)
             }
         } catch (e: Exception) {
             _pipelineEvents.emit(VoicePipelineEvent.Error("LLM error: ${e.message}"))

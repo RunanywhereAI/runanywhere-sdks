@@ -20,6 +20,7 @@ sealed class SDKError : Exception() {
 
     data class ModelLoadingFailed(override val message: String) : SDKError()
     data class ModelDownloadFailed(override val message: String) : SDKError()
+    data class ModelRegistrationFailed(override val message: String) : SDKError()
 
     // File system errors
     data class FileSystemError(override val message: String) : SDKError()
@@ -30,6 +31,9 @@ sealed class SDKError : Exception() {
     // Network errors
     data class NetworkError(override val message: String) : SDKError()
     data class AuthenticationError(override val message: String) : SDKError()
+    
+    // Security errors
+    data class SecurityError(override val message: String) : SDKError()
 
     // Configuration errors
     data class ConfigurationError(override val message: String) : SDKError()

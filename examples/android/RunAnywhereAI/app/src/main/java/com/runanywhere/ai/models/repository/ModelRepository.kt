@@ -10,11 +10,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Date
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ModelRepository @Inject constructor(
+class ModelRepository(
     private val context: Context
 ) {
     private val modelsDir = File(context.filesDir, "models")
@@ -50,17 +47,17 @@ class ModelRepository @Inject constructor(
                 ModelInfo(
                     id = sdkModel.id,
                     name = sdkModel.name,
-                    category = mapCategory(sdkModel.category),
-                    format = mapFormat(sdkModel.format),
+                    category = mapCategory(sdkModel.category.toString()),
+                    format = mapFormat(sdkModel.format.toString()),
                     downloadURL = sdkModel.downloadURL,
                     localPath = sdkModel.localPath,
                     downloadSize = sdkModel.downloadSize,
                     memoryRequired = sdkModel.memoryRequired,
-                    compatibleFrameworks = mapFrameworks(sdkModel.frameworks),
-                    preferredFramework = mapFramework(sdkModel.preferredFramework),
+                    compatibleFrameworks = mapFrameworks(listOf(sdkModel.preferredFramework?.toString() ?: "LLAMACPP")),
+                    preferredFramework = mapFramework(sdkModel.preferredFramework?.toString()),
                     contextLength = sdkModel.contextLength,
                     supportsThinking = sdkModel.supportsThinking,
-                    metadata = mapMetadata(sdkModel.metadata),
+                    metadata = mapMetadata(null), // Handle metadata separately
                     state = determineModelState(sdkModel)
                 )
             }

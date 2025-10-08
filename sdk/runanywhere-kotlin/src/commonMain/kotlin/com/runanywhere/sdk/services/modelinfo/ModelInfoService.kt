@@ -116,20 +116,20 @@ class ModelInfoService(
     }
 
     /**
-     * Update model download status
-     * Equivalent to iOS: func updateDownloadStatus(_ modelId: String, isDownloaded: Bool) async throws
+     * Update model download status with local path
+     * Enhanced version that accepts local path
      */
-    suspend fun updateDownloadStatus(modelId: String, isDownloaded: Boolean) = mutex.withLock {
-        logger.debug("Updating download status for model: $modelId, isDownloaded: $isDownloaded")
+    suspend fun updateDownloadStatus(modelId: String, isDownloaded: Boolean, localPath: String? = null) = mutex.withLock {
+        logger.debug("Updating download status for model: $modelId, isDownloaded: $isDownloaded, localPath: $localPath")
 
         try {
             // Get current model
             val currentModel = getModel(modelId)
                 ?: throw SDKError.ModelNotFound(modelId)
 
-            // Update download status
+            // Update download status with provided local path
             val updatedModel = currentModel.copy(
-                localPath = if (isDownloaded) "/path/to/model" else null,
+                localPath = if (isDownloaded) localPath else null,
                 updatedAt = SimpleInstant.now()
             )
 
@@ -139,10 +139,36 @@ class ModelInfoService(
             // Update cache
             cachedModels[modelId] = updatedModel
 
-            logger.info("Download status updated for model: $modelId")
+            logger.info("Download status updated for model: $modelId with localPath: $localPath")
 
         } catch (e: Exception) {
             logger.error("Failed to update download status for model: $modelId - ${e.message}")
+            throw SDKError.RuntimeError("Database operation failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Load all stored models from repository
+     * Equivalent to iOS: func loadStoredModels() async throws -> [ModelInfo]
+     */
+    suspend fun loadStoredModels(): List<ModelInfo> = mutex.withLock {
+        logger.debug("Loading all stored models")
+
+        try {
+            val models = modelInfoRepository.fetchAll()
+            
+            // Update cache with all models
+            models.forEach { model ->
+                cachedModels[model.id] = model
+            }
+            
+            lastCacheUpdate = getCurrentTimeMillis()
+            
+            logger.info("Loaded ${models.size} stored models")
+            return models
+
+        } catch (e: Exception) {
+            logger.error("Failed to load stored models - ${e.message}")
             throw SDKError.RuntimeError("Database operation failed: ${e.message}")
         }
     }

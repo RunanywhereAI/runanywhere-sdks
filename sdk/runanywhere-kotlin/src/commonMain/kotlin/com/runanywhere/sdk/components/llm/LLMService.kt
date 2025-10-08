@@ -213,9 +213,12 @@ class LlamaCppServiceProvider : BaseLLMServiceProvider() {
         "streaming",
         "context-window-8k",
         "context-window-32k",
+        "context-window-128k",
         "gpu-acceleration",
         "quantization",
-        "grammar-sampling"
+        "grammar-sampling",
+        "rope-scaling",
+        "flash-attention"
     )
 
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
@@ -223,8 +226,8 @@ class LlamaCppServiceProvider : BaseLLMServiceProvider() {
     }
 
     override fun getAvailableSystemMemory(): Long {
-        // This would be implemented per platform
-        return 8_000_000_000L // 8GB default
+        // Platform-specific implementation would go here
+        return Runtime.getRuntime().maxMemory()
     }
 
     override fun canHandle(modelId: String?): Boolean {
@@ -236,8 +239,41 @@ class LlamaCppServiceProvider : BaseLLMServiceProvider() {
                modelIdLower.contains("mistral") ||
                modelIdLower.contains("mixtral") ||
                modelIdLower.contains("phi") ||
+               modelIdLower.contains("gemma") ||
+               modelIdLower.contains("qwen") ||
+               modelIdLower.contains("codellama") ||
                modelIdLower.endsWith(".gguf") ||
                modelIdLower.endsWith(".ggml")
+    }
+
+    override fun validateModelCompatibility(model: ModelInfo): ModelCompatibilityResult {
+        val warnings = mutableListOf<String>()
+        
+        // Check if it's a supported format
+        val isCompatible = when {
+            model.format.toString().contains("GGUF", ignoreCase = true) -> true
+            model.format.toString().contains("GGML", ignoreCase = true) -> true
+            else -> {
+                warnings.add("Model format ${model.format} may not be fully supported")
+                false
+            }
+        }
+        
+        // Check memory requirements
+        val memoryRequired = estimateMemoryRequirements(model)
+        val availableMemory = getAvailableSystemMemory()
+        
+        if (memoryRequired > availableMemory * 0.8) {
+            warnings.add("Model may require more memory than available (${memoryRequired / 1024 / 1024}MB required)")
+        }
+        
+        return ModelCompatibilityResult(
+            isCompatible = isCompatible,
+            details = "Model ${model.name} compatibility check for llama.cpp framework",
+            memoryRequired = memoryRequired,
+            recommendedConfiguration = getOptimalConfiguration(model),
+            warnings = warnings
+        )
     }
 }
 
