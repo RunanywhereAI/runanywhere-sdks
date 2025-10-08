@@ -499,7 +499,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         // Check if model is already available (cached)
         if (modelStorage.isModelAvailable(actualModelId)) {
-            jvmLogger.info("Model $actualModelId already exists at: $modelPath")
+            jvmLogger.info("✅ Model $actualModelId already exists at: $modelPath")
             val fileSize = modelFile.length()
             jvmLogger.info("Existing model size: $fileSize bytes")
 
@@ -507,7 +507,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             jvmLogger.info("Using cached model for $actualModelId")
         } else {
             // Model doesn't exist or is invalid, download it
-            jvmLogger.info("Model $actualModelId not found locally, downloading...")
+            jvmLogger.info("⬇️ Model $actualModelId not found locally, downloading...")
 
             try {
                 // Auto-download the model
@@ -524,7 +524,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                     }
                 }.last() // Wait for completion
 
-                jvmLogger.info("Model $actualModelId downloaded successfully")
+                jvmLogger.info("✅ Model $actualModelId downloaded successfully")
 
                 // Verify the downloaded model
                 if (!modelFile.exists()) {
@@ -535,25 +535,29 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 jvmLogger.info("Downloaded model size: $fileSize bytes")
 
             } catch (e: Exception) {
-                jvmLogger.error("Failed to download model $actualModelId: ${e.message}")
+                jvmLogger.error("❌ Failed to download model $actualModelId: ${e.message}")
 
-                // For v0.1: Return mock success in development mode
+                // In development mode, continue without the model (will use mock transcription)
                 if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
-                    jvmLogger.warn("DEVELOPMENT MODE: Using mock mode due to download failure")
-                    // Create a mock model entry for development
-                    val mockModel = ModelInfo(
+                    jvmLogger.warn("🔧 DEVELOPMENT MODE: Download failed, will use mock transcription as fallback")
+                    jvmLogger.info("💡 You can manually download the model later with: RunAnywhere.downloadModel(\"$actualModelId\")")
+
+                    // Create a model entry without local path for tracking
+                    val fallbackModel = ModelInfo(
                         id = actualModelId,
-                        name = "Whisper Base (Mock)",
+                        name = "Whisper Base (Download Failed)",
                         category = ModelCategory.SPEECH_RECOGNITION,
                         format = ModelFormat.GGML,
-                        downloadURL = "mock://whisper-base",
-                        downloadSize = 142_000_000,
-                        memoryRequired = 200_000_000, // 200 MB for base model
-                        localPath = null // No local path for mock
+                        downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                        downloadSize = 147_951_465L,
+                        memoryRequired = 200_000_000L,
+                        localPath = null // No local path since download failed
                     )
-                    serviceContainer.modelInfoService.saveModel(mockModel)
-                    return true
+                    serviceContainer.modelInfoService.saveModel(fallbackModel)
+                    return true // Continue in development mode
                 }
+
+                // In production mode, fail if download fails
                 return false
             }
         }

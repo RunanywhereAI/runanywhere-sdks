@@ -36,7 +36,7 @@ class AndroidSecureStorage private constructor(
          * Create secure storage instance for Android
          */
         fun create(identifier: String): AndroidSecureStorage {
-            val appContext = context 
+            val appContext = context
                 ?: throw SDKError.SecurityError("AndroidSecureStorage not initialized. Call initialize(context) first.")
 
             // Return cached instance if available for the same identifier
@@ -184,11 +184,11 @@ class AndroidSecureStorage private constructor(
             // Test by trying to read/write a test value
             val testKey = "availability_test"
             val testValue = "test"
-            
+
             encryptedPrefs.edit().putString(testKey, testValue).apply()
             val retrievedValue = encryptedPrefs.getString(testKey, null)
             encryptedPrefs.edit().remove(testKey).apply()
-            
+
             retrievedValue == testValue
         } catch (e: Exception) {
             logger.error("Secure storage availability test failed", e)

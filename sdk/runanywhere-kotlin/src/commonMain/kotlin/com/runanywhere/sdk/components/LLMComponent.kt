@@ -232,14 +232,14 @@ class LLMServiceAdapter(
             temperature = options.temperature,
             streamingEnabled = false
         )
-        
+
         // Create a basic LLM service from the provider
         val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
             modelId = options.model ?: "default",
             temperature = options.temperature.toDouble(),
             maxTokens = options.maxTokens
         )
-        
+
         val llmService = provider.createLLMService(llmConfig)
         return llmService.generate(prompt, llmOptions)
     }
@@ -251,7 +251,7 @@ class LLMServiceAdapter(
             temperature = options.temperature,
             streamingEnabled = true
         )
-        
+
         return flow {
             // Create a basic LLM service from the provider
             val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
@@ -259,14 +259,14 @@ class LLMServiceAdapter(
                 temperature = options.temperature.toDouble(),
                 maxTokens = options.maxTokens
             )
-            
+
             val llmService = provider.createLLMService(llmConfig)
             val tokens = mutableListOf<String>()
-            
+
             llmService.streamGenerate(prompt, llmOptions) { token ->
                 tokens.add(token)
             }
-            
+
             for (token in tokens) {
                 emit(token)
             }

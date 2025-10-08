@@ -133,14 +133,14 @@ if adb devices | grep -q "emulator"; then
 else
     print_info "Starting emulator '$EMULATOR_NAME'..."
     print_warning "This may take a few minutes on first boot..."
-    
+
     # Start emulator in background
     emulator -avd "$EMULATOR_NAME" -no-snapshot-save -wipe-data &
     EMULATOR_PID=$!
-    
+
     print_info "Waiting for emulator to boot..."
     adb wait-for-device
-    
+
     # Wait for system to be ready
     print_info "Waiting for Android system to be ready..."
     while [ "$(adb shell getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
@@ -148,7 +148,7 @@ else
         echo -n "."
     done
     echo ""
-    
+
     print_status "Emulator is ready!"
 fi
 
@@ -177,15 +177,15 @@ print_info "Building debug APK..."
 
 if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
     print_status "Build successful!"
-    
+
     print_info "Installing app on device..."
     adb install -r app/build/outputs/apk/debug/app-debug.apk
-    
+
     print_info "Launching app..."
-    
+
     # Launch the app on the device
     adb shell am start -n com.runanywhere.runanywhereai.debug/com.runanywhere.runanywhereai.MainActivity
-    
+
     print_status "App launched successfully on device!"
     print_status "Setup complete - ready for Phase 1 implementation!"
 else

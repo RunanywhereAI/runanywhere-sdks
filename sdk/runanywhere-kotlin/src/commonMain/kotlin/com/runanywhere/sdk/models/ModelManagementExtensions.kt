@@ -15,12 +15,12 @@ import kotlin.uuid.Uuid
 
 /**
  * Model Management Extensions for RunAnywhere SDK - EXACT copy of iOS RunAnywhere+ModelManagement.swift
- * 
+ *
  * This object provides static methods for model management operations.
  * All methods are suspend functions following Kotlin coroutine patterns.
  */
 object RunAnywhereModelManagement {
-    
+
     private val logger = SDKLogger("ModelManagement")
 
     /**
@@ -57,7 +57,7 @@ object RunAnywhereModelManagement {
             // Get the current model ID from generation service
             // TODO: Implement when generation service supports getCurrentModel()
             // val currentModel = ServiceContainer.shared.generationService.getCurrentModel()
-            
+
             // For now, unload all models as a placeholder
             ServiceContainer.shared.modelLoadingService.clearAllModels()
 
@@ -98,16 +98,16 @@ object RunAnywhereModelManagement {
             logger.debug("Looking for model: $modelIdentifier")
 
             var modelInfo = modelInfoService.getModel(modelIdentifier)
-            
+
             if (modelInfo == null) {
                 logger.error("Model not found in database: $modelIdentifier")
-                
+
                 // Try to find in registry as fallback
                 val registryModel = ServiceContainer.shared.modelRegistry.getModel(modelIdentifier)
                 if (registryModel != null) {
                     logger.debug("Found model in registry, saving to database")
                     modelInfoService.saveModel(registryModel)
-                    
+
                     // Now try again
                     modelInfo = modelInfoService.getModel(modelIdentifier)
                         ?: throw SDKError.ModelNotFound(modelIdentifier)
@@ -131,7 +131,7 @@ object RunAnywhereModelManagement {
             ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
 
             EventBus.publish(SDKModelEvent.DownloadCompleted(modelIdentifier))
-            
+
         } catch (error: Exception) {
             EventBus.publish(SDKModelEvent.DownloadFailed(modelIdentifier, error))
             throw error
@@ -148,11 +148,11 @@ object RunAnywhereModelManagement {
         try {
             // Use model manager to delete model
             ServiceContainer.shared.modelManager.deleteModel(modelIdentifier)
-            
+
             // Also remove from registry and database
             ServiceContainer.shared.modelRegistry.removeModel(modelIdentifier)
             // TODO: Add deletion from modelInfoService when it supports deletion
-            
+
             EventBus.publish(SDKModelEvent.DeleteCompleted(modelIdentifier))
         } catch (error: Exception) {
             EventBus.publish(SDKModelEvent.DeleteFailed(modelIdentifier, error))
@@ -217,7 +217,7 @@ object RunAnywhereModelManagement {
     fun getDownloadProgress(modelIdentifier: String): Double? {
         val activeDownloads = ServiceContainer.shared.downloadService.getActiveDownloads()
         val modelDownload = activeDownloads.find { it.modelId == modelIdentifier }
-        
+
         // TODO: Get actual progress from the download task
         // This would require enhancing the download task to provide current progress
         return null
@@ -249,7 +249,7 @@ object RunAnywhereModelManagement {
         val totalSize = ServiceContainer.shared.modelManager.getTotalModelsSize()
         val downloadedModels = ServiceContainer.shared.modelRegistry.getAllModels()
             .filter { it.localPath != null }
-        
+
         return@withContext ModelStorageStatistics(
             totalStorageUsed = totalSize,
             modelCount = downloadedModels.size,

@@ -35,7 +35,7 @@ class LLMComponent(
     }
 
     override val componentType: SDKComponent = SDKComponent.LLM
-    
+
     private val logger = SDKLogger("LLMComponent")
     private val serviceContainer: ServiceContainer? = ServiceContainer.shared
 
@@ -63,13 +63,13 @@ class LLMComponent(
             // Resolve actual model path from model registry
             val modelRegistry = serviceContainer?.modelRegistry
             val modelInfo = modelRegistry?.getModel(modelId)
-            
+
             if (modelInfo != null) {
                 modelPath = modelInfo.localPath
-                
+
                 // Check if model needs downloading
                 val needsDownload = modelInfo.localPath == null || !modelRegistry.isModelDownloaded(modelId)
-                
+
                 if (needsDownload) {
                     // Emit download required event
                     EventBus.publish(ComponentInitializationEvent.ComponentDownloadRequired(
@@ -80,7 +80,7 @@ class LLMComponent(
 
                     // Download model
                     downloadModel(modelId)
-                    
+
                     // Update model path after download
                     val updatedModelInfo = modelRegistry.getModel(modelId)
                     modelPath = updatedModelInfo?.localPath
@@ -103,7 +103,7 @@ class LLMComponent(
 
         // Check if we have the new LLMServiceProvider interface
         val enhancedProvider = provider as? LLMServiceProvider
-        
+
         val llmService = if (enhancedProvider != null) {
             // Use the real LLMServiceProvider interface
             enhancedProvider.createLLMService(llmConfiguration)
@@ -168,17 +168,17 @@ class LLMComponent(
         try {
             // First try to get model info from registry
             val modelInfo = serviceContainer?.modelRegistry?.getModel(modelId)
-            
+
             if (modelInfo != null && modelInfo.downloadURL != null) {
                 // Use model manager to download from URL
                 logger.info("Downloading model $modelId from URL: ${modelInfo.downloadURL}")
                 val downloadedPath = serviceContainer?.modelManager?.ensureModel(modelInfo)
-                
+
                 // Update model registry with local path
                 val updatedModelInfo = modelInfo.copy(localPath = downloadedPath)
                 serviceContainer?.modelRegistry?.updateModel(updatedModelInfo)
                 logger.info("Model $modelId downloaded successfully to: $downloadedPath")
-                
+
             } else {
                 // Try to get the LLM provider to handle the download (legacy support)
                 val provider = ModuleRegistry.llmProvider(modelId)
@@ -192,11 +192,11 @@ class LLMComponent(
                             progress = progress.toDouble()
                         ))
                     }
-                    
+
                     // Update model registry with downloaded model info
                     serviceContainer?.modelRegistry?.registerModel(downloadedModel)
                     logger.info("Model $modelId downloaded successfully via provider")
-                    
+
                 } else {
                     // Fallback: simulate download with progress for development
                     logger.warn("No provider found for model $modelId, simulating download")
@@ -218,7 +218,7 @@ class LLMComponent(
                 component = componentType.name,
                 modelId = modelId
             ))
-            
+
         } catch (e: Exception) {
             logger.error("Failed to download model $modelId: ${e.message}")
             EventBus.publish(ComponentInitializationEvent.ComponentDownloadFailed(

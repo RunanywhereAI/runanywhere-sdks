@@ -113,7 +113,7 @@ class RealNetworkService(
                     return response.body
                 } else {
                     val error = handleHttpError(response, endpoint, method)
-                    
+
                     // Retry only on specific error conditions
                     if (shouldRetry(response.statusCode, attempt)) {
                         lastException = error
@@ -125,12 +125,12 @@ class RealNetworkService(
                             continue
                         }
                     }
-                    
+
                     throw error
                 }
             } catch (e: Exception) {
                 lastException = e
-                
+
                 if (!shouldRetryException(e, attempt)) {
                     logger.error("$method request failed: ${endpoint.url} - ${e.message}")
                     throw when (e) {
@@ -138,7 +138,7 @@ class RealNetworkService(
                         else -> SDKError.NetworkError("$method request failed: ${e.message}")
                     }
                 }
-                
+
                 attempt++
                 if (attempt < maxRetryAttempts) {
                     val delayMs = calculateBackoffDelay(attempt)
@@ -153,7 +153,7 @@ class RealNetworkService(
                 }
             }
         }
-        
+
         throw lastException ?: SDKError.NetworkError("Request failed after $maxRetryAttempts attempts")
     }
 
@@ -271,7 +271,7 @@ class RealNetworkService(
      */
     private fun shouldRetry(statusCode: Int, attempt: Int): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
-        
+
         return when (statusCode) {
             408, 429 -> true  // Timeout, Rate limit
             in 500..599 -> true  // Server errors
@@ -284,7 +284,7 @@ class RealNetworkService(
      */
     private fun shouldRetryException(exception: Exception, attempt: Int): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
-        
+
         return when (exception) {
             is SDKError.InvalidAPIKey -> false  // Don't retry auth errors
             is SDKError.NetworkError -> {

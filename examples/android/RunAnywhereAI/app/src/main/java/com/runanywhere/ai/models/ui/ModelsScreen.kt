@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun ModelsScreen() {
     val context = LocalContext.current
-    val viewModel: ModelManagementViewModel = viewModel { 
+    val viewModel: ModelManagementViewModel = viewModel {
         ModelManagementViewModel(ModelRepository(context))
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()

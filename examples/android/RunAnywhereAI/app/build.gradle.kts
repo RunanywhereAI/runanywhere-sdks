@@ -221,7 +221,7 @@ dependencies {
 
     // Serialization
     implementation(libs.kotlinx.serialization.json)
-    
+
     // DateTime - Required for SDK events (kotlinx.datetime.Instant)
     implementation(libs.kotlinx.datetime)
 

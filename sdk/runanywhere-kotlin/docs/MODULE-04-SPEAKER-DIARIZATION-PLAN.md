@@ -1,16 +1,16 @@
 # Module 4: Speaker Diarization Implementation Plan
-**Priority**: 🔴 CRITICAL/EMERGENCY  
-**Estimated Timeline**: 10-12 days  
-**Dependencies**: Module 2 (STT) for audio processing foundation  
-**Team Assignment**: 2 Developers (1 Senior + 1 ML Engineer)  
+**Priority**: 🔴 CRITICAL/EMERGENCY
+**Estimated Timeline**: 10-12 days
+**Dependencies**: Module 2 (STT) for audio processing foundation
+**Team Assignment**: 2 Developers (1 Senior + 1 ML Engineer)
 
 ## 🚨 EMERGENCY STATUS ALERT
 
 **CRITICAL BUSINESS GAP**: Speaker diarization is completely missing from the Kotlin SDK while being a core production feature in iOS. This represents a **major competitive disadvantage** and **feature parity failure**.
 
-**Current Status**: 0% implemented - No code, no interfaces, no design  
-**iOS Status**: 100% production-ready with 584-line implementation  
-**Business Impact**: HIGH - Core voice feature missing  
+**Current Status**: 0% implemented - No code, no interfaces, no design
+**iOS Status**: 100% production-ready with 584-line implementation
+**Business Impact**: HIGH - Core voice feature missing
 
 ---
 
@@ -27,7 +27,7 @@ Speaker diarization (speaker identification and conversation attribution) is a *
 
 **Why This is Emergency Priority**:
 1. **Feature Parity Violation**: Major iOS feature completely missing
-2. **Business Critical**: Core voice capability expected by users  
+2. **Business Critical**: Core voice capability expected by users
 3. **Competitive Disadvantage**: Limits voice assistant capabilities
 4. **Technical Debt**: Will become harder to implement later
 
@@ -63,8 +63,8 @@ Build complete speaker diarization system matching iOS capabilities:
 ---
 
 ## Phase 1: Foundation Architecture (Day 1-3)
-**Duration**: 3 days  
-**Priority**: CRITICAL  
+**Duration**: 3 days
+**Priority**: CRITICAL
 
 ### Task 1.1: Speaker Data Models Design
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/components/diarization/`
@@ -87,7 +87,7 @@ data class SpeakerInfo(
         if (other !is SpeakerInfo) return false
         return id == other.id
     }
-    
+
     override fun hashCode(): Int = id.hashCode()
 }
 
@@ -106,17 +106,17 @@ data class SpeakerProfile(
         else {
             val embeddingSize = voiceEmbeddings.first().size
             val result = FloatArray(embeddingSize)
-            
+
             voiceEmbeddings.forEach { embedding ->
                 embedding.forEachIndexed { index, value ->
                     result[index] += value
                 }
             }
-            
+
             result.forEachIndexed { index, value ->
                 result[index] = value / voiceEmbeddings.size
             }
-            
+
             result
         }
     }
@@ -194,70 +194,70 @@ interface SpeakerDiarizationService {
      * Initialize the speaker diarization service
      */
     suspend fun initialize(): Boolean
-    
+
     /**
      * Process audio data and perform speaker diarization
      */
     suspend fun processAudio(audioData: ByteArray): DiarizationResult
-    
+
     /**
      * Process audio with existing STT transcription
      */
     suspend fun processAudioWithTranscription(
-        audioData: ByteArray, 
+        audioData: ByteArray,
         transcription: String,
         timestamps: List<TimestampInfo>
     ): DiarizationResult
-    
+
     /**
      * Create or update a speaker profile from audio samples
      */
     suspend fun createSpeakerProfile(
-        speakerId: String, 
+        speakerId: String,
         audioSamples: List<ByteArray>,
         name: String? = null
     ): SpeakerProfile
-    
+
     /**
      * Identify speaker in audio segment
      */
     suspend fun identifySpeaker(audioData: ByteArray): SpeakerIdentificationResult
-    
+
     /**
      * Extract voice embedding from audio
      */
     suspend fun extractVoiceEmbedding(audioData: ByteArray): FloatArray
-    
+
     /**
      * Calculate similarity between two voice embeddings
      */
     fun calculateSimilarity(embedding1: FloatArray, embedding2: FloatArray): Float
-    
+
     /**
      * Get all known speaker profiles
      */
     suspend fun getSpeakerProfiles(): List<SpeakerProfile>
-    
+
     /**
      * Update existing speaker profile with new audio sample
      */
     suspend fun updateSpeakerProfile(speakerId: String, audioData: ByteArray): Boolean
-    
+
     /**
      * Delete speaker profile
      */
     suspend fun deleteSpeakerProfile(speakerId: String): Boolean
-    
+
     /**
      * Process streaming audio for real-time diarization
      */
     fun processAudioStream(audioStream: Flow<ByteArray>): Flow<SpeechSegment>
-    
+
     /**
      * Cleanup resources
      */
     fun cleanup()
-    
+
     /**
      * Service state
      */
@@ -275,62 +275,62 @@ class SpeakerDiarizationComponent(
     configuration: SpeakerDiarizationConfiguration,
     serviceContainer: ServiceContainer? = null
 ) : BaseComponent<SpeakerDiarizationService>(configuration, serviceContainer) {
-    
+
     companion object {
         override val componentType: SDKComponent = SDKComponent.SPEAKER_DIARIZATION
     }
-    
+
     private val diarizationConfig = configuration as SpeakerDiarizationConfiguration
-    
+
     override suspend fun createService(): SpeakerDiarizationService {
         val provider = ModuleRegistry.speakerDiarizationProvider()
             ?: throw SDKError.ComponentNotAvailable("No speaker diarization provider available")
-        
+
         return provider.createSpeakerDiarizationService(diarizationConfig)
     }
-    
+
     /**
      * High-level diarization with STT integration
      */
     suspend fun diarizeWithTranscription(audioData: ByteArray): DiarizationWithText {
         ensureReady()
-        
+
         return try {
             updateState(ComponentState.PROCESSING)
-            
+
             // Get STT transcription first
             val sttComponent = serviceContainer?.sttComponent
                 ?: throw SDKError.ComponentNotAvailable("STT component required for transcription")
-            
+
             val transcriptionResult = sttComponent.transcribe(audioData)
-            
+
             // Perform diarization
             val diarizationResult = service!!.processAudioWithTranscription(
                 audioData = audioData,
                 transcription = transcriptionResult.transcript,
                 timestamps = transcriptionResult.segments
             )
-            
+
             // Combine results
             val labeledTranscript = createLabeledTranscript(
                 transcriptionResult.segments,
                 diarizationResult.segments
             )
-            
+
             updateState(ComponentState.READY)
-            
+
             DiarizationWithText(
                 diarizationResult = diarizationResult,
                 originalTranscription = transcriptionResult,
                 labeledTranscript = labeledTranscript
             )
-            
+
         } catch (e: Exception) {
             updateState(ComponentState.FAILED)
             throw SDKError.ComponentProcessingFailed("Speaker diarization failed", e)
         }
     }
-    
+
     /**
      * Real-time streaming diarization
      */
@@ -338,15 +338,15 @@ class SpeakerDiarizationComponent(
         audioStream: Flow<ByteArray>
     ): Flow<SpeakerDiarizationEvent> = flow {
         ensureReady()
-        
+
         service!!.processAudioStream(audioStream).collect { segment ->
             emit(SpeakerDiarizationEvent.SpeakerSegment(segment))
-            
+
             // Emit speaker change events
             // This would track speaker transitions
         }
     }
-    
+
     /**
      * Speaker learning and profile management
      */
@@ -355,11 +355,11 @@ class SpeakerDiarizationComponent(
         audioSamples: List<ByteArray>
     ): SpeakerProfile {
         ensureReady()
-        
+
         val speakerId = generateSpeakerId(name)
         return service!!.createSpeakerProfile(speakerId, audioSamples, name)
     }
-    
+
     private fun createLabeledTranscript(
         transcriptionSegments: List<TimestampInfo>,
         diarizationSegments: List<SpeechSegment>
@@ -374,7 +374,7 @@ class SpeakerDiarizationComponent(
                     diarizationSegment.endTime
                 )
             }
-            
+
             matchingDiarization?.let { diarization ->
                 LabeledTranscriptSegment(
                     text = transcriptSegment.text,
@@ -386,14 +386,14 @@ class SpeakerDiarizationComponent(
             }
         }
     }
-    
+
     private fun timeSegmentsOverlap(
         start1: Long, end1: Long,
         start2: Long, end2: Long
     ): Boolean {
         return start1 < end2 && start2 < end1
     }
-    
+
     private fun generateSpeakerId(name: String): String {
         return "speaker_${name.lowercase().replace(" ", "_")}_${System.currentTimeMillis()}"
     }
@@ -432,8 +432,8 @@ sealed class SpeakerDiarizationEvent {
 ---
 
 ## Phase 2: Core Algorithm Implementation (Day 4-7)
-**Duration**: 4 days  
-**Priority**: CRITICAL  
+**Duration**: 4 days
+**Priority**: CRITICAL
 
 ### Task 2.1: Voice Embedding Extraction
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/components/diarization/algorithms/`
@@ -441,7 +441,7 @@ sealed class SpeakerDiarizationEvent {
 ```kotlin
 // Voice feature extraction for speaker identification
 class VoiceEmbeddingExtractor {
-    
+
     /**
      * Extract MFCC (Mel-Frequency Cepstral Coefficients) features
      */
@@ -450,66 +450,66 @@ class VoiceEmbeddingExtractor {
         val hopSize = 256
         val numMelFilters = 26
         val numMFCC = 13
-        
+
         // Pre-emphasis filter
         val preEmphasized = applyPreEmphasis(audioData)
-        
+
         // Windowing and FFT
         val spectrograms = computeSpectrogram(preEmphasized, windowSize, hopSize)
-        
+
         // Mel filter bank
         val melSpectrograms = applyMelFilterBank(spectrograms, sampleRate, numMelFilters)
-        
+
         // DCT to get MFCC
         val mfccFeatures = applyDCT(melSpectrograms, numMFCC)
-        
+
         // Feature normalization
         return normalizeMFCC(mfccFeatures)
     }
-    
+
     /**
      * Extract voice embedding combining multiple features
      */
     fun extractVoiceEmbedding(audioData: ByteArray): FloatArray {
         val floatAudio = convertBytesToFloat(audioData)
         val sampleRate = 16000 // Assuming 16kHz
-        
+
         // Extract different feature types
         val mfccFeatures = extractMFCC(floatAudio, sampleRate)
         val spectralFeatures = extractSpectralFeatures(floatAudio, sampleRate)
         val prosodyFeatures = extractProsodyFeatures(floatAudio, sampleRate)
-        
+
         // Combine features into single embedding
         return combineFeatures(mfccFeatures, spectralFeatures, prosodyFeatures)
     }
-    
+
     private fun extractSpectralFeatures(audio: FloatArray, sampleRate: Int): FloatArray {
         val spectralCentroid = calculateSpectralCentroid(audio, sampleRate)
         val spectralRolloff = calculateSpectralRolloff(audio, sampleRate)
         val zeroCrossingRate = calculateZeroCrossingRate(audio)
         val spectralFlux = calculateSpectralFlux(audio)
-        
+
         return floatArrayOf(spectralCentroid, spectralRolloff, zeroCrossingRate, spectralFlux)
     }
-    
+
     private fun extractProsodyFeatures(audio: FloatArray, sampleRate: Int): FloatArray {
         val fundamentalFreq = extractFundamentalFrequency(audio, sampleRate)
         val energy = calculateRMSEnergy(audio)
         val tonality = calculateTonality(audio)
-        
+
         return floatArrayOf(fundamentalFreq, energy, tonality)
     }
-    
+
     private fun combineFeatures(vararg featureArrays: FloatArray): FloatArray {
         val totalSize = featureArrays.sumOf { it.size }
         val combined = FloatArray(totalSize)
         var offset = 0
-        
+
         featureArrays.forEach { features ->
             System.arraycopy(features, 0, combined, offset, features.size)
             offset += features.size
         }
-        
+
         // Apply dimensionality reduction if needed (PCA)
         return if (combined.size > 512) {
             applyPCA(combined, targetDimensions = 512)
@@ -517,78 +517,78 @@ class VoiceEmbeddingExtractor {
             combined
         }
     }
-    
+
     // Audio processing utility functions
     private fun applyPreEmphasis(audio: FloatArray, alpha: Float = 0.97f): FloatArray {
         val result = FloatArray(audio.size)
         result[0] = audio[0]
-        
+
         for (i in 1 until audio.size) {
             result[i] = audio[i] - alpha * audio[i - 1]
         }
-        
+
         return result
     }
-    
+
     private fun computeSpectrogram(audio: FloatArray, windowSize: Int, hopSize: Int): Array<FloatArray> {
         val numFrames = (audio.size - windowSize) / hopSize + 1
         val spectrogram = Array(numFrames) { FloatArray(windowSize / 2 + 1) }
-        
+
         val window = hammingWindow(windowSize)
         val fft = FFT(windowSize)
-        
+
         for (frame in 0 until numFrames) {
             val start = frame * hopSize
             val frameData = FloatArray(windowSize)
-            
+
             for (i in 0 until windowSize) {
                 frameData[i] = audio[start + i] * window[i]
             }
-            
+
             val fftResult = fft.forward(frameData)
             spectrogram[frame] = fftResult.magnitude()
         }
-        
+
         return spectrogram
     }
-    
+
     private fun calculateSpectralCentroid(audio: FloatArray, sampleRate: Int): Float {
         // Implementation of spectral centroid calculation
         val spectrum = FFT(audio.size).forward(audio)
         val magnitude = spectrum.magnitude()
-        
+
         var weightedSum = 0f
         var totalMagnitude = 0f
-        
+
         for (i in magnitude.indices) {
             val frequency = i * sampleRate.toFloat() / audio.size
             weightedSum += frequency * magnitude[i]
             totalMagnitude += magnitude[i]
         }
-        
+
         return if (totalMagnitude > 0) weightedSum / totalMagnitude else 0f
     }
-    
+
     private fun extractFundamentalFrequency(audio: FloatArray, sampleRate: Int): Float {
         // Autocorrelation-based pitch detection
         val minPeriod = sampleRate / 800 // Max 800Hz
         val maxPeriod = sampleRate / 80  // Min 80Hz
-        
+
         var maxCorrelation = 0f
         var bestPeriod = minPeriod
-        
+
         for (period in minPeriod..maxPeriod) {
             var correlation = 0f
             for (i in 0 until audio.size - period) {
                 correlation += audio[i] * audio[i + period]
             }
-            
+
             if (correlation > maxCorrelation) {
                 maxCorrelation = correlation
                 bestPeriod = period
             }
         }
-        
+
         return sampleRate.toFloat() / bestPeriod
     }
 }
@@ -599,7 +599,7 @@ class VoiceEmbeddingExtractor {
 
 ```kotlin
 class SpeakerClustering {
-    
+
     /**
      * Cluster speech segments by speaker using voice embeddings
      */
@@ -609,17 +609,17 @@ class SpeakerClustering {
         similarityThreshold: Float = 0.75f
     ): List<SpeakerCluster> {
         if (segments.isEmpty()) return emptyList()
-        
+
         // Initialize clusters
         val clusters = mutableListOf<SpeakerCluster>()
-        
+
         segments.forEach { segment ->
             val embedding = segment.voiceEmbedding
                 ?: throw IllegalArgumentException("Segment must have voice embedding")
-            
+
             // Find best matching cluster
             val bestCluster = findBestCluster(embedding, clusters, similarityThreshold)
-            
+
             if (bestCluster != null) {
                 // Add to existing cluster
                 bestCluster.addSegment(segment)
@@ -636,10 +636,10 @@ class SpeakerClustering {
                 forcedCluster?.addSegment(segment)
             }
         }
-        
+
         return clusters
     }
-    
+
     /**
      * Identify speaker for new audio segment
      */
@@ -659,21 +659,21 @@ class SpeakerClustering {
                 similarityScores = emptyMap()
             )
         }
-        
+
         val similarityScores = mutableMapOf<String, Float>()
         var bestMatch: SpeakerProfile? = null
         var bestSimilarity = 0f
-        
+
         knownSpeakers.forEach { speaker ->
             val similarity = calculateEmbeddingSimilarity(voiceEmbedding, speaker.averageEmbedding)
             similarityScores[speaker.speakerId] = similarity
-            
+
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = speaker
             }
         }
-        
+
         return if (bestSimilarity >= threshold && bestMatch != null) {
             // Match found
             SpeakerIdentificationResult(
@@ -697,36 +697,36 @@ class SpeakerClustering {
             )
         }
     }
-    
+
     /**
      * Calculate similarity between two voice embeddings
      */
     fun calculateEmbeddingSimilarity(embedding1: FloatArray, embedding2: FloatArray): Float {
-        require(embedding1.size == embedding2.size) { 
-            "Embeddings must have same size: ${embedding1.size} vs ${embedding2.size}" 
+        require(embedding1.size == embedding2.size) {
+            "Embeddings must have same size: ${embedding1.size} vs ${embedding2.size}"
         }
-        
+
         // Cosine similarity
         var dotProduct = 0f
         var norm1 = 0f
         var norm2 = 0f
-        
+
         for (i in embedding1.indices) {
             dotProduct += embedding1[i] * embedding2[i]
             norm1 += embedding1[i] * embedding1[i]
             norm2 += embedding2[i] * embedding2[i]
         }
-        
+
         val magnitude1 = sqrt(norm1)
         val magnitude2 = sqrt(norm2)
-        
+
         return if (magnitude1 > 0f && magnitude2 > 0f) {
             dotProduct / (magnitude1 * magnitude2)
         } else {
             0f
         }
     }
-    
+
     private fun findBestCluster(
         embedding: FloatArray,
         clusters: List<SpeakerCluster>,
@@ -734,7 +734,7 @@ class SpeakerClustering {
     ): SpeakerCluster? {
         var bestCluster: SpeakerCluster? = null
         var bestSimilarity = 0f
-        
+
         clusters.forEach { cluster ->
             val similarity = calculateEmbeddingSimilarity(embedding, cluster.centroidEmbedding)
             if (similarity > bestSimilarity && similarity >= threshold) {
@@ -742,10 +742,10 @@ class SpeakerClustering {
                 bestCluster = cluster
             }
         }
-        
+
         return bestCluster
     }
-    
+
     private fun generateClusterId(): String = "cluster_${System.currentTimeMillis()}_${Random.nextInt(1000)}"
     private fun generateNewSpeakerId(): String = "speaker_${System.currentTimeMillis()}_${Random.nextInt(1000)}"
 }
@@ -757,18 +757,18 @@ data class SpeakerCluster(
     private val _segments = mutableListOf<SpeechSegment>()
     val segments: List<SpeechSegment> get() = _segments.toList()
     val centroidEmbedding: FloatArray get() = _centroidEmbedding
-    
+
     fun addSegment(segment: SpeechSegment) {
         _segments.add(segment)
         updateCentroid()
     }
-    
+
     private fun updateCentroid() {
         if (_segments.isEmpty()) return
-        
+
         val embeddingSize = _centroidEmbedding.size
         val newCentroid = FloatArray(embeddingSize)
-        
+
         _segments.forEach { segment ->
             segment.voiceEmbedding?.let { embedding ->
                 for (i in 0 until embeddingSize) {
@@ -776,12 +776,12 @@ data class SpeakerCluster(
                 }
             }
         }
-        
+
         // Average the embeddings
         for (i in 0 until embeddingSize) {
             newCentroid[i] /= _segments.size
         }
-        
+
         _centroidEmbedding = newCentroid
     }
 }
@@ -792,7 +792,7 @@ data class SpeakerCluster(
 
 ```kotlin
 class AudioSegmentation {
-    
+
     /**
      * Segment audio into speech segments using VAD and change point detection
      */
@@ -803,23 +803,23 @@ class AudioSegmentation {
     ): List<AudioSegment> {
         val floatAudio = convertBytesToFloat(audioData)
         val sampleRate = 16000
-        
+
         // Apply VAD to find speech regions
         val speechRegions = findSpeechRegions(floatAudio, vadService, sampleRate)
-        
+
         // Apply speaker change detection within speech regions
         val segments = mutableListOf<AudioSegment>()
-        
+
         speechRegions.forEach { region ->
             val regionAudio = floatAudio.sliceArray(region.startSample until region.endSample)
             val changePoints = detectSpeakerChangePoints(regionAudio, sampleRate)
-            
+
             // Create segments based on change points
             var segmentStart = region.startSample
-            
+
             changePoints.forEach { changePoint ->
                 val segmentEnd = region.startSample + changePoint
-                
+
                 if ((segmentEnd - segmentStart) * 1000 / sampleRate >= minimumSegmentDuration) {
                     segments.add(
                         AudioSegment(
@@ -831,10 +831,10 @@ class AudioSegmentation {
                         )
                     )
                 }
-                
+
                 segmentStart = segmentEnd
             }
-            
+
             // Add final segment
             if ((region.endSample - segmentStart) * 1000 / sampleRate >= minimumSegmentDuration) {
                 segments.add(
@@ -848,10 +848,10 @@ class AudioSegmentation {
                 )
             }
         }
-        
+
         return segments
     }
-    
+
     /**
      * Detect speaker change points within audio using spectral features
      */
@@ -859,11 +859,11 @@ class AudioSegmentation {
         val windowSize = sampleRate / 4 // 250ms windows
         val hopSize = windowSize / 4    // 75% overlap
         val changePoints = mutableListOf<Int>()
-        
+
         if (audio.size < windowSize * 2) return changePoints
-        
+
         val features = mutableListOf<FloatArray>()
-        
+
         // Extract features for each window
         var windowStart = 0
         while (windowStart + windowSize < audio.size) {
@@ -872,28 +872,28 @@ class AudioSegmentation {
             features.add(mfcc)
             windowStart += hopSize
         }
-        
+
         // Detect change points using distance metric
         val threshold = calculateAdaptiveThreshold(features)
-        
+
         for (i in 1 until features.size - 1) {
             val prevFeature = features[i - 1]
             val currentFeature = features[i]
             val nextFeature = features[i + 1]
-            
+
             val distancePrev = calculateFeatureDistance(prevFeature, currentFeature)
             val distanceNext = calculateFeatureDistance(currentFeature, nextFeature)
-            
+
             // Peak detection for change points
             if (distancePrev > threshold && distanceNext > threshold) {
                 val changePointSample = i * hopSize
                 changePoints.add(changePointSample)
             }
         }
-        
+
         return changePoints
     }
-    
+
     private fun findSpeechRegions(
         audio: FloatArray,
         vadService: VADService,
@@ -901,16 +901,16 @@ class AudioSegmentation {
     ): List<SpeechRegion> {
         val regions = mutableListOf<SpeechRegion>()
         val frameSize = sampleRate / 100 // 10ms frames
-        
+
         var inSpeech = false
         var speechStart = 0
-        
+
         for (frameStart in 0 until audio.size step frameSize) {
             val frameEnd = minOf(frameStart + frameSize, audio.size)
             val frame = audio.sliceArray(frameStart until frameEnd)
-            
+
             val isSpeech = vadService.processAudioData(frame)
-            
+
             if (isSpeech && !inSpeech) {
                 // Speech started
                 speechStart = frameStart
@@ -921,41 +921,41 @@ class AudioSegmentation {
                 inSpeech = false
             }
         }
-        
+
         // Handle case where speech continues to end
         if (inSpeech) {
             regions.add(SpeechRegion(speechStart, audio.size))
         }
-        
+
         return regions
     }
-    
+
     private fun calculateFeatureDistance(feature1: FloatArray, feature2: FloatArray): Float {
         require(feature1.size == feature2.size)
-        
+
         var sumSquaredDiff = 0f
         for (i in feature1.indices) {
             val diff = feature1[i] - feature2[i]
             sumSquaredDiff += diff * diff
         }
-        
+
         return sqrt(sumSquaredDiff)
     }
-    
+
     private fun calculateAdaptiveThreshold(features: List<FloatArray>): Float {
         if (features.size < 2) return 0f
-        
+
         val distances = mutableListOf<Float>()
-        
+
         for (i in 1 until features.size) {
             val distance = calculateFeatureDistance(features[i - 1], features[i])
             distances.add(distance)
         }
-        
+
         val mean = distances.average().toFloat()
         val variance = distances.map { (it - mean) * (it - mean) }.average().toFloat()
         val stdDev = sqrt(variance)
-        
+
         // Threshold = mean + 2 * standard deviation
         return mean + 2 * stdDev
     }
@@ -985,8 +985,8 @@ data class SpeechRegion(
 ---
 
 ## Phase 3: Service Implementation (Day 8-10)
-**Duration**: 3 days  
-**Priority**: HIGH  
+**Duration**: 3 days
+**Priority**: HIGH
 
 ### Task 3.1: Complete Service Implementation
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/components/diarization/DefaultSpeakerDiarizationService.kt`
@@ -995,15 +995,15 @@ data class SpeechRegion(
 class DefaultSpeakerDiarizationService(
     private val configuration: SpeakerDiarizationConfiguration
 ) : SpeakerDiarizationService {
-    
+
     private val embeddingExtractor = VoiceEmbeddingExtractor()
     private val speakerClustering = SpeakerClustering()
     private val audioSegmentation = AudioSegmentation()
     private val speakerProfileRepository = SpeakerProfileRepository()
-    
+
     private var isInitialized = false
     private val logger = SDKLogger.getLogger("SpeakerDiarizationService")
-    
+
     override suspend fun initialize(): Boolean {
         return try {
             // Initialize any ML models or resources
@@ -1016,13 +1016,13 @@ class DefaultSpeakerDiarizationService(
             false
         }
     }
-    
-    override suspend fun processAudio(audioData: ByteArray): DiarizationResult = 
+
+    override suspend fun processAudio(audioData: ByteArray): DiarizationResult =
         withContext(Dispatchers.IO) {
             require(isInitialized) { "Service not initialized" }
-            
+
             val startTime = System.currentTimeMillis()
-            
+
             try {
                 // Step 1: Segment audio into speech regions
                 val vadService = createVADService() // Get from service container
@@ -1031,13 +1031,13 @@ class DefaultSpeakerDiarizationService(
                     vadService = vadService,
                     minimumSegmentDuration = configuration.minimumSegmentDuration
                 )
-                
+
                 // Step 2: Extract voice embeddings for each segment
                 val speechSegments = audioSegments.map { segment ->
                     val embedding = embeddingExtractor.extractVoiceEmbedding(
                         convertFloatToBytes(segment.audioData)
                     )
-                    
+
                     SpeechSegment(
                         startTime = segment.startTime,
                         endTime = segment.endTime,
@@ -1047,28 +1047,28 @@ class DefaultSpeakerDiarizationService(
                         voiceEmbedding = embedding
                     )
                 }
-                
+
                 // Step 3: Identify speakers for each segment
                 val identifiedSegments = identifySpeakersForSegments(speechSegments)
-                
+
                 // Step 4: Create speaker info list
                 val speakerInfoList = createSpeakerInfoList(identifiedSegments)
-                
+
                 val endTime = System.currentTimeMillis()
-                
+
                 DiarizationResult(
                     segments = identifiedSegments,
                     speakers = speakerInfoList,
                     overallConfidence = calculateOverallConfidence(identifiedSegments),
                     processingTimeMs = endTime - startTime
                 )
-                
+
             } catch (e: Exception) {
                 logger.error("Audio processing failed", e)
                 throw e
             }
         }
-    
+
     override suspend fun processAudioWithTranscription(
         audioData: ByteArray,
         transcription: String,
@@ -1076,31 +1076,31 @@ class DefaultSpeakerDiarizationService(
     ): DiarizationResult = withContext(Dispatchers.IO) {
         // Process audio normally
         val diarizationResult = processAudio(audioData)
-        
+
         // Align transcription with speaker segments
         val alignedSegments = alignTranscriptionWithSpeakers(
             diarizationResult.segments,
             timestamps
         )
-        
+
         diarizationResult.copy(segments = alignedSegments)
     }
-    
+
     override suspend fun createSpeakerProfile(
         speakerId: String,
         audioSamples: List<ByteArray>,
         name: String?
     ): SpeakerProfile = withContext(Dispatchers.IO) {
         require(audioSamples.isNotEmpty()) { "Audio samples cannot be empty" }
-        
+
         // Extract embeddings from all samples
         val embeddings = audioSamples.map { sample ->
             embeddingExtractor.extractVoiceEmbedding(sample)
         }
-        
+
         // Calculate voice characteristics from first sample
         val characteristics = extractVoiceCharacteristics(audioSamples.first())
-        
+
         val profile = SpeakerProfile(
             speakerId = speakerId,
             name = name,
@@ -1111,53 +1111,53 @@ class DefaultSpeakerDiarizationService(
             sampleCount = audioSamples.size,
             confidenceHistory = List(audioSamples.size) { 1.0f }
         )
-        
+
         // Save profile
         speakerProfileRepository.saveSpeakerProfile(profile)
-        
+
         logger.info("Created speaker profile for $speakerId with ${audioSamples.size} samples")
         profile
     }
-    
-    override suspend fun identifySpeaker(audioData: ByteArray): SpeakerIdentificationResult = 
+
+    override suspend fun identifySpeaker(audioData: ByteArray): SpeakerIdentificationResult =
         withContext(Dispatchers.IO) {
             val embedding = embeddingExtractor.extractVoiceEmbedding(audioData)
             val knownSpeakers = speakerProfileRepository.getAllSpeakerProfiles()
-            
+
             speakerClustering.identifySpeaker(
                 voiceEmbedding = embedding,
                 knownSpeakers = knownSpeakers,
                 threshold = configuration.similarityThreshold
             )
         }
-    
-    override suspend fun extractVoiceEmbedding(audioData: ByteArray): FloatArray = 
+
+    override suspend fun extractVoiceEmbedding(audioData: ByteArray): FloatArray =
         withContext(Dispatchers.IO) {
             embeddingExtractor.extractVoiceEmbedding(audioData)
         }
-    
+
     override fun calculateSimilarity(embedding1: FloatArray, embedding2: FloatArray): Float {
         return speakerClustering.calculateEmbeddingSimilarity(embedding1, embedding2)
     }
-    
+
     override suspend fun getSpeakerProfiles(): List<SpeakerProfile> {
         return speakerProfileRepository.getAllSpeakerProfiles()
     }
-    
-    override suspend fun updateSpeakerProfile(speakerId: String, audioData: ByteArray): Boolean = 
+
+    override suspend fun updateSpeakerProfile(speakerId: String, audioData: ByteArray): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val existingProfile = speakerProfileRepository.getSpeakerProfile(speakerId)
                     ?: return@withContext false
-                
+
                 val newEmbedding = embeddingExtractor.extractVoiceEmbedding(audioData)
-                
+
                 val updatedProfile = existingProfile.copy(
                     voiceEmbeddings = existingProfile.voiceEmbeddings + newEmbedding,
                     updateTime = System.currentTimeMillis(),
                     sampleCount = existingProfile.sampleCount + 1
                 )
-                
+
                 speakerProfileRepository.saveSpeakerProfile(updatedProfile)
                 true
             } catch (e: Exception) {
@@ -1165,7 +1165,7 @@ class DefaultSpeakerDiarizationService(
                 false
             }
         }
-    
+
     override suspend fun deleteSpeakerProfile(speakerId: String): Boolean {
         return try {
             speakerProfileRepository.deleteSpeakerProfile(speakerId)
@@ -1175,22 +1175,22 @@ class DefaultSpeakerDiarizationService(
             false
         }
     }
-    
+
     override fun processAudioStream(audioStream: Flow<ByteArray>): Flow<SpeechSegment> = flow {
         val audioBuffer = mutableListOf<Byte>()
         val bufferDurationMs = 2000 // Process 2-second chunks
         val sampleRate = 16000
         val bytesPerSample = 2 // 16-bit
         val maxBufferSize = (bufferDurationMs * sampleRate * bytesPerSample) / 1000
-        
+
         audioStream.collect { audioChunk ->
             audioBuffer.addAll(audioChunk.toList())
-            
+
             if (audioBuffer.size >= maxBufferSize) {
                 val processChunk = audioBuffer.take(maxBufferSize).toByteArray()
                 audioBuffer.clear()
                 audioBuffer.addAll(audioBuffer.drop(maxBufferSize))
-                
+
                 // Process chunk
                 val result = processAudio(processChunk)
                 result.segments.forEach { segment ->
@@ -1198,7 +1198,7 @@ class DefaultSpeakerDiarizationService(
                 }
             }
         }
-        
+
         // Process remaining audio
         if (audioBuffer.isNotEmpty()) {
             val remainingChunk = audioBuffer.toByteArray()
@@ -1208,57 +1208,57 @@ class DefaultSpeakerDiarizationService(
             }
         }
     }.flowOn(Dispatchers.IO)
-    
+
     override fun cleanup() {
         isInitialized = false
         logger.info("Speaker diarization service cleaned up")
     }
-    
+
     override val isReady: Boolean get() = isInitialized
     override val supportedAudioFormats: List<String> = listOf("PCM_16BIT", "WAV")
     override val maxSupportedSpeakers: Int get() = configuration.maxSpeakers
-    
+
     // Private helper methods
     private suspend fun identifySpeakersForSegments(
         segments: List<SpeechSegment>
     ): List<SpeechSegment> {
         val knownSpeakers = speakerProfileRepository.getAllSpeakerProfiles()
-        
+
         return segments.map { segment ->
             val embedding = segment.voiceEmbedding
                 ?: throw IllegalStateException("Segment missing voice embedding")
-            
+
             val identification = speakerClustering.identifySpeaker(
                 voiceEmbedding = embedding,
                 knownSpeakers = knownSpeakers,
                 threshold = configuration.similarityThreshold
             )
-            
+
             // If new speaker and learning is enabled, create profile
             if (identification.isNewSpeaker && configuration.enableSpeakerLearning) {
                 val audioData = segment.audioData
                     ?: throw IllegalStateException("Segment missing audio data")
-                
+
                 createSpeakerProfile(
                     speakerId = identification.speakerId,
                     audioSamples = listOf(audioData)
                 )
             }
-            
+
             segment.copy(
                 speakerId = identification.speakerId,
                 confidence = identification.confidence
             )
         }
     }
-    
+
     private fun createSpeakerInfoList(segments: List<SpeechSegment>): List<SpeakerInfo> {
         return segments.groupBy { it.speakerId }.map { (speakerId, speakerSegments) ->
             val avgConfidence = speakerSegments.map { it.confidence }.average().toFloat()
             val totalDuration = speakerSegments.sumOf { it.endTime - it.startTime }
             val embedding = speakerSegments.first().voiceEmbedding
                 ?: throw IllegalStateException("Missing voice embedding")
-            
+
             SpeakerInfo(
                 id = speakerId,
                 confidence = avgConfidence,
@@ -1268,7 +1268,7 @@ class DefaultSpeakerDiarizationService(
             )
         }
     }
-    
+
     private fun calculateOverallConfidence(segments: List<SpeechSegment>): Float {
         return if (segments.isEmpty()) 0f
         else segments.map { it.confidence }.average().toFloat()
@@ -1286,8 +1286,8 @@ class DefaultSpeakerDiarizationService(
 ---
 
 ## Phase 4: Integration and Testing (Day 10-12)
-**Duration**: 2-3 days  
-**Priority**: MEDIUM  
+**Duration**: 2-3 days
+**Priority**: MEDIUM
 
 ### Task 4.1: Android App Integration
 **Files**: `examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/`
@@ -1297,10 +1297,10 @@ class DefaultSpeakerDiarizationService(
 class EnhancedVoiceAssistantViewModel(
     private val voicePipelineService: VoicePipelineService
 ) : ViewModel() {
-    
+
     private val _speakerInfo = MutableStateFlow<List<SpeakerInfo>>(emptyList())
     val speakerInfo: StateFlow<List<SpeakerInfo>> = _speakerInfo.asStateFlow()
-    
+
     fun enableSpeakerDiarization() {
         viewModelScope.launch {
             try {
@@ -1310,36 +1310,36 @@ class EnhancedVoiceAssistantViewModel(
                     maxSpeakers = 4,
                     similarityThreshold = 0.75f
                 )
-                
+
                 val diarizationComponent = SpeakerDiarizationComponent(config)
                 diarizationComponent.initialize()
-                
+
                 // Process voice input with speaker identification
                 voicePipelineService.events
                     .filterIsInstance<VoicePipelineEvent.TranscriptionComplete>()
                     .collect { event ->
                         // Perform diarization on transcribed audio
                         val result = diarizationComponent.diarizeWithTranscription(event.audioData)
-                        
+
                         _speakerInfo.value = result.diarizationResult.speakers
-                        
+
                         // Update UI with speaker-labeled transcript
                         updateConversationWithSpeakers(result.labeledTranscript)
                     }
-                
+
             } catch (e: Exception) {
                 logger.error("Failed to enable speaker diarization", e)
             }
         }
     }
-    
+
     private fun updateConversationWithSpeakers(labeledTranscript: List<LabeledTranscriptSegment>) {
         // Update conversation history with speaker labels
         val speakerMessages = labeledTranscript.groupBy { it.speakerId }.map { (speakerId, segments) ->
             val fullText = segments.joinToString(" ") { it.text }
             SpeakerMessage(speakerId, fullText, segments.first().startTime)
         }
-        
+
         // Update UI state with speaker-labeled messages
         _uiState.value = _uiState.value.copy(
             speakerMessages = speakerMessages,
@@ -1371,14 +1371,14 @@ class DefaultSpeakerDiarizationProvider : SpeakerDiarizationServiceProvider {
         configuration: SpeakerDiarizationConfiguration
     ): SpeakerDiarizationService {
         val service = DefaultSpeakerDiarizationService(configuration)
-        
+
         if (!service.initialize()) {
             throw SDKError.ComponentInitializationFailed("Failed to initialize speaker diarization service")
         }
-        
+
         return service
     }
-    
+
     override fun canHandle(configuration: Any?): Boolean = true
     override val name: String = "Default Speaker Diarization Provider"
 }

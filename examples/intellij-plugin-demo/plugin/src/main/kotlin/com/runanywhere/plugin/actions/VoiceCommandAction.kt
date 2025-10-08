@@ -10,8 +10,8 @@ import com.runanywhere.plugin.isInitialized
 import com.runanywhere.plugin.services.VoiceService
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.components.stt.STTStreamEvent
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
+import com.intellij.openapi.application.ApplicationManager
 import javax.swing.SwingUtilities
 
 /**
@@ -49,6 +49,7 @@ class VoiceCommandAction : AnAction("Voice Command") {
             e.presentation.text = "Stop Recording"
 
             // Use the new streaming transcription API
+            @OptIn(DelicateCoroutinesApi::class)
             GlobalScope.launch {
                 try {
                     RunAnywhere.startStreamingTranscription()

@@ -1,15 +1,15 @@
 # Module 1: LLM Component Implementation Plan
-**Priority**: 🔴 CRITICAL  
-**Estimated Timeline**: 5-7 days  
-**Dependencies**: None (can start immediately)  
-**Team Assignment**: 1 Senior Developer  
+**Priority**: 🔴 CRITICAL
+**Estimated Timeline**: 5-7 days
+**Dependencies**: None (can start immediately)
+**Team Assignment**: 1 Senior Developer
 
 ## Executive Summary
 
 The LLM component is the highest priority module blocking core SDK functionality. While the architecture is production-ready, all generation methods currently return mock responses. This module focuses on implementing real LLM integration with llama.cpp JNI bindings.
 
-**Current Status**: Architecture 100% complete, Implementation 0% complete  
-**Target**: Full production LLM generation with streaming support  
+**Current Status**: Architecture 100% complete, Implementation 0% complete
+**Target**: Full production LLM generation with streaming support
 
 ---
 
@@ -48,8 +48,8 @@ suspend fun generate(prompt: String, options: GenerationOptions): GenerationResu
 ---
 
 ## Phase 1: Provider Interface Alignment (Day 1)
-**Duration**: 6-8 hours  
-**Priority**: HIGH  
+**Duration**: 6-8 hours
+**Priority**: HIGH
 
 ### Task 1.1: Fix Provider Interface Pattern
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/core/ModuleRegistry.kt`
@@ -80,7 +80,7 @@ interface LLMServiceProvider {
 override suspend fun createService(): LLMService {
     val provider = ModuleRegistry.llmProvider(configuration.modelId)
         ?: throw SDKError.ComponentNotAvailable("No LLM provider for model: ${configuration.modelId}")
-    
+
     return provider.createLLMService(configuration)
 }
 ```
@@ -94,8 +94,8 @@ override suspend fun createService(): LLMService {
 ---
 
 ## Phase 2: LlamaCpp Integration Implementation (Day 2-5)
-**Duration**: 3-4 days  
-**Priority**: CRITICAL  
+**Duration**: 3-4 days
+**Priority**: CRITICAL
 
 ### Task 2.1: JNI Bindings Development
 **Location**: `native/llama-jni/`
@@ -110,23 +110,23 @@ extern "C" {
     JNIEXPORT jlong JNICALL
     Java_com_runanywhere_sdk_llama_LlamaJNI_initModel(JNIEnv *env, jobject thiz, jstring model_path) {
         const char *path = env->GetStringUTFChars(model_path, nullptr);
-        
+
         llama_model_params model_params = llama_model_default_params();
         llama_model *model = llama_load_model_from_file(path, model_params);
-        
+
         env->ReleaseStringUTFChars(model_path, path);
         return reinterpret_cast<jlong>(model);
     }
-    
+
     JNIEXPORT jstring JNICALL
-    Java_com_runanywhere_sdk_llama_LlamaJNI_generate(JNIEnv *env, jobject thiz, 
+    Java_com_runanywhere_sdk_llama_LlamaJNI_generate(JNIEnv *env, jobject thiz,
                                                      jlong model_ptr, jstring prompt, jint max_tokens) {
         llama_model *model = reinterpret_cast<llama_model*>(model_ptr);
         const char *prompt_text = env->GetStringUTFChars(prompt, nullptr);
-        
+
         // Implementation details for generation
         std::string result = generate_text(model, prompt_text, max_tokens);
-        
+
         env->ReleaseStringUTFChars(prompt, prompt_text);
         return env->NewStringUTF(result.c_str());
     }
@@ -143,7 +143,7 @@ object LlamaJNI {
     external fun getStreamToken(tokenPtr: Long): String
     external fun isStreamComplete(tokenPtr: Long): Boolean
     external fun cleanup(modelPtr: Long)
-    
+
     init {
         System.loadLibrary("llama-jni")
     }
@@ -157,7 +157,7 @@ object LlamaJNI {
 class LlamaCppService(private val modelPath: String) : LLMService {
     private var modelPtr: Long = 0L
     private var isInitialized = false
-    
+
     override suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
             modelPtr = LlamaJNI.initModel(modelPath)
@@ -168,15 +168,15 @@ class LlamaCppService(private val modelPath: String) : LLMService {
             false
         }
     }
-    
-    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult = 
+
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult =
         withContext(Dispatchers.IO) {
             if (!isInitialized) throw IllegalStateException("LLaMA model not initialized")
-            
+
             val startTime = System.currentTimeMillis()
             val result = LlamaJNI.generate(modelPtr, prompt, options.maxTokens)
             val endTime = System.currentTimeMillis()
-            
+
             GenerationResult(
                 text = result,
                 tokensGenerated = countTokens(result),
@@ -187,11 +187,11 @@ class LlamaCppService(private val modelPath: String) : LLMService {
                 )
             )
         }
-    
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationToken> = 
+
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationToken> =
         flow {
             if (!isInitialized) throw IllegalStateException("LLaMA model not initialized")
-            
+
             val tokenPtrs = LlamaJNI.generateStream(modelPtr, prompt, options.maxTokens)
             for (tokenPtr in tokenPtrs) {
                 val token = LlamaJNI.getStreamToken(tokenPtr)
@@ -200,7 +200,7 @@ class LlamaCppService(private val modelPath: String) : LLMService {
                 if (isComplete) break
             }
         }.flowOn(Dispatchers.IO)
-    
+
     override suspend fun cleanup() {
         if (isInitialized) {
             LlamaJNI.cleanup(modelPtr)
@@ -208,7 +208,7 @@ class LlamaCppService(private val modelPath: String) : LLMService {
             isInitialized = false
         }
     }
-    
+
     override val isReady: Boolean get() = isInitialized
     override val currentModel: String? get() = if (isInitialized) modelPath else null
 }
@@ -221,24 +221,24 @@ class LlamaCppProvider : LLMServiceProvider {
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
         val modelPath = resolveModelPath(configuration.modelId)
         val service = LlamaCppService(modelPath)
-        
+
         if (!service.initialize()) {
             throw SDKError.ComponentInitializationFailed("Failed to initialize LLaMA model: ${configuration.modelId}")
         }
-        
+
         return service
     }
-    
+
     override fun canHandle(modelId: String?): Boolean {
-        return modelId?.let { 
-            it.startsWith("llama") || 
-            it.startsWith("mistral") || 
+        return modelId?.let {
+            it.startsWith("llama") ||
+            it.startsWith("mistral") ||
             it.endsWith(".gguf")
         } ?: true
     }
-    
+
     override val name: String = "LLaMA.cpp Provider"
-    
+
     private fun resolveModelPath(modelId: String?): String {
         // Model path resolution logic
         return when (modelId) {
@@ -271,8 +271,8 @@ object LlamaCppModule {
 ---
 
 ## Phase 3: Enhanced Features Implementation (Day 5-6)
-**Duration**: 1-2 days  
-**Priority**: HIGH  
+**Duration**: 1-2 days
+**Priority**: HIGH
 
 ### Task 3.1: Structured Output Generation
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/generation/StructuredGenerationService.kt`
@@ -292,18 +292,18 @@ class StructuredGenerationService(
     ): T {
         val schema = type.getJsonSchema()
         val structuredPrompt = buildStructuredPrompt(prompt, schema)
-        
+
         val result = generationService.generate(structuredPrompt, options)
         return parseStructuredResult(result, type::class)
     }
-    
+
     private fun buildStructuredPrompt(prompt: String, schema: String): String {
         return """
             $prompt
-            
+
             Please respond with valid JSON that matches this schema:
             $schema
-            
+
             Response:
         """.trimIndent()
     }
@@ -339,8 +339,8 @@ class ModelValidator {
 ---
 
 ## Phase 4: Integration and Testing (Day 6-7)
-**Duration**: 1-2 days  
-**Priority**: MEDIUM  
+**Duration**: 1-2 days
+**Priority**: MEDIUM
 
 ### Task 4.1: Android App Integration
 **Files**: `examples/android/RunAnywhereAI/app/src/main/java/com/runanywhere/runanywhereai/`
@@ -350,10 +350,10 @@ class ModelValidator {
 class RunAnywhereApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        
+
         // Register LLM providers
         LlamaCppModule.register()
-        
+
         // Initialize SDK
         lifecycleScope.launch {
             RunAnywhere.initialize(API_KEY, BASE_URL, SDKEnvironment.DEVELOPMENT)
@@ -371,10 +371,10 @@ class LLMIntegrationTest {
         // Setup
         LlamaCppModule.register()
         RunAnywhere.initialize("test-key", null, SDKEnvironment.DEVELOPMENT)
-        
+
         // Test generation
         val result = RunAnywhere.generate("What is 2+2?")
-        
+
         // Assertions
         assertThat(result).isNotEqualTo("Generated response for: What is 2+2?") // Not mock
         assertThat(result).contains("4")

@@ -4,7 +4,7 @@
 
 This document provides a comprehensive comparison between the iOS SDK (Swift) and Kotlin Multiplatform SDK public interfaces for the RunAnywhere AI platform. Both SDKs share similar architectural patterns but differ significantly in their implementation approaches, with iOS using extension-based modular design and Kotlin employing expect/actual multiplatform patterns.
 
-**Last Updated:** October 2025  
+**Last Updated:** October 2025
 **Current Development Status:**
 - **iOS SDK**: Production-ready with full feature set
 - **Kotlin SDK**: Active development - Core features implemented, advanced features in progress
@@ -123,7 +123,7 @@ public static var events: EventBus
 
 **Architecture:** Multiplatform expect/actual pattern ✅ **IMPLEMENTED**
 - **Interface:** `interface RunAnywhereSDK` ✅ **Complete**
-- **Base Class:** `abstract class BaseRunAnywhereSDK` ✅ **Complete**  
+- **Base Class:** `abstract class BaseRunAnywhereSDK` ✅ **Complete**
 - **Platform Objects:** `expect object RunAnywhere : BaseRunAnywhereSDK` ✅ **Complete**
 - **Pattern:** Object-oriented with shared logic in base class
 
@@ -164,7 +164,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     // ✅ IMPLEMENTED - STTComponent with Whisper JNI integration
     // ✅ IMPLEMENTED - VADComponent for voice activity detection
     // ✅ IMPLEMENTED - LLMComponent with multiple model support
-    
+
     // Current capabilities:
     // - Full model download and management
     // - Text generation with local models
@@ -178,13 +178,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 ```kotlin
 actual object RunAnywhere : BaseRunAnywhereSDK() {
     suspend fun initialize(context: Context, apiKey: String, baseURL: String?, environment: SDKEnvironment) // ✅ IMPLEMENTED
-    
+
     // ✅ IMPLEMENTED - Android-specific implementations
     // ✅ IMPLEMENTED - Room database with entity definitions
     // ✅ IMPLEMENTED - EncryptedSharedPreferences for secure storage
     // ✅ IMPLEMENTED - Context-aware file system integration
     // ✅ IMPLEMENTED - Android-specific component implementations
-    
+
     // Current capabilities:
     // - Context-aware initialization
     // - Secure credential storage
@@ -302,7 +302,7 @@ data class GenerationOptions(
 #### Current Status - iOS SDK Gaps:
 1. **Progress Tracking:** ✅ **RESOLVED** - Added download progress with Flow<Float>
 2. **topK Parameter:** ❌ Still missing topK sampling parameter
-3. **Seed Parameter:** ❌ Still missing seed for reproducible generation  
+3. **Seed Parameter:** ❌ Still missing seed for reproducible generation
 4. **Platform Context:** ✅ **RESOLVED** - Android Context support added
 5. **Cleanup Method:** ✅ **RESOLVED** - Explicit cleanup method implemented
 
@@ -316,7 +316,7 @@ data class GenerationOptions(
 
 **Medium Priority - Missing:**
 5. **Extension Methods:** ❌ **ENHANCEMENT** - No extension-based API organization
-6. **Execution Targets:** ❌ **ENHANCEMENT** - No execution target preferences  
+6. **Execution Targets:** ❌ **ENHANCEMENT** - No execution target preferences
 7. **Conversation Factory:** ❌ **ENHANCEMENT** - No conversation factory methods
 8. **Component Priorities:** ❌ **ENHANCEMENT** - No component initialization priorities
 
@@ -331,7 +331,7 @@ data class GenerationOptions(
 
 **Implementation Priorities (Next Quarter):**
 1. **Structured Output Support** (Q4 2025) - Critical for feature parity
-2. **Pipeline Management APIs** (Q1 2026) - Voice conversation pipelines  
+2. **Pipeline Management APIs** (Q1 2026) - Voice conversation pipelines
 3. **Cost Tracking Integration** (Q1 2026) - Real-time usage monitoring
 4. **Enhanced Streaming** (Q4 2025) - Production-ready streaming implementation
 
@@ -468,7 +468,7 @@ The key opportunity lies in achieving feature parity while maintaining each plat
 | Component | iOS SDK | Kotlin SDK | Gap Priority |
 |-----------|---------|------------|--------------|
 | **Core Initialization** | ✅ Production | ✅ Production | None |
-| **Model Management** | ✅ Production | ✅ Production | None |  
+| **Model Management** | ✅ Production | ✅ Production | None |
 | **Text Generation** | ✅ Production | ✅ Production | None |
 | **Streaming Generation** | ✅ Production | ⚠️ Basic Implementation | Medium |
 | **Voice Transcription** | ✅ Production | ⚠️ Component Ready | Low |
@@ -484,7 +484,7 @@ The key opportunity lies in achieving feature parity while maintaining each plat
    - Add structured generation methods to RunAnywhere interface
    - Create data class generation from schemas
 
-2. **Enhanced Streaming** (3 weeks) 
+2. **Enhanced Streaming** (3 weeks)
    - Improve Flow-based streaming implementation
    - Add proper backpressure handling
    - Implement streaming cancellation

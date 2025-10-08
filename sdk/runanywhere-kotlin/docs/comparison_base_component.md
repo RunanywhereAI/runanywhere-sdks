@@ -1,6 +1,6 @@
 # Base Component Architecture Comparison: iOS vs Kotlin SDKs
 
-**Date**: October 8, 2025  
+**Date**: October 8, 2025
 **Analysis**: Updated comprehensive comparison of component architecture patterns between iOS Swift and Kotlin Multiplatform SDKs
 
 ## Executive Summary
@@ -234,11 +234,11 @@ sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZA
 public final class ModuleRegistry {
     private var sttProviders: [STTServiceProvider] = []
     private var llmProviders: [LLMServiceProvider] = []
-    
+
     public func registerSTT(_ provider: STTServiceProvider) {
         sttProviders.append(provider)
     }
-    
+
     public func sttProvider(for modelId: String? = nil) -> STTServiceProvider? {
         if let modelId = modelId {
             return sttProviders.first { $0.canHandle(modelId: modelId) }
@@ -290,19 +290,19 @@ object ModuleRegistry {
 public func initialize() async throws {
     guard state == .notInitialized else { ... }
     updateState(.initializing)
-    
+
     try {
         // Stage: Validation
         currentStage = "validation"
         eventBus.publish(ComponentInitializationEvent.componentChecking(...))
-        
-        // Stage: Service Creation  
+
+        // Stage: Service Creation
         currentStage = "service_creation"
         eventBus.publish(ComponentInitializationEvent.componentInitializing(...))
-        
+
         // Stage: Service Initialization
         currentStage = "service_initialization"
-        
+
         // Ready
         updateState(.ready)
         eventBus.publish(ComponentInitializationEvent.componentReady(...))
@@ -316,22 +316,22 @@ public func initialize() async throws {
 suspend fun initialize() {
     if (state != ComponentState.NOT_INITIALIZED) { ... }
     updateState(ComponentState.INITIALIZING)
-    
+
     try {
         // Stage: Validation
         currentStage = "validation"
         eventBus.publish(ComponentInitializationEvent.ComponentChecking(...))
         configuration.validate()
-        
+
         // Stage: Service Creation
         currentStage = "service_creation"
         eventBus.publish(ComponentInitializationEvent.ComponentInitializing(...))
         service = createService()
-        
+
         // Stage: Service Initialization
         currentStage = "service_initialization"
         initializeService()
-        
+
         // Ready
         currentStage = null
         updateState(ComponentState.READY)
@@ -361,18 +361,18 @@ public func cleanup() async throws {
 ```kotlin
 override suspend fun cleanup() {
     if (state == ComponentState.NOT_INITIALIZED) return
-    
+
     updateState(ComponentState.NOT_INITIALIZED)
-    
+
     // Allow subclass to perform cleanup
     performCleanup()
-    
+
     // Clear service reference
     service = null
-    
+
     // Clear service container reference for better memory management
     serviceContainer = null
-    
+
     // Reset current stage
     currentStage = null
 }
@@ -593,7 +593,7 @@ data class ComponentStatus(
 // Integration with memory service for pressure-aware cleanup
 protected open suspend fun handleMemoryPressure() {
     if (state != ComponentState.READY) return
-    
+
     // Release non-essential resources
     performMemoryOptimization()
 }
@@ -619,7 +619,7 @@ class STTComponentTest {
         assertTrue(events.any { it is ComponentInitializationEvent.ComponentChecking })
         assertTrue(events.any { it is ComponentInitializationEvent.ComponentInitializing })
         assertTrue(events.any { it is ComponentInitializationEvent.ComponentReady })
-        
+
         job.cancel()
     }
 }
@@ -627,7 +627,7 @@ class STTComponentTest {
 
 ## 16. Conclusion
 
-The Kotlin SDK base component architecture has achieved **92% architectural alignment** with the iOS implementation, representing a **significant improvement** from the previous 80% alignment. 
+The Kotlin SDK base component architecture has achieved **92% architectural alignment** with the iOS implementation, representing a **significant improvement** from the previous 80% alignment.
 
 ### Major Achievements ✅
 

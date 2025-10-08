@@ -1,15 +1,15 @@
 # Module 3: Android App Completion Implementation Plan
-**Priority**: 🟡 HIGH  
-**Estimated Timeline**: 6-8 days  
-**Dependencies**: Module 1 (LLM) for voice responses, Module 2 (STT) for voice transcription  
-**Team Assignment**: 1 Senior Android Developer  
+**Priority**: 🟡 HIGH
+**Estimated Timeline**: 6-8 days
+**Dependencies**: Module 1 (LLM) for voice responses, Module 2 (STT) for voice transcription
+**Team Assignment**: 1 Senior Android Developer
 
 ## Executive Summary
 
 The Android app has solid architectural foundations with 2 production-ready features (Chat, Quiz) but needs completion of 3 remaining features (Voice Assistant, Settings, Storage). The focus is on implementing missing functionality rather than architectural changes, as the UI frameworks are already excellent.
 
-**Current Status**: 65% complete with strong foundation  
-**Target**: Full feature parity with iOS app across all 5 tabs  
+**Current Status**: 65% complete with strong foundation
+**Target**: Full feature parity with iOS app across all 5 tabs
 
 ---
 
@@ -18,7 +18,7 @@ The Android app has solid architectural foundations with 2 production-ready feat
 ### ✅ Production-Ready Features
 **Chat Interface**: Advanced implementation with analytics that exceeds iOS
 - Real-time streaming generation ✅
-- Thinking mode support ✅  
+- Thinking mode support ✅
 - Comprehensive performance analytics ✅
 - Message threading and error handling ✅
 
@@ -51,9 +51,9 @@ The Android app has solid architectural foundations with 2 production-ready feat
 ---
 
 ## Phase 1: Voice Assistant Reliability (Day 1-3)
-**Duration**: 2-3 days  
-**Priority**: HIGH  
-**Dependencies**: Module 2 (STT) must be 50%+ complete  
+**Duration**: 2-3 days
+**Priority**: HIGH
+**Dependencies**: Module 2 (STT) must be 50%+ complete
 
 ### Task 1.1: Audio Capture Service Improvements
 **Files**: `app/src/main/java/com/runanywhere/runanywhereai/domain/services/AudioCaptureService.kt`
@@ -73,34 +73,34 @@ class ImprovedAudioCaptureService(private val context: Context) {
         .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
         .setChannelMask(AudioFormat.CHANNEL_IN_MONO)
         .build()
-    
+
     private val bufferSize = AudioRecord.getMinBufferSize(
         16000,
         AudioFormat.CHANNEL_IN_MONO,
         AudioFormat.ENCODING_PCM_16BIT
     ) * 4 // Use larger buffer for stability
-    
+
     fun startCapture(): Flow<ByteArray> = flow {
         ensureAudioPermission()
-        
+
         audioRecord = AudioRecord.Builder()
             .setAudioSource(MediaRecorder.AudioSource.MIC)
             .setAudioFormat(audioFormat)
             .setBufferSizeInBytes(bufferSize)
             .build()
-        
+
         if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
             throw IllegalStateException("Failed to initialize AudioRecord")
         }
-        
+
         audioRecord?.startRecording()
         isRecording = true
-        
+
         val audioBuffer = ByteArray(bufferSize / 4) // Read in smaller chunks
-        
+
         while (isRecording) {
             val bytesRead = audioRecord?.read(audioBuffer, 0, audioBuffer.size) ?: 0
-            
+
             if (bytesRead > 0) {
                 // Convert to proper format and emit
                 val processedAudio = processAudioBuffer(audioBuffer, bytesRead)
@@ -110,16 +110,16 @@ class ImprovedAudioCaptureService(private val context: Context) {
             }
         }
     }.flowOn(Dispatchers.IO)
-    
+
     private fun processAudioBuffer(buffer: ByteArray, bytesRead: Int): ByteArray {
         // Ensure buffer is properly sized and formatted
         val result = ByteArray(bytesRead)
         System.arraycopy(buffer, 0, result, 0, bytesRead)
-        
+
         // Apply basic noise reduction/normalization if needed
         return result
     }
-    
+
     fun stopCapture() {
         isRecording = false
         audioRecord?.apply {
@@ -130,9 +130,9 @@ class ImprovedAudioCaptureService(private val context: Context) {
         }
         audioRecord = null
     }
-    
+
     private fun ensureAudioPermission() {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) 
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED) {
             throw SecurityException("Audio recording permission not granted")
         }
@@ -157,21 +157,21 @@ class EnhancedVoicePipelineService(
 ) {
     private val _sessionState = MutableStateFlow(VoiceSessionState.Idle)
     val sessionState: StateFlow<VoiceSessionState> = _sessionState.asStateFlow()
-    
+
     private val _events = MutableSharedFlow<VoicePipelineEvent>()
     val events: SharedFlow<VoicePipelineEvent> = _events.asSharedFlow()
-    
+
     private var currentSession: Job? = null
     private var audioJob: Job? = null
-    
+
     suspend fun startVoiceSession() {
         // Cancel any existing session
         stopVoiceSession()
-        
+
         currentSession = CoroutineScope(Dispatchers.Main).launch {
             try {
                 updateState(VoiceSessionState.Listening)
-                
+
                 // Start audio capture
                 audioJob = launch {
                     audioCaptureService.startCapture()
@@ -183,7 +183,7 @@ class EnhancedVoicePipelineService(
                             processAudioChunk(audioData)
                         }
                 }
-                
+
                 // Monitor for session timeout
                 launch {
                     delay(30000) // 30 second timeout
@@ -192,98 +192,98 @@ class EnhancedVoicePipelineService(
                         stopVoiceSession()
                     }
                 }
-                
+
             } catch (e: Exception) {
                 _events.emit(VoicePipelineEvent.Error(e))
                 updateState(VoiceSessionState.Error(e.message ?: "Session failed"))
             }
         }
     }
-    
+
     private suspend fun processAudioChunk(audioData: ByteArray) {
         try {
             // Convert audio format for SDK
             val floatAudio = convertToFloatArray(audioData)
-            
+
             // Use VAD to detect speech
             val vadResult = RunAnywhere.processVAD(floatAudio)
-            
+
             when (vadResult.activityType) {
                 "SPEECH_START" -> {
                     _events.emit(VoicePipelineEvent.SpeechDetected)
                     updateState(VoiceSessionState.Recording)
                 }
-                
+
                 "SPEECH_END" -> {
                     updateState(VoiceSessionState.Processing)
                     processTranscription(floatAudio)
                 }
-                
+
                 "SILENCE" -> {
                     // Continue listening
                 }
             }
-            
+
         } catch (e: Exception) {
             _events.emit(VoicePipelineEvent.Error(e))
             logger.error("Audio processing error", e)
         }
     }
-    
+
     private suspend fun processTranscription(audioData: FloatArray) {
         try {
             // Transcribe audio using SDK
             val transcript = RunAnywhere.transcribe(audioData.toByteArray())
-            
+
             if (transcript.isNotEmpty() && transcript != "Transcription not yet implemented on Android") {
                 _events.emit(VoicePipelineEvent.TranscriptionComplete(transcript))
-                
+
                 // Generate response
                 updateState(VoiceSessionState.Generating)
                 val response = RunAnywhere.generate(transcript)
-                
+
                 _events.emit(VoicePipelineEvent.ResponseGenerated(transcript, response))
-                
+
                 // Speak response
                 updateState(VoiceSessionState.Speaking)
                 synthesizeSpeech(response)
-                
+
                 // Return to listening
                 updateState(VoiceSessionState.Listening)
-                
+
             } else {
                 _events.emit(VoicePipelineEvent.TranscriptionEmpty)
                 updateState(VoiceSessionState.Listening)
             }
-            
+
         } catch (e: Exception) {
             _events.emit(VoicePipelineEvent.Error(e))
             updateState(VoiceSessionState.Error(e.message ?: "Processing failed"))
         }
     }
-    
+
     private fun synthesizeSpeech(text: String) {
         ttsService.speak(text, TextToSpeech.QUEUE_FLUSH, null, "voice_response")
     }
-    
+
     private fun convertToFloatArray(audioData: ByteArray): FloatArray {
         val floatArray = FloatArray(audioData.size / 2)
         val byteBuffer = ByteBuffer.wrap(audioData).order(ByteOrder.LITTLE_ENDIAN)
-        
+
         for (i in floatArray.indices) {
             floatArray[i] = byteBuffer.short.toFloat() / Short.MAX_VALUE
         }
-        
+
         return floatArray
     }
-    
+
     fun stopVoiceSession() {
         audioJob?.cancel()
         currentSession?.cancel()
         audioCaptureService.stopCapture()
         updateState(VoiceSessionState.Idle)
     }
-    
+
     private fun updateState(newState: VoiceSessionState) {
         _sessionState.value = newState
     }
@@ -298,13 +298,13 @@ class RobustVoiceAssistantViewModel(
     private val voicePipelineService: VoicePipelineService,
     private val applicationContext: Context
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(VoiceAssistantUiState())
     val uiState: StateFlow<VoiceAssistantUiState> = _uiState.asStateFlow()
-    
+
     private var retryAttempts = 0
     private val maxRetries = 3
-    
+
     init {
         // Monitor pipeline events with error recovery
         viewModelScope.launch {
@@ -312,7 +312,7 @@ class RobustVoiceAssistantViewModel(
                 handlePipelineEvent(event)
             }
         }
-        
+
         // Monitor session state
         viewModelScope.launch {
             voicePipelineService.sessionState.collect { state ->
@@ -320,26 +320,26 @@ class RobustVoiceAssistantViewModel(
             }
         }
     }
-    
+
     private suspend fun handlePipelineEvent(event: VoicePipelineEvent) {
         when (event) {
             is VoicePipelineEvent.Error -> {
                 handleError(event.error)
             }
-            
+
             is VoicePipelineEvent.TranscriptionComplete -> {
-                updateUIState { 
+                updateUIState {
                     copy(
                         transcription = event.transcript,
-                        conversationHistory = conversationHistory + 
+                        conversationHistory = conversationHistory +
                             ConversationTurn(event.transcript, null, System.currentTimeMillis())
                     )
                 }
                 retryAttempts = 0 // Reset on success
             }
-            
+
             is VoicePipelineEvent.ResponseGenerated -> {
-                updateUIState { 
+                updateUIState {
                     copy(
                         lastResponse = event.response,
                         conversationHistory = conversationHistory.map { turn ->
@@ -350,21 +350,21 @@ class RobustVoiceAssistantViewModel(
                     )
                 }
             }
-            
+
             is VoicePipelineEvent.SessionTimeout -> {
                 updateUIState { copy(sessionState = VoiceSessionState.Idle) }
                 showUserMessage("Voice session timed out")
             }
         }
     }
-    
+
     private suspend fun handleError(error: Throwable) {
         when {
             error is SecurityException -> {
                 updateUIState { copy(sessionState = VoiceSessionState.Error("Microphone permission required")) }
                 requestMicrophonePermission()
             }
-            
+
             error.message?.contains("AudioRecord") == true -> {
                 if (retryAttempts < maxRetries) {
                     retryAttempts++
@@ -374,17 +374,17 @@ class RobustVoiceAssistantViewModel(
                     updateUIState { copy(sessionState = VoiceSessionState.Error("Audio system unavailable")) }
                 }
             }
-            
+
             error.message?.contains("network") == true -> {
                 updateUIState { copy(sessionState = VoiceSessionState.Error("Network connection required")) }
             }
-            
+
             else -> {
                 updateUIState { copy(sessionState = VoiceSessionState.Error(error.message ?: "Unknown error")) }
             }
         }
     }
-    
+
     fun startVoiceSession() {
         viewModelScope.launch {
             try {
@@ -394,12 +394,12 @@ class RobustVoiceAssistantViewModel(
             }
         }
     }
-    
+
     fun stopVoiceSession() {
         voicePipelineService.stopVoiceSession()
         retryAttempts = 0
     }
-    
+
     private fun updateUIState(update: VoiceAssistantUiState.() -> VoiceAssistantUiState) {
         _uiState.value = _uiState.value.update()
     }
@@ -416,8 +416,8 @@ class RobustVoiceAssistantViewModel(
 ---
 
 ## Phase 2: Settings Implementation (Day 3-5)
-**Duration**: 2-3 days  
-**Priority**: HIGH  
+**Duration**: 2-3 days
+**Priority**: HIGH
 
 ### Task 2.1: Settings Data Layer
 **Files**: `app/src/main/java/com/runanywhere/runanywhereai/domain/model/AppSettings.kt`
@@ -498,13 +498,13 @@ class SettingsRepositoryImpl(
     private val dataStore: DataStore<Preferences>,
     private val context: Context
 ) : SettingsRepository {
-    
+
     private val gson = Gson()
-    
+
     override suspend fun getSettings(): AppSettings {
         return dataStore.data.first().toAppSettings()
     }
-    
+
     override suspend fun saveSettings(settings: AppSettings) {
         dataStore.edit { preferences ->
             // SDK Settings
@@ -514,34 +514,34 @@ class SettingsRepositoryImpl(
             preferences[PreferencesKeys.SDK_TEMPERATURE] = settings.sdkSettings.temperature
             preferences[PreferencesKeys.SDK_TOP_P] = settings.sdkSettings.topP
             preferences[PreferencesKeys.SDK_TOP_K] = settings.sdkSettings.topK
-            
+
             // Voice Settings
             preferences[PreferencesKeys.VOICE_STT_MODEL] = settings.voiceSettings.sttModel
             preferences[PreferencesKeys.VOICE_LLM_MODEL] = settings.voiceSettings.llmModel
             preferences[PreferencesKeys.VOICE_TTS_VOICE] = settings.voiceSettings.ttsVoice
             preferences[PreferencesKeys.VOICE_SPEECH_RATE] = settings.voiceSettings.speechRate
             preferences[PreferencesKeys.VOICE_ENABLE_VAD] = settings.voiceSettings.enableVAD
-            
+
             // UI Settings
             preferences[PreferencesKeys.UI_ENABLE_STREAMING] = settings.uiSettings.enableStreamingAnimation
             preferences[PreferencesKeys.UI_SHOW_ANALYTICS] = settings.uiSettings.showDetailedAnalytics
             preferences[PreferencesKeys.UI_THEME_MODE] = settings.uiSettings.themeMode.name
-            
+
             // Privacy Settings
             preferences[PreferencesKeys.PRIVACY_ENABLE_TELEMETRY] = settings.privacySettings.enableTelemetry
             preferences[PreferencesKeys.PRIVACY_ENABLE_ANALYTICS] = settings.privacySettings.enableUsageAnalytics
         }
-        
+
         // Apply settings to SDK
         applySettingsToSDK(settings)
     }
-    
+
     override fun getSettingsFlow(): Flow<AppSettings> {
         return dataStore.data.map { preferences ->
             preferences.toAppSettings()
         }
     }
-    
+
     private suspend fun applySettingsToSDK(settings: AppSettings) {
         try {
             // Update SDK configuration in real-time
@@ -553,15 +553,15 @@ class SettingsRepositoryImpl(
                 "topP" to settings.sdkSettings.topP,
                 "topK" to settings.sdkSettings.topK
             )
-            
+
             // Apply to SDK (this would need SDK support for runtime config updates)
             // RunAnywhere.updateConfiguration(sdkConfig)
-            
+
         } catch (e: Exception) {
             logger.error("Failed to apply settings to SDK", e)
         }
     }
-    
+
     private fun Preferences.toAppSettings(): AppSettings {
         return AppSettings(
             sdkSettings = SDKSettings(
@@ -590,7 +590,7 @@ class SettingsRepositoryImpl(
             )
         )
     }
-    
+
     object PreferencesKeys {
         val SDK_DEFAULT_LLM_MODEL = stringPreferencesKey("sdk_default_llm_model")
         val SDK_DEFAULT_STT_MODEL = stringPreferencesKey("sdk_default_stt_model")
@@ -598,17 +598,17 @@ class SettingsRepositoryImpl(
         val SDK_TEMPERATURE = floatPreferencesKey("sdk_temperature")
         val SDK_TOP_P = floatPreferencesKey("sdk_top_p")
         val SDK_TOP_K = intPreferencesKey("sdk_top_k")
-        
+
         val VOICE_STT_MODEL = stringPreferencesKey("voice_stt_model")
         val VOICE_LLM_MODEL = stringPreferencesKey("voice_llm_model")
         val VOICE_TTS_VOICE = stringPreferencesKey("voice_tts_voice")
         val VOICE_SPEECH_RATE = floatPreferencesKey("voice_speech_rate")
         val VOICE_ENABLE_VAD = booleanPreferencesKey("voice_enable_vad")
-        
+
         val UI_ENABLE_STREAMING = booleanPreferencesKey("ui_enable_streaming")
         val UI_SHOW_ANALYTICS = booleanPreferencesKey("ui_show_analytics")
         val UI_THEME_MODE = stringPreferencesKey("ui_theme_mode")
-        
+
         val PRIVACY_ENABLE_TELEMETRY = booleanPreferencesKey("privacy_enable_telemetry")
         val PRIVACY_ENABLE_ANALYTICS = booleanPreferencesKey("privacy_enable_analytics")
     }
@@ -626,7 +626,7 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val availableModels by viewModel.availableModels.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -647,15 +647,15 @@ fun SettingsScreen(
                     availableModels = availableModels.llmModels,
                     onModelSelected = viewModel::updateDefaultLLMModel
                 )
-                
+
                 ModelSelectionSetting(
-                    title = "Default STT Model", 
+                    title = "Default STT Model",
                     subtitle = "Model used for speech recognition",
                     selectedModel = settings.sdkSettings.defaultSTTModel,
                     availableModels = availableModels.sttModels,
                     onModelSelected = viewModel::updateDefaultSTTModel
                 )
-                
+
                 SliderSetting(
                     title = "Temperature",
                     subtitle = "Controls randomness in generation (0.0 = deterministic, 2.0 = very random)",
@@ -665,7 +665,7 @@ fun SettingsScreen(
                     onValueChange = viewModel::updateTemperature,
                     valueFormatter = { "%.1f".format(it) }
                 )
-                
+
                 SliderSetting(
                     title = "Max Tokens",
                     subtitle = "Maximum length of generated responses",
@@ -675,7 +675,7 @@ fun SettingsScreen(
                     onValueChange = { viewModel.updateMaxTokens(it.toInt()) },
                     valueFormatter = { "${it.toInt()} tokens" }
                 )
-                
+
                 SliderSetting(
                     title = "Top-P",
                     subtitle = "Controls diversity via nucleus sampling",
@@ -687,7 +687,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // Voice Configuration Section
         item {
             SettingsSection(
@@ -702,7 +702,7 @@ fun SettingsScreen(
                     availableModels = availableModels.sttModels,
                     onModelSelected = viewModel::updateVoiceSTTModel
                 )
-                
+
                 ModelSelectionSetting(
                     title = "Voice LLM Model",
                     subtitle = "Model for voice conversation responses",
@@ -710,14 +710,14 @@ fun SettingsScreen(
                     availableModels = availableModels.llmModels,
                     onModelSelected = viewModel::updateVoiceLLMModel
                 )
-                
+
                 SwitchSetting(
                     title = "Voice Activity Detection",
                     subtitle = "Automatically detect when you start and stop speaking",
                     checked = settings.voiceSettings.enableVAD,
                     onCheckedChange = viewModel::updateVADEnabled
                 )
-                
+
                 SliderSetting(
                     title = "Speech Rate",
                     subtitle = "Speed of text-to-speech output",
@@ -729,7 +729,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // User Interface Section
         item {
             SettingsSection(
@@ -741,10 +741,10 @@ fun SettingsScreen(
                     title = "Theme",
                     subtitle = "App color scheme",
                     selectedValue = settings.uiSettings.themeMode.name,
-                    options = ThemeMode.values().map { 
+                    options = ThemeMode.values().map {
                         it.name to when(it) {
                             ThemeMode.LIGHT -> "Light"
-                            ThemeMode.DARK -> "Dark" 
+                            ThemeMode.DARK -> "Dark"
                             ThemeMode.SYSTEM -> "Follow System"
                         }
                     },
@@ -752,21 +752,21 @@ fun SettingsScreen(
                         viewModel.updateThemeMode(ThemeMode.valueOf(themeName))
                     }
                 )
-                
+
                 SwitchSetting(
                     title = "Streaming Animation",
                     subtitle = "Show real-time typing animation for AI responses",
                     checked = settings.uiSettings.enableStreamingAnimation,
                     onCheckedChange = viewModel::updateStreamingAnimation
                 )
-                
+
                 SwitchSetting(
                     title = "Detailed Analytics",
                     subtitle = "Show performance metrics and timing information",
                     checked = settings.uiSettings.showDetailedAnalytics,
                     onCheckedChange = viewModel::updateShowAnalytics
                 )
-                
+
                 SwitchSetting(
                     title = "Haptic Feedback",
                     subtitle = "Vibration feedback for interactions",
@@ -775,7 +775,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // Privacy & Data Section
         item {
             SettingsSection(
@@ -789,21 +789,21 @@ fun SettingsScreen(
                     checked = settings.privacySettings.enableUsageAnalytics,
                     onCheckedChange = viewModel::updateAnalyticsEnabled
                 )
-                
+
                 SwitchSetting(
                     title = "Error Reporting",
                     subtitle = "Automatically report crashes and errors",
                     checked = settings.privacySettings.enableCrashReporting,
                     onCheckedChange = viewModel::updateCrashReporting
                 )
-                
+
                 SwitchSetting(
                     title = "Performance Telemetry",
                     subtitle = "Share performance metrics to help optimize the service",
                     checked = settings.privacySettings.enableTelemetry,
                     onCheckedChange = viewModel::updateTelemetryEnabled
                 )
-                
+
                 SliderSetting(
                     title = "Data Retention",
                     subtitle = "How long to keep local conversation data",
@@ -815,7 +815,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // Actions Section
         item {
             SettingsSection(
@@ -830,14 +830,14 @@ fun SettingsScreen(
                     onClick = { viewModel.clearConversationHistory() },
                     isDestructive = true
                 )
-                
+
                 ActionSetting(
                     title = "Clear Model Cache",
                     subtitle = "Free up space by removing downloaded models",
                     actionText = "Clear",
                     onClick = { viewModel.clearModelCache() }
                 )
-                
+
                 ActionSetting(
                     title = "Reset to Defaults",
                     subtitle = "Restore all settings to default values",
@@ -861,20 +861,20 @@ fun SettingsScreen(
 ---
 
 ## Phase 3: Storage Management Implementation (Day 5-7)
-**Duration**: 2-3 days  
-**Priority**: MEDIUM  
+**Duration**: 2-3 days
+**Priority**: MEDIUM
 
 ### Task 3.1: Storage Analysis Service
 **Files**: `app/src/main/java/com/runanywhere/runanywhereai/domain/services/StorageAnalysisService.kt`
 
 ```kotlin
 class StorageAnalysisService(private val context: Context) {
-    
+
     fun getStorageInfo(): StorageInfo {
         val internalStorage = getInternalStorageInfo()
         val externalStorage = getExternalStorageInfo()
         val appStorage = getAppStorageInfo()
-        
+
         return StorageInfo(
             internal = internalStorage,
             external = externalStorage,
@@ -883,15 +883,15 @@ class StorageAnalysisService(private val context: Context) {
             availableSpace = internalStorage.availableBytes + (externalStorage?.availableBytes ?: 0)
         )
     }
-    
+
     private fun getInternalStorageInfo(): StorageDetails {
         val internalDir = context.filesDir
         val statFs = StatFs(internalDir.path)
-        
+
         val blockSize = statFs.blockSizeLong
         val totalBlocks = statFs.blockCountLong
         val availableBlocks = statFs.availableBlocksLong
-        
+
         return StorageDetails(
             path = internalDir.path,
             totalBytes = totalBlocks * blockSize,
@@ -899,16 +899,16 @@ class StorageAnalysisService(private val context: Context) {
             usedBytes = (totalBlocks - availableBlocks) * blockSize
         )
     }
-    
+
     private fun getExternalStorageInfo(): StorageDetails? {
         return if (Environment.getExternalStorageState() == Environment.MEDIA_MOUNTED) {
             val externalDir = context.getExternalFilesDir(null) ?: return null
             val statFs = StatFs(externalDir.path)
-            
+
             val blockSize = statFs.blockSizeLong
             val totalBlocks = statFs.blockCountLong
             val availableBlocks = statFs.availableBlocksLong
-            
+
             StorageDetails(
                 path = externalDir.path,
                 totalBytes = totalBlocks * blockSize,
@@ -917,13 +917,13 @@ class StorageAnalysisService(private val context: Context) {
             )
         } else null
     }
-    
+
     private fun getAppStorageInfo(): AppStorageDetails {
         val cacheSize = calculateDirectorySize(context.cacheDir)
         val dataSize = calculateDirectorySize(context.filesDir)
         val databaseSize = getDatabaseSize()
         val modelsSize = getModelsSize()
-        
+
         return AppStorageDetails(
             totalAppSize = cacheSize + dataSize + databaseSize,
             cacheSize = cacheSize,
@@ -933,11 +933,11 @@ class StorageAnalysisService(private val context: Context) {
             breakdown = getStorageBreakdown()
         )
     }
-    
+
     fun getModelInventory(): List<ModelStorageInfo> {
         val modelDir = File(context.filesDir, "models")
         if (!modelDir.exists()) return emptyList()
-        
+
         return modelDir.listFiles()?.mapNotNull { file ->
             if (file.isFile) {
                 val modelInfo = analyzeModelFile(file)
@@ -955,42 +955,42 @@ class StorageAnalysisService(private val context: Context) {
             } else null
         }?.sortedByDescending { it.lastModified } ?: emptyList()
     }
-    
+
     suspend fun cleanupCache(): CleanupResult {
         return withContext(Dispatchers.IO) {
             var cleanedBytes = 0L
             val errors = mutableListOf<String>()
-            
+
             try {
                 // Clear app cache
                 val cacheDeleted = deleteDirectoryContents(context.cacheDir)
                 cleanedBytes += cacheDeleted
-                
+
                 // Clear temporary files
                 val tempDir = File(context.filesDir, "temp")
                 if (tempDir.exists()) {
                     val tempDeleted = deleteDirectoryContents(tempDir)
                     cleanedBytes += tempDeleted
                 }
-                
+
                 // Clear old conversation exports
                 val exportDir = File(context.filesDir, "exports")
                 if (exportDir.exists()) {
                     val exportDeleted = deleteOldFiles(exportDir, maxAgeMs = 7 * 24 * 60 * 60 * 1000) // 7 days
                     cleanedBytes += exportDeleted
                 }
-                
+
             } catch (e: Exception) {
                 errors.add("Cache cleanup failed: ${e.message}")
             }
-            
+
             CleanupResult(
                 bytesFreed = cleanedBytes,
                 errors = errors
             )
         }
     }
-    
+
     suspend fun deleteModel(modelId: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
@@ -1014,19 +1014,19 @@ class StorageAnalysisService(private val context: Context) {
             }
         }
     }
-    
+
     private fun calculateDirectorySize(directory: File): Long {
         if (!directory.exists()) return 0L
-        
+
         return directory.walkTopDown()
             .filter { it.isFile }
             .sumOf { it.length() }
     }
-    
+
     private fun analyzeModelFile(file: File): ModelFileInfo {
         val extension = file.extension.lowercase()
         val isCurrentlyLoaded = checkIfModelIsLoaded(file.nameWithoutExtension)
-        
+
         val type = when {
             extension == "bin" || extension == "gguf" -> ModelType.LLM
             extension.contains("whisper") -> ModelType.STT
@@ -1034,10 +1034,10 @@ class StorageAnalysisService(private val context: Context) {
             extension == "tflite" -> ModelType.TENSORFLOW_LITE
             else -> ModelType.UNKNOWN
         }
-        
+
         return ModelFileInfo(type, isCurrentlyLoaded)
     }
-    
+
     private fun checkIfModelIsLoaded(modelId: String): Boolean {
         // This would check with the SDK if the model is currently loaded
         // For now, return false as a placeholder
@@ -1084,7 +1084,7 @@ fun StorageScreen(
     val storageInfo by viewModel.storageInfo.collectAsState()
     val modelInventory by viewModel.modelInventory.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -1098,12 +1098,12 @@ fun StorageScreen(
                 onCleanupCache = viewModel::cleanupCache
             )
         }
-        
+
         // Device Information Section
         item {
             DeviceInfoCard()
         }
-        
+
         // Model Inventory Section
         item {
             ModelInventorySection(
@@ -1112,13 +1112,13 @@ fun StorageScreen(
                 onModelDetails = viewModel::showModelDetails
             )
         }
-        
+
         // Storage Breakdown Section
         item {
             StorageBreakdownCard(storageInfo.app)
         }
     }
-    
+
     // Handle UI states
     when {
         uiState.isCleaningUp -> {
@@ -1126,7 +1126,7 @@ fun StorageScreen(
                 onDismiss = { /* Handle cleanup completion */ }
             )
         }
-        
+
         uiState.cleanupResult != null -> {
             CleanupResultDialog(
                 result = uiState.cleanupResult,
@@ -1154,14 +1154,14 @@ private fun StorageOverviewCard(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
-            
+
             // Storage usage visualization
             StorageUsageBar(
                 usedBytes = storageInfo.usedSpace,
                 totalBytes = storageInfo.totalSpace,
                 modifier = Modifier.fillMaxWidth()
             )
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -1171,23 +1171,23 @@ private fun StorageOverviewCard(
                     value = formatBytes(storageInfo.usedSpace),
                     color = MaterialTheme.colorScheme.primary
                 )
-                
+
                 StorageInfoItem(
-                    label = "Available", 
+                    label = "Available",
                     value = formatBytes(storageInfo.availableSpace),
                     color = MaterialTheme.colorScheme.outline
                 )
-                
+
                 StorageInfoItem(
                     label = "Total",
                     value = formatBytes(storageInfo.totalSpace),
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            
+
             // App storage breakdown
             AppStorageBreakdown(storageInfo.app)
-            
+
             // Cleanup action
             OutlinedButton(
                 onClick = onCleanupCache,
@@ -1224,16 +1224,16 @@ private fun ModelInventorySection(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Text(
                     text = "${models.size} models",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
+
             Spacer(modifier = Modifier.height(12.dp))
-            
+
             if (models.isEmpty()) {
                 EmptyStateMessage(
                     icon = Icons.Default.ModelTraining,
@@ -1247,7 +1247,7 @@ private fun ModelInventorySection(
                         onDelete = { onDeleteModel(model.modelId) },
                         onShowDetails = { onModelDetails(model) }
                     )
-                    
+
                     if (model != models.last()) {
                         Divider(modifier = Modifier.padding(vertical = 8.dp))
                     }
@@ -1268,8 +1268,8 @@ private fun ModelInventorySection(
 ---
 
 ## Phase 4: Model Management Backend Integration (Day 7-8)
-**Duration**: 1-2 days  
-**Priority**: MEDIUM  
+**Duration**: 1-2 days
+**Priority**: MEDIUM
 
 ### Task 4.1: Connect Model UI to SDK
 **Files**: `app/src/main/java/com/runanywhere/runanywhereai/presentation/models/ModelManagementViewModel.kt`
@@ -1279,36 +1279,36 @@ class ModelManagementViewModel(
     private val modelRepository: ModelRepository,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
-    
+
     private val _uiState = MutableStateFlow(ModelManagementUiState())
     val uiState: StateFlow<ModelManagementUiState> = _uiState.asStateFlow()
-    
+
     init {
         loadModels()
         observeDownloadProgress()
     }
-    
+
     private fun loadModels() {
         viewModelScope.launch {
             try {
                 updateState { copy(isLoading = true) }
-                
+
                 // Get available models from SDK
                 val availableModels = RunAnywhere.availableModels()
                 val downloadedModels = getDownloadedModels()
-                
+
                 val modelCategories = categorizeModels(availableModels, downloadedModels)
-                
-                updateState { 
+
+                updateState {
                     copy(
                         isLoading = false,
                         modelCategories = modelCategories,
                         currentModel = getCurrentModel()
                     )
                 }
-                
+
             } catch (e: Exception) {
-                updateState { 
+                updateState {
                     copy(
                         isLoading = false,
                         error = e.message ?: "Failed to load models"
@@ -1317,7 +1317,7 @@ class ModelManagementViewModel(
             }
         }
     }
-    
+
     fun downloadModel(modelId: String) {
         viewModelScope.launch {
             try {
@@ -1325,34 +1325,34 @@ class ModelManagementViewModel(
                 RunAnywhere.downloadModel(modelId).collect { progress ->
                     updateDownloadProgress(modelId, progress)
                 }
-                
+
                 // Refresh model list after download
                 loadModels()
-                
+
             } catch (e: Exception) {
-                updateState { 
+                updateState {
                     copy(error = "Download failed: ${e.message}")
                 }
             }
         }
     }
-    
+
     fun loadModel(modelId: String) {
         viewModelScope.launch {
             try {
                 updateState { copy(isLoading = true) }
-                
+
                 val success = RunAnywhere.loadModel(modelId)
-                
+
                 if (success) {
                     // Update current model
-                    updateState { 
+                    updateState {
                         copy(
                             isLoading = false,
                             currentModel = modelId
                         )
                     }
-                    
+
                     // Update default model in settings
                     val currentSettings = settingsRepository.getSettings()
                     settingsRepository.saveSettings(
@@ -1362,18 +1362,18 @@ class ModelManagementViewModel(
                             )
                         )
                     )
-                    
+
                 } else {
-                    updateState { 
+                    updateState {
                         copy(
                             isLoading = false,
                             error = "Failed to load model: $modelId"
                         )
                     }
                 }
-                
+
             } catch (e: Exception) {
-                updateState { 
+                updateState {
                     copy(
                         isLoading = false,
                         error = "Model loading error: ${e.message}"
@@ -1382,12 +1382,12 @@ class ModelManagementViewModel(
             }
         }
     }
-    
+
     private fun observeDownloadProgress() {
         viewModelScope.launch {
             // This would observe SDK download progress events
             // For now, we'll implement a placeholder
-            
+
             // RunAnywhere.downloadEvents.collect { event ->
             //     when (event) {
             //         is DownloadStarted -> updateDownloadProgress(event.modelId, 0f)
@@ -1403,9 +1403,9 @@ class ModelManagementViewModel(
             // }
         }
     }
-    
+
     private fun updateDownloadProgress(modelId: String, progress: Float) {
-        updateState { 
+        updateState {
             copy(
                 downloadProgress = downloadProgress.toMutableMap().apply {
                     put(modelId, progress)
@@ -1413,7 +1413,7 @@ class ModelManagementViewModel(
             )
         }
     }
-    
+
     private suspend fun getCurrentModel(): String? {
         return try {
             RunAnywhere.currentModel?.id
@@ -1421,7 +1421,7 @@ class ModelManagementViewModel(
             null
         }
     }
-    
+
     private fun updateState(update: ModelManagementUiState.() -> ModelManagementUiState) {
         _uiState.value = _uiState.value.update()
     }
@@ -1467,7 +1467,7 @@ class ModelManagementViewModel(
 ### High Risk 🔴
 1. **Voice Pipeline Complexity**: Audio processing has many failure modes
    - **Mitigation**: Comprehensive error handling, incremental improvement
-   
+
 2. **Real-time Settings Updates**: SDK may not support runtime configuration
    - **Mitigation**: Implement app restart prompt for critical changes
 

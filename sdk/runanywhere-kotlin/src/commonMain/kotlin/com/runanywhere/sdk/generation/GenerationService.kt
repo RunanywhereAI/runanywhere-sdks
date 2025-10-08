@@ -26,10 +26,10 @@ class GenerationService {
     // Track active generation sessions
     private val activeSessions = mutableMapOf<String, GenerationSession>()
     private var currentSessionId: String? = null
-    
+
     // Track currently loaded model
     private var currentModel: LoadedModelWithService? = null
-    
+
     // LLM component for actual generation
     private var llmComponent: LLMComponent? = null
 
@@ -47,7 +47,7 @@ class GenerationService {
         )
         return generate(prompt, convertedOptions)
     }
-    
+
     /**
      * Generate text with the specified prompt and options
      */
@@ -116,7 +116,7 @@ class GenerationService {
         )
         return streamGenerate(prompt, convertedOptions)
     }
-    
+
     /**
      * Stream text generation
      */
@@ -202,14 +202,14 @@ class GenerationService {
     ): String {
         // Use LLM component for actual generation
         val component = llmComponent ?: throw IllegalStateException("LLM component not initialized")
-        
+
         // Convert GenerationOptions to RunAnywhereGenerationOptions
         val llmOptions = RunAnywhereGenerationOptions(
             maxTokens = options.maxTokens,
             temperature = options.temperature,
             streamingEnabled = options.streaming
         )
-        
+
         // Generate using LLM component
         val result = component.generate(prompt)
         return result.text
@@ -254,7 +254,7 @@ class GenerationService {
             publishGenerationCancelled(sessionId)
         }
     }
-    
+
     /**
      * Set the currently loaded model - matches iOS API
      */
@@ -266,14 +266,14 @@ class GenerationService {
             logger.info("Current model cleared")
         }
     }
-    
+
     /**
      * Get the currently loaded model - matches iOS API
      */
     fun getCurrentModel(): LoadedModelWithService? {
         return currentModel
     }
-    
+
     /**
      * Initialize the generation service with an LLM component
      */
@@ -281,7 +281,7 @@ class GenerationService {
         llmComponent = component
         logger.info("GenerationService initialized with LLM component")
     }
-    
+
     /**
      * Check if the service is ready for generation
      */

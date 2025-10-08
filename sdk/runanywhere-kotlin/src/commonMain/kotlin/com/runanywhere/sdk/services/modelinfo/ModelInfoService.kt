@@ -156,14 +156,14 @@ class ModelInfoService(
 
         try {
             val models = modelInfoRepository.fetchAll()
-            
+
             // Update cache with all models
             models.forEach { model ->
                 cachedModels[model.id] = model
             }
-            
+
             lastCacheUpdate = getCurrentTimeMillis()
-            
+
             logger.info("Loaded ${models.size} stored models")
             return models
 

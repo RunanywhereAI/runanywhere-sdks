@@ -271,17 +271,17 @@ class AndroidAudioCapture(private val context: Context? = null) {
     fun getAvailableInputDevices(): List<String> {
         return try {
             val devices = mutableListOf<String>()
-            
+
             // Basic Android audio sources
             devices.add("Default Microphone")
-            
+
             // Check if device has specific features
             context?.packageManager?.let { pm ->
                 if (pm.hasSystemFeature(PackageManager.FEATURE_MICROPHONE)) {
                     devices.add("Built-in Microphone")
                 }
             }
-            
+
             devices
         } catch (e: Exception) {
             logger.error("Error getting audio input devices", e)

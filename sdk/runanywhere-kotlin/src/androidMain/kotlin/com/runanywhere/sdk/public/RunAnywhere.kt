@@ -96,17 +96,17 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         // Android uses Room database
         androidLogger.info("Initializing Room database for Android")
-        
+
         // Initialize FileManager with Android context
         // FileManager.setContext(context) // TODO: Fix this - FileManager doesn't have setContext method
-        
+
         // Initialize audio capture with context
         audioCapture = AndroidAudioCapture(context)
-        
+
         // Initialize Android-specific services
         val platformContext = com.runanywhere.sdk.foundation.PlatformContext(context)
         ServiceContainer.shared.initialize(platformContext)
-        
+
         // Initialize model downloader
         // modelDownloader = ModelDownloader(modelStorage) // TODO: Fix constructor parameters
     }
@@ -227,13 +227,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     // MARK: - Audio and STT Methods
 
     override fun transcribeStream(
-        audioStream: Flow<ByteArray>, 
+        audioStream: Flow<ByteArray>,
         chunkSizeMs: Int
     ): Flow<STTStreamEvent> {
         requireInitialized()
-        
+
         androidLogger.info("Starting streaming transcription")
-        
+
         return flow {
             audioStream.collect { audioChunk ->
                 val result = transcribe(audioChunk)
@@ -251,35 +251,35 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     override suspend fun transcribeWithRecording(durationSeconds: Int): String {
         requireInitialized()
-        
+
         androidLogger.info("Recording audio for $durationSeconds seconds and transcribing...")
-        
+
         val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
-        
+
         // Record audio for the specified duration
         val audioData = audioCapture.recordAudio(durationSeconds * 1000L)
-        
+
         androidLogger.info("Recorded ${audioData.size} bytes of audio, transcribing...")
-        
+
         // Transcribe the recorded audio
         return transcribe(audioData)
     }
 
     fun startRecordingWithWaveform(): Flow<STTStreamEvent.AudioLevelChanged> = flow {
         requireInitialized()
-        
+
         val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
-        
+
         androidLogger.info("Starting audio recording with waveform")
-        
+
         try {
             // Start continuous audio capture
             val audioChunkFlow = audioCapture.startContinuousCapture()
-            
+
             // Buffer for accumulating audio for transcription
             val audioBuffer = mutableListOf<Float>()
             var chunkCount = 0
-            
+
             audioChunkFlow.collect { chunk ->
                 // Calculate RMS for waveform
                 val rms = chunk.samples.map { it * it }.average().toFloat()
@@ -288,40 +288,40 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 } else {
                     -80f // Silence threshold
                 }
-                
+
                 // Emit audio level for waveform
                 emit(STTStreamEvent.AudioLevelChanged(decibelLevel, System.currentTimeMillis() / 1000.0))
-                
+
                 // Accumulate audio samples for transcription
                 audioBuffer.addAll(chunk.samples.toList())
                 chunkCount++
-                
+
                 // Process transcription every ~0.5 seconds (5 chunks of 100ms each)
                 if (chunkCount >= 5) {
                     try {
                         // Convert accumulated samples to PCM bytes
                         val pcmBytes = convertFloatSamplesToPCM(audioBuffer.toFloatArray())
-                        
+
                         if (pcmBytes.isNotEmpty()) {
                             // Perform transcription
                             val transcription = transcribe(pcmBytes)
-                            
+
                             if (transcription.isNotBlank()) {
                                 // Emit transcription result (placeholder)
                                 androidLogger.debug("Transcription: $transcription")
                             }
                         }
-                        
+
                         // Clear buffer for next batch
                         audioBuffer.clear()
                         chunkCount = 0
-                        
+
                     } catch (e: Exception) {
                         androidLogger.error("Error processing audio chunk", e)
                     }
                 }
             }
-            
+
         } catch (e: Exception) {
             androidLogger.error("Error in audio recording with waveform", e)
             throw e
@@ -349,12 +349,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             androidLogger.warn("Recording already in progress")
             return
         }
-        
+
         val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
-        
+
         androidLogger.info("Starting audio recording...")
         recordingBuffer.reset()
-        
+
         // Start capturing audio into the buffer
         recordingJob = sdkScope.launch {
             try {
@@ -370,7 +370,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 androidLogger.error("Error during recording", e)
             }
         }
-        
+
         isRecording = true
         androidLogger.info("Recording started")
     }
@@ -382,12 +382,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         if (isRecording) {
             throw IllegalStateException("Recording already in progress")
         }
-        
+
         val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
-        
+
         androidLogger.info("Starting audio recording with live transcription...")
         isRecording = true
-        
+
         try {
             audioCapture.startContinuousCapture()
                 .collect { chunk ->
@@ -395,7 +395,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                         // Store audio for final transcription
                         val pcmBytes = convertFloatSamplesToPCM(chunk.samples)
                         recordingBuffer.write(pcmBytes)
-                        
+
                         // Emit partial transcription placeholder
                         emit("Recording... (${recordingBuffer.size()} bytes)")
                     }
@@ -414,26 +414,26 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             androidLogger.warn("No recording in progress")
             return ""
         }
-        
+
         androidLogger.info("Stopping recording and transcribing...")
         isRecording = false
-        
+
         // Stop the recording job
         recordingJob?.cancel()
         recordingJob = null
         audioCapture?.stopCapture()
-        
+
         // Get the recorded audio
         val audioData = recordingBuffer.toByteArray()
         recordingBuffer.reset()
-        
+
         if (audioData.isEmpty()) {
             androidLogger.warn("No audio data recorded")
             return ""
         }
-        
+
         androidLogger.info("Recorded ${audioData.size} bytes, transcribing...")
-        
+
         // Transcribe the recorded audio
         return transcribe(audioData)
     }
@@ -443,16 +443,16 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
      */
     private fun convertFloatSamplesToPCM(samples: FloatArray): ByteArray {
         val pcmBytes = ByteArray(samples.size * 2)
-        
+
         for (i in samples.indices) {
             // Convert float [-1.0, 1.0] to 16-bit signed integer
             val sample16 = (samples[i] * 32767.0f).toInt().coerceIn(-32768, 32767)
-            
+
             // Store as little-endian bytes
             pcmBytes[i * 2] = (sample16 and 0xFF).toByte()
             pcmBytes[i * 2 + 1] = ((sample16 shr 8) and 0xFF).toByte()
         }
-        
+
         return pcmBytes
     }
 
@@ -463,13 +463,13 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             recordingJob?.cancel()
             audioCapture?.stopCapture()
         }
-        
+
         // Cleanup audio resources
         audioCapture = null
-        
+
         // Cancel SDK scope
         sdkScope.cancel()
-        
+
         // Cleanup Android-specific resources
         ServiceContainer.shared.cleanup()
         androidContext = null

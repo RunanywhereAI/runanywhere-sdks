@@ -1,7 +1,7 @@
 # Detailed Implementation Plan: Android/Kotlin Cross-Platform Parity
-**Date**: October 8, 2025  
-**Goal**: Achieve complete native parity between iOS and Android implementations  
-**Timeline**: 4-5 weeks for full implementation  
+**Date**: October 8, 2025
+**Goal**: Achieve complete native parity between iOS and Android implementations
+**Timeline**: 4-5 weeks for full implementation
 
 ## Executive Summary
 
@@ -18,8 +18,8 @@ This document provides a detailed, actionable implementation plan to bring the A
 ---
 
 ## Phase 1: SDK Critical Services Implementation 🔴
-**Duration**: 8-10 days  
-**Priority**: CRITICAL - Blocks core functionality  
+**Duration**: 8-10 days
+**Priority**: CRITICAL - Blocks core functionality
 
 ### Task 1.1: LLM Generation Service Integration
 **Files to Modify**:
@@ -67,7 +67,7 @@ object LlamaJNI {
     external fun getStreamToken(tokenPtr: Long): String
     external fun isStreamComplete(tokenPtr: Long): Boolean
     external fun cleanup(contextPtr: Long)
-    
+
     init {
         System.loadLibrary("llama-jni")
     }
@@ -76,7 +76,7 @@ object LlamaJNI {
 // modules/runanywhere-llm-llamacpp/src/commonMain/kotlin/LlamaCppService.kt
 class LlamaCppService : LLMService {
     private var contextPtr: Long = 0L
-    
+
     override suspend fun initialize(modelPath: String): Boolean = withContext(Dispatchers.IO) {
         try {
             contextPtr = LlamaJNI.initModel(modelPath)
@@ -86,21 +86,21 @@ class LlamaCppService : LLMService {
             false
         }
     }
-    
-    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult = 
+
+    override suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult =
         withContext(Dispatchers.IO) {
             val startTime = System.currentTimeMillis()
             val result = LlamaJNI.generate(contextPtr, prompt, options.maxTokens)
             val endTime = System.currentTimeMillis()
-            
+
             GenerationResult(
                 text = result,
                 tokensGenerated = result.split(" ").size,
                 generationTimeMs = endTime - startTime
             )
         }
-    
-    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationToken> = 
+
+    override fun generateStream(prompt: String, options: GenerationOptions): Flow<GenerationToken> =
         flow {
             val tokenPtrs = LlamaJNI.generateStream(contextPtr, prompt, options.maxTokens)
             for (tokenPtr in tokenPtrs) {
@@ -122,18 +122,18 @@ class GenerationService(
     suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         val llmProvider = ModuleRegistry.llmProvider(options.modelId)
             ?: throw SDKError.ComponentNotAvailable("No LLM provider for model: ${options.modelId}")
-        
+
         val llmService = llmProvider.createLLMService()
-        
+
         // Publish generation started event
         eventBus.publish(GenerationEvent.Started(prompt, options))
-        
+
         return try {
             val result = llmService.generate(prompt, options)
-            
+
             // Publish generation completed event
             eventBus.publish(GenerationEvent.Completed(result))
-            
+
             result
         } catch (e: Exception) {
             // Publish generation failed event
@@ -173,7 +173,7 @@ class NativeHttpClient : HttpClient {
             connectTimeoutMillis = 10000
         }
     }
-    
+
     override suspend fun get(url: String): String = withContext(Dispatchers.IO) {
         try {
             client.get(url).body()
@@ -181,7 +181,7 @@ class NativeHttpClient : HttpClient {
             throw NetworkError.RequestFailed("GET request failed: ${e.message}", e)
         }
     }
-    
+
     override suspend fun post(url: String, body: String): String = withContext(Dispatchers.IO) {
         try {
             client.post(url) {
@@ -192,13 +192,13 @@ class NativeHttpClient : HttpClient {
             throw NetworkError.RequestFailed("POST request failed: ${e.message}", e)
         }
     }
-    
+
     override suspend fun downloadFile(url: String, destination: String, onProgress: (Float) -> Unit): Boolean {
         return try {
             val response = client.get(url)
             val contentLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull() ?: -1L
             var downloadedBytes = 0L
-            
+
             response.body<ByteReadChannel>().copyTo(File(destination).outputStream()) { bytesRead ->
                 downloadedBytes += bytesRead
                 if (contentLength > 0) {
@@ -223,7 +223,7 @@ class NativeFileWriter : FileWriter {
             throw FileSystemError.WriteFailed("Failed to write file: $path", e)
         }
     }
-    
+
     override suspend fun readFile(path: String): String = withContext(Dispatchers.IO) {
         try {
             File(path).readText()
@@ -256,12 +256,12 @@ class ModelDownloadService(
     private val httpClient: HttpClient,
     private val fileManager: FileManager
 ) : DownloadService {
-    
+
     override suspend fun downloadModel(model: ModelInfo): Flow<DownloadProgress> = flow {
         val localPath = fileManager.getModelPath(model.id)
-        
+
         emit(DownloadProgress.Started(model.id))
-        
+
         try {
             val downloaded = httpClient.downloadFile(
                 url = model.downloadURL ?: throw IllegalArgumentException("No download URL"),
@@ -271,7 +271,7 @@ class ModelDownloadService(
                     emit(DownloadProgress.InProgress(model.id, progress))
                 }
             )
-            
+
             if (downloaded) {
                 // Verify file integrity
                 val isValid = verifyModelIntegrity(localPath, model.checksum)
@@ -288,10 +288,10 @@ class ModelDownloadService(
             emit(DownloadProgress.Failed(model.id, e.message ?: "Unknown error"))
         }
     }.flowOn(Dispatchers.IO)
-    
+
     private suspend fun verifyModelIntegrity(filePath: String, expectedChecksum: String?): Boolean {
         if (expectedChecksum == null) return true
-        
+
         return try {
             val actualChecksum = calculateSHA256(filePath)
             actualChecksum == expectedChecksum
@@ -334,13 +334,13 @@ class AllocationManager(
 ) {
     private val allocatedModels = mutableMapOf<String, AllocationInfo>()
     private val memoryThreshold = 0.85f // 85% memory usage threshold
-    
+
     suspend fun allocateMemory(modelId: String, sizeBytes: Long): Boolean {
         // Check if we have enough memory
         val currentUsage = memoryService.getCurrentMemoryUsage()
         val totalMemory = memoryService.getTotalMemory()
         val projectedUsage = (currentUsage + sizeBytes).toFloat() / totalMemory
-        
+
         if (projectedUsage > memoryThreshold) {
             // Try to free up memory by evicting models
             val freedMemory = evictModelsForSpace(sizeBytes)
@@ -348,7 +348,7 @@ class AllocationManager(
                 return false // Not enough memory even after eviction
             }
         }
-        
+
         // Allocate memory for the model
         allocatedModels[modelId] = AllocationInfo(
             modelId = modelId,
@@ -356,17 +356,17 @@ class AllocationManager(
             timestamp = System.currentTimeMillis(),
             accessCount = 1
         )
-        
+
         return true
     }
-    
+
     private suspend fun evictModelsForSpace(requiredBytes: Long): Long {
         var freedBytes = 0L
         val modelsToEvict = cacheEviction.selectModelsForEviction(
             allocatedModels.values.toList(),
             requiredBytes
         )
-        
+
         for (modelId in modelsToEvict) {
             val allocInfo = allocatedModels[modelId]
             if (allocInfo != null) {
@@ -374,23 +374,23 @@ class AllocationManager(
                 evictModel(modelId)
                 freedBytes += allocInfo.sizeBytes
                 allocatedModels.remove(modelId)
-                
+
                 logger.info("Evicted model $modelId (${allocInfo.sizeBytes} bytes) due to memory pressure")
-                
+
                 if (freedBytes >= requiredBytes) break
             }
         }
-        
+
         return freedBytes
     }
-    
+
     private suspend fun evictModel(modelId: String) {
         // Signal components to unload this model
         eventBus.publish(MemoryEvent.ModelEvicted(modelId))
-        
+
         // Give components time to cleanup
         delay(100)
-        
+
         // Force garbage collection
         System.gc()
     }
@@ -399,22 +399,22 @@ class AllocationManager(
 // src/commonMain/kotlin/com/runanywhere/sdk/memory/CacheEviction.kt
 class CacheEviction {
     fun selectModelsForEviction(
-        allocatedModels: List<AllocationInfo>, 
+        allocatedModels: List<AllocationInfo>,
         requiredBytes: Long
     ): List<String> {
         // Sort by LRU (least recently used)
         val sortedModels = allocatedModels.sortedBy { it.lastAccessTime }
-        
+
         val modelsToEvict = mutableListOf<String>()
         var accumulatedBytes = 0L
-        
+
         for (model in sortedModels) {
             modelsToEvict.add(model.modelId)
             accumulatedBytes += model.sizeBytes
-            
+
             if (accumulatedBytes >= requiredBytes) break
         }
-        
+
         return modelsToEvict
     }
 }
@@ -429,8 +429,8 @@ class CacheEviction {
 ---
 
 ## Phase 2: Android App Core Features 🟡
-**Duration**: 6-8 days  
-**Priority**: HIGH - Complete missing app functionality  
+**Duration**: 6-8 days
+**Priority**: HIGH - Complete missing app functionality
 
 ### Task 2.1: Voice Pipeline Reliability Improvements
 **Files to Modify**:
@@ -448,13 +448,13 @@ class AudioCaptureService {
     private var audioRecord: AudioRecord? = null
     private var isRecording = false
     private val audioBuffer = ByteArray(4096)
-    
+
     fun startCapture(): Flow<ByteArray> = flow {
         val sampleRate = 16000
         val channelConfig = AudioFormat.CHANNEL_IN_MONO
         val audioFormat = AudioFormat.ENCODING_PCM_16BIT
         val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-        
+
         audioRecord = AudioRecord(
             MediaRecorder.AudioSource.MIC,
             sampleRate,
@@ -465,7 +465,7 @@ class AudioCaptureService {
             if (record.state == AudioRecord.STATE_INITIALIZED) {
                 record.startRecording()
                 isRecording = true
-                
+
                 while (isRecording) {
                     val bytesRead = record.read(audioBuffer, 0, audioBuffer.size)
                     if (bytesRead > 0) {
@@ -477,7 +477,7 @@ class AudioCaptureService {
             }
         }
     }.flowOn(Dispatchers.IO)
-    
+
     fun stopCapture() {
         isRecording = false
         audioRecord?.apply {
@@ -501,14 +501,14 @@ class VoicePipelineService(
 ) {
     private val _sessionState = MutableStateFlow(VoiceSessionState.Idle)
     val sessionState: StateFlow<VoiceSessionState> = _sessionState.asStateFlow()
-    
+
     private val _events = MutableSharedFlow<VoicePipelineEvent>()
     val events: SharedFlow<VoicePipelineEvent> = _events.asSharedFlow()
-    
+
     suspend fun startSession() {
         try {
             updateState(VoiceSessionState.Listening)
-            
+
             audioCaptureService.startCapture()
                 .map { audioData -> processAudioChunk(audioData) }
                 .collect { event ->
@@ -520,11 +520,11 @@ class VoicePipelineService(
             _events.emit(VoicePipelineEvent.Error(e))
         }
     }
-    
+
     private suspend fun processAudioChunk(audioData: ByteArray): VoicePipelineEvent {
         // VAD processing
         val vadResult = vadComponent.processAudio(audioData)
-        
+
         return when (vadResult.activityType) {
             SpeechActivityType.SPEECH_START -> {
                 VoicePipelineEvent.SpeechDetected
@@ -542,26 +542,26 @@ class VoicePipelineService(
             }
         }
     }
-    
+
     private suspend fun processTranscription(transcript: String): VoicePipelineEvent {
         updateState(VoiceSessionState.Processing)
-        
+
         return try {
             val response = llmComponent.generate(transcript)
             updateState(VoiceSessionState.Speaking)
-            
+
             synthesizeSpeech(response)
-            
+
             VoicePipelineEvent.ResponseGenerated(transcript, response)
         } catch (e: Exception) {
             VoicePipelineEvent.Error(e)
         }
     }
-    
+
     private fun synthesizeSpeech(text: String) {
         ttsService.speak(text, TextToSpeech.QUEUE_FLUSH, null, "response_${System.currentTimeMillis()}")
     }
-    
+
     private fun updateState(newState: VoiceSessionState) {
         _sessionState.value = newState
     }
@@ -648,11 +648,11 @@ interface SettingsRepository {
 class SettingsRepositoryImpl(
     private val dataStore: DataStore<Preferences>
 ) : SettingsRepository {
-    
+
     override suspend fun getSettings(): AppSettings {
         return dataStore.data.first().toAppSettings()
     }
-    
+
     override suspend fun saveSettings(settings: AppSettings) {
         dataStore.edit { preferences ->
             preferences[SDK_DEFAULT_MODEL] = settings.sdkSettings.defaultModel
@@ -661,13 +661,13 @@ class SettingsRepositoryImpl(
             // ... save all settings
         }
     }
-    
+
     override fun getSettingsFlow(): Flow<AppSettings> {
         return dataStore.data.map { preferences ->
             preferences.toAppSettings()
         }
     }
-    
+
     private fun Preferences.toAppSettings(): AppSettings {
         return AppSettings(
             sdkSettings = SDKSettings(
@@ -679,7 +679,7 @@ class SettingsRepositoryImpl(
             // ... map other setting categories
         )
     }
-    
+
     companion object {
         private val SDK_DEFAULT_MODEL = stringPreferencesKey("sdk_default_model")
         private val SDK_MAX_TOKENS = intPreferencesKey("sdk_max_tokens")
@@ -698,7 +698,7 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
-    
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -715,14 +715,14 @@ fun SettingsScreen(
                     selectedModel = settings.sdkSettings.defaultModel,
                     onModelSelected = viewModel::updateDefaultModel
                 )
-                
+
                 SliderSetting(
                     title = "Temperature",
                     value = settings.sdkSettings.temperature,
                     valueRange = 0f..2f,
                     onValueChange = viewModel::updateTemperature
                 )
-                
+
                 SliderSetting(
                     title = "Max Tokens",
                     value = settings.sdkSettings.maxTokens.toFloat(),
@@ -731,7 +731,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // Voice Settings Section
         item {
             SettingsSection(
@@ -743,14 +743,14 @@ fun SettingsScreen(
                     selectedModel = settings.voiceSettings.sttModel,
                     onModelSelected = viewModel::updateSTTModel
                 )
-                
+
                 SwitchSetting(
                     title = "Enable VAD",
                     description = "Voice Activity Detection",
                     checked = settings.voiceSettings.enableVAD,
                     onCheckedChange = viewModel::updateVADEnabled
                 )
-                
+
                 SliderSetting(
                     title = "Speech Rate",
                     value = settings.voiceSettings.speechRate,
@@ -759,7 +759,7 @@ fun SettingsScreen(
                 )
             }
         }
-        
+
         // Privacy Settings Section
         item {
             SettingsSection(
@@ -772,7 +772,7 @@ fun SettingsScreen(
                     checked = settings.privacySettings.enableTelemetry,
                     onCheckedChange = viewModel::updateTelemetryEnabled
                 )
-                
+
                 SwitchSetting(
                     title = "Analytics",
                     description = "Share performance analytics",
@@ -807,11 +807,11 @@ class StorageAnalysisService(
     fun getStorageInfo(): StorageInfo {
         val statsManager = context.getSystemService(Context.STORAGE_STATS_SERVICE) as StorageStatsManager
         val storageManager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
-        
+
         val totalBytes = getTotalSpace()
         val availableBytes = getAvailableSpace()
         val usedBytes = totalBytes - availableBytes
-        
+
         return StorageInfo(
             totalSpace = totalBytes,
             availableSpace = availableBytes,
@@ -821,12 +821,12 @@ class StorageAnalysisService(
             cacheStorage = getCacheStorageUsage()
         )
     }
-    
+
     fun getModelInventory(): List<ModelStorageInfo> {
         // Scan model directory for downloaded models
         val modelDir = File(context.filesDir, "models")
         if (!modelDir.exists()) return emptyList()
-        
+
         return modelDir.listFiles()?.mapNotNull { file ->
             if (file.isFile && file.name.endsWith(".bin")) {
                 ModelStorageInfo(
@@ -839,12 +839,12 @@ class StorageAnalysisService(
             } else null
         } ?: emptyList()
     }
-    
+
     suspend fun cleanupCache(): Long {
         val cacheDir = context.cacheDir
         return recursiveDelete(cacheDir)
     }
-    
+
     suspend fun deleteModel(modelId: String): Boolean {
         val modelFile = File(context.filesDir, "models/$modelId.bin")
         return modelFile.delete()
@@ -861,8 +861,8 @@ class StorageAnalysisService(
 ---
 
 ## Phase 3: Advanced Features Implementation 🟢
-**Duration**: 6-8 days  
-**Priority**: MEDIUM - Advanced functionality  
+**Duration**: 6-8 days
+**Priority**: MEDIUM - Advanced functionality
 
 ### Task 3.1: Speaker Diarization Component
 **Files to Create**:
@@ -927,31 +927,31 @@ class StructuredGenerationService(
     ): T {
         val schema = type.getJsonSchema()
         val structuredPrompt = buildStructuredPrompt(prompt, schema)
-        
+
         val result = generationService.generate(structuredPrompt, options)
-        
+
         return parseStructuredResult(result, type::class)
     }
-    
+
     private fun buildStructuredPrompt(prompt: String, schema: String): String {
         return """
             $prompt
-            
+
             Please respond with valid JSON that matches this schema:
             $schema
-            
+
             Response:
         """.trimIndent()
     }
-    
+
     private fun <T : Generatable> parseStructuredResult(result: String, clazz: KClass<T>): T {
         val jsonStart = result.indexOf("{")
         val jsonEnd = result.lastIndexOf("}") + 1
-        
+
         if (jsonStart == -1 || jsonEnd <= jsonStart) {
             throw IllegalArgumentException("No valid JSON found in response")
         }
-        
+
         val jsonString = result.substring(jsonStart, jsonEnd)
         return Json.decodeFromString(clazz.serializer(), jsonString)
     }
@@ -961,8 +961,8 @@ class StructuredGenerationService(
 ---
 
 ## Phase 4: Polish & Production Readiness 🔵
-**Duration**: 4-5 days  
-**Priority**: LOW - Quality improvements  
+**Duration**: 4-5 days
+**Priority**: LOW - Quality improvements
 
 ### Task 4.1: Performance Optimization
 - Memory usage optimization

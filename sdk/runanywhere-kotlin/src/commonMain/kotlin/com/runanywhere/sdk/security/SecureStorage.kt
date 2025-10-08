@@ -11,7 +11,7 @@ import com.runanywhere.sdk.data.models.SDKError
  * - Native: Platform-specific secure storage APIs
  */
 interface SecureStorage {
-    
+
     /**
      * Store a string value securely
      * @param key Unique identifier for the value
@@ -19,7 +19,7 @@ interface SecureStorage {
      * @throws SDKError.SecurityError if storage fails
      */
     suspend fun setSecureString(key: String, value: String)
-    
+
     /**
      * Retrieve a stored string value
      * @param key Unique identifier for the value
@@ -27,7 +27,7 @@ interface SecureStorage {
      * @throws SDKError.SecurityError if retrieval fails
      */
     suspend fun getSecureString(key: String): String?
-    
+
     /**
      * Store binary data securely
      * @param key Unique identifier for the data
@@ -35,7 +35,7 @@ interface SecureStorage {
      * @throws SDKError.SecurityError if storage fails
      */
     suspend fun setSecureData(key: String, data: ByteArray)
-    
+
     /**
      * Retrieve stored binary data
      * @param key Unique identifier for the data
@@ -43,33 +43,33 @@ interface SecureStorage {
      * @throws SDKError.SecurityError if retrieval fails
      */
     suspend fun getSecureData(key: String): ByteArray?
-    
+
     /**
      * Remove a stored value
      * @param key Unique identifier for the value to remove
      * @throws SDKError.SecurityError if removal fails
      */
     suspend fun removeSecure(key: String)
-    
+
     /**
      * Check if a key exists in secure storage
      * @param key Unique identifier to check
      * @return true if key exists, false otherwise
      */
     suspend fun containsKey(key: String): Boolean
-    
+
     /**
      * Clear all stored values (use with caution)
      * @throws SDKError.SecurityError if clear operation fails
      */
     suspend fun clearAll()
-    
+
     /**
      * Get all stored keys (for debugging/migration purposes)
      * @return Set of all stored keys
      */
     suspend fun getAllKeys(): Set<String>
-    
+
     /**
      * Check if secure storage is available and properly configured
      * @return true if secure storage is available, false otherwise
@@ -89,7 +89,7 @@ expect class SecureStorageFactory {
          * @return Platform-appropriate SecureStorage implementation
          */
         fun create(identifier: String = "com.runanywhere.sdk"): SecureStorage
-        
+
         /**
          * Check if secure storage is supported on this platform
          * @return true if supported, false otherwise
@@ -102,7 +102,7 @@ expect class SecureStorageFactory {
  * Convenience functions for common secure storage operations
  */
 object SecureStorageUtils {
-    
+
     /**
      * Store authentication tokens securely
      */
@@ -116,7 +116,7 @@ object SecureStorageUtils {
         refreshToken?.let { storage.setSecureString("refresh_token", it) }
         storage.setSecureString("token_expires_at", expiresAt.toString())
     }
-    
+
     /**
      * Retrieve authentication tokens from secure storage
      */
@@ -124,14 +124,14 @@ object SecureStorageUtils {
         val accessToken = storage.getSecureString("access_token") ?: return null
         val refreshToken = storage.getSecureString("refresh_token")
         val expiresAt = storage.getSecureString("token_expires_at")?.toLongOrNull() ?: 0L
-        
+
         return AuthTokens(
             accessToken = accessToken,
             refreshToken = refreshToken,
             expiresAt = expiresAt
         )
     }
-    
+
     /**
      * Clear all authentication data
      */
