@@ -1,9 +1,17 @@
+<!--
+    Build Android App
+
+    Builds the Android sample app. The SDK is automatically built as a local module.
+    No separate SDK build needed!
+
+    Output: app-debug.apk in examples/android/RunAnywhereAI/app/build/outputs/apk/debug/
+-->
 <component name="ProjectRunConfigurationManager">
-    <configuration default="false" name="Run IntelliJ Plugin" type="GradleRunConfiguration"
+    <configuration default="false" name="1️⃣ Build Android App" type="GradleRunConfiguration"
         factoryName="Gradle">
         <ExternalSystemSettings>
             <option name="executionName" />
-            <option name="externalProjectPath" value="$PROJECT_DIR$/examples/intellij-plugin-demo/plugin" />
+            <option name="externalProjectPath" value="$PROJECT_DIR$" />
             <option name="externalSystemIdString" value="GRADLE" />
             <option name="scriptParameters" value="" />
             <option name="taskDescriptions">
@@ -11,15 +19,15 @@
             </option>
             <option name="taskNames">
                 <list>
-                    <option value="runIde" />
+                    <option value="buildAndroidApp" />
                 </list>
             </option>
-            <option name="vmOptions" value="" />
+            <option name="vmOptions" />
         </ExternalSystemSettings>
         <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
         <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
         <DebugAllEnabled>false</DebugAllEnabled>
-        <ForceTestExec>false</ForceTestExec>
+        <RunAsTest>false</RunAsTest>
         <method v="2" />
     </configuration>
 </component>
