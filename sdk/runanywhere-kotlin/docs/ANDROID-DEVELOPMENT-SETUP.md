@@ -1,14 +1,14 @@
 # Android Development Setup Guide
-**Date**: October 8, 2025  
-**Purpose**: Complete setup guide for Android development and testing of RunAnywhere SDK  
-**Target**: Developers working on Android/Kotlin implementation  
+**Date**: October 8, 2025
+**Purpose**: Complete setup guide for Android development and testing of RunAnywhere SDK
+**Target**: Developers working on Android/Kotlin implementation
 
 ## Quick Start Summary
 
 This guide will help you set up your Android development environment to work on the RunAnywhere Kotlin SDK and Android sample app. The setup includes emulator configuration, project build, and testing validation.
 
-**Estimated Setup Time**: 30-45 minutes  
-**Prerequisites**: Basic Android development experience  
+**Estimated Setup Time**: 30-45 minutes
+**Prerequisites**: Basic Android development experience
 
 ---
 
@@ -220,12 +220,12 @@ Check `app/build.gradle.kts` for proper SDK dependency:
 dependencies {
     // RunAnywhere Kotlin SDK
     implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
-    
+
     // Jetpack Compose
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
-    
+
     // Other dependencies...
 }
 ```

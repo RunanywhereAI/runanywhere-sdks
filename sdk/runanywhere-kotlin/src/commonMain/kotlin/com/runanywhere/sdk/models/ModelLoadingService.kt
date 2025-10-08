@@ -118,7 +118,7 @@ class ModelLoadingService(
 
         // Remove from loaded models
         loadedModels.remove(modelId)
-        
+
         logger.info("✅ Model unloaded: $modelId")
     }
 

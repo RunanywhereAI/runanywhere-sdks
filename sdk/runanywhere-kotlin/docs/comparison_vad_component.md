@@ -4,7 +4,7 @@
 
 This document provides a comprehensive comparison between the Voice Activity Detection (VAD) component implementations in the iOS Swift SDK and the Kotlin Multiplatform SDK, analyzing their architectural differences, detection strategies, and platform-specific implementations.
 
-**Last Updated:** October 2025  
+**Last Updated:** October 2025
 **Status:** ✅ IMPLEMENTED - Both iOS and Kotlin VAD components are fully functional with auto-calibration, TTS feedback prevention, and multi-platform support.
 
 ## Architecture Overview
@@ -38,7 +38,7 @@ The Kotlin implementation uses a sophisticated multi-platform architecture with 
 - **VADService Interface** (`VADModels.kt`): Protocol defining VAD service operations with iOS parity
 - **VADComponent** (`VADComponent.kt`): Main component extending `BaseComponent<VADServiceWrapper>` with iOS-compatible API
 - **VADServiceProvider** (`VADServiceProvider.kt`): Platform abstraction layer using `expect/actual` pattern
-- **Platform Implementations**: 
+- **Platform Implementations**:
   - **Android**: WebRTC VAD with Google's GMM-based algorithm
   - **JVM**: SimpleEnergyVAD matching iOS behavior exactly
   - **Common**: SimpleEnergyVAD for cross-platform compatibility
@@ -74,7 +74,7 @@ private func calculateAverageEnergy(of signal: [Float]) -> Float {
 - **Sophisticated Hysteresis**:
   - Standard: `voiceStartThreshold = 1` frame, `voiceEndThreshold = 8` frames
   - TTS Mode: `ttsVoiceStartThreshold = 10` frames, `ttsVoiceEndThreshold = 5` frames
-- **Dynamic Thresholds**: 
+- **Dynamic Thresholds**:
   - Default: `0.015` (lowered for better sensitivity)
   - Calibrated: `ambientNoise * multiplier` (typically 2.5x)
   - Runtime adjustable with validation
@@ -86,7 +86,7 @@ private func calculateAverageEnergy(of signal: [Float]) -> Float {
 
 #### Android: WebRTC VAD (Production-Grade)
 - **Algorithm**: Google WebRTC GMM-based (Gaussian Mixture Model) VAD
-- **Library**: `android-vad` (com.konovalov.vad.webrtc) 
+- **Library**: `android-vad` (com.konovalov.vad.webrtc)
 - **Mode**: `AGGRESSIVE` (default for best speech detection)
 - **Frame Support**: Dynamic based on sample rate (10ms, 20ms, 30ms windows)
 - **Sample Rates**: 8kHz, 16kHz, 32kHz, 48kHz
@@ -175,12 +175,12 @@ private fun updateSpeechState(isSpeech: Boolean) {
 // Exact iOS RMS calculation implementation
 private fun calculateAverageEnergy(signal: FloatArray): Float {
     if (signal.isEmpty()) return 0.0f
-    
+
     var sum = 0.0f
     for (sample in signal) {
         sum += sample * sample
     }
-    
+
     return sqrt(sum / signal.size)  // Equivalent to iOS vDSP_rmsqv
 }
 
@@ -189,7 +189,7 @@ private fun updateSpeechState(hasVoice: Boolean, energy: Float) {
     if (hasVoice) {
         consecutiveVoiceFrames++
         consecutiveSilentFrames = 0
-        
+
         if (!isCurrentlySpeaking && consecutiveVoiceFrames >= voiceStartThreshold) {
             isCurrentlySpeaking = true
             onSpeechActivity?.invoke(SpeechActivityEvent.STARTED)
@@ -197,7 +197,7 @@ private fun updateSpeechState(hasVoice: Boolean, energy: Float) {
     } else {
         consecutiveSilentFrames++
         consecutiveVoiceFrames = 0
-        
+
         if (isCurrentlySpeaking && consecutiveSilentFrames >= voiceEndThreshold) {
             isCurrentlySpeaking = false
             onSpeechActivity?.invoke(SpeechActivityEvent.ENDED)
@@ -222,7 +222,7 @@ public struct VADConfiguration {
     public let energyThreshold: Float = 0.015       // Base threshold
     public let enableAutoCalibration: Bool = false  // Auto-calibration toggle
     public let calibrationMultiplier: Float = 2.0   // Multiplier for calibrated threshold
-    
+
     // Validation with guidance
     public func validate() throws {
         guard energyThreshold >= 0 && energyThreshold <= 1.0 else {
@@ -285,7 +285,7 @@ class SimpleEnergyVAD {
     // Exact iOS hysteresis values
     private val voiceStartThreshold = 2   // iOS value
     private val voiceEndThreshold = 10    // iOS value
-    
+
     // iOS-compatible threshold management
     override var energyThreshold: Float
         get() = vadConfig.energyThreshold
@@ -379,10 +379,10 @@ fun detectSpeechSegments(
     var isInSpeech = false
     var silenceFrames = 0
     val silenceFramesThreshold = 10  // iOS voiceEndThreshold value
-    
+
     audioStream.collect { audioSamples ->
         val output = processAudioChunk(audioSamples)
-        
+
         when {
             output.isSpeechDetected && !isInSpeech -> {
                 isInSpeech = true
@@ -400,7 +400,7 @@ fun detectSpeechSegments(
                 silenceFrames = 0
             }
         }
-        
+
         emit(output)
     }
 }
@@ -641,8 +641,8 @@ public func notifyTTSDidFinish() {
 
 ### 1. Auto-Calibration Implementation for Kotlin
 
-**Priority**: High  
-**Target Platforms**: JVM/Common SimpleEnergyVAD  
+**Priority**: High
+**Target Platforms**: JVM/Common SimpleEnergyVAD
 **Estimated Effort**: 2-3 days
 
 #### Implementation Tasks:
@@ -664,7 +664,7 @@ class SimpleEnergyVAD {
     private var isCalibrating = false
     private var calibrationSamples = mutableListOf<Float>()
     private var ambientNoiseLevel: Float = 0.0f
-    
+
     suspend fun startCalibration() {
         // Port iOS calibration logic
         // Collect samples for calibrationDurationSeconds
@@ -678,10 +678,10 @@ class SimpleEnergyVAD {
 ```kotlin
 private fun completeCalibration() {
     val sortedSamples = calibrationSamples.sorted()
-    val percentile90 = sortedSamples[min(sortedSamples.size - 1, 
+    val percentile90 = sortedSamples[min(sortedSamples.size - 1,
                       (sortedSamples.size * 0.90).toInt())]
     ambientNoiseLevel = percentile90
-    
+
     val calculatedThreshold = ambientNoiseLevel * calibrationMultiplier
     energyThreshold = max(calculatedThreshold, 0.006f)
         .coerceAtMost(0.020f)
@@ -690,8 +690,8 @@ private fun completeCalibration() {
 
 ### 2. TTS Feedback Prevention for Kotlin
 
-**Priority**: High  
-**Target Platforms**: All platforms  
+**Priority**: High
+**Target Platforms**: All platforms
 **Estimated Effort**: 3-4 days
 
 #### Implementation Tasks:
@@ -700,7 +700,7 @@ private fun completeCalibration() {
 ```kotlin
 interface VADService {
     // Existing methods...
-    
+
     // TTS feedback prevention
     fun notifyTTSWillStart()
     fun notifyTTSDidFinish()
@@ -714,13 +714,13 @@ class SimpleEnergyVAD {
     private var isTTSActive = false
     private var baseEnergyThreshold: Float = 0.022f
     private var ttsThresholdMultiplier: Float = 3.0f
-    
+
     override fun notifyTTSWillStart() {
         isTTSActive = true
         baseEnergyThreshold = energyThreshold
         energyThreshold = energyThreshold * ttsThresholdMultiplier
     }
-    
+
     override fun notifyTTSDidFinish() {
         isTTSActive = false
         energyThreshold = baseEnergyThreshold
@@ -740,8 +740,8 @@ class WebRTCVADService {
 
 ### 3. Debug Statistics Implementation
 
-**Priority**: Medium  
-**Target Platforms**: All platforms  
+**Priority**: Medium
+**Target Platforms**: All platforms
 **Estimated Effort**: 1-2 days
 
 #### Implementation Tasks:
@@ -768,7 +768,7 @@ class SimpleEnergyVAD {
     private val recentEnergyValues = mutableListOf<Float>()
     private val maxRecentValues = 50
     private var frameCount = 0L
-    
+
     private fun updateStatistics(energy: Float) {
         recentEnergyValues.add(energy)
         if (recentEnergyValues.size > maxRecentValues) {
@@ -776,7 +776,7 @@ class SimpleEnergyVAD {
         }
         frameCount++
     }
-    
+
     override fun getStatistics(): VADStatistics {
         return VADStatistics(
             currentEnergy = recentEnergyValues.lastOrNull() ?: 0f,
@@ -792,8 +792,8 @@ class SimpleEnergyVAD {
 
 ### 4. Enhanced Pause/Resume Implementation
 
-**Priority**: Low  
-**Target Platforms**: All platforms  
+**Priority**: Low
+**Target Platforms**: All platforms
 **Estimated Effort**: 1 day
 
 #### Implementation Tasks:
@@ -874,7 +874,7 @@ override fun pause() {
 ### Cross-Platform Considerations (🎯 Strategic Focus)
 1. **Achieve feature parity** between iOS and Kotlin implementations
 2. **Standardize testing methodology** across platforms
-3. **Create unified performance benchmarks** 
+3. **Create unified performance benchmarks**
 4. **Implement consistent logging and debugging** across platforms
 5. **Plan for** ML-based VAD integration as future enhancement
 

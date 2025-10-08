@@ -116,7 +116,7 @@ class NetworkIntegrationTest {
         // Assert
         assertSame(circuitBreaker1, circuitBreaker1Again) // Should reuse existing instance
         assertNotSame(circuitBreaker1, circuitBreaker2) // Should be different instances
-        
+
         val allStatuses = CircuitBreakerRegistry.getAllStatuses()
         assertTrue(allStatuses.containsKey("service1"))
         assertTrue(allStatuses.containsKey("service2"))
@@ -133,7 +133,7 @@ class NetworkIntegrationTest {
             )
         }
 
-        // Test missing base URL for production  
+        // Test missing base URL for production
         assertFailsWith<IllegalArgumentException> {
             NetworkServiceFactory.create(
                 environment = SDKEnvironment.PRODUCTION,

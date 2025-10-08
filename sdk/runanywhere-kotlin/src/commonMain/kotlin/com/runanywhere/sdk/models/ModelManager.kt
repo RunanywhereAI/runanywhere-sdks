@@ -43,7 +43,7 @@ class ModelManager(
         }
 
         logger.info("⬇️ Model not found locally, downloading: ${modelInfo.id}")
-        
+
         // Emit download started event
         EventBus.publish(SDKModelEvent.DownloadStarted(modelInfo.id))
 
@@ -52,13 +52,13 @@ class ModelManager(
             val downloadedPath = downloadService.downloadModel(modelInfo) { progress ->
                 // Emit progress events
                 EventBus.publish(SDKModelEvent.DownloadProgress(
-                    modelInfo.id, 
+                    modelInfo.id,
                     progress.percentage
                 ))
             }
 
             logger.info("✅ Model downloaded successfully: ${modelInfo.id} -> $downloadedPath")
-            
+
             // Verify model integrity if checksums are available
             logger.info("🔍 Verifying model integrity: ${modelInfo.id}")
             when (val verificationResult = integrityVerifier.verifyModel(modelInfo, downloadedPath)) {
@@ -76,10 +76,10 @@ class ModelManager(
                     // Continue anyway but log the warning
                 }
             }
-            
+
             // Emit download completed event
             EventBus.publish(SDKModelEvent.DownloadCompleted(modelInfo.id))
-            
+
             return@withContext downloadedPath
 
         } catch (e: Exception) {
@@ -102,7 +102,7 @@ class ModelManager(
      */
     private fun getModelPath(modelInfo: ModelInfo): String {
         val modelsDir = "${fileSystem.getDataDirectory()}/models"
-        
+
         // Use framework-specific folder if available
         val frameworkDir = if (modelInfo.preferredFramework != null) {
             "$modelsDir/${modelInfo.preferredFramework!!.name.lowercase()}"
@@ -111,7 +111,7 @@ class ModelManager(
         } else {
             modelsDir
         }
-        
+
         val fileName = "${modelInfo.id}.${modelInfo.format.name.lowercase()}"
         return "$frameworkDir/$modelInfo.id/$fileName"
     }
@@ -129,7 +129,7 @@ class ModelManager(
             "$modelsDir/llamacpp/$modelId/$modelId.gguf",
             "$modelsDir/whisperkit/$modelId/$modelId.bin"
         )
-        
+
         return commonPaths.any { fileSystem.existsSync(it) }
     }
 
@@ -138,7 +138,7 @@ class ModelManager(
      */
     suspend fun deleteModel(modelId: String) = withContext(Dispatchers.IO) {
         logger.info("🗑️ Deleting model: $modelId")
-        
+
         try {
             // Look for the model in common locations and delete
             val modelsDir = "${fileSystem.getDataDirectory()}/models"
@@ -147,7 +147,7 @@ class ModelManager(
                 "$modelsDir/llamacpp/$modelId",
                 "$modelsDir/whisperkit/$modelId"
             )
-            
+
             var deletedAny = false
             for (dir in possibleDirs) {
                 if (fileSystem.exists(dir)) {
@@ -156,13 +156,13 @@ class ModelManager(
                     logger.info("✅ Deleted model directory: $dir")
                 }
             }
-            
+
             if (deletedAny) {
                 EventBus.publish(SDKModelEvent.DeleteCompleted(modelId))
             } else {
                 logger.warn("⚠️ No model files found to delete for: $modelId")
             }
-            
+
         } catch (e: Exception) {
             logger.error("❌ Failed to delete model: $modelId", e)
             EventBus.publish(SDKModelEvent.DeleteFailed(modelId, e))
@@ -187,7 +187,7 @@ class ModelManager(
      */
     suspend fun clearAllModels() = withContext(Dispatchers.IO) {
         logger.info("🗑️ Clearing all models")
-        
+
         try {
             val modelsDir = "${fileSystem.getDataDirectory()}/models"
             if (fileSystem.exists(modelsDir)) {

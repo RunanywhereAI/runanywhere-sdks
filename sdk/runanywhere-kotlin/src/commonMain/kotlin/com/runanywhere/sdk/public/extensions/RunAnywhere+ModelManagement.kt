@@ -210,7 +210,7 @@ suspend fun addModelFromURL(
 
         // Publish success event
         EventBus.publish(SDKModelEvent.CustomModelRegistered(modelInfo.id, url))
-        
+
         logger.info("Successfully added custom model: ${modelInfo.name} (${modelInfo.id})")
         return@withContext modelInfo
 

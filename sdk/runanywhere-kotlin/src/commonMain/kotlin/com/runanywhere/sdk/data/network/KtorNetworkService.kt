@@ -117,7 +117,7 @@ class KtorNetworkService(
                     return response.readBytes()
                 } else {
                     val error = handleKtorHttpError(response, endpoint, method)
-                    
+
                     // Retry only on specific error conditions
                     if (shouldRetry(response.status.value, attempt)) {
                         lastException = error
@@ -129,12 +129,12 @@ class KtorNetworkService(
                             continue
                         }
                     }
-                    
+
                     throw error
                 }
             } catch (e: Exception) {
                 lastException = e
-                
+
                 if (!shouldRetryException(e, attempt)) {
                     logger.error("$method request failed: ${endpoint.url} - ${e.message}")
                     throw when (e) {
@@ -142,7 +142,7 @@ class KtorNetworkService(
                         else -> SDKError.NetworkError("$method request failed: ${e.message}")
                     }
                 }
-                
+
                 attempt++
                 if (attempt < maxRetryAttempts) {
                     val delayMs = calculateBackoffDelay(attempt)
@@ -157,7 +157,7 @@ class KtorNetworkService(
                 }
             }
         }
-        
+
         throw lastException ?: SDKError.NetworkError("Request failed after $maxRetryAttempts attempts")
     }
 
@@ -277,7 +277,7 @@ class KtorNetworkService(
      */
     private fun shouldRetry(statusCode: Int, attempt: Int): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
-        
+
         return when (statusCode) {
             408, 429 -> true  // Timeout, Rate limit
             in 500..599 -> true  // Server errors
@@ -290,7 +290,7 @@ class KtorNetworkService(
      */
     private fun shouldRetryException(exception: Exception, attempt: Int): Boolean {
         if (attempt >= maxRetryAttempts - 1) return false
-        
+
         return when (exception) {
             is SDKError.InvalidAPIKey -> false  // Don't retry auth errors
             is SDKError.NetworkError -> {

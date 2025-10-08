@@ -21,7 +21,7 @@ struct LlamaModel {
     bool loaded;
 
     LlamaModel(const std::string& path) : model(nullptr), ctx(nullptr), model_path(path), loaded(false) {}
-    
+
     ~LlamaModel() {
         if (ctx) {
             llama_free(ctx);
@@ -43,37 +43,37 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_LlamaCppService_00024Companion
 
     // Initialize llama.cpp backend
     llama_backend_init();
-    
+
     // Create a new model instance
     auto* wrapper = new LlamaModel(path);
 
     // Real llama.cpp model loading
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = 0; // CPU only for Android compatibility
-    
+
     wrapper->model = llama_load_model_from_file(path, model_params);
-    
+
     if (!wrapper->model) {
         LOGE("Failed to load model from: %s", path);
         delete wrapper;
         env->ReleaseStringUTFChars(modelPath, path);
         return 0;
     }
-    
+
     // Create context
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx = 2048;
     ctx_params.n_threads = 4;
-    
+
     wrapper->ctx = llama_new_context_with_model(wrapper->model, ctx_params);
-    
+
     if (!wrapper->ctx) {
         LOGE("Failed to create context for model: %s", path);
         delete wrapper;
         env->ReleaseStringUTFChars(modelPath, path);
         return 0;
     }
-    
+
     wrapper->loaded = true;
     env->ReleaseStringUTFChars(modelPath, path);
 
@@ -98,60 +98,60 @@ Java_com_runanywhere_runanywhereai_llm_frameworks_LlamaCppService_00024Companion
     try {
         // Tokenize the prompt
         std::vector<llama_token> tokens = llama_tokenize(wrapper->ctx, promptStr, true, true);
-        
+
         if (tokens.empty()) {
             env->ReleaseStringUTFChars(prompt, promptStr);
             return env->NewStringUTF("Error: Failed to tokenize prompt");
         }
-        
+
         // Clear previous state
         llama_kv_cache_clear(wrapper->ctx);
-        
+
         // Evaluate the prompt
         int n_eval = tokens.size();
         if (llama_decode(wrapper->ctx, llama_batch_get_one(tokens.data(), n_eval, 0, 0))) {
             env->ReleaseStringUTFChars(prompt, promptStr);
             return env->NewStringUTF("Error: Failed to evaluate prompt");
         }
-        
+
         // Generate tokens
         std::string result;
         int n_generated = 0;
-        
+
         for (int i = 0; i < maxTokens && n_generated < maxTokens; ++i) {
             // Sample next token
             llama_token new_token = llama_sample_token_greedy(wrapper->ctx, nullptr);
-            
+
             // Check for end of sequence
             if (llama_token_is_eog(wrapper->model, new_token)) {
                 break;
             }
-            
+
             // Decode token to text
             char piece[256];
             int n = llama_token_to_piece(wrapper->model, new_token, piece, sizeof(piece), true);
             if (n > 0) {
                 result.append(piece, n);
             }
-            
+
             // Add token to context for next iteration
             if (llama_decode(wrapper->ctx, llama_batch_get_one(&new_token, 1, tokens.size() + i, 0))) {
                 LOGE("Failed to decode token at position %d", i);
                 break;
             }
-            
+
             n_generated++;
         }
-        
+
         env->ReleaseStringUTFChars(prompt, promptStr);
-        
+
         if (result.empty()) {
             return env->NewStringUTF("Generated text (empty result)");
         }
-        
+
         LOGI("Generated %d tokens, result length: %zu", n_generated, result.length());
         return env->NewStringUTF(result.c_str());
-        
+
     } catch (const std::exception& e) {
         LOGE("Exception during generation: %s", e.what());
         env->ReleaseStringUTFChars(prompt, promptStr);

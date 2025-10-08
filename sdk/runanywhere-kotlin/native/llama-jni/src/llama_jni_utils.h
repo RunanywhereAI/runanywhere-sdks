@@ -30,7 +30,7 @@ jobjectArray vector_to_jstring_array(JNIEnv* env, const std::vector<std::string>
 /**
  * Create Java object from model info
  */
-jobject create_model_info_object(JNIEnv* env, const std::string& name, 
+jobject create_model_info_object(JNIEnv* env, const std::string& name,
                                  const std::string& type, long parameter_count,
                                  const std::string& quantization, long file_size,
                                  int context_length, int embedding_size,

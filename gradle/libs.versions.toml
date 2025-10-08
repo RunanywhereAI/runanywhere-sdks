@@ -1,6 +1,6 @@
 [versions]
 # Android & Kotlin
-agp = "8.7.3"
+agp = "8.11.2"
 kotlin = "2.1.0"
 
 # AndroidX Core

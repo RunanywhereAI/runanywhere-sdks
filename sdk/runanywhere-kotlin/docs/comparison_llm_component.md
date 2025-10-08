@@ -70,7 +70,7 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper> {
     private var conversationContext: Context?
     private var isModelLoaded = false
     private var modelPath: String?
-    
+
     public override func createService() async throws -> LLMServiceWrapper {
         // Provider resolution through ModuleRegistry
         let provider = await MainActor.run {
@@ -145,7 +145,7 @@ interface LLMServiceProvider {
 ```swift
 public class LLMSwiftService: LLMService {
     private var llm: LLM?  // LLM.swift framework instance
-    
+
     public func initialize(modelPath: String?) async throws {
         self.llm = LLM(
             from: URL(fileURLWithPath: modelPath),
@@ -154,7 +154,7 @@ public class LLMSwiftService: LLMService {
             maxTokenCount: Int32(maxTokens)
         )
     }
-    
+
     public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         let response = try await withThrowingTaskGroup(of: String.self) { group in
             group.addTask {
@@ -180,11 +180,11 @@ expect class LlamaCppService() {
 // JVM actual implementation
 actual class LlamaCppService {
     private var llamaContext: Long = 0L
-    
+
     actual suspend fun initialize(modelPath: String) {
         llamaContext = llamaCppInitialize(modelPath) // JNI call
     }
-    
+
     actual suspend fun generate(prompt: String, options: GenerationOptions): GenerationResult {
         return performJvmGeneration(prompt, options) // Native implementation
     }
@@ -224,7 +224,7 @@ fun streamGenerate(
     systemPrompt: String? = null
 ): Flow<String> = flow {
     val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
-    
+
     // Mock streaming - collect from provider flow and emit to callback
     service.streamGenerate(fullPrompt, options) { token ->
         // Emit via Flow
@@ -266,13 +266,13 @@ data class RunAnywhereGenerationOptions(
 ```swift
 private func downloadModel(modelId: String) async throws {
     eventBus.publish(ComponentInitializationEvent.componentDownloadRequired(...))
-    
+
     for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
         modelLoadProgress = progress
         eventBus.publish(ComponentInitializationEvent.componentDownloadProgress(...))
         try await Task.sleep(nanoseconds: 100_000_000)
     }
-    
+
     eventBus.publish(ComponentInitializationEvent.componentDownloadCompleted(...))
 }
 ```
@@ -281,13 +281,13 @@ private func downloadModel(modelId: String) async throws {
 ```kotlin
 private suspend fun downloadModel(modelId: String) {
     EventBus.publish(ComponentInitializationEvent.ComponentDownloadStarted(...))
-    
+
     for (i in 0..10) {
         val progress = i / 10.0
         EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(...))
         kotlinx.coroutines.delay(100) // Mock delay
     }
-    
+
     EventBus.publish(ComponentInitializationEvent.ComponentDownloadCompleted(...))
 }
 ```
@@ -370,11 +370,11 @@ val llmService = try await provider.createLLMService(configuration: llmConfigura
    // JVM actual
    actual class LlamaCppService : LLMService {
        private var llamaContext: Long = 0L
-       
+
        actual suspend fun initialize(modelPath: String?) {
            llamaContext = LlamaCppJNI.initialize(modelPath)
        }
-       
+
        actual suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String {
            return LlamaCppJNI.generate(llamaContext, prompt, options)
        }
@@ -401,10 +401,10 @@ class LLMComponentTest {
     fun `should create real service when provider registered`() = runTest {
         // Register real provider
         ModuleRegistry.registerLLM(LlamaCppProvider())
-        
+
         val component = LLMComponent(LLMConfiguration(modelId = "llama-7b"))
         component.initialize()
-        
+
         val service = component.getService()
         assertNotNull(service)
         assertTrue(service is LlamaCppService)
@@ -419,9 +419,9 @@ class LLMIntegrationTest {
     fun `should generate text with real llama.cpp`() = runTest {
         val component = LLMComponent(LLMConfiguration(modelId = "test-model.gguf"))
         component.initialize()
-        
+
         val output = component.generate("Hello, world!")
-        
+
         assertNotNull(output.text)
         assertTrue(output.tokenUsage.totalTokens > 0)
         assertEquals(FinishReason.COMPLETED, output.finishReason)

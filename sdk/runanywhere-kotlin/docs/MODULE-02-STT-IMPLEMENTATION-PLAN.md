@@ -1,15 +1,15 @@
 # Module 2: STT Component Implementation Plan
-**Priority**: 🔴 CRITICAL  
-**Estimated Timeline**: 5-7 days  
-**Dependencies**: None (can run parallel with LLM module)  
-**Team Assignment**: 1 Senior Developer with Audio/JNI experience  
+**Priority**: 🔴 CRITICAL
+**Estimated Timeline**: 5-7 days
+**Dependencies**: None (can run parallel with LLM module)
+**Team Assignment**: 1 Senior Developer with Audio/JNI experience
 
 ## Executive Summary
 
 The STT component has complete architecture but lacks Whisper engine integration. While interfaces are production-ready and perfectly aligned with iOS, all transcription methods return placeholder text. This module focuses on implementing WhisperKit integration with native whisper.cpp bindings.
 
-**Current Status**: Architecture 100% complete, Whisper integration 0% complete  
-**Target**: Production STT with real-time transcription and streaming support  
+**Current Status**: Architecture 100% complete, Whisper integration 0% complete
+**Target**: Production STT with real-time transcription and streaming support
 
 ---
 
@@ -48,8 +48,8 @@ override suspend fun transcribe(audioData: FloatArray): TranscriptionResult {
 ---
 
 ## Phase 1: Whisper JNI Foundation (Day 1-2)
-**Duration**: 1.5-2 days  
-**Priority**: CRITICAL  
+**Duration**: 1.5-2 days
+**Priority**: CRITICAL
 
 ### Task 1.1: Native Whisper Integration Setup
 **Location**: `native/whisper-jni/`
@@ -66,69 +66,69 @@ extern "C" {
     JNIEXPORT jlong JNICALL
     Java_com_runanywhere_sdk_whisper_WhisperJNI_initContext(JNIEnv *env, jobject thiz, jstring model_path) {
         const char *path = env->GetStringUTFChars(model_path, nullptr);
-        
+
         struct whisper_context_params cparams = whisper_context_default_params();
         struct whisper_context *ctx = whisper_init_from_file_with_params(path, cparams);
-        
+
         env->ReleaseStringUTFChars(model_path, path);
         return reinterpret_cast<jlong>(ctx);
     }
-    
+
     JNIEXPORT jobject JNICALL
     Java_com_runanywhere_sdk_whisper_WhisperJNI_transcribe(JNIEnv *env, jobject thiz,
                                                            jlong ctx_ptr, jfloatArray audio_data) {
         struct whisper_context *ctx = reinterpret_cast<struct whisper_context*>(ctx_ptr);
-        
+
         jsize length = env->GetArrayLength(audio_data);
         jfloat *audio = env->GetFloatArrayElements(audio_data, nullptr);
-        
+
         // Whisper transcription
         struct whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
         wparams.language = "en";
         wparams.translate = false;
         wparams.print_progress = false;
         wparams.print_timestamps = true;
-        
+
         int result = whisper_full(ctx, wparams, audio, length);
-        
+
         if (result != 0) {
             env->ReleaseFloatArrayElements(audio_data, audio, JNI_ABORT);
             return nullptr;
         }
-        
+
         // Extract results
         const int n_segments = whisper_full_n_segments(ctx);
         std::string full_text;
-        
+
         // Create Java result object
         jclass resultClass = env->FindClass("com/runanywhere/sdk/whisper/WhisperResult");
         jmethodID constructor = env->GetMethodID(resultClass, "<init>", "(Ljava/lang/String;F[Lcom/runanywhere/sdk/whisper/WhisperSegment;)V");
-        
+
         // Build segments array
         jclass segmentClass = env->FindClass("com/runanywhere/sdk/whisper/WhisperSegment");
         jobjectArray segments = env->NewObjectArray(n_segments, segmentClass, nullptr);
-        
+
         for (int i = 0; i < n_segments; ++i) {
             const char *text = whisper_full_get_segment_text(ctx, i);
             const int64_t t0 = whisper_full_get_segment_t0(ctx, i);
             const int64_t t1 = whisper_full_get_segment_t1(ctx, i);
-            
+
             full_text += text;
-            
+
             // Create segment object
             jstring segmentText = env->NewStringUTF(text);
             jmethodID segmentConstructor = env->GetMethodID(segmentClass, "<init>", "(Ljava/lang/String;JJ)V");
             jobject segment = env->NewObject(segmentClass, segmentConstructor, segmentText, t0, t1);
             env->SetObjectArrayElement(segments, i, segment);
         }
-        
+
         jstring transcriptText = env->NewStringUTF(full_text.c_str());
         jobject result_obj = env->NewObject(resultClass, constructor, transcriptText, 0.95f, segments);
-        
+
         env->ReleaseFloatArrayElements(audio_data, audio, JNI_ABORT);
         return result_obj;
     }
-    
+
     JNIEXPORT void JNICALL
     Java_com_runanywhere_sdk_whisper_WhisperJNI_freeContext(JNIEnv *env, jobject thiz, jlong ctx_ptr) {
         struct whisper_context *ctx = reinterpret_cast<struct whisper_context*>(ctx_ptr);
@@ -146,7 +146,7 @@ object WhisperJNI {
     external fun initContext(modelPath: String): Long
     external fun transcribe(contextPtr: Long, audioData: FloatArray): WhisperResult?
     external fun freeContext(contextPtr: Long)
-    
+
     init {
         System.loadLibrary("whisper-jni")
     }
@@ -176,10 +176,10 @@ plugins {
 
 android {
     compileSdk = 34
-    
+
     defaultConfig {
         minSdk = 24
-        
+
         externalNativeBuild {
             cmake {
                 cppFlags("-std=c++17")
@@ -187,14 +187,14 @@ android {
             }
         }
     }
-    
+
     externalNativeBuild {
         cmake {
             path("src/main/cpp/CMakeLists.txt")
             version = "3.22.1"
         }
     }
-    
+
     sourceSets {
         getByName("main") {
             jniLibs.srcDirs("src/main/jniLibs")
@@ -212,8 +212,8 @@ android {
 ---
 
 ## Phase 2: Service Implementation (Day 2-4)
-**Duration**: 2-3 days  
-**Priority**: CRITICAL  
+**Duration**: 2-3 days
+**Priority**: CRITICAL
 
 ### Task 2.1: WhisperSTTService Implementation
 **Files**: `modules/runanywhere-whisperkit/src/androidMain/kotlin/AndroidWhisperKitService.kt`
@@ -222,37 +222,37 @@ android {
 class AndroidWhisperKitService(private val modelPath: String) : STTService {
     private var whisperContext: Long = 0L
     private var isInitialized = false
-    
+
     override suspend fun initialize(): Boolean = withContext(Dispatchers.IO) {
         try {
             whisperContext = WhisperJNI.initContext(modelPath)
             isInitialized = whisperContext != 0L
-            
+
             if (isInitialized) {
                 logger.info("Whisper STT Service initialized successfully with model: $modelPath")
             } else {
                 logger.error("Failed to initialize Whisper context")
             }
-            
+
             isInitialized
         } catch (e: Exception) {
             logger.error("Exception during Whisper initialization", e)
             false
         }
     }
-    
-    override suspend fun transcribe(audioData: FloatArray): TranscriptionResult = 
+
+    override suspend fun transcribe(audioData: FloatArray): TranscriptionResult =
         withContext(Dispatchers.IO) {
             if (!isInitialized) {
                 throw IllegalStateException("Whisper STT Service not initialized")
             }
-            
+
             val startTime = System.currentTimeMillis()
             val whisperResult = WhisperJNI.transcribe(whisperContext, audioData)
                 ?: throw RuntimeException("Whisper transcription failed")
-            
+
             val endTime = System.currentTimeMillis()
-            
+
             TranscriptionResult(
                 transcript = whisperResult.transcript.trim(),
                 confidence = whisperResult.confidence,
@@ -268,31 +268,31 @@ class AndroidWhisperKitService(private val modelPath: String) : STTService {
                 }
             )
         }
-    
-    override suspend fun transcribeWithTimestamps(audioData: FloatArray): List<TimestampInfo> = 
+
+    override suspend fun transcribeWithTimestamps(audioData: FloatArray): List<TimestampInfo> =
         withContext(Dispatchers.IO) {
             val result = transcribe(audioData)
             result.segments
         }
-    
-    override suspend fun detectLanguage(audioData: FloatArray): Map<String, Float> = 
+
+    override suspend fun detectLanguage(audioData: FloatArray): Map<String, Float> =
         withContext(Dispatchers.IO) {
             // For now, return English with high confidence
             // TODO: Implement actual language detection using Whisper
             mapOf("en" to 0.9f)
         }
-    
+
     override suspend fun transcribeStream(
         audioStream: Flow<FloatArray>,
         onPartial: (String) -> Unit
     ): Flow<String> = flow {
         var accumulatedText = ""
-        
+
         audioStream.collect { audioChunk ->
             try {
                 val result = transcribe(audioChunk)
                 val newText = result.transcript
-                
+
                 if (newText.isNotEmpty() && newText != accumulatedText) {
                     accumulatedText = newText
                     onPartial(newText)
@@ -304,7 +304,7 @@ class AndroidWhisperKitService(private val modelPath: String) : STTService {
             }
         }
     }.flowOn(Dispatchers.IO)
-    
+
     override fun cleanup() {
         if (isInitialized) {
             WhisperJNI.freeContext(whisperContext)
@@ -313,10 +313,10 @@ class AndroidWhisperKitService(private val modelPath: String) : STTService {
             logger.info("Whisper STT Service cleaned up")
         }
     }
-    
+
     override val isReady: Boolean get() = isInitialized
     override val currentModel: String? get() = if (isInitialized) modelPath else null
-    
+
     private fun detectLanguage(text: String): String {
         // Simple language detection based on text characteristics
         // TODO: Use Whisper's built-in language detection
@@ -332,7 +332,7 @@ class AndroidWhisperKitService(private val modelPath: String) : STTService {
 class JvmWhisperKitService(private val modelPath: String) : STTService {
     // Similar implementation to Android version
     // Same JNI bindings work for JVM platforms
-    
+
     companion object {
         init {
             // Load platform-specific native library
@@ -362,7 +362,7 @@ class JvmWhisperKitService(private val modelPath: String) : STTService {
 class WhisperKitProvider : STTServiceProvider {
     override suspend fun createSTTService(configuration: STTConfiguration): STTService {
         val modelPath = resolveModelPath(configuration.modelId)
-        
+
         return when {
             isAndroid() -> AndroidWhisperKitService(modelPath)
             isJvm() -> JvmWhisperKitService(modelPath)
@@ -373,17 +373,17 @@ class WhisperKitProvider : STTServiceProvider {
             }
         }
     }
-    
+
     override fun canHandle(modelId: String?): Boolean {
-        return modelId?.let { 
-            it.startsWith("whisper") || 
+        return modelId?.let {
+            it.startsWith("whisper") ||
             it.contains("whisper") ||
             it.endsWith(".bin")
         } ?: true
     }
-    
+
     override val name: String = "WhisperKit Provider"
-    
+
     private fun resolveModelPath(modelId: String?): String {
         return when (modelId) {
             "whisper-base" -> "models/whisper-base.bin"
@@ -393,10 +393,10 @@ class WhisperKitProvider : STTServiceProvider {
             else -> "models/whisper-base.bin" // Default fallback
         }
     }
-    
-    private fun isAndroid(): Boolean = 
+
+    private fun isAndroid(): Boolean =
         System.getProperty("java.vendor.url")?.contains("android") == true
-    
+
     private fun isJvm(): Boolean = !isAndroid()
 }
 ```
@@ -411,8 +411,8 @@ class WhisperKitProvider : STTServiceProvider {
 ---
 
 ## Phase 3: Model Management Integration (Day 4-5)
-**Duration**: 1-2 days  
-**Priority**: HIGH  
+**Duration**: 1-2 days
+**Priority**: HIGH
 
 ### Task 3.1: Whisper Model Download
 **Files**: `src/commonMain/kotlin/com/runanywhere/sdk/models/WhisperModelManager.kt`
@@ -423,31 +423,31 @@ class WhisperModelManager(
     private val fileManager: FileManager
 ) {
     private val baseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main"
-    
+
     private val modelUrls = mapOf(
         "whisper-base" to "$baseUrl/ggml-base.bin",
         "whisper-small" to "$baseUrl/ggml-small.bin",
         "whisper-medium" to "$baseUrl/ggml-medium.bin",
         "whisper-large" to "$baseUrl/ggml-large.bin"
     )
-    
+
     suspend fun downloadModel(modelId: String): Flow<DownloadProgress> = flow {
-        val url = modelUrls[modelId] 
+        val url = modelUrls[modelId]
             ?: throw IllegalArgumentException("Unknown Whisper model: $modelId")
-        
+
         val localPath = fileManager.getModelPath("$modelId.bin")
-        
+
         if (fileManager.exists(localPath)) {
             emit(DownloadProgress.Completed(modelId, localPath))
             return@flow
         }
-        
+
         emit(DownloadProgress.Started(modelId))
-        
+
         downloadService.downloadFile(url, localPath) { progress ->
             emit(DownloadProgress.InProgress(modelId, progress))
         }
-        
+
         if (fileManager.exists(localPath)) {
             if (validateWhisperModel(localPath)) {
                 emit(DownloadProgress.Completed(modelId, localPath))
@@ -459,7 +459,7 @@ class WhisperModelManager(
             emit(DownloadProgress.Failed(modelId, "Download failed"))
         }
     }
-    
+
     private suspend fun validateWhisperModel(modelPath: String): Boolean {
         return try {
             val context = WhisperJNI.initContext(modelPath)
@@ -486,13 +486,13 @@ object WhisperKitModule {
         ModuleRegistry.registerSTTProvider(WhisperKitProvider())
         logger.info("WhisperKit provider registered successfully")
     }
-    
+
     suspend fun ensureDefaultModel(): Boolean {
         val modelManager = WhisperModelManager(
             downloadService = ServiceContainer.shared.downloadService,
             fileManager = ServiceContainer.shared.fileManager
         )
-        
+
         return try {
             modelManager.downloadModel("whisper-base").collect { progress ->
                 when (progress) {
@@ -527,8 +527,8 @@ object WhisperKitModule {
 ---
 
 ## Phase 4: Advanced Features & Integration (Day 5-7)
-**Duration**: 2-3 days  
-**Priority**: MEDIUM  
+**Duration**: 2-3 days
+**Priority**: MEDIUM
 
 ### Task 4.1: Enhanced Streaming Implementation
 ```kotlin
@@ -542,21 +542,21 @@ class StreamingSTTService(
     ): Flow<STTStreamEvent> = flow {
         var audioBuffer = mutableListOf<Float>()
         var lastTranscript = ""
-        
+
         audioStream.collect { audioData ->
             val floatData = audioData.toFloatArray()
             val vadResult = vadService.processAudio(floatData)
-            
+
             when (vadResult.activityType) {
                 SpeechActivityType.SPEECH_START -> {
                     emit(STTStreamEvent.SpeechStarted)
                     audioBuffer.clear()
                     audioBuffer.addAll(floatData.toList())
                 }
-                
+
                 SpeechActivityType.SPEECH_ACTIVE -> {
                     audioBuffer.addAll(floatData.toList())
-                    
+
                     // Transcribe accumulated audio
                     if (audioBuffer.size > 16000) { // 1 second at 16kHz
                         val result = whisperService.transcribe(audioBuffer.toFloatArray())
@@ -566,7 +566,7 @@ class StreamingSTTService(
                         }
                     }
                 }
-                
+
                 SpeechActivityType.SPEECH_END -> {
                     if (audioBuffer.isNotEmpty()) {
                         val finalResult = whisperService.transcribe(audioBuffer.toFloatArray())
@@ -576,7 +576,7 @@ class StreamingSTTService(
                     }
                     emit(STTStreamEvent.SpeechEnded)
                 }
-                
+
                 else -> {
                     // Continue collecting audio during silence
                 }
@@ -594,24 +594,24 @@ class WhisperLanguageDetector(private val whisperService: WhisperSTTService) {
         // Use Whisper's language detection feature
         val supportedLanguages = listOf("en", "es", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh")
         val probabilities = mutableMapOf<String, Float>()
-        
+
         // For now, implement simple heuristic
         // TODO: Use Whisper's actual language detection API
         val transcript = whisperService.transcribe(audioData).transcript
-        
+
         supportedLanguages.forEach { lang ->
             probabilities[lang] = calculateLanguageProbability(transcript, lang)
         }
-        
+
         val detectedLanguage = probabilities.maxByOrNull { it.value }?.key ?: "en"
-        
+
         return LanguageDetectionResult(
             detectedLanguage = detectedLanguage,
             confidence = probabilities[detectedLanguage] ?: 0.5f,
             allProbabilities = probabilities
         )
     }
-    
+
     private fun calculateLanguageProbability(text: String, language: String): Float {
         // Simple heuristic-based language detection
         // TODO: Replace with actual Whisper language detection
@@ -631,17 +631,17 @@ class WhisperLanguageDetector(private val whisperService: WhisperSTTService) {
 class RunAnywhereApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        
+
         lifecycleScope.launch {
             // Register STT provider
             WhisperKitModule.register()
-            
+
             // Ensure default model is available
             val modelReady = WhisperKitModule.ensureDefaultModel()
             if (!modelReady) {
                 logger.warning("Default Whisper model not available")
             }
-            
+
             // Initialize SDK
             RunAnywhere.initialize(API_KEY, BASE_URL, SDKEnvironment.DEVELOPMENT)
         }
@@ -654,16 +654,16 @@ class VoiceAssistantViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val transcriptResult = RunAnywhere.transcribe(audioData)
-                
+
                 if (transcriptResult.isNotEmpty()) {
                     _uiState.value = _uiState.value.copy(
                         transcription = transcriptResult,
                         sessionState = VoiceSessionState.Processing
                     )
-                    
+
                     // Process with LLM
                     val response = RunAnywhere.generate(transcriptResult)
-                    
+
                     _uiState.value = _uiState.value.copy(
                         lastResponse = response,
                         sessionState = VoiceSessionState.Speaking

@@ -430,7 +430,7 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
     ): String {
         requireInitialized()
-        
+
         // Try to use GenerationService first (preferred approach)
         if (serviceContainer.generationService.isReady()) {
             val genOptions = com.runanywhere.sdk.generation.GenerationOptions(
@@ -438,29 +438,29 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                 maxTokens = options?.maxTokens ?: 2048,
                 streaming = false
             )
-            
+
             val result = serviceContainer.generationService.generate(prompt, genOptions)
             return result.text
         }
-        
+
         // Fallback: Get or create LLM component directly
-        var llmComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM) 
+        var llmComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM)
             as? com.runanywhere.sdk.components.llm.LLMComponent
-        
+
         if (llmComponent == null || !llmComponent.isReady) {
             // Try to find an available model from the registry
             val availableModels = serviceContainer.modelRegistry.discoverModels()
-            val llmModels = availableModels.filter { 
-                it.category == com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE 
+            val llmModels = availableModels.filter {
+                it.category == com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE
             }
-            
+
             if (llmModels.isEmpty()) {
                 throw SDKError.ComponentNotAvailable("No LLM models available. Please add a model using addModelFromURL() first.")
             }
-            
+
             // Use the first available LLM model
             val modelToUse = llmModels.first()
-            
+
             // Initialize LLM component with discovered model
             val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
                 modelId = modelToUse.id,
@@ -471,14 +471,14 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             llmComponent = com.runanywhere.sdk.components.llm.LLMComponent(llmConfig)
             llmComponent.initialize()
             serviceContainer.setComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM, llmComponent)
-            
+
             // Initialize GenerationService with this component
             serviceContainer.generationService.initializeWithLLMComponent(llmComponent)
         }
-        
+
         // Use provided options or create defaults
         val genOptions = options ?: com.runanywhere.sdk.models.RunAnywhereGenerationOptions.DEFAULT
-        
+
         // Generate using LLM component directly
         val result = llmComponent.generate(prompt, genOptions.systemPrompt)
         return result.text
@@ -492,7 +492,7 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
     ): Flow<String> = flow {
         requireInitialized()
-        
+
         // Try to use GenerationService for streaming (preferred approach)
         if (serviceContainer.generationService.isReady()) {
             val genOptions = com.runanywhere.sdk.generation.GenerationOptions(
@@ -500,31 +500,31 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                 maxTokens = options?.maxTokens ?: 2048,
                 streaming = true
             )
-            
+
             serviceContainer.generationService.streamGenerate(prompt, genOptions).collect { chunk ->
                 emit(chunk.text)
             }
             return@flow
         }
-        
+
         // Fallback: Get or initialize LLM component directly
-        var llmComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM) 
+        var llmComponent = serviceContainer.getComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM)
             as? com.runanywhere.sdk.components.llm.LLMComponent
-        
+
         if (llmComponent == null || !llmComponent.isReady) {
             // Try to find an available model from the registry
             val availableModels = serviceContainer.modelRegistry.discoverModels()
-            val llmModels = availableModels.filter { 
-                it.category == com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE 
+            val llmModels = availableModels.filter {
+                it.category == com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE
             }
-            
+
             if (llmModels.isEmpty()) {
                 throw SDKError.ComponentNotAvailable("No LLM models available. Please add a model using addModelFromURL() first.")
             }
-            
+
             // Use the first available LLM model
             val modelToUse = llmModels.first()
-            
+
             // Initialize LLM component with discovered model
             val llmConfig = com.runanywhere.sdk.components.llm.LLMConfiguration(
                 modelId = modelToUse.id,
@@ -535,14 +535,14 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             llmComponent = com.runanywhere.sdk.components.llm.LLMComponent(llmConfig)
             llmComponent.initialize()
             serviceContainer.setComponent(com.runanywhere.sdk.components.base.SDKComponent.LLM, llmComponent)
-            
+
             // Initialize GenerationService with this component
             serviceContainer.generationService.initializeWithLLMComponent(llmComponent)
         }
-        
+
         // Use provided options or create defaults
         val genOptions = options ?: com.runanywhere.sdk.models.RunAnywhereGenerationOptions.DEFAULT
-        
+
         // Stream using LLM component directly
         llmComponent.streamGenerate(prompt, genOptions.systemPrompt).collect { token ->
             emit(token)
@@ -558,14 +558,14 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
     ): T {
         requireInitialized()
-        
+
         // Simple iOS pattern:
         // 1. Create StructuredOutputHandler
         val handler = StructuredOutputHandler()
-        
+
         // 2. Get system prompt for type
         val systemPrompt = handler.getSystemPrompt(type)
-        
+
         // 3. Enhance options with structured output config
         val effectiveOptions = com.runanywhere.sdk.models.RunAnywhereGenerationOptions(
             maxTokens = options?.maxTokens ?: 1500,
@@ -577,13 +577,13 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             preferredExecutionTarget = options?.preferredExecutionTarget,
             systemPrompt = systemPrompt
         )
-        
+
         // 4. Build user prompt
         val userPrompt = handler.buildUserPrompt(type, prompt)
-        
+
         // 5. Call regular generate() method
         val generatedText = generate(userPrompt, effectiveOptions)
-        
+
         // 6. Parse result as T
         return handler.parseStructuredOutput(generatedText, type)
     }
@@ -854,7 +854,7 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             throw IllegalStateException("SDK not initialized. Call initialize() first")
         }
     }
-    
+
 }
 
 /**

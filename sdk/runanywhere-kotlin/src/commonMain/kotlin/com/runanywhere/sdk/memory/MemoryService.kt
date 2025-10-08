@@ -184,7 +184,7 @@ interface MemoryManager {
     fun setMemoryThreshold(threshold: Long)
     fun getLoadedModels(): List<LoadedModel>
     fun isHealthy(): Boolean
-    
+
     // Methods required by ModelLoadingService - EXACT copy of iOS MemoryManager
     suspend fun registerLoadedModel(modelId: String, size: Long, service: Any)
     suspend fun unregisterModel(modelId: String)

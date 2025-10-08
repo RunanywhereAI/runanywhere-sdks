@@ -69,7 +69,7 @@ class JvmSecureStorage private constructor(
          */
         private fun loadOrCreateKey(storageDir: File): SecretKey {
             val keyFile = File(storageDir, ".encryption_key")
-            
+
             return if (keyFile.exists()) {
                 try {
                     val keyBytes = keyFile.readBytes()
@@ -90,10 +90,10 @@ class JvmSecureStorage private constructor(
             val keyGenerator = KeyGenerator.getInstance("AES")
             keyGenerator.init(256) // 256-bit AES key
             val secretKey = keyGenerator.generateKey()
-            
+
             // Save key to file with restricted permissions
             keyFile.writeBytes(secretKey.encoded)
-            
+
             // Set file permissions to be readable only by owner (Unix-like systems)
             try {
                 val path = keyFile.toPath()
@@ -104,7 +104,7 @@ class JvmSecureStorage private constructor(
             } catch (e: Exception) {
                 // Ignore on Windows or if POSIX permissions are not supported
             }
-            
+
             return secretKey
         }
 
@@ -141,7 +141,7 @@ class JvmSecureStorage private constructor(
         try {
             val file = File(storageDir, "${key}.enc")
             if (!file.exists()) return@withContext null
-            
+
             val encryptedData = file.readBytes()
             val decryptedData = decrypt(encryptedData)
             val value = String(decryptedData)
@@ -169,7 +169,7 @@ class JvmSecureStorage private constructor(
         try {
             val file = File(storageDir, "${key}.bin.enc")
             if (!file.exists()) return@withContext null
-            
+
             val encryptedData = file.readBytes()
             val decryptedData = decrypt(encryptedData)
             logger.debug("Retrieved secure data for key: $key (${decryptedData.size} bytes)")
@@ -184,7 +184,7 @@ class JvmSecureStorage private constructor(
         try {
             val stringFile = File(storageDir, "${key}.enc")
             val dataFile = File(storageDir, "${key}.bin.enc")
-            
+
             var removed = false
             if (stringFile.exists()) {
                 stringFile.delete()
@@ -194,7 +194,7 @@ class JvmSecureStorage private constructor(
                 dataFile.delete()
                 removed = true
             }
-            
+
             if (removed) {
                 logger.debug("Removed secure data for key: $key")
             }
@@ -233,7 +233,7 @@ class JvmSecureStorage private constructor(
         try {
             storageDir.listFiles()
                 ?.filter { it.name.endsWith(".enc") }
-                ?.map { 
+                ?.map {
                     it.name.removeSuffix(".enc").removeSuffix(".bin")
                 }
                 ?.toSet() ?: emptySet()
@@ -263,13 +263,13 @@ class JvmSecureStorage private constructor(
         // Generate random IV
         val iv = ByteArray(ivLength)
         SecureRandom().nextBytes(iv)
-        
+
         // Initialize cipher for encryption
         cipher.init(Cipher.ENCRYPT_MODE, secretKey, GCMParameterSpec(gcmTagLength * 8, iv))
-        
+
         // Encrypt data
         val encryptedData = cipher.doFinal(data)
-        
+
         // Combine IV + encrypted data
         return iv + encryptedData
     }
@@ -281,10 +281,10 @@ class JvmSecureStorage private constructor(
         // Extract IV and encrypted data
         val iv = encryptedDataWithIv.sliceArray(0 until ivLength)
         val encryptedData = encryptedDataWithIv.sliceArray(ivLength until encryptedDataWithIv.size)
-        
+
         // Initialize cipher for decryption
         cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(gcmTagLength * 8, iv))
-        
+
         // Decrypt data
         return cipher.doFinal(encryptedData)
     }

@@ -98,32 +98,32 @@ class DefaultModelRegistry : ModelRegistry {
     override fun filterModels(criteria: ModelCriteria): List<ModelInfo> {
         return models.values.filter { model ->
             var matches = true
-            
+
             criteria.category?.let { category ->
                 matches = matches && model.category == category
             }
-            
+
             criteria.framework?.let { framework ->
-                matches = matches && (model.preferredFramework == framework || 
+                matches = matches && (model.preferredFramework == framework ||
                                     model.compatibleFrameworks.contains(framework))
             }
-            
+
             criteria.minMemoryRequired?.let { minMemory ->
                 matches = matches && (model.memoryRequired ?: 0L) >= minMemory
             }
-            
+
             criteria.maxMemoryRequired?.let { maxMemory ->
                 matches = matches && (model.memoryRequired ?: Long.MAX_VALUE) <= maxMemory
             }
-            
+
             criteria.format?.let { format ->
                 matches = matches && model.format.name.equals(format, ignoreCase = true)
             }
-            
+
             criteria.isDownloaded?.let { downloaded ->
                 matches = matches && (model.localPath != null) == downloaded
             }
-            
+
             matches
         }
     }

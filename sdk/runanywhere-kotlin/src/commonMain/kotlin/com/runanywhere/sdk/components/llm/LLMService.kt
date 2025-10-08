@@ -248,7 +248,7 @@ class LlamaCppServiceProvider : BaseLLMServiceProvider() {
 
     override fun validateModelCompatibility(model: ModelInfo): ModelCompatibilityResult {
         val warnings = mutableListOf<String>()
-        
+
         // Check if it's a supported format
         val isCompatible = when {
             model.format.toString().contains("GGUF", ignoreCase = true) -> true
@@ -258,15 +258,15 @@ class LlamaCppServiceProvider : BaseLLMServiceProvider() {
                 false
             }
         }
-        
+
         // Check memory requirements
         val memoryRequired = estimateMemoryRequirements(model)
         val availableMemory = getAvailableSystemMemory()
-        
+
         if (memoryRequired > availableMemory * 0.8) {
             warnings.add("Model may require more memory than available (${memoryRequired / 1024 / 1024}MB required)")
         }
-        
+
         return ModelCompatibilityResult(
             isCompatible = isCompatible,
             details = "Model ${model.name} compatibility check for llama.cpp framework",

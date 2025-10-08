@@ -43,7 +43,7 @@ class RunAnywhereApplication : Application() {
             // Initialize KMP SDK - lazy initialization should prevent JVM class loading
             RunAnywhere.initialize(
                 apiKey = "demo-api-key",
-                baseURL = "https://api.runanywhere.ai", 
+                baseURL = "https://api.runanywhere.ai",
                 environment = SDKEnvironment.DEVELOPMENT
             )
 
@@ -56,7 +56,7 @@ class RunAnywhereApplication : Application() {
 
             // Add a demo model from URL for development (matching iOS behavior)
             addDemoModel()
-            
+
             // Auto-load first available model (matching iOS behavior)
             autoLoadFirstModel()
 
@@ -125,7 +125,7 @@ class RunAnywhereApplication : Application() {
     private suspend fun addDemoModel() {
         try {
             Log.i("RunAnywhereApp", "🔗 Adding demo model from URL...")
-            
+
             // Add a demo model from a public URL for development
             // Using a small quantized GGUF model that works with llama.cpp
             val demoModelUrl = "https://huggingface.co/QuantFactory/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/TinyLlama-1.1B-Chat-v1.0.Q4_K_M.gguf"
@@ -134,9 +134,9 @@ class RunAnywhereApplication : Application() {
                 name = "TinyLlama-1.1B-Chat (Demo)",
                 type = "LLM"
             )
-            
+
             Log.i("RunAnywhereApp", "✅ Demo model added successfully: ${modelInfo.name} (${modelInfo.id})")
-            
+
         } catch (e: Exception) {
             Log.w("RunAnywhereApp", "⚠️ Failed to add demo model: ${e.message}")
             Log.i("RunAnywhereApp", "💡 App will continue without demo model")

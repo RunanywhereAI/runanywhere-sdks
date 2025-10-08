@@ -8,7 +8,7 @@ group = "com.runanywhere"
 version = "1.0.0"
 
 intellij {
-    version.set("2024.2")   // IC-2024.2 uses JDK 17
+    version.set("2024.1")   // Use 2024.1 to avoid compatibility warnings with plugin 1.x
     type.set("IC")
     plugins.set(listOf("java"))
 }
@@ -22,12 +22,17 @@ repositories {
 
 dependencies {
     // RunAnywhere KMP SDK (adjust version/coords if your repo uses a different name)
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0") {
+        // Exclude Kotlin stdlib to avoid conflicts with IntelliJ Platform's version
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-common")
+        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    }
 }
 
 tasks {
     patchPluginXml {
-        sinceBuild.set("242")
+        sinceBuild.set("241")
         untilBuild.set("251.*")
         changeNotes.set(
             """

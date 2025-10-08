@@ -20,7 +20,7 @@ class LlamaCppProvider : LLMServiceProvider {
 
     override fun canHandle(modelId: String?): Boolean {
         if (modelId == null) return false
-        
+
         // Handle GGUF/GGML models and llama-based models
         val modelIdLower = modelId.lowercase()
         return modelIdLower.contains("llama") ||
@@ -53,7 +53,7 @@ class LlamaCppProvider : LLMServiceProvider {
 
     override fun validateModelCompatibility(model: ModelInfo): ModelCompatibilityResult {
         val warnings = mutableListOf<String>()
-        
+
         // Check if it's a supported format
         val isCompatible = when {
             model.format.toString().contains("GGUF", ignoreCase = true) -> true
@@ -63,15 +63,15 @@ class LlamaCppProvider : LLMServiceProvider {
                 false
             }
         }
-        
+
         // Check memory requirements
         val memoryRequired = estimateMemoryRequirements(model)
         val availableMemory = getAvailableSystemMemory()
-        
+
         if (memoryRequired > availableMemory * 0.8) {
             warnings.add("Model may require more memory than available (${memoryRequired / 1024 / 1024}MB required)")
         }
-        
+
         return ModelCompatibilityResult(
             isCompatible = isCompatible,
             details = "Model ${model.name} compatibility check for llama.cpp framework",
@@ -100,7 +100,7 @@ class LlamaCppProvider : LLMServiceProvider {
 
     override fun getOptimalConfiguration(model: ModelInfo): HardwareConfiguration {
         val memoryMB = (estimateMemoryRequirements(model) / 1024 / 1024).toInt()
-        
+
         return HardwareConfiguration(
             preferGPU = true,
             minMemoryMB = memoryMB,

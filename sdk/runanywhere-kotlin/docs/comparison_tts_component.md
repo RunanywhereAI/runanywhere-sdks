@@ -431,7 +431,7 @@ public final class SystemTTSService {
     public var availableVoices: [String] {
         AVSpeechSynthesisVoice.speechVoices().map { $0.language }
     }
-    
+
     // Neural voice support
     public let useNeuralVoice: Bool
 }
@@ -694,7 +694,7 @@ class AndroidTTSService(
     private val context: Context
 ) : TTSService {
     private lateinit var textToSpeech: TextToSpeech
-    
+
     override suspend fun initialize() {
         // Initialize Android TextToSpeech engine
         textToSpeech = TextToSpeech(context) { status ->
@@ -703,7 +703,7 @@ class AndroidTTSService(
             }
         }
     }
-    
+
     override suspend fun synthesize(text: String, options: TTSOptions): ByteArray {
         // Implement Android TTS synthesis with audio capture
         return synthesizeToAudioFile(text, options)
@@ -749,7 +749,7 @@ data class PhonemeTimestamp(
 class AndroidTTSService(private val context: Context) : TTSService {
     private var textToSpeech: TextToSpeech? = null
     private val audioCapture = AudioCapture()
-    
+
     override suspend fun initialize() {
         // 1. Initialize TextToSpeech with callback
         // 2. Configure audio capture for raw audio
@@ -1034,7 +1034,7 @@ class AndroidSSMLProcessor {
 
 **Result**: Once Android implementation is complete, the Kotlin SDK will have:
 - ✅ Full iOS feature parity
-- ✅ Cross-platform consistency  
+- ✅ Cross-platform consistency
 - ✅ Production-ready TTS capabilities
 - ✅ Advanced features (SSML, streaming, voice styles)
 

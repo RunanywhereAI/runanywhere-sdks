@@ -532,10 +532,10 @@ class ServiceContainer {
             // Initialize LLM component only if a provider is registered
             if (ModuleRegistry.hasLLM) {
                 llmComponent.initialize()
-                
+
                 // Initialize GenerationService with LLM component
                 generationService.initializeWithLLMComponent(llmComponent)
-                
+
                 logger.info("✅ LLM component initialized")
             } else {
                 logger.info("ℹ️ LLM component skipped - no provider registered yet")
@@ -594,7 +594,7 @@ class ServiceContainer {
         //     logger.info("✅ LlamaCpp module registered")
         // } catch (e: Exception) {
         //     logger.warn("⚠️ LlamaCpp module registration failed: ${e.message}")
-        //     
+        //
         //     // Fallback: Try to register the provider directly
         //     try {
         //         val llamaCppProvider = com.runanywhere.sdk.llm.llamacpp.LlamaCppProvider()
@@ -616,35 +616,49 @@ class ServiceContainer {
      * This follows the iOS pattern where MockNetworkService provides the models
      */
     private suspend fun fetchAndPopulateModels() {
-        logger.info("🔄 Fetching models from MockNetworkService (like iOS)")
+        logger.info("🔄 Populating hardcoded mock models for development mode (avoiding network calls)")
 
         try {
-            // Initialize network service if not already done
-            if (!::networkService.isInitialized) {
-                networkService = NetworkServiceFactory.create(
-                    environment = SDKEnvironment.DEVELOPMENT,
-                    baseURL = null,
-                    apiKey = null
-                )
-            }
+            // Use hardcoded mock models instead of network calls to avoid any JSON/network issues
+            val models = listOf(
+                // Whisper Base - Real GGML model for JVM/Android
+                com.runanywhere.sdk.models.ModelInfo(
+                    id = "whisper-base",
+                    name = "Whisper Base",
+                    category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
+                    format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
+                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                    localPath = null,
+                    downloadSize = 74_000_000L, // ~74MB
+                    memoryRequired = 74_000_000L, // 74MB
+                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT),
+                    preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT,
+                    contextLength = 0,
+                    supportsThinking = false,
+                    createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
+                    updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now()
+                ),
 
-            // Fetch models from the network service (will return mock data in dev mode)
-            val modelsData = networkService.getRaw(
-                endpoint = APIEndpoint.models,
-                requiresAuth = false
+                // Whisper Tiny - Smaller model for faster testing
+                com.runanywhere.sdk.models.ModelInfo(
+                    id = "whisper-tiny",
+                    name = "Whisper Tiny",
+                    category = com.runanywhere.sdk.models.enums.ModelCategory.SPEECH_RECOGNITION,
+                    format = com.runanywhere.sdk.models.enums.ModelFormat.GGML,
+                    downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+                    localPath = null,
+                    downloadSize = 39_000_000L, // ~39MB
+                    memoryRequired = 39_000_000L, // 39MB
+                    compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT),
+                    preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_KIT,
+                    contextLength = 0,
+                    supportsThinking = false,
+                    createdAt = com.runanywhere.sdk.utils.SimpleInstant.now(),
+                    updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now()
+                )
             )
 
-            // Parse the response
-            val json = Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            }
-
-            val modelsJson = modelsData.decodeToString()
-            logger.info("📦 Received models JSON: ${modelsJson.take(200)}...")
-
-            val models = json.decodeFromString<List<com.runanywhere.sdk.models.ModelInfo>>(modelsJson)
-            logger.info("📦 Parsed ${models.size} models from MockNetworkService")
+            logger.info("📦 Using ${models.size} hardcoded mock models for development")
 
             // Save each model to the ModelInfoService
             for (model in models) {
@@ -661,11 +675,11 @@ class ServiceContainer {
             if (whisperBase != null) {
                 logger.info("✅ Whisper Base model verified: ${whisperBase.name} (${(whisperBase.downloadSize ?: 0) / 1_000_000}MB)")
             } else {
-                logger.error("❌ Whisper Base model not found after fetching from MockNetworkService!")
+                logger.error("❌ Whisper Base model not found after adding hardcoded models!")
             }
 
         } catch (e: Exception) {
-            logger.error("❌ Failed to fetch and populate models: ${e.message}", e)
+            logger.error("❌ Failed to populate hardcoded models: ${e.message}", e)
             e.printStackTrace()
         }
     }
@@ -674,7 +688,7 @@ class ServiceContainer {
      * Add a model from URL - demonstrates the complete model loading pipeline
      * This function shows how to:
      * 1. Add a model to the repository
-     * 2. Download it using the model manager  
+     * 2. Download it using the model manager
      * 3. Verify integrity
      * 4. Make it available for use
      */
@@ -689,7 +703,7 @@ class ServiceContainer {
         compatibleFrameworks: List<LLMFramework> = listOf(LLMFramework.LLAMACPP)
     ): ModelHandle {
         logger.info("🚀 Adding model from URL: $modelId")
-        
+
         // Step 1: Create ModelInfo with URL
         val modelInfo = ModelInfo(
             id = modelId,
@@ -702,21 +716,21 @@ class ServiceContainer {
             compatibleFrameworks = compatibleFrameworks,
             preferredFramework = compatibleFrameworks.firstOrNull()
         )
-        
+
         // Step 2: Save to model repository
         logger.info("💾 Saving model to repository: $modelId")
         modelInfoService.saveModel(modelInfo)
-        
+
         // Step 3: Ensure model is downloaded (this triggers the download if needed)
         logger.info("⬇️ Ensuring model is downloaded: $modelId")
         val localPath = modelManager.ensureModel(modelInfo)
-        
+
         // Step 4: Update model with local path
         val updatedModel = modelInfo.copy(localPath = localPath)
         modelInfoService.saveModel(updatedModel)
-        
+
         logger.info("✅ Model successfully added and downloaded: $modelId -> $localPath")
-        
+
         // Return handle for use
         return ModelHandle(modelId, localPath)
     }

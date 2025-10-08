@@ -4,7 +4,7 @@
 
 This document provides a comprehensive comparison of file management architectures between the RunAnywhere iOS SDK (Swift) and Kotlin Multiplatform SDK, analyzing patterns, abstractions, and implementation approaches.
 
-**Last Updated:** October 2025  
+**Last Updated:** October 2025
 **Implementation Status:** iOS SDK - Production Ready | Kotlin SDK - Active Development
 
 ## 1. File System Abstraction Patterns
@@ -107,7 +107,7 @@ actual class FileManager {
         actual val modelsDirectory: String = "${System.getProperty("user.home")}/.runanywhere/models"
         actual val shared: FileManager = FileManager()
     }
-    
+
     actual suspend fun getModelPath(modelId: String): String {
         val framework = determineFramework(modelId) // Auto-detection logic
         return if (framework != "unknown") {
@@ -121,9 +121,9 @@ actual class FileManager {
 // Android Implementation (✅ Complete)
 actual class FileManager {
     private lateinit var context: Context
-    
+
     actual companion object {
-        actual val modelsDirectory: String get() = 
+        actual val modelsDirectory: String get() =
             "${AndroidApplication.context.filesDir.absolutePath}/runanywhere/models"
     }
 }
@@ -743,6 +743,6 @@ The architectures are **conceptually aligned** with the same directory structure
 
 ---
 
-*Last Updated: October 2025*  
-*Comparison covers iOS SDK v1.0 and Kotlin SDK v0.1 (Current Development)*  
+*Last Updated: October 2025*
+*Comparison covers iOS SDK v1.0 and Kotlin SDK v0.1 (Current Development)*
 *Implementation Status: iOS Production Ready | Kotlin JVM/Android Ready | Native In Development*

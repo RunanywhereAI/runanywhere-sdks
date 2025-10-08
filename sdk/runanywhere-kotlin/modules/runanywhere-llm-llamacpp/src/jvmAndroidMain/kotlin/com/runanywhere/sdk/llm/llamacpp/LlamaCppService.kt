@@ -23,7 +23,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
     private var modelInfo: ModelInfo? = null
 
     override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
-        val actualModelPath = modelPath ?: configuration.modelId 
+        val actualModelPath = modelPath ?: configuration.modelId
             ?: throw IllegalArgumentException("No model path provided")
 
         if (!LlamaCppNative.isLoaded()) {
@@ -150,10 +150,10 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         }
 
         val startTime = com.runanywhere.sdk.foundation.currentTimeMillis()
-        
+
         // Build prompt from messages
         val prompt = buildPrompt(input.messages, input.systemPrompt)
-        
+
         // Use provided options or defaults
         val options = input.options ?: RunAnywhereGenerationOptions(
             maxTokens = configuration.maxTokens,
@@ -163,9 +163,9 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
 
         // Generate text
         val response = generate(prompt, options)
-        
+
         val generationTime = com.runanywhere.sdk.foundation.currentTimeMillis() - startTime
-        
+
         // Calculate token usage (rough estimate)
         val promptTokens = getTokenCount(prompt)
         val completionTokens = getTokenCount(response)
@@ -215,7 +215,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
             // Note: This is a simplified approach. Real implementation would need coroutine channels
             // for proper async emission within the callback
         }
-        
+
         // Emit completion chunk
         emit(LLMGenerationChunk(
             delta = "",
@@ -274,11 +274,11 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
 
     private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
         var prompt = ""
-        
+
         systemPrompt?.let { system ->
             prompt += "System: $system\n\n"
         }
-        
+
         for (message in messages) {
             when (message.role) {
                 MessageRole.USER -> prompt += "User: ${message.content}\n"
@@ -286,7 +286,7 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
                 MessageRole.SYSTEM -> prompt += "System: ${message.content}\n"
             }
         }
-        
+
         prompt += "Assistant: "
         return prompt
     }

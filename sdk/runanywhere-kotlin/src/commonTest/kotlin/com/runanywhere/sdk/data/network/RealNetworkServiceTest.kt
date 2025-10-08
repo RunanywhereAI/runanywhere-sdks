@@ -85,7 +85,7 @@ class RealNetworkServiceTest {
         // Arrange
         val endpoint = APIEndpoint.models
         mockAuthService.setAccessToken("test-token")
-        
+
         // First call fails with 503, second succeeds
         mockHttpClient.setResponses(
             HttpResponse(503, "Service Unavailable".encodeToByteArray()),
@@ -179,10 +179,10 @@ class RealNetworkServiceTest {
 class MockHttpClient : HttpClient {
     private val responses = mutableListOf<HttpResponse>()
     private var responseIndex = 0
-    
+
     var lastRequest: MockRequest? = null
         private set
-    
+
     var callCount = 0
         private set
 
@@ -258,7 +258,7 @@ class MockHttpClient : HttpClient {
         if (responses.isEmpty()) {
             return HttpResponse(500, "No mock response configured".encodeToByteArray())
         }
-        
+
         val response = responses[responseIndex.coerceAtMost(responses.size - 1)]
         if (responseIndex < responses.size - 1) {
             responseIndex++
