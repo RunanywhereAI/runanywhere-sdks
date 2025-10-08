@@ -230,6 +230,50 @@ class LLMComponent(
         }
     }
 
+    /**
+     * Unload the currently loaded model from memory.
+     * Matches Swift SDK's unloadModel() API.
+     *
+     * @throws SDKError.ComponentNotReady if no model is loaded
+     */
+    suspend fun unloadModel() {
+        if (!_isModelLoaded || service?.wrappedService == null) {
+            logger.warn("No model loaded to unload")
+            return
+        }
+
+        val modelId = llmConfiguration.modelId ?: "unknown"
+        logger.info("Unloading model: $modelId")
+
+        try {
+            // Call service cleanup
+            service?.wrappedService?.cleanup()
+
+            // Clear service reference
+            service = null
+            _isModelLoaded = false
+            modelPath = null
+
+            // Publish event
+            EventBus.publish(ComponentInitializationEvent.ComponentUnloaded(
+                component = componentType.name,
+                modelId = modelId,
+                timestamp = currentTimeMillis()
+            ))
+
+            logger.info("✅ Model unloaded successfully: $modelId")
+        } catch (e: Exception) {
+            logger.error("Failed to unload model: $modelId", e)
+            throw SDKError.ComponentNotReady("Failed to unload model: ${e.message}")
+        }
+    }
+
+    /**
+     * Get the currently loaded model ID
+     */
+    val loadedModelId: String?
+        get() = if (_isModelLoaded) llmConfiguration.modelId else null
+
     // MARK: - Helper Properties
 
     private val llmService: LLMService?

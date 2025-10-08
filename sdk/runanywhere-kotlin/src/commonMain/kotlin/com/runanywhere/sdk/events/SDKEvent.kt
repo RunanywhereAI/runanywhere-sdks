@@ -244,6 +244,7 @@ sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZA
     data class ComponentInitializing(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentReady(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentFailed(val component: String, val error: Throwable) : ComponentInitializationEvent()
+    data class ComponentUnloaded(val component: String, val modelId: String, override val timestamp: Long = currentTimeMillis()) : ComponentInitializationEvent()
 
     // Batch events
     data class ParallelInitializationStarted(val components: List<String>) : ComponentInitializationEvent()
