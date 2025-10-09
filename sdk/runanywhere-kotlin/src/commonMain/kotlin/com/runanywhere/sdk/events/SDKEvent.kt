@@ -27,7 +27,8 @@ enum class SDKEventType {
     DEVICE,
     ERROR,
     PERFORMANCE,
-    NETWORK
+    NETWORK,
+    LOGGING
 }
 
 /**
@@ -223,6 +224,20 @@ sealed class SDKDeviceEvent : BaseSDKEvent(SDKEventType.DEVICE) {
     object DeviceInfoSyncCompleted : SDKDeviceEvent()
     data class DeviceInfoSyncFailed(val error: Throwable) : SDKDeviceEvent()
     data class DeviceStateChanged(val property: String, val newValue: String) : SDKDeviceEvent()
+}
+
+/**
+ * SDK Logging Events for public API
+ * Matches iOS logging event system
+ */
+sealed class SDKLoggingEvent : BaseSDKEvent(SDKEventType.LOGGING) {
+    data class ConfigurationUpdated(val level: String, val consoleEnabled: Boolean) : SDKLoggingEvent()
+    data class LocalLoggingConfigured(val enabled: Boolean, val maxSizeMB: Int, val maxFileCount: Int) : SDKLoggingEvent()
+    data class ComponentLogLevelChanged(val component: String, val level: String) : SDKLoggingEvent()
+    data class DebugModeChanged(val enabled: Boolean) : SDKLoggingEvent()
+    object FlushStarted : SDKLoggingEvent()
+    object FlushCompleted : SDKLoggingEvent()
+    data class FlushFailed(val error: String) : SDKLoggingEvent()
 }
 
 /**
