@@ -260,6 +260,13 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         get() = EventBus.shared
 
     /**
+     * Current configuration data
+     * Exposed for extension functions
+     */
+    val configurationData: ConfigurationData?
+        get() = _configurationData
+
+    /**
      * Initialize the RunAnywhere SDK
      *
      * This method performs LIGHTWEIGHT initialization (matches Swift SDK):
