@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.sp
 /**
  * iOS-matching typography system
  * All values match iOS text styles exactly
- * Reference: examples/ios/RunAnywhereAI/IOS_IMPLEMENTATION_DETAILS.md
+ * Reference: examples/ios/RunAnywhereAI/RunAnywhereAI/Core/DesignSystem/Typography.swift
  */
 val Typography = Typography(
     // iOS Display (34pt bold) - Large title
@@ -44,7 +44,7 @@ val Typography = Typography(
         lineHeight = 25.sp
     ),
 
-    // iOS Headline (17pt semibold)
+    // iOS Headline (17pt semibold) - Navigation titles
     headlineMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
@@ -67,7 +67,7 @@ val Typography = Typography(
         lineHeight = 34.sp
     ),
 
-    // iOS Title 2 (22pt semibold)
+    // iOS Title 2 (22pt semibold) - Empty state titles
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.SemiBold,
@@ -83,7 +83,7 @@ val Typography = Typography(
         lineHeight = 25.sp
     ),
 
-    // iOS Body (17pt regular) - Default text
+    // iOS Body (17pt regular) - Message content, input field
     bodyLarge = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
@@ -91,7 +91,7 @@ val Typography = Typography(
         lineHeight = 22.sp
     ),
 
-    // iOS Subheadline (15pt regular)
+    // iOS Subheadline (15pt regular) - Empty state subtitles
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
@@ -115,15 +115,15 @@ val Typography = Typography(
         lineHeight = 20.sp
     ),
 
-    // iOS Footnote (13pt regular)
+    // iOS Caption (12pt regular) - Thinking labels, timestamps
     labelMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        lineHeight = 18.sp
+        fontSize = 12.sp,
+        lineHeight = 16.sp
     ),
 
-    // iOS Caption 1 (12pt regular)
+    // iOS Caption2 (11pt regular) - Analytics text, model badges
     labelSmall = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Normal,
@@ -131,3 +131,97 @@ val Typography = Typography(
         lineHeight = 13.sp
     )
 )
+
+/**
+ * Custom text styles for specific iOS components not covered by Material 3 Typography
+ */
+object AppTypography {
+    // Custom sizes matching iOS exactly
+    val system9 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 9.sp,
+        lineHeight = 11.sp
+    )
+
+    val system10 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 10.sp,
+        lineHeight = 12.sp
+    )
+
+    val system11 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 13.sp
+    )
+
+    val system11Medium = system11.copy(fontWeight = FontWeight.Medium)
+
+    val system12 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp
+    )
+
+    val system12Medium = system12.copy(fontWeight = FontWeight.Medium)
+
+    val system28 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 28.sp,
+        lineHeight = 34.sp
+    )
+
+    val system60 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 60.sp,
+        lineHeight = 72.sp
+    )
+
+    // Weight variants (matching iOS)
+    val caption = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp
+    )
+
+    val caption2 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 11.sp,
+        lineHeight = 13.sp
+    )
+
+    val caption2Medium = caption2.copy(fontWeight = FontWeight.Medium)
+
+    val caption2Bold = caption2.copy(fontWeight = FontWeight.Bold)
+
+    // Monospaced variants (for model info)
+    val monospacedCaption = TextStyle(
+        fontFamily = FontFamily.Monospace,
+        fontWeight = FontWeight.Bold,
+        fontSize = 9.sp,
+        lineHeight = 11.sp
+    )
+
+    // Rounded variants (for model info stats)
+    val rounded10 = TextStyle(
+        fontFamily = FontFamily.Default,  // Could use rounded font if available
+        fontWeight = FontWeight.Medium,
+        fontSize = 10.sp,
+        lineHeight = 12.sp
+    )
+
+    val rounded11 = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 13.sp
+    )
+}
