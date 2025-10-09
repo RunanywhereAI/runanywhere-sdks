@@ -93,12 +93,7 @@ data class VADOutput(
 
     // Timestamp (required by ComponentOutput)
     override val timestamp: Long = getCurrentTimeMillis()
-) : ComponentOutput {
-
-    // iOS compatibility property alias
-    @Deprecated("Use isSpeechDetected for iOS parity", ReplaceWith("isSpeechDetected"))
-    val isSpeech: Boolean get() = isSpeechDetected
-}
+) : ComponentOutput
 
 // MARK: - VAD Metadata (simplified)
 
@@ -175,11 +170,7 @@ data class VADResult(
     val isSpeechDetected: Boolean,
     val confidence: Float = 0.0f,
     val timestamp: Long = getCurrentTimeMillis()
-) {
-    // iOS compatibility property alias
-    @Deprecated("Use isSpeechDetected for iOS parity", ReplaceWith("isSpeechDetected"))
-    val isSpeech: Boolean get() = isSpeechDetected
-}
+)
 
 // MARK: - VAD Service Wrapper
 
