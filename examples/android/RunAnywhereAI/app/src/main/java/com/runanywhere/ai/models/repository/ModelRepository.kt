@@ -89,6 +89,7 @@ class ModelRepository(
             // Use SDK download if available
             if (RunAnywhere.isInitialized) {
                 RunAnywhere.downloadModel(modelId).collect { progress ->
+                    // SDK returns Float progress (0.0 to 1.0)
                     emit(progress)
                     updateDownloadProgress(modelId, progress)
                 }
