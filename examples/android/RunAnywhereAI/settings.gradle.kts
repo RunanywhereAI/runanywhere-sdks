@@ -34,3 +34,7 @@ include(":sdk:runanywhere-kotlin")
 project(":sdk:runanywhere-kotlin").projectDir = file("../../../sdk/runanywhere-kotlin")
 include(":sdk:runanywhere-kotlin:jni")
 project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
+
+// Include SDK modules
+include(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp")

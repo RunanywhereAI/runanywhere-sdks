@@ -21,7 +21,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 // Depend on core SDK for interfaces and models
-                api(project(":"))
+                // Use rootProject to ensure correct resolution in composite builds
+                api(project.parent!!.parent!!)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
             }

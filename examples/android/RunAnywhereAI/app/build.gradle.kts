@@ -201,6 +201,9 @@ dependencies {
     // SDK module - Use local project for development
     implementation(project(":sdk:runanywhere-kotlin"))
 
+    // LlamaCPP module for on-device LLM
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
+
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
