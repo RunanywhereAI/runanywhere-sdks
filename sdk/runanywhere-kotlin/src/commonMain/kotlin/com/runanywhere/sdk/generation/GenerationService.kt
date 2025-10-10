@@ -260,6 +260,9 @@ class GenerationService {
      */
     fun setCurrentModel(model: LoadedModelWithService?) {
         currentModel = model
+        // CRITICAL: Also set the model in StreamingService
+        streamingService.setLoadedModel(model)
+
         if (model != null) {
             logger.info("Current model set to: ${model.model.id}")
         } else {

@@ -529,14 +529,36 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         try {
             if (app.isSDKReady()) {
                 val availableModels = RunAnywhere.availableModels()
-                val loadedModel = availableModels.firstOrNull { it.localPath != null }
+                val downloadedModel = availableModels.firstOrNull { it.localPath != null }
 
-                _uiState.value = _uiState.value.copy(
-                    isModelLoaded = loadedModel != null,
-                    loadedModelName = loadedModel?.name
-                )
+                if (downloadedModel != null) {
+                    Log.i("ChatViewModel", "📦 Found downloaded model: ${downloadedModel.name}, loading into memory...")
 
-                Log.i("ChatViewModel", "✅ Model status updated: '${loadedModel?.name}' is loaded")
+                    try {
+                        // Load the model into memory
+                        RunAnywhere.loadModel(downloadedModel.id)
+
+                        _uiState.value = _uiState.value.copy(
+                            isModelLoaded = true,
+                            loadedModelName = downloadedModel.name
+                        )
+
+                        Log.i("ChatViewModel", "✅ Model loaded successfully: ${downloadedModel.name}")
+                    } catch (e: Exception) {
+                        Log.e("ChatViewModel", "❌ Failed to load model: ${e.message}", e)
+                        _uiState.value = _uiState.value.copy(
+                            isModelLoaded = false,
+                            loadedModelName = null,
+                            error = e
+                        )
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = false,
+                        loadedModelName = null
+                    )
+                    Log.i("ChatViewModel", "ℹ️ No downloaded models found")
+                }
 
                 // Update system message to reflect current state
                 val currentMessages = _uiState.value.messages.toMutableList()

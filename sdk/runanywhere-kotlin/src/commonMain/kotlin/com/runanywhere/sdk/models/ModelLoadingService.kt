@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.models
 
+import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
@@ -71,31 +73,52 @@ class ModelLoadingService(
             logger.info("🏗️ Built-in model detected, skipping file check")
         }
 
-        // Check memory availability
-        val memoryRequired = modelInfo.memoryRequired ?: (1024 * 1024 * 1024L) // Default 1GB if not specified
-        val canAllocate = memoryService.canAllocate(memoryRequired)
-        if (!canAllocate) {
-            throw SDKError.LoadingFailed("Insufficient memory")
+        // Get the appropriate LLM provider for this model
+        val provider = ModuleRegistry.llmProvider(modelId)
+            ?: throw SDKError.LoadingFailed("No LLM provider available for model: $modelId")
+
+        logger.info("🚀 Using LLM provider: ${provider.name} for model: $modelId")
+
+        // Create LLMConfiguration from ModelInfo
+        val configuration = com.runanywhere.sdk.components.llm.LLMConfiguration(
+            modelId = modelInfo.localPath ?: modelInfo.id,
+            contextLength = modelInfo.contextLength ?: 2048,
+            useGPUIfAvailable = true,
+            streamingEnabled = true
+        )
+
+        // Create the actual LLM service using the provider
+        val llmService = try {
+            provider.createLLMService(configuration)
+        } catch (e: Exception) {
+            logger.error("❌ Failed to create LLM service: ${e.message}")
+            throw SDKError.LoadingFailed("Failed to create LLM service: ${e.message}")
         }
 
-        // For now, create a mock service until LLM adapters are implemented
-        logger.info("🚀 Creating mock service for model (real adapter integration pending)")
-        val mockService = MockLLMService(modelInfo)
+        // Initialize the LLM service with the model
+        try {
+            // Cast to EnhancedLLMService to access loadModel method
+            if (llmService is com.runanywhere.sdk.components.llm.EnhancedLLMService) {
+                llmService.loadModel(modelInfo)
+                logger.info("✅ LLM service initialized with model: $modelId")
+            } else {
+                // Fallback to initialize method for basic LLMService
+                llmService.initialize(modelInfo.localPath)
+                logger.info("✅ LLM service initialized with model path: ${modelInfo.localPath}")
+            }
+        } catch (e: Exception) {
+            logger.error("❌ Failed to load model into LLM service: ${e.message}")
+            throw SDKError.LoadingFailed("Failed to load model: ${e.message}")
+        }
 
         // Create loaded model
         val loaded = LoadedModelWithService(
             model = modelInfo,
-            service = mockService,
+            service = llmService,
             localPath = modelInfo.localPath,
             loadedAt = System.currentTimeMillis()
         )
 
-        // Register loaded model with memory service
-        memoryService.registerLoadedModel(
-            modelId = loaded.model.id,
-            size = modelInfo.memoryRequired ?: memoryRequired,
-            service = mockService
-        )
         loadedModels[modelId] = loaded
 
         logger.info("✅ Model loaded successfully: $modelId")
@@ -108,13 +131,15 @@ class ModelLoadingService(
     suspend fun unloadModel(modelId: String) = withContext(Dispatchers.Default) {
         val loaded = loadedModels[modelId] ?: return@withContext
 
-        // Cleanup service
-        if (loaded.service is MockLLMService) {
-            loaded.service.cleanup()
+        // Cleanup LLM service
+        if (loaded.service is LLMService) {
+            try {
+                // LLMService doesn't have a cleanup method, just let it be garbage collected
+                logger.info("🗑️ Releasing LLM service for model: $modelId")
+            } catch (e: Exception) {
+                logger.error("⚠️ Error during service cleanup: ${e.message}")
+            }
         }
-
-        // Unregister from memory service
-        memoryService.unregisterModel(modelId)
 
         // Remove from loaded models
         loadedModels.remove(modelId)
@@ -153,23 +178,4 @@ class ModelLoadingService(
         }
         logger.info("✅ All models unloaded")
     }
-}
-
-/**
- * Mock LLM Service for development until real adapters are implemented
- */
-private class MockLLMService(
-    private val modelInfo: ModelInfo
-) {
-    private val logger = SDKLogger("MockLLMService")
-
-    init {
-        logger.info("MockLLMService created for model: ${modelInfo.id}")
-    }
-
-    suspend fun cleanup() {
-        logger.info("MockLLMService cleanup for model: ${modelInfo.id}")
-    }
-
-    fun getCurrentModel(): ModelInfo = modelInfo
 }

@@ -127,6 +127,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         // Android uses Room database (local only, no network)
         androidLogger.info("Initializing local database for Android")
 
+        // Initialize MemoryMonitor with Android context
+        com.runanywhere.sdk.memory.MemoryMonitor.initialize(context)
+        androidLogger.info("MemoryMonitor initialized")
+
         // Initialize audio capture with context
         audioCapture = AndroidAudioCapture(context)
 
@@ -215,18 +219,22 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val model = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
-        if (model.localPath == null) {
-            androidLogger.warn("Model $modelId not downloaded. Download it first.")
-            return false
-        }
-
-        // Load model into memory using ModelManager
+        // Ensure model file is available (download if needed)
         return try {
             serviceContainer.modelManager.loadModel(model)
-            androidLogger.info("Model $modelId loaded successfully")
+            androidLogger.info("Model file ensured: $modelId")
+
+            // Now load model into LLM service for inference using ModelLoadingService
+            androidLogger.info("Loading model into LLM service: $modelId")
+            val loadedModel = serviceContainer.modelLoadingService.loadModel(modelId)
+
+            // Set the loaded model in the generation service
+            serviceContainer.generationService.setCurrentModel(loadedModel)
+
+            androidLogger.info("Model $modelId loaded successfully into LLM service")
             true
         } catch (e: Exception) {
-            androidLogger.error("Failed to load model $modelId: ${e.message}")
+            androidLogger.error("Failed to load model $modelId: ${e.message}", e)
             false
         }
     }

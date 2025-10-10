@@ -54,13 +54,18 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     }
 
     override fun canHandle(modelId: String?): Boolean {
-        // Accept nil/empty or default
-        if (modelId.isNullOrEmpty() || modelId == "default") return true
+        // For now, accept all models since this is the only LLM provider
+        // Model compatibility is validated in validateModelCompatibility()
+        return true
 
+        // TODO: Re-enable this check once we support multiple providers
+        // Accept nil/empty or default
+        // if (modelId.isNullOrEmpty() || modelId == "default") return true
+        //
         // Check for supported file extensions
-        val supportedExtensions = listOf(".gguf", ".ggml", ".bin")
-        val lowercasedId = modelId.lowercase()
-        return supportedExtensions.any { lowercasedId.endsWith(it) }
+        // val supportedExtensions = listOf(".gguf", ".ggml", ".bin")
+        // val lowercasedId = modelId.lowercase()
+        // return supportedExtensions.any { lowercasedId.endsWith(it) }
     }
 
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
