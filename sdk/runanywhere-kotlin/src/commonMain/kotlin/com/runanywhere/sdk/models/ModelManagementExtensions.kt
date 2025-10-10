@@ -35,9 +35,9 @@ object RunAnywhereModelManagement {
             // Use existing service logic directly
             val loadedModel = ServiceContainer.shared.modelLoadingService.loadModel(modelIdentifier)
 
-            // IMPORTANT: Set the loaded model in the generation service
-            // TODO: Implement when generation service supports model setting
-            // ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
+            // CRITICAL: Set the loaded model in the generation service so it can use it for inference
+            ServiceContainer.shared.generationService.setCurrentModel(loadedModel)
+            logger.info("✅ Model loaded and set in GenerationService: ${loadedModel.model.id}")
 
             EventBus.publish(SDKModelEvent.LoadCompleted(modelIdentifier))
             return@withContext loadedModel.model

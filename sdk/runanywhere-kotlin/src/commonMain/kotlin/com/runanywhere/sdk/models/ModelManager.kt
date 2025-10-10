@@ -35,7 +35,13 @@ class ModelManager(
     suspend fun ensureModel(modelInfo: ModelInfo): String = withContext(Dispatchers.IO) {
         logger.info("🔍 Ensuring model is available: ${modelInfo.id}")
 
-        // Check if model file already exists
+        // First check if model already has a local path and file exists
+        if (modelInfo.localPath != null && fileSystem.exists(modelInfo.localPath!!)) {
+            logger.info("✅ Model already exists at: ${modelInfo.localPath}")
+            return@withContext modelInfo.localPath!!
+        }
+
+        // Check if model file exists at expected path
         val expectedPath = getModelPath(modelInfo)
         if (fileSystem.exists(expectedPath)) {
             logger.info("✅ Model already exists at: $expectedPath")

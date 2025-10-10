@@ -1,6 +1,9 @@
 package com.runanywhere.sdk.generation
 
+import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.LoadedModelWithService
+import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -12,6 +15,21 @@ class StreamingService {
 
     private val logger = SDKLogger("StreamingService")
 
+    // Reference to the currently loaded model and service
+    private var currentModel: LoadedModelWithService? = null
+
+    /**
+     * Set the current loaded model for streaming
+     */
+    fun setLoadedModel(model: LoadedModelWithService?) {
+        currentModel = model
+        if (model != null) {
+            logger.info("StreamingService: Model set to ${model.model.id}")
+        } else {
+            logger.info("StreamingService: Model cleared")
+        }
+    }
+
     /**
      * Stream text generation with the specified prompt and options
      */
@@ -19,8 +37,35 @@ class StreamingService {
         prompt: String,
         options: GenerationOptions
     ): Flow<GenerationChunk> = flow {
-        logger.error("StreamingService.stream() called but no LLM service is configured!")
-        throw IllegalStateException("No LLM service available for streaming. LLM component must be initialized first.")
+        val model = currentModel
+            ?: throw IllegalStateException("No model loaded for streaming. Call loadModel() first.")
+
+        val llmService = model.service as? LLMService
+            ?: throw IllegalStateException("Loaded service is not an LLM service")
+
+        logger.info("🚀 Starting streaming with model: ${model.model.id}")
+
+        // Convert to RunAnywhereGenerationOptions
+        val llmOptions = RunAnywhereGenerationOptions(
+            temperature = options.temperature,
+            maxTokens = options.maxTokens,
+            streamingEnabled = true
+        )
+
+        // Stream tokens from the LLM service
+        val fullText = StringBuilder()
+        llmService.streamGenerate(prompt, llmOptions) { token ->
+            fullText.append(token)
+            // For now, emit the full accumulated text as chunks
+            // TODO: Emit individual tokens when LlamaCppService supports it
+        }
+
+        // Emit final chunk with all text
+        emit(GenerationChunk(
+            text = fullText.toString(),
+            tokenCount = fullText.length / 4, // Rough estimate
+            isComplete = true
+        ))
     }
 
     /**
