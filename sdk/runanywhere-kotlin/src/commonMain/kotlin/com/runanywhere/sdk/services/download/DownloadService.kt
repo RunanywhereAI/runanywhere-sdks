@@ -129,6 +129,18 @@ interface DownloadManager {
 }
 
 /**
+ * Platform-specific download implementation
+ * Each platform provides its own optimized downloader
+ */
+internal expect suspend fun downloadWithPlatformImplementation(
+    downloadURL: String,
+    destinationPath: String,
+    modelId: String,
+    expectedSize: Long,
+    progressChannel: Channel<DownloadProgress>
+)
+
+/**
  * KtorDownloadService - EXACT 1:1 copy of iOS AlamofireDownloadService
  * Using Ktor instead of Alamofire, but identical business logic, method names, and architecture
  */
@@ -155,23 +167,18 @@ class KtorDownloadService(
     // MARK: - Initialization (EXACT copy of iOS)
 
     init {
-        // Configure HTTP client - equivalent to iOS URLSessionConfiguration
+        // SIMPLIFIED HTTP CLIENT - NO buffering, NO retries, NO plugins
+        // This prevents Ktor from buffering the entire response in memory
         httpClient = HttpClient {
+            // ONLY timeout - nothing else that could buffer
             install(HttpTimeout) {
                 requestTimeoutMillis = (configuration.timeout * 1000).toLong()
                 connectTimeoutMillis = (configuration.timeout * 1000).toLong()
                 socketTimeoutMillis = (configuration.timeout * 2 * 1000).toLong()
             }
 
-            // Equivalent to iOS RetryPolicy
-            install(HttpRequestRetry) {
-                retryOnServerErrors(maxRetries = configuration.retryCount)
-                retryOnException(maxRetries = configuration.retryCount)
-                exponentialDelay(
-                    base = 2.0,
-                    maxDelayMs = (configuration.retryDelay * 1000).toLong()
-                )
-            }
+            // Disable ALL automatic response handling to prevent buffering
+            expectSuccess = false
         }
 
         // Auto-discover and register download strategies from adapters
@@ -217,88 +224,14 @@ class KtorDownloadService(
                 // Ensure directory exists
                 fileSystem.createDirectory(modelFolder)
 
-                // Download in coroutine
-                coroutineScope {
-                    val response = httpClient.prepareGet(downloadURL).execute()
-
-                    if (!response.status.isSuccess()) {
-                        throw mapHttpError(response.status.value)
-                    }
-
-                    val contentLength = response.contentLength() ?: model.downloadSize ?: 0L
-                    val channel = response.bodyAsChannel()
-
-                    var bytesDownloaded = 0L
-                    val buffer = ByteArray(configuration.chunkSize)
-                    var lastProgressTime = System.currentTimeMillis()
-                    var lastBytesDownloaded = 0L
-                    val downloadStartTime = System.currentTimeMillis()
-
-                    // Create temporary file for downloading
-                    val tempPath = "$destinationPath.tmp"
-                    val fileData = mutableListOf<ByteArray>()
-
-                    while (!channel.isClosedForRead) {
-                        val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
-                        if (bytesRead <= 0) break
-
-                        // Store data in memory temporarily (can be improved with actual file streaming)
-                        val chunkData = ByteArray(bytesRead)
-                        buffer.copyInto(chunkData, 0, 0, bytesRead)
-                        fileData.add(chunkData)
-                        bytesDownloaded += bytesRead
-
-                        // Report progress (matching iOS progress reporting)
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastProgressTime >= 100) { // Report every 100ms
-                            // Calculate speed (bytes per second)
-                            val elapsedTime = (currentTime - lastProgressTime) / 1000.0 // seconds
-                            val bytesInInterval = bytesDownloaded - lastBytesDownloaded
-                            val speed = if (elapsedTime > 0) bytesInInterval / elapsedTime else null
-
-                            // Calculate ETA (seconds remaining)
-                            val remainingBytes = contentLength - bytesDownloaded
-                            val eta = if (speed != null && speed > 0) remainingBytes / speed else null
-
-                            val progress = DownloadProgress(
-                                bytesDownloaded = bytesDownloaded,
-                                totalBytes = contentLength,
-                                state = DownloadState.Downloading,
-                                estimatedTimeRemaining = eta,
-                                speed = speed
-                            )
-                            progressChannel.trySend(progress)
-
-                            // Log progress at 10% intervals (matching iOS)
-                            val progressPercent = if (contentLength > 0) (bytesDownloaded.toDouble() / contentLength) * 100 else 0.0
-                            if (progressPercent.toInt() % 10 == 0) {
-                                logger.debug(
-                                    "Download progress - modelId: ${model.id}, progress: $progressPercent%, bytesDownloaded: $bytesDownloaded, totalBytes: $contentLength, speed: ${formatSpeed(speed)}, eta: ${formatETA(eta)}"
-                                )
-                            }
-                            lastProgressTime = currentTime
-                            lastBytesDownloaded = bytesDownloaded
-                        }
-                    }
-
-                    // Write all data to file
-                    val allData = fileData.fold(ByteArray(0)) { acc, chunk -> acc + chunk }
-                    fileSystem.writeBytes(destinationPath, allData)
-
-                    // Final progress update
-                    progressChannel.trySend(
-                        DownloadProgress(
-                            bytesDownloaded = contentLength,
-                            totalBytes = contentLength,
-                            state = DownloadState.Completed
-                        )
-                    )
-
-                    // Update model with local path (simplified without registry for now)
-                    logger.info(
-                        "Download completed - modelId: ${model.id}, localPath: $destinationPath, fileSize: ${allData.size}"
-                    )
-                }
+                // Use platform-specific download implementation
+                downloadWithPlatformImplementation(
+                    downloadURL = downloadURL,
+                    destinationPath = destinationPath,
+                    modelId = model.id,
+                    expectedSize = model.downloadSize ?: 0L,
+                    progressChannel = progressChannel
+                )
 
                 destinationPath
 
@@ -612,23 +545,27 @@ suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resume
             val totalLength = contentLength + startByte
             val channel = response.bodyAsChannel()
 
-            // Read existing file data for append
-            var existingData = ByteArray(0)
-            if (startByte > 0 && fileSystem.exists(destinationPath)) {
-                existingData = fileSystem.readBytes(destinationPath)
-            }
+            // Use temp file for new data
+            val tempPath = "$destinationPath.tmp"
 
             var bytesDownloaded = startByte
             val buffer = ByteArray(configuration.chunkSize)
-            val newData = mutableListOf<ByteArray>()
+
+            // If resuming, copy existing file to temp
+            if (startByte > 0 && fileSystem.exists(destinationPath)) {
+                fileSystem.copy(destinationPath, tempPath)
+            } else {
+                fileSystem.writeBytes(tempPath, ByteArray(0))
+            }
 
             while (!channel.isClosedForRead) {
                 val bytesRead = channel.readAvailable(buffer, 0, buffer.size)
                 if (bytesRead <= 0) break
 
+                // Append chunk directly to temp file
                 val chunkData = ByteArray(bytesRead)
                 buffer.copyInto(chunkData, 0, 0, bytesRead)
-                newData.add(chunkData)
+                fileSystem.appendBytes(tempPath, chunkData)
                 bytesDownloaded += bytesRead
 
                 // Report progress
@@ -640,10 +577,8 @@ suspend fun KtorDownloadService.downloadModelWithResume(model: ModelInfo, resume
                 progressChannel.trySend(progress)
             }
 
-            // Combine existing and new data, then write to file
-            val allNewData = newData.fold(ByteArray(0)) { acc, chunk -> acc + chunk }
-            val combinedData = existingData + allNewData
-            fileSystem.writeBytes(destinationPath, combinedData)
+            // Move temp file to final destination
+            fileSystem.move(tempPath, destinationPath)
 
             // Final progress update
             progressChannel.trySend(
