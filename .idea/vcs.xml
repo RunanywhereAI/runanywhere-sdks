@@ -33,5 +33,6 @@
     <mapping directory="$PROJECT_DIR$/examples/ios/RunAnywhereAI/build/SourcePackages/checkouts/swift-crypto" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/examples/ios/RunAnywhereAI/build/SourcePackages/checkouts/swift-syntax" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/examples/ios/RunAnywhereAI/build/SourcePackages/checkouts/swift-transformers" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-kotlin/native/llama-jni/llama.cpp" vcs="Git" />
   </component>
 </project>

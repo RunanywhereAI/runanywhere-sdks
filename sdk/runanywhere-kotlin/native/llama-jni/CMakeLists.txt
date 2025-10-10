@@ -15,6 +15,9 @@ find_package(Java REQUIRED)
 # Set up llama.cpp
 set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
 
+# Enable common library build
+set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
+
 # Add llama.cpp subdirectory
 add_subdirectory(${LLAMA_CPP_DIR} EXCLUDE_FROM_ALL)
 
@@ -34,9 +37,10 @@ set(JNI_SOURCES
 # Create the JNI library
 add_library(llama-jni SHARED ${JNI_SOURCES})
 
-# Link with llama and JNI
+# Link with llama, common (from llama.cpp), and JNI
 target_link_libraries(llama-jni
     llama
+    common
     ${JNI_LIBRARIES}
 )
 
@@ -46,6 +50,7 @@ target_include_directories(llama-jni PRIVATE
     ${LLAMA_CPP_DIR}/include
     ${LLAMA_CPP_DIR}/common
     ${LLAMA_CPP_DIR}/src
+    ${LLAMA_CPP_DIR}
     src
 )
 
