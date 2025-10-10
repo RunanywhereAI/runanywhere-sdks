@@ -3,22 +3,17 @@ package com.runanywhere.sdk.public
 import android.annotation.SuppressLint
 import android.content.Context
 import com.runanywhere.sdk.audio.AndroidAudioCapture
-import com.runanywhere.sdk.components.base.ComponentState
-import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTStreamEvent
 import com.runanywhere.sdk.components.stt.STTTranscriptionResult
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKInitParams
-import com.runanywhere.sdk.files.FileManager
-import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.ModelStorage
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.ModelCategory
-import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.models.ModelStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,12 +22,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 /**
