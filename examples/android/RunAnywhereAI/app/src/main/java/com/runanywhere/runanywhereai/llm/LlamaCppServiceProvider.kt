@@ -4,6 +4,9 @@ import com.runanywhere.sdk.components.llm.LLMConfiguration
 import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.components.llm.LLMServiceProvider
 import com.runanywhere.sdk.core.ModuleRegistry
+import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppNative
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppService
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import com.runanywhere.sdk.models.enums.LLMFramework
@@ -19,6 +22,8 @@ import kotlinx.coroutines.withContext
  */
 object LlamaCppServiceProvider : LLMServiceProvider {
 
+    private val logger = SDKLogger("LlamaCppServiceProvider")
+
     override val name: String = "Llama.cpp (llama-cpp)"
 
     override val framework: LLMFramework = LLMFramework.LLAMA_CPP
@@ -29,6 +34,16 @@ object LlamaCppServiceProvider : LLMServiceProvider {
         "quantization",
         "gguf-format"
     )
+
+    init {
+        // Force native library loading by accessing LlamaCppNative
+        val isLoaded = LlamaCppNative.isLoaded()
+        if (isLoaded) {
+            logger.info("✅ llama.cpp native library loaded successfully")
+        } else {
+            logger.error("❌ llama.cpp native library failed to load")
+        }
+    }
 
     /**
      * Register this provider with ModuleRegistry
@@ -49,9 +64,13 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     }
 
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
-        // For now, return a placeholder service
-        // TODO: Integrate actual llama.cpp JNI bindings
-        return PlaceholderLLMService(configuration)
+        logger.info("Creating LlamaCppService with configuration: ${configuration.modelId}")
+
+        if (!LlamaCppNative.isLoaded()) {
+            throw IllegalStateException("Cannot create LlamaCppService: Native library not loaded")
+        }
+
+        return LlamaCppService(configuration)
     }
 
     override fun validateModelCompatibility(model: ModelInfo): com.runanywhere.sdk.components.llm.ModelCompatibilityResult {
@@ -128,56 +147,5 @@ object LlamaCppServiceProvider : LLMServiceProvider {
      */
     private fun getAvailableSystemMemory(): Long {
         return Runtime.getRuntime().maxMemory()
-    }
-}
-
-/**
- * Placeholder LLM Service implementation
- * TODO: Replace with actual llama.cpp JNI integration
- */
-private class PlaceholderLLMService(
-    private val configuration: LLMConfiguration
-) : LLMService {
-
-    override var isReady: Boolean = false
-        private set
-
-    override var currentModel: String? = null
-        private set
-
-    override suspend fun initialize(modelPath: String?) {
-        currentModel = modelPath
-        isReady = modelPath != null
-    }
-
-    override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String {
-        if (!isReady) {
-            throw IllegalStateException("LLM service not ready. Call initialize() first.")
-        }
-
-        // Placeholder: return mock response
-        return "This is a placeholder response. Llama.cpp JNI integration is pending."
-    }
-
-    override suspend fun streamGenerate(
-        prompt: String,
-        options: RunAnywhereGenerationOptions,
-        onToken: (String) -> Unit
-    ) {
-        if (!isReady) {
-            throw IllegalStateException("LLM service not ready. Call initialize() first.")
-        }
-
-        // Placeholder: simulate streaming
-        val response = "This is a placeholder streaming response. "
-        response.split(" ").forEach { token ->
-            onToken("$token ")
-            kotlinx.coroutines.delay(100)
-        }
-    }
-
-    override suspend fun cleanup() {
-        isReady = false
-        currentModel = null
     }
 }

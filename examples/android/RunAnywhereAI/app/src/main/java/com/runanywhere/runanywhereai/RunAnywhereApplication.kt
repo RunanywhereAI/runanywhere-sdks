@@ -205,6 +205,11 @@ class RunAnywhereApplication : Application() {
                 "🎉 All models registered for development (lazy loading enabled)"
             )
 
+            // Scan file system for already downloaded models
+            Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
+            RunAnywhere.scanForDownloadedModels()
+            Log.i("RunAnywhereApp", "✅ File system scan complete")
+
             // Note: In Kotlin SDK, we don't register STT/TTS adapters during app initialization
             // They are registered when needed by the SDK's service container
             // WhisperKit and other framework adapters are handled internally by the SDK

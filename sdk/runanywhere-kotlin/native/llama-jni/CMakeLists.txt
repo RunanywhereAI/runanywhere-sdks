@@ -15,8 +15,10 @@ find_package(Java REQUIRED)
 # Set up llama.cpp
 set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
 
-# Enable common library build
+# Force static library builds for llama.cpp
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries" FORCE)
 set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
+set(LLAMA_STATIC ON CACHE BOOL "Build static library" FORCE)
 
 # Add llama.cpp subdirectory
 add_subdirectory(${LLAMA_CPP_DIR} EXCLUDE_FROM_ALL)
