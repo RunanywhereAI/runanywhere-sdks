@@ -153,7 +153,11 @@ class ModelSelectionViewModel : ViewModel() {
 
                 android.util.Log.d("ModelSelectionVM", "✅ Download complete for $modelId")
 
-                // Reload models after download completes
+                // Small delay to ensure registry update propagates
+                kotlinx.coroutines.delay(500)
+
+                // Reload models after download completes - should now have localPath set
+                android.util.Log.d("ModelSelectionVM", "🔄 Refreshing models list to get updated localPath...")
                 loadModelsAndFrameworks()
 
                 _uiState.update {
@@ -197,11 +201,15 @@ class ModelSelectionViewModel : ViewModel() {
 
             android.util.Log.d("ModelSelectionVM", "✅ Model loaded successfully: $modelId")
 
+            // Get the loaded model from the updated models list
+            val loadedModel = _uiState.value.models.find { it.id == modelId }
+
             _uiState.update {
                 it.copy(
                     loadingProgress = "Model loaded successfully!",
                     isLoadingModel = false,
-                    selectedModelId = null
+                    selectedModelId = null,
+                    currentModel = loadedModel  // Track the currently loaded model
                 )
             }
         } catch (e: Exception) {
@@ -216,6 +224,13 @@ class ModelSelectionViewModel : ViewModel() {
             }
         }
     }
+
+    /**
+     * Refresh models list - called after download completes
+     */
+    fun refreshModels() {
+        loadModelsAndFrameworks()
+    }
 }
 
 /**
@@ -227,6 +242,7 @@ data class ModelSelectionUiState(
     val frameworks: List<String> = emptyList(),
     val expandedFramework: String? = null,
     val selectedModelId: String? = null,
+    val currentModel: ModelInfo? = null,  // Currently loaded model - matches iOS
     val isLoading: Boolean = true,
     val isLoadingModel: Boolean = false,
     val loadingProgress: String = "",

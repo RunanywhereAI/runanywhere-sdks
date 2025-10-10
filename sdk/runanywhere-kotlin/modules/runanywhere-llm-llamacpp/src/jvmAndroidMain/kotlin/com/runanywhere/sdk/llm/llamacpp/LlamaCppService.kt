@@ -27,18 +27,15 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             ?: throw IllegalArgumentException("No model path provided")
 
         if (!LlamaCppNative.isLoaded()) {
-            logger.warn("llama.cpp native library not loaded, using mock mode")
-            // Mock initialization for development/testing
-            this@LlamaCppService.modelPath = actualModelPath
-            isInitialized = true
-            modelInfo = createMockModelInfo()
-            logger.info("Initialized llama.cpp in mock mode with model: ${modelInfo?.name}")
-            return@withContext
+            logger.error("llama.cpp native library not loaded! Cannot initialize.")
+            throw IllegalStateException("llama.cpp native library (libllama-jni.so) is not loaded. Check that the library is included in the APK.")
         }
 
         if (isInitialized && contextHandle != 0L) {
             cleanup()
         }
+
+        logger.info("Initializing llama.cpp with model: $actualModelPath")
 
         val params = LlamaParams(
             nGpuLayers = configuration.gpuLayers ?: determineGpuLayers(),
@@ -59,7 +56,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         isInitialized = true
         modelInfo = convertToSDKModelInfo(LlamaCppNative.llamaGetModelInfo(contextHandle), actualModelPath)
 
-        logger.info("Initialized llama.cpp with model: ${modelInfo?.name}")
+        logger.info("✅ Initialized llama.cpp with model: ${modelInfo?.name}")
         logger.debug("Model info: $modelInfo")
     }
 
@@ -71,9 +68,8 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
-        // Mock mode when native library not available
         if (!LlamaCppNative.isLoaded()) {
-            return@withContext generateMockResponse(prompt)
+            throw IllegalStateException("llama.cpp native library not loaded")
         }
 
         if (contextHandle == 0L) {
@@ -102,10 +98,8 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
-        // Mock mode when native library not available
         if (!LlamaCppNative.isLoaded()) {
-            streamMockResponse(prompt, onToken)
-            return@withContext
+            throw IllegalStateException("llama.cpp native library not loaded")
         }
 
         if (contextHandle == 0L) {
@@ -138,7 +132,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
     // Interface properties
     actual override val isReady: Boolean
-        get() = isInitialized && (contextHandle != 0L || !LlamaCppNative.isLoaded())
+        get() = isInitialized && contextHandle != 0L && LlamaCppNative.isLoaded()
 
     actual override val currentModel: String?
         get() = modelInfo?.name ?: modelPath?.split("/")?.lastOrNull()
@@ -304,37 +298,6 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         LlamaCppNative.llamaTokenize(contextHandle, text)
     }
 
-    // Mock mode helpers for development/testing
-    private fun createMockModelInfo(): com.runanywhere.sdk.models.ModelInfo {
-        return com.runanywhere.sdk.models.ModelInfo(
-            id = modelPath ?: "mock-model",
-            name = "Mock LLM Model",
-            category = com.runanywhere.sdk.models.enums.ModelCategory.LANGUAGE,
-            format = com.runanywhere.sdk.models.enums.ModelFormat.GGUF,
-            downloadURL = null,
-            localPath = modelPath,
-            downloadSize = 0,
-            memoryRequired = 0,
-            compatibleFrameworks = listOf(com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP),
-            preferredFramework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
-            contextLength = 4096,
-            supportsThinking = false,
-            metadata = null
-        )
-    }
-
-    private fun generateMockResponse(prompt: String): String {
-        return "Mock response for: ${prompt.take(50)}..."
-    }
-
-    private suspend fun streamMockResponse(prompt: String, onToken: (String) -> Unit) {
-        val response = generateMockResponse(prompt)
-        val words = response.split(" ")
-        for (word in words) {
-            onToken("$word ")
-            kotlinx.coroutines.delay(50) // Simulate streaming
-        }
-    }
 }
 
 // Converter helper

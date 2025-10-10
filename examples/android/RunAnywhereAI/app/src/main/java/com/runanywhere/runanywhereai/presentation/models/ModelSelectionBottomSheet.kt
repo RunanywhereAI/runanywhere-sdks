@@ -151,6 +151,7 @@ fun ModelSelectionBottomSheet(
                         items(filteredModels, key = { it.id }) { model ->
                             SelectableModelRow(
                                 model = model,
+                                isSelected = uiState.currentModel?.id == model.id,  // Track if this model is loaded
                                 isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
                                 onDownloadModel = {
                                     viewModel.downloadModel(model.id)
@@ -411,10 +412,12 @@ private fun EmptyModelsMessage(framework: String) {
 @Composable
 private fun SelectableModelRow(
     model: com.runanywhere.sdk.models.ModelInfo,
+    isSelected: Boolean,  // Matches iOS - is this the currently loaded model?
     isLoading: Boolean,
     onDownloadModel: () -> Unit,
     onSelectModel: () -> Unit
 ) {
+    // State detection - EXACT iOS logic
     val isDownloaded = model.localPath != null
     val canDownload = model.downloadURL != null
 
@@ -441,7 +444,7 @@ private fun SelectableModelRow(
                 Text(
                     text = model.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (isLoading) FontWeight.SemiBold else FontWeight.Normal
+                    fontWeight = if (isSelected || isLoading) FontWeight.SemiBold else FontWeight.Normal
                 )
 
                 // Badges row
@@ -471,13 +474,28 @@ private fun SelectableModelRow(
                     }
                 }
 
-                // Status indicator
+                // Status indicator - EXACT iOS logic
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     when {
+                        isSelected -> {
+                            // Model is loaded - show green checkmark
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Loaded",
+                                modifier = Modifier.size(12.dp),
+                                tint = Color(0xFF4CAF50)  // Green
+                            )
+                            Text(
+                                text = "Loaded",
+                                style = AppTypography.caption2,
+                                color = Color(0xFF4CAF50)
+                            )
+                        }
                         isDownloaded -> {
+                            // Model is downloaded but not loaded
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Downloaded",
@@ -503,12 +521,33 @@ private fun SelectableModelRow(
 
             Spacer(modifier = Modifier.width(Dimensions.smallMedium))
 
-            // RIGHT: Action button
+            // RIGHT: Action button - EXACT iOS logic
             when {
                 isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
+                isSelected -> {
+                    // Model is loaded - show "Loaded" status (matches iOS)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Loaded",
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Loaded",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF4CAF50),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
                 isDownloaded -> {
+                    // Model is downloaded - show "Load" button (matches iOS)
                     Button(
                         onClick = onSelectModel,
                         enabled = !isLoading,
@@ -516,10 +555,11 @@ private fun SelectableModelRow(
                             containerColor = MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text("Select")
+                        Text("Load")
                     }
                 }
                 canDownload -> {
+                    // Model is not downloaded - show "Download" button (matches iOS)
                     Button(
                         onClick = onDownloadModel,
                         enabled = !isLoading,

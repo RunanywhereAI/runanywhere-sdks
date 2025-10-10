@@ -928,7 +928,7 @@ fun ChatInputView(
                         style = MaterialTheme.typography.bodyLarge
                     )
                 },
-                enabled = enabled && !isGenerating && isModelLoaded,
+                enabled = isModelLoaded && !isGenerating,
                 textStyle = MaterialTheme.typography.bodyLarge,
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.Transparent,
@@ -942,9 +942,10 @@ fun ChatInputView(
             )
 
             // Send button
+            val canSendMessage = isModelLoaded && !isGenerating && value.trim().isNotBlank()
             IconButton(
                 onClick = onSend,
-                enabled = enabled && value.isNotBlank() && !isGenerating && isModelLoaded,
+                enabled = canSendMessage,
                 modifier = Modifier.size(Dimensions.sendButtonSize)
             ) {
                 Icon(
@@ -955,7 +956,7 @@ fun ChatInputView(
                         .size(Dimensions.sendButtonSize)
                         .clip(CircleShape)
                         .background(
-                            if (enabled && value.isNotBlank() && !isGenerating && isModelLoaded) {
+                            if (canSendMessage) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)

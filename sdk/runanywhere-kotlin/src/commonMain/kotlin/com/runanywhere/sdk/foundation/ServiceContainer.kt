@@ -263,6 +263,12 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
 
             modelInfoService.initialize()
+
+            // Scan file system for already downloaded models
+            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
+            logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
@@ -376,6 +382,12 @@ class ServiceContainer {
 
             modelInfoService.initialize()
             fetchAndPopulateModels()
+
+            // Scan file system for already downloaded models
+            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
+            logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 

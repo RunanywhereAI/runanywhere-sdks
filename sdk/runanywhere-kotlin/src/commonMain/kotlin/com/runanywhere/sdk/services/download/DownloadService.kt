@@ -233,6 +233,26 @@ class KtorDownloadService(
                     progressChannel = progressChannel
                 )
 
+                // Update model with local path in BOTH registry AND repository
+                val updatedModel = model.copy(localPath = destinationPath, updatedAt = com.runanywhere.sdk.utils.SimpleInstant.now())
+
+                // 1. Update in-memory registry
+                ServiceContainer.shared.modelRegistry.updateModel(updatedModel)
+
+                // 2. Save to persistent repository (database)
+                try {
+                    ServiceContainer.shared.modelInfoService.saveModel(updatedModel)
+                    logger.info(
+                        "Model saved to repository - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}"
+                    )
+                } catch (e: Exception) {
+                    logger.error("Failed to save model to repository: ${e.message}", e)
+                }
+
+                logger.info(
+                    "Model updated in registry - modelId: ${model.id}, localPath: $destinationPath, isDownloaded: ${updatedModel.isDownloaded}"
+                )
+
                 destinationPath
 
             } catch (e: kotlinx.coroutines.CancellationException) {

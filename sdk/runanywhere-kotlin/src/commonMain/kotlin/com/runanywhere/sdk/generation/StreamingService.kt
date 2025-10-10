@@ -19,27 +19,8 @@ class StreamingService {
         prompt: String,
         options: GenerationOptions
     ): Flow<GenerationChunk> = flow {
-        logger.debug("Starting streaming for prompt: ${prompt.take(50)}...")
-
-        // TODO: Implement actual streaming with LLM service
-        // This is a mock implementation
-
-        val mockResponse = "This is a streaming response for your prompt. "
-        val words = mockResponse.split(" ")
-
-        for ((index, word) in words.withIndex()) {
-            val chunk = GenerationChunk(
-                text = "$word ",
-                isComplete = index == words.lastIndex,
-                tokenCount = word.length / 4 // Rough token estimate
-            )
-            emit(chunk)
-
-            // Simulate streaming delay
-            delay(50)
-        }
-
-        logger.debug("Streaming completed")
+        logger.error("StreamingService.stream() called but no LLM service is configured!")
+        throw IllegalStateException("No LLM service available for streaming. LLM component must be initialized first.")
     }
 
     /**

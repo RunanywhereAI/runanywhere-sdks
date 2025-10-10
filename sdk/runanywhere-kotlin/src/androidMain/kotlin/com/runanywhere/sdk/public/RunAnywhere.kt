@@ -139,6 +139,25 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         androidLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
     }
 
+    /**
+     * Scan file system for downloaded models and restore their localPath
+     * Should be called after models are registered
+     */
+    suspend fun scanForDownloadedModels() {
+        val context = androidContext ?: throw IllegalStateException("Android context not provided")
+
+        try {
+            val modelsPath = context.filesDir.absolutePath + "/models"
+            val repository = ServiceContainer.shared.modelInfoRepository
+            if (repository is com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl) {
+                repository.scanAndUpdateDownloadedModels(modelsPath, ServiceContainer.shared.fileSystem)
+                androidLogger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+            }
+        } catch (e: Exception) {
+            androidLogger.warn("Failed to scan for downloaded models: ${e.message}")
+        }
+    }
+
     // These methods are no longer called during initialization (Phase 1)
     // They're kept for backward compatibility but are now unused
     // Authentication and device registration happen lazily via ensureDeviceRegistered()
