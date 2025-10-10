@@ -16,23 +16,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 
 /**
- * Model Selection Bottom Sheet - Matches iOS ModelSelectionSheet.swift
- *
- * Features:
- * - Device information section
- * - Available frameworks section (expandable)
- * - Models list filtered by framework
- * - Download/Load/Select actions matching iOS
- * - Loading overlay during model loading
- *
+ * Model Selection Bottom Sheet - EXACT iOS Implementation
  * Reference: iOS ModelSelectionSheet.swift
+ *
+ * UI Hierarchy:
+ * 1. Navigation Bar (Title + Cancel/Add Model buttons)
+ * 2. Main Content List:
+ *    - Section 1: Device Status
+ *    - Section 2: Available Frameworks (expandable)
+ *    - Section 3: Models for [Framework] (conditional - when framework expanded)
+ * 3. Loading Overlay (when loading model)
+ *
+ * Flow:
+ * - User taps "Select Model" from chat screen
+ * - Sheet shows device info + available frameworks
+ * - User taps framework → expands to show models
+ * - User can download (if not downloaded) or select (if downloaded/built-in)
+ * - On select: model loads with progress overlay
+ * - On success: sheet dismisses, chat updates
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,14 +50,17 @@ fun ModelSelectionBottomSheet(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!uiState.isLoadingModel) onDismiss() },
         sheetState = sheetState,
-        containerColor = AppColors.backgroundPrimary
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Box {
+            // Main Content
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -58,54 +68,77 @@ fun ModelSelectionBottomSheet(
                 contentPadding = PaddingValues(Dimensions.large),
                 verticalArrangement = Arrangement.spacedBy(Dimensions.large)
             ) {
-                // Title
+                // HEADER - "Select Model"
                 item {
-                    Text(
-                        text = "Select Model",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Cancel button
+                        TextButton(
+                            onClick = { if (!uiState.isLoadingModel) onDismiss() },
+                            enabled = !uiState.isLoadingModel
+                        ) {
+                            Text("Cancel")
+                        }
 
-                // Device Information Section - Matching iOS
-                item {
-                    DeviceInformationSection(deviceInfo = uiState.deviceInfo)
-                }
-
-                // Available Frameworks Section - Matching iOS
-                item {
-                    if (uiState.frameworks.isNotEmpty()) {
-                        AvailableFrameworksSection(
-                            frameworks = uiState.frameworks,
-                            expandedFramework = uiState.expandedFramework,
-                            onToggleFramework = { viewModel.toggleFramework(it) }
+                        // Title
+                        Text(
+                            text = "Select Model",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
+
+                        // Add Model button (placeholder for future)
+                        TextButton(
+                            onClick = { /* TODO: Add model from URL */ },
+                            enabled = false
+                        ) {
+                            Text("Add Model")
+                        }
                     }
                 }
 
-                // Models Section - Filtered by expanded framework
+                // SECTION 1: DEVICE STATUS
+                item {
+                    DeviceStatusSection(deviceInfo = uiState.deviceInfo)
+                }
+
+                // SECTION 2: AVAILABLE FRAMEWORKS
+                item {
+                    AvailableFrameworksSection(
+                        frameworks = uiState.frameworks,
+                        expandedFramework = uiState.expandedFramework,
+                        isLoading = uiState.isLoading,
+                        onToggleFramework = { viewModel.toggleFramework(it) }
+                    )
+                }
+
+                // SECTION 3: MODELS FOR [FRAMEWORK] (Conditional)
                 if (uiState.expandedFramework != null) {
                     item {
                         Text(
                             text = "Models for ${uiState.expandedFramework}",
                             style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = Dimensions.small)
                         )
                     }
 
+                    // Filter models by expanded framework
                     val filteredModels = uiState.models.filter { model ->
-                        model.compatibleFrameworks.map { it.toString() }.contains(uiState.expandedFramework)
+                        model.compatibleFrameworks.map { it.toString() }
+                            .contains(uiState.expandedFramework)
                     }
 
                     if (filteredModels.isEmpty()) {
+                        // Empty state
                         item {
-                            Text(
-                                text = "No models available for this framework.\nTap 'Add Model' to add a model from URL.",
-                                style = AppTypography.caption,
-                                color = AppColors.statusBlue
-                            )
+                            EmptyModelsMessage(framework = uiState.expandedFramework!!)
                         }
                     } else {
+                        // Model rows
                         items(filteredModels, key = { it.id }) { model ->
                             SelectableModelRow(
                                 model = model,
@@ -116,6 +149,8 @@ fun ModelSelectionBottomSheet(
                                 onSelectModel = {
                                     scope.launch {
                                         viewModel.selectModel(model.id)
+                                        // Wait a bit to show success message
+                                        kotlinx.coroutines.delay(500)
                                         onModelSelected(model)
                                         onDismiss()
                                     }
@@ -126,48 +161,69 @@ fun ModelSelectionBottomSheet(
                 }
             }
 
-            // Loading Overlay - Matching iOS
+            // LOADING OVERLAY - Matches iOS exactly
             if (uiState.isLoadingModel) {
                 LoadingOverlay(
-                    loadingProgress = uiState.loadingProgress
+                    modelName = uiState.models.find { it.id == uiState.selectedModelId }?.name ?: "Model",
+                    progress = uiState.loadingProgress
                 )
             }
         }
     }
 }
 
-/**
- * Device Information Section - Matches iOS deviceStatusSection
- */
+// ====================
+// SECTION 1: DEVICE STATUS
+// ====================
+
 @Composable
-private fun DeviceInformationSection(deviceInfo: DeviceInfo?) {
+private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = AppColors.backgroundGray6)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.large),
             verticalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
         ) {
             Text(
-                text = "Device Information",
+                text = "Device Status",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.SemiBold
             )
 
             if (deviceInfo != null) {
-                DeviceInfoRowLocal(label = "Device", icon = Icons.Default.PhoneAndroid, value = deviceInfo.model)
-                DeviceInfoRowLocal(label = "Processor", icon = Icons.Default.Memory, value = deviceInfo.processor)
-                DeviceInfoRowLocal(label = "Android", icon = Icons.Default.Android, value = deviceInfo.androidVersion)
-                DeviceInfoRowLocal(label = "Cores", icon = Icons.Default.Settings, value = deviceInfo.cores.toString())
+                DeviceInfoRowItem(
+                    label = "Model",
+                    icon = Icons.Default.PhoneAndroid,
+                    value = deviceInfo.model
+                )
+                DeviceInfoRowItem(
+                    label = "Processor",
+                    icon = Icons.Default.Memory,
+                    value = deviceInfo.processor
+                )
+                DeviceInfoRowItem(
+                    label = "Android",
+                    icon = Icons.Default.Android,
+                    value = deviceInfo.androidVersion
+                )
+                DeviceInfoRowItem(
+                    label = "Cores",
+                    icon = Icons.Default.Settings,
+                    value = deviceInfo.cores.toString()
+                )
             } else {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp))
-                    Text("Loading device info...", color = AppColors.textSecondary)
+                    Text(
+                        text = "Loading device info...",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -175,7 +231,11 @@ private fun DeviceInformationSection(deviceInfo: DeviceInfo?) {
 }
 
 @Composable
-private fun DeviceInfoRowLocal(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, value: String) {
+private fun DeviceInfoRowItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween
@@ -185,27 +245,33 @@ private fun DeviceInfoRowLocal(label: String, icon: androidx.compose.ui.graphics
                 imageVector = icon,
                 contentDescription = label,
                 modifier = Modifier.size(Dimensions.iconSmall),
-                tint = AppColors.textSecondary
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(label, style = MaterialTheme.typography.bodyLarge)
         }
-        Text(value, style = MaterialTheme.typography.bodyLarge, color = AppColors.textSecondary)
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
-/**
- * Available Frameworks Section - Matches iOS frameworksSection
- */
+// ====================
+// SECTION 2: AVAILABLE FRAMEWORKS
+// ====================
+
 @Composable
 private fun AvailableFrameworksSection(
     frameworks: List<String>,
     expandedFramework: String?,
+    isLoading: Boolean,
     onToggleFramework: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.mediumLarge),
-        colors = CardDefaults.cardColors(containerColor = AppColors.backgroundGray6)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.large),
@@ -217,19 +283,41 @@ private fun AvailableFrameworksSection(
                 fontWeight = FontWeight.SemiBold
             )
 
-            if (frameworks.isEmpty()) {
-                Text(
-                    text = "No framework adapters are currently registered. Register framework adapters to see available frameworks.",
-                    style = AppTypography.caption2,
-                    color = AppColors.statusOrange
-                )
-            } else {
-                frameworks.forEach { framework ->
-                    FrameworkRow(
-                        framework = framework,
-                        isExpanded = expandedFramework == framework,
-                        onTap = { onToggleFramework(framework) }
-                    )
+            when {
+                isLoading -> {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                        Text(
+                            text = "Loading frameworks...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                frameworks.isEmpty() -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(Dimensions.small)) {
+                        Text(
+                            text = "No framework adapters are currently registered.",
+                            style = AppTypography.caption2,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = "Register framework adapters to see available frameworks.",
+                            style = AppTypography.caption2,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                else -> {
+                    frameworks.forEach { framework ->
+                        FrameworkRow(
+                            framework = framework,
+                            isExpanded = expandedFramework == framework,
+                            onTap = { onToggleFramework(framework) }
+                        )
+                    }
                 }
             }
         }
@@ -250,20 +338,67 @@ private fun FrameworkRow(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
-            Text(framework, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-            Text("High-performance inference", style = AppTypography.caption2, color = AppColors.textSecondary)
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Framework icon
+            Icon(
+                imageVector = when (framework.uppercase()) {
+                    "LLAMACPP", "LLAMA_CPP" -> Icons.Default.Memory
+                    "MEDIAPIPE" -> Icons.Default.Psychology
+                    else -> Icons.Default.Settings
+                },
+                contentDescription = null,
+                modifier = Modifier.size(Dimensions.iconRegular),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Column {
+                Text(
+                    framework,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    "High-performance inference",
+                    style = AppTypography.caption2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
+
         Icon(
             imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-            contentDescription = if (isExpanded) "Collapse" else "Expand"
+            contentDescription = if (isExpanded) "Collapse" else "Expand",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 }
 
-/**
- * Selectable Model Row - Matches iOS SelectableModelRow
- */
+// ====================
+// SECTION 3: MODELS LIST
+// ====================
+
+@Composable
+private fun EmptyModelsMessage(framework: String) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(Dimensions.small),
+        modifier = Modifier.padding(vertical = Dimensions.small)
+    ) {
+        Text(
+            text = "No models available for this framework",
+            style = AppTypography.caption,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "Tap 'Add Model' to add a model from URL",
+            style = AppTypography.caption2,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
 @Composable
 private fun SelectableModelRow(
     model: com.runanywhere.sdk.models.ModelInfo,
@@ -271,10 +406,15 @@ private fun SelectableModelRow(
     onDownloadModel: () -> Unit,
     onSelectModel: () -> Unit
 ) {
+    val isDownloaded = model.localPath != null
+    val canDownload = model.downloadURL != null
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(Dimensions.medium),
-        colors = CardDefaults.cardColors(containerColor = AppColors.backgroundGray5)
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
     ) {
         Row(
             modifier = Modifier
@@ -283,88 +423,103 @@ private fun SelectableModelRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // LEFT: Model Info
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(Dimensions.xSmall)
             ) {
+                // Model name
                 Text(
                     text = model.name,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (isLoading) FontWeight.SemiBold else FontWeight.Normal
                 )
 
+                // Badges row
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.smallMedium)
                 ) {
                     // Size badge
                     val memReq = model.memoryRequired ?: 0L
                     if (memReq > 0) {
-                        Badge(
+                        ModelBadge(
                             text = formatBytes(memReq),
-                            icon = Icons.Default.Memory,
-                            backgroundColor = AppColors.badgeGray
+                            icon = Icons.Default.Memory
                         )
                     }
 
                     // Format badge
-                    Badge(
-                        text = model.format.name.uppercase(),
-                        backgroundColor = AppColors.badgeGray
-                    )
+                    ModelBadge(text = model.format.name.uppercase())
 
                     // Thinking badge
                     if (model.supportsThinking) {
-                        Badge(
+                        ModelBadge(
                             text = "THINKING",
                             icon = Icons.Default.Psychology,
-                            backgroundColor = AppColors.badgePurple,
-                            textColor = AppColors.primaryPurple
+                            backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                            textColor = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
 
-                // Download status
-                if (model.localPath == null && model.downloadURL != null) {
-                    Text(
-                        text = "Available for download",
-                        style = AppTypography.caption2,
-                        color = AppColors.statusBlue
-                    )
-                } else if (model.localPath != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall)) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Downloaded",
-                            modifier = Modifier.size(12.dp),
-                            tint = AppColors.statusGreen
-                        )
-                        Text(
-                            text = "Downloaded",
-                            style = AppTypography.caption2,
-                            color = AppColors.statusGreen
-                        )
+                // Status indicator
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    when {
+                        isDownloaded -> {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Downloaded",
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.tertiary
+                            )
+                            Text(
+                                text = "Downloaded",
+                                style = AppTypography.caption2,
+                                color = MaterialTheme.colorScheme.tertiary
+                            )
+                        }
+                        canDownload -> {
+                            Text(
+                                text = "Available for download",
+                                style = AppTypography.caption2,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.width(Dimensions.smallMedium))
 
-            // Action button
-            if (model.localPath == null && model.downloadURL != null) {
-                Button(
-                    onClick = onDownloadModel,
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryBlue)
-                ) {
-                    Text("Download")
+            // RIGHT: Action button
+            when {
+                isLoading -> {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
-            } else if (model.localPath != null) {
-                Button(
-                    onClick = onSelectModel,
-                    enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = AppColors.primaryBlue)
-                ) {
-                    Text("Select")
+                isDownloaded -> {
+                    Button(
+                        onClick = onSelectModel,
+                        enabled = !isLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Select")
+                    }
+                }
+                canDownload -> {
+                    Button(
+                        onClick = onDownloadModel,
+                        enabled = !isLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Text("Download")
+                    }
                 }
             }
         }
@@ -372,11 +527,11 @@ private fun SelectableModelRow(
 }
 
 @Composable
-private fun Badge(
+private fun ModelBadge(
     text: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    backgroundColor: Color,
-    textColor: Color = AppColors.textPrimary
+    backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
+    textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
     Row(
         modifier = Modifier
@@ -401,21 +556,27 @@ private fun Badge(
     }
 }
 
-/**
- * Loading Overlay - Matches iOS loadingOverlay
- */
+// ====================
+// LOADING OVERLAY - Matches iOS
+// ====================
+
 @Composable
-private fun LoadingOverlay(loadingProgress: String) {
+private fun LoadingOverlay(
+    modelName: String,
+    progress: String
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f)),
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f)),
         contentAlignment = Alignment.Center
     ) {
         Card(
             modifier = Modifier.padding(Dimensions.xxLarge),
             shape = RoundedCornerShape(Dimensions.cornerRadiusXLarge),
-            colors = CardDefaults.cardColors(containerColor = AppColors.backgroundPrimary)
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface
+            )
         ) {
             Column(
                 modifier = Modifier.padding(Dimensions.xxLarge),
@@ -423,20 +584,26 @@ private fun LoadingOverlay(loadingProgress: String) {
                 verticalArrangement = Arrangement.spacedBy(Dimensions.xLarge)
             ) {
                 CircularProgressIndicator()
+
                 Text(
                     text = "Loading Model",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
+
                 Text(
-                    text = loadingProgress,
+                    text = progress,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AppColors.textSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
     }
 }
+
+// ====================
+// UTILITY FUNCTIONS
+// ====================
 
 private fun formatBytes(bytes: Long): String {
     val gb = bytes / (1024.0 * 1024.0 * 1024.0)
