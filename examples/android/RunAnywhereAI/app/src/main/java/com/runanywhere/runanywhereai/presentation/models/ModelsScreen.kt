@@ -299,7 +299,7 @@ fun ModelItem(
                             ModelBadge(
                                 text = "THINKING",
                                 icon = Icons.Default.Psychology,
-                                color = Color(0xFF9C27B0) // Purple
+                                color = MaterialTheme.colorScheme.secondary
                             )
                         }
                     }
@@ -340,13 +340,13 @@ fun ModelItem(
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Loaded",
-                                tint = Color(0xFF4CAF50), // Green
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = "Loaded",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF4CAF50)
+                                color = MaterialTheme.colorScheme.tertiary
                             )
                         }
                     }
@@ -359,13 +359,13 @@ fun ModelItem(
                             Icon(
                                 imageVector = Icons.Default.CloudDone,
                                 contentDescription = "Downloaded",
-                                tint = Color(0xFF4CAF50),
+                                tint = MaterialTheme.colorScheme.tertiary,
                                 modifier = Modifier.size(16.dp)
                             )
                             Text(
                                 text = "Downloaded",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF4CAF50)
+                                color = MaterialTheme.colorScheme.tertiary
                             )
                         }
                     }

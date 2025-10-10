@@ -108,9 +108,9 @@ fun ChatScreen(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Info",
                             tint = if (uiState.messages.isNotEmpty()) {
-                                AppColors.primaryBlue
+                                MaterialTheme.colorScheme.primary
                             } else {
-                                AppColors.statusGray
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             }
                         )
                     }
@@ -144,15 +144,15 @@ fun ChatScreen(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Clear Chat",
                             tint = if (uiState.messages.isNotEmpty()) {
-                                AppColors.primaryRed
+                                MaterialTheme.colorScheme.error
                             } else {
-                                AppColors.statusGray
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             }
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AppColors.backgroundPrimary
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -161,7 +161,7 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(AppColors.backgroundGrouped)
+                .background(MaterialTheme.colorScheme.background)
         ) {
             // Model info bar (conditional) - matching iOS
             AnimatedVisibility(
@@ -214,7 +214,7 @@ fun ChatScreen(
             // Divider above input
             HorizontalDivider(
                 thickness = Dimensions.strokeThin,
-                color = AppColors.separator
+                color = MaterialTheme.colorScheme.outline
             )
 
             // Model selection prompt (when no model loaded) - matching iOS
@@ -298,7 +298,7 @@ fun ModelInfoBar(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AppColors.backgroundPrimary.copy(alpha = 0.95f)
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
     ) {
         Row(
             modifier = Modifier
@@ -312,18 +312,18 @@ fun ModelInfoBar(
         ) {
             // Framework badge
             Surface(
-                color = AppColors.primaryBlue,
+                color = MaterialTheme.colorScheme.primary,
                 shape = RoundedCornerShape(Dimensions.modelInfoFrameworkBadgeCornerRadius),
                 modifier = Modifier.border(
                     width = Dimensions.strokeThin,
-                    color = AppColors.textWhite.copy(alpha = 0.2f),
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(Dimensions.modelInfoFrameworkBadgeCornerRadius)
                 )
             ) {
                 Text(
                     text = framework,
                     style = AppTypography.monospacedCaption,
-                    color = AppColors.textWhite,
+                    color = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.padding(
                         horizontal = Dimensions.modelInfoFrameworkBadgePaddingHorizontal,
                         vertical = Dimensions.modelInfoFrameworkBadgePaddingVertical
@@ -335,7 +335,7 @@ fun ModelInfoBar(
             Text(
                 text = modelName.split(" ").first(),
                 style = AppTypography.rounded11,
-                color = AppColors.textSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             // Stats (storage icon + size) - matching iOS
@@ -347,12 +347,12 @@ fun ModelInfoBar(
                     imageVector = Icons.Default.Storage,
                     contentDescription = null,
                     modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = AppColors.textSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "1.2G",  // TODO: Get actual size
                     style = AppTypography.rounded10,
-                    color = AppColors.textSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -365,12 +365,12 @@ fun ModelInfoBar(
                     imageVector = Icons.Default.Description,
                     contentDescription = null,
                     modifier = Modifier.size(Dimensions.iconSmall),
-                    tint = AppColors.textSecondary
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = "128K",  // TODO: Get actual context length
                     style = AppTypography.rounded10,
-                    color = AppColors.textSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -384,7 +384,7 @@ fun ModelInfoBar(
     ) {
         HorizontalDivider(
             thickness = Dimensions.strokeThin,
-            color = AppColors.separator
+            color = MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -443,9 +443,9 @@ fun MessageBubbleView(
             if (message.content.isNotEmpty()) {
                 Surface(
                     color = if (message.role == MessageRole.USER) {
-                        AppColors.messageBubbleUser
+                        MaterialTheme.colorScheme.primary
                     } else {
-                        AppColors.messageBubbleAssistant
+                        MaterialTheme.colorScheme.surfaceVariant
                     },
                     shape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius),
                     modifier = Modifier
@@ -456,9 +456,9 @@ fun MessageBubbleView(
                         .border(
                             width = Dimensions.strokeThin,
                             color = if (message.role == MessageRole.USER) {
-                                AppColors.borderLight
+                                MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f)
                             } else {
-                                AppColors.borderMedium
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                             },
                             shape = RoundedCornerShape(Dimensions.messageBubbleCornerRadius)
                         )
@@ -467,9 +467,9 @@ fun MessageBubbleView(
                         text = message.content,
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (message.role == MessageRole.USER) {
-                            AppColors.textWhite
+                            MaterialTheme.colorScheme.onPrimary
                         } else {
-                            AppColors.textPrimary
+                            MaterialTheme.colorScheme.onSurface
                         },
                         modifier = Modifier.padding(
                             horizontal = Dimensions.messageBubblePaddingHorizontal,
@@ -494,7 +494,7 @@ fun MessageBubbleView(
                 Text(
                     text = formatTimestamp(message.timestamp),
                     style = AppTypography.caption2,
-                    color = AppColors.textSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.align(Alignment.End)
                 )
             }
@@ -527,7 +527,7 @@ fun ModelBadge(
     framework: String
 ) {
     Surface(
-        color = AppColors.primaryBlue,
+        color = MaterialTheme.colorScheme.primary,
         shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius),
         modifier = Modifier
             .shadow(
@@ -536,7 +536,7 @@ fun ModelBadge(
             )
             .border(
                 width = Dimensions.strokeThin,
-                color = AppColors.textWhite.copy(alpha = 0.2f),
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
                 shape = RoundedCornerShape(Dimensions.modelBadgeCornerRadius)
             )
     ) {
@@ -552,17 +552,17 @@ fun ModelBadge(
                 imageVector = Icons.Default.ViewInAr,
                 contentDescription = null,
                 modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                tint = AppColors.textWhite
+                tint = MaterialTheme.colorScheme.onPrimary
             )
             Text(
                 text = modelName,
                 style = AppTypography.caption2Medium,
-                color = AppColors.textWhite
+                color = MaterialTheme.colorScheme.onPrimary
             )
             Text(
                 text = framework,
                 style = AppTypography.caption2,
-                color = AppColors.textWhite
+                color = MaterialTheme.colorScheme.onPrimary
             )
         }
     }
@@ -589,16 +589,16 @@ fun ThinkingToggle(
                 .shadow(
                     elevation = Dimensions.shadowSmall,
                     shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius),
-                    ambientColor = AppColors.shadowThinking,
-                    spotColor = AppColors.shadowThinking
+                    ambientColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
+                    spotColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f)
                 )
                 .background(
-                    brush = AppColors.thinkingBackgroundGradient(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
                 )
                 .border(
                     width = Dimensions.strokeThin,
-                    color = AppColors.thinkingBorder,
+                    color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(Dimensions.thinkingSectionCornerRadius)
                 )
         ) {
@@ -614,19 +614,19 @@ fun ThinkingToggle(
                     imageVector = Icons.Default.Lightbulb,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption.fontSize.value.dp),
-                    tint = AppColors.primaryPurple
+                    tint = MaterialTheme.colorScheme.secondary
                 )
                 Text(
                     text = if (isExpanded) "Hide reasoning" else "Show reasoning...",
                     style = AppTypography.caption,
-                    color = AppColors.primaryPurple,
+                    color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.weight(1f)
                 )
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowRight,
                     contentDescription = null,
                     modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                    tint = AppColors.primaryPurple.copy(alpha = 0.6f)
+                    tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f)
                 )
             }
         }
@@ -640,7 +640,7 @@ fun ThinkingToggle(
             Column {
                 Spacer(modifier = Modifier.height(Dimensions.small))
                 Surface(
-                    color = AppColors.thinkingContentBackground,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(Dimensions.thinkingContentCornerRadius)
                 ) {
                     Box(
@@ -651,7 +651,7 @@ fun ThinkingToggle(
                         Text(
                             text = thinkingContent,
                             style = AppTypography.caption,
-                            color = AppColors.textSecondary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -677,14 +677,14 @@ fun AnalyticsFooter(
         Text(
             text = "12:34 PM",  // TODO: Get actual timestamp
             style = AppTypography.caption2,
-            color = AppColors.textSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Separator
         Text(
             text = "•",
             style = AppTypography.caption2,
-            color = AppColors.textSecondary.copy(alpha = 0.5f)
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         )
 
         // Duration
@@ -692,12 +692,12 @@ fun AnalyticsFooter(
             Text(
                 text = "${ttft / 1000f}s",
                 style = AppTypography.caption2,
-                color = AppColors.textSecondary
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = "•",
                 style = AppTypography.caption2,
-                color = AppColors.textSecondary.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
         }
 
@@ -705,7 +705,7 @@ fun AnalyticsFooter(
         Text(
             text = String.format("%.1f tok/s", analytics.averageTokensPerSecond),
             style = AppTypography.caption2,
-            color = AppColors.textSecondary
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         // Thinking indicator
@@ -713,13 +713,13 @@ fun AnalyticsFooter(
             Text(
                 text = "•",
                 style = AppTypography.caption2,
-                color = AppColors.textSecondary.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )
             Icon(
                 imageVector = Icons.Default.Lightbulb,
                 contentDescription = null,
                 modifier = Modifier.size(AppTypography.caption2.fontSize.value.dp),
-                tint = AppColors.primaryPurple
+                tint = MaterialTheme.colorScheme.secondary
             )
         }
     }
@@ -736,7 +736,7 @@ fun TypingIndicatorView() {
         horizontalArrangement = Arrangement.Start
     ) {
         Surface(
-            color = AppColors.typingIndicatorBackground,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius),
             modifier = Modifier
                 .shadow(
@@ -745,7 +745,7 @@ fun TypingIndicatorView() {
                 )
                 .border(
                     width = Dimensions.strokeThin,
-                    color = AppColors.typingIndicatorBorder,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f),
                     shape = RoundedCornerShape(Dimensions.typingIndicatorCornerRadius)
                 )
         ) {
@@ -779,7 +779,7 @@ fun TypingIndicatorView() {
                                 scaleY = scale
                             }
                             .background(
-                                color = AppColors.typingIndicatorDots,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
                                 shape = CircleShape
                             )
                     )
@@ -791,7 +791,7 @@ fun TypingIndicatorView() {
                 Text(
                     text = "AI is thinking...",
                     style = AppTypography.caption,
-                    color = AppColors.typingIndicatorText
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                 )
             }
         }
@@ -821,7 +821,7 @@ fun EmptyStateView(
             imageVector = if (isModelLoaded) Icons.Default.Chat else Icons.Default.Download,
             contentDescription = null,
             modifier = Modifier.size(Dimensions.emptyStateIconSize),
-            tint = AppColors.textSecondary.copy(alpha = 0.6f)
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
         )
 
         Spacer(modifier = Modifier.height(Dimensions.emptyStateIconTextSpacing))
@@ -830,7 +830,7 @@ fun EmptyStateView(
         Text(
             text = "Start a conversation",
             style = MaterialTheme.typography.titleMedium,
-            color = AppColors.textPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(Dimensions.emptyStateTitleSubtitleSpacing))
@@ -843,7 +843,7 @@ fun EmptyStateView(
                 "Select a model first, then start chatting"
             },
             style = MaterialTheme.typography.bodyMedium,
-            color = AppColors.textSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
     }
@@ -859,7 +859,7 @@ fun ModelSelectionPrompt(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AppColors.modelFrameworkBg
+        color = MaterialTheme.colorScheme.primaryContainer
     ) {
         Column(
             modifier = Modifier.padding(Dimensions.mediumLarge),
@@ -869,14 +869,14 @@ fun ModelSelectionPrompt(
             Text(
                 text = "Welcome! Select and download a model to start chatting.",
                 style = AppTypography.caption,
-                color = AppColors.textSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
             Button(
                 onClick = onSelectModel,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AppColors.primaryBlue
+                    containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(
@@ -903,7 +903,7 @@ fun ChatInputView(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = AppColors.backgroundPrimary,
+        color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp
     ) {
         Row(
@@ -950,19 +950,15 @@ fun ChatInputView(
                 Icon(
                     imageVector = Icons.Default.ArrowUpward,
                     contentDescription = "Send",
-                    tint = if (enabled && value.isNotBlank() && !isGenerating && isModelLoaded) {
-                        AppColors.primaryAccent
-                    } else {
-                        AppColors.statusGray
-                    },
+                    tint = Color.White,
                     modifier = Modifier
                         .size(Dimensions.sendButtonSize)
                         .clip(CircleShape)
                         .background(
                             if (enabled && value.isNotBlank() && !isGenerating && isModelLoaded) {
-                                AppColors.primaryAccent
+                                MaterialTheme.colorScheme.primary
                             } else {
-                                AppColors.statusGray
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
                             }
                         )
                         .padding(6.dp)

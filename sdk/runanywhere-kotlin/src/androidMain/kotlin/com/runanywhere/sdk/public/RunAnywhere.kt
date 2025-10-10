@@ -1,5 +1,6 @@
 package com.runanywhere.sdk.public
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.runanywhere.sdk.audio.AndroidAudioCapture
 import com.runanywhere.sdk.components.base.ComponentState
@@ -38,6 +39,7 @@ import java.io.ByteArrayOutputStream
  * Android implementation of RunAnywhere SDK
  * Simplified version using platform abstractions
  */
+@SuppressLint("StaticFieldLeak") // TODO: double check this later
 actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     private val androidLogger = SDKLogger("RunAnywhere.Android")
@@ -219,7 +221,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         }
     }
 
-    override suspend fun generate(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): String {
+    override suspend fun generate(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): String {
         requireInitialized()
 
         androidLogger.info("Generating response for prompt: ${prompt.take(50)}...")
@@ -239,7 +244,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
-    override fun generateStream(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): Flow<String> {
+    override fun generateStream(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): Flow<String> {
         requireInitialized()
 
         androidLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
@@ -287,7 +295,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         androidLogger.info("Recording audio for $durationSeconds seconds and transcribing...")
 
-        val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture =
+            this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
 
         // Record audio for the specified duration
         val audioData = audioCapture.recordAudio(durationSeconds * 1000L)
@@ -301,7 +310,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     fun startRecordingWithWaveform(): Flow<STTStreamEvent.AudioLevelChanged> = flow {
         requireInitialized()
 
-        val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture = this@RunAnywhere.audioCapture
+            ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording with waveform")
 
@@ -323,7 +333,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 }
 
                 // Emit audio level for waveform
-                emit(STTStreamEvent.AudioLevelChanged(decibelLevel, System.currentTimeMillis() / 1000.0))
+                emit(
+                    STTStreamEvent.AudioLevelChanged(
+                        decibelLevel,
+                        System.currentTimeMillis() / 1000.0
+                    )
+                )
 
                 // Accumulate audio samples for transcription
                 audioBuffer.addAll(chunk.samples.toList())
@@ -383,7 +398,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             return
         }
 
-        val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture =
+            this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording...")
         recordingBuffer.reset()
@@ -416,7 +432,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             throw IllegalStateException("Recording already in progress")
         }
 
-        val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture = this@RunAnywhere.audioCapture
+            ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording with live transcription...")
         isRecording = true
