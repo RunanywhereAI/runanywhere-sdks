@@ -62,24 +62,27 @@ android {
         ndk {
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        externalNativeBuild {
+            cmake {
+                // Following official llama.cpp Android example
+                arguments += "-DLLAMA_BUILD_COMMON=ON"
+                arguments += "-DCMAKE_BUILD_TYPE=Release"
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("../../native/llama-jni/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
-    sourceSets {
-        named("main") {
-            jniLibs.srcDirs("src/androidMain/jniLibs")
-        }
-    }
 }
 
-// Task to copy native libraries
-tasks.register<Copy>("copyNativeLibraries") {
-    from("../../native/llama-jni/build/android") {
-        include("**/*.so")
-    }
-    into("src/androidMain/jniLibs")
-}
+// No need to manually copy native libraries - CMake builds them automatically

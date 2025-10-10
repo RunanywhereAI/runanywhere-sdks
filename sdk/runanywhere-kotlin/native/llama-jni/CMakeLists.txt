@@ -1,34 +1,18 @@
-cmake_minimum_required(VERSION 3.18)
+# Based on official llama.cpp Android example
+# See: llama.cpp/examples/llama.android/llama/src/main/cpp/CMakeLists.txt
 
-project(llama-jni)
+cmake_minimum_required(VERSION 3.22.1)
+
+project("llama-jni")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find JNI
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-
-# Find Java
-find_package(Java REQUIRED)
-
-# Set up llama.cpp
+# Set up llama.cpp path
 set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
 
-# Force static library builds for llama.cpp
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries" FORCE)
-set(LLAMA_BUILD_COMMON ON CACHE BOOL "Build common library" FORCE)
-set(LLAMA_STATIC ON CACHE BOOL "Build static library" FORCE)
-
-# Add llama.cpp subdirectory
-add_subdirectory(${LLAMA_CPP_DIR} EXCLUDE_FROM_ALL)
-
-# Get llama.cpp include directories
-target_include_directories(llama PUBLIC
-    ${LLAMA_CPP_DIR}/include
-    ${LLAMA_CPP_DIR}/common
-    ${LLAMA_CPP_DIR}/src
-)
+# Add llama.cpp subdirectory (provides llama and common targets)
+add_subdirectory(${LLAMA_CPP_DIR} build-llama)
 
 # JNI source files
 set(JNI_SOURCES
@@ -36,62 +20,21 @@ set(JNI_SOURCES
     src/llama_jni_utils.cpp
 )
 
-# Create the JNI library
+# Create the JNI shared library
 add_library(llama-jni SHARED ${JNI_SOURCES})
 
-# Link with llama, common (from llama.cpp), and JNI
+# Link with llama.cpp libraries (following official Android example)
 target_link_libraries(llama-jni
     llama
     common
-    ${JNI_LIBRARIES}
-)
+    android
+    log)
 
 # Include directories
 target_include_directories(llama-jni PRIVATE
-    ${JNI_INCLUDE_DIRS}
     ${LLAMA_CPP_DIR}/include
     ${LLAMA_CPP_DIR}/common
     ${LLAMA_CPP_DIR}/src
     ${LLAMA_CPP_DIR}
     src
-)
-
-# Platform-specific configurations
-if(ANDROID)
-    target_link_libraries(llama-jni log)
-    set_target_properties(llama-jni PROPERTIES
-        ANDROID_STL c++_shared
-    )
-elseif(APPLE)
-    set_target_properties(llama-jni PROPERTIES
-        MACOSX_RPATH ON
-        INSTALL_RPATH "@loader_path"
-    )
-elseif(UNIX)
-    set_target_properties(llama-jni PROPERTIES
-        INSTALL_RPATH "$ORIGIN"
-    )
-endif()
-
-# Compiler-specific optimizations
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(llama-jni PRIVATE
-        -O3
-        -ffast-math
-        -funroll-loops
-        -fno-finite-math-only
-    )
-endif()
-
-# Output configuration
-set_target_properties(llama-jni PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
-)
-
-# Install configuration (optional)
-install(TARGETS llama-jni
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
 )
