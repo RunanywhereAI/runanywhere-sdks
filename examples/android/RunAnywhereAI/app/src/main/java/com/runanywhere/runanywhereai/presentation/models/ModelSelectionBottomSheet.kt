@@ -127,9 +127,18 @@ fun ModelSelectionBottomSheet(
                     }
 
                     // Filter models by expanded framework
+                    // CRITICAL: Use displayName to match framework names from ViewModel
                     val filteredModels = uiState.models.filter { model ->
-                        model.compatibleFrameworks.map { it.toString() }
+                        model.compatibleFrameworks.map { it.displayName }
                             .contains(uiState.expandedFramework)
+                    }
+
+                    // Debug logging
+                    android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${uiState.expandedFramework}")
+                    android.util.Log.d("ModelSelectionSheet", "📦 Total models: ${uiState.models.size}")
+                    android.util.Log.d("ModelSelectionSheet", "✅ Filtered models: ${filteredModels.size}")
+                    filteredModels.forEach { model ->
+                        android.util.Log.d("ModelSelectionSheet", "   - ${model.name} (${model.compatibleFrameworks.map { it.displayName }})")
                     }
 
                     if (filteredModels.isEmpty()) {

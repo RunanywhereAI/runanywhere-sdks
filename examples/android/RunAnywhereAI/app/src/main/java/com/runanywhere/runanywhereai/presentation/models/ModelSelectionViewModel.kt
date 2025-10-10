@@ -48,14 +48,46 @@ class ModelSelectionViewModel : ViewModel() {
     private fun loadModelsAndFrameworks() {
         viewModelScope.launch {
             try {
+                android.util.Log.d("ModelSelectionVM", "🔄 Loading models and frameworks...")
+
                 // Call SDK to get available models - matching iOS
                 val models = RunAnywhere.availableModels()
+                android.util.Log.d("ModelSelectionVM", "📦 Fetched ${models.size} models from SDK")
 
-                // Extract unique frameworks from models (convert enum to string)
-                val frameworks = models
-                    .flatMap { it.compatibleFrameworks.map { fw -> fw.toString() } }
-                    .distinct()
-                    .sorted()
+                // Get registered framework providers from ModuleRegistry
+                val llmProviders = com.runanywhere.sdk.core.ModuleRegistry.allLLMProviders
+                val sttProviders = com.runanywhere.sdk.core.ModuleRegistry.allSTTProviders
+
+                android.util.Log.d("ModelSelectionVM", "🔍 LLM Providers registered: ${llmProviders.size}")
+                llmProviders.forEach { provider ->
+                    android.util.Log.d("ModelSelectionVM", "   - ${provider.name}")
+                    android.util.Log.d("ModelSelectionVM", "     framework enum: ${provider.framework}")
+                    android.util.Log.d("ModelSelectionVM", "     displayName: ${provider.framework.displayName}")
+                }
+
+                // Build framework list from registered providers
+                // CRITICAL: Use displayName to match UI filtering
+                val frameworks = buildList {
+                    // Add LLM frameworks using displayName
+                    llmProviders.forEach { provider ->
+                        add(provider.framework.displayName)  // e.g., "llama.cpp"
+                    }
+                    // Add STT frameworks
+                    sttProviders.forEach { provider ->
+                        add(provider.name)
+                    }
+                }.distinct().sorted()
+
+                android.util.Log.d("ModelSelectionVM", "✅ Loaded ${models.size} models and ${frameworks.size} frameworks")
+                android.util.Log.d("ModelSelectionVM", "📦 Frameworks: $frameworks")
+
+                // Log each model's details
+                models.forEachIndexed { index, model ->
+                    android.util.Log.d("ModelSelectionVM", "📋 Model ${index + 1}: ${model.name}")
+                    android.util.Log.d("ModelSelectionVM", "   - ID: ${model.id}")
+                    android.util.Log.d("ModelSelectionVM", "   - Compatible Frameworks (enum): ${model.compatibleFrameworks}")
+                    android.util.Log.d("ModelSelectionVM", "   - Compatible Frameworks (displayName): ${model.compatibleFrameworks.map { it.displayName }}")
+                }
 
                 _uiState.update {
                     it.copy(
@@ -65,7 +97,12 @@ class ModelSelectionViewModel : ViewModel() {
                         error = null
                     )
                 }
+
+                android.util.Log.d("ModelSelectionVM", "🎉 UI state updated successfully")
+
             } catch (e: Exception) {
+                android.util.Log.e("ModelSelectionVM", "❌ Failed to load models: ${e.message}", e)
+                e.printStackTrace()
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -77,11 +114,13 @@ class ModelSelectionViewModel : ViewModel() {
     }
 
     fun toggleFramework(framework: String) {
+        android.util.Log.d("ModelSelectionVM", "🔀 Toggling framework: $framework")
         _uiState.update {
             it.copy(
                 expandedFramework = if (it.expandedFramework == framework) null else framework
             )
         }
+        android.util.Log.d("ModelSelectionVM", "   Expanded framework now: ${_uiState.value.expandedFramework}")
     }
 
     /**
@@ -90,6 +129,8 @@ class ModelSelectionViewModel : ViewModel() {
     fun downloadModel(modelId: String) {
         viewModelScope.launch {
             try {
+                android.util.Log.d("ModelSelectionVM", "⬇️ Starting download for model: $modelId")
+
                 _uiState.update {
                     it.copy(
                         selectedModelId = modelId,
@@ -100,12 +141,17 @@ class ModelSelectionViewModel : ViewModel() {
 
                 // Call SDK download API with progress
                 RunAnywhere.downloadModel(modelId).collect { progress ->
+                    val progressPercent = (progress * 100).toInt()
+                    android.util.Log.d("ModelSelectionVM", "📊 Download progress: $progressPercent%")
+
                     _uiState.update {
                         it.copy(
-                            loadingProgress = "Downloading: ${(progress * 100).toInt()}%"
+                            loadingProgress = "Downloading: $progressPercent%"
                         )
                     }
                 }
+
+                android.util.Log.d("ModelSelectionVM", "✅ Download complete for $modelId")
 
                 // Reload models after download completes
                 loadModelsAndFrameworks()
@@ -118,6 +164,7 @@ class ModelSelectionViewModel : ViewModel() {
                     )
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ModelSelectionVM", "❌ Download failed for $modelId: ${e.message}", e)
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
@@ -135,6 +182,8 @@ class ModelSelectionViewModel : ViewModel() {
      */
     suspend fun selectModel(modelId: String) {
         try {
+            android.util.Log.d("ModelSelectionVM", "🔄 Loading model into memory: $modelId")
+
             _uiState.update {
                 it.copy(
                     selectedModelId = modelId,
@@ -146,6 +195,8 @@ class ModelSelectionViewModel : ViewModel() {
             // Call SDK to load model - matching iOS
             RunAnywhere.loadModel(modelId)
 
+            android.util.Log.d("ModelSelectionVM", "✅ Model loaded successfully: $modelId")
+
             _uiState.update {
                 it.copy(
                     loadingProgress = "Model loaded successfully!",
@@ -154,6 +205,7 @@ class ModelSelectionViewModel : ViewModel() {
                 )
             }
         } catch (e: Exception) {
+            android.util.Log.e("ModelSelectionVM", "❌ Failed to load model $modelId: ${e.message}", e)
             _uiState.update {
                 it.copy(
                     isLoadingModel = false,

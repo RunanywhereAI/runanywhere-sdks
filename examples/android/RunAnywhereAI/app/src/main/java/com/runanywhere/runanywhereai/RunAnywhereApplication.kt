@@ -57,7 +57,10 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
 
-                // Register models for development (matches iOS pattern)
+                // STEP 1: Register Service Providers (matches iOS pattern)
+                registerServiceProvidersForDevelopment()
+
+                // STEP 2: Register models for development
                 registerModelsForDevelopment()
 
             } else {
@@ -107,8 +110,32 @@ class RunAnywhereApplication : Application() {
     }
 
     /**
+     * Register Service Providers (matches iOS LLMSwiftServiceProvider.register())
+     * This is Step 1 of the two-tier registration pattern:
+     * 1. Register service providers with ModuleRegistry
+     * 2. Register models with their framework associations
+     */
+    private fun registerServiceProvidersForDevelopment() {
+        Log.i("RunAnywhereApp", "🔧 Registering Service Providers for DEVELOPMENT mode")
+
+        try {
+            // Register Llama.cpp service provider
+            com.runanywhere.runanywhereai.llm.LlamaCppServiceProvider.register()
+            Log.i("RunAnywhereApp", "✅ Registered LlamaCppServiceProvider")
+
+            // TODO: Register WhisperKit/STT provider when available
+            // TODO: Register TTS provider when available
+
+            Log.i("RunAnywhereApp", "🎉 All service providers registered successfully")
+
+        } catch (e: Exception) {
+            Log.e("RunAnywhereApp", "❌ Failed to register service providers: ${e.message}")
+        }
+    }
+
+    /**
      * Register models for development mode (matches iOS registerAdaptersForDevelopment)
-     * In Kotlin SDK, we don't have framework adapters, so we directly register models
+     * This is Step 2 - models are associated with frameworks via compatibleFrameworks field
      */
     private suspend fun registerModelsForDevelopment() {
         Log.i("RunAnywhereApp", "📦 Registering models for DEVELOPMENT mode")
