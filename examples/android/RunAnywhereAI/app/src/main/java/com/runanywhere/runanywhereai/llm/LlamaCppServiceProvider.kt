@@ -5,7 +5,7 @@ import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.components.llm.LLMServiceProvider
 import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.llm.llamacpp.LlamaCppNative
+import com.runanywhere.sdk.llm.llamacpp.LLamaAndroid
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppService
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
@@ -36,12 +36,12 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     )
 
     init {
-        // Force native library loading by accessing LlamaCppNative
-        val isLoaded = LlamaCppNative.isLoaded()
-        if (isLoaded) {
+        // Force native library loading by accessing LLamaAndroid instance
+        try {
+            LLamaAndroid.instance()
             logger.info("✅ llama.cpp native library loaded successfully")
-        } else {
-            logger.error("❌ llama.cpp native library failed to load")
+        } catch (e: Exception) {
+            logger.error("❌ llama.cpp native library failed to load", e)
         }
     }
 
@@ -71,8 +71,11 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
         logger.info("Creating LlamaCppService with configuration: ${configuration.modelId}")
 
-        if (!LlamaCppNative.isLoaded()) {
-            throw IllegalStateException("Cannot create LlamaCppService: Native library not loaded")
+        try {
+            // Check if native library is available
+            LLamaAndroid.instance()
+        } catch (e: Exception) {
+            throw IllegalStateException("Cannot create LlamaCppService: Native library not loaded", e)
         }
 
         return LlamaCppService(configuration)

@@ -137,12 +137,12 @@ class ServiceContainer {
         ModelManager(fileSystem, downloadService)
     }
 
-    val generationService: GenerationService by lazy {
-        GenerationService()
-    }
-
     val streamingService: StreamingService by lazy {
         StreamingService()
+    }
+
+    val generationService: GenerationService by lazy {
+        GenerationService(streamingService)
     }
 
     // New services for 8-step bootstrap matching iOS

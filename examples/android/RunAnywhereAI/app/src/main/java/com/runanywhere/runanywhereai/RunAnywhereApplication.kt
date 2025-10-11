@@ -168,6 +168,15 @@ class RunAnywhereApplication : Application() {
             )
             Log.i("RunAnywhereApp", "✅ Registered: Llama 3.2 1B Instruct Q6_K")
 
+
+            // Llama 3.2 1B - good quality
+            addModelFromURL(
+                url = "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
+                name = "QWEN 2 0.5B Q4_0 Instruct",
+                type = "LLM"
+            )
+            Log.i("RunAnywhereApp", "✅ Registered: QWEN 2 0.5B Instruct Q6_K Q4_0")
+
             // SmolLM2 1.7B - larger but capable
             addModelFromURL(
                 url = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
