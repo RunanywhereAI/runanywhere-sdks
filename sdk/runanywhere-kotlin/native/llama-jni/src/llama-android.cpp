@@ -80,10 +80,11 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_free_1model(JNIEnv *, jobject
     llama_model_free(reinterpret_cast<llama_model *>(model));
 }
 
-// JNI: Create context
+// JNI: Create context with configurable parameters
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1context(JNIEnv *env, jobject, jlong jmodel) {
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1context(
+    JNIEnv *env, jobject, jlong jmodel, jint n_ctx, jint n_threads_hint) {
     auto model = reinterpret_cast<llama_model *>(jmodel);
 
     if (!model) {
@@ -92,11 +93,17 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1context(JNIEnv *env, job
         return 0;
     }
 
-    int n_threads = std::max(1, std::min(8, (int) sysconf(_SC_NPROCESSORS_ONLN) - 2));
-    LOGi("Using %d threads", n_threads);
+    // Use provided n_threads or auto-detect
+    int n_threads;
+    if (n_threads_hint <= 0) {
+        n_threads = std::max(1, std::min(8, (int) sysconf(_SC_NPROCESSORS_ONLN) - 2));
+    } else {
+        n_threads = n_threads_hint;
+    }
+    LOGi("Using %d threads (context size: %d)", n_threads, n_ctx);
 
     llama_context_params ctx_params = llama_context_default_params();
-    ctx_params.n_ctx           = 2048;
+    ctx_params.n_ctx           = n_ctx;
     ctx_params.n_threads       = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
@@ -189,14 +196,40 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_free_1batch(JNIEnv *, jobject
     delete batch;
 }
 
-// JNI: Create sampler
+// JNI: Create sampler with configurable parameters
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1sampler(JNIEnv *, jobject) {
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1sampler(
+    JNIEnv *, jobject, jfloat temperature, jfloat min_p, jint top_k) {
+
     auto sparams = llama_sampler_chain_default_params();
     sparams.no_perf = true;
     llama_sampler * smpl = llama_sampler_chain_init(sparams);
-    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+
+    // Add sampling strategies based on parameters
+    if (temperature > 0.0f) {
+        // Temperature-based sampling
+        llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature));
+
+        // Add min-P sampling if specified
+        if (min_p > 0.0f && min_p < 1.0f) {
+            llama_sampler_chain_add(smpl, llama_sampler_init_min_p(min_p, 1));
+        }
+
+        // Add top-K sampling if specified
+        if (top_k > 0) {
+            llama_sampler_chain_add(smpl, llama_sampler_init_top_k(top_k));
+        }
+
+        // Distribution sampler for probabilistic selection
+        llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+        LOGi("Created sampler: temp=%.2f, min_p=%.2f, top_k=%d", temperature, min_p, top_k);
+    } else {
+        // Greedy sampling (deterministic)
+        llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+        LOGi("Created greedy sampler");
+    }
 
     return reinterpret_cast<jlong>(smpl);
 }

@@ -63,23 +63,28 @@ android {
 
         ndk {
             // Target ARM 64-bit only (modern Android devices)
-            // armeabi-v7a has NEON intrinsics conflicts with latest llama.cpp
+            // Building multiple optimized variants for different CPU features
             abiFilters += listOf("arm64-v8a")
         }
 
         externalNativeBuild {
             cmake {
-                // llama.cpp build configuration (following the guide)
+                // llama.cpp build configuration
                 arguments += "-DLLAMA_CURL=OFF"           // Disable CURL support
                 arguments += "-DLLAMA_BUILD_COMMON=ON"    // Build common utilities
                 arguments += "-DGGML_LLAMAFILE=OFF"       // Disable llamafile
                 arguments += "-DCMAKE_BUILD_TYPE=Release" // Release build
                 arguments += "-DGGML_NEON=ON"             // Enable ARM NEON SIMD
 
-                // Optimization flags for ARM Cortex-A53
-                cppFlags += "-O3"
-                cppFlags += "-march=armv8-a"
-                cppFlags += "-mtune=cortex-a53"
+                // Note: Optimization flags are handled by CMakeLists.txt for each variant
+                // This allows building 7 different ARM64 variants with different CPU features:
+                // - baseline (armv8-a)
+                // - fp16 (armv8.2-a+fp16)
+                // - dotprod (armv8.2-a+fp16+dotprod)
+                // - v8_4 (armv8.4-a+fp16+dotprod)
+                // - i8mm (armv8.4-a+fp16+dotprod+i8mm)
+                // - sve (armv8.4-a+fp16+dotprod+sve)
+                // - i8mm-sve (armv8.4-a+fp16+dotprod+i8mm+sve)
             }
         }
     }

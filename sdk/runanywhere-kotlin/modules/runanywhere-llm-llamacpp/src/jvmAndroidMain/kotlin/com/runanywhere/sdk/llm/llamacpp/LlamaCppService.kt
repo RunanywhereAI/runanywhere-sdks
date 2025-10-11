@@ -33,7 +33,16 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         logger.info("Initializing llama.cpp with model: $actualModelPath")
 
         try {
-            llama.load(actualModelPath)
+            // Create config from LLMConfiguration
+            val config = LlamaModelConfig(
+                contextSize = configuration.contextLength,
+                threads = 0, // auto-detect
+                temperature = configuration.temperature.toFloat(),
+                minP = 0.05f, // Default min-P
+                topK = 40 // Default top-K
+            )
+
+            llama.load(actualModelPath, config)
             this@LlamaCppService.modelPath = actualModelPath
             isInitialized = true
             logger.info("✅ Initialized llama.cpp successfully")
