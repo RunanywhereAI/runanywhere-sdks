@@ -4,6 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
 ### Before starting work.
 - Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.
+- DO NOT PLAN or WRITE any unit tests unless specified otherwise.
 - Always in plan mode to make a plan refer to `thoughts/shared/plans/{descriptive_name}.md`.
 - After get the plan, make sure you Write the plan to the appropriate file as mentioned in the guide that you referred to.
 - If the task require external knowledge or certain package, also research to get latest knowledge (Use Task tool for research)
