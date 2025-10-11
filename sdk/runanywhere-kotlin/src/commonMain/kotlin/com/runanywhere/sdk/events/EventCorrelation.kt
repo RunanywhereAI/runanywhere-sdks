@@ -1,10 +1,6 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.runanywhere.sdk.events
 
 import kotlinx.coroutines.flow.*
-import kotlinx.datetime.Instant
-import kotlinx.datetime.Clock
 import kotlin.random.Random
 import com.runanywhere.sdk.foundation.currentTimeMillis
 
@@ -50,7 +46,7 @@ abstract class CorrelatedBaseSDKEvent(
     override val requestId: String? = null,
     override val sessionId: String? = null,
     override val correlationId: String? = null,
-    override val timestamp: Instant = Instant.fromEpochMilliseconds(currentTimeMillis())
+    override val timestamp: Long = currentTimeMillis()
 ) : CorrelatedSDKEvent
 
 /**
@@ -104,8 +100,8 @@ object EventFilters {
      * Filter events by time range
      */
     fun <T : SDKEvent> Flow<T>.filterByTimeRange(
-        startTime: Instant,
-        endTime: Instant
+        startTime: Long,
+        endTime: Long
     ): Flow<T> {
         return filter { event ->
             event.timestamp >= startTime && event.timestamp <= endTime
@@ -137,7 +133,7 @@ fun EventBus.getEventsForCorrelation(correlationId: String): Flow<SDKEvent> {
     return allEvents.run { EventFilters.run { filterByCorrelationId(correlationId) } }
 }
 
-fun EventBus.getEventsInTimeRange(startTime: Instant, endTime: Instant): Flow<SDKEvent> {
+fun EventBus.getEventsInTimeRange(startTime: Long, endTime: Long): Flow<SDKEvent> {
     return allEvents.run { EventFilters.run { filterByTimeRange(startTime, endTime) } }
 }
 

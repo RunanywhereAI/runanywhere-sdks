@@ -223,4 +223,76 @@ class ConfigurationService(
         // No background sync
     }
 
+    // MARK: - Configuration Helper Methods for Extension APIs
+
+    /**
+     * Get a string value from configuration
+     */
+    suspend fun getString(key: String, default: String): String {
+        val config = currentConfig ?: return default
+        return when (key) {
+            "routing.policy" -> config.routing.policy.name
+            else -> default
+        }
+    }
+
+    /**
+     * Get a double value from configuration
+     */
+    suspend fun getDouble(key: String, default: Double): Double {
+        val config = currentConfig ?: return default
+        return when (key) {
+            "generation.temperature" -> config.generation.defaults.temperature
+            "generation.topP" -> config.generation.defaults.topP
+            "generation.frequencyPenalty" -> default // Not in existing model
+            "generation.presencePenalty" -> default // Not in existing model
+            "generation.repeatPenalty" -> config.generation.defaults.repetitionPenalty ?: default
+            else -> default
+        }
+    }
+
+    /**
+     * Get an integer value from configuration
+     */
+    suspend fun getInt(key: String, default: Int): Int {
+        val config = currentConfig ?: return default
+        return when (key) {
+            "generation.maxTokens" -> config.generation.defaults.maxTokens
+            "generation.topK" -> config.generation.defaults.topK ?: default
+            else -> default
+        }
+    }
+
+    /**
+     * Get a string list value from configuration
+     */
+    suspend fun getStringList(key: String, default: List<String>): List<String> {
+        val config = currentConfig ?: return default
+        return when (key) {
+            "generation.stopSequences" -> config.generation.defaults.stopSequences
+            else -> default
+        }
+    }
+
+    /**
+     * Reload configuration from backend
+     */
+    suspend fun reload() {
+        val repository = configRepository ?: return
+        try {
+            val apiKey = currentConfig?.apiKey ?: ""
+            val newConfig = repository.fetchRemoteConfiguration(apiKey)
+            if (newConfig != null) {
+                mutex.withLock {
+                    currentConfig = newConfig
+                    repository.saveLocalConfiguration(newConfig)
+                }
+                logger.info("Configuration reloaded from backend")
+            }
+        } catch (e: Exception) {
+            logger.error("Failed to reload configuration: ${e.message}")
+            throw e
+        }
+    }
+
 }

@@ -13,6 +13,18 @@ interface FileSystem {
     suspend fun writeBytes(path: String, data: ByteArray)
 
     /**
+     * Append bytes to an existing file
+     * If file doesn't exist, creates it and writes the data
+     */
+    suspend fun appendBytes(path: String, data: ByteArray)
+
+    /**
+     * Write to a file using an output stream (for efficient streaming)
+     * The output stream is automatically closed when the block completes
+     */
+    suspend fun <T> writeStream(path: String, block: suspend (java.io.OutputStream) -> T): T
+
+    /**
      * Read bytes from a file
      */
     suspend fun readBytes(path: String): ByteArray

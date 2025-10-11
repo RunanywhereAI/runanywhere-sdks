@@ -1,8 +1,5 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.runanywhere.sdk.events
 
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import com.runanywhere.sdk.foundation.currentTimeMillis
 
@@ -11,7 +8,7 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
  * Mirrors iOS SDKEvent protocol
  */
 interface SDKEvent {
-    val timestamp: Instant
+    val timestamp: Long  // Use epoch millis instead of Instant to avoid kotlin.time issues
     val eventType: SDKEventType
 }
 
@@ -30,7 +27,8 @@ enum class SDKEventType {
     DEVICE,
     ERROR,
     PERFORMANCE,
-    NETWORK
+    NETWORK,
+    LOGGING
 }
 
 /**
@@ -38,7 +36,7 @@ enum class SDKEventType {
  */
 abstract class BaseSDKEvent(
     override val eventType: SDKEventType,
-    override val timestamp: Instant = Instant.fromEpochMilliseconds(currentTimeMillis())
+    override val timestamp: Long = currentTimeMillis()
 ) : SDKEvent
 
 /**
@@ -229,6 +227,20 @@ sealed class SDKDeviceEvent : BaseSDKEvent(SDKEventType.DEVICE) {
 }
 
 /**
+ * SDK Logging Events for public API
+ * Matches iOS logging event system
+ */
+sealed class SDKLoggingEvent : BaseSDKEvent(SDKEventType.LOGGING) {
+    data class ConfigurationUpdated(val level: String, val consoleEnabled: Boolean) : SDKLoggingEvent()
+    data class LocalLoggingConfigured(val enabled: Boolean, val maxSizeMB: Int, val maxFileCount: Int) : SDKLoggingEvent()
+    data class ComponentLogLevelChanged(val component: String, val level: String) : SDKLoggingEvent()
+    data class DebugModeChanged(val enabled: Boolean) : SDKLoggingEvent()
+    object FlushStarted : SDKLoggingEvent()
+    object FlushCompleted : SDKLoggingEvent()
+    data class FlushFailed(val error: String) : SDKLoggingEvent()
+}
+
+/**
  * Events for component initialization lifecycle
  */
 sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZATION) {
@@ -247,6 +259,7 @@ sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZA
     data class ComponentInitializing(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentReady(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentFailed(val component: String, val error: Throwable) : ComponentInitializationEvent()
+    data class ComponentUnloaded(val component: String, val modelId: String, override val timestamp: Long = currentTimeMillis()) : ComponentInitializationEvent()
 
     // Batch events
     data class ParallelInitializationStarted(val components: List<String>) : ComponentInitializationEvent()

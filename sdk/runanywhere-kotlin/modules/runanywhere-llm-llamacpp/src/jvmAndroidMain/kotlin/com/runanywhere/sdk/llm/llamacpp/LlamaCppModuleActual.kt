@@ -5,8 +5,8 @@ package com.runanywhere.sdk.llm.llamacpp
  */
 actual fun checkNativeLibraryAvailable(): Boolean {
     return try {
-        // Check if we can load the native library
-        LlamaCppNative.isLoaded()
+        // Check if llama-android library can be loaded
+        LLamaAndroid.instance().isLoaded
     } catch (e: Exception) {
         false
     }

@@ -172,6 +172,32 @@ object ModuleRegistry {
         }
     }
 
+    // MARK: - Provider List Access (for framework management)
+
+    /**
+     * Get all registered STT providers
+     */
+    val allSTTProviders: List<STTServiceProvider>
+        get() = sttProviders.toList()
+
+    /**
+     * Get all registered LLM providers
+     */
+    val allLLMProviders: List<LLMServiceProvider>
+        get() = llmProviders.toList()
+
+    /**
+     * Get all registered TTS providers
+     */
+    val allTTSProviders: List<TTSServiceProvider>
+        get() = ttsProviders.toList()
+
+    /**
+     * Get all registered VLM providers
+     */
+    val allVLMProviders: List<VLMServiceProvider>
+        get() = vlmProviders.toList()
+
     // MARK: - Availability Checking
 
     /**

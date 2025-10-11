@@ -43,6 +43,9 @@ object EventBus {
     private val _deviceEvents = MutableSharedFlow<SDKDeviceEvent>()
     val deviceEvents: SharedFlow<SDKDeviceEvent> = _deviceEvents.asSharedFlow()
 
+    private val _loggingEvents = MutableSharedFlow<SDKLoggingEvent>()
+    val loggingEvents: SharedFlow<SDKLoggingEvent> = _loggingEvents.asSharedFlow()
+
     private val _componentEvents = MutableSharedFlow<ComponentInitializationEvent>()
     val componentEvents: SharedFlow<ComponentInitializationEvent> = _componentEvents.asSharedFlow()
 
@@ -137,6 +140,14 @@ object EventBus {
      */
     fun publish(event: SDKDeviceEvent) {
         _deviceEvents.tryEmit(event)
+        _allEvents.tryEmit(event as SDKEvent)
+    }
+
+    /**
+     * Publish a logging event
+     */
+    fun publish(event: SDKLoggingEvent) {
+        _loggingEvents.tryEmit(event)
         _allEvents.tryEmit(event as SDKEvent)
     }
 

@@ -22,18 +22,33 @@
 #
 # ./scripts/sdk.sh [command] [options]
 #
-# QUICK START FOR PLUGIN DEVELOPERS:
-# -----------------------------------
-# ./scripts/sdk.sh jvm              # Build JVM SDK for IntelliJ plugin
-# ./scripts/sdk.sh jvm --publish    # Build and publish to local Maven
-# ./scripts/sdk.sh clean jvm        # Clean and rebuild JVM target
+# ============================================================================
+# SIMPLIFIED WORKFLOWS (Most Common)
+# ============================================================================
 #
-# COMMON WORKFLOWS:
+# BUILD SDK TARGETS:
+# ------------------
+# ./scripts/sdk.sh sdk-jvm          # Build JVM SDK only (for IntelliJ plugins)
+# ./scripts/sdk.sh sdk-android      # Build Android SDK only
+# ./scripts/sdk.sh sdk-all          # Build both JVM + Android targets
+#
+# BUILD & RUN SAMPLE APPS (with automatic SDK sync):
+# ---------------------------------------------------
+# ./scripts/sdk.sh plugin-app       # Build SDK + Run IntelliJ plugin
+# ./scripts/sdk.sh android-app      # Build SDK + Run Android app
+#
+# CLEANUP COMMANDS:
 # -----------------
-# ./scripts/sdk.sh all              # Build all targets
-# ./scripts/sdk.sh test             # Run all tests
-# ./scripts/sdk.sh clean all        # Clean rebuild everything
-# ./scripts/sdk.sh jvm --watch      # Watch mode for JVM development
+# ./scripts/sdk.sh clean-sdk        # Quick clean (SDK only) ~5s
+# ./scripts/sdk.sh clean-all        # Clean SDK + sample apps ~10s
+# ./scripts/sdk.sh clean-deep       # Deep clean + caches + Maven ~15s
+# ./scripts/sdk.sh clean-workspace  # Nuclear option - complete reset ~30s
+#
+# ============================================================================
+# ADVANCED COMMANDS
+# ============================================================================
+#
+# For more commands, run: ./scripts/sdk.sh help
 #
 # ============================================================================
 
@@ -263,6 +278,21 @@ ${BOLD}${GREEN}USAGE:${NC}
     ./scripts/sdk.sh ${YELLOW}[command]${NC} ${CYAN}[options]${NC}
 
 ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
+    ${BOLD}${YELLOW}SIMPLIFIED WORKFLOWS:${NC}
+    ${YELLOW}sdk-jvm${NC}          Build JVM SDK only (for IntelliJ plugins)
+    ${YELLOW}sdk-android${NC}      Build Android SDK only
+    ${YELLOW}sdk-all${NC}          Build both JVM and Android SDK targets
+    ${YELLOW}plugin-app${NC}       Build JVM SDK + Run IntelliJ Plugin
+    ${YELLOW}android-app${NC}      Build Android SDK + Run Android Sample App
+
+    ${BOLD}${YELLOW}CLEANUP COMMANDS:${NC}
+    ${YELLOW}clean${NC}            Clean SDK build artifacts (basic)
+    ${YELLOW}clean-sdk${NC}        Clean SDK build artifacts only
+    ${YELLOW}clean-deep${NC}       Deep clean: SDK + caches + daemon + Maven
+    ${YELLOW}clean-all${NC}        Clean everything: SDK + sample apps + natives
+    ${YELLOW}clean-workspace${NC}  Nuclear clean: Complete workspace reset (5s delay)
+
+    ${BOLD}${YELLOW}ADVANCED BUILD COMMANDS:${NC}
     ${YELLOW}build-all${NC}       Complete build for all platforms (recommended)
     ${YELLOW}build-modules${NC}   Build all KMP modules
     ${YELLOW}build-native${NC}    Build native libraries (whisper, llama.cpp)
@@ -276,9 +306,6 @@ ${BOLD}${GREEN}PRIMARY COMMANDS:${NC} ${CYAN}(Most commonly used)${NC}
     ${YELLOW}dev-plugin${NC}      Clean rebuild SDK, force recompile and run plugin
     ${YELLOW}android${NC}         Build Android AAR library
     ${YELLOW}all${NC}             Build all targets (JVM, Android, Native)
-    ${YELLOW}clean${NC}           Clean all build artifacts
-    ${YELLOW}clean-build${NC}     Clean and build all platforms
-    ${YELLOW}deep-clean${NC}      Deep clean caches and build all platforms
     ${YELLOW}test${NC}            Run tests for all platforms
 
 ${BOLD}${GREEN}BUILD COMMANDS:${NC}
@@ -331,7 +358,19 @@ ${BOLD}${GREEN}OPTIONS:${NC}
     ${CYAN}--ide-version${NC}   Override IDE version (e.g., 2023.3, 2024.1)
 
 ${BOLD}${GREEN}EXAMPLES:${NC}
-    ${CYAN}# Quick build without cleaning${NC}
+    ${CYAN}# Quick workflows for common tasks${NC}
+    ./scripts/sdk.sh sdk-jvm            # Build JVM SDK only
+    ./scripts/sdk.sh sdk-all            # Build both JVM + Android SDK
+    ./scripts/sdk.sh plugin-app         # Build SDK and run IntelliJ plugin
+    ./scripts/sdk.sh android-app        # Build SDK and run Android app
+
+    ${CYAN}# Cleanup tasks${NC}
+    ./scripts/sdk.sh clean-sdk          # Quick clean of SDK only
+    ./scripts/sdk.sh clean-all          # Clean SDK + all sample apps
+    ./scripts/sdk.sh clean-deep         # Deep clean including caches
+    ./scripts/sdk.sh clean-workspace    # Complete workspace reset (nuclear)
+
+    ${CYAN}# Complete builds${NC}
     ./scripts/sdk.sh build-all
 
     ${CYAN}# Clean and build${NC}
@@ -400,29 +439,7 @@ gradle_exec() {
 # BUILD COMMANDS
 # ============================================================================
 
-# Clean all build artifacts
-cmd_clean() {
-    print_header "Cleaning Build Artifacts"
-    gradle_exec clean
-    rm -rf build/
-    print_success "Build artifacts cleaned"
-}
 
-# Clean JVM build
-cmd_clean_jvm() {
-    print_header "Cleaning JVM Build"
-
-    echo "▶ Removing JVM build artifacts..."
-    rm -rf build/classes/kotlin/jvm*
-    rm -rf build/kotlin/jvm*
-    rm -rf build/libs/*jvm*.jar
-    rm -rf build/tmp/jvm*
-
-    echo "▶ Cleaning Gradle caches..."
-    ./gradlew clean --no-build-cache
-
-    print_success "JVM build cleaned successfully!"
-}
 
 # Build JVM target (primary for IntelliJ plugins)
 cmd_jvm() {
@@ -1004,6 +1021,419 @@ cmd_config_validate() {
 }
 
 # ============================================================================
+# CLEANUP COMMANDS
+# ============================================================================
+
+# Clean SDK build artifacts only (basic clean)
+cmd_clean_sdk() {
+    print_header "Cleaning SDK Build Artifacts"
+
+    print_step "Removing build directories..."
+    rm -rf build/
+    rm -rf .gradle/
+
+    print_step "Running Gradle clean..."
+    gradle_exec clean || true
+
+    print_success "✅ SDK build artifacts cleaned"
+}
+
+# Deep clean SDK with caches and daemon (aggressive clean)
+cmd_clean_deep() {
+    print_header "Deep Clean - SDK + Caches + Daemon"
+
+    print_step "[1/5] Stopping Gradle daemon..."
+    ./gradlew --stop || true
+
+    print_step "[2/5] Cleaning build artifacts..."
+    ./gradlew clean --no-daemon --no-build-cache --no-configuration-cache || true
+    rm -rf build/
+    rm -rf .gradle/
+
+    print_step "[3/5] Cleaning local Gradle caches..."
+    rm -rf ~/.gradle/caches/modules-2/files-2.1/com.runanywhere.sdk/ || true
+    rm -rf ~/.gradle/caches/transforms-*/ || true
+
+    print_step "[4/5] Cleaning Kotlin compiler daemon..."
+    pkill -f "kotlin-compile-daemon" || true
+    rm -rf ~/Library/Application\ Support/kotlin/daemon/* 2>/dev/null || true
+    rm -rf ~/.kotlin/daemon/* 2>/dev/null || true
+
+    print_step "[5/5] Cleaning Maven Local SDK artifacts..."
+    rm -rf ~/.m2/repository/com/runanywhere/sdk/ || true
+
+    print_success "✅ Deep clean completed"
+    print_info "Gradle daemon, caches, and Maven artifacts removed"
+}
+
+# Clean everything - SDK + sample apps + dependencies
+cmd_clean_all() {
+    print_header "Clean All - SDK + Sample Apps + Dependencies"
+
+    # Clean SDK first
+    print_step "[1/4] Cleaning SDK..."
+    cmd_clean_sdk
+
+    # Clean Android sample app
+    if [[ -d "$ANDROID_APP_DIR" ]]; then
+        print_step "[2/4] Cleaning Android sample app..."
+        cd "$ANDROID_APP_DIR"
+        ./gradlew clean || true
+        rm -rf app/build/ || true
+        rm -rf build/ || true
+        rm -rf .gradle/ || true
+        cd "$PROJECT_DIR"
+        print_success "Android app cleaned"
+    else
+        print_step "[2/4] Android app not found, skipping..."
+    fi
+
+    # Clean IntelliJ plugin
+    local plugin_dir="$(cd "$SCRIPT_DIR/../../../examples/intellij-plugin-demo/plugin" 2>/dev/null && pwd)"
+    if [[ -n "$plugin_dir" ]] && [[ -d "$plugin_dir" ]]; then
+        print_step "[3/4] Cleaning IntelliJ plugin..."
+        cd "$plugin_dir"
+        ./gradlew clean || true
+        rm -rf build/ || true
+        rm -rf .gradle/ || true
+        cd "$PROJECT_DIR"
+        print_success "IntelliJ plugin cleaned"
+    else
+        print_step "[3/4] IntelliJ plugin not found, skipping..."
+    fi
+
+    # Clean native libraries
+    print_step "[4/4] Cleaning native libraries..."
+    for lib in "${NATIVE_LIBS[@]}"; do
+        local native_dir="$PROJECT_DIR/native/$lib"
+        if [[ -d "$native_dir/build" ]]; then
+            rm -rf "$native_dir/build" || true
+            print_info "Cleaned $lib"
+        fi
+    done
+
+    print_success "✅ All build artifacts cleaned"
+
+    # Summary
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Cleaned:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  ✅ SDK build artifacts"
+    [[ -d "$ANDROID_APP_DIR" ]] && echo "  ✅ Android sample app"
+    [[ -n "$plugin_dir" ]] && echo "  ✅ IntelliJ plugin"
+    echo "  ✅ Native libraries"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# Clean workspace and prepare for fresh start (nuclear option)
+cmd_clean_workspace() {
+    print_header "Clean Workspace - Complete Reset"
+
+    print_warning "This will remove ALL build artifacts, caches, and dependencies!"
+    print_info "Press Ctrl+C within 5 seconds to cancel..."
+    sleep 5
+
+    print_step "[1/6] Stopping all Gradle daemons..."
+    ./gradlew --stop || true
+    pkill -f "GradleDaemon" || true
+
+    print_step "[2/6] Cleaning SDK..."
+    cmd_clean_sdk
+
+    print_step "[3/6] Cleaning sample apps..."
+    # Clean Android app
+    if [[ -d "$ANDROID_APP_DIR" ]]; then
+        cd "$ANDROID_APP_DIR"
+        ./gradlew --stop || true
+        ./gradlew clean || true
+        rm -rf app/build/ build/ .gradle/ || true
+        cd "$PROJECT_DIR"
+    fi
+
+    # Clean IntelliJ plugin
+    local plugin_dir="$(cd "$SCRIPT_DIR/../../../examples/intellij-plugin-demo/plugin" 2>/dev/null && pwd)"
+    if [[ -n "$plugin_dir" ]] && [[ -d "$plugin_dir" ]]; then
+        cd "$plugin_dir"
+        ./gradlew --stop || true
+        ./gradlew clean || true
+        rm -rf build/ .gradle/ || true
+        cd "$PROJECT_DIR"
+    fi
+
+    print_step "[4/6] Cleaning native libraries..."
+    for lib in "${NATIVE_LIBS[@]}"; do
+        rm -rf "$PROJECT_DIR/native/$lib/build" || true
+    done
+
+    print_step "[5/6] Cleaning global Gradle caches..."
+    rm -rf ~/.gradle/caches/modules-2/files-2.1/com.runanywhere.sdk/ || true
+    rm -rf ~/.gradle/caches/transforms-*/ || true
+    rm -rf ~/.gradle/caches/8.*/transforms/ || true
+
+    print_step "[6/6] Cleaning Maven Local SDK..."
+    rm -rf ~/.m2/repository/com/runanywhere/sdk/ || true
+
+    print_success "✅ Workspace completely cleaned"
+    print_info "Run 'sdk-all' to rebuild everything"
+}
+
+# ============================================================================
+# SIMPLIFIED WORKFLOW COMMANDS
+# ============================================================================
+
+# Build SDK (JVM only) - no sample apps
+cmd_sdk_jvm() {
+    print_header "Build SDK - JVM Target Only"
+
+    print_step "[1/2] Building JVM SDK..."
+    gradle_exec :compileKotlinJvm :jvmJar || {
+        print_error "JVM build failed"
+        return 1
+    }
+
+    print_step "[2/2] Publishing to Maven Local..."
+    cmd_publish_jvm
+
+    print_success "✅ JVM SDK built and published"
+    local jar_file="build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar"
+    if [[ -f "$jar_file" ]]; then
+        print_info "JAR: $jar_file ($(du -h "$jar_file" | cut -f1))"
+    fi
+}
+
+# Build SDK (Android only) - no sample apps
+cmd_sdk_android() {
+    print_header "Build SDK - Android Target Only"
+
+    print_step "[1/2] Building Android SDK..."
+    gradle_exec :compileDebugKotlinAndroid :assembleDebug || {
+        print_warning "Debug build failed, trying release..."
+        gradle_exec :compileReleaseKotlinAndroid :assembleRelease || {
+            print_error "Android build failed"
+            return 1
+        }
+    }
+
+    print_step "[2/2] Publishing to Maven Local..."
+    gradle_exec :publishAndroidDebugPublicationToMavenLocal || gradle_exec :publishAndroidReleasePublicationToMavenLocal || true
+
+    print_success "✅ Android SDK built and published"
+
+    # Show built artifacts
+    local aar_debug="build/outputs/aar/$SDK_JAR_NAME-debug.aar"
+    local aar_release="build/outputs/aar/$SDK_JAR_NAME-release.aar"
+    [[ -f "$aar_debug" ]] && print_info "AAR: $aar_debug ($(du -h "$aar_debug" | cut -f1))"
+    [[ -f "$aar_release" ]] && print_info "AAR: $aar_release ($(du -h "$aar_release" | cut -f1))"
+}
+
+# Build SDK (All targets) - no sample apps
+cmd_sdk_all() {
+    print_header "Build SDK - All Targets (JVM + Android)"
+
+    print_step "[1/3] Building JVM target..."
+    gradle_exec :compileKotlinJvm :jvmJar || print_warning "JVM build had issues"
+
+    print_step "[2/3] Building Android target..."
+    gradle_exec :compileDebugKotlinAndroid :assembleDebug || print_warning "Android build had issues"
+
+    print_step "[3/3] Publishing to Maven Local..."
+    gradle_exec publishToMavenLocal || print_warning "Publishing had issues"
+
+    print_success "✅ SDK built for all targets"
+
+    # Summary
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "SDK Build Summary:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    [[ -f "build/libs/$SDK_JAR_NAME-jvm-$SDK_VERSION.jar" ]] && echo "  ✅ JVM JAR" || echo "  ❌ JVM JAR"
+    [[ -f "build/outputs/aar/$SDK_JAR_NAME-debug.aar" ]] && echo "  ✅ Android AAR" || echo "  ❌ Android AAR"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+}
+
+# Build and Run Android Sample App (with latest SDK)
+cmd_android_app() {
+    print_header "Build & Run Android Sample App"
+
+    # Step 1: Build and publish Android SDK
+    print_step "[1/4] Building Android SDK..."
+    cmd_sdk_android || {
+        print_error "SDK build failed"
+        return 1
+    }
+
+    # Step 2: Build Android sample app
+    if [[ ! -d "$ANDROID_APP_DIR" ]]; then
+        print_error "Android app not found at: $ANDROID_APP_DIR"
+        return 1
+    fi
+
+    print_step "[2/4] Syncing Android app with latest SDK..."
+    cd "$ANDROID_APP_DIR"
+
+    # Ensure mavenLocal is in repositories
+    ensure_android_maven_local
+
+    # Force Gradle to refresh dependencies to pick up latest SDK
+    print_info "Refreshing Gradle dependencies..."
+    ./gradlew --refresh-dependencies clean || {
+        print_warning "Gradle refresh had issues, continuing..."
+    }
+
+    print_step "[3/4] Building Android sample app..."
+
+    # Build the app
+    ./gradlew assembleDebug || {
+        print_error "Android app build failed"
+        return 1
+    }
+
+    local apk="app/build/outputs/apk/debug/app-debug.apk"
+    if [[ ! -f "$apk" ]]; then
+        print_error "APK not found at: $apk"
+        return 1
+    fi
+
+    print_success "✅ Android app built: $apk ($(du -h "$apk" | cut -f1))"
+
+    # Step 4: Install and run on device/emulator
+    print_step "[4/4] Installing and launching app..."
+
+    # Check for connected devices
+    if ! command -v adb &> /dev/null; then
+        print_warning "adb not found in PATH. Please install manually: adb install $apk"
+        cd "$PROJECT_DIR"
+        return 0
+    fi
+
+    local devices=$(adb devices | grep -v "List" | grep "device$" | wc -l)
+    if [[ $devices -eq 0 ]]; then
+        print_warning "No Android devices/emulators connected"
+        print_info "Please connect a device or start an emulator, then run:"
+        print_info "  cd $ANDROID_APP_DIR && adb install -r $apk"
+        cd "$PROJECT_DIR"
+        return 0
+    fi
+
+    # Install APK
+    adb install -r "$apk" || {
+        print_warning "Installation failed. Try manually: adb install -r $apk"
+        cd "$PROJECT_DIR"
+        return 1
+    }
+
+    # Launch app (get package name from AndroidManifest)
+    local package_name=$(./gradlew -q app:printPackageName 2>/dev/null || echo "com.runanywhere.ai")
+    adb shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 || {
+        print_info "App installed. Please launch manually."
+    }
+
+    print_success "✅ Android app installed and launched!"
+    cd "$PROJECT_DIR"
+}
+
+# Build and Run IntelliJ Plugin (with latest SDK)
+cmd_plugin_app() {
+    print_header "Build & Run IntelliJ Plugin"
+
+    # Step 1: Build and publish JVM SDK
+    print_step "[1/4] Building JVM SDK..."
+    cmd_sdk_jvm || {
+        print_error "SDK build failed"
+        return 1
+    }
+
+    # Step 2: Configure and build plugin
+    local plugin_dir="$(cd "$SCRIPT_DIR/../../../examples/intellij-plugin-demo/plugin" 2>/dev/null && pwd)"
+
+    if [[ -z "$plugin_dir" ]] || [[ ! -d "$plugin_dir" ]]; then
+        local git_root="$(git rev-parse --show-toplevel 2>/dev/null)"
+        if [[ -n "$git_root" ]]; then
+            plugin_dir="$git_root/examples/intellij-plugin-demo/plugin"
+        fi
+    fi
+
+    if [[ ! -d "$plugin_dir" ]]; then
+        print_error "Plugin directory not found at: examples/intellij-plugin-demo/plugin"
+        return 1
+    fi
+
+    print_step "[2/4] Syncing plugin with latest SDK..."
+    cd "$plugin_dir"
+
+    # Detect IDE and configure plugin
+    local ide_info=$(detect_ide "IC")
+    if [[ -n "$ide_info" ]]; then
+        local detected_version=$(echo "$ide_info" | cut -d':' -f2)
+        print_info "Detected IntelliJ IDEA version: $detected_version"
+        update_plugin_for_ide "$plugin_dir" "IC" "$ide_info"
+    else
+        print_info "Using default IntelliJ configuration"
+        update_plugin_for_ide "$plugin_dir" "IC" ""
+    fi
+
+    # Force Gradle to refresh dependencies to pick up latest SDK
+    if [[ -f "./gradlew" ]]; then
+        print_info "Refreshing Gradle dependencies..."
+        ./gradlew --refresh-dependencies clean || {
+            print_warning "Gradle refresh had issues, continuing..."
+        }
+    else
+        print_error "gradlew not found in plugin directory"
+        cd "$PROJECT_DIR"
+        return 1
+    fi
+
+    print_step "[3/4] Building IntelliJ plugin..."
+
+    ./gradlew buildPlugin || {
+        print_error "Plugin build failed"
+        cd "$PROJECT_DIR"
+        return 1
+    }
+
+    print_success "✅ Plugin built successfully"
+
+    # Step 4: Run IntelliJ with plugin
+    print_step "[4/4] Starting IntelliJ IDEA with plugin..."
+    print_info "IntelliJ will start in a new window. Close this window to stop."
+
+    ./gradlew runIde
+
+    cd "$PROJECT_DIR"
+}
+
+# Helper: Ensure Android app has mavenLocal in repositories
+ensure_android_maven_local() {
+    local settings_file="$ANDROID_APP_DIR/settings.gradle.kts"
+    [[ ! -f "$settings_file" ]] && settings_file="$ANDROID_APP_DIR/settings.gradle"
+
+    if [[ -f "$settings_file" ]] && ! grep -q "mavenLocal()" "$settings_file"; then
+        print_info "Adding mavenLocal() to Android app repositories..."
+        # Backup original
+        cp "$settings_file" "$settings_file.bak"
+
+        # Add mavenLocal after first repositories block
+        if grep -q "repositories {" "$settings_file"; then
+            sed -i.tmp '/repositories {/,/}/ s/repositories {/repositories {\n        mavenLocal()/' "$settings_file" 2>/dev/null || {
+                # Fallback: just add to dependencyResolutionManagement
+                echo "" >> "$settings_file"
+                echo "// Added by sdk.sh" >> "$settings_file"
+                echo "dependencyResolutionManagement {" >> "$settings_file"
+                echo "    repositories {" >> "$settings_file"
+                echo "        mavenLocal()" >> "$settings_file"
+                echo "        google()" >> "$settings_file"
+                echo "        mavenCentral()" >> "$settings_file"
+                echo "    }" >> "$settings_file"
+                echo "}" >> "$settings_file"
+            }
+            rm -f "$settings_file.tmp"
+        fi
+    fi
+}
+
+# ============================================================================
 # WATCH MODE
 # ============================================================================
 
@@ -1446,7 +1876,11 @@ for cmd in "${COMMANDS[@]}"; do
     # Map command to function
     case $cmd in
         # Primary commands
-        clean)          cmd_clean ;;
+        clean)          cmd_clean_sdk ;;
+        clean-sdk)      cmd_clean_sdk ;;
+        clean-deep)     cmd_clean_deep ;;
+        clean-all)      cmd_clean_all ;;
+        clean-workspace) cmd_clean_workspace ;;
         build-all)
             # Pass global clean options to build_all
             if [[ "$OPT_DEEP_CLEAN" == "true" ]]; then
@@ -1461,8 +1895,6 @@ for cmd in "${COMMANDS[@]}"; do
         build-native)   cmd_build_native ;;
         build-samples)  cmd_build_samples ;;
         build-complete) cmd_build_complete ;;
-        clean-build)    cmd_build_all --clean ;;
-        deep-clean)     cmd_build_all --deep-clean ;;
         jvm)
             if [[ "$OPT_WATCH" == "true" ]]; then
                 watch_mode cmd_jvm
@@ -1473,7 +1905,13 @@ for cmd in "${COMMANDS[@]}"; do
         android)        cmd_android ;;
         native)         cmd_native ;;
         all)            cmd_all ;;
-        clean-jvm)      cmd_clean_jvm ;;
+        # Simplified workflows
+        sdk-jvm)        cmd_sdk_jvm ;;
+        sdk-android)    cmd_sdk_android ;;
+        sdk-all)        cmd_sdk_all ;;
+        plugin-app)     cmd_plugin_app ;;
+        android-app)    cmd_android_app ;;
+
         # Plugin commands
         plugin)         cmd_plugin ;;
         plugin-as)      cmd_plugin_as ;;

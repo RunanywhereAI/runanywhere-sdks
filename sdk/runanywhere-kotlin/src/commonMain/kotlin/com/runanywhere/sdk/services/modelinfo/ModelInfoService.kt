@@ -363,17 +363,9 @@ class ModelInfoService(
             throw SDKError.ConfigurationError("Model name cannot be blank")
         }
 
-        if (model.downloadURL?.isBlank() == true) {
-            throw SDKError.ConfigurationError("Model download URL cannot be blank")
-        }
-
-        if ((model.downloadSize ?: 0) <= 0) {
-            throw SDKError.ConfigurationError("Model download size must be positive")
-        }
-
-        if ((model.memoryRequired ?: 0) <= 0) {
-            throw SDKError.ConfigurationError("Model memory required must be positive")
-        }
+        // Note: downloadURL, downloadSize, and memoryRequired are OPTIONAL during registration
+        // They can be populated later during model discovery or download
+        // iOS doesn't enforce these validations during registration
 
         logger.debug("Model validation passed for: ${model.id}")
     }

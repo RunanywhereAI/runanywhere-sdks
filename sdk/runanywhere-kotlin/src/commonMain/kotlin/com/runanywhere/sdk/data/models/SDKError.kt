@@ -31,9 +31,14 @@ sealed class SDKError : Exception() {
     // Network errors
     data class NetworkError(override val message: String) : SDKError()
     data class AuthenticationError(override val message: String) : SDKError()
+    data class Timeout(override val message: String) : SDKError()
+    data class ServerError(override val message: String) : SDKError()
 
     // Security errors
     data class SecurityError(override val message: String) : SDKError()
+
+    // Storage errors
+    data class StorageError(override val message: String) : SDKError()
 
     // Configuration errors
     data class ConfigurationError(override val message: String) : SDKError()

@@ -213,3 +213,16 @@ sdk/runanywhere-kotlin/build/generated/config/
 !sdk/runanywhere-kotlin/config/*.example.json
 !sdk/runanywhere-kotlin/config/template.json
 !sdk/runanywhere-kotlin/config/README.md
+
+# Native build artifacts (llama.cpp)
+sdk/runanywhere-kotlin/native/llama-jni/build/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/androidMain/jniLibs/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/native/
+
+# llama.cpp is a submodule - tracked in .gitmodules
+# Build artifacts from llama.cpp
+*.o
+*.so
+*.dylib
+*.dll
+*.a

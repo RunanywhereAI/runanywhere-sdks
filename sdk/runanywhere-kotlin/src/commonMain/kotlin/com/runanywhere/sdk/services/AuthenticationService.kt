@@ -158,6 +158,62 @@ class AuthenticationService(
     }
 
     /**
+     * Register device with backend (lazy registration pattern from Swift SDK)
+     * Matches Swift SDK's AuthenticationService.registerDevice() method
+     */
+    suspend fun registerDevice(): DeviceRegistrationResponse = mutex.withLock {
+        logger.debug("Registering device with backend")
+
+        try {
+            // Get access token (authenticate if needed)
+            val token = getAccessToken()
+
+            // Collect device information
+            val deviceInfo = PlatformUtils.getDeviceInfo()
+
+            // Create registration request
+            val request = DeviceRegistrationRequest(
+                deviceModel = deviceInfo["deviceModel"] ?: "unknown",
+                deviceName = deviceInfo["deviceName"] ?: "unknown",
+                operatingSystem = SDKConstants.platform,
+                osVersion = deviceInfo["os_version"] ?: "unknown",
+                sdkVersion = SDKConstants.version,
+                appIdentifier = getAppIdentifier(),
+                appVersion = PlatformUtils.getAppVersion() ?: "unknown",
+                hardwareCapabilities = deviceInfo.filterValues { it.isNotEmpty() },
+                privacySettings = emptyMap()
+            )
+            val requestBody = json.encodeToString(DeviceRegistrationRequest.serializer(), request)
+
+            // Make API call
+            val response = httpClient.post(
+                url = SDKConfig.getApiUrl("/api/v1/devices/register"),
+                body = requestBody.encodeToByteArray(),
+                headers = mapOf(
+                    "Authorization" to "Bearer $token",
+                    "Content-Type" to "application/json",
+                    "X-SDK-Client" to "RunAnywhereKotlinSDK",
+                    "X-SDK-Version" to SDKConstants.version,
+                    "X-Platform" to SDKConstants.platform
+                )
+            )
+
+            if (!response.isSuccessful) {
+                throw SDKError.NetworkError("Device registration failed with status: ${response.statusCode}")
+            }
+
+            val registrationResponse = json.decodeFromString<DeviceRegistrationResponse>(response.bodyAsString())
+            logger.info("Device registered successfully: ${registrationResponse.deviceId}")
+
+            return registrationResponse
+
+        } catch (e: Exception) {
+            logger.error("Device registration failed", e)
+            throw SDKError.NetworkError("Device registration failed: ${e.message}")
+        }
+    }
+
+    /**
      * Check if authenticated
      * Matches iOS AuthenticationService.isAuthenticated() method
      */

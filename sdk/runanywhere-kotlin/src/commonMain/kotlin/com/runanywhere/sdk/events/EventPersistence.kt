@@ -90,8 +90,8 @@ class EventPersistence(
      * Get events in time range
      */
     suspend fun getEventsInTimeRange(
-        startTime: Instant,
-        endTime: Instant
+        startTime: Long,
+        endTime: Long
     ): List<PersistedEvent> {
         return mutex.withLock {
             _events.filter {

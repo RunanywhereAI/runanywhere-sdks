@@ -176,8 +176,11 @@ suspend fun addModelFromURL(
         }
 
         // Create model info with comprehensive details
+        // Use URL hash as deterministic ID so the same URL always generates the same ID
+        val modelId = url.hashCode().toString()
+
         val modelInfo = ModelInfo(
-            id = Uuid.random().toString(),
+            id = modelId,
             name = name,
             category = modelCategory,
             format = com.runanywhere.sdk.models.enums.ModelFormat.GGUF, // Default to GGUF
