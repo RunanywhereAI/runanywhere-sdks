@@ -16,11 +16,12 @@ import kotlinx.coroutines.sync.withLock
  * Service for text generation with LLM models
  * Handles both streaming and non-streaming generation
  */
-class GenerationService {
+class GenerationService(
+    private val streamingService: StreamingService = StreamingService()
+) {
 
     private val logger = SDKLogger("GenerationService")
     private val optionsResolver = GenerationOptionsResolver()
-    private val streamingService = StreamingService()
     private val mutex = Mutex()
 
     // Track active generation sessions

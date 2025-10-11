@@ -8,7 +8,6 @@ import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.*
 import com.runanywhere.sdk.public.RunAnywhere
-// import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,7 +15,6 @@ import java.util.*
 import kotlin.collections.map
 import kotlin.collections.toMutableList
 import kotlin.math.ceil
-// import javax.inject.Inject
 
 /**
  * Enhanced ChatUiState matching iOS functionality
@@ -212,7 +210,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             val thinkingEndRange = fullResponse.indexOf("</think>")
 
                             if (thinkingRange < thinkingEndRange) {
-                                thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
+                                thinkingContent =
+                                    fullResponse.substring(thinkingRange, thinkingEndRange)
                                 responseContent = fullResponse.substring(thinkingEndRange + 8)
                                 isInThinkingMode = false
                                 thinkingEndTime = System.currentTimeMillis()
@@ -352,7 +351,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Update assistant message content
      */
-    private fun updateAssistantMessage(messageId: String, content: String, thinkingContent: String?) {
+    private fun updateAssistantMessage(
+        messageId: String,
+        content: String,
+        thinkingContent: String?
+    ) {
         val currentMessages = _uiState.value.messages
         val updatedMessages = currentMessages.map { message ->
             if (message.id == messageId) {
@@ -371,7 +374,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Update assistant message with analytics
      */
-    private fun updateAssistantMessageWithAnalytics(messageId: String, analytics: MessageAnalytics) {
+    private fun updateAssistantMessageWithAnalytics(
+        messageId: String,
+        analytics: MessageAnalytics
+    ) {
         val currentMessages = _uiState.value.messages
         val updatedMessages = currentMessages.map { message ->
             if (message.id == messageId) {
@@ -472,12 +478,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return when {
             thinking.lowercase().contains("user") && thinking.lowercase().contains("help") ->
                 "I'm here to help! Let me know what you need."
+
             thinking.lowercase().contains("question") || thinking.lowercase().contains("ask") ->
                 "That's a good question. Let me think about this more."
+
             thinking.lowercase().contains("consider") || thinking.lowercase().contains("think") ->
                 "Let me consider this carefully. How can I help you further?"
+
             thinking.length > 200 ->
                 "I was thinking through this carefully. Could you help me understand what you're looking for?"
+
             else ->
                 "I'm processing your message. What would be most helpful for you?"
         }
@@ -532,7 +542,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val downloadedModel = availableModels.firstOrNull { it.localPath != null }
 
                 if (downloadedModel != null) {
-                    Log.i("ChatViewModel", "📦 Found downloaded model: ${downloadedModel.name}, loading into memory...")
+                    Log.i(
+                        "ChatViewModel",
+                        "📦 Found downloaded model: ${downloadedModel.name}, loading into memory..."
+                    )
 
                     try {
                         // Load the model into memory
@@ -543,7 +556,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             loadedModelName = downloadedModel.name
                         )
 
-                        Log.i("ChatViewModel", "✅ Model loaded successfully: ${downloadedModel.name}")
+                        Log.i(
+                            "ChatViewModel",
+                            "✅ Model loaded successfully: ${downloadedModel.name}"
+                        )
                     } catch (e: Exception) {
                         Log.e("ChatViewModel", "❌ Failed to load model: ${e.message}", e)
                         _uiState.value = _uiState.value.copy(

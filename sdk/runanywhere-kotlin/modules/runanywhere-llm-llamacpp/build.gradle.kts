@@ -59,16 +59,38 @@ android {
     defaultConfig {
         minSdk = 24
 
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            // Target ARM 64-bit only (modern Android devices)
+            // armeabi-v7a has NEON intrinsics conflicts with latest llama.cpp
+            abiFilters += listOf("arm64-v8a")
         }
 
         externalNativeBuild {
             cmake {
-                // Following official llama.cpp Android example
-                arguments += "-DLLAMA_BUILD_COMMON=ON"
-                arguments += "-DCMAKE_BUILD_TYPE=Release"
+                // llama.cpp build configuration (following the guide)
+                arguments += "-DLLAMA_CURL=OFF"           // Disable CURL support
+                arguments += "-DLLAMA_BUILD_COMMON=ON"    // Build common utilities
+                arguments += "-DGGML_LLAMAFILE=OFF"       // Disable llamafile
+                arguments += "-DCMAKE_BUILD_TYPE=Release" // Release build
+                arguments += "-DGGML_NEON=ON"             // Enable ARM NEON SIMD
+
+                // Optimization flags for ARM Cortex-A53
+                cppFlags += "-O3"
+                cppFlags += "-march=armv8-a"
+                cppFlags += "-mtune=cortex-a53"
             }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 
@@ -83,6 +105,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-}
 
-// No need to manually copy native libraries - CMake builds them automatically
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
