@@ -69,12 +69,13 @@ android {
 
         externalNativeBuild {
             cmake {
-                // llama.cpp build configuration
+                // llama.cpp build configuration - matching SmolChat-Android
                 arguments += "-DLLAMA_CURL=OFF"           // Disable CURL support
                 arguments += "-DLLAMA_BUILD_COMMON=ON"    // Build common utilities
                 arguments += "-DGGML_LLAMAFILE=OFF"       // Disable llamafile
                 arguments += "-DCMAKE_BUILD_TYPE=Release" // Release build
                 arguments += "-DGGML_NEON=ON"             // Enable ARM NEON SIMD
+                arguments += "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON" // Critical: Support 16KB page sizes (Android 15+)
 
                 // Note: Optimization flags are handled by CMakeLists.txt for each variant
                 // This allows building 7 different ARM64 variants with different CPU features:

@@ -77,7 +77,7 @@ class LLamaAndroid {
         context: Long,
         batch: Long,
         text: String,
-        formatChat: Boolean,
+        parseSpecialTokens: Boolean,  // Renamed for clarity
         nLen: Int
     ): Int
 
@@ -108,7 +108,8 @@ class LLamaAndroid {
                     val context = new_context(model, config.contextSize, config.threads)
                     if (context == 0L) throw IllegalStateException("new_context() failed")
 
-                    val batch = new_batch(512, 0, 1)
+                    // Fix: Use dynamic batch size matching context size (like SmolChat)
+                    val batch = new_batch(config.contextSize, 0, 1)
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                     val sampler = new_sampler(config.temperature, config.minP, config.topK)
@@ -124,11 +125,12 @@ class LLamaAndroid {
 
     /**
      * Generate text from prompt (streaming)
+     * @param parseSpecialTokens Whether to parse special tokens (default true for chat templates)
      */
-    fun send(message: String, formatChat: Boolean = false): Flow<String> = flow {
+    fun send(message: String, parseSpecialTokens: Boolean = true): Flow<String> = flow {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
-                val ncur = IntVar(completion_init(state.context, state.batch, message, formatChat, nlen))
+                val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, nlen))
                 while (ncur.value <= nlen) {
                     val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
                     if (str == null) {
@@ -245,11 +247,10 @@ class LLamaAndroid {
         }
 
         // Native CPU detection methods (called via JNI from baseline library)
-        @JvmStatic
-        private external fun detectCPUFeatures(): String
+        // Note: These are external functions on the companion object, not @JvmStatic
+        external fun detectCPUFeatures(): String
 
-        @JvmStatic
-        private external fun getCPUInfo(): String
+        external fun getCPUInfo(): String
 
         // Singleton instance
         private val _instance: LLamaAndroid = LLamaAndroid()

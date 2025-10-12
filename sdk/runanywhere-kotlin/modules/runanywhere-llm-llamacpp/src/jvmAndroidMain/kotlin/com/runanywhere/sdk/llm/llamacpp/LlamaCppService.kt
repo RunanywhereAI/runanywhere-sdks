@@ -64,8 +64,8 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         var tokenCount = 0
         val maxTokens = options.maxTokens
 
-        // Use formatChat = false since we're manually formatting with Qwen template
-        llama.send(prompt, formatChat = false).collect { token ->
+        // Use parseSpecialTokens = true for proper chat template handling
+        llama.send(prompt, parseSpecialTokens = true).collect { token ->
             result.append(token)
             tokenCount++
             if (tokenCount >= maxTokens) {
@@ -92,8 +92,8 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         var tokenCount = 0
         val maxTokens = options.maxTokens
 
-        // Use formatChat = false since we're manually formatting with Qwen template
-        llama.send(prompt, formatChat = false).collect { token ->
+        // Always parse special tokens (true) for proper chat template handling
+        llama.send(prompt, parseSpecialTokens = true).collect { token ->
             logger.info("🔤 Token #$tokenCount: '$token'")
             onToken(token)
             tokenCount++
@@ -202,10 +202,11 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         var tokenCount = 0
         val maxTokens = options.maxTokens
 
-        logger.info("🚀 Starting llama.send() with formatChat=false, maxTokens=$maxTokens")
+        logger.info("🚀 Starting llama.send() with parseSpecialTokens=true, maxTokens=$maxTokens")
 
-        // Use formatChat = false since we're manually formatting with Qwen template
-        return llama.send(prompt, formatChat = false).map { token ->
+        // Always parse special tokens (true) for proper chat template handling
+        // This works for Qwen2, LFM2, and other models
+        return llama.send(prompt, parseSpecialTokens = true).map { token ->
             val currentChunk = chunkIndex++
             val currentTokens = tokenCount++
             val isComplete = currentTokens >= maxTokens
@@ -251,34 +252,66 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
     private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
         val prompt = StringBuilder()
 
-        // Use Qwen2 chat template format
-        // Format: <|im_start|>role\ncontent<|im_end|>\n
+        // Detect model type based on current model name/path
+        val modelPath = currentModel ?: ""
+        val isLFM2 = modelPath.contains("LFM2", ignoreCase = true) ||
+                     modelPath.contains("1546711167") // LiquidAI model ID
+        val isQwen = modelPath.contains("qwen", ignoreCase = true) ||
+                     modelPath.contains("-1841487817") || // Qwen 2.5 0.5B ID
+                     modelPath.contains("-1039016089")    // Qwen 2 0.5B ID
 
-        // Add system prompt (always include for Qwen2)
-        // Use a more helpful default that instructs the model to be concise and relevant
-        val system = systemPrompt ?: """You are a helpful, friendly AI assistant.
+        logger.info("🔍 Model detection - Path: $modelPath, isLFM2: $isLFM2, isQwen: $isQwen")
+
+        if (isQwen) {
+            // Use Qwen2 chat template format
+            // Format: <|im_start|>role\ncontent<|im_end|>\n
+            logger.info("📝 Using Qwen2 chat template format")
+
+            val system = systemPrompt ?: """You are a helpful, friendly AI assistant.
 Answer questions clearly and concisely.
 Be direct and relevant to the user's query.
 Keep responses focused and helpful."""
 
-        prompt.append("<|im_start|>system\n")
-        prompt.append(system)
-        prompt.append("<|im_end|>\n")
-
-        // Add all messages from conversation history
-        for (message in messages) {
-            val role = when (message.role) {
-                MessageRole.USER -> "user"
-                MessageRole.ASSISTANT -> "assistant"
-                MessageRole.SYSTEM -> "system"
-            }
-            prompt.append("<|im_start|>$role\n")
-            prompt.append(message.content)
+            prompt.append("<|im_start|>system\n")
+            prompt.append(system)
             prompt.append("<|im_end|>\n")
-        }
 
-        // Start the assistant's response
-        prompt.append("<|im_start|>assistant\n")
+            // Add all messages from conversation history
+            for (message in messages) {
+                val role = when (message.role) {
+                    MessageRole.USER -> "user"
+                    MessageRole.ASSISTANT -> "assistant"
+                    MessageRole.SYSTEM -> "system"
+                }
+                prompt.append("<|im_start|>$role\n")
+                prompt.append(message.content)
+                prompt.append("<|im_end|>\n")
+            }
+
+            // Start the assistant's response
+            prompt.append("<|im_start|>assistant\n")
+        } else {
+            // Use simpler format for LFM2 and other models
+            // LFM2 typically works better with simple prompts without special tokens
+            logger.info("📝 Using simple prompt format (no chat template)")
+
+            // Add system prompt if provided
+            if (systemPrompt != null) {
+                prompt.append("$systemPrompt\n\n")
+            }
+
+            // Add conversation history in simple format
+            for (message in messages) {
+                when (message.role) {
+                    MessageRole.USER -> prompt.append("User: ${message.content}\n")
+                    MessageRole.ASSISTANT -> prompt.append("Assistant: ${message.content}\n")
+                    MessageRole.SYSTEM -> prompt.append("System: ${message.content}\n")
+                }
+            }
+
+            // Start assistant response
+            prompt.append("Assistant: ")
+        }
 
         return prompt.toString()
     }

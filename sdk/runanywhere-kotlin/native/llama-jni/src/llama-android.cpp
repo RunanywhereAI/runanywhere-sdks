@@ -104,8 +104,10 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1context(
 
     llama_context_params ctx_params = llama_context_default_params();
     ctx_params.n_ctx           = n_ctx;
+    ctx_params.n_batch         = n_ctx;  // Fix: Match batch size to context size (like SmolChat)
     ctx_params.n_threads       = n_threads;
     ctx_params.n_threads_batch = n_threads;
+    ctx_params.no_perf         = true;   // Fix: Disable perf tracking for lower overhead (like SmolChat)
 
     llama_context * context = llama_init_from_model(model, ctx_params);
 
@@ -249,7 +251,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1init(
     jlong context_pointer,
     jlong batch_pointer,
     jstring jtext,
-    jboolean format_chat,
+    jboolean parse_special_tokens,  // Changed parameter name for clarity
     jint n_len
 ) {
     cached_token_chars.clear();
@@ -258,7 +260,10 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1init(
     const auto context = reinterpret_cast<llama_context *>(context_pointer);
     const auto batch = reinterpret_cast<llama_batch *>(batch_pointer);
 
-    bool parse_special = (format_chat == JNI_TRUE);
+    // Use the parse_special_tokens parameter (defaults to true in Kotlin)
+    // This ensures special tokens like <|im_start|>, <|im_end|> are properly recognized
+    // for chat-formatted models like Qwen2, while allowing flexibility for other models
+    bool parse_special = (parse_special_tokens == JNI_TRUE);
     const auto tokens_list = common_tokenize(context, text, true, parse_special);
 
     auto n_ctx = llama_n_ctx(context);
@@ -267,7 +272,11 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1init(
     LOGi("n_len = %d, n_ctx = %d, n_kv_req = %zu", n_len, n_ctx, n_kv_req);
 
     if (n_kv_req > n_ctx) {
-        LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");
+        LOGe("error: n_kv_req (%zu) > n_ctx (%d), the required KV cache size is not big enough", n_kv_req, n_ctx);
+        env->ReleaseStringUTFChars(jtext, text);
+        env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+            "Context size exceeded: increase context_length in configuration");
+        return -1;
     }
 
     common_batch_clear(*batch);
