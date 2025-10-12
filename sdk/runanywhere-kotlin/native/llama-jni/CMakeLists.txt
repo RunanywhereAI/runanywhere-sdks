@@ -2,21 +2,17 @@ cmake_minimum_required(VERSION 3.22.1)
 
 project("llama-android")
 
-# Calculate path to llama.cpp from EXTERNAL directory
-# We're at: sdk/runanywhere-kotlin/native/llama-jni/CMakeLists.txt
-# We need:  EXTERNAL/llama.cpp (4 levels up)
-get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
-set(LLAMA_CPP_DIR "${PROJECT_ROOT}/EXTERNAL/llama.cpp")
+# llama.cpp is a submodule in the same directory as this CMakeLists.txt
+set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
 
 # Debug: Print paths to verify
 message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
-message(STATUS "PROJECT_ROOT: ${PROJECT_ROOT}")
 message(STATUS "LLAMA_CPP_DIR: ${LLAMA_CPP_DIR}")
 message(STATUS "ANDROID_ABI: ${ANDROID_ABI}")
 
 # Verify llama.cpp directory exists
 if(NOT EXISTS "${LLAMA_CPP_DIR}/CMakeLists.txt")
-    message(FATAL_ERROR "llama.cpp not found at ${LLAMA_CPP_DIR}. Please ensure it's cloned to EXTERNAL/llama.cpp")
+    message(FATAL_ERROR "llama.cpp not found at ${LLAMA_CPP_DIR}. Please ensure the submodule is initialized: git submodule update --init --recursive")
 endif()
 
 # Add llama.cpp as subdirectory

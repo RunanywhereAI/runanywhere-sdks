@@ -145,3 +145,42 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 }
+
+// Include third-party licenses in JVM JAR
+tasks.named<Jar>("jvmJar") {
+    from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
+        into("META-INF")
+    }
+}
+
+// Configure publishing to include license acknowledgments
+publishing {
+    publications.withType<MavenPublication> {
+        pom {
+            name.set("RunAnywhere Kotlin SDK")
+            description.set("Privacy-first, on-device AI SDK for Kotlin/JVM and Android")
+            url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                }
+            }
+
+            developers {
+                developer {
+                    id.set("runanywhere")
+                    name.set("RunAnywhere Team")
+                    email.set("founders@runanywhere.ai")
+                }
+            }
+
+            scm {
+                connection.set("scm:git:git://github.com/RunanywhereAI/runanywhere-sdks.git")
+                developerConnection.set("scm:git:ssh://github.com/RunanywhereAI/runanywhere-sdks.git")
+                url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
+            }
+        }
+    }
+}

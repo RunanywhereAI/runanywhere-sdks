@@ -114,6 +114,12 @@ swift build --configuration release
 # Android
 cd sdk/runanywhere-kotlin
 ./scripts/sdk.sh build-all --clean
+
+# Verify third-party licenses are included
+# For JAR:
+unzip -l build/libs/RunAnywhereKotlinSDK-jvm-0.2.0.jar | grep THIRD_PARTY_LICENSES
+# For AAR:
+unzip -l build/outputs/aar/RunAnywhereKotlinSDK-release.aar | grep THIRD_PARTY_LICENSES
 ```
 
 ---
@@ -744,6 +750,7 @@ Use this checklist for each release:
 - [ ] Version numbers updated (iOS + Android)
 - [ ] CHANGELOG.md updated
 - [ ] Documentation updated
+- [ ] Third-party licenses verified (THIRD_PARTY_LICENSES.md is current)
 - [ ] Code freeze announced
 
 ### iOS Release

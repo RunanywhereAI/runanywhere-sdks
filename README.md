@@ -444,6 +444,15 @@ See our [Contributing Guidelines](CONTRIBUTING.md) for detailed instructions.
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
+### Third-Party Licenses
+
+This project includes code from third-party open source projects.
+See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the complete list of third-party licenses
+and acknowledgments, including:
+
+- **llama.cpp** (MIT License) - GGUF model support
+- **MLC-LLM** (Apache License 2.0) - Universal LLM deployment engine
+
 ## 💬 Community & Support
 
 - **Discord**: [Join our community](https://discord.gg/pxRkYmWh)
