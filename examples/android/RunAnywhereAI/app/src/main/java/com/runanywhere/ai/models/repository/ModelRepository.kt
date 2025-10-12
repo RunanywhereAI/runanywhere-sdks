@@ -10,11 +10,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Date
-import javax.inject.Inject
-import javax.inject.Singleton
 
-@Singleton
-class ModelRepository @Inject constructor(
+class ModelRepository(
     private val context: Context
 ) {
     private val modelsDir = File(context.filesDir, "models")
@@ -50,28 +47,26 @@ class ModelRepository @Inject constructor(
                 ModelInfo(
                     id = sdkModel.id,
                     name = sdkModel.name,
-                    category = mapCategory(sdkModel.category),
-                    format = mapFormat(sdkModel.format),
+                    category = mapCategory(sdkModel.category.toString()),
+                    format = mapFormat(sdkModel.format.toString()),
                     downloadURL = sdkModel.downloadURL,
                     localPath = sdkModel.localPath,
                     downloadSize = sdkModel.downloadSize,
                     memoryRequired = sdkModel.memoryRequired,
-                    compatibleFrameworks = mapFrameworks(sdkModel.frameworks),
-                    preferredFramework = mapFramework(sdkModel.preferredFramework),
+                    compatibleFrameworks = mapFrameworks(listOf(sdkModel.preferredFramework?.toString() ?: "LLAMACPP")),
+                    preferredFramework = mapFramework(sdkModel.preferredFramework?.toString()),
                     contextLength = sdkModel.contextLength,
                     supportsThinking = sdkModel.supportsThinking,
-                    metadata = mapMetadata(sdkModel.metadata),
+                    metadata = mapMetadata(null), // Handle metadata separately
                     state = determineModelState(sdkModel)
                 )
             }
 
-            // Add some mock models for demo
-            val allModels = models + getMockModels()
-
-            _availableModels.value = allModels
+            // Use models from SDK directly - NO MOCK DATA
+            _availableModels.value = models
         } catch (e: Exception) {
-            // If SDK not initialized or fails, use mock models
-            _availableModels.value = getMockModels()
+            // If SDK not initialized or fails, show empty list
+            _availableModels.value = emptyList()
         } finally {
             _isLoading.value = false
         }
@@ -92,6 +87,7 @@ class ModelRepository @Inject constructor(
             // Use SDK download if available
             if (RunAnywhere.isInitialized) {
                 RunAnywhere.downloadModel(modelId).collect { progress ->
+                    // SDK returns Float progress (0.0 to 1.0)
                     emit(progress)
                     updateDownloadProgress(modelId, progress)
                 }
@@ -333,48 +329,4 @@ class ModelRepository @Inject constructor(
         }
     }
 
-    private fun getMockModels(): List<ModelInfo> {
-        return listOf(
-            ModelInfo(
-                id = "llama3.2-3b",
-                name = "Llama 3.2 3B",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                downloadURL = "https://example.com/llama3.2-3b.gguf",
-                downloadSize = 2_147_483_648, // 2GB
-                memoryRequired = 4_294_967_296, // 4GB
-                compatibleFrameworks = listOf(LLMFramework.LLAMACPP),
-                preferredFramework = LLMFramework.LLAMACPP,
-                contextLength = 8192,
-                supportsThinking = true,
-                thinkingTags = listOf("reasoning", "analysis"),
-                state = ModelState.AVAILABLE
-            ),
-            ModelInfo(
-                id = "whisper-base",
-                name = "Whisper Base",
-                category = ModelCategory.AUDIO,
-                format = ModelFormat.GGUF,
-                downloadURL = "https://example.com/whisper-base.gguf",
-                downloadSize = 147_483_648, // 140MB
-                memoryRequired = 500_000_000, // 500MB
-                compatibleFrameworks = listOf(LLMFramework.WHISPER_CPP),
-                preferredFramework = LLMFramework.WHISPER_CPP,
-                state = ModelState.AVAILABLE
-            ),
-            ModelInfo(
-                id = "gemma-2b",
-                name = "Gemma 2B",
-                category = ModelCategory.LANGUAGE,
-                format = ModelFormat.GGUF,
-                localPath = "${modelsDir.absolutePath}/gemma-2b.gguf",
-                downloadSize = 1_610_612_736, // 1.5GB
-                memoryRequired = 3_221_225_472, // 3GB
-                compatibleFrameworks = listOf(LLMFramework.LLAMACPP, LLMFramework.ONNX_RUNTIME),
-                preferredFramework = LLMFramework.LLAMACPP,
-                contextLength = 4096,
-                state = ModelState.DOWNLOADED
-            )
-        )
-    }
 }

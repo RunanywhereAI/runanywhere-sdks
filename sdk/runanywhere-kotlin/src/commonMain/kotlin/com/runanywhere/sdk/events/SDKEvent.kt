@@ -1,8 +1,5 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.runanywhere.sdk.events
 
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import com.runanywhere.sdk.foundation.currentTimeMillis
 
@@ -11,7 +8,7 @@ import com.runanywhere.sdk.foundation.currentTimeMillis
  * Mirrors iOS SDKEvent protocol
  */
 interface SDKEvent {
-    val timestamp: Instant
+    val timestamp: Long  // Use epoch millis instead of Instant to avoid kotlin.time issues
     val eventType: SDKEventType
 }
 
@@ -30,7 +27,8 @@ enum class SDKEventType {
     DEVICE,
     ERROR,
     PERFORMANCE,
-    NETWORK
+    NETWORK,
+    LOGGING
 }
 
 /**
@@ -38,7 +36,7 @@ enum class SDKEventType {
  */
 abstract class BaseSDKEvent(
     override val eventType: SDKEventType,
-    override val timestamp: Instant = Instant.fromEpochMilliseconds(currentTimeMillis())
+    override val timestamp: Long = currentTimeMillis()
 ) : SDKEvent
 
 /**
@@ -120,14 +118,17 @@ sealed class SDKModelEvent : BaseSDKEvent(SDKEventType.MODEL) {
     data class DownloadProgress(val modelId: String, val progress: Double) : SDKModelEvent()
     data class DownloadCompleted(val modelId: String) : SDKModelEvent()
     data class DownloadFailed(val modelId: String, val error: Throwable) : SDKModelEvent()
+    data class DownloadCancelled(val modelId: String) : SDKModelEvent()
     object ListRequested : SDKModelEvent()
-    data class ListCompleted(val models: List<String>) : SDKModelEvent()
+    data class ListCompleted(val models: List<com.runanywhere.sdk.models.ModelInfo>) : SDKModelEvent()
     data class ListFailed(val error: Throwable) : SDKModelEvent()
     data class CatalogLoaded(val models: List<String>) : SDKModelEvent()
     data class DeleteStarted(val modelId: String) : SDKModelEvent()
     data class DeleteCompleted(val modelId: String) : SDKModelEvent()
     data class DeleteFailed(val modelId: String, val error: Throwable) : SDKModelEvent()
     data class CustomModelAdded(val name: String, val url: String) : SDKModelEvent()
+    data class CustomModelRegistered(val modelId: String, val url: String) : SDKModelEvent()
+    data class CustomModelFailed(val name: String, val url: String, val error: String) : SDKModelEvent()
     data class BuiltInModelRegistered(val modelId: String) : SDKModelEvent()
 }
 
@@ -226,6 +227,20 @@ sealed class SDKDeviceEvent : BaseSDKEvent(SDKEventType.DEVICE) {
 }
 
 /**
+ * SDK Logging Events for public API
+ * Matches iOS logging event system
+ */
+sealed class SDKLoggingEvent : BaseSDKEvent(SDKEventType.LOGGING) {
+    data class ConfigurationUpdated(val level: String, val consoleEnabled: Boolean) : SDKLoggingEvent()
+    data class LocalLoggingConfigured(val enabled: Boolean, val maxSizeMB: Int, val maxFileCount: Int) : SDKLoggingEvent()
+    data class ComponentLogLevelChanged(val component: String, val level: String) : SDKLoggingEvent()
+    data class DebugModeChanged(val enabled: Boolean) : SDKLoggingEvent()
+    object FlushStarted : SDKLoggingEvent()
+    object FlushCompleted : SDKLoggingEvent()
+    data class FlushFailed(val error: String) : SDKLoggingEvent()
+}
+
+/**
  * Events for component initialization lifecycle
  */
 sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZATION) {
@@ -240,9 +255,11 @@ sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZA
     data class ComponentDownloadStarted(val component: String, val modelId: String) : ComponentInitializationEvent()
     data class ComponentDownloadProgress(val component: String, val modelId: String, val progress: Double) : ComponentInitializationEvent()
     data class ComponentDownloadCompleted(val component: String, val modelId: String) : ComponentInitializationEvent()
+    data class ComponentDownloadFailed(val component: String, val modelId: String, val error: String) : ComponentInitializationEvent()
     data class ComponentInitializing(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentReady(val component: String, val modelId: String?) : ComponentInitializationEvent()
     data class ComponentFailed(val component: String, val error: Throwable) : ComponentInitializationEvent()
+    data class ComponentUnloaded(val component: String, val modelId: String, override val timestamp: Long = currentTimeMillis()) : ComponentInitializationEvent()
 
     // Batch events
     data class ParallelInitializationStarted(val components: List<String>) : ComponentInitializationEvent()
@@ -261,6 +278,7 @@ sealed class ComponentInitializationEvent : BaseSDKEvent(SDKEventType.INITIALIZA
             is ComponentDownloadStarted -> component
             is ComponentDownloadProgress -> component
             is ComponentDownloadCompleted -> component
+            is ComponentDownloadFailed -> component
             is ComponentInitializing -> component
             is ComponentReady -> component
             is ComponentFailed -> component

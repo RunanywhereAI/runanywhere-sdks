@@ -4,13 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.ai.models.data.*
 import com.runanywhere.ai.models.repository.ModelRepository
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class ModelManagementViewModel @Inject constructor(
+class ModelManagementViewModel(
     private val repository: ModelRepository
 ) : ViewModel() {
 

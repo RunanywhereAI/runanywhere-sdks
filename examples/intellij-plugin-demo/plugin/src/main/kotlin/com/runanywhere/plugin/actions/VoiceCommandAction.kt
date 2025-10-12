@@ -8,6 +8,10 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.ui.Messages
 import com.runanywhere.plugin.isInitialized
 import com.runanywhere.plugin.services.VoiceService
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.components.stt.STTStreamEvent
+import kotlinx.coroutines.*
+import com.intellij.openapi.application.ApplicationManager
 import javax.swing.SwingUtilities
 
 /**
@@ -44,32 +48,87 @@ class VoiceCommandAction : AnAction("Voice Command") {
             isRecording = true
             e.presentation.text = "Stop Recording"
 
-            voiceService.startVoiceCapture { transcription ->
-                // Handle transcription result
-                SwingUtilities.invokeLater {
-                    if (editor != null && editor.document.isWritable) {
-                        // Insert transcription at cursor position
-                        WriteCommandAction.runWriteCommandAction(project) {
-                            val offset = editor.caretModel.offset
-                            editor.document.insertString(offset, transcription)
-                            editor.caretModel.moveToOffset(offset + transcription.length)
+            // Use the new streaming transcription API
+            @OptIn(DelicateCoroutinesApi::class)
+            GlobalScope.launch {
+                try {
+                    RunAnywhere.startStreamingTranscription()
+                        .collect { sttEvent ->
+                            // Handle different STT event types
+                            when (sttEvent) {
+                                is STTStreamEvent.FinalTranscription -> {
+                                    val transcription = sttEvent.result.transcript
+                                    SwingUtilities.invokeLater {
+                                        if (editor != null && editor.document.isWritable) {
+                                            // Insert transcription at cursor position
+                                            WriteCommandAction.runWriteCommandAction(project) {
+                                                val offset = editor.caretModel.offset
+                                                editor.document.insertString(offset, transcription)
+                                                editor.caretModel.moveToOffset(offset + transcription.length)
+                                            }
+                                        } else {
+                                            // Show in dialog if no editor available
+                                            Messages.showInfoMessage(
+                                                project,
+                                                "Transcription: $transcription",
+                                                "Voice Command Result"
+                                            )
+                                        }
+                                    }
+                                }
+                                is STTStreamEvent.PartialTranscription -> {
+                                    // Could show partial results in status bar if desired
+                                    // For now, we'll just ignore partial results
+                                }
+                                is STTStreamEvent.AudioLevelChanged -> {
+                                    // Could show audio level indicator if desired
+                                    // For now, we'll just ignore audio level changes
+                                }
+                                is STTStreamEvent.Error -> {
+                                    // Handle transcription errors
+                                    SwingUtilities.invokeLater {
+                                        Messages.showErrorDialog(
+                                            project,
+                                            "Transcription error: ${sttEvent.error}",
+                                            "Voice Command Error"
+                                        )
+                                    }
+                                }
+                                is STTStreamEvent.LanguageDetected -> {
+                                    // Language detection - could log or ignore
+                                }
+                                STTStreamEvent.SilenceDetected -> {
+                                    // Silence detection - could use for UI feedback
+                                }
+                                is STTStreamEvent.SpeakerChanged -> {
+                                    // Speaker change - could use for multi-speaker scenarios
+                                }
+                                STTStreamEvent.SpeechEnded -> {
+                                    // Speech ended - could use for UI feedback
+                                }
+                                STTStreamEvent.SpeechStarted -> {
+                                    // Speech started - could use for UI feedback
+                                }
+                            }
                         }
-                    } else {
-                        // Show in dialog if no editor available
-                        Messages.showInfoMessage(
+                } catch (e: Exception) {
+                    SwingUtilities.invokeLater {
+                        Messages.showErrorDialog(
                             project,
-                            "Transcription: $transcription",
-                            "Voice Command Result"
+                            "Voice transcription failed: ${e.message}",
+                            "Voice Command Error"
                         )
                     }
-
-                    isRecording = false
-                    e.presentation.text = "Voice Command"
+                } finally {
+                    SwingUtilities.invokeLater {
+                        isRecording = false
+                        e.presentation.text = "Voice Command"
+                    }
                 }
             }
         } else {
             // Stop recording
-            voiceService.stopVoiceCapture()
+            RunAnywhere.stopStreamingTranscription()
             isRecording = false
             e.presentation.text = "Voice Command"
         }

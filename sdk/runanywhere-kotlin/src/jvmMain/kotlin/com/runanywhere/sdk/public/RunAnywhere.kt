@@ -38,8 +38,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     private lateinit var modelDownloader: ModelDownloader
     private var sttComponent: STTComponent? = null
     private var vadComponent: VADComponent? = null
-    private val modelStorage = JvmModelStorage()
-    private val audioCapture = com.runanywhere.sdk.audio.JvmAudioCapture()
+    private val modelStorage by lazy { JvmModelStorage() }
+    private val audioCapture by lazy { com.runanywhere.sdk.audio.JvmAudioCapture() }
 
     // SDK's own coroutine scope for background operations
     private val sdkScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -51,6 +51,43 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     // Default model for v0.1 release
     private val DEFAULT_MODEL = "whisper-base"
+
+    // Device ID storage key
+    private const val DEVICE_ID_KEY = "com.runanywhere.sdk.deviceId"
+
+    // MARK: - Device Registration Storage (Platform-Specific)
+
+    override suspend fun getStoredDeviceId(): String? {
+        jvmLogger.debug("Getting stored device ID from secure storage")
+        return try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            val deviceId = secureStorage.getSecureString(DEVICE_ID_KEY)
+            if (!deviceId.isNullOrEmpty()) {
+                jvmLogger.debug("Found stored device ID: ${deviceId.take(8)}...")
+            }
+            deviceId
+        } catch (e: Exception) {
+            jvmLogger.warn("Failed to get stored device ID: ${e.message}")
+            null
+        }
+    }
+
+    override suspend fun storeDeviceId(deviceId: String) {
+        jvmLogger.debug("Storing device ID in secure storage")
+        try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            secureStorage.setSecureString(DEVICE_ID_KEY, deviceId)
+            jvmLogger.info("Device ID stored successfully")
+        } catch (e: Exception) {
+            jvmLogger.error("Failed to store device ID: ${e.message}")
+            throw com.runanywhere.sdk.data.models.SDKError.StorageError("Failed to store device ID: ${e.message}")
+        }
+    }
+
+    override fun generateDeviceIdentifier(): String {
+        // Use Java UUID for device identifier
+        return java.util.UUID.randomUUID().toString()
+    }
 
     override suspend fun storeCredentialsSecurely(params: SDKInitParams) {
         // JVM uses encrypted file-based storage with JvmSecureStorage
@@ -74,131 +111,37 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     }
 
     override suspend fun initializeDatabase() {
-        // JVM uses file-based database and secure storage
-        jvmLogger.info("Initializing secure storage and database for JVM")
+        // JVM uses file-based database (local only, no network)
+        jvmLogger.info("Initializing local database for JVM")
 
         try {
-            // 1. Create secure storage
-            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
-            jvmLogger.info("JvmSecureStorage created successfully")
-
-            // 2. Create network service with OkHttpEngine
-            val networkConfig = com.runanywhere.sdk.network.NetworkConfiguration.production()
-            val httpClient = com.runanywhere.sdk.network.createHttpClient(networkConfig)
-            jvmLogger.info("OkHttpEngine created with production configuration")
-
-            // 3. Initialize ServiceContainer with platform context, environment, and API key
+            // Initialize ServiceContainer with platform context
             val platformContext = com.runanywhere.sdk.foundation.PlatformContext()
-            // Get the API key from stored params (set during initialize call)
             val apiKey = _initParams?.apiKey
             val baseURL = _initParams?.baseURL
             serviceContainer.initialize(platformContext, currentEnvironment, apiKey, baseURL)
 
             jvmLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
         } catch (e: Exception) {
-            jvmLogger.error("Failed to initialize database and storage: ${e.message}")
+            jvmLogger.error("Failed to initialize database: ${e.message}")
             throw e
         }
     }
 
+    // These methods are no longer called during initialization (Phase 1)
+    // They're kept for backward compatibility but are now unused
+    // Authentication and device registration happen lazily via ensureDeviceRegistered()
+
     override suspend fun authenticateWithBackend(params: SDKInitParams) {
-        // Skip authentication in development mode
-        if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
-            jvmLogger.info("Skipping authentication in development mode")
-            return
-        }
-
-        jvmLogger.info("Authenticating with backend API")
-
-        try {
-            // 1. Validate API key
-            if (params.apiKey.isEmpty()) {
-                throw IllegalArgumentException("API key cannot be empty")
-            }
-
-            // 2. Initialize SDK configuration with base URL
-            com.runanywhere.sdk.config.SDKConfig.initialize(params.baseURL)
-
-            // 3. Create secure storage and network service
-            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
-            val networkConfig = com.runanywhere.sdk.network.NetworkConfiguration.production()
-            val httpClient = com.runanywhere.sdk.network.createHttpClient(networkConfig)
-
-            // 4. Create authentication service
-            val authService = com.runanywhere.sdk.services.AuthenticationService(secureStorage, httpClient)
-
-            // 5. Authenticate with API key
-            val authResponse = authService.authenticate(params.apiKey)
-            jvmLogger.info("Authentication successful - deviceId: ${authResponse.deviceId}")
-
-            // 5. Load any existing tokens from storage
-            authService.loadStoredTokens()
-
-            // 6. Get/generate persistent device ID
-            val deviceId = com.runanywhere.sdk.foundation.PersistentDeviceIdentity.getPersistentDeviceUUID()
-            jvmLogger.info("Device ID: $deviceId")
-
-            // 7. Create and use DeviceRegistrationService to register device if needed
-            val networkService = com.runanywhere.sdk.data.network.NetworkServiceFactory.create(
-                environment = currentEnvironment,
-                baseURL = params.baseURL,
-                apiKey = params.apiKey,
-                authenticationService = authService  // Pass the auth service for token management
-            )
-
-            val deviceRegistrationService = com.runanywhere.sdk.services.DeviceRegistrationService(networkService)
-
-            if (!deviceRegistrationService.isDeviceRegistered()) {
-                jvmLogger.info("Device not registered, performing registration...")
-                val registrationResult = deviceRegistrationService.registerDevice()
-
-                registrationResult.fold(
-                    onSuccess = { response ->
-                        jvmLogger.info("Device registration successful: ${response.message}")
-                    },
-                    onFailure = { error ->
-                        jvmLogger.warn("Device registration failed (optional): ${error.message}")
-                        // Don't fail initialization if device registration fails
-                    }
-                )
-            } else {
-                jvmLogger.info("Device already registered")
-            }
-
-        } catch (e: Exception) {
-            // Only throw if it's an authentication error, not device registration
-            if (e.message?.contains("Authentication failed") == true ||
-                e.message?.contains("Invalid API key") == true ||
-                e.message?.contains("401") == true) {
-                jvmLogger.error("Authentication failed: ${e.message}")
-                throw e
-            } else {
-                // For other errors (like device registration), just log and continue
-                jvmLogger.warn("Non-critical error during authentication phase: ${e.message}")
-            }
-        }
+        // This method is no longer called during initialization
+        // Authentication happens lazily during ensureDeviceRegistered()
+        jvmLogger.debug("authenticateWithBackend() called (unused in Phase 1)")
     }
 
     override suspend fun performHealthCheck() {
-        jvmLogger.info("Performing health check")
-
-        try {
-            // Skip health check in development mode
-            if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
-                jvmLogger.info("Skipping health check in development mode")
-                return
-            }
-
-            // Skip health check for now - it's optional
-            // The authentication service in the container hasn't been authenticated yet
-            // This is a known issue that needs refactoring
-            jvmLogger.info("Skipping health check (optional) - continuing initialization")
-            return
-
-        } catch (e: Exception) {
-            jvmLogger.warn("Health check failed (optional): ${e.message}")
-            // Don't throw - health check is optional
-        }
+        // This method is no longer called during initialization
+        // Health check is optional and can be done after initialization
+        jvmLogger.debug("performHealthCheck() called (unused in Phase 1)")
     }
 
     override suspend fun cleanupPlatform() {
@@ -499,7 +442,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         // Check if model is already available (cached)
         if (modelStorage.isModelAvailable(actualModelId)) {
-            jvmLogger.info("Model $actualModelId already exists at: $modelPath")
+            jvmLogger.info("✅ Model $actualModelId already exists at: $modelPath")
             val fileSize = modelFile.length()
             jvmLogger.info("Existing model size: $fileSize bytes")
 
@@ -507,7 +450,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             jvmLogger.info("Using cached model for $actualModelId")
         } else {
             // Model doesn't exist or is invalid, download it
-            jvmLogger.info("Model $actualModelId not found locally, downloading...")
+            jvmLogger.info("⬇️ Model $actualModelId not found locally, downloading...")
 
             try {
                 // Auto-download the model
@@ -524,7 +467,7 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                     }
                 }.last() // Wait for completion
 
-                jvmLogger.info("Model $actualModelId downloaded successfully")
+                jvmLogger.info("✅ Model $actualModelId downloaded successfully")
 
                 // Verify the downloaded model
                 if (!modelFile.exists()) {
@@ -535,25 +478,29 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 jvmLogger.info("Downloaded model size: $fileSize bytes")
 
             } catch (e: Exception) {
-                jvmLogger.error("Failed to download model $actualModelId: ${e.message}")
+                jvmLogger.error("❌ Failed to download model $actualModelId: ${e.message}")
 
-                // For v0.1: Return mock success in development mode
+                // In development mode, continue without the model (will use mock transcription)
                 if (currentEnvironment == com.runanywhere.sdk.data.models.SDKEnvironment.DEVELOPMENT) {
-                    jvmLogger.warn("DEVELOPMENT MODE: Using mock mode due to download failure")
-                    // Create a mock model entry for development
-                    val mockModel = ModelInfo(
+                    jvmLogger.warn("🔧 DEVELOPMENT MODE: Download failed, will use mock transcription as fallback")
+                    jvmLogger.info("💡 You can manually download the model later with: RunAnywhere.downloadModel(\"$actualModelId\")")
+
+                    // Create a model entry without local path for tracking
+                    val fallbackModel = ModelInfo(
                         id = actualModelId,
-                        name = "Whisper Base (Mock)",
+                        name = "Whisper Base (Download Failed)",
                         category = ModelCategory.SPEECH_RECOGNITION,
                         format = ModelFormat.GGML,
-                        downloadURL = "mock://whisper-base",
-                        downloadSize = 142_000_000,
-                        memoryRequired = 200_000_000, // 200 MB for base model
-                        localPath = null // No local path for mock
+                        downloadURL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+                        downloadSize = 147_951_465L,
+                        memoryRequired = 200_000_000L,
+                        localPath = null // No local path since download failed
                     )
-                    serviceContainer.modelInfoService.saveModel(mockModel)
-                    return true
+                    serviceContainer.modelInfoService.saveModel(fallbackModel)
+                    return true // Continue in development mode
                 }
+
+                // In production mode, fail if download fails
                 return false
             }
         }

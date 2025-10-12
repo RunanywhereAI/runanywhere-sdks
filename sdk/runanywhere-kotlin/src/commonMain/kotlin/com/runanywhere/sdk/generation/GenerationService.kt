@@ -3,6 +3,10 @@ package com.runanywhere.sdk.generation
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKGenerationEvent
+import com.runanywhere.sdk.models.LoadedModelWithService
+import com.runanywhere.sdk.components.llm.LLMComponent
+import com.runanywhere.sdk.components.llm.LLMConfiguration
+import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.Mutex
@@ -12,16 +16,38 @@ import kotlinx.coroutines.sync.withLock
  * Service for text generation with LLM models
  * Handles both streaming and non-streaming generation
  */
-class GenerationService {
+class GenerationService(
+    private val streamingService: StreamingService = StreamingService()
+) {
 
     private val logger = SDKLogger("GenerationService")
     private val optionsResolver = GenerationOptionsResolver()
-    private val streamingService = StreamingService()
     private val mutex = Mutex()
 
     // Track active generation sessions
     private val activeSessions = mutableMapOf<String, GenerationSession>()
     private var currentSessionId: String? = null
+
+    // Track currently loaded model
+    private var currentModel: LoadedModelWithService? = null
+
+    // LLM component for actual generation
+    private var llmComponent: LLMComponent? = null
+
+    /**
+     * Generate text with RunAnywhereGenerationOptions
+     */
+    suspend fun generate(
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ): GenerationResult {
+        val convertedOptions = GenerationOptions(
+            temperature = options.temperature,
+            maxTokens = options.maxTokens,
+            streaming = options.streamingEnabled
+        )
+        return generate(prompt, convertedOptions)
+    }
 
     /**
      * Generate text with the specified prompt and options
@@ -75,6 +101,21 @@ class GenerationService {
                 activeSessions.remove(sessionId)
             }
         }
+    }
+
+    /**
+     * Stream text generation with RunAnywhereGenerationOptions
+     */
+    fun streamGenerate(
+        prompt: String,
+        options: RunAnywhereGenerationOptions
+    ): Flow<GenerationChunk> {
+        val convertedOptions = GenerationOptions(
+            temperature = options.temperature,
+            maxTokens = options.maxTokens,
+            streaming = true
+        )
+        return streamGenerate(prompt, convertedOptions)
     }
 
     /**
@@ -160,10 +201,19 @@ class GenerationService {
         prompt: String,
         options: GenerationOptions
     ): String {
-        // TODO: Implement actual generation with LLM service
-        // This is a placeholder implementation
-        kotlinx.coroutines.delay(100) // Simulate processing
-        return "Generated response for: $prompt"
+        // Use LLM component for actual generation
+        val component = llmComponent ?: throw IllegalStateException("LLM component not initialized")
+
+        // Convert GenerationOptions to RunAnywhereGenerationOptions
+        val llmOptions = RunAnywhereGenerationOptions(
+            maxTokens = options.maxTokens,
+            temperature = options.temperature,
+            streamingEnabled = options.streaming
+        )
+
+        // Generate using LLM component
+        val result = component.generate(prompt)
+        return result.text
     }
 
     private fun calculateTokens(prompt: String, response: String): Int {
@@ -204,6 +254,43 @@ class GenerationService {
             currentSessionId = null
             publishGenerationCancelled(sessionId)
         }
+    }
+
+    /**
+     * Set the currently loaded model - matches iOS API
+     */
+    fun setCurrentModel(model: LoadedModelWithService?) {
+        currentModel = model
+        // CRITICAL: Also set the model in StreamingService
+        streamingService.setLoadedModel(model)
+
+        if (model != null) {
+            logger.info("Current model set to: ${model.model.id}")
+        } else {
+            logger.info("Current model cleared")
+        }
+    }
+
+    /**
+     * Get the currently loaded model - matches iOS API
+     */
+    fun getCurrentModel(): LoadedModelWithService? {
+        return currentModel
+    }
+
+    /**
+     * Initialize the generation service with an LLM component
+     */
+    fun initializeWithLLMComponent(component: LLMComponent) {
+        llmComponent = component
+        logger.info("GenerationService initialized with LLM component")
+    }
+
+    /**
+     * Check if the service is ready for generation
+     */
+    fun isReady(): Boolean {
+        return llmComponent?.isReady == true
     }
 }
 
