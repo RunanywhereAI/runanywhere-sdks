@@ -51,18 +51,29 @@ function(build_library_variant target_name cpu_flags)
         ${LLAMA_CPP_DIR}
     )
 
-    # Optimization flags
+    # Optimization flags - matching SmolChat's conservative approach
     target_compile_options(${target_name} PUBLIC
-        -O3 -DNDEBUG
-        -ffast-math -funroll-loops
+        -O3  # Keep O3 optimization
+        # Removed: -DNDEBUG (enables assertions for debugging)
+        # Removed: -ffast-math (can affect numerical accuracy)
+        # Removed: -funroll-loops (aggressive optimization)
         -fvisibility=hidden -fvisibility-inlines-hidden
         -ffunction-sections -fdata-sections
         ${cpu_flags}
     )
 
-    # Link-time optimization
+    # Add compile definitions to match SmolChat
+    target_compile_definitions(${target_name} PRIVATE
+        GGML_COMMIT=""
+        GGML_VERSION=""
+        GGML_USE_CPU
+        GGML_USE_CPU_AARCH64
+    )
+
+    # Link-time optimization - matching SmolChat
     target_link_options(${target_name} PRIVATE
         -Wl,--gc-sections
+        # Keep --strip-all for smaller binary size
         -Wl,--strip-all
         -flto
         -Wl,--exclude-libs,ALL

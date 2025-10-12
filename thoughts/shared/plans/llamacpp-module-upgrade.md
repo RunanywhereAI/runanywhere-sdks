@@ -305,6 +305,79 @@ data class LlamaModelConfig(
 
 ---
 
+## Phase 2.3: JNI Symbol Visibility Fix ✅ COMPLETE (Completed: 2025-10-11)
+
+### Issue Discovery
+
+**Problem**: Runtime crash with `UnsatisfiedLinkError` when calling `detectCPUFeatures()`:
+```
+No implementation found for java.lang.String
+com.runanywhere.sdk.llm.llamacpp.LLamaAndroid.detectCPUFeatures()
+```
+
+**Root Cause Analysis**:
+1. **Symbol Stripping**: Aggressive linker flags (`-fvisibility=hidden`, `-Wl,--strip-all`) were hiding JNI symbols
+2. **Include Order**: `jni.h` was included after other code, potentially causing macro definition issues
+3. **Method Naming**: JNI signatures were correct (`Java_com_runanywhere_..._00024Companion_...`)
+
+### Fix Implementation ✅
+
+**2.3.1 Fixed cpu_features.cpp** ✅
+- [x] Moved `#include <jni.h>` to top of file (before cpu_features.h)
+- [x] Added `__attribute__((visibility("default")))` to both JNI functions:
+  - `Java_..._detectCPUFeatures`
+  - `Java_..._getCPUInfo`
+- [x] This ensures symbols are exported despite `-fvisibility=hidden` flag
+
+**Before**:
+```cpp
+#include "cpu_features.h"
+// ... other includes
+extern "C" {
+#include <jni.h>
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_detectCPUFeatures(...)
+```
+
+**After**:
+```cpp
+#include <jni.h>
+#include "cpu_features.h"
+// ... other includes
+extern "C" {
+
+__attribute__((visibility("default")))
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_detectCPUFeatures(...)
+```
+
+### Verification ✅
+
+**Symbol Export Check**:
+```bash
+$ nm -D libllama-android.so | grep detectCPUFeatures
+0000000000007ae8 T Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_detectCPUFeatures
+0000000000007bac T Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_getCPUInfo
+```
+
+**Results**:
+- ✅ Symbols now exported with `T` flag (text/code symbol in dynamic symbol table)
+- ✅ All 7 library variants contain properly exported symbols
+- ✅ Build successful: `BUILD SUCCESSFUL in 2s`
+- ✅ All libraries present: baseline + 6 optimized variants (57KB each)
+
+**Files Modified**:
+- ✅ `sdk/runanywhere-kotlin/native/llama-jni/src/cpu_features.cpp`
+
+**Success Criteria**:
+- [x] JNI symbols properly exported ✅
+- [x] All library variants build successfully ✅
+- [x] Symbol visibility verified with `nm -D` ✅
+- [x] Ready for runtime device testing ✅
+
+---
+
 **2.1.5 Improve Memory Management**
 - [ ] Ensure proper RAII patterns (smart pointers, destructors)
 - [ ] Add memory usage tracking (model size, KV cache, buffers)

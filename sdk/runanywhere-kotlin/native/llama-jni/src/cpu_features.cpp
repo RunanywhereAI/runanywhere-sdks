@@ -1,3 +1,4 @@
+#include <jni.h>
 #include "cpu_features.h"
 #include <fstream>
 #include <sstream>
@@ -100,8 +101,7 @@ std::string detect_best_variant() {
 // JNI entry point for CPU feature detection
 extern "C" {
 
-#include <jni.h>
-
+__attribute__((visibility("default")))
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_detectCPUFeatures(
     JNIEnv* env, jobject /* this */) {
@@ -110,6 +110,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_detectCPUFeatu
     return env->NewStringUTF(variant.c_str());
 }
 
+__attribute__((visibility("default")))
 JNIEXPORT jstring JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_00024Companion_getCPUInfo(
     JNIEnv* env, jobject /* this */) {
