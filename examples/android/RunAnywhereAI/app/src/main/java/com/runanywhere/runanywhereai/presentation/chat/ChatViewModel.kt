@@ -5,16 +5,16 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
-import com.runanywhere.runanywhereai.domain.model.*
+import com.runanywhere.runanywhereai.data.ConversationStore
+import com.runanywhere.runanywhereai.domain.models.*
 import com.runanywhere.sdk.public.RunAnywhere
-// import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import java.util.*
+import kotlin.collections.map
+import kotlin.collections.toMutableList
 import kotlin.math.ceil
-// import javax.inject.Inject
 
 /**
  * Enhanced ChatUiState matching iOS functionality
@@ -27,7 +27,7 @@ data class ChatUiState(
     val currentInput: String = "",
     val error: Throwable? = null,
     val useStreaming: Boolean = true,
-    val currentConversation: com.runanywhere.runanywhereai.domain.models.Conversation? = null
+    val currentConversation: Conversation? = null
 ) {
     val canSend: Boolean
         get() = currentInput.trim().isNotEmpty() && !isGenerating && isModelLoaded
@@ -41,7 +41,7 @@ data class ChatUiState(
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as RunAnywhereApplication
-    private val conversationId = UUID.randomUUID().toString()
+    private val conversationStore = ConversationStore.getInstance(application)
     private val tokensPerSecondHistory = mutableListOf<Double>()
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -50,9 +50,40 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private var generationJob: Job? = null
 
     init {
-        // Initialize with system message if model is loaded
+        // Always start with a new conversation for a fresh chat experience
+        val conversation = conversationStore.createConversation()
+        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+
+        // Initialize with system message if model is already loaded
         viewModelScope.launch {
             checkModelStatus()
+            // Add system message only if model is loaded
+            if (_uiState.value.isModelLoaded) {
+                addSystemMessage()
+            }
+        }
+    }
+
+    /**
+     * Add system message
+     */
+    private fun addSystemMessage() {
+        val modelName = _uiState.value.loadedModelName ?: return
+
+        val content = "Model '$modelName' is loaded and ready to chat!"
+        val systemMessage = ChatMessage(
+            role = MessageRole.SYSTEM,
+            content = content
+        )
+
+        val currentMessages = _uiState.value.messages.toMutableList()
+        currentMessages.add(0, systemMessage)
+        _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+        // Save to conversation store
+        _uiState.value.currentConversation?.let { conversation ->
+            val updatedConversation = conversation.copy(messages = currentMessages)
+            conversationStore.updateConversation(updatedConversation)
         }
     }
 
@@ -63,10 +94,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     fun sendMessage() {
         val currentState = _uiState.value
 
+        Log.i("ChatViewModel", "🎯 sendMessage() called")
+        Log.i(
+            "ChatViewModel",
+            "📝 canSend: ${currentState.canSend}, isModelLoaded: ${currentState.isModelLoaded}, loadedModelName: ${currentState.loadedModelName}"
+        )
+
         if (!currentState.canSend) {
             Log.w("ChatViewModel", "Cannot send message - canSend is false")
             return
         }
+
+        Log.i("ChatViewModel", "✅ canSend is true, proceeding")
 
         val prompt = currentState.currentInput
         Log.i("ChatViewModel", "🎯 Sending message: ${prompt.take(50)}...")
@@ -87,6 +126,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(
             messages = _uiState.value.messages + userMessage
         )
+
+        // Save user message to conversation
+        _uiState.value.currentConversation?.let { conversation ->
+            conversationStore.addMessage(userMessage, conversation)
+        }
 
         // Create assistant message that will be updated with streaming tokens
         val assistantMessage = ChatMessage(
@@ -166,7 +210,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             val thinkingEndRange = fullResponse.indexOf("</think>")
 
                             if (thinkingRange < thinkingEndRange) {
-                                thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
+                                thinkingContent =
+                                    fullResponse.substring(thinkingRange, thinkingEndRange)
                                 responseContent = fullResponse.substring(thinkingEndRange + 8)
                                 isInThinkingMode = false
                                 thinkingEndTime = System.currentTimeMillis()
@@ -226,7 +271,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Create analytics
         val analytics = createMessageAnalytics(
             messageId = messageId,
-            conversationId = conversationId,
+            conversationId = _uiState.value.currentConversation?.id ?: "",
             startTime = startTime,
             endTime = endTime,
             firstTokenTime = firstTokenTime,
@@ -261,7 +306,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
             val analytics = createMessageAnalytics(
                 messageId = messageId,
-                conversationId = conversationId,
+                conversationId = _uiState.value.currentConversation?.id ?: "",
                 startTime = startTime,
                 endTime = endTime,
                 firstTokenTime = null,
@@ -306,7 +351,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Update assistant message content
      */
-    private fun updateAssistantMessage(messageId: String, content: String, thinkingContent: String?) {
+    private fun updateAssistantMessage(
+        messageId: String,
+        content: String,
+        thinkingContent: String?
+    ) {
         val currentMessages = _uiState.value.messages
         val updatedMessages = currentMessages.map { message ->
             if (message.id == messageId) {
@@ -325,7 +374,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Update assistant message with analytics
      */
-    private fun updateAssistantMessageWithAnalytics(messageId: String, analytics: MessageAnalytics) {
+    private fun updateAssistantMessageWithAnalytics(
+        messageId: String,
+        analytics: MessageAnalytics
+    ) {
         val currentMessages = _uiState.value.messages
         val updatedMessages = currentMessages.map { message ->
             if (message.id == messageId) {
@@ -426,12 +478,16 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         return when {
             thinking.lowercase().contains("user") && thinking.lowercase().contains("help") ->
                 "I'm here to help! Let me know what you need."
+
             thinking.lowercase().contains("question") || thinking.lowercase().contains("ask") ->
                 "That's a good question. Let me think about this more."
+
             thinking.lowercase().contains("consider") || thinking.lowercase().contains("think") ->
                 "Let me consider this carefully. How can I help you further?"
+
             thinking.length > 200 ->
                 "I was thinking through this carefully. Could you help me understand what you're looking for?"
+
             else ->
                 "I'm processing your message. What would be most helpful for you?"
         }
@@ -449,12 +505,23 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun clearChat() {
         generationJob?.cancel()
+
+        val currentMessages = _uiState.value.messages
         _uiState.value = _uiState.value.copy(
             messages = emptyList(),
             currentInput = "",
             isGenerating = false,
             error = null
         )
+
+        // Create new conversation
+        val conversation = conversationStore.createConversation()
+        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+
+        // Only add system message if model is loaded
+        if (_uiState.value.isModelLoaded) {
+            addSystemMessage()
+        }
     }
 
     /**
@@ -468,23 +535,63 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Check model status
      */
-    private suspend fun checkModelStatus() {
+    suspend fun checkModelStatus() {
         try {
             if (app.isSDKReady()) {
                 val availableModels = RunAnywhere.availableModels()
-                val loadedModel = availableModels.firstOrNull { it.localPath != null }
+                val downloadedModel = availableModels.firstOrNull { it.localPath != null }
 
-                _uiState.value = _uiState.value.copy(
-                    isModelLoaded = loadedModel != null,
-                    loadedModelName = loadedModel?.name
-                )
+                if (downloadedModel != null) {
+                    Log.i(
+                        "ChatViewModel",
+                        "📦 Found downloaded model: ${downloadedModel.name}, loading into memory..."
+                    )
 
-                Log.i("ChatViewModel", "Model status: loaded=${loadedModel != null}, name=${loadedModel?.name}")
+                    try {
+                        // Load the model into memory
+                        RunAnywhere.loadModel(downloadedModel.id)
+
+                        _uiState.value = _uiState.value.copy(
+                            isModelLoaded = true,
+                            loadedModelName = downloadedModel.name
+                        )
+
+                        Log.i(
+                            "ChatViewModel",
+                            "✅ Model loaded successfully: ${downloadedModel.name}"
+                        )
+                    } catch (e: Exception) {
+                        Log.e("ChatViewModel", "❌ Failed to load model: ${e.message}", e)
+                        _uiState.value = _uiState.value.copy(
+                            isModelLoaded = false,
+                            loadedModelName = null,
+                            error = e
+                        )
+                    }
+                } else {
+                    _uiState.value = _uiState.value.copy(
+                        isModelLoaded = false,
+                        loadedModelName = null
+                    )
+                    Log.i("ChatViewModel", "ℹ️ No downloaded models found")
+                }
+
+                // Update system message to reflect current state
+                val currentMessages = _uiState.value.messages.toMutableList()
+                if (currentMessages.firstOrNull()?.role == MessageRole.SYSTEM) {
+                    currentMessages.removeAt(0)
+                }
+                _uiState.value = _uiState.value.copy(messages = currentMessages)
+
+                if (_uiState.value.isModelLoaded) {
+                    addSystemMessage()
+                }
             } else {
                 _uiState.value = _uiState.value.copy(
                     isModelLoaded = false,
                     loadedModelName = null
                 )
+                Log.i("ChatViewModel", "❌ SDK not ready")
             }
         } catch (e: Exception) {
             Log.e("ChatViewModel", "Failed to check model status", e)
@@ -493,6 +600,43 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 loadedModelName = null
             )
         }
+    }
+
+    /**
+     * Load a conversation
+     */
+    fun loadConversation(conversation: Conversation) {
+        _uiState.value = _uiState.value.copy(currentConversation = conversation)
+
+        // For new conversations (empty messages), start fresh
+        // For existing conversations, load the messages
+        if (conversation.messages.isEmpty()) {
+            _uiState.value = _uiState.value.copy(messages = emptyList())
+            // Add system message if model is loaded
+            if (_uiState.value.isModelLoaded) {
+                addSystemMessage()
+            }
+        } else {
+            _uiState.value = _uiState.value.copy(messages = conversation.messages)
+
+            val analyticsCount = conversation.messages.mapNotNull { it.analytics }.size
+            Log.i(
+                "ChatViewModel",
+                "📂 Loaded conversation with ${conversation.messages.size} messages, $analyticsCount have analytics"
+            )
+        }
+
+        // Update model info if available
+        conversation.modelName?.let { modelName ->
+            _uiState.value = _uiState.value.copy(loadedModelName = modelName)
+        }
+    }
+
+    /**
+     * Create a new conversation
+     */
+    fun createNewConversation() {
+        clearChat()
     }
 
     /**

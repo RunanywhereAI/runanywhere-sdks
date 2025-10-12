@@ -1,90 +1,105 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.22.1)
 
-project(llama-jni)
+project("llama-android")
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Calculate path to llama.cpp from EXTERNAL directory
+# We're at: sdk/runanywhere-kotlin/native/llama-jni/CMakeLists.txt
+# We need:  EXTERNAL/llama.cpp (4 levels up)
+get_filename_component(PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
+set(LLAMA_CPP_DIR "${PROJECT_ROOT}/EXTERNAL/llama.cpp")
 
-# Find JNI
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
+# Debug: Print paths to verify
+message(STATUS "CMAKE_CURRENT_SOURCE_DIR: ${CMAKE_CURRENT_SOURCE_DIR}")
+message(STATUS "PROJECT_ROOT: ${PROJECT_ROOT}")
+message(STATUS "LLAMA_CPP_DIR: ${LLAMA_CPP_DIR}")
+message(STATUS "ANDROID_ABI: ${ANDROID_ABI}")
 
-# Find Java
-find_package(Java REQUIRED)
-
-# Set up llama.cpp
-set(LLAMA_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp")
-
-# Add llama.cpp subdirectory
-add_subdirectory(${LLAMA_CPP_DIR} EXCLUDE_FROM_ALL)
-
-# Get llama.cpp include directories
-target_include_directories(llama PUBLIC
-    ${LLAMA_CPP_DIR}/include
-    ${LLAMA_CPP_DIR}/common
-    ${LLAMA_CPP_DIR}/src
-)
-
-# JNI source files
-set(JNI_SOURCES
-    src/llama_jni.cpp
-    src/llama_jni_utils.cpp
-)
-
-# Create the JNI library
-add_library(llama-jni SHARED ${JNI_SOURCES})
-
-# Link with llama and JNI
-target_link_libraries(llama-jni
-    llama
-    ${JNI_LIBRARIES}
-)
-
-# Include directories
-target_include_directories(llama-jni PRIVATE
-    ${JNI_INCLUDE_DIRS}
-    ${LLAMA_CPP_DIR}/include
-    ${LLAMA_CPP_DIR}/common
-    ${LLAMA_CPP_DIR}/src
-    src
-)
-
-# Platform-specific configurations
-if(ANDROID)
-    target_link_libraries(llama-jni log)
-    set_target_properties(llama-jni PROPERTIES
-        ANDROID_STL c++_shared
-    )
-elseif(APPLE)
-    set_target_properties(llama-jni PROPERTIES
-        MACOSX_RPATH ON
-        INSTALL_RPATH "@loader_path"
-    )
-elseif(UNIX)
-    set_target_properties(llama-jni PROPERTIES
-        INSTALL_RPATH "$ORIGIN"
-    )
+# Verify llama.cpp directory exists
+if(NOT EXISTS "${LLAMA_CPP_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "llama.cpp not found at ${LLAMA_CPP_DIR}. Please ensure it's cloned to EXTERNAL/llama.cpp")
 endif()
 
-# Compiler-specific optimizations
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(llama-jni PRIVATE
-        -O3
-        -ffast-math
-        -funroll-loops
-        -fno-finite-math-only
+# Add llama.cpp as subdirectory
+add_subdirectory(${LLAMA_CPP_DIR} build-llama)
+
+# Common compile options following SmolChat's optimization pattern
+add_compile_options("-ffile-prefix-map=${LLAMA_CPP_DIR}=.")
+add_link_options("LINKER:--build-id=none")
+
+# Function to build library variants with different optimizations
+function(build_library_variant target_name cpu_flags)
+    message(STATUS "Building ${target_name} with flags: ${cpu_flags}")
+
+    add_library(${target_name} SHARED
+        src/llama-android.cpp
+        src/cpu_features.cpp
     )
+
+    # Link llama.cpp libraries
+    target_link_libraries(${target_name}
+        llama      # Core llama.cpp library
+        common     # Common utilities (tokenization, etc.)
+        android    # Android system library
+        log        # Android logging
+    )
+
+    # Include directories
+    target_include_directories(${target_name} PRIVATE
+        ${LLAMA_CPP_DIR}/include
+        ${LLAMA_CPP_DIR}/common
+        ${LLAMA_CPP_DIR}/src
+        ${LLAMA_CPP_DIR}
+    )
+
+    # Optimization flags - matching SmolChat's conservative approach
+    target_compile_options(${target_name} PUBLIC
+        -O3  # Keep O3 optimization
+        # Removed: -DNDEBUG (enables assertions for debugging)
+        # Removed: -ffast-math (can affect numerical accuracy)
+        # Removed: -funroll-loops (aggressive optimization)
+        -fvisibility=hidden -fvisibility-inlines-hidden
+        -ffunction-sections -fdata-sections
+        ${cpu_flags}
+    )
+
+    # Add compile definitions to match SmolChat
+    target_compile_definitions(${target_name} PRIVATE
+        GGML_COMMIT=""
+        GGML_VERSION=""
+        GGML_USE_CPU
+        GGML_USE_CPU_AARCH64
+    )
+
+    # Link-time optimization - matching SmolChat
+    target_link_options(${target_name} PRIVATE
+        -Wl,--gc-sections
+        # Keep --strip-all for smaller binary size
+        -Wl,--strip-all
+        -flto
+        -Wl,--exclude-libs,ALL
+    )
+endfunction()
+
+# Build different variants for ARM64-v8a (following SmolChat's pattern)
+if (${ANDROID_ABI} STREQUAL "arm64-v8a")
+    # Baseline ARM64 (armv8-a)
+    build_library_variant("llama-android" "-march=armv8-a")
+
+    # ARMv8.2-a with FP16 support
+    build_library_variant("llama-android-fp16" "-march=armv8.2-a+fp16")
+
+    # ARMv8.2-a with FP16 + DotProd
+    build_library_variant("llama-android-dotprod" "-march=armv8.2-a+fp16+dotprod")
+
+    # ARMv8.4-a variants
+    build_library_variant("llama-android-v8_4" "-march=armv8.4-a+fp16+dotprod")
+    build_library_variant("llama-android-i8mm" "-march=armv8.4-a+fp16+dotprod+i8mm")
+    build_library_variant("llama-android-sve" "-march=armv8.4-a+fp16+dotprod+sve")
+    build_library_variant("llama-android-i8mm-sve" "-march=armv8.4-a+fp16+dotprod+i8mm+sve")
+
+    message(STATUS "Building 7 ARM64 variants: baseline, fp16, dotprod, v8_4, i8mm, sve, i8mm-sve")
+else()
+    # For other architectures, build baseline only
+    build_library_variant("llama-android" "")
+    message(STATUS "Building baseline variant for ${ANDROID_ABI}")
 endif()
-
-# Output configuration
-set_target_properties(llama-jni PROPERTIES
-    POSITION_INDEPENDENT_CODE ON
-    CXX_VISIBILITY_PRESET hidden
-    VISIBILITY_INLINES_HIDDEN ON
-)
-
-# Install configuration (optional)
-install(TARGETS llama-jni
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-)

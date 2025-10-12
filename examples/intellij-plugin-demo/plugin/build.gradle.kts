@@ -1,6 +1,6 @@
 plugins {
     id("org.jetbrains.intellij") version "1.17.4"
-    kotlin("jvm") version "2.1.21"
+    kotlin("jvm") version "2.1.0"  // Match the version from gradle/libs.versions.toml
     java
 }
 
@@ -14,20 +14,16 @@ intellij {
 }
 
 repositories {
-    mavenLocal()
+    mavenLocal()  // For SDK dependency
     mavenCentral()
     gradlePluginPortal()
     google()
 }
 
 dependencies {
-    // RunAnywhere KMP SDK (adjust version/coords if your repo uses a different name)
-    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0") {
-        // Exclude Kotlin stdlib to avoid conflicts with IntelliJ Platform's version
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-common")
-        exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
-    }
+    // RunAnywhere KMP SDK - Use Maven Local (published separately)
+    // Run './gradlew publishSdkToMavenLocal' from root to publish SDK
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
 }
 
 tasks {
@@ -65,10 +61,3 @@ tasks {
 kotlin {
     jvmToolchain(17)
 }
-
-// If you prefer Java toolchain style instead of the kotlin{} helper, you can use:
-// java {
-//     toolchain {
-//         languageVersion.set(JavaLanguageVersion.of(17))
-//     }
-// }

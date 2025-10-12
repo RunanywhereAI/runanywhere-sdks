@@ -85,7 +85,7 @@ class ModelIntegrityVerifier(
      */
     private suspend fun calculateSHA256(filePath: String): String {
         logger.debug("Calculating SHA256 for: $filePath")
-        return calculatePlatformChecksum(filePath, "SHA-256", fileSystem)
+        return com.runanywhere.sdk.platform.calculateSHA256(filePath)
     }
 
     /**
@@ -94,7 +94,7 @@ class ModelIntegrityVerifier(
      */
     private suspend fun calculateMD5(filePath: String): String {
         logger.debug("Calculating MD5 for: $filePath")
-        return calculatePlatformChecksum(filePath, "MD5", fileSystem)
+        return com.runanywhere.sdk.platform.calculateMD5(filePath)
     }
 
     /**
@@ -121,8 +121,3 @@ class ModelIntegrityVerifier(
         return@withContext true
     }
 }
-
-/**
- * Platform-specific checksum calculation - to be implemented per platform
- */
-expect suspend fun calculatePlatformChecksum(filePath: String, algorithm: String, fileSystem: FileSystem): String

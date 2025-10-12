@@ -193,6 +193,17 @@ sdk/runanywhere-web/
 EXTERNAL/
 dist/
 
+# MLC-LLM submodule build artifacts (submodule is inside MLC module, similar to llama.cpp)
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/build/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/*.jar
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/arm64-v8a/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/armeabi-v7a/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/x86_64/
+
+# Keep the output README for documentation
+!sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm/android/mlc4j/output/README.md
+
 # Configuration files with real values
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.staging.json
 sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
@@ -213,3 +224,16 @@ sdk/runanywhere-kotlin/build/generated/config/
 !sdk/runanywhere-kotlin/config/*.example.json
 !sdk/runanywhere-kotlin/config/template.json
 !sdk/runanywhere-kotlin/config/README.md
+
+# Native build artifacts (llama.cpp)
+sdk/runanywhere-kotlin/native/llama-jni/build/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/androidMain/jniLibs/
+sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/native/
+
+# llama.cpp is a submodule - tracked in .gitmodules
+# Build artifacts from llama.cpp
+*.o
+*.so
+*.dylib
+*.dll
+*.a
