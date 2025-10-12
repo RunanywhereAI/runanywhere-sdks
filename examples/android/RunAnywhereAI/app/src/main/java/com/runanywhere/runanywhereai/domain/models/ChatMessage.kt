@@ -1,11 +1,13 @@
 package com.runanywhere.runanywhereai.domain.models
 
+import kotlinx.serialization.Serializable
 import java.util.*
 
 /**
  * Represents a chat message in the conversation
  * Enhanced to match iOS Message functionality with comprehensive analytics
  */
+@Serializable
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val role: MessageRole,
@@ -21,6 +23,7 @@ data class ChatMessage(
 /**
  * Message role types matching iOS implementation
  */
+@Serializable
 enum class MessageRole {
     SYSTEM, USER, ASSISTANT
 }
@@ -28,6 +31,7 @@ enum class MessageRole {
 /**
  * Model information for each message
  */
+@Serializable
 data class MessageModelInfo(
     val modelId: String,
     val modelName: String,
@@ -38,6 +42,7 @@ data class MessageModelInfo(
  * Comprehensive analytics information matching iOS MessageAnalytics
  * Tracks detailed performance metrics for AI generation
  */
+@Serializable
 data class MessageAnalytics(
     // Identifiers
     val messageId: String,
@@ -79,6 +84,7 @@ data class MessageAnalytics(
 /**
  * Completion status for messages
  */
+@Serializable
 enum class CompletionStatus {
     COMPLETE,
     INTERRUPTED,
@@ -89,6 +95,7 @@ enum class CompletionStatus {
 /**
  * Generation mode (streaming vs non-streaming)
  */
+@Serializable
 enum class GenerationMode {
     STREAMING,
     NON_STREAMING
@@ -97,6 +104,7 @@ enum class GenerationMode {
 /**
  * Generation parameters used for the message
  */
+@Serializable
 data class GenerationParameters(
     val temperature: Double = 0.7,
     val maxTokens: Int = 500,
@@ -107,6 +115,7 @@ data class GenerationParameters(
 /**
  * Conversation analytics aggregating message metrics
  */
+@Serializable
 data class ConversationAnalytics(
     val conversationId: String,
     val startTime: Long,
@@ -132,6 +141,7 @@ data class ConversationAnalytics(
 /**
  * Performance summary for conversations
  */
+@Serializable
 data class PerformanceSummary(
     val totalMessages: Int,
     val averageResponseTime: Double,
@@ -167,6 +177,7 @@ data class PerformanceSummary(
 /**
  * Conversation data class for persistence
  */
+@Serializable
 data class Conversation(
     val id: String = UUID.randomUUID().toString(),
     val title: String? = null,

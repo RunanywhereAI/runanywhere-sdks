@@ -9,6 +9,8 @@ import com.runanywhere.sdk.events.ComponentInitializationEvent
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.models.*
 import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.foundation.ServiceContainer
+import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 
@@ -34,6 +36,9 @@ class LLMComponent(
 
     override val componentType: SDKComponent = SDKComponent.LLM
 
+    private val logger = SDKLogger("LLMComponent")
+    private val serviceContainer: ServiceContainer? = ServiceContainer.shared
+
     // MARK: - Properties
 
     private var conversationContext: Context? = null
@@ -50,65 +55,74 @@ class LLMComponent(
         }
     }
 
-    // MARK: - Service Creation
+    // MARK: - Service Creation (iOS-aligned pattern)
 
+    /**
+     * Create LLM service - matches Swift SDK pattern
+     * Separated from model downloading for clarity
+     */
     override suspend fun createService(): LLMServiceWrapper {
-        // Check if model needs downloading
-        llmConfiguration.modelId?.let { modelId ->
-            modelPath = modelId // In real implementation, resolve path from model registry
+        // 1. Ensure model is available locally (download if needed)
+        ensureModelAvailable()
 
-            // Simulate download check
-            val needsDownload = false // In real implementation, check model store
+        // 2. Get provider from registry (iOS pattern)
+        val provider = ModuleRegistry.llmProvider(llmConfiguration.modelId)
+            ?: throw SDKError.ComponentNotInitialized(
+                "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.registerLLM(provider)."
+            )
+
+        // 3. Create service via provider (iOS pattern)
+        val llmService = provider.createLLMService(llmConfiguration)
+
+        // 4. Initialize the service with model path
+        llmService.initialize(modelPath)
+        _isModelLoaded = true
+
+        // 5. Wrap and return
+        return LLMServiceWrapper(llmService)
+    }
+
+    /**
+     * Ensure model is available locally (download if needed)
+     * Separated for clarity - matches iOS ModelLoadingService pattern
+     */
+    private suspend fun ensureModelAvailable() {
+        val modelId = llmConfiguration.modelId ?: return
+
+        // Get model info from registry
+        val modelRegistry = serviceContainer?.modelRegistry
+        val modelInfo = modelRegistry?.getModel(modelId)
+
+        if (modelInfo != null) {
+            modelPath = modelInfo.localPath
+
+            // Check if model needs downloading
+            val needsDownload = modelInfo.localPath == null || !modelRegistry.isModelDownloaded(modelId)
 
             if (needsDownload) {
                 // Emit download required event
                 EventBus.publish(ComponentInitializationEvent.ComponentDownloadRequired(
                     component = componentType.name,
                     modelId = modelId,
-                    sizeBytes = 1_000_000_000L // 1GB example
+                    sizeBytes = modelInfo.downloadSize ?: 1_000_000_000L
                 ))
 
                 // Download model
+                logger.info("⬇️  Downloading model: $modelId")
                 downloadModel(modelId)
+
+                // Update model path after download
+                val updatedModelInfo = modelRegistry.getModel(modelId)
+                modelPath = updatedModelInfo?.localPath
+                logger.info("✅ Model downloaded: $modelId")
+            } else {
+                logger.info("✅ Model already available: $modelId")
             }
+        } else {
+            // Model not found in registry, use model ID as path
+            modelPath = modelId
+            logger.warn("⚠️  Model $modelId not found in registry, using as direct path")
         }
-
-        // Try to get a registered LLM provider from central registry
-        val provider = ModuleRegistry.llmProvider(llmConfiguration.modelId)
-
-        if (provider == null) {
-            throw SDKError.ComponentNotInitialized(
-                "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.registerLLM(provider)."
-            )
-        }
-
-        // Create service through provider - ModuleRegistry uses different interface for now
-        // TODO: Align ModuleRegistry with LLMServiceProvider from llm package
-        val mockService = object : LLMService {
-            override suspend fun initialize(modelPath: String?) {
-                // Mock implementation
-            }
-            override suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String {
-                return provider.generate(prompt, com.runanywhere.sdk.generation.GenerationOptions())
-            }
-            override suspend fun streamGenerate(prompt: String, options: RunAnywhereGenerationOptions, onToken: (String) -> Unit) {
-                // Mock streaming - collect from flow and call onToken
-                provider.generateStream(prompt, com.runanywhere.sdk.generation.GenerationOptions()).collect { token ->
-                    onToken(token)
-                }
-            }
-            override val isReady: Boolean get() = true
-            override val currentModel: String? get() = llmConfiguration.modelId
-            override suspend fun cleanup() {}
-        }
-        val llmService = mockService
-
-        // Initialize the service
-        llmService.initialize(modelPath)
-        _isModelLoaded = true
-
-        // Wrap and return the service
-        return LLMServiceWrapper(llmService)
     }
 
     override suspend fun performCleanup() {
@@ -127,24 +141,114 @@ class LLMComponent(
             modelId = modelId
         ))
 
-        // Simulate download with progress
-        for (i in 0..10) {
-            val progress = i / 10.0
-            modelLoadProgress = progress
-            EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(
+        try {
+            // First try to get model info from registry
+            val modelInfo = serviceContainer?.modelRegistry?.getModel(modelId)
+
+            if (modelInfo != null && modelInfo.downloadURL != null) {
+                // Use model manager to download from URL
+                logger.info("Downloading model $modelId from URL: ${modelInfo.downloadURL}")
+                val downloadedPath = serviceContainer?.modelManager?.ensureModel(modelInfo)
+
+                // Update model registry with local path
+                val updatedModelInfo = modelInfo.copy(localPath = downloadedPath)
+                serviceContainer?.modelRegistry?.updateModel(updatedModelInfo)
+                logger.info("Model $modelId downloaded successfully to: $downloadedPath")
+
+            } else {
+                // Try to get the LLM provider to handle the download (legacy support)
+                val provider = ModuleRegistry.llmProvider(modelId)
+                if (provider != null) {
+                    // Use provider to download the model
+                    val downloadedModel = provider.downloadModel(modelId) { progress ->
+                        modelLoadProgress = progress.toDouble()
+                        EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(
+                            component = componentType.name,
+                            modelId = modelId,
+                            progress = progress.toDouble()
+                        ))
+                    }
+
+                    // Update model registry with downloaded model info
+                    serviceContainer?.modelRegistry?.registerModel(downloadedModel)
+                    logger.info("Model $modelId downloaded successfully via provider")
+
+                } else {
+                    // Fallback: simulate download with progress for development
+                    logger.warn("No provider found for model $modelId, simulating download")
+                    for (i in 0..10) {
+                        val progress = i / 10.0
+                        modelLoadProgress = progress
+                        EventBus.publish(ComponentInitializationEvent.ComponentDownloadProgress(
+                            component = componentType.name,
+                            modelId = modelId,
+                            progress = progress
+                        ))
+                        kotlinx.coroutines.delay(100) // 0.1 second
+                    }
+                }
+            }
+
+            // Emit download completed event
+            EventBus.publish(ComponentInitializationEvent.ComponentDownloadCompleted(
+                component = componentType.name,
+                modelId = modelId
+            ))
+
+        } catch (e: Exception) {
+            logger.error("Failed to download model $modelId: ${e.message}")
+            EventBus.publish(ComponentInitializationEvent.ComponentDownloadFailed(
                 component = componentType.name,
                 modelId = modelId,
-                progress = progress
+                error = e.message ?: "Unknown error"
             ))
-            kotlinx.coroutines.delay(100) // 0.1 second
+            throw e
+        }
+    }
+
+    /**
+     * Unload the currently loaded model from memory.
+     * Matches Swift SDK's unloadModel() API.
+     *
+     * @throws SDKError.ComponentNotReady if no model is loaded
+     */
+    suspend fun unloadModel() {
+        if (!_isModelLoaded || service?.wrappedService == null) {
+            logger.warn("No model loaded to unload")
+            return
         }
 
-        // Emit download completed event
-        EventBus.publish(ComponentInitializationEvent.ComponentDownloadCompleted(
-            component = componentType.name,
-            modelId = modelId
-        ))
+        val modelId = llmConfiguration.modelId ?: "unknown"
+        logger.info("Unloading model: $modelId")
+
+        try {
+            // Call service cleanup
+            service?.wrappedService?.cleanup()
+
+            // Clear service reference
+            service = null
+            _isModelLoaded = false
+            modelPath = null
+
+            // Publish event
+            EventBus.publish(ComponentInitializationEvent.ComponentUnloaded(
+                component = componentType.name,
+                modelId = modelId,
+                timestamp = currentTimeMillis()
+            ))
+
+            logger.info("✅ Model unloaded successfully: $modelId")
+        } catch (e: Exception) {
+            logger.error("Failed to unload model: $modelId", e)
+            throw SDKError.ComponentNotReady("Failed to unload model: ${e.message}")
+        }
     }
+
+    /**
+     * Get the currently loaded model ID
+     */
+    val loadedModelId: String?
+        get() = if (_isModelLoaded) llmConfiguration.modelId else null
 
     // MARK: - Helper Properties
 

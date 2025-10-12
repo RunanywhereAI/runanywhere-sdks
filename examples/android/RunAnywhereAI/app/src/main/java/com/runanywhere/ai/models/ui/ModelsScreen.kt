@@ -22,17 +22,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.ai.models.data.*
+import com.runanywhere.ai.models.repository.ModelRepository
 import com.runanywhere.ai.models.viewmodel.ModelManagementViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ModelsScreen(
-    viewModel: ModelManagementViewModel = hiltViewModel()
-) {
+fun ModelsScreen() {
+    val context = LocalContext.current
+    val viewModel: ModelManagementViewModel = viewModel {
+        ModelManagementViewModel(ModelRepository(context))
+    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val modelsByFramework by viewModel.modelsByFramework.collectAsStateWithLifecycle()
     val currentModel by viewModel.currentModel.collectAsStateWithLifecycle()
@@ -171,7 +174,10 @@ fun ModelsScreen(
     if (uiState.showAddModelDialog) {
         AddModelDialog(
             onDismiss = { viewModel.hideAddModelDialog() },
-            onAddModel = { /* TODO: Implement */ }
+            onAddModel = { modelName: String, modelUrl: String, framework: LLMFramework, supportsThinking: Boolean ->
+                // TODO: Implement custom model addition
+                viewModel.hideAddModelDialog()
+            }
         )
     }
 }

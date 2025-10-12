@@ -38,6 +38,9 @@ class SDKLogger(private val tag: String) {
 
         private var currentLevel: LogLevel = LogLevel.INFO
 
+        // Shared instance for convenience
+        val shared: SDKLogger = SDKLogger("RunAnywhere")
+
         fun setLevel(level: LogLevel) {
             currentLevel = level
         }

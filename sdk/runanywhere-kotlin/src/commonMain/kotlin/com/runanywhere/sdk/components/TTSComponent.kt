@@ -42,8 +42,8 @@ class TTSComponent(
 
     // MARK: - Audio Format Configuration
 
-    private val _audioFormat = MutableStateFlow(ttsConfiguration.outputFormat)
-    val audioFormat: StateFlow<TTSOutputFormat> = _audioFormat.asStateFlow()
+    private val _audioFormat = MutableStateFlow(ttsConfiguration.audioFormat)
+    val audioFormat: StateFlow<AudioFormat> = _audioFormat.asStateFlow()
 
     // MARK: - Progressive Streaming Support
 
@@ -113,16 +113,16 @@ class TTSComponent(
             val processingTime = getCurrentTimeMillis() - startTime
             val estimatedDuration = estimateAudioDuration(audioData, options.audioFormat)
 
-            // Create comprehensive output with metadata
+            // Create comprehensive output with metadata (iOS compatible with AudioFormat)
             TTSOutput(
                 audioData = audioData,
-                format = options.outputFormat ?: TTSOutputFormat.PCM_16KHZ, // Default fallback
+                format = options.audioFormat, // iOS-compatible AudioFormat
                 duration = estimatedDuration,
                 metadata = SynthesisMetadata(
                     voice = options.effectiveVoice,
                     language = options.language,
                     processingTimeMs = processingTime,
-                    audioFormat = options.outputFormat ?: TTSOutputFormat.PCM_16KHZ,
+                    audioFormat = options.audioFormat, // iOS-compatible AudioFormat
                     sampleRate = options.sampleRate,
                     originalText = input.text,
                     processedText = input.textToSynthesize,
@@ -312,34 +312,20 @@ class TTSComponent(
             rate = ttsConfiguration.defaultRate,
             pitch = ttsConfiguration.defaultPitch,
             volume = ttsConfiguration.defaultVolume,
-            audioFormat = ttsConfiguration.outputFormat.toAudioFormat(),
-            sampleRate = ttsConfiguration.outputFormat.sampleRate,
-            useSSML = input.isSSML,
-            outputFormat = ttsConfiguration.outputFormat
+            audioFormat = ttsConfiguration.audioFormat, // iOS-compatible AudioFormat
+            sampleRate = ttsConfiguration.sampleRate,
+            useSSML = input.isSSML
         )
     }
 
     /**
-     * Estimate audio duration from byte array - supports both AudioFormat and TTSOutputFormat
+     * Estimate audio duration from byte array - iOS-compatible using AudioFormat
      */
     private fun estimateAudioDuration(audioData: ByteArray, format: AudioFormat): Double {
         return when (format) {
             AudioFormat.PCM, AudioFormat.WAV -> audioData.size.toDouble() / (16000 * 2) // 16-bit samples
             AudioFormat.MP3, AudioFormat.AAC -> audioData.size.toDouble() / (16000 * 2) // Estimate for compressed
             AudioFormat.FLAC, AudioFormat.OPUS -> audioData.size.toDouble() / (16000 * 2)
-        }
-    }
-
-    /**
-     * Estimate audio duration from byte array (TTSOutputFormat - backward compatibility)
-     */
-    private fun estimateAudioDuration(audioData: ByteArray, format: TTSOutputFormat): Double {
-        return when (format) {
-            TTSOutputFormat.PCM_16KHZ -> audioData.size.toDouble() / (16000 * 2) // 16-bit samples
-            TTSOutputFormat.PCM_8KHZ -> audioData.size.toDouble() / (8000 * 2)
-            TTSOutputFormat.PCM_24KHZ -> audioData.size.toDouble() / (24000 * 2)
-            TTSOutputFormat.PCM_48KHZ -> audioData.size.toDouble() / (48000 * 2)
-            else -> audioData.size.toDouble() / (16000 * 2) // Default estimation
         }
     }
 }
@@ -369,7 +355,7 @@ data class TTSInput(
 @Serializable
 data class TTSOutput(
     val audioData: ByteArray,
-    val format: TTSOutputFormat,
+    val format: AudioFormat, // iOS-compatible AudioFormat
     val duration: Double,
     val metadata: SynthesisMetadata,
     override val timestamp: Long = getCurrentTimeMillis()
@@ -407,7 +393,7 @@ data class SynthesisMetadata(
     val voice: TTSVoice,
     val language: String,
     val processingTimeMs: Long,
-    val audioFormat: TTSOutputFormat,
+    val audioFormat: AudioFormat, // iOS-compatible AudioFormat
     val sampleRate: Int,
     val originalText: String,
     val processedText: String,
@@ -448,11 +434,7 @@ data class TTSOptions(
     val sampleRate: Int = 16000,
 
     // SSML support - iOS compatible
-    val useSSML: Boolean = false,
-
-    // Backward compatibility
-    @Deprecated("Use audioFormat for iOS parity")
-    val outputFormat: TTSOutputFormat? = null
+    val useSSML: Boolean = false
 ) {
     /**
      * Get effective voice - prioritizes voiceId (iOS style) over voice object
@@ -566,40 +548,6 @@ enum class AudioFormat {
 }
 
 /**
- * TTS Output format (keeping existing for backward compatibility)
- * @deprecated Use AudioFormat for iOS parity
- */
-@Serializable
-enum class TTSOutputFormat {
-    PCM_8KHZ,
-    PCM_16KHZ,
-    PCM_24KHZ,
-    PCM_48KHZ,
-    MP3,
-    OGG_VORBIS,
-    OPUS;
-
-    val sampleRate: Int
-        get() = when (this) {
-            PCM_8KHZ -> 8000
-            PCM_16KHZ -> 16000
-            PCM_24KHZ -> 24000
-            PCM_48KHZ -> 48000
-            else -> 16000 // Default for compressed formats
-        }
-
-    /**
-     * Convert to iOS-compatible AudioFormat
-     */
-    fun toAudioFormat(): AudioFormat = when (this) {
-        PCM_8KHZ, PCM_16KHZ, PCM_24KHZ, PCM_48KHZ -> AudioFormat.PCM
-        MP3 -> AudioFormat.MP3
-        OGG_VORBIS -> AudioFormat.FLAC // Close match
-        OPUS -> AudioFormat.OPUS
-    }
-}
-
-/**
  * TTS Configuration
  */
 data class TTSConfiguration(
@@ -608,13 +556,15 @@ data class TTSConfiguration(
     val defaultRate: Float = 1.0f,
     val defaultPitch: Float = 1.0f,
     val defaultVolume: Float = 1.0f,
-    val outputFormat: TTSOutputFormat = TTSOutputFormat.PCM_16KHZ,
+    val audioFormat: AudioFormat = AudioFormat.PCM, // iOS-compatible AudioFormat
+    val sampleRate: Int = 16000, // Sample rate (iOS typically uses this)
     val enableSSML: Boolean = true
 ) : ComponentConfiguration {
     override fun validate() {
         require(defaultRate > 0f && defaultRate <= 3f) { "Rate must be between 0 and 3" }
         require(defaultPitch > 0f && defaultPitch <= 2f) { "Pitch must be between 0 and 2" }
         require(defaultVolume >= 0f && defaultVolume <= 1f) { "Volume must be between 0 and 1" }
+        require(sampleRate > 0) { "Sample rate must be positive" }
     }
 }
 

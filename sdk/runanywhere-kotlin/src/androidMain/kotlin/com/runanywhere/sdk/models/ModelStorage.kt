@@ -17,7 +17,11 @@ actual class PlatformFile(private val file: File) {
 
 actual fun createPlatformFile(path: String): PlatformFile = PlatformFile(File(path))
 
-actual fun getPlatformBaseDir(): String = System.getProperty("user.home")
+actual fun getPlatformBaseDir(): String {
+    // On Android, we should use the app's files directory
+    // This will be overridden by FileManager.setContext() when initialized
+    return "/data/data/com.runanywhere.runanywhereai/files"
+}
 
 actual fun createDirectory(path: String): Boolean {
     val dir = File(path)

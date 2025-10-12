@@ -1,134 +1,181 @@
 package com.runanywhere.sdk.models
 
+import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.core.ModuleRegistry
 import com.runanywhere.sdk.data.models.LoadedModel
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKModelEvent
-import com.runanywhere.sdk.files.FileManager
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.services.download.DownloadService
-import com.runanywhere.sdk.utils.getCurrentTimeMillis
+import com.runanywhere.sdk.memory.MemoryManager
+import com.runanywhere.sdk.storage.FileSystem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Model loading service with download support
+ * LoadedModel enhanced with service reference - EXACT copy of iOS LoadedModel
+ */
+data class LoadedModelWithService(
+    val model: ModelInfo,
+    val service: Any, // Would be LLMService in production
+    val localPath: String? = null,
+    val loadedAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Service responsible for loading models - EXACT copy of iOS ModelLoadingService
  */
 class ModelLoadingService(
-    private val modelRegistry: ModelRegistry,
-    private val downloadService: DownloadService
+    private val registry: ModelRegistry,
+    private val memoryService: MemoryManager,
+    private val fileSystem: FileSystem
 ) {
     private val logger = SDKLogger("ModelLoadingService")
-    private val loadedModels = mutableMapOf<String, LoadedModel>()
+    private val loadedModels = mutableMapOf<String, LoadedModelWithService>()
 
-    suspend fun loadModel(modelId: String): LoadedModel = withContext(Dispatchers.Default) {
-        logger.info("Loading model: $modelId")
+    /**
+     * Load a model by identifier - EXACT copy of iOS implementation
+     */
+    suspend fun loadModel(modelId: String): LoadedModelWithService = withContext(Dispatchers.Default) {
+        logger.info("🚀 Loading model: $modelId")
 
         // Check if already loaded
-        loadedModels[modelId]?.let {
-            logger.info("Model $modelId already loaded")
-            return@withContext it
+        loadedModels[modelId]?.let { loaded ->
+            logger.info("✅ Model already loaded: $modelId")
+            return@withContext loaded
         }
 
         // Get model info from registry
-        val modelInfo = modelRegistry.getModel(modelId)
-            ?: throw SDKError.ModelNotFound(modelId)
+        val modelInfo = registry.getModel(modelId)
+            ?: run {
+                logger.error("❌ Model not found in registry: $modelId")
+                throw SDKError.ModelNotFound(modelId)
+            }
 
-        // Check if model file exists locally
-        val modelPath = FileManager.shared.getModelPath(modelId)
-        val modelExists = FileManager.shared.fileExists(modelPath)
+        logger.info("✅ Found model in registry: ${modelInfo.name}")
 
-        if (!modelExists) {
-            logger.info("Model $modelId not found locally, downloading...")
+        // Check if this is a built-in model (e.g., Foundation Models)
+        val isBuiltIn = modelInfo.localPath?.toString()?.startsWith("builtin") == true
 
-            // Emit download required event
-            EventBus.publish(SDKModelEvent.DownloadStarted(modelId))
+        if (!isBuiltIn) {
+            // Check model file exists for non-built-in models
+            if (modelInfo.localPath == null) {
+                throw SDKError.ModelNotFound("Model '$modelId' not downloaded")
+            }
 
-            try {
-                // Download the model
-                downloadModel(modelInfo, modelPath)
-
-                // Emit download completed
-                EventBus.publish(SDKModelEvent.DownloadCompleted(modelId))
-
-            } catch (e: Exception) {
-                logger.error("Failed to download model $modelId", e)
-                EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
-                throw SDKError.LoadingFailed("Failed to download model: ${e.message}")
+            // Verify file exists on filesystem
+            modelInfo.localPath?.let { path ->
+                if (!fileSystem.exists(path)) {
+                    throw SDKError.ModelNotFound("Model file not found at path: $path")
+                }
             }
         } else {
-            logger.info("Model $modelId found locally at $modelPath")
+            logger.info("🏗️ Built-in model detected, skipping file check")
         }
 
-        // Validate the model file exists
-        val fileExists = FileManager.shared.fileExists(modelPath)
-        if (!fileExists) {
-            logger.error("Model $modelId file not found after download")
-            throw SDKError.LoadingFailed("Model file not found, please try again")
-        }
+        // Get the appropriate LLM provider for this model
+        val provider = ModuleRegistry.llmProvider(modelId)
+            ?: throw SDKError.LoadingFailed("No LLM provider available for model: $modelId")
 
-        // TODO: Add proper validation once ValidationService is platform-specific
-        logger.info("Model $modelId validation skipped (development mode)")
+        logger.info("🚀 Using LLM provider: ${provider.name} for model: $modelId")
 
-        // Create LoadedModel instance
-        val loadedModel = LoadedModel(
-            model = modelInfo,
-            localPath = modelPath,
-            loadedAt = getCurrentTimeMillis()
+        // Create LLMConfiguration from ModelInfo
+        val configuration = com.runanywhere.sdk.components.llm.LLMConfiguration(
+            modelId = modelInfo.localPath ?: modelInfo.id,
+            contextLength = modelInfo.contextLength ?: 2048,
+            useGPUIfAvailable = true,
+            streamingEnabled = true
         )
 
-        // Cache the loaded model
-        loadedModels[modelId] = loadedModel
+        // Create the actual LLM service using the provider
+        val llmService = try {
+            provider.createLLMService(configuration)
+        } catch (e: Exception) {
+            logger.error("❌ Failed to create LLM service: ${e.message}")
+            throw SDKError.LoadingFailed("Failed to create LLM service: ${e.message}")
+        }
 
-        logger.info("Model $modelId loaded successfully")
-        return@withContext loadedModel
+        // Initialize the LLM service with the model
+        try {
+            // Cast to EnhancedLLMService to access loadModel method
+            if (llmService is com.runanywhere.sdk.components.llm.EnhancedLLMService) {
+                llmService.loadModel(modelInfo)
+                logger.info("✅ LLM service initialized with model: $modelId")
+            } else {
+                // Fallback to initialize method for basic LLMService
+                llmService.initialize(modelInfo.localPath)
+                logger.info("✅ LLM service initialized with model path: ${modelInfo.localPath}")
+            }
+        } catch (e: Exception) {
+            logger.error("❌ Failed to load model into LLM service: ${e.message}")
+            throw SDKError.LoadingFailed("Failed to load model: ${e.message}")
+        }
+
+        // Create loaded model
+        val loaded = LoadedModelWithService(
+            model = modelInfo,
+            service = llmService,
+            localPath = modelInfo.localPath,
+            loadedAt = System.currentTimeMillis()
+        )
+
+        loadedModels[modelId] = loaded
+
+        logger.info("✅ Model loaded successfully: $modelId")
+        return@withContext loaded
     }
 
-    private suspend fun downloadModel(modelInfo: ModelInfo, targetPath: String) {
-        if (modelInfo.downloadURL == null) {
-            throw SDKError.LoadingFailed("No download URL available for model ${modelInfo.id}")
+    /**
+     * Unload a model - EXACT copy of iOS implementation
+     */
+    suspend fun unloadModel(modelId: String) = withContext(Dispatchers.Default) {
+        val loaded = loadedModels[modelId] ?: return@withContext
+
+        // Cleanup LLM service
+        if (loaded.service is LLMService) {
+            try {
+                // LLMService doesn't have a cleanup method, just let it be garbage collected
+                logger.info("🗑️ Releasing LLM service for model: $modelId")
+            } catch (e: Exception) {
+                logger.error("⚠️ Error during service cleanup: ${e.message}")
+            }
         }
 
-        // For development mode, we'll simulate a successful download
-        // In production, this would actually download the model
-        logger.info("Downloading model to $targetPath")
+        // Remove from loaded models
+        loadedModels.remove(modelId)
 
-        // Create parent directories if needed
-        val parentDir = targetPath.substringBeforeLast("/")
-        FileManager.shared.createDirectory(parentDir)
-
-        // For development, create a dummy file
-        // In production, this would be replaced with actual download logic
-        if (!FileManager.shared.fileExists(targetPath)) {
-            // Write some dummy data to simulate a model file
-            FileManager.shared.writeFile(
-                targetPath,
-                "DUMMY_MODEL_DATA_${modelInfo.id}".toByteArray()
-            )
-        }
-
-        // Emit progress events
-        for (progress in 1..10) {
-            EventBus.publish(SDKModelEvent.DownloadProgress(modelInfo.id, (progress / 10f).toDouble()))
-            kotlinx.coroutines.delay(100) // Simulate download time
-        }
+        logger.info("✅ Model unloaded: $modelId")
     }
 
+    /**
+     * Get currently loaded model - EXACT copy of iOS implementation
+     */
+    fun getLoadedModel(modelId: String): LoadedModelWithService? {
+        return loadedModels[modelId]
+    }
+
+    /**
+     * Check if model is loaded
+     */
     fun isModelLoaded(modelId: String): Boolean {
         return loadedModels.containsKey(modelId)
     }
 
-    fun getLoadedModel(modelId: String): LoadedModel? {
-        return loadedModels[modelId]
+    /**
+     * Get all loaded models
+     */
+    fun getAllLoadedModels(): List<LoadedModelWithService> {
+        return loadedModels.values.toList()
     }
 
-    fun unloadModel(modelId: String) {
-        loadedModels.remove(modelId)
-        logger.info("Model $modelId unloaded")
-    }
-
-    fun clearAllModels() {
-        loadedModels.clear()
-        logger.info("All models unloaded")
+    /**
+     * Clear all loaded models
+     */
+    suspend fun clearAllModels() = withContext(Dispatchers.Default) {
+        val modelIds = loadedModels.keys.toList()
+        for (modelId in modelIds) {
+            unloadModel(modelId)
+        }
+        logger.info("✅ All models unloaded")
     }
 }

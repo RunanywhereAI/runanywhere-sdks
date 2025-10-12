@@ -1,5 +1,7 @@
 package com.runanywhere.sdk.storage
 
+import kotlinx.coroutines.runBlocking
+
 /**
  * Platform-agnostic file system abstraction
  * Provides common file operations that are implemented differently on each platform
@@ -9,6 +11,18 @@ interface FileSystem {
      * Write bytes to a file
      */
     suspend fun writeBytes(path: String, data: ByteArray)
+
+    /**
+     * Append bytes to an existing file
+     * If file doesn't exist, creates it and writes the data
+     */
+    suspend fun appendBytes(path: String, data: ByteArray)
+
+    /**
+     * Write to a file using an output stream (for efficient streaming)
+     * The output stream is automatically closed when the block completes
+     */
+    suspend fun <T> writeStream(path: String, block: suspend (java.io.OutputStream) -> T): T
 
     /**
      * Read bytes from a file
@@ -21,9 +35,19 @@ interface FileSystem {
     suspend fun exists(path: String): Boolean
 
     /**
+     * Check if a file or directory exists (synchronous version)
+     */
+    fun existsSync(path: String): Boolean = runBlocking { exists(path) }
+
+    /**
      * Delete a file or directory
      */
     suspend fun delete(path: String): Boolean
+
+    /**
+     * Delete a directory and all its contents recursively
+     */
+    suspend fun deleteRecursively(path: String): Boolean
 
     /**
      * Create a directory (including parent directories if needed)

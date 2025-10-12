@@ -32,7 +32,7 @@ interface Generatable {
         /**
          * Generate schema with custom properties and validation rules
          */
-        private fun generateSchemaForType(type: KClass<out Generatable>): String {
+        fun generateSchemaForType(type: KClass<out Generatable>): String {
             val typeName = type.simpleName ?: "Unknown"
 
             // Generate comprehensive schema based on type
@@ -411,7 +411,7 @@ data class StructuredOutputConfig(
             return StructuredOutputConfig(
                 typeName = T::class.simpleName ?: "Unknown",
                 includeSchemaInPrompt = includeSchemaInPrompt,
-                jsonSchema = Generatable.getJsonSchema(T::class),
+                jsonSchema = Generatable.generateSchemaForType(T::class),
                 generationInstructions = instance?.getGenerationInstructions(),
                 enforceStrictValidation = enforceStrictValidation,
                 includeExamples = includeExamples,

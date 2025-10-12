@@ -47,7 +47,7 @@ class MemoryService(
         checkMemoryConditions()
     }
 
-    suspend fun unregisterModel(modelId: String) {
+    suspend fun unregisterModelFromMemory(modelId: String) {
         mutex.withLock {
             allocationManager.unregisterModel(modelId)
         }
@@ -111,6 +111,20 @@ class MemoryService(
         return memoryMonitor.getAvailableMemory() > 0
     }
 
+    override suspend fun registerLoadedModel(modelId: String, size: Long, service: Any) {
+        val memoryModel = MemoryLoadedModel(
+            id = modelId,
+            name = modelId,
+            size = size,
+            framework = "llama.cpp"
+        )
+        registerModel(memoryModel, size, service, MemoryPriority.NORMAL)
+    }
+
+    override suspend fun unregisterModel(modelId: String) {
+        unregisterModelFromMemory(modelId)
+    }
+
     // MARK: - Memory Information
 
     fun getMemoryStatistics(): MemoryStatistics {
@@ -170,6 +184,10 @@ interface MemoryManager {
     fun setMemoryThreshold(threshold: Long)
     fun getLoadedModels(): List<LoadedModel>
     fun isHealthy(): Boolean
+
+    // Methods required by ModelLoadingService - EXACT copy of iOS MemoryManager
+    suspend fun registerLoadedModel(modelId: String, size: Long, service: Any)
+    suspend fun unregisterModel(modelId: String)
 }
 
 // MARK: - Memory Models
