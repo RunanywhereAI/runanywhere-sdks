@@ -17,14 +17,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.runanywhere.runanywhereai.presentation.chat.ChatScreen
-import com.runanywhere.ai.models.ui.ModelsScreen
+import com.runanywhere.runanywhereai.presentation.storage.StorageScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.quiz.QuizScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
 
 /**
  * Main navigation component matching iOS app structure
- * 5 tabs: Chat, Models, Settings, Quiz, Voice
+ * 5 tabs: Chat, Storage, Settings, Quiz, Voice
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -45,8 +45,8 @@ fun AppNavigation() {
                 ChatScreen()
             }
 
-            composable(NavigationRoute.MODELS) {
-                ModelsScreen()
+            composable(NavigationRoute.STORAGE) {
+                StorageScreen()
             }
 
             composable(NavigationRoute.SETTINGS) {
@@ -69,7 +69,7 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Match iOS tab order and icons exactly
+    // Match iOS tab order and icons exactly: Chat, Storage, Settings, Quiz, Voice
     val items = listOf(
         BottomNavItem(
             route = NavigationRoute.CHAT,
@@ -78,8 +78,8 @@ fun BottomNavigationBar(navController: NavController) {
             selectedIcon = Icons.Filled.Chat
         ),
         BottomNavItem(
-            route = NavigationRoute.MODELS,
-            label = "Models",
+            route = NavigationRoute.STORAGE,
+            label = "Storage",
             icon = Icons.Outlined.Storage,
             selectedIcon = Icons.Filled.Storage
         ),
@@ -138,7 +138,7 @@ fun BottomNavigationBar(navController: NavController) {
  */
 object NavigationRoute {
     const val CHAT = "chat"
-    const val MODELS = "models"
+    const val STORAGE = "storage"
     const val SETTINGS = "settings"
     const val QUIZ = "quiz"
     const val VOICE = "voice"

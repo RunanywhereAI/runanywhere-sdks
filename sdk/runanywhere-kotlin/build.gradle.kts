@@ -16,6 +16,11 @@ kotlin {
 
     // JVM target for IntelliJ plugins and general JVM usage
     jvm {
+        compilations.all {
+            compilerOptions.configure {
+                freeCompilerArgs.add("-Xsuppress-version-warnings")
+            }
+        }
         testRuns["test"].executionTask.configure {
             useJUnitPlatform()
         }
@@ -26,6 +31,8 @@ kotlin {
         compilations.all {
             compilerOptions.configure {
                 jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                freeCompilerArgs.add("-Xsuppress-version-warnings")
+                freeCompilerArgs.add("-Xno-param-assertions")
             }
         }
     }
@@ -49,6 +56,9 @@ kotlin {
                 implementation(libs.ktor.client.content.negotiation)
                 implementation(libs.ktor.client.logging)
                 implementation(libs.ktor.serialization.kotlinx.json)
+
+                // Okio for file system operations (replaces Files library from iOS)
+                implementation("com.squareup.okio:okio:3.9.0")
             }
         }
 
@@ -56,6 +66,8 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                // Okio FakeFileSystem for testing
+                implementation("com.squareup.okio:okio-fakefilesystem:3.9.0")
             }
         }
 

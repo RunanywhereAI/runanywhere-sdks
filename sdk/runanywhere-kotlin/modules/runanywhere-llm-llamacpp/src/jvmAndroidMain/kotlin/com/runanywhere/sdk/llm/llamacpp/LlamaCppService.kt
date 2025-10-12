@@ -8,151 +8,140 @@ import com.runanywhere.sdk.components.llm.LLMOutput
 import com.runanywhere.sdk.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.math.min
 
 /**
- * Actual implementation of LlamaCpp service for JVM and Android platforms
+ * LlamaCpp service implementation using the new LLamaAndroid wrapper
+ * This wraps the low-level streaming API into our SDK interfaces
  */
-actual class LlamaCppService(private val configuration: LLMConfiguration) : EnhancedLLMService {
+actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) : EnhancedLLMService {
     private val logger = SDKLogger("LlamaCppService")
-    private var contextHandle: Long = 0L
+    private val llama = LLamaAndroid.instance()
     private var modelPath: String? = null
     private var isInitialized = false
-    private var modelInfo: ModelInfo? = null
 
-    override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
+    actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         val actualModelPath = modelPath ?: configuration.modelId
             ?: throw IllegalArgumentException("No model path provided")
 
-        if (!LlamaCppNative.isLoaded()) {
-            logger.warn("llama.cpp native library not loaded, using mock mode")
-            // Mock initialization for development/testing
-            this@LlamaCppService.modelPath = actualModelPath
-            isInitialized = true
-            modelInfo = createMockModelInfo()
-            logger.info("Initialized llama.cpp in mock mode with model: ${modelInfo?.name}")
-            return@withContext
-        }
-
-        if (isInitialized && contextHandle != 0L) {
+        if (isInitialized) {
+            logger.info("Already initialized, unloading previous model")
             cleanup()
         }
 
-        val params = LlamaParams(
-            nGpuLayers = configuration.gpuLayers ?: determineGpuLayers(),
-            nCtx = configuration.contextLength,
-            nBatch = 512,
-            nThreads = configuration.cpuThreads ?: determineOptimalThreads(),
-            useMmap = configuration.memoryMapping,
-            useMlock = configuration.memoryLock,
-            f16Kv = true
-        )
+        logger.info("Initializing llama.cpp with model: $actualModelPath")
 
-        contextHandle = LlamaCppNative.llamaInit(actualModelPath, params)
-        if (contextHandle == 0L) {
-            throw IllegalStateException("Failed to initialize llama.cpp with model: $actualModelPath")
+        try {
+            // Create config from LLMConfiguration
+            val config = LlamaModelConfig(
+                contextSize = configuration.contextLength,
+                threads = 0, // auto-detect
+                temperature = configuration.temperature.toFloat(),
+                minP = 0.05f, // Default min-P
+                topK = 40 // Default top-K
+            )
+
+            llama.load(actualModelPath, config)
+            this@LlamaCppService.modelPath = actualModelPath
+            isInitialized = true
+            logger.info("✅ Initialized llama.cpp successfully")
+        } catch (e: Exception) {
+            logger.error("Failed to initialize llama.cpp", e)
+            throw IllegalStateException("Failed to initialize llama.cpp: ${e.message}", e)
         }
-
-        this@LlamaCppService.modelPath = actualModelPath
-        isInitialized = true
-        modelInfo = LlamaCppNative.llamaGetModelInfo(contextHandle)
-
-        logger.info("Initialized llama.cpp with model: ${modelInfo?.name}")
-        logger.debug("Model info: $modelInfo")
     }
 
-    override suspend fun generate(
+    actual override suspend fun generate(
         prompt: String,
         options: RunAnywhereGenerationOptions
-    ): String = withContext(Dispatchers.Default) {
+    ): String = withContext(Dispatchers.IO) {
         if (!isInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
-        // Mock mode when native library not available
-        if (!LlamaCppNative.isLoaded()) {
-            return@withContext generateMockResponse(prompt)
+        val result = StringBuilder()
+        var tokenCount = 0
+        val maxTokens = options.maxTokens
+
+        // Use parseSpecialTokens = true for proper chat template handling
+        llama.send(prompt, parseSpecialTokens = true).collect { token ->
+            result.append(token)
+            tokenCount++
+            if (tokenCount >= maxTokens) {
+                return@collect
+            }
         }
 
-        if (contextHandle == 0L) {
-            throw IllegalStateException("LlamaCppService not initialized properly")
-        }
-
-        val params = GenerationParams(
-            maxTokens = options.maxTokens,
-            temperature = options.temperature,
-            topK = 40, // Default value
-            topP = 0.95f, // Default value
-            repeatPenalty = 1.1f,
-            stopSequences = options.stopSequences
-        )
-
-        val nativeResult = LlamaCppNative.llamaGenerate(contextHandle, prompt, params)
-        return@withContext nativeResult.text
+        result.toString()
     }
 
-    override suspend fun streamGenerate(
+    actual override suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
         onToken: (String) -> Unit
-    ) = withContext(Dispatchers.Default) {
+    ) = withContext(Dispatchers.IO) {
         if (!isInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
-        // Mock mode when native library not available
-        if (!LlamaCppNative.isLoaded()) {
-            streamMockResponse(prompt, onToken)
-            return@withContext
-        }
+        logger.info("🚀 streamGenerate called with prompt length: ${prompt.length}")
+        logger.info("📝 First 200 chars of prompt: ${prompt.take(200)}")
+        logger.info("⚙️ Options: maxTokens=${options.maxTokens}, temp=${options.temperature}, streaming=${options.streamingEnabled}")
 
-        if (contextHandle == 0L) {
-            throw IllegalStateException("LlamaCppService not initialized properly")
-        }
+        var tokenCount = 0
+        val maxTokens = options.maxTokens
 
-        val params = GenerationParams(
-            maxTokens = options.maxTokens,
-            temperature = options.temperature,
-            topK = 40, // Default value
-            topP = 0.95f, // Default value
-            repeatPenalty = 1.1f,
-            stopSequences = options.stopSequences
-        )
-
-        LlamaCppNative.llamaGenerateStream(contextHandle, prompt, params) { token ->
+        // Always parse special tokens (true) for proper chat template handling
+        llama.send(prompt, parseSpecialTokens = true).collect { token ->
+            logger.info("🔤 Token #$tokenCount: '$token'")
             onToken(token)
+            tokenCount++
+            if (tokenCount >= maxTokens) {
+                logger.info("⛔ Reached maxTokens limit: $maxTokens")
+                return@collect
+            }
         }
+        logger.info("✅ streamGenerate completed with $tokenCount tokens")
     }
 
-    override suspend fun cleanup() = withContext(Dispatchers.IO) {
-        if (LlamaCppNative.isLoaded() && contextHandle != 0L) {
-            LlamaCppNative.llamaFree(contextHandle)
-            contextHandle = 0L
+    actual override suspend fun cleanup() = withContext(Dispatchers.IO) {
+        if (isInitialized) {
+            logger.info("Cleaning up llama.cpp context")
+            llama.unload()
+            isInitialized = false
+            modelPath = null
+            logger.info("Cleaned up llama.cpp context")
         }
-        isInitialized = false
-        modelInfo = null
-        logger.info("Cleaned up llama.cpp context")
     }
 
     // Interface properties
-    override val isReady: Boolean
-        get() = isInitialized && (contextHandle != 0L || !LlamaCppNative.isLoaded())
+    actual override val isReady: Boolean
+        get() = isInitialized
 
-    override val currentModel: String?
-        get() = modelInfo?.name ?: modelPath?.split("/")?.lastOrNull()
+    actual override val currentModel: String?
+        get() = modelPath?.split("/")?.lastOrNull()
 
     // EnhancedLLMService implementation
-    override suspend fun process(input: LLMInput): LLMOutput {
-        if (!isInitialized || contextHandle == 0L) {
+    actual override suspend fun process(input: LLMInput): LLMOutput {
+        if (!isInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
+
+        logger.info("🎯 process() called with ${input.messages.size} messages")
+        logger.info("📨 Messages:")
+        input.messages.forEach { msg ->
+            logger.info("  - ${msg.role}: ${msg.content.take(100)}")
+        }
+        logger.info("🔧 System prompt: ${input.systemPrompt?.take(100) ?: "null"}")
 
         val startTime = com.runanywhere.sdk.foundation.currentTimeMillis()
 
         // Build prompt from messages
         val prompt = buildPrompt(input.messages, input.systemPrompt)
+        logger.info("📝 Built prompt length: ${prompt.length} chars")
+        logger.info("📝 Full prompt:\n$prompt")
+        logger.info("📝 [END OF PROMPT]")
 
         // Use provided options or defaults
         val options = input.options ?: RunAnywhereGenerationOptions(
@@ -163,15 +152,18 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
 
         // Generate text
         val response = generate(prompt, options)
+        logger.info("✅ Generated response: ${response.take(200)}")
 
         val generationTime = com.runanywhere.sdk.foundation.currentTimeMillis() - startTime
 
         // Calculate token usage (rough estimate)
-        val promptTokens = getTokenCount(prompt)
-        val completionTokens = getTokenCount(response)
+        val promptTokens = estimateTokenCount(prompt)
+        val completionTokens = estimateTokenCount(response)
         val tokensPerSecond = if (generationTime > 0) {
             (completionTokens.toDouble() * 1000.0) / generationTime
         } else null
+
+        logger.info("📊 Stats: ${completionTokens} tokens in ${generationTime}ms (${tokensPerSecond?.toInt() ?: 0} tok/s)")
 
         return LLMOutput(
             text = response,
@@ -190,117 +182,137 @@ actual class LlamaCppService(private val configuration: LLMConfiguration) : Enha
         )
     }
 
-    override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
-        if (!isInitialized || contextHandle == 0L) {
+    actual override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> {
+        if (!isInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
+        logger.info("🌊 streamProcess() called with ${input.messages.size} messages")
         val prompt = buildPrompt(input.messages, input.systemPrompt)
+        logger.info("📝 Stream prompt length: ${prompt.length} chars")
+        logger.info("📝 Stream prompt (first 300 chars):\n${prompt.take(300)}")
+
         val options = input.options ?: RunAnywhereGenerationOptions(
             maxTokens = configuration.maxTokens,
             temperature = configuration.temperature.toFloat(),
             streamingEnabled = true
         )
 
+        var chunkIndex = 0
         var tokenCount = 0
-        streamGenerate(prompt, options) { token ->
-            tokenCount++
-            // Emit as LLMGenerationChunk
-            val chunk = LLMGenerationChunk(
-                delta = token,
-                isComplete = false,
-                tokenIndex = tokenCount,
+        val maxTokens = options.maxTokens
+
+        logger.info("🚀 Starting llama.send() with parseSpecialTokens=true, maxTokens=$maxTokens")
+
+        // Always parse special tokens (true) for proper chat template handling
+        // This works for Qwen2, LFM2, and other models
+        return llama.send(prompt, parseSpecialTokens = true).map { token ->
+            val currentChunk = chunkIndex++
+            val currentTokens = tokenCount++
+            val isComplete = currentTokens >= maxTokens
+
+            logger.info("🔤 Stream token #$currentTokens: '$token' (len=${token.length})")
+
+            LLMGenerationChunk(
+                text = token,
+                isComplete = isComplete,
+                chunkIndex = currentChunk,
                 timestamp = com.runanywhere.sdk.foundation.currentTimeMillis()
             )
-            // Note: This is a simplified approach. Real implementation would need coroutine channels
-            // for proper async emission within the callback
         }
-
-        // Emit completion chunk
-        emit(LLMGenerationChunk(
-            delta = "",
-            isComplete = true,
-            tokenIndex = tokenCount,
-            timestamp = com.runanywhere.sdk.foundation.currentTimeMillis()
-        ))
     }
 
-    override suspend fun loadModel(modelInfo: com.runanywhere.sdk.models.ModelInfo) {
+    actual override suspend fun loadModel(modelInfo: com.runanywhere.sdk.models.ModelInfo) {
         val localPath = modelInfo.localPath ?: throw IllegalArgumentException("Model has no local path")
         initialize(localPath)
     }
 
-    override fun cancelCurrent() {
-        // llama.cpp doesn't support cancellation directly
-        // This would require implementing a cancellation mechanism in the native layer
+    actual override fun cancelCurrent() {
+        // llama.cpp doesn't support cancellation directly in this implementation
         logger.info("Cancellation requested but not implemented in llama.cpp")
     }
 
-    override fun getTokenCount(text: String): Int {
-        return if (isInitialized) {
-            try {
-                LlamaCppNative.llamaGetTokenCount(contextHandle, text)
-            } catch (e: Exception) {
-                // Fallback to rough estimation
-                text.length / 4
-            }
-        } else {
-            // Fallback to rough estimation
-            text.length / 4
-        }
+    actual override fun getTokenCount(text: String): Int {
+        return estimateTokenCount(text)
     }
 
-    override fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
-        val promptTokens = getTokenCount(prompt)
+    actual override fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
+        val promptTokens = estimateTokenCount(prompt)
         val totalTokens = promptTokens + maxTokens
         return totalTokens <= configuration.contextLength
     }
 
     // Helper methods
 
-    private fun determineGpuLayers(): Int {
-        val gpuInfo = LlamaCppNative.llamaGetGpuInfo()
-        return if (gpuInfo != null && gpuInfo.availableMemory > 4_000_000_000L) {
-            // If GPU has more than 4GB available, offload layers
-            35 // Typical for 7B models
-        } else {
-            0 // CPU only
-        }
-    }
-
-    private fun determineOptimalThreads(): Int {
-        return min(Runtime.getRuntime().availableProcessors() - 1, 8)
+    private fun estimateTokenCount(text: String): Int {
+        // Rough estimation: 1 token ≈ 4 characters
+        return text.length / 4
     }
 
     private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
-        var prompt = ""
+        val prompt = StringBuilder()
 
-        systemPrompt?.let { system ->
-            prompt += "System: $system\n\n"
-        }
+        // Detect model type based on current model name/path
+        val modelPath = currentModel ?: ""
+        val isLFM2 = modelPath.contains("LFM2", ignoreCase = true) ||
+                     modelPath.contains("1546711167") // LiquidAI model ID
+        val isQwen = modelPath.contains("qwen", ignoreCase = true) ||
+                     modelPath.contains("-1841487817") || // Qwen 2.5 0.5B ID
+                     modelPath.contains("-1039016089")    // Qwen 2 0.5B ID
 
-        for (message in messages) {
-            when (message.role) {
-                MessageRole.USER -> prompt += "User: ${message.content}\n"
-                MessageRole.ASSISTANT -> prompt += "Assistant: ${message.content}\n"
-                MessageRole.SYSTEM -> prompt += "System: ${message.content}\n"
+        logger.info("🔍 Model detection - Path: $modelPath, isLFM2: $isLFM2, isQwen: $isQwen")
+
+        if (isQwen) {
+            // Use Qwen2 chat template format
+            // Format: <|im_start|>role\ncontent<|im_end|>\n
+            logger.info("📝 Using Qwen2 chat template format")
+
+            val system = systemPrompt ?: """You are a helpful, friendly AI assistant.
+Answer questions clearly and concisely.
+Be direct and relevant to the user's query.
+Keep responses focused and helpful."""
+
+            prompt.append("<|im_start|>system\n")
+            prompt.append(system)
+            prompt.append("<|im_end|>\n")
+
+            // Add all messages from conversation history
+            for (message in messages) {
+                val role = when (message.role) {
+                    MessageRole.USER -> "user"
+                    MessageRole.ASSISTANT -> "assistant"
+                    MessageRole.SYSTEM -> "system"
+                }
+                prompt.append("<|im_start|>$role\n")
+                prompt.append(message.content)
+                prompt.append("<|im_end|>\n")
             }
+
+            // Start the assistant's response
+            prompt.append("<|im_start|>assistant\n")
+        } else {
+            // Use simpler format for LFM2 and other models
+            // LFM2 typically works better with simple prompts without special tokens
+            logger.info("📝 Using simple prompt format (no chat template)")
+
+            // Add system prompt if provided
+            if (systemPrompt != null) {
+                prompt.append("$systemPrompt\n\n")
+            }
+
+            // Add conversation history in simple format
+            for (message in messages) {
+                when (message.role) {
+                    MessageRole.USER -> prompt.append("User: ${message.content}\n")
+                    MessageRole.ASSISTANT -> prompt.append("Assistant: ${message.content}\n")
+                    MessageRole.SYSTEM -> prompt.append("System: ${message.content}\n")
+                }
+            }
+
+            // Start assistant response
+            prompt.append("Assistant: ")
         }
 
-        prompt += "Assistant: "
-        return prompt
-    }
-
-    // Additional utility methods for compatibility
-
-    suspend fun getMemoryUsage(): MemoryUsage? = withContext(Dispatchers.IO) {
-        if (contextHandle != 0L) {
-            LlamaCppNative.llamaGetMemoryUsage(contextHandle)
-        } else null
-    }
-
-    suspend fun tokenize(text: String): IntArray = withContext(Dispatchers.Default) {
-        if (!isInitialized) throw IllegalStateException("Service not initialized")
-        LlamaCppNative.llamaTokenize(contextHandle, text)
+        return prompt.toString()
     }
 }

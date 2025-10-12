@@ -137,12 +137,12 @@ class ServiceContainer {
         ModelManager(fileSystem, downloadService)
     }
 
-    val generationService: GenerationService by lazy {
-        GenerationService()
-    }
-
     val streamingService: StreamingService by lazy {
         StreamingService()
+    }
+
+    val generationService: GenerationService by lazy {
+        GenerationService(streamingService)
     }
 
     // New services for 8-step bootstrap matching iOS
@@ -184,6 +184,29 @@ class ServiceContainer {
         )
 
         logger.info("ServiceContainer initialized with $environment environment")
+    }
+
+    /**
+     * Initialize network services lazily when first needed (matches Swift SDK)
+     * Called during device registration, not during initialization
+     */
+    suspend fun initializeNetworkServices(params: SDKInitParams) {
+        // Skip if already initialized
+        if (::networkService.isInitialized) {
+            logger.debug("Network services already initialized")
+            return
+        }
+
+        logger.info("Initializing network services lazily...")
+
+        // Create network service based on environment
+        networkService = NetworkServiceFactory.create(
+            environment = params.environment,
+            baseURL = params.baseURL,
+            apiKey = params.apiKey
+        )
+
+        logger.info("✅ Network services initialized")
     }
 
     /**
@@ -240,6 +263,12 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepStarted(4, "Model repository sync"))
 
             modelInfoService.initialize()
+
+            // Scan file system for already downloaded models
+            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
+            logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
@@ -353,6 +382,12 @@ class ServiceContainer {
 
             modelInfoService.initialize()
             fetchAndPopulateModels()
+
+            // Scan file system for already downloaded models
+            val modelsPath = fileSystem.getDataDirectory() + "/models"
+            (modelInfoRepository as? ModelInfoRepositoryImpl)?.scanAndUpdateDownloadedModels(modelsPath, fileSystem)
+            logger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+
             val models = modelInfoService.getAllModels()
             EventBus.publish(SDKBootstrapEvent.ModelCatalogSynced(models))
 
@@ -584,26 +619,16 @@ class ServiceContainer {
 
     /**
      * Register LlamaCpp provider for development
+     *
+     * NOTE: LlamaCpp module is separate and auto-registers itself when included.
+     * The module uses object initializer to call ModuleRegistry.registerLLM() automatically.
+     * No explicit registration needed in ServiceContainer.
      */
     private fun registerLlamaCppProvider() {
-        logger.info("ℹ️ LlamaCpp provider registration skipped - module not available yet")
-        // TODO: Implement LlamaCpp module registration when module is ready
-        // try {
-        //     // Register the LlamaCpp module which will auto-register the provider
-        //     com.runanywhere.sdk.llm.llamacpp.LlamaCppModule.register()
-        //     logger.info("✅ LlamaCpp module registered")
-        // } catch (e: Exception) {
-        //     logger.warn("⚠️ LlamaCpp module registration failed: ${e.message}")
-        //
-        //     // Fallback: Try to register the provider directly
-        //     try {
-        //         val llamaCppProvider = com.runanywhere.sdk.llm.llamacpp.LlamaCppProvider()
-        //         ModuleRegistry.registerLLM(llamaCppProvider)
-        //         logger.info("✅ LlamaCpp provider registered as fallback")
-        //     } catch (fallbackError: Exception) {
-        //         logger.warn("⚠️ LlamaCpp provider fallback registration also failed: ${fallbackError.message}")
-        //     }
-        // }
+        // LlamaCpp module auto-registers via its object initializer
+        // If you want to manually register, add the module as a dependency and call:
+        // com.runanywhere.sdk.llm.llamacpp.LlamaCppModule.register()
+        logger.debug("LlamaCpp module will auto-register if available on classpath")
     }
 
     /**

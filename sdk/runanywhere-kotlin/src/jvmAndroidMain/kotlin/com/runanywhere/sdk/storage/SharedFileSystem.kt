@@ -3,6 +3,8 @@ package com.runanywhere.sdk.storage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
 
 /**
  * Shared FileSystem implementation for JVM and Android platforms
@@ -12,6 +14,18 @@ abstract class SharedFileSystem : FileSystem {
 
     override suspend fun writeBytes(path: String, data: ByteArray) = withContext(Dispatchers.IO) {
         File(path).writeBytes(data)
+    }
+
+    override suspend fun appendBytes(path: String, data: ByteArray) = withContext(Dispatchers.IO) {
+        FileOutputStream(path, true).use { outputStream ->
+            outputStream.write(data)
+        }
+    }
+
+    override suspend fun <T> writeStream(path: String, block: suspend (OutputStream) -> T): T = withContext(Dispatchers.IO) {
+        FileOutputStream(path).use { outputStream ->
+            block(outputStream)
+        }
     }
 
     override suspend fun readBytes(path: String): ByteArray = withContext(Dispatchers.IO) {

@@ -1,23 +1,19 @@
 package com.runanywhere.sdk.public
 
+import android.annotation.SuppressLint
 import android.content.Context
 import com.runanywhere.sdk.audio.AndroidAudioCapture
-import com.runanywhere.sdk.components.base.ComponentState
-import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.components.stt.STTComponent
 import com.runanywhere.sdk.components.stt.STTStreamEvent
 import com.runanywhere.sdk.components.stt.STTTranscriptionResult
 import com.runanywhere.sdk.components.vad.VADComponent
 import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKInitParams
-import com.runanywhere.sdk.files.FileManager
-import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.models.ModelStorage
+import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.models.ModelDownloader
 import com.runanywhere.sdk.models.ModelInfo
-import com.runanywhere.sdk.models.enums.ModelCategory
-import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.models.ModelStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -26,18 +22,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 
 /**
  * Android implementation of RunAnywhere SDK
  * Simplified version using platform abstractions
  */
+@SuppressLint("StaticFieldLeak") // TODO: double check this later
 actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     private val androidLogger = SDKLogger("RunAnywhere.Android")
@@ -57,6 +50,43 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
     // Store the Android context
     private var androidContext: Context? = null
+
+    // Device ID storage key
+    private const val DEVICE_ID_KEY = "com.runanywhere.sdk.deviceId"
+
+    // MARK: - Device Registration Storage (Platform-Specific)
+
+    override suspend fun getStoredDeviceId(): String? {
+        androidLogger.debug("Getting stored device ID from secure storage")
+        return try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            val deviceId = secureStorage.getSecureString(DEVICE_ID_KEY)
+            if (!deviceId.isNullOrEmpty()) {
+                androidLogger.debug("Found stored device ID: ${deviceId.take(8)}...")
+            }
+            deviceId
+        } catch (e: Exception) {
+            androidLogger.warn("Failed to get stored device ID: ${e.message}")
+            null
+        }
+    }
+
+    override suspend fun storeDeviceId(deviceId: String) {
+        androidLogger.debug("Storing device ID in secure storage")
+        try {
+            val secureStorage = com.runanywhere.sdk.storage.createSecureStorage()
+            secureStorage.setSecureString(DEVICE_ID_KEY, deviceId)
+            androidLogger.info("Device ID stored successfully")
+        } catch (e: Exception) {
+            androidLogger.error("Failed to store device ID: ${e.message}")
+            throw com.runanywhere.sdk.data.models.SDKError.StorageError("Failed to store device ID: ${e.message}")
+        }
+    }
+
+    override fun generateDeviceIdentifier(): String {
+        // Use Java UUID for device identifier (same as JVM)
+        return java.util.UUID.randomUUID().toString()
+    }
 
     /**
      * Android-specific initialization with Context
@@ -94,39 +124,58 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             "Android context not provided. Use RunAnywhere.initialize(context, ...) on Android"
         )
 
-        // Android uses Room database
-        androidLogger.info("Initializing Room database for Android")
+        // Android uses Room database (local only, no network)
+        androidLogger.info("Initializing local database for Android")
 
-        // Initialize FileManager with Android context
-        // FileManager.setContext(context) // TODO: Fix this - FileManager doesn't have setContext method
+        // Initialize MemoryMonitor with Android context
+        com.runanywhere.sdk.memory.MemoryMonitor.initialize(context)
+        androidLogger.info("MemoryMonitor initialized")
 
         // Initialize audio capture with context
         audioCapture = AndroidAudioCapture(context)
 
         // Initialize Android-specific services
         val platformContext = com.runanywhere.sdk.foundation.PlatformContext(context)
-        ServiceContainer.shared.initialize(platformContext)
+        val apiKey = _initParams?.apiKey
+        val baseURL = _initParams?.baseURL
+        ServiceContainer.shared.initialize(platformContext, currentEnvironment, apiKey, baseURL)
 
-        // Initialize model downloader
-        // modelDownloader = ModelDownloader(modelStorage) // TODO: Fix constructor parameters
+        androidLogger.info("ServiceContainer initialized with environment: $currentEnvironment")
     }
 
-    override suspend fun authenticateWithBackend(params: SDKInitParams) {
-        // Skip authentication in development mode
-        if (currentEnvironment == SDKEnvironment.DEVELOPMENT) {
-            androidLogger.info("Skipping authentication in development mode")
-            return
-        }
+    /**
+     * Scan file system for downloaded models and restore their localPath
+     * Should be called after models are registered
+     */
+    suspend fun scanForDownloadedModels() {
+        val context = androidContext ?: throw IllegalStateException("Android context not provided")
 
-        androidLogger.info("Authenticating with backend API")
-        // Authentication is handled by ServiceContainer.bootstrap()
-        serviceContainer.authenticationService.authenticate(params.apiKey)
+        try {
+            val modelsPath = context.filesDir.absolutePath + "/models"
+            val repository = ServiceContainer.shared.modelInfoRepository
+            if (repository is com.runanywhere.sdk.data.repositories.ModelInfoRepositoryImpl) {
+                repository.scanAndUpdateDownloadedModels(modelsPath, ServiceContainer.shared.fileSystem)
+                androidLogger.info("🔍 Scanned file system for downloaded models at: $modelsPath")
+            }
+        } catch (e: Exception) {
+            androidLogger.warn("Failed to scan for downloaded models: ${e.message}")
+        }
+    }
+
+    // These methods are no longer called during initialization (Phase 1)
+    // They're kept for backward compatibility but are now unused
+    // Authentication and device registration happen lazily via ensureDeviceRegistered()
+
+    override suspend fun authenticateWithBackend(params: SDKInitParams) {
+        // This method is no longer called during initialization
+        // Authentication happens lazily during ensureDeviceRegistered()
+        androidLogger.debug("authenticateWithBackend() called (unused in Phase 1)")
     }
 
     override suspend fun performHealthCheck() {
-        androidLogger.info("Performing health check")
-        // Health check would be implemented here
-        // For now, we assume healthy if authentication succeeded
+        // This method is no longer called during initialization
+        // Health check is optional and can be done after initialization
+        androidLogger.debug("performHealthCheck() called (unused in Phase 1)")
     }
 
     override suspend fun availableModels(): List<ModelInfo> {
@@ -170,23 +219,30 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val model = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
-        if (model.localPath == null) {
-            androidLogger.warn("Model $modelId not downloaded. Download it first.")
-            return false
-        }
-
-        // Load model into memory using ModelManager
+        // Ensure model file is available (download if needed)
         return try {
             serviceContainer.modelManager.loadModel(model)
-            androidLogger.info("Model $modelId loaded successfully")
+            androidLogger.info("Model file ensured: $modelId")
+
+            // Now load model into LLM service for inference using ModelLoadingService
+            androidLogger.info("Loading model into LLM service: $modelId")
+            val loadedModel = serviceContainer.modelLoadingService.loadModel(modelId)
+
+            // Set the loaded model in the generation service
+            serviceContainer.generationService.setCurrentModel(loadedModel)
+
+            androidLogger.info("Model $modelId loaded successfully into LLM service")
             true
         } catch (e: Exception) {
-            androidLogger.error("Failed to load model $modelId: ${e.message}")
+            androidLogger.error("Failed to load model $modelId: ${e.message}", e)
             false
         }
     }
 
-    override suspend fun generate(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): String {
+    override suspend fun generate(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): String {
         requireInitialized()
 
         androidLogger.info("Generating response for prompt: ${prompt.take(50)}...")
@@ -206,7 +262,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         return result.text
     }
 
-    override fun generateStream(prompt: String, options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?): Flow<String> {
+    override fun generateStream(
+        prompt: String,
+        options: com.runanywhere.sdk.models.RunAnywhereGenerationOptions?
+    ): Flow<String> {
         requireInitialized()
 
         androidLogger.info("Starting streaming generation for prompt: ${prompt.take(50)}...")
@@ -254,7 +313,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
 
         androidLogger.info("Recording audio for $durationSeconds seconds and transcribing...")
 
-        val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture =
+            this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
 
         // Record audio for the specified duration
         val audioData = audioCapture.recordAudio(durationSeconds * 1000L)
@@ -268,7 +328,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     fun startRecordingWithWaveform(): Flow<STTStreamEvent.AudioLevelChanged> = flow {
         requireInitialized()
 
-        val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture = this@RunAnywhere.audioCapture
+            ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording with waveform")
 
@@ -290,7 +351,12 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
                 }
 
                 // Emit audio level for waveform
-                emit(STTStreamEvent.AudioLevelChanged(decibelLevel, System.currentTimeMillis() / 1000.0))
+                emit(
+                    STTStreamEvent.AudioLevelChanged(
+                        decibelLevel,
+                        System.currentTimeMillis() / 1000.0
+                    )
+                )
 
                 // Accumulate audio samples for transcription
                 audioBuffer.addAll(chunk.samples.toList())
@@ -350,7 +416,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             return
         }
 
-        val audioCapture = this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture =
+            this.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording...")
         recordingBuffer.reset()
@@ -383,7 +450,8 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             throw IllegalStateException("Recording already in progress")
         }
 
-        val audioCapture = this@RunAnywhere.audioCapture ?: throw IllegalStateException("Audio capture not initialized")
+        val audioCapture = this@RunAnywhere.audioCapture
+            ?: throw IllegalStateException("Audio capture not initialized")
 
         androidLogger.info("Starting audio recording with live transcription...")
         isRecording = true
