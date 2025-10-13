@@ -287,10 +287,27 @@ This file should be included in all distributed artifacts:
   android {
       sourceSets {
           getByName("main") {
-              assets.srcDirs("../../THIRD_PARTY_LICENSES.md")
+              // Point to the assets directory
+              assets.srcDir("src/main/assets")
           }
       }
   }
+
+  // Copy THIRD_PARTY_LICENSES.md into assets before packaging
+  tasks.register<Copy>("copyThirdPartyLicenses") {
+      from(rootProject.file("THIRD_PARTY_LICENSES.md"))
+      into("src/main/assets")
+  }
+
+  tasks.named("preBuild") {
+      dependsOn("copyThirdPartyLicenses")
+  }
+  ```
+
+  **Alternative approach** - Copy the file manually:
+  ```bash
+  # Copy the file into your module's assets directory
+  cp ../../THIRD_PARTY_LICENSES.md src/main/assets/
   ```
 
 - **JAR**: Include in META-INF:
