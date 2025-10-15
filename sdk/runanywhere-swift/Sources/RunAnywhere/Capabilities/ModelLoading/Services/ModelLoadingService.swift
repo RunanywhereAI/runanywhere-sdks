@@ -56,10 +56,14 @@ public class ModelLoadingService {
             throw SDKError.loadingFailed("Insufficient memory")
         }
 
-        // Find appropriate adapter
-        logger.info("🚀 Finding adapter for model")
+        // Determine modality based on model (for now, default to textToText for LLMs)
+        let modality: FrameworkModality = modelInfo.preferredFramework == .whisperKit ? .voiceToText : .textToText
 
-        guard let adapter = adapterRegistry.findBestAdapter(for: modelInfo) else {
+        // Find all adapters that can handle this model
+        logger.info("🚀 Finding adapters for model (modality: \(modality))")
+        let adapters = await adapterRegistry.findAllAdapters(for: modelInfo, modality: modality)
+
+        guard !adapters.isEmpty else {
             logger.error("❌ No adapter found for model with preferred framework: \(modelInfo.preferredFramework?.rawValue ?? "none")")
             logger.error("❌ Compatible frameworks: \(modelInfo.compatibleFrameworks.map { $0.rawValue })")
             throw SDKError.frameworkNotAvailable(
@@ -67,33 +71,45 @@ public class ModelLoadingService {
             )
         }
 
-        logger.info("✅ Found adapter for framework: \(adapter.framework.rawValue)")
+        logger.info("✅ Found \(adapters.count) adapter(s) capable of loading this model")
 
-        // Determine modality based on model (for now, default to textToText for LLMs)
-        let modality: FrameworkModality = modelInfo.preferredFramework == .whisperKit ? .voiceToText : .textToText
+        // Try to load with each adapter (primary + fallbacks)
+        var lastError: Error?
+        for (index, adapter) in adapters.enumerated() {
+            let isPrimary = index == 0
+            logger.info(isPrimary ? "🚀 Trying primary adapter: \(adapter.framework.rawValue)" : "🔄 Trying fallback adapter: \(adapter.framework.rawValue)")
 
-        // Load model through adapter
-        logger.info("🚀 Loading model through adapter")
-        let service = try await adapter.loadModel(modelInfo, for: modality)
-        logger.info("✅ Model loaded through adapter")
+            do {
+                let service = try await adapter.loadModel(modelInfo, for: modality)
+                logger.info("✅ Model loaded successfully with \(adapter.framework.rawValue)")
 
-        // Cast to LLMService
-        guard let llmService = service as? LLMService else {
-            throw SDKError.loadingFailed("Adapter returned incompatible service type")
+                // Cast to LLMService
+                guard let llmService = service as? LLMService else {
+                    throw SDKError.loadingFailed("Adapter returned incompatible service type")
+                }
+
+                // Create loaded model
+                let loaded = LoadedModel(model: modelInfo, service: llmService)
+
+                // Register loaded model
+                memoryService.registerLoadedModel(
+                    loaded,
+                    size: modelInfo.memoryRequired ?? memoryRequired,
+                    service: llmService
+                )
+                loadedModels[modelId] = loaded
+
+                return loaded
+            } catch {
+                logger.error("❌ Failed to load model with \(adapter.framework.rawValue): \(error.localizedDescription)")
+                lastError = error
+                // Continue to next adapter
+            }
         }
 
-        // Create loaded model
-        let loaded = LoadedModel(model: modelInfo, service: llmService)
-
-        // Register loaded model
-        memoryService.registerLoadedModel(
-            loaded,
-            size: modelInfo.memoryRequired ?? memoryRequired,
-            service: llmService
-        )
-        loadedModels[modelId] = loaded
-
-        return loaded
+        // All adapters failed
+        logger.error("❌ All adapters failed to load model")
+        throw lastError ?? SDKError.loadingFailed("Failed to load model with any available adapter")
     }
 
     /// Unload a model

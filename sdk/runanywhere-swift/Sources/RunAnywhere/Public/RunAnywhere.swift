@@ -539,9 +539,49 @@ public enum RunAnywhere {
         return serviceContainer.generationService.getCurrentModel()?.model
     }
 
+    // MARK: - Multi-Adapter Support (NEW)
+
+    /// Register a framework adapter with optional priority
+    /// Higher priority adapters are preferred when multiple can handle the same model
+    /// - Parameters:
+    ///   - adapter: The framework adapter to register
+    ///   - priority: Priority level (higher = preferred, default: 100)
+    public static func registerFrameworkAdapter(_ adapter: UnifiedFrameworkAdapter, priority: Int = 100) {
+        // Note: Adapter registration can happen before SDK initialization
+        // This allows registering adapters during app setup
+        serviceContainer.adapterRegistry.register(adapter, priority: priority)
+    }
+
+    /// Get all adapters capable of handling a specific model
+    /// - Parameter modelId: The model identifier
+    /// - Returns: Array of framework types that can handle this model
+    public static func availableAdapters(for modelId: String) async -> [LLMFramework] {
+        guard isInitialized else {
+            return []
+        }
+
+        // Get model info
+        guard let model = serviceContainer.modelRegistry.getModel(by: modelId) else {
+            return []
+        }
+
+        // Determine modality
+        let modality: FrameworkModality
+        if model.category == .speechRecognition || model.preferredFramework == .whisperKit {
+            modality = .voiceToText
+        } else {
+            modality = .textToText
+        }
+
+        // Get all capable adapters
+        let adapters = await serviceContainer.adapterRegistry.findAllAdapters(for: model, modality: modality)
+        return adapters.map(\.framework)
+    }
+
     // MARK: - Authentication Info
 
     /// Get current user ID
+    /// - Returns: User ID if SDK is initialized and authenticated, nil otherwise
     public static func getUserId() async -> String? {
         guard isInitialized,
               let authService = serviceContainer.authenticationService else {
@@ -551,6 +591,7 @@ public enum RunAnywhere {
     }
 
     /// Get current organization ID
+    /// - Returns: Organization ID if SDK is initialized and authenticated, nil otherwise
     public static func getOrganizationId() async -> String? {
         guard isInitialized,
               let authService = serviceContainer.authenticationService else {
