@@ -214,6 +214,71 @@ for try await token in stream {
 }
 ```
 
+## Configuration
+
+The RunAnywhere SDK uses a **three-layer configuration system** for flexibility and clarity:
+
+### Quick Configuration Guide
+
+| What to Configure | Method | Layer |
+|-------------------|--------|-------|
+| **API Key & Environment** | `RunAnywhere.initialize()` | Layer 2 (Init) |
+| **Temperature, Max Tokens** | `RunAnywhere.setDefaultGenerationSettings()` | Layer 3 (Runtime) |
+| **Routing Policy** | `RunAnywhere.setRoutingPolicy()` | Layer 3 (Runtime) |
+| **Apply Preset** | `RunAnywhere.updateConfiguration(preset:)` | Layer 3 (Runtime) |
+
+### Configuration Presets
+
+Use presets for common scenarios:
+
+```swift
+// Creative writing - high temperature, diverse output
+try await RunAnywhere.updateConfiguration(preset: .creative)
+
+// Precise responses - low temperature, focused output
+try await RunAnywhere.updateConfiguration(preset: .precise)
+
+// Privacy-focused - device-only routing
+try await RunAnywhere.updateConfiguration(preset: .privacyFocused)
+
+// Balanced - default settings
+try await RunAnywhere.updateConfiguration(preset: .balanced)
+
+// Cloud-preferred - maximum performance
+try await RunAnywhere.updateConfiguration(preset: .cloudPreferred)
+```
+
+### Custom Configuration
+
+Update specific settings:
+
+```swift
+// Change routing policy
+try await RunAnywhere.setRoutingPolicy(.preferDevice)
+
+// Update generation defaults
+let settings = DefaultGenerationSettings(
+    temperature: 0.8,
+    maxTokens: 200,
+    topP: 0.95
+)
+try await RunAnywhere.setDefaultGenerationSettings(settings)
+
+// Read current configuration
+let currentSettings = await RunAnywhere.getCurrentGenerationSettings()
+let routingPolicy = await RunAnywhere.getCurrentRoutingPolicy()
+```
+
+### Three Configuration Layers
+
+The SDK separates configuration into three distinct layers:
+
+1. **Layer 1: Build-Time Constants** - API URLs, feature flags (from JSON files)
+2. **Layer 2: SDK Initialization** - API key, environment mode (set once at startup)
+3. **Layer 3: Runtime Configuration** - Temperature, routing, user preferences (change anytime)
+
+**📖 For complete configuration documentation, see:** [Configuration Guide](docs/CONFIGURATION_GUIDE.md)
+
 ## Advanced Features
 
 ### Voice AI Pipeline

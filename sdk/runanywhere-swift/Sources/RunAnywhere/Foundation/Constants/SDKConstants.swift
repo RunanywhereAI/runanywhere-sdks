@@ -70,13 +70,15 @@ public enum SDKConstants {
         public static let topP: Double = 0.95
         public static let topK: Int = 40
 
-        // SDK configuration - FORCE LOCAL ONLY
-        public static let cloudRoutingEnabled: Bool = false  // Disable cloud routing completely
-        public static let privacyModeEnabled: Bool = true
-        public static let routingPolicy = RoutingPolicy.deviceOnly  // Force on-device only
-        public static let allowUserOverride: Bool = false  // Don't allow override to cloud
+        // SDK configuration - Safe defaults that can be overridden via RunAnywhere.updateConfiguration()
+        // Note: These are FALLBACK values used only when configuration hasn't been loaded yet
+        // To change these at runtime, use: RunAnywhere.setRoutingPolicy() or RunAnywhere.updateConfiguration(preset:)
+        public static let cloudRoutingEnabled: Bool = false  // Safe default: Device-only until user configures
+        public static let privacyModeEnabled: Bool = true    // Safe default: Privacy-first approach
+        public static let routingPolicy = RoutingPolicy.deviceOnly  // Safe default: Device-only
+        public static let allowUserOverride: Bool = true  // Allow user to override configuration
 
-        // Analytics configuration - hardcoded to be fully enabled
+        // Analytics configuration - Can be configured via ConfigurationData
         public static let analyticsEnabled: Bool = true
         public static let enableLiveMetrics: Bool = true   // Enable live metrics for better real-time tracking
 

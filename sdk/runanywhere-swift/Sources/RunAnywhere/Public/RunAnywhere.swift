@@ -113,6 +113,13 @@ public enum RunAnywhere {
             // Step 5: Setup local services only (no network calls)
             try serviceContainer.setupLocalServices(with: params)
 
+            // Step 6: Load configuration asynchronously (doesn't block initialization)
+            Task {
+                let config = await serviceContainer.configurationService.loadConfigurationOnLaunch(apiKey: params.apiKey)
+                configurationData = config  // Store the loaded configuration
+                logger.debug("Configuration loaded and stored (source: \(config.source))")
+            }
+
             // Mark as initialized
             isInitialized = true
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
