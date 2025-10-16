@@ -354,9 +354,10 @@ public enum RunAnywhere {
 
     /// Simple text generation with automatic event publishing
     /// - Parameter prompt: The text prompt
-    /// - Returns: Generated response
+    /// - Returns: Generated response (text only)
     public static func chat(_ prompt: String) async throws -> String {
-        return try await generate(prompt, options: nil)
+        let result = try await generate(prompt, options: nil)
+        return result.text
     }
 
     /// Text generation with options
@@ -364,10 +365,15 @@ public enum RunAnywhere {
     ///   - prompt: The text prompt
     ///   - options: Generation options (optional, defaults to maxTokens: 100)
     /// - Returns: Generated response
+    /// Generate text with full metrics and analytics
+    /// - Parameters:
+    ///   - prompt: The text prompt
+    ///   - options: Generation options (optional)
+    /// - Returns: GenerationResult with full metrics including thinking tokens, timing, performance, etc.
     public static func generate(
         _ prompt: String,
         options: RunAnywhereGenerationOptions? = nil
-    ) async throws -> String {
+    ) async throws -> GenerationResult {
         EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
         do {
@@ -398,60 +404,55 @@ public enum RunAnywhere {
                 ))
             }
 
-            return result.text
+            return result
         } catch {
             EventBus.shared.publish(SDKGenerationEvent.failed(error))
             throw error
         }
     }
 
-    /// Streaming text generation
+    /// Streaming text generation with complete analytics
+    ///
+    /// Returns both a token stream for real-time display and a task that resolves to complete metrics.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// let result = try await RunAnywhere.generateStream(prompt)
+    ///
+    /// // Display tokens in real-time
+    /// for try await token in result.stream {
+    ///     print(token, terminator: "")
+    /// }
+    ///
+    /// // Get complete analytics after streaming finishes
+    /// let metrics = try await result.result.value
+    /// print("Speed: \(metrics.performanceMetrics.tokensPerSecond) tok/s")
+    /// print("Tokens: \(metrics.tokensUsed)")
+    /// print("Time: \(metrics.latencyMs)ms")
+    /// ```
+    ///
     /// - Parameters:
     ///   - prompt: The text prompt
     ///   - options: Generation options (optional)
-    /// - Returns: AsyncStream of generated tokens
+    /// - Returns: StreamingResult containing both the token stream and final metrics task
     public static func generateStream(
         _ prompt: String,
         options: RunAnywhereGenerationOptions? = nil
-    ) -> AsyncThrowingStream<String, Error> {
-        AsyncThrowingStream { continuation in
-            Task {
-                EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
+    ) async throws -> StreamingResult {
+        EventBus.shared.publish(SDKGenerationEvent.started(prompt: prompt))
 
-                do {
-                    // Ensure initialized
-                    guard isInitialized else {
-                        throw SDKError.notInitialized
-                    }
-
-                    // Lazy device registration on first API call
-                    try await ensureDeviceRegistered()
-
-                    let stream = serviceContainer.streamingService.generateStream(
-                        prompt: prompt,
-                        options: options ?? RunAnywhereGenerationOptions()
-                    )
-
-                    var fullResponse = ""
-                    for try await token in stream {
-                        EventBus.shared.publish(SDKGenerationEvent.tokenGenerated(token: token))
-                        fullResponse += token
-                        continuation.yield(token)
-                    }
-
-                    EventBus.shared.publish(SDKGenerationEvent.completed(
-                        response: fullResponse,
-                        tokensUsed: fullResponse.count / 4, // Rough estimate
-                        latencyMs: 0 // Would need to track properly
-                    ))
-
-                    continuation.finish()
-                } catch {
-                    EventBus.shared.publish(SDKGenerationEvent.failed(error))
-                    continuation.finish(throwing: error)
-                }
-            }
+        // Ensure initialized
+        guard isInitialized else {
+            throw SDKError.notInitialized
         }
+
+        // Lazy device registration on first API call
+        try await ensureDeviceRegistered()
+
+        return serviceContainer.streamingService.generateStreamWithMetrics(
+            prompt: prompt,
+            options: options ?? RunAnywhereGenerationOptions()
+        )
     }
 
     // MARK: - Voice Operations
@@ -646,10 +647,10 @@ public class Conversation {
         messages.append("User: \(message)")
 
         let contextPrompt = messages.joined(separator: "\n") + "\nAssistant:"
-        let response = try await RunAnywhere.generate(contextPrompt)
+        let result = try await RunAnywhere.generate(contextPrompt)
 
-        messages.append("Assistant: \(response)")
-        return response
+        messages.append("Assistant: \(result.text)")
+        return result.text
     }
 
     /// Get conversation history
@@ -669,5 +670,26 @@ extension RunAnywhere {
     /// Create a new conversation
     public static func conversation() -> Conversation {
         Conversation()
+    }
+}
+
+// MARK: - Utilities
+
+extension RunAnywhere {
+    /// Estimate token count in text
+    ///
+    /// Uses improved heuristics for accurate token estimation.
+    ///
+    /// Example:
+    /// ```swift
+    /// let prompt = "Explain quantum computing"
+    /// let tokenCount = RunAnywhere.estimateTokenCount(prompt)
+    /// print("Estimated tokens: \(tokenCount)")
+    /// ```
+    ///
+    /// - Parameter text: The text to analyze
+    /// - Returns: Estimated number of tokens
+    public static func estimateTokenCount(_ text: String) -> Int {
+        return TokenCounter.estimateTokenCount(text)
     }
 }

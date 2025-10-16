@@ -77,7 +77,18 @@ public class VoiceLLMHandler {
         streamingTTSHandler?.reset()
 
         var fullResponse = ""
+        var responseContent = "" // Content without thinking
+        var thinkingContent = ""
         var firstTokenReceived = false
+
+        // Get current loaded model to check if it supports thinking
+        let loadedModel = RunAnywhere.serviceContainer.generationService.getCurrentModel()
+        let shouldParseThinking = loadedModel?.model.supportsThinking ?? false
+        let thinkingPattern = loadedModel?.model.thinkingPattern ?? ThinkingTagPattern.defaultPattern
+
+        // Buffers for thinking parsing
+        var buffer = ""
+        var inThinkingSection = false
 
         try await llmService.streamGenerate(
             prompt: transcript,
@@ -88,19 +99,60 @@ public class VoiceLLMHandler {
                     continuation.yield(.llmStreamStarted)
                 }
                 fullResponse += token
-                continuation.yield(.llmStreamToken(token))
 
-                // Process token for streaming TTS if enabled
-                if ttsEnabled, let handler = streamingTTSHandler {
-                    Task {
-                        let ttsOptions = TTSOptions(
-                            voice: ttsConfig?.voice,
-                            language: "en",
-                            rate: ttsConfig?.speakingRate ?? 1.0,
-                            pitch: ttsConfig?.pitch ?? 1.0,
-                            volume: ttsConfig?.volume ?? 1.0
-                        )
-                        await handler.processToken(token, options: ttsOptions, continuation: continuation)
+                // Parse thinking if model supports it
+                if shouldParseThinking {
+                    let (tokenType, cleanToken) = ThinkingParser.parseStreamingToken(
+                        token: token,
+                        pattern: thinkingPattern,
+                        buffer: &buffer,
+                        inThinkingSection: &inThinkingSection
+                    )
+
+                    switch tokenType {
+                    case .thinking:
+                        // Thinking token - don't send to TTS or emit as stream token
+                        if let thinking = cleanToken {
+                            thinkingContent += thinking
+                        }
+                    case .content:
+                        // Response content token - send to TTS and emit
+                        if let content = cleanToken {
+                            responseContent += content
+                            continuation.yield(.llmStreamToken(content))
+
+                            // Process token for streaming TTS if enabled (only response content, not thinking)
+                            if ttsEnabled, let handler = streamingTTSHandler {
+                                Task {
+                                    let ttsOptions = TTSOptions(
+                                        voice: ttsConfig?.voice,
+                                        language: "en",
+                                        rate: ttsConfig?.speakingRate ?? 1.0,
+                                        pitch: ttsConfig?.pitch ?? 1.0,
+                                        volume: ttsConfig?.volume ?? 1.0
+                                    )
+                                    await handler.processToken(content, options: ttsOptions, continuation: continuation)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // No thinking parsing - treat all tokens as content
+                    responseContent += token
+                    continuation.yield(.llmStreamToken(token))
+
+                    // Process token for streaming TTS if enabled
+                    if ttsEnabled, let handler = streamingTTSHandler {
+                        Task {
+                            let ttsOptions = TTSOptions(
+                                voice: ttsConfig?.voice,
+                                language: "en",
+                                rate: ttsConfig?.speakingRate ?? 1.0,
+                                pitch: ttsConfig?.pitch ?? 1.0,
+                                volume: ttsConfig?.volume ?? 1.0
+                            )
+                            await handler.processToken(token, options: ttsOptions, continuation: continuation)
+                        }
                     }
                 }
             }
@@ -118,8 +170,10 @@ public class VoiceLLMHandler {
             await handler.flushRemaining(options: ttsOptions, continuation: continuation)
         }
 
-        continuation.yield(.llmFinalResponse(fullResponse))
-        return fullResponse
+        // Return only the response content (without thinking)
+        let finalResponse = shouldParseThinking ? responseContent : fullResponse
+        continuation.yield(.llmFinalResponse(finalResponse))
+        return finalResponse
     }
 
     private func generateNonStreaming(

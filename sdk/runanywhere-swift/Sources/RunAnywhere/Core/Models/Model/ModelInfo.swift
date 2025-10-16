@@ -24,6 +24,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     // Model-specific capabilities (optional based on category)
     public let contextLength: Int?  // For language models
     public let supportsThinking: Bool  // For reasoning models
+    public let thinkingPattern: ThinkingTagPattern?  // Custom thinking pattern (if supportsThinking)
 
     // Optional metadata
     public let metadata: ModelInfoMetadata?
@@ -58,7 +59,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         case id, name, category, format, downloadURL, localPath
         case downloadSize, memoryRequired
         case compatibleFrameworks, preferredFramework
-        case contextLength, supportsThinking
+        case contextLength, supportsThinking, thinkingPattern
         case metadata
         case source, createdAt, updatedAt, syncPending
         case lastUsed, usageCount
@@ -77,6 +78,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         preferredFramework: LLMFramework? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
+        thinkingPattern: ThinkingTagPattern? = nil,
         metadata: ModelInfoMetadata? = nil,
         source: ConfigurationSource = .remote,
         createdAt: Date = Date(),
@@ -106,6 +108,9 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
 
         // Set supportsThinking based on category
         self.supportsThinking = category.supportsThinking ? supportsThinking : false
+
+        // Set thinking pattern based on supportsThinking
+        self.thinkingPattern = supportsThinking ? (thinkingPattern ?? .defaultPattern) : nil
 
         self.metadata = metadata
         self.source = source
@@ -140,6 +145,7 @@ extension ModelInfo {
         case preferredFramework
         case contextLength
         case supportsThinking
+        case thinkingPattern
         case metadata
         case source
         case createdAt
