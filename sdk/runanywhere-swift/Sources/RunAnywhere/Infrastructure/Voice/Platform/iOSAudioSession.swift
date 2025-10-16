@@ -34,7 +34,8 @@ public class IOSAudioSession {
 
         case .conversation:
             category = .playAndRecord
-            options = [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+            // Use .duckOthers for echo cancellation to prevent mic from capturing TTS output
+            options = [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .duckOthers]
         }
 
         // Configure audio session
