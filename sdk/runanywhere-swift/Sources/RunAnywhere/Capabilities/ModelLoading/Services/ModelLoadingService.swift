@@ -1,13 +1,16 @@
 import Foundation
 
 /// Service responsible for loading models
-public class ModelLoadingService {
+/// Actor ensures thread-safe access and prevents concurrent duplicate loads
+public actor ModelLoadingService {
     private let registry: ModelRegistry
     private let adapterRegistry: AdapterRegistry
     private let memoryService: MemoryManager // Using MemoryManager protocol for now
     private let logger = SDKLogger(category: "ModelLoadingService")
 
     private var loadedModels: [String: LoadedModel] = [:]
+    /// Track in-flight loading tasks to prevent duplicate concurrent loads
+    private var inflightLoads: [String: Task<LoadedModel, Error>] = [:]
 
     public init(
         registry: ModelRegistry,
@@ -20,12 +23,53 @@ public class ModelLoadingService {
     }
 
     /// Load a model by identifier
+    /// Concurrent calls for the same model will be deduplicated
     public func loadModel(_ modelId: String) async throws -> LoadedModel {
         logger.info("🚀 Loading model: \(modelId)")
 
         // Check if already loaded
         if let loaded = loadedModels[modelId] {
             logger.info("✅ Model already loaded: \(modelId)")
+            return loaded
+        }
+
+        // Check if a load is already in progress
+        if let existingTask = inflightLoads[modelId] {
+            logger.info("⏳ Model load already in progress, awaiting existing task: \(modelId)")
+            return try await existingTask.value
+        }
+
+        // Create a new loading task
+        let loadTask = Task<LoadedModel, Error> { [weak self] in
+            guard let self = self else {
+                throw SDKError.invalidState("ModelLoadingService deallocated during load")
+            }
+            return try await self.performLoad(modelId: modelId)
+        }
+
+        // Store the task to prevent duplicate loads
+        inflightLoads[modelId] = loadTask
+
+        // Ensure task is removed when complete (success or failure)
+        defer {
+            Task { [weak self] in
+                await self?.cleanupInflightTask(modelId: modelId)
+            }
+        }
+
+        return try await loadTask.value
+    }
+
+    /// Cleanup in-flight task after completion
+    private func cleanupInflightTask(modelId: String) {
+        inflightLoads.removeValue(forKey: modelId)
+    }
+
+    /// Perform the actual model loading
+    private func performLoad(modelId: String) async throws -> LoadedModel {
+        // Double-check if loaded while we were waiting
+        if let loaded = loadedModels[modelId] {
+            logger.info("✅ Model loaded by another task: \(modelId)")
             return loaded
         }
 

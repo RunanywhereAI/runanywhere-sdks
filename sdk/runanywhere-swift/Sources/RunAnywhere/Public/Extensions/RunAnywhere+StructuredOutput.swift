@@ -116,6 +116,7 @@ public extension RunAnywhere {
                 stopSequences: options?.stopSequences ?? [],
                 streamingEnabled: false,
                 preferredExecutionTarget: options?.preferredExecutionTarget,
+                preferredFramework: options?.preferredFramework,
                 structuredOutput: StructuredOutputConfig(
                     type: type,
                     includeSchemaInPrompt: false
@@ -177,6 +178,7 @@ public extension RunAnywhere {
             stopSequences: options?.stopSequences ?? [],
             streamingEnabled: true,
             preferredExecutionTarget: options?.preferredExecutionTarget,
+            preferredFramework: options?.preferredFramework,
             structuredOutput: StructuredOutputConfig(
                 type: type,
                 includeSchemaInPrompt: false
@@ -277,6 +279,7 @@ public extension RunAnywhere {
                 stopSequences: baseOptions.stopSequences,
                 streamingEnabled: baseOptions.streamingEnabled,
                 preferredExecutionTarget: baseOptions.preferredExecutionTarget,
+                preferredFramework: baseOptions.preferredFramework,
                 structuredOutput: structuredOutput,
                 systemPrompt: baseOptions.systemPrompt
             )

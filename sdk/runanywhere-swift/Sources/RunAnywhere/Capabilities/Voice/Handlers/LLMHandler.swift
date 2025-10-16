@@ -31,6 +31,7 @@ public class VoiceLLMHandler {
         let options = RunAnywhereGenerationOptions(
             maxTokens: config?.maxTokens ?? 100,
             temperature: Float(config?.temperature ?? 0.7),
+            preferredFramework: config?.preferredFramework,
             systemPrompt: config?.systemPrompt
         )
 
