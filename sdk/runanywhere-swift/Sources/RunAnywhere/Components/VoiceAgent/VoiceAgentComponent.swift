@@ -112,7 +112,8 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
                 prompt: transcript,
                 options: RunAnywhereGenerationOptions(
                     maxTokens: agentParams.llmConfig.maxTokens,
-                    temperature: Float(agentParams.llmConfig.temperature)
+                    temperature: Float(agentParams.llmConfig.temperature),
+                    preferredFramework: agentParams.llmConfig.preferredFramework
                 )
             )
             result.response = response
@@ -173,7 +174,8 @@ public final class VoiceAgentComponent: BaseComponent<VoiceAgentService>, @unche
             prompt: prompt,
             options: RunAnywhereGenerationOptions(
                 maxTokens: agentParams.llmConfig.maxTokens,
-                temperature: Float(agentParams.llmConfig.temperature)
+                temperature: Float(agentParams.llmConfig.temperature),
+                preferredFramework: agentParams.llmConfig.preferredFramework
             )
         )
         return result

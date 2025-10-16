@@ -79,6 +79,11 @@ class ModelListViewModel: ObservableObject {
         await loadModelsFromRegistry()
     }
 
+    /// Get all adapters capable of handling a specific model (NEW - Multi-Adapter Support)
+    func availableAdapters(for model: ModelInfo) async -> [LLMFramework] {
+        return await RunAnywhere.availableAdapters(for: model.id)
+    }
+
     /// Select and load a model
     func selectModel(_ model: ModelInfo) async {
         do {

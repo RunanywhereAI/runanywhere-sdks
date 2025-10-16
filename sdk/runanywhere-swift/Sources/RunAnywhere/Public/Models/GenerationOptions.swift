@@ -23,6 +23,9 @@ public struct RunAnywhereGenerationOptions: Sendable {
     /// Preferred execution target
     public let preferredExecutionTarget: ExecutionTarget?
 
+    /// Preferred framework for generation (NEW)
+    public let preferredFramework: LLMFramework?
+
     /// Structured output configuration (optional)
     public let structuredOutput: StructuredOutputConfig?
 
@@ -38,6 +41,7 @@ public struct RunAnywhereGenerationOptions: Sendable {
     ///   - stopSequences: Stop generation at these sequences (default: empty)
     ///   - streamingEnabled: Enable streaming mode (default: false)
     ///   - preferredExecutionTarget: Preferred execution target
+    ///   - preferredFramework: Preferred framework adapter (optional)
     ///   - structuredOutput: Structured output configuration (optional)
     ///   - systemPrompt: System prompt for AI behavior (optional)
     public init(
@@ -48,6 +52,7 @@ enableRealTimeTracking: Bool = true,
         stopSequences: [String] = [],
         streamingEnabled: Bool = false,
         preferredExecutionTarget: ExecutionTarget? = nil,
+        preferredFramework: LLMFramework? = nil,
         structuredOutput: StructuredOutputConfig? = nil,
         systemPrompt: String? = nil
     ) {
@@ -58,6 +63,7 @@ self.enableRealTimeTracking = enableRealTimeTracking
         self.stopSequences = stopSequences
         self.streamingEnabled = streamingEnabled
         self.preferredExecutionTarget = preferredExecutionTarget
+        self.preferredFramework = preferredFramework
         self.structuredOutput = structuredOutput
         self.systemPrompt = systemPrompt
     }

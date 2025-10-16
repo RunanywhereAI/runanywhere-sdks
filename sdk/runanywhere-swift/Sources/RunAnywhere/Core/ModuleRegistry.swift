@@ -26,8 +26,14 @@ public final class ModuleRegistry {
 
     // MARK: - Properties
 
-    private var sttProviders: [STTServiceProvider] = []
-    private var llmProviders: [LLMServiceProvider] = []
+    /// Internal structure to track providers with their priorities
+    private struct PrioritizedProvider<Provider> {
+        let provider: Provider
+        let priority: Int
+    }
+
+    private var sttProviders: [PrioritizedProvider<STTServiceProvider>] = []
+    private var llmProviders: [PrioritizedProvider<LLMServiceProvider>] = []
     private var speakerDiarizationProviders: [SpeakerDiarizationServiceProvider] = []
     private var vlmProviders: [VLMServiceProvider] = []
     private var wakeWordProviders: [WakeWordServiceProvider] = []
@@ -36,16 +42,28 @@ public final class ModuleRegistry {
 
     // MARK: - Registration Methods
 
-    /// Register a Speech-to-Text provider (e.g., WhisperCPP)
-    public func registerSTT(_ provider: STTServiceProvider) {
-        sttProviders.append(provider)
-        print("[ModuleRegistry] Registered STT provider: \(provider.name)")
+    /// Register a Speech-to-Text provider with optional priority (e.g., WhisperCPP)
+    /// Higher priority providers are preferred (default: 100)
+    public func registerSTT(_ provider: STTServiceProvider, priority: Int = 100) {
+        let prioritizedProvider = PrioritizedProvider(provider: provider, priority: priority)
+        sttProviders.append(prioritizedProvider)
+        // Sort by priority (higher first)
+        sttProviders.sort { lhs, rhs in
+            lhs.priority > rhs.priority
+        }
+        print("[ModuleRegistry] Registered STT provider: \(provider.name) with priority: \(priority)")
     }
 
-    /// Register a Language Model provider (e.g., llama.cpp)
-    public func registerLLM(_ provider: LLMServiceProvider) {
-        llmProviders.append(provider)
-        print("[ModuleRegistry] Registered LLM provider: \(provider.name)")
+    /// Register a Language Model provider with optional priority (e.g., llama.cpp)
+    /// Higher priority providers are preferred (default: 100)
+    public func registerLLM(_ provider: LLMServiceProvider, priority: Int = 100) {
+        let prioritizedProvider = PrioritizedProvider(provider: provider, priority: priority)
+        llmProviders.append(prioritizedProvider)
+        // Sort by priority (higher first)
+        llmProviders.sort { lhs, rhs in
+            lhs.priority > rhs.priority
+        }
+        print("[ModuleRegistry] Registered LLM provider: \(provider.name) with priority: \(priority)")
     }
 
     /// Register a Speaker Diarization provider (e.g., FluidAudioDiarization)
@@ -68,20 +86,36 @@ public final class ModuleRegistry {
 
     // MARK: - Provider Access
 
-    /// Get an STT provider for the specified model
+    /// Get an STT provider for the specified model (returns highest priority match)
     public func sttProvider(for modelId: String? = nil) -> STTServiceProvider? {
         if let modelId = modelId {
-            return sttProviders.first { $0.canHandle(modelId: modelId) }
+            return sttProviders.first(where: { $0.provider.canHandle(modelId: modelId) })?.provider
         }
-        return sttProviders.first
+        return sttProviders.first?.provider
     }
 
-    /// Get an LLM provider for the specified model
+    /// Get ALL STT providers that can handle the specified model (sorted by priority)
+    public func allSTTProviders(for modelId: String? = nil) -> [STTServiceProvider] {
+        if let modelId = modelId {
+            return sttProviders.filter { $0.provider.canHandle(modelId: modelId) }.map { $0.provider }
+        }
+        return sttProviders.map { $0.provider }
+    }
+
+    /// Get an LLM provider for the specified model (returns highest priority match)
     public func llmProvider(for modelId: String? = nil) -> LLMServiceProvider? {
         if let modelId = modelId {
-            return llmProviders.first { $0.canHandle(modelId: modelId) }
+            return llmProviders.first(where: { $0.provider.canHandle(modelId: modelId) })?.provider
         }
-        return llmProviders.first
+        return llmProviders.first?.provider
+    }
+
+    /// Get ALL LLM providers that can handle the specified model (sorted by priority)
+    public func allLLMProviders(for modelId: String? = nil) -> [LLMServiceProvider] {
+        if let modelId = modelId {
+            return llmProviders.filter { $0.provider.canHandle(modelId: modelId) }.map { $0.provider }
+        }
+        return llmProviders.map { $0.provider }
     }
 
     /// Get a Speaker Diarization provider

@@ -76,6 +76,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
     public let maxTokens: Int
     public let systemPrompt: String?
     public let streamingEnabled: Bool
+    public let preferredFramework: LLMFramework?
 
     public enum QuantizationLevel: String, Sendable {
         case q4v0 = "Q4_0"
@@ -97,7 +98,8 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
         temperature: Double = 0.7,
         maxTokens: Int = 100,  // Default to 100 tokens
         systemPrompt: String? = nil,
-        streamingEnabled: Bool = true
+        streamingEnabled: Bool = true,
+        preferredFramework: LLMFramework? = nil
     ) {
         self.modelId = modelId
         self.contextLength = contextLength
@@ -109,6 +111,7 @@ public struct LLMConfiguration: ComponentConfiguration, ComponentInitParameters 
         self.maxTokens = maxTokens
         self.systemPrompt = systemPrompt ?? preloadContext
         self.streamingEnabled = streamingEnabled
+        self.preferredFramework = preferredFramework
     }
 
     public func validate() throws {
@@ -430,7 +433,8 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
         let options = input.options ?? RunAnywhereGenerationOptions(
             maxTokens: llmConfiguration.maxTokens,
             temperature: Float(llmConfiguration.temperature),
-            streamingEnabled: llmConfiguration.streamingEnabled
+            streamingEnabled: llmConfiguration.streamingEnabled,
+            preferredFramework: llmConfiguration.preferredFramework
         )
 
         // Build prompt
@@ -484,7 +488,8 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
                     let options = RunAnywhereGenerationOptions(
                         maxTokens: llmConfiguration.maxTokens,
                         temperature: Float(llmConfiguration.temperature),
-                        streamingEnabled: true
+                        streamingEnabled: true,
+                        preferredFramework: llmConfiguration.preferredFramework
                     )
 
                     let fullPrompt = buildPrompt(
