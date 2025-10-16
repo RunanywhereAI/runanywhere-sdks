@@ -8,8 +8,36 @@ public enum ConfigurationSource: String, Codable, Sendable {
     case defaults
 }
 
-/// Main configuration data structure using composed configurations
-/// Works for both network API and database storage
+/// **Layer 3: Runtime Configuration** - Dynamic settings loaded from backend or set by consumer
+///
+/// This configuration is loaded **at runtime** and can change dynamically. It is NOT used for SDK initialization.
+/// For SDK initialization parameters, use `SDKInitParams` instead.
+///
+/// **Configuration Precedence:**
+/// 1. Consumer overrides (set via `RunAnywhere.updateConfiguration()`)
+/// 2. Remote backend configuration (fetched in production mode)
+/// 3. Database cache (from previous sessions)
+/// 4. SDK defaults
+///
+/// **When to Use:**
+/// - Configuring generation defaults (temperature, max tokens)
+/// - Setting routing policy (device-only, prefer-cloud, etc.)
+/// - Adjusting storage limits
+/// - Enabling/disabling features
+///
+/// **How to Access:**
+/// ```swift
+/// // Read current configuration
+/// let settings = await RunAnywhere.getCurrentGenerationSettings()
+/// let policy = await RunAnywhere.getCurrentRoutingPolicy()
+///
+/// // Update configuration
+/// try await RunAnywhere.updateConfiguration(preset: .creative)
+/// try await RunAnywhere.setRoutingPolicy(.preferDevice)
+/// ```
+///
+/// Main configuration data structure using composed configurations.
+/// Works for both network API and database storage.
 public struct ConfigurationData: Codable, RepositoryEntity, FetchableRecord, PersistableRecord, Sendable {
     /// Unique identifier for this configuration
     public let id: String

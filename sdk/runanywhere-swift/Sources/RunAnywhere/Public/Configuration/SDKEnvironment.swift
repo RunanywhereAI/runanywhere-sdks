@@ -67,7 +67,43 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
     }
 }
 
-/// SDK initialization parameters
+/// **Layer 2: SDK Initialization Parameters** - Bootstrap configuration for SDK setup
+///
+/// These parameters are used to **initialize the SDK** when your app starts. They configure
+/// the basic authentication and environment mode.
+///
+/// **This is NOT for runtime configuration.** For dynamic settings like temperature, routing policy,
+/// or storage limits, use `ConfigurationData` and `RunAnywhere.updateConfiguration()` instead.
+///
+/// **When to Use:**
+/// - Setting up API authentication (API key)
+/// - Choosing environment mode (dev/staging/production)
+/// - Providing backend URL
+///
+/// **Configuration Layers:**
+/// - **Layer 1**: Build-time constants (`RunAnywhereConstants` from JSON/env)
+/// - **Layer 2**: SDK initialization (this struct - `SDKInitParams`)
+/// - **Layer 3**: Runtime configuration (`ConfigurationData`)
+///
+/// **Example:**
+/// ```swift
+/// // Production mode
+/// try RunAnywhere.initialize(
+///     apiKey: "your-api-key",
+///     baseURL: "https://api.runanywhere.ai",
+///     environment: .production
+/// )
+///
+/// // Development mode (simpler)
+/// try RunAnywhere.initialize(
+///     apiKey: "dev",
+///     environment: .development
+/// )
+///
+/// // Using convenience method
+/// let params = SDKInitParams.development()
+/// try RunAnywhere.initialize(with: params)
+/// ```
 public struct SDKInitParams {
     /// API key for authentication
     public let apiKey: String
@@ -112,7 +148,32 @@ public struct SDKInitParams {
 
     /// Development mode initializer (no URL required)
     /// - Parameter apiKey: Optional API key for development
+    /// - Returns: SDK initialization parameters configured for development mode
     public static func development(apiKey: String = "dev-mode") -> SDKInitParams {
         SDKInitParams(apiKey: apiKey, baseURL: nil, environment: .development)
+    }
+
+    /// Production mode initializer with URL from constants
+    /// - Parameter apiKey: Your RunAnywhere API key
+    /// - Returns: SDK initialization parameters configured for production mode
+    /// - Throws: SDKError if URL from constants is invalid
+    public static func production(apiKey: String) throws -> SDKInitParams {
+        let urlString = RunAnywhereConstants.apiURLs.production
+        guard let url = URL(string: urlString) else {
+            throw SDKError.validationFailed("Invalid production URL from constants: \(urlString)")
+        }
+        return SDKInitParams(apiKey: apiKey, baseURL: url, environment: .production)
+    }
+
+    /// Staging mode initializer with URL from constants
+    /// - Parameter apiKey: Your RunAnywhere API key
+    /// - Returns: SDK initialization parameters configured for staging mode
+    /// - Throws: SDKError if URL from constants is invalid
+    public static func staging(apiKey: String) throws -> SDKInitParams {
+        let urlString = RunAnywhereConstants.apiURLs.staging
+        guard let url = URL(string: urlString) else {
+            throw SDKError.validationFailed("Invalid staging URL from constants: \(urlString)")
+        }
+        return SDKInitParams(apiKey: apiKey, baseURL: url, environment: .staging)
     }
 }

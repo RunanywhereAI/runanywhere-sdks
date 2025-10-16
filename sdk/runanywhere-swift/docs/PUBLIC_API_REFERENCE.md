@@ -375,13 +375,22 @@ let lenientResult = try await RunAnywhere.generateStructured(
 
 ```swift
 // Update generation settings
-await RunAnywhere.requestConfiguration(
-    RunAnywhere.ConfigurationRequest(
-        temperature: 0.9,
-        maxTokens: 200,
-        topP: 0.95
-    )
+let settings = DefaultGenerationSettings(
+    temperature: 0.9,
+    maxTokens: 200,
+    topP: 0.95
 )
+try await RunAnywhere.setDefaultGenerationSettings(settings)
+
+// Update routing policy
+try await RunAnywhere.setRoutingPolicy(.preferDevice)
+
+// Update storage configuration
+let storage = StorageConfiguration(
+    maxCacheSize: 2_000_000_000,  // 2GB
+    evictionPolicy: .lru
+)
+try await RunAnywhere.setStorageConfiguration(storage)
 ```
 
 ### Get Current Settings
@@ -390,18 +399,21 @@ await RunAnywhere.requestConfiguration(
 // Query current configuration
 let settings = await RunAnywhere.getCurrentGenerationSettings()
 let routingPolicy = await RunAnywhere.getCurrentRoutingPolicy()
-let privacyMode = await RunAnywhere.getCurrentPrivacyMode()
+let fullConfig = await RunAnywhere.getCurrentConfiguration()
 ```
 
 ### Configuration Presets
 
 ```swift
 // Use built-in presets
-await RunAnywhere.requestConfiguration(.creative())         // High temperature
-await RunAnywhere.requestConfiguration(.precise())          // Low temperature
-await RunAnywhere.requestConfiguration(.balanced())         // Balanced settings
-await RunAnywhere.requestConfiguration(.privacyFocused())   // Device-only
+try await RunAnywhere.updateConfiguration(preset: .creative)         // High temperature, diverse output
+try await RunAnywhere.updateConfiguration(preset: .precise)          // Low temperature, focused output
+try await RunAnywhere.updateConfiguration(preset: .balanced)         // Default settings
+try await RunAnywhere.updateConfiguration(preset: .privacyFocused)   // Device-only routing
+try await RunAnywhere.updateConfiguration(preset: .cloudPreferred)   // Prefer cloud execution
 ```
+
+**For detailed configuration documentation, see:** [Configuration Guide](./CONFIGURATION_GUIDE.md)
 
 ## Storage Management
 
