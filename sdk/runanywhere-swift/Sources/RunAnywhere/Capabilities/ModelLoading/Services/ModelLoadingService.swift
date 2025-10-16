@@ -49,6 +49,15 @@ public class ModelLoadingService {
             logger.info("🏗️ Built-in model detected, skipping file check")
         }
 
+        // ModelLoadingService handles LLM models only
+        // STT models are loaded through STTComponent → ModuleRegistry → STT providers
+        if modelInfo.category == .speechRecognition || modelInfo.preferredFramework == .whisperKit {
+            logger.error("❌ Cannot load STT model through ModelLoadingService")
+            throw SDKError.loadingFailed(
+                "Model '\(modelId)' is a speech recognition model. STT models are loaded automatically through STTComponent."
+            )
+        }
+
         // Check memory availability
         let memoryRequired = modelInfo.memoryRequired ?? 1024 * 1024 * 1024 // Default 1GB if not specified
         let canAllocate = try await memoryService.canAllocate(memoryRequired)
@@ -56,8 +65,8 @@ public class ModelLoadingService {
             throw SDKError.loadingFailed("Insufficient memory")
         }
 
-        // Determine modality based on model (for now, default to textToText for LLMs)
-        let modality: FrameworkModality = modelInfo.preferredFramework == .whisperKit ? .voiceToText : .textToText
+        // ModelLoadingService handles LLMs only; constrain to text-to-text modality
+        let modality: FrameworkModality = .textToText
 
         // Find all adapters that can handle this model
         logger.info("🚀 Finding adapters for model (modality: \(modality))")
@@ -83,9 +92,11 @@ public class ModelLoadingService {
                 let service = try await adapter.loadModel(modelInfo, for: modality)
                 logger.info("✅ Model loaded successfully with \(adapter.framework.rawValue)")
 
-                // Cast to LLMService
+                // Cast to LLMService (by construction: text-to-text modality)
                 guard let llmService = service as? LLMService else {
-                    throw SDKError.loadingFailed("Adapter returned incompatible service type")
+                    throw SDKError.loadingFailed(
+                        "Adapter '\(adapter.framework.rawValue)' did not return an LLMService for text-to-text modality"
+                    )
                 }
 
                 // Create loaded model
