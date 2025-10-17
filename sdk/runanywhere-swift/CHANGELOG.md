@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.15.1] - 2025-10-17
+## [0.15.2] - 2025-10-17
+
+### Fixed
+- **Critical Platform Requirements**: Updated minimum iOS version to 16.0 to match adapter dependencies
+- All adapter modules (LLMSwift, WhisperKitTranscription, FluidAudioDiarization) require iOS 16+
+- This fixes SPM compilation errors when consuming the package
+
+### Changed
+- Minimum platform requirements: iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0
+
+## [0.15.1] - 2025-10-17 [YANKED]
+
+**Note**: This version had platform requirement mismatches causing compilation errors. Use 0.15.2 instead.
 
 ### Fixed
 - **Critical SPM Fix**: Changed FluidAudio dependency from `branch: "main"` to `from: "0.5.0"` to fix SPM resolution

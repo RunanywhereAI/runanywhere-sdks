@@ -66,7 +66,7 @@ The Android SDK is under active development. We're bringing the same powerful on
 - **🚀 Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
 - **⚡ Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
 - **🧠 Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
-- **📱 Cross-Platform** - iOS 14.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
+- **📱 Cross-Platform** - iOS 16.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
 - **🎛️ Component Architecture** - Modular components for flexible AI pipeline construction
 
 ## 🗺️ Roadmap
@@ -153,7 +153,7 @@ print("Tokens: \(result.tokensUsed)")
 ## 📋 System Requirements
 
 ### iOS SDK
-- **Platforms**: iOS 14.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
+- **Platforms**: iOS 16.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
 - **Development**: Xcode 15.0+, Swift 5.9+
 - **Recommended**: iOS 17.0+ for full feature support
 
@@ -175,8 +175,8 @@ Add RunAnywhere to your project:
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
 3. **Select version rule:**
-   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.15.1`
-   - **Specific Version**: Choose **Exact** and enter `0.15.1`
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.15.2`
+   - **Specific Version**: Choose **Exact** and enter `0.15.2`
    - **Development Branch**: Choose **Branch** and enter `main`
 4. Select products based on your needs:
    - `RunAnywhere` - Core SDK (required)
@@ -189,7 +189,7 @@ Add RunAnywhere to your project:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.1")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.2")
 ],
 targets: [
     .target(
