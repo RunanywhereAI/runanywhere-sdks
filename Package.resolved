@@ -32,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/FluidInference/FluidAudio.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "3a7402877ea4eb4d7a10e0b421e68f691d33a887"
+        "revision" : "e1bd7cec1a99d211b15c9514489459d3d828ec45",
+        "version" : "0.7.0"
       }
     },
     {
