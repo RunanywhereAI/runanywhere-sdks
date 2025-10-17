@@ -1,35 +1,44 @@
 package com.runanywhere.ai.models.data
 
-import java.util.Date
+import com.runanywhere.sdk.models.ModelInfo as SdkModelInfo
+import com.runanywhere.sdk.models.ModelInfoMetadata
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.utils.SimpleInstant
 
-data class ModelInfo(
-    val id: String,
-    val name: String,
-    val category: ModelCategory,
-    val format: ModelFormat,
-    val downloadURL: String? = null,
-    var localPath: String? = null,
-    val downloadSize: Long? = null,
-    val memoryRequired: Long? = null,
-    val compatibleFrameworks: List<LLMFramework>,
-    val preferredFramework: LLMFramework? = null,
-    val contextLength: Int? = null,
-    val supportsThinking: Boolean = false,
+/**
+ * UI wrapper around SDK's ModelInfo to add app-specific UI state
+ * Uses the SDK's ModelInfo as the source of truth for model data
+ */
+data class ModelUiState(
+    val modelInfo: SdkModelInfo,
+    val state: ModelState = ModelState.NOT_AVAILABLE,
+    val downloadProgress: Float = 0f,
+    // App-specific fields not in SDK
     val thinkingTags: List<String> = emptyList(),
-    val metadata: ModelMetadata? = null,
-    var state: ModelState = ModelState.NOT_AVAILABLE,
-    var downloadProgress: Float = 0f,
-    var lastUsed: Date? = null,
-    var downloadedAt: Date? = null
+    val downloadedAt: SimpleInstant? = null
 ) {
-    val isDownloaded: Boolean
-        get() = localPath != null
+    // Delegate common properties to SDK ModelInfo for convenience
+    val id: String get() = modelInfo.id
+    val name: String get() = modelInfo.name
+    val category get() = modelInfo.category
+    val format get() = modelInfo.format
+    val downloadURL: String? get() = modelInfo.downloadURL
+    val localPath: String? get() = modelInfo.localPath
+    val downloadSize: Long? get() = modelInfo.downloadSize
+    val memoryRequired: Long? get() = modelInfo.memoryRequired
+    val compatibleFrameworks get() = modelInfo.compatibleFrameworks
+    val preferredFramework get() = modelInfo.preferredFramework
+    val contextLength: Int? get() = modelInfo.contextLength
+    val supportsThinking: Boolean get() = modelInfo.supportsThinking
+    val metadata: ModelInfoMetadata? get() = modelInfo.metadata
+    val lastUsed get() = modelInfo.lastUsed
 
-    val canDownload: Boolean
-        get() = downloadURL != null && !isDownloaded
-
-    val isBuiltIn: Boolean
-        get() = preferredFramework == LLMFramework.FOUNDATION_MODELS
+    // Computed properties
+    val isDownloaded: Boolean get() = modelInfo.isDownloaded
+    val canDownload: Boolean get() = downloadURL != null && !isDownloaded
+    val isBuiltIn: Boolean get() = preferredFramework == LLMFramework.FOUNDATION_MODELS
 
     val displaySize: String
         get() = downloadSize?.let { formatBytes(it) } ?: "Unknown"
@@ -55,17 +64,30 @@ data class ModelInfo(
                 else -> String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024))
             }
         }
+
+        /**
+         * Create ModelUiState from SDK ModelInfo
+         */
+        fun fromSdkModel(sdkModel: SdkModelInfo): ModelUiState {
+            return ModelUiState(
+                modelInfo = sdkModel,
+                state = determineInitialState(sdkModel),
+                downloadProgress = 0f,
+                thinkingTags = emptyList(), // Could be extracted from metadata.tags if needed
+                downloadedAt = if (sdkModel.localPath != null) SimpleInstant.now() else null
+            )
+        }
+
+        private fun determineInitialState(sdkModel: SdkModelInfo): ModelState {
+            return when {
+                sdkModel.preferredFramework == LLMFramework.FOUNDATION_MODELS -> ModelState.BUILT_IN
+                sdkModel.localPath != null -> ModelState.DOWNLOADED
+                sdkModel.downloadURL != null -> ModelState.AVAILABLE
+                else -> ModelState.NOT_AVAILABLE
+            }
+        }
     }
 }
 
-data class ModelMetadata(
-    val description: String? = null,
-    val author: String? = null,
-    val version: String? = null,
-    val license: String? = null,
-    val tags: List<String> = emptyList(),
-    val capabilities: List<String> = emptyList(),
-    val limitations: List<String> = emptyList(),
-    val baseModel: String? = null,
-    val quantization: String? = null
-)
+// Type alias for backward compatibility during migration
+typealias ModelInfo = ModelUiState

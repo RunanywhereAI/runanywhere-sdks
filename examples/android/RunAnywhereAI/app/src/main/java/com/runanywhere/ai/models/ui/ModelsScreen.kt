@@ -27,6 +27,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.ai.models.data.*
 import com.runanywhere.ai.models.repository.ModelRepository
 import com.runanywhere.ai.models.viewmodel.ModelManagementViewModel
+import com.runanywhere.sdk.models.enums.LLMFramework
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -377,7 +378,7 @@ fun FrameworkSection(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = getFrameworkIcon(framework),
+                            imageVector = framework.getIcon(),
                             contentDescription = null,
                             modifier = Modifier.size(24.dp),
                             tint = MaterialTheme.colorScheme.primary
@@ -675,16 +676,5 @@ fun ModelActionButton(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
-    }
-}
-
-fun getFrameworkIcon(framework: LLMFramework): ImageVector {
-    return when (framework) {
-        LLMFramework.LLAMACPP -> Icons.Default.Computer
-        LLMFramework.ONNX_RUNTIME -> Icons.Default.Memory
-        LLMFramework.TENSORFLOW_LITE -> Icons.Default.Android
-        LLMFramework.FOUNDATION_MODELS -> Icons.Default.PhoneAndroid
-        LLMFramework.WHISPER_CPP -> Icons.Default.Mic
-        LLMFramework.CUSTOM -> Icons.Default.Extension
     }
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.ai.models.data.*
 import com.runanywhere.ai.models.repository.ModelRepository
+import com.runanywhere.sdk.models.enums.LLMFramework
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -19,7 +20,7 @@ class ModelManagementViewModel(
     val modelsByFramework: StateFlow<Map<LLMFramework, List<ModelInfo>>> =
         repository.availableModels.map { models ->
             models.groupBy { model ->
-                model.preferredFramework ?: LLMFramework.CUSTOM
+                model.preferredFramework ?: LLMFramework.LLAMA_CPP
             }
         }.stateIn(
             scope = viewModelScope,
