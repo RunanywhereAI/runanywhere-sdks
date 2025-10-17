@@ -153,3 +153,4 @@ sdk/runanywhere-swift/Configuration/Private/
 
 # Keep example files
 !sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json
+examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
