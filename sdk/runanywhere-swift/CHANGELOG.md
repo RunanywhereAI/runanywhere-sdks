@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Swift Package Manager Support**: Added root-level Package.swift to enable proper SPM consumption from monorepo
-- Package can now be added via `https://github.com/RunanywhereAI/sdks` in Xcode and Package.swift
+- Package can now be added via `https://github.com/RunanywhereAI/runanywhere-sdks` in Xcode and Package.swift
 
 ### Changed
 - Repository structure updated to support SPM distribution from monorepo
@@ -50,8 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Performance analytics and metrics
 - Support for GGUF, Core ML, WhisperKit, and other frameworks
 
-[Unreleased]: https://github.com/RunanywhereAI/sdks/compare/v0.15.0...HEAD
-[0.15.0]: https://github.com/RunanywhereAI/sdks/compare/v0.14.0...v0.15.0
-[0.14.0]: https://github.com/RunanywhereAI/sdks/compare/v0.13.0...v0.14.0
-[0.13.0]: https://github.com/RunanywhereAI/sdks/compare/v0.1.0...v0.13.0
-[0.1.0]: https://github.com/RunanywhereAI/sdks/releases/tag/v0.1.0
+[Unreleased]: https://github.com/RunanywhereAI/runanywhere-sdks/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/RunanywhereAI/runanywhere-sdks/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/RunanywhereAI/runanywhere-sdks/compare/v0.13.0...v0.14.0
+[0.13.0]: https://github.com/RunanywhereAI/runanywhere-sdks/compare/v0.1.0...v0.13.0
+[0.1.0]: https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/v0.1.0

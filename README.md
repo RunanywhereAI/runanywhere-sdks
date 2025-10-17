@@ -173,7 +173,7 @@ Add RunAnywhere to your project:
 
 #### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
-2. Enter the repository URL: `https://github.com/RunanywhereAI/sdks`
+2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
 3. **Select version rule:**
    - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.15.0`
    - **Specific Version**: Choose **Exact** and enter `0.15.0`
@@ -189,7 +189,7 @@ Add RunAnywhere to your project:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/sdks", from: "0.15.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.0")
 ],
 targets: [
     .target(

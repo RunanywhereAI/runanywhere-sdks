@@ -113,7 +113,7 @@ Move `[Unreleased]` content to new version section:
 **`README.md` (root):**
 Update all version references:
 ```swift
-.package(url: "https://github.com/RunanywhereAI/sdks", from: "0.16.0")
+.package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
 ```
 
 **`sdk/runanywhere-swift/README.md`:**
@@ -168,7 +168,7 @@ gh release create v0.16.0 \
 ```
 
 Or create manually via GitHub web UI:
-1. Go to https://github.com/RunanywhereAI/sdks/releases/new
+1. Go to https://github.com/RunanywhereAI/runanywhere-sdks/releases/new
 2. Select tag `v0.16.0`
 3. Title: `RunAnywhere iOS SDK v0.16.0`
 4. Copy release notes from CHANGELOG.md
@@ -184,7 +184,7 @@ Test that users can install the new version:
 ```swift
 // Create a test Package.swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
 ]
 ```
 
@@ -278,7 +278,7 @@ sdks/
 
 - **Discord**: https://discord.gg/pxRkYmWh
 - **Email**: founders@runanywhere.ai
-- **GitHub Issues**: https://github.com/RunanywhereAI/sdks/issues
+- **GitHub Issues**: https://github.com/RunanywhereAI/runanywhere-sdks/issues
 
 ---
 
