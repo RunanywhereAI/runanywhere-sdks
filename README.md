@@ -195,9 +195,9 @@ targets: [
     .target(
         name: "YourApp",
         dependencies: [
-            .product(name: "RunAnywhere", package: "sdks"),
-            .product(name: "LLMSwift", package: "sdks"),
-            .product(name: "WhisperKitTranscription", package: "sdks")
+            .product(name: "RunAnywhere", package: "runanywhere-sdks"),
+            .product(name: "LLMSwift", package: "runanywhere-sdks"),
+            .product(name: "WhisperKitTranscription", package: "runanywhere-sdks")
         ]
     )
 ]
