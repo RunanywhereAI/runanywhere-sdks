@@ -1,22 +1,19 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kotlin.compose)  // Re-enable for Kotlin 2.0
+    alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
-    // id("kotlin-kapt")
-    // TODO: #001 - Add Hilt plugin when configured in project level build.gradle
-    // id("dagger.hilt.android.plugin")
 }
 
 android {
     namespace = "com.runanywhere.runanywhereai"
-    compileSdk = 35  // Update to 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.runanywhere.runanywhereai"
         minSdk = 24
-        targetSdk = 35  // Update to 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
@@ -183,8 +180,6 @@ android {
 
         // Suppress specific warnings
         disable += listOf(
-            "OldTargetApi",  // Allow older target SDK for now
-            "ExpiredTargetSdkVersion",  // Allow current SDK version
             "NewApi"  // Allow using newer APIs with compatibility checks
         )
     }
@@ -198,23 +193,29 @@ android {
 }
 
 dependencies {
-    // SDK module - Use local project for development
+    // ========================================
+    // SDK Dependencies (Local Modules)
+    // ========================================
     implementation(project(":sdk:runanywhere-kotlin"))
-
-    // LlamaCPP module for on-device LLM
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
 
-    // AndroidX Core
+    // ========================================
+    // AndroidX Core & Lifecycle
+    // ========================================
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
 
+    // ========================================
     // Material Design
+    // ========================================
     implementation(libs.material)
 
+    // ========================================
     // Compose
+    // ========================================
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
@@ -222,61 +223,79 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
+    // ========================================
     // Navigation
+    // ========================================
     implementation(libs.androidx.navigation.compose)
 
+    // ========================================
     // Coroutines
+    // ========================================
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
 
-    // Serialization
+    // ========================================
+    // Serialization & DateTime
+    // ========================================
     implementation(libs.kotlinx.serialization.json)
-
-    // DateTime - Required for SDK events (kotlinx.datetime.Instant)
     implementation(libs.kotlinx.datetime)
 
-    // Dependency Injection
-    // implementation(libs.hilt.android)
-    // kapt(libs.hilt.android.compiler)
-    // implementation(libs.hilt.navigation.compose)
-
+    // ========================================
     // Networking
+    // ========================================
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.gson)
 
-    // File Management
+    // ========================================
+    // File Management & Storage
+    // ========================================
     implementation(libs.commons.io)
 
+    // ========================================
     // Background Work
+    // ========================================
     implementation(libs.androidx.work.runtime.ktx)
 
-    // Speech Recognition & VAD (for SDK)
+    // ========================================
+    // Speech Recognition & Audio Processing
+    // ========================================
     implementation(libs.whisper.jni)
     implementation(libs.android.vad.webrtc)
     implementation(libs.prdownloader)
 
+    // ========================================
     // Security
+    // ========================================
     implementation(libs.androidx.security.crypto)
 
-    // Permissions handling
+    // ========================================
+    // Permissions
+    // ========================================
     implementation(libs.accompanist.permissions)
 
-    // Room Database (if needed for model caching)
+    // ========================================
+    // Database
+    // ========================================
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    // kapt(libs.androidx.room.compiler)
 
-    // Play Core (for in-app updates)
+    // ========================================
+    // Play Services
+    // ========================================
     implementation(libs.google.play.core)
     implementation(libs.google.play.core.ktx)
 
+    // ========================================
     // Logging
+    // ========================================
     implementation(libs.timber)
 
+    // ========================================
     // Testing
+    // ========================================
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.mockk)
@@ -285,10 +304,13 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
-    // Enforce Kotlin version alignment across all dependencies to avoid conflicts
+    // ========================================
+    // Kotlin Version Constraints
+    // ========================================
     constraints {
         implementation("org.jetbrains.kotlin:kotlin-stdlib") {
             version {

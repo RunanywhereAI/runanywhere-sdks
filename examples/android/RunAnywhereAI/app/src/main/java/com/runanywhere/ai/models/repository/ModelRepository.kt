@@ -4,6 +4,10 @@ import android.content.Context
 import android.os.Environment
 import android.os.StatFs
 import com.runanywhere.ai.models.data.*
+import com.runanywhere.ai.models.ui.extension
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -42,27 +46,11 @@ class ModelRepository(
             // Get models from SDK
             val sdkModels = RunAnywhere.availableModels()
 
-            // Map SDK models to our ModelInfo
+            // Convert SDK models to UI state models
             val models = sdkModels.map { sdkModel ->
-                ModelInfo(
-                    id = sdkModel.id,
-                    name = sdkModel.name,
-                    category = mapCategory(sdkModel.category.toString()),
-                    format = mapFormat(sdkModel.format.toString()),
-                    downloadURL = sdkModel.downloadURL,
-                    localPath = sdkModel.localPath,
-                    downloadSize = sdkModel.downloadSize,
-                    memoryRequired = sdkModel.memoryRequired,
-                    compatibleFrameworks = mapFrameworks(listOf(sdkModel.preferredFramework?.toString() ?: "LLAMACPP")),
-                    preferredFramework = mapFramework(sdkModel.preferredFramework?.toString()),
-                    contextLength = sdkModel.contextLength,
-                    supportsThinking = sdkModel.supportsThinking,
-                    metadata = mapMetadata(null), // Handle metadata separately
-                    state = determineModelState(sdkModel)
-                )
+                ModelUiState.fromSdkModel(sdkModel)
             }
 
-            // Use models from SDK directly - NO MOCK DATA
             _availableModels.value = models
         } catch (e: Exception) {
             // If SDK not initialized or fails, show empty list
@@ -101,7 +89,7 @@ class ModelRepository(
             }
 
             // Update model state and path
-            val localPath = File(modelsDir, "${modelId}.${model.format.extension}").absolutePath
+            val localPath = File(modelsDir, "${modelId}${model.format.extension}").absolutePath
             updateModelPath(modelId, localPath)
             updateModelState(modelId, ModelState.DOWNLOADED)
 
@@ -223,10 +211,9 @@ class ModelRepository(
         _availableModels.update { models ->
             models.map { model ->
                 if (model.id == modelId) {
-                    model.copy(
-                        localPath = path,
-                        downloadedAt = if (path != null) Date() else null
-                    )
+                    // Update the underlying SDK model's localPath
+                    val updatedSdkModel = model.modelInfo.copy(localPath = path)
+                    model.copy(modelInfo = updatedSdkModel)
                 } else {
                     model
                 }
@@ -236,6 +223,17 @@ class ModelRepository(
 
     private fun updateDownloadProgress(modelId: String, progress: Float) {
         _downloadProgress.update { it + (modelId to progress) }
+
+        // Also update the model's download progress in UI state
+        _availableModels.update { models ->
+            models.map { model ->
+                if (model.id == modelId) {
+                    model.copy(downloadProgress = progress)
+                } else {
+                    model
+                }
+            }
+        }
     }
 
     private fun calculateDirectorySize(dir: File): Long {
@@ -273,60 +271,4 @@ class ModelRepository(
         }
         return models
     }
-
-    private fun mapCategory(category: String?): ModelCategory {
-        return when (category?.lowercase()) {
-            "language" -> ModelCategory.LANGUAGE
-            "vision" -> ModelCategory.VISION
-            "audio" -> ModelCategory.AUDIO
-            "multimodal" -> ModelCategory.MULTIMODAL
-            else -> ModelCategory.SPECIALIZED
-        }
-    }
-
-    private fun mapFormat(format: String?): ModelFormat {
-        return ModelFormat.values().find {
-            it.extension == format || it.name == format?.uppercase()
-        } ?: ModelFormat.UNKNOWN
-    }
-
-    private fun mapFramework(framework: String?): LLMFramework? {
-        return when (framework?.lowercase()) {
-            "llamacpp", "llama.cpp" -> LLMFramework.LLAMACPP
-            "onnx", "onnxruntime" -> LLMFramework.ONNX_RUNTIME
-            "tflite", "tensorflow" -> LLMFramework.TENSORFLOW_LITE
-            "foundation" -> LLMFramework.FOUNDATION_MODELS
-            "whisper" -> LLMFramework.WHISPER_CPP
-            else -> null
-        }
-    }
-
-    private fun mapFrameworks(frameworks: List<String>?): List<LLMFramework> {
-        return frameworks?.mapNotNull { mapFramework(it) } ?: emptyList()
-    }
-
-    private fun mapMetadata(metadata: Map<String, Any>?): ModelMetadata? {
-        if (metadata == null) return null
-
-        return ModelMetadata(
-            description = metadata["description"] as? String,
-            author = metadata["author"] as? String,
-            version = metadata["version"] as? String,
-            license = metadata["license"] as? String,
-            tags = (metadata["tags"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            capabilities = (metadata["capabilities"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            limitations = (metadata["limitations"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-            baseModel = metadata["baseModel"] as? String,
-            quantization = metadata["quantization"] as? String
-        )
-    }
-
-    private fun determineModelState(sdkModel: com.runanywhere.sdk.models.ModelInfo): ModelState {
-        return when {
-            sdkModel.localPath != null -> ModelState.DOWNLOADED
-            sdkModel.downloadURL != null -> ModelState.AVAILABLE
-            else -> ModelState.NOT_AVAILABLE
-        }
-    }
-
 }

@@ -76,7 +76,14 @@ tasks.register("runAndroidApp") {
         // 3. Launch the app
         println(" Launching app...")
         exec {
-            commandLine("adb", "shell", "am", "start", "-n", "ai.runanywhere.android/.MainActivity")
+            commandLine(
+                "adb",
+                "shell",
+                "am",
+                "start",
+                "-n",
+                "com.runanywhere.runanywhereai.debug/.MainActivity"
+            )
         }
 
         println(" Android app launched successfully")

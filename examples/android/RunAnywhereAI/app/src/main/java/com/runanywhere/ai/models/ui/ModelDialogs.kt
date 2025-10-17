@@ -16,6 +16,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.runanywhere.ai.models.data.*
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.ModelCategory
+import com.runanywhere.sdk.models.enums.ModelFormat
+import kotlin.collections.isNotEmpty
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,7 +98,7 @@ fun ModelDetailsDialog(
                     }
 
                     // Capabilities
-                    if (model.supportsThinking || model.metadata?.capabilities?.isNotEmpty() == true) {
+                    if (model.supportsThinking || model.metadata?.tags?.isNotEmpty() == true) {
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -141,7 +145,8 @@ fun ModelDetailsDialog(
                                     }
                                 }
 
-                                model.metadata?.capabilities?.forEach { capability ->
+                                // Show metadata tags as capabilities
+                                model.metadata?.tags?.forEach { tag ->
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -152,7 +157,7 @@ fun ModelDetailsDialog(
                                             modifier = Modifier.size(16.dp),
                                             tint = MaterialTheme.colorScheme.primary
                                         )
-                                        Text(capability, style = MaterialTheme.typography.bodyMedium)
+                                        Text(tag, style = MaterialTheme.typography.bodyMedium)
                                     }
                                 }
                             }
@@ -184,7 +189,7 @@ fun ModelDetailsDialog(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
                                         Icon(
-                                            getFrameworkIcon(framework),
+                                            framework.getIcon(),
                                             contentDescription = null,
                                             modifier = Modifier.size(20.dp)
                                         )
@@ -246,8 +251,8 @@ fun ModelDetailsDialog(
                                 metadata.baseModel?.let {
                                     DetailRow("Base Model", it)
                                 }
-                                metadata.quantization?.let {
-                                    DetailRow("Quantization", it)
+                                metadata.quantizationLevel?.let {
+                                    DetailRow("Quantization", it.value)
                                 }
                             }
                         }
@@ -403,7 +408,7 @@ fun AddModelDialog(
                                 },
                                 leadingIcon = {
                                     Icon(
-                                        getFrameworkIcon(framework),
+                                        framework.getIcon(),
                                         contentDescription = null
                                     )
                                 }

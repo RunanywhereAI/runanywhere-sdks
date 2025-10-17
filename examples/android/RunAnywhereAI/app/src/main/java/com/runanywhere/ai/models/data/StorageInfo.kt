@@ -23,7 +23,7 @@ data class StorageInfo(
 }
 
 data class StoredModel(
-    val modelInfo: ModelInfo,
+    val modelInfo: ModelUiState, // This now uses the type alias
     val fileSize: Long,
     val lastAccessed: Long,
     val accessCount: Int = 0,
