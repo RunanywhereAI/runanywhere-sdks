@@ -43,7 +43,7 @@ let package = Package(
         // Adapter module dependencies
         .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.5.0"),
     ],
     targets: [
         // Core SDK target
