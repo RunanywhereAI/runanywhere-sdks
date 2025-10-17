@@ -4,10 +4,10 @@ import PackageDescription
 let package = Package(
     name: "RunAnywhere",
     platforms: [
-        .iOS(.v14),
-        .macOS(.v12),
-        .tvOS(.v14),
-        .watchOS(.v7)
+        .iOS(.v16),
+        .macOS(.v13),
+        .tvOS(.v16),
+        .watchOS(.v9)
     ],
     products: [
         // Core SDK
