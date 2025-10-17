@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.15.0] - 2025-10-17
+## [0.15.1] - 2025-10-17
+
+### Fixed
+- **Critical SPM Fix**: Changed FluidAudio dependency from `branch: "main"` to `from: "0.5.0"` to fix SPM resolution
+- SPM doesn't allow branch dependencies in released packages - now uses tagged version
+
+## [0.15.0] - 2025-10-17 [YANKED]
+
+**Note**: This version was yanked due to SPM resolution issues with FluidAudio dependency. Use 0.15.1 instead.
 
 ### Added
 - **Integrated Adapter Modules**: LLMSwift, WhisperKitTranscription, and FluidAudioDiarization now available as products from main package
