@@ -30,13 +30,13 @@ struct VoiceAssistantView: View {
                 Spacer()
 
                 // Status indicator
-                HStack(spacing: 6) {
+                HStack(spacing: AppSpacing.small) {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
                     Text(statusText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 Spacer()

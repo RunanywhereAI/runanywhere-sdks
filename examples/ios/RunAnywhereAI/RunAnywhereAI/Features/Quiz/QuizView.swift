@@ -47,10 +47,10 @@ struct QuizView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: { showingModelSelection = true }) {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             Image(systemName: "cube")
                             Text("Model")
-                                .font(.caption)
+                                .font(AppTypography.caption)
                         }
                     }
                 }
@@ -78,7 +78,7 @@ struct QuizView: View {
 
                     // Generation progress overlay
                     if viewModel.showGenerationProgress {
-                        Color.black.opacity(0.3)
+                        AppColors.overlayLight
                             .ignoresSafeArea()
                             .transition(.opacity)
 
@@ -97,10 +97,10 @@ struct QuizView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button(action: { showingModelSelection = true }) {
-                            HStack(spacing: 4) {
+                            HStack(spacing: AppSpacing.xSmall) {
                                 Image(systemName: "cube")
                                 Text("Model")
-                                    .font(.caption)
+                                    .font(AppTypography.caption)
                             }
                         }
                     }
@@ -120,7 +120,7 @@ struct QuizView: View {
         } message: {
             Text(viewModel.error ?? "")
         }
-        .animation(.easeInOut(duration: 0.3), value: viewModel.showGenerationProgress)
+        .animation(.easeInOut(duration: AppLayout.animationRegular), value: viewModel.showGenerationProgress)
     }
 
     private func handleModelSelected(_ model: ModelInfo) async {
@@ -133,32 +133,31 @@ struct QuizGeneratingView: View {
     @State private var rotation: Double = 0
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: AppSpacing.xLarge) {
             Image(systemName: "brain")
-                .font(.system(size: 60))
-                .foregroundColor(.accentColor)
+                .font(AppTypography.system60)
+                .foregroundColor(AppColors.primaryAccent)
                 .rotationEffect(.degrees(rotation))
                 .onAppear {
-                    withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                    withAnimation(.linear(duration: AppLayout.animationLoopSlow).repeatForever(autoreverses: false)) {
                         rotation = 360
                     }
                 }
 
             Text("Generating Quiz...")
-                .font(.title2)
-                .fontWeight(.semibold)
+                .font(AppTypography.title2Semibold)
 
             Text("Analyzing your content and creating questions")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+                .font(AppTypography.subheadline)
+                .foregroundColor(AppColors.textSecondary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal)
+                .padding(.horizontal, AppSpacing.large)
 
             ProgressView()
                 .scaleEffect(1.5)
                 .padding(.top)
         }
-        .padding()
+        .padding(AppSpacing.large)
     }
 }
 

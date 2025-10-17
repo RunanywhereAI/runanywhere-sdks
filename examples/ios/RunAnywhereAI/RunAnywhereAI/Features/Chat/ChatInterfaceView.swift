@@ -14,20 +14,7 @@ import UIKit
 import AppKit
 #endif
 
-// MARK: - Platform-specific colors
-#if os(iOS)
-private let platformBackgroundColor = UIColor.systemGroupedBackground
-private let platformSystemBackground = UIColor.systemBackground
-private let platformSeparator = UIColor.separator
-private let platformSystemGray5 = UIColor.systemGray5
-private let platformSystemGray6 = UIColor.systemGray6
-#else
-private let platformBackgroundColor = NSColor.controlBackgroundColor
-private let platformSystemBackground = NSColor.controlBackgroundColor
-private let platformSeparator = NSColor.separatorColor
-private let platformSystemGray5 = NSColor.controlColor
-private let platformSystemGray6 = NSColor.controlBackgroundColor
-#endif
+// Use centralized design system colors
 
 struct ChatInterfaceView: View {
     @StateObject private var viewModel = ChatViewModel()
@@ -56,15 +43,15 @@ struct ChatInterfaceView: View {
                     Spacer()
 
                     Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
-                        .font(.headline)
+                        .font(AppTypography.headline)
 
                     Spacer()
 
                     toolbarButtons
                 }
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-                .background(Color(NSColor.windowBackgroundColor))
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.vertical, AppSpacing.smallMedium)
+                .background(AppColors.backgroundPrimary)
 
                 Divider()
 
@@ -141,23 +128,22 @@ struct ChatInterfaceView: View {
                             Spacer()
 
                             Image(systemName: "message.circle")
-                                .font(.system(size: 60))
-                                .foregroundColor(.secondary.opacity(0.6))
+                                .font(AppTypography.system60)
+                                .foregroundColor(AppColors.textSecondary.opacity(0.6))
 
                             VStack(spacing: 8) {
                                 Text("Start a conversation")
-                                    .font(.title2)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.primary)
+                                    .font(AppTypography.title2Semibold)
+                                    .foregroundColor(AppColors.textPrimary)
 
                                 if viewModel.isModelLoaded {
                                     Text("Type a message below to get started")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .font(AppTypography.subheadline)
+                                        .foregroundColor(AppColors.textSecondary)
                                 } else {
                                     Text("Select a model first, then start chatting")
-                                        .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .font(AppTypography.subheadline)
+                                        .foregroundColor(AppColors.textSecondary)
                                 }
                             }
 
@@ -165,7 +151,7 @@ struct ChatInterfaceView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        LazyVStack(spacing: 16) {
+                        LazyVStack(spacing: AppSpacing.large) {
                             // Add spacer at top for better scrolling
                             Spacer(minLength: 20)
                                 .id("top-spacer")
@@ -192,12 +178,12 @@ struct ChatInterfaceView: View {
                             Spacer(minLength: 20)
                                 .id("bottom-spacer")
                         }
-                        .padding()
+                        .padding(AppSpacing.large)
                     }
                 }
                 .defaultScrollAnchor(.bottom)
             }
-            .background(Color(platformBackgroundColor))
+            .background(AppColors.backgroundGrouped)
             .contentShape(Rectangle()) // Makes entire area tappable
             .onTapGesture {
                 // Dismiss keyboard when tapping outside
@@ -319,14 +305,14 @@ struct ChatInterfaceView: View {
             #endif
 
             Button(action: { showingModelSelection = true }) {
-                HStack(spacing: 4) {
+                HStack(spacing: AppSpacing.xSmall) {
                     Image(systemName: "cube")
                     if viewModel.isModelLoaded {
                         Text("Switch Model")
-                            .font(.caption)
+                            .font(AppTypography.caption)
                     } else {
                         Text("Select Model")
-                            .font(.caption)
+                            .font(AppTypography.caption)
                     }
                 }
             }
@@ -352,25 +338,25 @@ struct ChatInterfaceView: View {
             if !viewModel.isModelLoaded {
                 VStack(spacing: 8) {
                     Text("Welcome! Select and download a model to start chatting.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
 
                     Button("Select Model") {
                         showingModelSelection = true
                     }
-                    .font(.caption)
+                    .font(AppTypography.caption)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.blue.opacity(0.1))
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.vertical, AppSpacing.mediumLarge)
+                .background(AppColors.modelFrameworkBg)
 
                 Divider()
             }
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
                     .lineLimit(1...4)
@@ -383,14 +369,14 @@ struct ChatInterfaceView: View {
 
                 Button(action: sendMessage) {
                     Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundColor(viewModel.canSend ? .accentColor : .gray)
+                        .font(AppTypography.system28)
+                        .foregroundColor(viewModel.canSend ? AppColors.primaryAccent : AppColors.statusGray)
                 }
                 .disabled(!viewModel.canSend)
             }
-            .padding()
-            .background(Color(platformSystemBackground))
-            .animation(.easeInOut(duration: 0.25), value: isTextFieldFocused)
+            .padding(AppSpacing.large)
+            .background(AppColors.backgroundPrimary)
+            .animation(.easeInOut(duration: AppLayout.animationFast), value: isTextFieldFocused)
         }
     }
 
@@ -412,7 +398,7 @@ struct ChatInterfaceView: View {
 
             // Check for errors after a short delay
             Task {
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
+                try? await Task.sleep(nanoseconds: UInt64(AppLayout.animationSlow * 1_000_000_000)) // Use AppLayout timing
                 if let error = viewModel.error {
                     await MainActor.run {
                         debugMessage = "Error occurred: \(error.localizedDescription)"
@@ -446,14 +432,14 @@ struct ChatInterfaceView: View {
 
     // Minimalistic model info bar
     private var modelInfoBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppSpacing.smallMedium) {
             // Framework indicator
             if let currentModel = ModelListViewModel.shared.currentModel {
                 Text(currentModel.compatibleFrameworks.first?.rawValue.uppercased() ?? "AI")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .font(AppTypography.monospacedCaption)
+                    .foregroundColor(AppColors.textWhite)
+                    .padding(.horizontal, AppSpacing.small)
+                    .padding(.vertical, AppSpacing.xxSmall)
                     .background(
                         RoundedRectangle(cornerRadius: 4)
                             .fill(Color.blue)
@@ -469,37 +455,37 @@ struct ChatInterfaceView: View {
 
             // Key stats
             if let currentModel = ModelListViewModel.shared.currentModel {
-                HStack(spacing: 12) {
+                HStack(spacing: AppSpacing.mediumLarge) {
                     // Model size
                     HStack(spacing: 3) {
                         Image(systemName: "internaldrive")
-                            .font(.system(size: 8))
+                            .font(.system(size: AppSpacing.iconSmall))
                         Text(formatModelSize(currentModel.memoryRequired ?? 0))
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(AppTypography.rounded10)
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppColors.textSecondary)
 
                     // Context length
                     HStack(spacing: 3) {
                         Image(systemName: "text.alignleft")
-                            .font(.system(size: 8))
+                            .font(.system(size: AppSpacing.iconSmall))
                         Text("\(formatNumber(currentModel.contextLength ?? 0))")
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(AppTypography.rounded10)
                     }
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppColors.textSecondary)
                 }
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 6)
+        .padding(.horizontal, AppSpacing.large)
+        .padding(.vertical, AppSpacing.small)
         .background(
             Rectangle()
-                .fill(Color(platformSystemBackground).opacity(0.95))
+                .fill(AppColors.backgroundPrimary.opacity(0.95))
                 .overlay(
                     Rectangle()
-                        .frame(height: 0.5)
-                        .foregroundColor(Color(platformSeparator))
-                        .offset(y: 12)
+                        .frame(height: AppSpacing.strokeThin)
+                        .foregroundColor(AppColors.separator)
+                        .offset(y: AppSpacing.mediumLarge)
                 )
         )
     }
@@ -530,43 +516,43 @@ struct TypingIndicatorView: View {
 
     var body: some View {
         HStack {
-            Spacer(minLength: 60)
+            Spacer(minLength: AppSpacing.padding60)
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.mediumLarge) {
                 // Animated dots
-                HStack(spacing: 4) {
+                HStack(spacing: AppSpacing.xSmall) {
                     ForEach(0..<3) { index in
                         Circle()
-                            .fill(Color.blue.opacity(0.7))
-                            .frame(width: 8, height: 8)
+                            .fill(AppColors.primaryBlue.opacity(0.7))
+                            .frame(width: AppSpacing.iconSmall, height: AppSpacing.iconSmall)
                             .scaleEffect(animationPhase == index ? 1.3 : 0.8)
                             .animation(
-                                Animation.easeInOut(duration: 0.6)
+                                Animation.easeInOut(duration: AppLayout.animationVerySlow)
                                     .repeatForever(autoreverses: true)
                                     .delay(Double(index) * 0.2),
                                 value: animationPhase
                             )
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.horizontal, AppSpacing.mediumLarge)
+                .padding(.vertical, AppSpacing.smallMedium)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(Color(platformSystemGray5))
-                        .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 2)
+                    RoundedRectangle(cornerRadius: AppSpacing.large)
+                        .fill(AppColors.backgroundGray5)
+                        .shadow(color: AppColors.shadowLight, radius: 3, x: 0, y: 2)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16)
-                                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: AppSpacing.large)
+                                .strokeBorder(AppColors.borderLight, lineWidth: AppSpacing.strokeThin)
                         )
                 )
 
                 Text("AI is thinking...")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
                     .opacity(0.8)
             }
 
-            Spacer(minLength: 60)
+            Spacer(minLength: AppSpacing.padding60)
         }
         .onAppear {
             withAnimation {
@@ -589,7 +575,7 @@ struct MessageBubbleView: View {
     var body: some View {
         HStack {
             if message.role == .user {
-                Spacer(minLength: 60)
+                Spacer(minLength: AppSpacing.padding60)
             }
 
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 6) {
@@ -616,48 +602,48 @@ struct MessageBubbleView: View {
             }
 
             if message.role != .user {
-                Spacer(minLength: 60)
+                Spacer(minLength: AppSpacing.padding60)
             }
         }
     }
 
     private var thinkingSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppSpacing.small) {
             // Simple thinking toggle button
             Button(action: {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(.easeInOut(duration: AppLayout.animationFast)) {
                     isThinkingExpanded.toggle()
                 }
             }) {
                 HStack(spacing: 8) {
                     // Simple icon
                     Image(systemName: "lightbulb.min")
-                        .font(.caption)
-                        .foregroundColor(.purple)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryPurple)
 
                     // Clean summary text
                     Text(isThinkingExpanded ? "Hide reasoning" : thinkingSummary)
-                        .font(.caption)
-                        .foregroundColor(.purple)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.primaryPurple)
                         .lineLimit(1)
 
                     Spacer()
 
                     // Simple expand indicator
                     Image(systemName: isThinkingExpanded ? "chevron.up" : "chevron.right")
-                        .font(.caption2)
-                        .foregroundColor(.purple.opacity(0.6))
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.primaryPurple.opacity(0.6))
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
+                .padding(.horizontal, AppSpacing.regular)
+                .padding(.vertical, AppSpacing.padding9)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(LinearGradient(colors: [Color.purple.opacity(0.1), Color.purple.opacity(0.05)],
+                    RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
+                        .fill(LinearGradient(colors: [AppColors.primaryPurple.opacity(0.1), AppColors.primaryPurple.opacity(0.05)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing))
-                        .shadow(color: .purple.opacity(0.2), radius: 2, x: 0, y: 1)
+                        .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(Color.purple.opacity(0.2), lineWidth: 0.5)
+                            RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
+                                .strokeBorder(AppColors.primaryPurple.opacity(0.2), lineWidth: AppSpacing.strokeThin)
                         )
                 )
             }
@@ -668,17 +654,17 @@ struct MessageBubbleView: View {
                 VStack(spacing: 0) {
                     ScrollView {
                         Text(message.thinkingContent ?? "")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
                     }
-                    .frame(maxHeight: 150) // Shorter max height
-                    .padding(12)
+                    .frame(maxHeight: AppSpacing.minFrameHeight) // Shorter max height
+                    .padding(AppSpacing.mediumLarge)
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(platformSystemGray6))
+                        RoundedRectangle(cornerRadius: AppSpacing.medium)
+                            .fill(AppColors.backgroundGray6)
                     )
 
                     // Subtle completion status
@@ -686,11 +672,11 @@ struct MessageBubbleView: View {
                         HStack {
                             Spacer()
                             Text("Reasoning incomplete")
-                                .font(.caption2)
-                                .foregroundColor(.orange.opacity(0.8))
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.primaryOrange.opacity(0.8))
                                 .italic()
                         }
-                        .padding(.top, 4)
+                        .padding(.top, AppSpacing.xSmall)
                     }
                 }
                 .transition(.asymmetric(
@@ -749,16 +735,16 @@ struct MessageBubbleView: View {
     }
 
     private var thinkingProgressIndicator: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: AppSpacing.smallMedium) {
             // Animated thinking dots instead of brain icon
             HStack(spacing: 3) {
                 ForEach(0..<3, id: \.self) { index in
                     Circle()
-                        .fill(Color.purple)
-                        .frame(width: 6, height: 6)
+                        .fill(AppColors.primaryPurple)
+                        .frame(width: AppSpacing.small, height: AppSpacing.small)
                         .scaleEffect(isGenerating ? 1.0 : 0.5)
                         .animation(
-                            Animation.easeInOut(duration: 0.6)
+                            Animation.easeInOut(duration: AppLayout.animationVerySlow)
                                 .repeatForever()
                                 .delay(Double(index) * 0.2),
                             value: isGenerating
@@ -767,19 +753,19 @@ struct MessageBubbleView: View {
             }
 
             Text("Thinking...")
-                .font(.caption)
-                .foregroundColor(.purple.opacity(0.8))
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.primaryPurple.opacity(0.8))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, AppSpacing.mediumLarge)
+        .padding(.vertical, AppSpacing.smallMedium)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(LinearGradient(colors: [Color.purple.opacity(0.12), Color.purple.opacity(0.06)],
+            RoundedRectangle(cornerRadius: AppSpacing.medium)
+                .fill(LinearGradient(colors: [AppColors.primaryPurple.opacity(0.12), AppColors.primaryPurple.opacity(0.06)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing))
-                .shadow(color: .purple.opacity(0.2), radius: 2, x: 0, y: 1)
+                .shadow(color: AppColors.primaryPurple.opacity(0.2), radius: 2, x: 0, y: 1)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .strokeBorder(Color.purple.opacity(0.3), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: AppSpacing.medium)
+                        .strokeBorder(AppColors.primaryPurple.opacity(0.3), lineWidth: AppSpacing.strokeThin)
                 )
         )
         .transition(.opacity.combined(with: .scale(scale: 0.9)))
@@ -791,33 +777,32 @@ struct MessageBubbleView: View {
                 Spacer()
             }
 
-            HStack(spacing: 6) {
+            HStack(spacing: AppSpacing.small) {
                 // Model icon
                 Image(systemName: "cube")
-                    .font(.caption2)
-                    .foregroundColor(.white)
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textWhite)
 
                 // Model name
                 Text(message.modelInfo?.modelName ?? "Unknown")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
+                    .font(AppTypography.caption2Medium)
+                    .foregroundColor(AppColors.textWhite)
 
                 // Framework badge
                 Text(message.modelInfo?.framework ?? "")
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(AppTypography.caption2)
+                    .foregroundColor(AppColors.textWhite.opacity(0.8))
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, AppSpacing.medium)
             .padding(.vertical, 5)
             .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(LinearGradient(colors: [Color.blue, Color.blue.opacity(0.8)],
+                RoundedRectangle(cornerRadius: AppSpacing.regular)
+                    .fill(LinearGradient(colors: [AppColors.primaryBlue, AppColors.primaryBlue.opacity(0.8)],
                                        startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: .blue.opacity(0.3), radius: 2, x: 0, y: 1)
+                    .shadow(color: AppColors.primaryBlue.opacity(0.3), radius: 2, x: 0, y: 1)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: AppSpacing.regular)
+                            .strokeBorder(AppColors.textWhite.opacity(0.2), lineWidth: AppSpacing.strokeThin)
                     )
             )
 
@@ -835,24 +820,24 @@ struct MessageBubbleView: View {
 
             // Timestamp
             Text(message.timestamp, style: .time)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
 
             // Analytics summary (if available)
             if let analytics = message.analytics {
                 Group {
                     Text("•")
-                        .foregroundColor(.secondary.opacity(0.5))
+                        .foregroundColor(AppColors.textSecondary.opacity(0.5))
 
                     // Response time
                     Text("\(String(format: "%.1f", analytics.totalGenerationTime))s")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
 
                     // Tokens per second (if meaningful)
                     if analytics.averageTokensPerSecond > 0 {
                         Text("•")
-                            .foregroundColor(.secondary.opacity(0.5))
+                            .foregroundColor(AppColors.textSecondary.opacity(0.5))
 
                         Text("\(Int(analytics.averageTokensPerSecond)) tok/s")
                             .font(.caption2)
@@ -862,8 +847,8 @@ struct MessageBubbleView: View {
                     // Thinking mode indicator
                     if analytics.wasThinkingMode {
                         Image(systemName: "lightbulb.min")
-                            .font(.caption2)
-                            .foregroundColor(.purple.opacity(0.7))
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.primaryPurple.opacity(0.7))
                     }
                 }
             }
@@ -879,30 +864,30 @@ struct MessageBubbleView: View {
         // Only show message bubble if there's content
         if !message.content.isEmpty {
             Text(message.content)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.horizontal, AppSpacing.large)
+                .padding(.vertical, AppSpacing.mediumLarge)
                 .background(
-                    RoundedRectangle(cornerRadius: 18)
+                    RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
                         .fill(message.role == .user ?
-                              LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.9)],
+                              LinearGradient(colors: [AppColors.userBubbleGradientStart, AppColors.userBubbleGradientEnd],
                                            startPoint: .topLeading, endPoint: .bottomTrailing) :
-                              LinearGradient(colors: [Color(platformSystemGray5), Color(platformSystemGray6)],
+                              LinearGradient(colors: [AppColors.backgroundGray5, AppColors.backgroundGray6],
                                            startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
-                        .shadow(color: .black.opacity(0.12), radius: 4, x: 0, y: 2)
+                        .shadow(color: AppColors.shadowMedium, radius: 4, x: 0, y: 2)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 18)
+                            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusBubble)
                                 .strokeBorder(
                                     message.role == .user ?
-                                    Color.white.opacity(0.3) :
-                                    Color.black.opacity(0.05),
-                                    lineWidth: 0.5
+                                    AppColors.borderLight :
+                                    AppColors.borderMedium,
+                                    lineWidth: AppSpacing.strokeThin
                                 )
                         )
                 )
-                .foregroundColor(message.role == .user ? .white : .primary)
+                .foregroundColor(message.role == .user ? AppColors.textWhite : AppColors.textPrimary)
                 .scaleEffect(isGenerating && message.role == .assistant && message.content.count < 50 ? 1.02 : 1.0)
-                .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true), value: isGenerating)
+                .animation(.easeInOut(duration: AppLayout.animationLoopSlow).repeatForever(autoreverses: true), value: isGenerating)
         }
     }
 }
@@ -981,50 +966,49 @@ struct ChatOverviewTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: AppSpacing.xLarge) {
                 // Conversation Summary Card
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                     Text("Conversation Summary")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                        .font(AppTypography.headlineSemibold)
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         HStack {
                             Image(systemName: "message.circle")
-                                .foregroundColor(.blue)
+                                .foregroundColor(AppColors.primaryBlue)
                             Text(conversationSummary)
-                                .font(.subheadline)
+                                .font(AppTypography.subheadline)
                         }
 
                         if let conversation = conversation {
                             HStack {
                                 Image(systemName: "clock")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(AppColors.primaryBlue)
                                 Text("Created \(conversation.createdAt, style: .relative)")
-                                    .font(.subheadline)
+                                    .font(AppTypography.subheadline)
                             }
                         }
 
                         if !analyticsMessages.isEmpty {
                             HStack {
                                 Image(systemName: "cube")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(AppColors.primaryBlue)
                                 let models = Set(analyticsMessages.map { $0.modelName })
                                 Text("\(models.count) model\(models.count == 1 ? "" : "s") used")
-                                    .font(.subheadline)
+                                    .font(AppTypography.subheadline)
                             }
                         }
                     }
                 }
-                .padding()
+                .padding(AppSpacing.large)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(platformSystemGray6))
+                    RoundedRectangle(cornerRadius: AppSpacing.mediumLarge)
+                        .fill(AppColors.backgroundGray6)
                 )
 
                 // Performance Highlights
                 if !analyticsMessages.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                         Text("Performance Highlights")
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -1032,46 +1016,46 @@ struct ChatOverviewTab: View {
                         LazyVGrid(columns: [
                             GridItem(.flexible()),
                             GridItem(.flexible())
-                        ], spacing: 12) {
+                        ], spacing: AppSpacing.mediumLarge) {
                             PerformanceCard(
                                 title: "Avg Response Time",
                                 value: String(format: "%.1fs", averageResponseTime),
                                 icon: "timer",
-                                color: .green
+                                color: AppColors.statusGreen
                             )
 
                             PerformanceCard(
                                 title: "Avg Speed",
                                 value: "\(Int(averageTokensPerSecond)) tok/s",
                                 icon: "speedometer",
-                                color: .blue
+                                color: AppColors.statusBlue
                             )
 
                             PerformanceCard(
                                 title: "Total Tokens",
                                 value: "\(totalTokens)",
                                 icon: "textformat.123",
-                                color: .purple
+                                color: AppColors.primaryPurple
                             )
 
                             PerformanceCard(
                                 title: "Success Rate",
                                 value: "\(Int(completionRate * 100))%",
                                 icon: "checkmark.circle",
-                                color: .orange
+                                color: AppColors.statusOrange
                             )
                         }
                     }
-                    .padding()
+                    .padding(AppSpacing.large)
                     .background(
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(platformSystemGray6))
+                            .fill(AppColors.backgroundGray6)
                     )
                 }
 
                 Spacer()
             }
-            .padding()
+            .padding(AppSpacing.large)
         }
     }
 
@@ -1105,7 +1089,7 @@ struct PerformanceCard: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppSpacing.smallMedium) {
             HStack {
                 Image(systemName: icon)
                     .foregroundColor(color)
@@ -1114,20 +1098,19 @@ struct PerformanceCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(AppTypography.title2Semibold)
 
                 Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: AppSpacing.cornerRadiusRegular)
                 .fill(color.opacity(0.1))
-                .strokeBorder(color.opacity(0.3), lineWidth: 1)
+                .strokeBorder(color.opacity(0.3), lineWidth: AppSpacing.strokeRegular)
         )
     }
 }
@@ -1176,59 +1159,58 @@ struct MessageAnalyticsRow: View {
             // Header
             HStack {
                 Text("Message #\(messageNumber)")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(AppTypography.subheadlineSemibold)
 
                 Spacer()
 
                 Text(analytics.modelName)
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.blue.opacity(0.1))
-                    .cornerRadius(4)
+                    .font(AppTypography.caption)
+                    .padding(.horizontal, AppSpacing.small)
+                    .padding(.vertical, AppSpacing.xxSmall)
+                    .background(AppColors.badgeBlue)
+                    .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                 Text(analytics.framework)
-                    .font(.caption)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.purple.opacity(0.1))
-                    .cornerRadius(4)
+                    .font(AppTypography.caption)
+                    .padding(.horizontal, AppSpacing.small)
+                    .padding(.vertical, AppSpacing.xxSmall)
+                    .background(AppColors.badgePurple)
+                    .cornerRadius(AppSpacing.cornerRadiusSmall)
             }
 
             // Performance Metrics
-            HStack(spacing: 16) {
+            HStack(spacing: AppSpacing.large) {
                 MetricView(
                     label: "Time",
                     value: String(format: "%.1fs", analytics.totalGenerationTime),
-                    color: .green
+                    color: AppColors.statusGreen
                 )
 
                 if let ttft = analytics.timeToFirstToken {
                     MetricView(
                         label: "TTFT",
                         value: String(format: "%.1fs", ttft),
-                        color: .blue
+                        color: AppColors.statusBlue
                     )
                 }
 
                 MetricView(
                     label: "Speed",
                     value: "\(Int(analytics.averageTokensPerSecond)) tok/s",
-                    color: .purple
+                    color: AppColors.primaryPurple
                 )
 
                 if analytics.wasThinkingMode {
                     Image(systemName: "lightbulb.min")
-                        .foregroundColor(.orange)
+                        .foregroundColor(AppColors.statusOrange)
                         .font(.caption)
                 }
             }
 
             // Content Preview
             Text(message.content.prefix(100))
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(AppTypography.caption)
+                .foregroundColor(AppColors.textSecondary)
                 .lineLimit(2)
         }
         .padding(.vertical, 4)
@@ -1243,15 +1225,14 @@ struct MetricView: View {
     let color: Color
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: AppSpacing.xxSmall) {
             Text(value)
-                .font(.caption)
-                .fontWeight(.semibold)
+                .font(AppTypography.captionMedium)
                 .foregroundColor(color)
 
             Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                .font(AppTypography.caption2)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 }
@@ -1267,10 +1248,10 @@ struct PerformanceTab: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
+            VStack(spacing: AppSpacing.xLarge) {
                 if !analyticsMessages.isEmpty {
                     // Models Used
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                         Text("Models Used")
                             .font(.headline)
                             .fontWeight(.semibold)
@@ -1285,7 +1266,7 @@ struct PerformanceTab: View {
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(modelName)
-                                        .font(.subheadline)
+                                        .font(AppTypography.subheadline)
                                         .fontWeight(.medium)
 
                                     Text("\(modelMessages.count) message\(modelMessages.count == 1 ? "" : "s")")
@@ -1302,20 +1283,20 @@ struct PerformanceTab: View {
 
                                     Text("\(Int(avgSpeed)) tok/s")
                                         .font(.caption)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(AppColors.primaryBlue)
                                 }
                             }
-                            .padding()
+                            .padding(AppSpacing.large)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color(platformSystemGray6))
+                                    .fill(AppColors.backgroundGray6)
                             )
                         }
                     }
 
                     // Thinking Mode Analysis
                     if analyticsMessages.contains(where: { $0.wasThinkingMode }) {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: AppSpacing.mediumLarge) {
                             Text("Thinking Mode Analysis")
                                 .font(.headline)
                                 .fontWeight(.semibold)
@@ -1328,9 +1309,9 @@ struct PerformanceTab: View {
                                     .foregroundColor(.purple)
 
                                 Text("Used in \(thinkingMessages.count) messages (\(String(format: "%.0f", thinkingPercentage))%)")
-                                    .font(.subheadline)
+                                    .font(AppTypography.subheadline)
                             }
-                            .padding()
+                            .padding(AppSpacing.large)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.purple.opacity(0.1))
@@ -1341,7 +1322,7 @@ struct PerformanceTab: View {
 
                 Spacer()
             }
-            .padding()
+            .padding(AppSpacing.large)
         }
     }
 }

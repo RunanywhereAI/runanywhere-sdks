@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-### Before starting work
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- Focus on SIMPLICITY, and following Clean SOLID principles when writing code. Reusability, Clean architecture(not strictly) style, clear separation of concerns.
+### Before starting work.
+- Do NOT write ANY MOCK IMPLEMENTATION unless specified otherwise.
+- DO NOT PLAN or WRITE any unit tests unless specified otherwise.
 - Always in plan mode to make a plan refer to `thoughts/shared/plans/{descriptive_name}.md`.
 - After get the plan, make sure you Write the plan to the appropriate file as mentioned in the guide that you referred to.
 - If the task require external knowledge or certain package, also research to get latest knowledge (Use Task tool for research)
@@ -24,14 +28,76 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository contains cross-platform SDKs for the RunAnywhere on-device AI platform. The platform provides intelligent routing between on-device and cloud AI models to optimize for cost and privacy.
 
 ### SDK Implementations
+- **Kotlin Multiplatform SDK** (`sdk/runanywhere-kotlin/`) - Cross-platform SDK supporting JVM, Android, and Native platforms
 - **Android SDK** (`sdk/runanywhere-android/`) - Kotlin-based SDK for Android
 - **iOS SDK** (`sdk/runanywhere-swift/`) - Swift Package Manager-based SDK for iOS/macOS/tvOS/watchOS
 
 ### Example Applications
 - **Android Demo** (`examples/android/RunAnywhereAI/`) - Sample Android app demonstrating SDK usage
 - **iOS Demo** (`examples/ios/RunAnywhereAI/`) - Sample iOS app demonstrating SDK usage
+- **IntelliJ Plugin Demo** (`examples/intellij-plugin-demo/`) - IntelliJ/Android Studio plugin for voice features
 
 ## Common Development Commands
+
+### Kotlin Multiplatform SDK Development
+
+```bash
+# Navigate to Kotlin SDK
+cd sdk/runanywhere-kotlin/
+
+# Build Commands (using scripts/sdk.sh)
+./scripts/sdk.sh build            # Build all platforms (JVM and Android)
+./scripts/sdk.sh build-all        # Same as 'build' - builds all targets
+./scripts/sdk.sh build-all --clean # Clean before building (removes build directories)
+./scripts/sdk.sh build-all --deep-clean # Deep clean including Gradle caches
+./scripts/sdk.sh build-all --no-clean   # Build without any cleanup (default)
+
+# Individual Platform Builds
+./scripts/sdk.sh jvm              # Build JVM JAR only
+./scripts/sdk.sh android          # Build Android AAR only
+./scripts/sdk.sh common           # Compile common module only
+
+# Testing
+./scripts/sdk.sh test             # Run all tests
+./scripts/sdk.sh test-jvm         # Run JVM tests
+./scripts/sdk.sh test-android     # Run Android tests
+
+# Publishing
+./scripts/sdk.sh publish          # Publish to Maven Local (~/.m2/repository)
+./scripts/sdk.sh publish-local    # Same as 'publish'
+
+# Cleanup Options
+./scripts/sdk.sh clean            # Clean build directories
+./scripts/sdk.sh deep-clean       # Clean build dirs and Gradle caches
+
+# Help and Info
+./scripts/sdk.sh help             # Show all available commands
+./scripts/sdk.sh --help           # Same as 'help'
+
+# Direct Gradle Commands (Alternative)
+./gradlew build                   # Build all targets
+./gradlew jvmJar                  # Build JVM JAR
+./gradlew assembleDebug           # Build Android Debug AAR
+./gradlew assembleRelease         # Build Android Release AAR
+./gradlew clean                   # Clean build directories
+./gradlew publishToMavenLocal     # Publish to local Maven
+```
+
+#### Build Script Features
+
+The `scripts/sdk.sh` script provides:
+- **Automatic cleanup options**: `--clean`, `--deep-clean`, `--no-clean` flags
+- **Build verification**: Checks for successful JAR and AAR creation
+- **Error handling**: Continues building other targets if one fails
+- **Progress indicators**: Clear output showing build status
+- **Flexible commands**: Support for multiple build scenarios
+
+#### Build Output Locations
+
+After a successful build:
+- **JVM JAR**: `build/libs/RunAnywhereKotlinSDK-jvm-0.1.0.jar`
+- **Android AAR**: `build/outputs/aar/RunAnywhereKotlinSDK-debug.aar`
+- **Maven Local**: `~/.m2/repository/com/runanywhere/sdk/`
 
 ### Android SDK Development
 
@@ -56,8 +122,7 @@ cd sdk/runanywhere-android/
 ```
 
 ### iOS SDK Development
-## While implementing:
-- Always use the latest Swift syntax - Swift 6 version is the latest right now. Use the latest concurrency etc patterns and try to implement CLEAN architecture unless explicitly mentioned otherwise.
+
 ```bash
 # Navigate to iOS SDK
 cd sdk/runanywhere-swift/
@@ -100,20 +165,23 @@ cd examples/android/RunAnywhereAI/
 ### iOS Example App
 
 To get logs for sample app and sdk use this in another terminal:
+```bash
 log stream --predicate 'subsystem CONTAINS "com.runanywhere"' --info --debug
+```
 
 For physical device:
+```bash
 idevicesyslog | grep "com.runanywhere"
+```
 
 #### Quick Build & Run (Recommended)
 ```bash
 # Navigate to iOS example
 cd examples/ios/RunAnywhereAI/
-IMPORTANT!! - Always use build and run to run the project with correct device or sim
+
 # Build and run on simulator (handles dependencies automatically)
 ./scripts/build_and_run.sh simulator "iPhone 16 Pro" --build-sdk
 
-NOTE: When running the app always check for running on the REAL device that's connected!
 # Build and run on connected device
 ./scripts/build_and_run.sh device
 
@@ -140,10 +208,8 @@ open RunAnywhereAI.xcworkspace
 ```
 
 #### Known Issues - Xcode 16 Sandbox
-
 **Error**: `Sandbox: rsync deny(1) file-write-create`
 **Fix**: After `pod install`, run `./fix_pods_sandbox.sh`
-**Note**: Required after each `pod install`
 
 ### Pre-commit Hooks
 
@@ -158,45 +224,60 @@ pre-commit run ios-sdk-swiftlint --all-files
 
 ## Architecture Overview
 
-### Core SDK Design Patterns
+### Kotlin Multiplatform SDK Architecture
 
-Both SDKs follow similar architectural patterns:
+The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native platforms:
 
-1. **Singleton Pattern**: Main SDK access through `RunAnywhereSDK.shared` (iOS) or `RunAnywhereSDK.getInstance()` (Android)
-2. **Configuration-based Initialization**: Initialize with API key and optional settings
-3. **Async/Promise-based APIs**: Modern async patterns (Kotlin coroutines for Android, async/await for iOS)
-4. **Model Loading**: Universal model loader supporting multiple formats (GGUF, ONNX, Core ML, MLX, TFLite)
-5. **Intelligent Routing**: Automatic decision-making for on-device vs cloud execution
-6. **Cost Tracking**: Real-time cost and savings tracking
+1. **Common Module** (`commonMain/`) - Platform-agnostic business logic
+   - Core services and interfaces
+   - Data models and repositories
+   - Network and authentication logic
+   - Model management abstractions
 
-### Key Components
+2. **Platform-Specific Implementations**:
+   - **JVM** (`jvmMain/`) - Desktop/IntelliJ plugin support
+   - **Android** (`androidMain/`) - Android-specific implementations with Room DB
+   - **Native** (`nativeMain/`) - Linux, macOS, Windows support
 
-**Android SDK Structure:**
-- `RunAnywhereSDK.kt` - Main SDK entry point and singleton
-- `Configuration.kt` - SDK configuration options
-- `GenerationOptions.kt` - Text generation parameters
-- `GenerationResult.kt` - Generation response with metrics
-- `Message.kt` & `Context.kt` - Conversation management
+3. **Key Components**:
+   - `RunAnywhere.kt` - Main SDK entry point (platform-specific implementations)
+   - `Services.kt` - Service container and dependency injection
+   - `STTComponent` - Speech-to-text with Whisper integration
+   - `VADComponent` - Voice activity detection
+   - `ModelManager` - Model downloading and lifecycle
+   - `ConfigurationService` - Environment-specific configuration
 
-**iOS SDK Structure:**
-- `RunAnywhereSDK.swift` - Main SDK class with shared instance
-- `Configuration.swift` - SDK configuration and policies
-- `GenerationOptions.swift` - Generation parameters
-- `GenerationResult.swift` - Results with cost tracking
-- `Context.swift` & `Message.swift` - Conversation context
+### Design Patterns
+
+1. **Repository Pattern**: Data access abstraction with platform-specific implementations
+2. **Service Container**: Centralized dependency injection
+3. **Event Bus**: Reactive communication between components
+4. **Provider Pattern**: Platform-specific service providers (STT, VAD)
 
 ### Platform Requirements
 
-**Android:**
-- Minimum SDK: 24 (Android 7.0)
-- Target SDK: 36
-- Kotlin: 2.0.21
+**Kotlin Multiplatform SDK:**
+- Kotlin: 2.1.21 (upgraded from 2.0.21 to fix compiler issues)
 - Gradle: 8.11.1
+- JVM Target: 17
+- Android Min SDK: 24
+- Android Target SDK: 36
 
-**iOS:**
+**iOS SDK:**
 - iOS 13.0+ / macOS 10.15+ / tvOS 13.0+ / watchOS 6.0+
 - Swift: 5.9+
 - Xcode: 15.0+
+
+## Maven Coordinates
+
+For IntelliJ/JetBrains plugin development:
+```kotlin
+dependencies {
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+}
+```
+
+Location after local publish: `~/.m2/repository/com/runanywhere/sdk/`
 
 ## CI/CD Pipeline
 
@@ -213,10 +294,488 @@ Workflows are located in `.github/workflows/`:
 - `android-app.yml` - Android example app CI
 - `ios-app.yml` - iOS example app CI
 
+## Kotlin Multiplatform (KMP) SDK - Critical Implementation Rules
+
+### 🚨 MANDATORY: iOS as Source of Truth
+**NEVER make assumptions when implementing KMP code. ALWAYS refer to the iOS implementation as the definitive source of truth.**
+
+#### Core Principles:
+1. **iOS First**: When encountering missing logic, unimplemented features, or unclear requirements in KMP, ALWAYS:
+   - Check the corresponding iOS implementation
+   - Copy the iOS logic exactly (head-to-head translation)
+   - Adapt only for Kotlin syntax, not business logic
+
+2. **commonMain First**: ALL business logic, protocols, interfaces, and structures MUST be defined in `commonMain/`:
+   - Interfaces and abstract classes
+   - Data models and enums
+   - Business logic and algorithms
+   - Service contracts and protocols
+   - Component definitions
+   - Even platform-specific service interfaces
+
+3. **Platform Implementation Naming Convention**: Platform-specific implementations MUST use clear prefixes:
+   - `AndroidTTSService.kt` (not just `TTSService.kt`)
+   - `JvmTTSService.kt` (not just `TTSServiceImpl.kt`)
+   - `IosTTSService.kt` (for any iOS-specific bridges)
+   - `WindowsTTSService.kt`, `LinuxTTSService.kt`, etc.
+
+#### Implementation Process:
+```kotlin
+// Step 1: Check iOS implementation (e.g., TTSService.swift)
+// Step 2: Define interface in commonMain matching iOS exactly
+// commonMain/kotlin/com/runanywhere/sdk/services/tts/TTSService.kt
+interface TTSService {
+    // Match iOS protocol exactly
+    suspend fun synthesize(text: String, options: TTSOptions): ByteArray
+    val availableVoices: List<String>
+}
+
+// Step 3: Implement platform-specific versions with clear names
+// androidMain/kotlin/com/runanywhere/sdk/services/tts/AndroidTTSService.kt
+class AndroidTTSService : TTSService {
+    // Android-specific implementation
+}
+
+// jvmMain/kotlin/com/runanywhere/sdk/services/tts/JvmTTSService.kt
+class JvmTTSService : TTSService {
+    // JVM-specific implementation
+}
+```
+
+#### Common Mistakes to AVOID:
+❌ **DON'T** invent your own logic when something is unclear
+❌ **DON'T** put business logic in platform-specific modules
+❌ **DON'T** name platform files generically (e.g., `TTSServiceImpl.kt`)
+❌ **DON'T** assume behavior - check iOS implementation
+
+#### Correct Approach:
+✅ **DO** check iOS implementation for every feature
+✅ **DO** keep all logic in commonMain
+✅ **DO** use platform prefixes for all platform files
+✅ **DO** translate iOS logic exactly, adapting only syntax
+
+#### Example: When you see incomplete KMP code:
+```kotlin
+// KMP has this incomplete method:
+fun processAudio(data: ByteArray): String {
+    // TODO: implement
+    return ""
+}
+
+// WRONG approach:
+fun processAudio(data: ByteArray): String {
+    // Making assumptions about what it should do
+    return data.toString()
+}
+
+// CORRECT approach:
+// 1. Find iOS AudioProcessor.swift
+// 2. Find processAudio method
+// 3. Copy exact logic:
+fun processAudio(data: ByteArray): String {
+    // Exact translation of iOS logic
+    val rms = calculateRMS(data)  // If iOS does this
+    val normalized = normalizeAudio(data, rms)  // If iOS does this
+    return encodeToBase64(normalized)  // If iOS does this
+}
+```
+
+### KMP Best Practices
+
+The Kotlin Multiplatform SDK has been aligned with iOS architecture patterns while leveraging Kotlin's strengths. These best practices ensure consistency, maintainability, and cross-platform compatibility.
+
+### Architecture Patterns
+
+#### Component-Based Architecture
+Follow the iOS component pattern but adapted to KMP idioms:
+
+```kotlin
+// Base component with lifecycle management
+abstract class BaseComponent<TService : Any>(
+    protected val configuration: ComponentConfiguration,
+    serviceContainer: ServiceContainer? = null
+) : Component {
+
+    // Component state tracking
+    override var state: ComponentState = ComponentState.NOT_INITIALIZED
+        protected set
+
+    // Service creation (platform-specific via providers)
+    protected abstract suspend fun createService(): TService
+
+    // Lifecycle methods
+    suspend fun initialize() { /* ... */ }
+    override suspend fun cleanup() { /* ... */ }
+    override suspend fun healthCheck(): ComponentHealth { /* ... */ }
+}
+```
+
+#### Event-Driven Architecture
+Use **Flow** instead of AsyncSequence for reactive streams:
+
+```kotlin
+// Central event bus with typed events
+object EventBus {
+    private val _componentEvents = MutableSharedFlow<ComponentEvent>()
+    val componentEvents: SharedFlow<ComponentEvent> = _componentEvents.asSharedFlow()
+
+    fun publish(event: ComponentEvent) {
+        _componentEvents.tryEmit(event)
+    }
+}
+
+// Usage: Listen to component state changes
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .collect { event ->
+        println("Component ${event.component} is ready")
+    }
+```
+
+#### Service Container Pattern
+Centralized dependency injection with lazy initialization:
+
+```kotlin
+class ServiceContainer {
+    companion object {
+        val shared = ServiceContainer()
+    }
+
+    // Platform abstractions via expect/actual
+    private val fileSystem by lazy { createFileSystem() }
+    private val httpClient by lazy { createHttpClient() }
+
+    // Service dependencies
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    // Platform-specific initialization
+    fun initialize(platformContext: PlatformContext) {
+        platformContext.initialize()
+    }
+}
+```
+
+### Code Organization
+
+#### commonMain Structure
+Keep all business logic, interfaces, and data models in `commonMain/`:
+
+```
+commonMain/
+├── components/          # Component implementations
+│   ├── base/           # Base component classes
+│   ├── stt/            # Speech-to-text components
+│   └── vad/            # Voice activity detection
+├── data/               # Data layer
+│   ├── models/         # Data classes and enums
+│   └── repositories/   # Repository interfaces
+├── events/             # Event definitions
+├── foundation/         # Core infrastructure
+│   ├── ServiceContainer.kt
+│   └── SDKLogger.kt
+├── core/               # Plugin architecture
+│   └── ModuleRegistry.kt
+└── services/           # Service interfaces
+    ├── configuration/
+    ├── analytics/
+    └── modelinfo/
+```
+
+#### Platform-Specific Structure
+Use `expect/actual` **only** for platform-specific implementations:
+
+```kotlin
+// commonMain - Interface only
+expect class PlatformContext {
+    fun initialize()
+}
+
+expect fun createFileSystem(): FileSystem
+expect fun createHttpClient(): HttpClient
+
+// androidMain - Android implementation
+actual class PlatformContext(private val context: Context) {
+    actual fun initialize() {
+        // Android-specific setup
+    }
+}
+
+actual fun createFileSystem(): FileSystem = AndroidFileSystem()
+```
+
+#### Module Separation Principles
+
+**Core SDK vs Feature Modules:**
+- Core SDK (`commonMain`): Essential services, base components
+- Feature modules: Optional capabilities (WhisperKit, external AI providers)
+- Plugin architecture: `ModuleRegistry` for runtime registration
+
+```kotlin
+// Plugin registration pattern
+object ModuleRegistry {
+    fun registerSTT(provider: STTServiceProvider) {
+        sttProviders.add(provider)
+    }
+
+    fun sttProvider(modelId: String? = null): STTServiceProvider? {
+        return sttProviders.firstOrNull { it.canHandle(modelId) }
+    }
+}
+
+// External module registration
+// In WhisperKit module:
+ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
+```
+
+### API Design
+
+#### Kotlin Idioms for iOS Patterns
+
+**Flow for Reactive Streams:**
+```kotlin
+// Instead of AsyncSequence, use Flow
+fun transcribeStream(audioFlow: Flow<ByteArray>): Flow<TranscriptionUpdate> {
+    return audioFlow.map { audioData ->
+        // Process audio chunk
+        TranscriptionUpdate(text = processAudio(audioData), isFinal = false)
+    }
+}
+```
+
+**Coroutines for Async Operations:**
+```kotlin
+// Instead of async/await, use suspend functions
+suspend fun loadModel(modelId: String): ModelLoadResult {
+    return withContext(Dispatchers.IO) {
+        modelRepository.loadModel(modelId)
+    }
+}
+```
+
+#### Structured Error Handling
+
+Use **sealed classes** for type-safe error handling:
+
+```kotlin
+sealed class SDKError : Exception() {
+    data class InvalidApiKey(override val message: String) : SDKError()
+    data class NetworkError(override val cause: Throwable?) : SDKError()
+    data class ComponentNotReady(override val message: String) : SDKError()
+    data class InvalidState(override val message: String) : SDKError()
+
+    // Result wrapper for operations
+    sealed class Result<out T> {
+        data class Success<T>(val value: T) : Result<T>()
+        data class Failure(val error: SDKError) : Result<Nothing>()
+    }
+}
+```
+
+#### Strong Typing with Data Classes
+
+**Always use structured types instead of strings:**
+```kotlin
+// Component configuration
+data class STTConfiguration(
+    val modelId: String,
+    val language: Language = Language.EN,
+    val enableVAD: Boolean = true,
+    val audioFormat: AudioFormat = AudioFormat.PCM_16BIT
+) : ComponentConfiguration {
+    override fun validate() {
+        require(modelId.isNotBlank()) { "Model ID cannot be blank" }
+    }
+}
+
+// Enum for type safety
+enum class Language(val code: String) {
+    EN("en"), ES("es"), FR("fr"), DE("de"), JA("ja")
+}
+
+enum class AudioFormat { PCM_16BIT, PCM_24BIT, FLAC, MP3 }
+```
+
+### Integration Patterns
+
+#### ModuleRegistry for Plugin Architecture
+
+**Provider Pattern with Type Safety:**
+```kotlin
+interface STTServiceProvider {
+    suspend fun createSTTService(configuration: STTConfiguration): STTService
+    fun canHandle(modelId: String?): Boolean
+    val name: String
+}
+
+// Registration in app initialization:
+ModuleRegistry.registerSTT(WhisperSTTProvider())
+ModuleRegistry.registerLLM(LlamaProvider())
+```
+
+#### EventBus for Component Communication
+
+**Centralized Event System:**
+```kotlin
+// Component publishes events
+eventBus.publish(ComponentInitializationEvent.ComponentReady(
+    component = SDKComponent.STT,
+    modelId = "whisper-base"
+))
+
+// Other components subscribe to events
+EventBus.componentEvents
+    .filterIsInstance<ComponentInitializationEvent.ComponentReady>()
+    .filter { it.component == SDKComponent.STT }
+    .collect { handleSTTReady(it) }
+```
+
+#### Provider Pattern for Extensibility
+
+**Service Creation with Fallbacks:**
+```kotlin
+class STTComponent(configuration: STTConfiguration) : BaseComponent<STTService>(configuration) {
+
+    override suspend fun createService(): STTService {
+        // Try external providers first
+        val provider = ModuleRegistry.sttProvider(configuration.modelId)
+
+        return provider?.createSTTService(configuration)
+            ?: throw SDKError.ComponentNotAvailable("No STT provider available for model: ${configuration.modelId}")
+    }
+}
+```
+
+### Performance Best Practices
+
+#### Memory Management
+
+**Component Lifecycle:**
+```kotlin
+abstract class BaseComponent<TService : Any> {
+
+    override suspend fun cleanup() {
+        // Proper resource cleanup
+        performCleanup()
+        service = null
+        serviceContainer = null // Allow GC
+        currentStage = null
+    }
+
+    protected open suspend fun performCleanup() {
+        // Override for component-specific cleanup
+    }
+}
+```
+
+**Service Container Memory Management:**
+```kotlin
+class ServiceContainer {
+    // Use lazy initialization to avoid memory pressure
+    val modelManager: ModelManager by lazy {
+        ModelManager(fileSystem, downloadService)
+    }
+
+    suspend fun cleanup() {
+        // Cleanup components in reverse dependency order
+        sttComponent.cleanup()
+        vadComponent.cleanup()
+    }
+}
+```
+
+#### Platform-Specific Optimizations
+
+**Android optimizations in `androidMain`:**
+```kotlin
+actual fun createFileSystem(): FileSystem = AndroidFileSystem().apply {
+    // Configure for Android-specific optimizations
+    enableFileWatcher = false // Reduce battery usage
+    cacheStrategy = CacheStrategy.MEMORY_FIRST
+}
+```
+
+**JVM optimizations in `jvmMain`:**
+```kotlin
+actual fun createHttpClient(): HttpClient = HttpClient {
+    engine {
+        // JVM-specific HTTP client configuration
+        threadsCount = 4
+        pipelining = true
+    }
+}
+```
+
+### Testing Patterns
+
+#### Component Testing
+```kotlin
+class STTComponentTest {
+    @Test
+    fun `should initialize successfully with valid configuration`() = runTest {
+        val config = STTConfiguration(modelId = "whisper-base")
+        val component = STTComponent(config)
+
+        component.initialize()
+
+        assertEquals(ComponentState.READY, component.state)
+        assertTrue(component.isReady)
+    }
+
+    @Test
+    fun `should emit events during initialization`() = runTest {
+        val events = mutableListOf<ComponentEvent>()
+        val job = launch {
+            EventBus.componentEvents.collect { events.add(it) }
+        }
+
+        val component = STTComponent(STTConfiguration(modelId = "whisper-base"))
+        component.initialize()
+
+        assertTrue(events.any { it is ComponentInitializationEvent.ComponentReady })
+        job.cancel()
+    }
+}
+```
+
+#### Mock Providers for Testing
+```kotlin
+class MockSTTProvider : STTServiceProvider {
+    override val name = "MockSTT"
+
+    override suspend fun createSTTService(configuration: STTConfiguration): STTService {
+        return MockSTTService()
+    }
+
+    override fun canHandle(modelId: String?): Boolean = true
+}
+
+// In test setup:
+ModuleRegistry.clear()
+ModuleRegistry.registerSTT(MockSTTProvider())
+```
+
+### Common Patterns Summary
+
+1. **Business Logic in commonMain**: Keep all core logic platform-agnostic
+2. **expect/actual for Platform APIs**: Only use for truly platform-specific code
+3. **Flow over AsyncSequence**: Use Kotlin's reactive streams
+4. **Coroutines over async/await**: Leverage structured concurrency
+5. **Sealed Classes for Errors**: Type-safe error handling
+6. **Data Classes for Models**: Strong typing throughout
+7. **ModuleRegistry for Plugins**: Extensible architecture
+8. **EventBus for Communication**: Decoupled component communication
+9. **Service Container for DI**: Centralized dependency management
+10. **Component Lifecycle**: Proper initialization and cleanup
+
+These patterns ensure the Kotlin Multiplatform SDK maintains architectural consistency with the iOS implementation while leveraging Kotlin's strengths for cross-platform development.
+
 ## Development Notes
 
-- Both SDKs are in early development with placeholder implementations
-- The SDKs focus on privacy-first, on-device AI with intelligent routing
+- The Kotlin Multiplatform SDK is the primary SDK implementation
+- Use `./scripts/sdk.sh` for all SDK operations - it handles configuration and build complexity
+- Configuration files (`dev.json`, `staging.json`, `prod.json`) are git-ignored - use example files as templates
+- Both SDKs focus on privacy-first, on-device AI with intelligent routing
 - Cost optimization is a key feature with real-time tracking
 - Pre-commit hooks are configured for code quality enforcement
-- SwiftLint is temporarily disabled in iOS SDK build due to plugin issues
