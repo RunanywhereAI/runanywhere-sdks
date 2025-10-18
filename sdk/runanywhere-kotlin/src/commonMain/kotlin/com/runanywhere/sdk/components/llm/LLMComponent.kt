@@ -388,12 +388,12 @@ class LLMComponent(
     fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         ensureReady()
 
-        val service = llmService as? EnhancedLLMService ?: throw SDKError.ComponentNotReady("Enhanced LLM service not available")
+        val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
 
         // Validate input
         input.validate()
 
-        // Use the enhanced service's streaming capability
+        // Use the service's streaming capability
         service.streamProcess(input).collect { chunk ->
             emit(chunk)
         }
@@ -410,7 +410,7 @@ class LLMComponent(
      * Load a specific model
      */
     suspend fun loadModel(modelInfo: ModelInfo) {
-        val service = llmService as? EnhancedLLMService ?: throw SDKError.ComponentNotReady("Enhanced LLM service not available")
+        val service = llmService ?: throw SDKError.ComponentNotReady("LLM service not available")
         service.loadModel(modelInfo)
     }
 
@@ -418,24 +418,21 @@ class LLMComponent(
      * Cancel current generation
      */
     fun cancelCurrent() {
-        val service = llmService as? EnhancedLLMService
-        service?.cancelCurrent()
+        llmService?.cancelCurrent()
     }
 
     /**
      * Get token count for text
      */
     fun getTokenCount(text: String): Int {
-        val service = llmService as? EnhancedLLMService
-        return service?.getTokenCount(text) ?: (text.length / 4) // Fallback estimation
+        return llmService?.getTokenCount(text) ?: (text.length / 4) // Fallback estimation
     }
 
     /**
      * Check if prompt fits within context window
      */
     fun fitsInContext(prompt: String, maxTokens: Int): Boolean {
-        val service = llmService as? EnhancedLLMService
-        return service?.fitsInContext(prompt, maxTokens) ?: run {
+        return llmService?.fitsInContext(prompt, maxTokens) ?: run {
             val promptTokens = getTokenCount(prompt)
             val totalTokens = promptTokens + maxTokens
             totalTokens <= llmConfiguration.contextLength

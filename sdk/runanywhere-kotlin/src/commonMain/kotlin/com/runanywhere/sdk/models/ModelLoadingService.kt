@@ -97,15 +97,9 @@ class ModelLoadingService(
 
         // Initialize the LLM service with the model
         try {
-            // Cast to EnhancedLLMService to access loadModel method
-            if (llmService is com.runanywhere.sdk.components.llm.EnhancedLLMService) {
-                llmService.loadModel(modelInfo)
-                logger.info("✅ LLM service initialized with model: $modelId")
-            } else {
-                // Fallback to initialize method for basic LLMService
-                llmService.initialize(modelInfo.localPath)
-                logger.info("✅ LLM service initialized with model path: ${modelInfo.localPath}")
-            }
+            // All LLM services now support loadModel method
+            llmService.loadModel(modelInfo)
+            logger.info("✅ LLM service initialized with model: $modelId")
         } catch (e: Exception) {
             logger.error("❌ Failed to load model into LLM service: ${e.message}")
             throw SDKError.LoadingFailed("Failed to load model: ${e.message}")

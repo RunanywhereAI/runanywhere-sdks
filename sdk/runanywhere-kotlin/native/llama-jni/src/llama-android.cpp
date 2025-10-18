@@ -349,6 +349,166 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1loop(
     return new_token;
 }
 
+// JNI: Apply chat template
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_apply_1chat_1template(
+    JNIEnv *env, jobject,
+    jlong model_pointer,
+    jstring jtemplate_name,
+    jobjectArray jmessages,
+    jboolean add_assistant_token
+) {
+    const auto model = reinterpret_cast<llama_model *>(model_pointer);
+
+    if (!model) {
+        LOGe("apply_chat_template(): model cannot be null");
+        env->ThrowNew(env->FindClass("java/lang/IllegalArgumentException"), "Model cannot be null");
+        return nullptr;
+    }
+
+    // Get template name (null = use model's default)
+    const char* template_name = nullptr;
+    if (jtemplate_name != nullptr) {
+        template_name = env->GetStringUTFChars(jtemplate_name, nullptr);
+    }
+
+    // Build messages vector from Java array
+    std::vector<llama_chat_message> messages;
+    int msg_count = env->GetArrayLength(jmessages);
+
+    // Get Message class and field IDs
+    jclass message_class = env->FindClass("com/runanywhere/sdk/models/Message");
+    jfieldID role_field = env->GetFieldID(message_class, "role", "Lcom/runanywhere/sdk/models/MessageRole;");
+    jfieldID content_field = env->GetFieldID(message_class, "content", "Ljava/lang/String;");
+
+    // Get MessageRole enum class and name method
+    jclass role_class = env->FindClass("com/runanywhere/sdk/models/MessageRole");
+    jmethodID name_method = env->GetMethodID(role_class, "name", "()Ljava/lang/String;");
+
+    // Collect messages with temporary storage for C strings
+    std::vector<std::string> role_storage;
+    std::vector<std::string> content_storage;
+    role_storage.reserve(msg_count);
+    content_storage.reserve(msg_count);
+
+    for (int i = 0; i < msg_count; i++) {
+        jobject jmsg = env->GetObjectArrayElement(jmessages, i);
+
+        // Get role enum
+        jobject jrole_enum = env->GetObjectField(jmsg, role_field);
+        jstring jrole_name = (jstring) env->CallObjectMethod(jrole_enum, name_method);
+        const char* role_str = env->GetStringUTFChars(jrole_name, nullptr);
+
+        // Convert to lowercase for llama.cpp (USER -> user, ASSISTANT -> assistant, SYSTEM -> system)
+        std::string role_lower = role_str;
+        std::transform(role_lower.begin(), role_lower.end(), role_lower.begin(), ::tolower);
+
+        // Get content
+        jstring jcontent = (jstring) env->GetObjectField(jmsg, content_field);
+        const char* content_str = env->GetStringUTFChars(jcontent, nullptr);
+
+        // Store in vectors (strings will persist)
+        role_storage.push_back(role_lower);
+        content_storage.push_back(content_str);
+
+        // Clean up temporary JNI references
+        env->ReleaseStringUTFChars(jrole_name, role_str);
+        env->ReleaseStringUTFChars(jcontent, content_str);
+        env->DeleteLocalRef(jrole_enum);
+        env->DeleteLocalRef(jrole_name);
+        env->DeleteLocalRef(jcontent);
+        env->DeleteLocalRef(jmsg);
+    }
+
+    // Build llama_chat_message array from stored strings
+    for (size_t i = 0; i < role_storage.size(); i++) {
+        messages.push_back({
+            role_storage[i].c_str(),
+            content_storage[i].c_str()
+        });
+    }
+
+    // Get the chat template from the model if not provided
+    std::string model_template;
+    const char* tmpl_to_use = template_name;
+
+    if (template_name == nullptr) {
+        // Read the template from model metadata
+        model_template.resize(2048);
+        int32_t template_len = llama_model_meta_val_str(
+            model,
+            "tokenizer.chat_template",
+            model_template.data(),
+            model_template.size()
+        );
+
+        if (template_len > 0) {
+            model_template.resize(template_len);
+            tmpl_to_use = model_template.c_str();
+            LOGi("Using model's chat template (length: %d)", template_len);
+        } else {
+            // Model doesn't have a chat template, use nullptr (will use llama.cpp's default)
+            LOGi("Model has no chat template in metadata, using llama.cpp default");
+            tmpl_to_use = nullptr;
+        }
+    }
+
+    // Apply chat template
+    std::string formatted;
+    formatted.resize(1024 * 1024); // 1MB buffer (resize dynamically if needed)
+
+    int32_t result = llama_chat_apply_template(
+        tmpl_to_use,
+        messages.data(),
+        messages.size(),
+        add_assistant_token == JNI_TRUE,
+        formatted.data(),
+        formatted.size()
+    );
+
+    // Clean up template name if allocated
+    if (template_name != nullptr) {
+        env->ReleaseStringUTFChars(jtemplate_name, template_name);
+    }
+
+    if (result < 0) {
+        LOGe("llama_chat_apply_template() failed with error code: %d", result);
+        env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+            "llama_chat_apply_template() failed - check template format");
+        return nullptr;
+    }
+
+    // Check if buffer was too small
+    if (result > formatted.size()) {
+        LOGi("Buffer too small (%zu), need %d bytes. Retrying...", formatted.size(), result);
+        formatted.resize(result + 1024); // Add some padding
+
+        result = llama_chat_apply_template(
+            tmpl_to_use,
+            messages.data(),
+            messages.size(),
+            add_assistant_token == JNI_TRUE,
+            formatted.data(),
+            formatted.size()
+        );
+
+        if (result < 0) {
+            env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
+                "llama_chat_apply_template() failed on retry");
+            return nullptr;
+        }
+    }
+
+    // Resize to actual length
+    formatted.resize(result);
+
+    LOGi("Applied chat template, result length: %d", result);
+    LOGi("Formatted prompt (first 500 chars): %.500s", formatted.c_str());
+
+    return env->NewStringUTF(formatted.c_str());
+}
+
 // JNI: Clear KV cache
 extern "C"
 JNIEXPORT void JNICALL

@@ -2,12 +2,13 @@ package com.runanywhere.sdk.llm.llamacpp
 
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.llm.EnhancedLLMService
+import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.components.llm.LLMInput
 import com.runanywhere.sdk.components.llm.LLMOutput
 import com.runanywhere.sdk.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
@@ -15,7 +16,7 @@ import kotlinx.coroutines.withContext
  * LlamaCpp service implementation using the new LLamaAndroid wrapper
  * This wraps the low-level streaming API into our SDK interfaces
  */
-actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) : EnhancedLLMService {
+actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) : LLMService {
     private val logger = SDKLogger("LlamaCppService")
     private val llama = LLamaAndroid.instance()
     private var modelPath: String? = null
@@ -60,12 +61,16 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
+        // Automatically convert prompt to message and apply chat template
+        val userMessage = Message(role = MessageRole.USER, content = prompt)
+        val formattedPrompt = buildPrompt(listOf(userMessage), systemPrompt = null)
+
         val result = StringBuilder()
         var tokenCount = 0
         val maxTokens = options.maxTokens
 
-        // Use parseSpecialTokens = true for proper chat template handling
-        llama.send(prompt, parseSpecialTokens = true).collect { token ->
+        // Stream with chat template-formatted prompt
+        llama.send(formattedPrompt, parseSpecialTokens = true).collect { token ->
             result.append(token)
             tokenCount++
             if (tokenCount >= maxTokens) {
@@ -85,20 +90,21 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             throw IllegalStateException("LlamaCppService not initialized")
         }
 
-        logger.info("🚀 streamGenerate called with prompt length: ${prompt.length}")
-        logger.info("📝 First 200 chars of prompt: ${prompt.take(200)}")
-        logger.info("⚙️ Options: maxTokens=${options.maxTokens}, temp=${options.temperature}, streaming=${options.streamingEnabled}")
+        logger.info("🚀 streamGenerate called")
+
+        // Automatically convert prompt to message and apply chat template
+        // This is transparent to the user - they just pass a string, we handle the rest
+        val userMessage = Message(role = MessageRole.USER, content = prompt)
+        val formattedPrompt = buildPrompt(listOf(userMessage), systemPrompt = null)
 
         var tokenCount = 0
         val maxTokens = options.maxTokens
 
-        // Always parse special tokens (true) for proper chat template handling
-        llama.send(prompt, parseSpecialTokens = true).collect { token ->
-            logger.info("🔤 Token #$tokenCount: '$token'")
+        // Stream with chat template-formatted prompt
+        llama.send(formattedPrompt, parseSpecialTokens = true).collect { token ->
             onToken(token)
             tokenCount++
             if (tokenCount >= maxTokens) {
-                logger.info("⛔ Reached maxTokens limit: $maxTokens")
                 return@collect
             }
         }
@@ -182,7 +188,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         )
     }
 
-    actual override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> {
+    actual override fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk> = flow {
         if (!isInitialized) {
             throw IllegalStateException("LlamaCppService not initialized")
         }
@@ -206,19 +212,19 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
 
         // Always parse special tokens (true) for proper chat template handling
         // This works for Qwen2, LFM2, and other models
-        return llama.send(prompt, parseSpecialTokens = true).map { token ->
+        llama.send(prompt, parseSpecialTokens = true).collect { token ->
             val currentChunk = chunkIndex++
             val currentTokens = tokenCount++
             val isComplete = currentTokens >= maxTokens
 
             logger.info("🔤 Stream token #$currentTokens: '$token' (len=${token.length})")
 
-            LLMGenerationChunk(
+            emit(LLMGenerationChunk(
                 text = token,
                 isComplete = isComplete,
                 chunkIndex = currentChunk,
                 timestamp = com.runanywhere.sdk.foundation.currentTimeMillis()
-            )
+            ))
         }
     }
 
@@ -249,69 +255,81 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         return text.length / 4
     }
 
-    private fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
+    private suspend fun buildPrompt(messages: List<Message>, systemPrompt: String?): String {
+        logger.info("🎯 buildPrompt() called with ${messages.size} messages, systemPrompt=${systemPrompt != null}")
+
+        // Prepare messages list with system prompt if provided
+        val allMessages = buildList {
+            // Add system prompt as first message if provided
+            if (systemPrompt != null) {
+                add(Message(
+                    role = MessageRole.SYSTEM,
+                    content = systemPrompt
+                ))
+            }
+
+            // Add all conversation messages
+            addAll(messages)
+        }
+
+        logger.info("📝 Total messages for template: ${allMessages.size}")
+        allMessages.forEachIndexed { index, msg ->
+            logger.info("  Message $index: ${msg.role} - ${msg.content.take(100)}")
+        }
+
+        // Use llama.cpp's built-in chat template
+        // This automatically detects and applies the correct template for ANY model:
+        // - Qwen2: <|im_start|>role\ncontent<|im_end|>
+        // - Llama 3.2: <|begin_of_text|>...<|start_header_id|>role<|end_header_id|>
+        // - LFM2: Whatever template is embedded in the model
+        // - Any future models: Will work automatically
+        logger.info("🔧 Applying llama.cpp chat template (model-specific, automatic)")
+
+        val formattedPrompt = try {
+            llama.applyChatTemplate(
+                messages = allMessages,
+                templateName = null, // Use model's default template
+                addAssistantToken = true // Add token to start assistant's response
+            )
+        } catch (e: Exception) {
+            logger.error("❌ Failed to apply chat template, falling back to simple format", e)
+
+            // Fallback to simple format if chat template fails
+            // This can happen if the model doesn't have a template defined
+            logger.warn("⚠️ Using fallback simple prompt format")
+            buildSimpleFallbackPrompt(allMessages)
+        }
+
+        logger.info("✅ Final prompt length: ${formattedPrompt.length} chars")
+        logger.info("📄 Prompt preview (first 500 chars):\n${formattedPrompt.take(500)}")
+        logger.info("📄 Prompt preview (last 200 chars):\n...${formattedPrompt.takeLast(200)}")
+
+        return formattedPrompt
+    }
+
+    /**
+     * Fallback prompt builder for models without chat templates
+     * This is only used if llama_chat_apply_template fails
+     */
+    private fun buildSimpleFallbackPrompt(messages: List<Message>): String {
         val prompt = StringBuilder()
 
-        // Detect model type based on current model name/path
-        val modelPath = currentModel ?: ""
-        val isLFM2 = modelPath.contains("LFM2", ignoreCase = true) ||
-                     modelPath.contains("1546711167") // LiquidAI model ID
-        val isQwen = modelPath.contains("qwen", ignoreCase = true) ||
-                     modelPath.contains("-1841487817") || // Qwen 2.5 0.5B ID
-                     modelPath.contains("-1039016089")    // Qwen 2 0.5B ID
-
-        logger.info("🔍 Model detection - Path: $modelPath, isLFM2: $isLFM2, isQwen: $isQwen")
-
-        if (isQwen) {
-            // Use Qwen2 chat template format
-            // Format: <|im_start|>role\ncontent<|im_end|>\n
-            logger.info("📝 Using Qwen2 chat template format")
-
-            val system = systemPrompt ?: """You are a helpful, friendly AI assistant.
-Answer questions clearly and concisely.
-Be direct and relevant to the user's query.
-Keep responses focused and helpful."""
-
-            prompt.append("<|im_start|>system\n")
-            prompt.append(system)
-            prompt.append("<|im_end|>\n")
-
-            // Add all messages from conversation history
-            for (message in messages) {
-                val role = when (message.role) {
-                    MessageRole.USER -> "user"
-                    MessageRole.ASSISTANT -> "assistant"
-                    MessageRole.SYSTEM -> "system"
+        for (message in messages) {
+            when (message.role) {
+                MessageRole.SYSTEM -> {
+                    prompt.append("${message.content}\n\n")
                 }
-                prompt.append("<|im_start|>$role\n")
-                prompt.append(message.content)
-                prompt.append("<|im_end|>\n")
-            }
-
-            // Start the assistant's response
-            prompt.append("<|im_start|>assistant\n")
-        } else {
-            // Use simpler format for LFM2 and other models
-            // LFM2 typically works better with simple prompts without special tokens
-            logger.info("📝 Using simple prompt format (no chat template)")
-
-            // Add system prompt if provided
-            if (systemPrompt != null) {
-                prompt.append("$systemPrompt\n\n")
-            }
-
-            // Add conversation history in simple format
-            for (message in messages) {
-                when (message.role) {
-                    MessageRole.USER -> prompt.append("User: ${message.content}\n")
-                    MessageRole.ASSISTANT -> prompt.append("Assistant: ${message.content}\n")
-                    MessageRole.SYSTEM -> prompt.append("System: ${message.content}\n")
+                MessageRole.USER -> {
+                    prompt.append("User: ${message.content}\n")
+                }
+                MessageRole.ASSISTANT -> {
+                    prompt.append("Assistant: ${message.content}\n")
                 }
             }
-
-            // Start assistant response
-            prompt.append("Assistant: ")
         }
+
+        // Start assistant response
+        prompt.append("Assistant: ")
 
         return prompt.toString()
     }
