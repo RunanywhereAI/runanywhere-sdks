@@ -4,10 +4,42 @@
 #include <sstream>
 #include <algorithm>
 #include <android/log.h>
+#include <sys/auxv.h>  // For getauxval()
 
 #define LOG_TAG "CPUFeatures"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+
+// AT_HWCAP definitions
+#ifndef AT_HWCAP
+#define AT_HWCAP 16
+#endif
+#ifndef AT_HWCAP2
+#define AT_HWCAP2 26
+#endif
+
+// Hardware capabilities from <asm/hwcap.h>
+#ifndef HWCAP_FP
+#define HWCAP_FP        (1 << 0)
+#endif
+#ifndef HWCAP_ASIMD
+#define HWCAP_ASIMD     (1 << 1)
+#endif
+#ifndef HWCAP_FPHP
+#define HWCAP_FPHP      (1 << 9)
+#endif
+#ifndef HWCAP_ASIMDHP
+#define HWCAP_ASIMDHP   (1 << 10)
+#endif
+#ifndef HWCAP_ASIMDDP
+#define HWCAP_ASIMDDP   (1 << 20)
+#endif
+#ifndef HWCAP_SVE
+#define HWCAP_SVE       (1 << 22)
+#endif
+#ifndef HWCAP2_I8MM
+#define HWCAP2_I8MM     (1 << 13)
+#endif
 
 namespace cpu_features {
 
@@ -24,19 +56,31 @@ static bool has_feature(const std::string& feature_name) {
 }
 
 bool has_fp16() {
-    return has_feature("fphp") || has_feature("asimdhp");
+    // Use hardware capabilities from AT_HWCAP (more reliable than /proc/cpuinfo)
+    unsigned long hwcap = getauxval(AT_HWCAP);
+    return (hwcap & HWCAP_FPHP) || (hwcap & HWCAP_ASIMDHP);
 }
 
 bool has_dotprod() {
-    return has_feature("asimddp");
+    unsigned long hwcap = getauxval(AT_HWCAP);
+    return (hwcap & HWCAP_ASIMDDP);
 }
 
 bool has_i8mm() {
-    return has_feature("i8mm");
+    unsigned long hwcap2 = getauxval(AT_HWCAP2);
+    return (hwcap2 & HWCAP2_I8MM);
 }
 
 bool has_sve() {
-    return has_feature("sve");
+    // CRITICAL: Disable SVE detection entirely for now
+    // SVE causes SIGILL crashes on emulators even when /proc/cpuinfo reports it
+    // Return false to prevent selecting SVE-enabled libraries
+    LOGI("SVE detection disabled - using safer fallback libraries");
+    return false;
+
+    // Original code (disabled):
+    // unsigned long hwcap = getauxval(AT_HWCAP);
+    // return (hwcap & HWCAP_SVE);
 }
 
 std::string get_cpu_info() {

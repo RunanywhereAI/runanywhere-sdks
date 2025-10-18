@@ -32,6 +32,7 @@ class StreamingService {
 
     /**
      * Stream text generation with the specified prompt and options
+     * Now uses proper chat template formatting via EnhancedLLMService
      */
     fun stream(
         prompt: String,
@@ -40,10 +41,8 @@ class StreamingService {
         val model = currentModel
             ?: throw IllegalStateException("No model loaded for streaming. Call loadModel() first.")
 
-        val llmService = model.service as? LLMService
-            ?: throw IllegalStateException("Loaded service is not an LLM service")
-
         logger.info("🚀 Starting streaming with model: ${model.model.id}")
+        logger.info("📝 User prompt: $prompt")
 
         // Convert to RunAnywhereGenerationOptions
         val llmOptions = RunAnywhereGenerationOptions(
@@ -52,18 +51,22 @@ class StreamingService {
             streamingEnabled = true
         )
 
-        // Stream tokens from the LLM service
+        // Get LLM service - all services now support chat templates automatically
+        val llmService = model.service as? LLMService
+            ?: throw IllegalStateException("Loaded service is not an LLM service")
+
+        logger.info("✅ Streaming with automatic chat template support")
+
+        // Use streamGenerate - it now automatically applies chat templates internally
+        // The user just passes a simple prompt, and the SDK handles everything
         val fullText = StringBuilder()
         llmService.streamGenerate(prompt, llmOptions) { token ->
             fullText.append(token)
-            // For now, emit the full accumulated text as chunks
-            // TODO: Emit individual tokens when LlamaCppService supports it
         }
 
-        // Emit final chunk with all text
         emit(GenerationChunk(
             text = fullText.toString(),
-            tokenCount = fullText.length / 4, // Rough estimate
+            tokenCount = fullText.length / 4,
             isComplete = true
         ))
     }

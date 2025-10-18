@@ -7,45 +7,39 @@ import com.runanywhere.sdk.models.enums.LLMFramework
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Protocol for Language Model services - exact match with iOS LLMService protocol
+ * Protocol for Language Model services - unified interface matching iOS LLMService protocol
+ * This interface combines simple text generation with structured message-based chat support
  */
 interface LLMService {
+    // Core initialization and lifecycle
     /** Initialize the LLM service with optional model path */
     suspend fun initialize(modelPath: String?)
 
-    /** Generate text from prompt */
+    /** Load a specific model */
+    suspend fun loadModel(modelInfo: ModelInfo)
+
+    /** Cleanup resources */
+    suspend fun cleanup()
+
+    // Simple text generation (for backward compatibility and simple use cases)
+    /** Generate text from prompt - automatically applies chat templates */
     suspend fun generate(prompt: String, options: RunAnywhereGenerationOptions): String
 
-    /** Stream generation token by token */
+    /** Stream generation token by token - automatically applies chat templates */
     suspend fun streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
         onToken: (String) -> Unit
     )
 
-    /** Check if service is ready */
-    val isReady: Boolean
-
-    /** Get current model identifier */
-    val currentModel: String?
-
-    /** Cleanup resources */
-    suspend fun cleanup()
-}
-
-/**
- * Enhanced LLM Service interface with rich I/O support
- */
-interface EnhancedLLMService : LLMService {
-    /** Process structured LLM input */
+    // Structured message-based generation (for proper chat applications)
+    /** Process structured LLM input with messages and roles */
     suspend fun process(input: LLMInput): LLMOutput
 
     /** Stream generation with structured input/output */
     fun streamProcess(input: LLMInput): Flow<LLMGenerationChunk>
 
-    /** Load a specific model */
-    suspend fun loadModel(modelInfo: ModelInfo)
-
+    // Utility methods
     /** Cancel current generation */
     fun cancelCurrent()
 
@@ -54,6 +48,13 @@ interface EnhancedLLMService : LLMService {
 
     /** Check if prompt fits within context window */
     fun fitsInContext(prompt: String, maxTokens: Int): Boolean
+
+    // State properties
+    /** Check if service is ready */
+    val isReady: Boolean
+
+    /** Get current model identifier */
+    val currentModel: String?
 }
 
 /**

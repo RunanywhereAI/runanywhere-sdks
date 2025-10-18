@@ -91,6 +91,43 @@ class LLamaAndroid {
 
     private external fun kv_cache_clear(context: Long)
 
+    private external fun apply_chat_template(
+        model: Long,
+        templateName: String?,
+        messages: Array<com.runanywhere.sdk.models.Message>,
+        addAssistantToken: Boolean
+    ): String
+
+    /**
+     * Apply chat template to messages using the model's built-in template
+     * This automatically handles all special tokens and formatting for any model
+     *
+     * @param messages List of conversation messages
+     * @param templateName Optional template name (null = use model's default)
+     * @param addAssistantToken Whether to add the assistant generation start token
+     * @return Formatted prompt with proper chat template applied
+     */
+    suspend fun applyChatTemplate(
+        messages: List<com.runanywhere.sdk.models.Message>,
+        templateName: String? = null,
+        addAssistantToken: Boolean = true
+    ): String = withContext(runLoop) {
+        val state = threadLocalState.get()
+        if (state !is State.Loaded) {
+            throw IllegalStateException("Model not loaded - cannot apply chat template")
+        }
+
+        logger.info("Applying chat template for ${messages.size} messages")
+        val result = apply_chat_template(
+            state.model,
+            templateName,
+            messages.toTypedArray(),
+            addAssistantToken
+        )
+        logger.info("Chat template applied, prompt length: ${result.length}")
+        result
+    }
+
     /**
      * Load model from file path with configuration
      */
