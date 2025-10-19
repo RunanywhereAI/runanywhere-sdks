@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlin.collections.isNotEmpty
+import com.runanywhere.sdk.models.DeviceInfo
 
 /**
  * Models Screen - Matches iOS Model Management UI
@@ -109,22 +110,27 @@ fun DeviceInformationCard(deviceInfo: DeviceInfo?) {
                 DeviceInfoRow(
                     icon = Icons.Default.PhoneAndroid,
                     label = "Device",
-                    value = deviceInfo.model
+                    value = deviceInfo.deviceModel
                 )
                 DeviceInfoRow(
                     icon = Icons.Default.Memory,
-                    label = "Processor",
-                    value = deviceInfo.processor
+                    label = "Platform",
+                    value = "${deviceInfo.platformName} ${deviceInfo.platformVersion}"
                 )
                 DeviceInfoRow(
                     icon = Icons.Default.Android,
-                    label = "Android",
-                    value = deviceInfo.androidVersion
+                    label = "OS Version",
+                    value = deviceInfo.osVersion
                 )
                 DeviceInfoRow(
                     icon = Icons.Default.CenterFocusWeak,
-                    label = "Cores",
-                    value = deviceInfo.cores.toString()
+                    label = "CPU Cores",
+                    value = deviceInfo.cpuCores.toString()
+                )
+                DeviceInfoRow(
+                    icon = Icons.Default.Memory,
+                    label = "Total Memory",
+                    value = "${deviceInfo.totalMemoryMB} MB"
                 )
             } else {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))

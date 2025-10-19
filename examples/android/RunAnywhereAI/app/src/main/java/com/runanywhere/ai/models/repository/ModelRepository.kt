@@ -1,7 +1,6 @@
 package com.runanywhere.ai.models.repository
 
 import android.content.Context
-import android.os.Environment
 import android.os.StatFs
 import com.runanywhere.ai.models.data.*
 import com.runanywhere.ai.models.ui.extension
@@ -166,10 +165,24 @@ class ModelRepository(
         val availableAppStorage = availableBlocks * blockSize
         val usedAppStorage = totalAppStorage - availableAppStorage
 
-        // Device storage
-        val externalStatFs = StatFs(Environment.getExternalStorageDirectory().path)
-        val totalDeviceStorage = externalStatFs.blockCountLong * externalStatFs.blockSizeLong
-        val availableDeviceStorage = externalStatFs.availableBlocksLong * externalStatFs.blockSizeLong
+        // Device storage - use app-accessible directory to avoid SecurityException on Android 11+
+        val (totalDeviceStorage, availableDeviceStorage) = try {
+            // Try to use external files directory (app-specific, doesn't require permissions)
+            val externalPath = context.getExternalFilesDir(null)?.path
+                ?: context.externalMediaDirs.firstOrNull()?.path
+                ?: context.filesDir.path // Fallback to internal storage
+
+            val externalStatFs = StatFs(externalPath)
+            val total = externalStatFs.blockCountLong * externalStatFs.blockSizeLong
+            val available = externalStatFs.availableBlocksLong * externalStatFs.blockSizeLong
+            Pair(total, available)
+        } catch (e: SecurityException) {
+            // If we still hit a SecurityException, fall back to internal storage stats
+            Pair(totalAppStorage, availableAppStorage)
+        } catch (e: IllegalArgumentException) {
+            // Handle invalid path
+            Pair(totalAppStorage, availableAppStorage)
+        }
 
         // Calculate models storage
         val modelsStorage = calculateDirectorySize(modelsDir)

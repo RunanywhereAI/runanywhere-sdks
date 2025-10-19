@@ -46,13 +46,14 @@ data class ModelUiState(
     val displayMemory: String
         get() = memoryRequired?.let { formatBytes(it) } ?: "Unknown"
 
-    fun updateState(): ModelState {
-        return when {
+    fun updateState(): ModelUiState {
+        val newState = when {
             isBuiltIn -> ModelState.BUILT_IN
             downloadURL == null -> ModelState.NOT_AVAILABLE
             localPath == null -> ModelState.AVAILABLE
             else -> ModelState.DOWNLOADED
         }
+        return copy(state = newState)
     }
 
     companion object {

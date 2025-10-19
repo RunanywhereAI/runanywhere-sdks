@@ -160,36 +160,85 @@ sealed class ModelEvent : ComponentEvent() {
 // MARK: - Pipeline Events (iOS Parity)
 
 /**
+ * Stages in the voice pipeline
+ * Matches iOS PipelineStage enum
+ */
+enum class PipelineStage(val displayName: String) {
+    VAD("VAD"),
+    TRANSCRIPTION("Speech-to-Text"),
+    LLM_GENERATION("LLM Generation"),
+    TEXT_TO_SPEECH("Text-to-Speech");
+
+    companion object {
+        val allCases: List<PipelineStage> = values().toList()
+    }
+}
+
+/**
  * Pipeline events that exactly match iOS ModularPipelineEvent patterns
- * These are used by STTHandler and voice pipeline components
+ * These are used by voice pipeline components
  */
 sealed class ModularPipelineEvent {
+    // VAD events
+    object vadSpeechStart : ModularPipelineEvent()
+    object vadSpeechEnd : ModularPipelineEvent()
+    data class vadAudioLevel(val level: Float) : ModularPipelineEvent()
+
     // STT specific events matching iOS patterns
+    data class sttPartialTranscript(val partial: String) : ModularPipelineEvent()
     data class sttFinalTranscript(val transcript: String) : ModularPipelineEvent()
+    data class sttLanguageDetected(val language: String) : ModularPipelineEvent()
 
     data class sttFinalTranscriptWithSpeaker(
         val transcript: String,
         val speaker: SpeakerInfo
     ) : ModularPipelineEvent()
 
+    data class sttPartialTranscriptWithSpeaker(
+        val text: String,
+        val speaker: SpeakerInfo
+    ) : ModularPipelineEvent()
+
+    data class sttNewSpeakerDetected(val speaker: SpeakerInfo) : ModularPipelineEvent()
+
     data class sttSpeakerChanged(
         val from: SpeakerInfo?,
         val to: SpeakerInfo
     ) : ModularPipelineEvent()
 
-    data class sttPartialTranscript(val partial: String) : ModularPipelineEvent()
+    // LLM events
+    object llmThinking : ModularPipelineEvent()
+    data class llmPartialResponse(val text: String) : ModularPipelineEvent()
+    data class llmFinalResponse(val text: String) : ModularPipelineEvent()
+    object llmStreamStarted : ModularPipelineEvent()
+    data class llmStreamToken(val token: String) : ModularPipelineEvent()
 
-    data class sttLanguageDetected(
-        val language: String,
-        val confidence: Float
-    ) : ModularPipelineEvent()
+    // TTS events
+    object ttsStarted : ModularPipelineEvent()
+    data class ttsAudioChunk(val data: ByteArray) : ModularPipelineEvent() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is ttsAudioChunk) return false
+            return data.contentEquals(other.data)
+        }
 
-    data class sttAudioLevelChanged(
-        val level: Float,
-        val timestamp: Double
-    ) : ModularPipelineEvent()
+        override fun hashCode(): Int = data.contentHashCode()
+    }
 
-    data class sttError(val error: com.runanywhere.sdk.components.stt.STTError) : ModularPipelineEvent()
+    object ttsCompleted : ModularPipelineEvent()
+
+    // Initialization events
+    data class componentInitializing(val componentName: String) : ModularPipelineEvent()
+    data class componentInitialized(val componentName: String) : ModularPipelineEvent()
+    data class componentInitializationFailed(val componentName: String, val error: Throwable) :
+        ModularPipelineEvent()
+
+    object allComponentsInitialized : ModularPipelineEvent()
+
+    // Pipeline events
+    object pipelineStarted : ModularPipelineEvent()
+    data class pipelineError(val error: Throwable) : ModularPipelineEvent()
+    object pipelineCompleted : ModularPipelineEvent()
 }
 
 /**
@@ -200,3 +249,37 @@ data class SpeakerInfo(
     val name: String? = null,
     val confidence: Float? = null
 )
+
+/**
+ * Complete result from voice pipeline
+ * Matches iOS VoicePipelineResult struct
+ */
+data class VoicePipelineResult(
+    val transcription: com.runanywhere.sdk.components.stt.STTOutput,
+    val llmResponse: String,
+    val audioOutput: ByteArray? = null,
+    val processingTime: Double = 0.0,
+    val stageTiming: Map<PipelineStage, Double> = emptyMap()
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is VoicePipelineResult) return false
+
+        return transcription == other.transcription &&
+                llmResponse == other.llmResponse &&
+                audioOutput?.contentEquals(
+                    other.audioOutput ?: ByteArray(0)
+                ) ?: (other.audioOutput == null) &&
+                processingTime == other.processingTime &&
+                stageTiming == other.stageTiming
+    }
+
+    override fun hashCode(): Int {
+        var result = transcription.hashCode()
+        result = 31 * result + llmResponse.hashCode()
+        result = 31 * result + (audioOutput?.contentHashCode() ?: 0)
+        result = 31 * result + processingTime.hashCode()
+        result = 31 * result + stageTiming.hashCode()
+        return result
+    }
+}

@@ -20,6 +20,9 @@ import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import com.runanywhere.sdk.models.DeviceInfo
+import kotlin.collections.filter
+import kotlin.collections.find
 
 /**
  * Model Selection Bottom Sheet - EXACT iOS Implementation
@@ -207,22 +210,27 @@ private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
                 DeviceInfoRowItem(
                     label = "Model",
                     icon = Icons.Default.PhoneAndroid,
-                    value = deviceInfo.model
+                    value = deviceInfo.deviceModel
                 )
                 DeviceInfoRowItem(
-                    label = "Processor",
+                    label = "Platform",
                     icon = Icons.Default.Memory,
-                    value = deviceInfo.processor
+                    value = "${deviceInfo.platformName} ${deviceInfo.platformVersion}"
                 )
                 DeviceInfoRowItem(
-                    label = "Android",
+                    label = "OS Version",
                     icon = Icons.Default.Android,
-                    value = deviceInfo.androidVersion
+                    value = deviceInfo.osVersion
                 )
                 DeviceInfoRowItem(
-                    label = "Cores",
+                    label = "CPU Cores",
                     icon = Icons.Default.Settings,
-                    value = deviceInfo.cores.toString()
+                    value = deviceInfo.cpuCores.toString()
+                )
+                DeviceInfoRowItem(
+                    label = "Memory",
+                    icon = Icons.Default.Memory,
+                    value = "${deviceInfo.totalMemoryMB} MB"
                 )
             } else {
                 Row(

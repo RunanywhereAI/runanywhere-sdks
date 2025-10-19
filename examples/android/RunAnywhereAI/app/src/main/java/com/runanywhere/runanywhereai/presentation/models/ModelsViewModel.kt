@@ -3,6 +3,8 @@ package com.runanywhere.runanywhereai.presentation.models
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.models.DeviceInfo
+import com.runanywhere.sdk.models.collectDeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,12 +27,7 @@ class ModelsViewModel : ViewModel() {
 
     private fun loadDeviceInfo() {
         viewModelScope.launch {
-            val deviceInfo = DeviceInfo(
-                model = Build.MODEL,
-                processor = Build.HARDWARE,
-                androidVersion = "API ${Build.VERSION.SDK_INT}",
-                cores = Runtime.getRuntime().availableProcessors()
-            )
+            val deviceInfo = collectDeviceInfo()
             _uiState.update { it.copy(deviceInfo = deviceInfo) }
         }
     }
