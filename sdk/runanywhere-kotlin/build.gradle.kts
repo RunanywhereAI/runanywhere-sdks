@@ -58,7 +58,7 @@ kotlin {
                 implementation(libs.ktor.serialization.kotlinx.json)
 
                 // Okio for file system operations (replaces Files library from iOS)
-                implementation("com.squareup.okio:okio:3.9.0")
+                implementation(libs.okio)
             }
         }
 
@@ -67,7 +67,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 // Okio FakeFileSystem for testing
-                implementation("com.squareup.okio:okio-fakefilesystem:3.9.0")
+                implementation(libs.okio.fakefilesystem)
             }
         }
 
