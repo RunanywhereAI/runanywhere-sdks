@@ -1520,19 +1520,66 @@ fi
 # Detect installed IDEs
 detect_ide() {
     local ide_type=$1
-    local detect_script="$SCRIPT_DIR/detect-ide.sh"
 
-    if [[ -f "$detect_script" ]]; then
-        local result
-        if [[ "$ide_type" == "AS" ]]; then
-            result=$("$detect_script" | grep "^AS:" | head -1)
-        else
-            result=$("$detect_script" | grep -E "^(IC|IU):" | head -1)
+    # Detect Android Studio on macOS
+    detect_android_studio_mac() {
+        local as_path="/Applications/Android Studio.app"
+        if [[ -d "$as_path" ]]; then
+            # Try to get version from Info.plist
+            local version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$as_path/Contents/Info.plist" 2>/dev/null)
+            # Also get build number
+            local build_file="$as_path/Contents/Resources/build.txt"
+            local build_info=""
+            if [[ -f "$build_file" ]]; then
+                build_info=$(cat "$build_file" | grep -oE 'AI-[0-9]+\.[0-9]+' | cut -d'-' -f2 | cut -d'.' -f1)
+            fi
+            if [[ -n "$version" ]]; then
+                echo "AS:$version:$as_path:$build_info"
+            fi
+        fi
+    }
+
+    # Detect IntelliJ IDEA on macOS
+    detect_intellij_mac() {
+        # Check for IntelliJ IDEA Community
+        local idea_ce="/Applications/IntelliJ IDEA CE.app"
+        if [[ -d "$idea_ce" ]]; then
+            local version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$idea_ce/Contents/Info.plist" 2>/dev/null)
+            if [[ -n "$version" ]]; then
+                echo "IC:$version:$idea_ce"
+            fi
         fi
 
-        if [[ -n "$result" ]]; then
-            echo "$result"
+        # Check for IntelliJ IDEA Ultimate
+        local idea_ult="/Applications/IntelliJ IDEA.app"
+        if [[ -d "$idea_ult" ]]; then
+            local version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$idea_ult/Contents/Info.plist" 2>/dev/null)
+            if [[ -n "$version" ]]; then
+                echo "IU:$version:$idea_ult"
+            fi
         fi
+    }
+
+    # Main detection based on OS
+    local result=""
+    case "$(uname -s)" in
+        Darwin)
+            if [[ "$ide_type" == "AS" ]]; then
+                result=$(detect_android_studio_mac | head -1)
+            else
+                result=$(detect_intellij_mac | head -1)
+            fi
+            ;;
+        Linux)
+            # Linux detection not yet implemented
+            ;;
+        *)
+            # Unsupported OS
+            ;;
+    esac
+
+    if [[ -n "$result" ]]; then
+        echo "$result"
     fi
 }
 
