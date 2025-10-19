@@ -1,11 +1,30 @@
 package com.runanywhere.runanywhereai.domain.models
 
+import com.runanywhere.sdk.models.Message
+import com.runanywhere.sdk.models.MessageRole as SDKMessageRole
+import com.runanywhere.sdk.models.MessageAnalytics as SDKMessageAnalytics
+import com.runanywhere.sdk.models.MessageModelInfo as SDKMessageModelInfo
+import com.runanywhere.sdk.models.CompletionStatus as SDKCompletionStatus
+import com.runanywhere.sdk.models.GenerationMode as SDKGenerationMode
+import com.runanywhere.sdk.models.GenerationParameters as SDKGenerationParameters
+import com.runanywhere.sdk.models.ConversationAnalytics as SDKConversationAnalytics
+import com.runanywhere.sdk.models.PerformanceSummary as SDKPerformanceSummary
+import com.runanywhere.sdk.models.Conversation as SDKConversation
 import kotlinx.serialization.Serializable
-import java.util.*
+import java.util.UUID
+
+// Re-export SDK types for use throughout the app
+typealias MessageRole = SDKMessageRole
+typealias MessageAnalytics = SDKMessageAnalytics
+typealias MessageModelInfo = SDKMessageModelInfo
+typealias CompletionStatus = SDKCompletionStatus
+typealias GenerationMode = SDKGenerationMode
+typealias GenerationParameters = SDKGenerationParameters
+typealias ConversationAnalytics = SDKConversationAnalytics
+typealias PerformanceSummary = SDKPerformanceSummary
 
 /**
- * Represents a chat message in the conversation
- * Enhanced to match iOS Message functionality with comprehensive analytics
+ * App-specific wrapper for SDK Message that adds an id field
  */
 @Serializable
 data class ChatMessage(
@@ -15,171 +34,44 @@ data class ChatMessage(
     val thinkingContent: String? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val analytics: MessageAnalytics? = null,
-    val modelInfo: MessageModelInfo? = null
+    val modelInfo: MessageModelInfo? = null,
+    val metadata: Map<String, String>? = null
 ) {
     val isFromUser: Boolean get() = role == MessageRole.USER
-}
 
-/**
- * Message role types matching iOS implementation
- */
-@Serializable
-enum class MessageRole {
-    SYSTEM, USER, ASSISTANT
-}
+    fun toSDKMessage(): Message = Message(
+        role = role,
+        content = content,
+        thinkingContent = thinkingContent,
+        metadata = metadata,
+        timestamp = timestamp,
+        analytics = analytics,
+        modelInfo = modelInfo
+    )
 
-/**
- * Model information for each message
- */
-@Serializable
-data class MessageModelInfo(
-    val modelId: String,
-    val modelName: String,
-    val framework: String
-)
-
-/**
- * Comprehensive analytics information matching iOS MessageAnalytics
- * Tracks detailed performance metrics for AI generation
- */
-@Serializable
-data class MessageAnalytics(
-    // Identifiers
-    val messageId: String,
-    val conversationId: String,
-    val modelId: String,
-    val modelName: String,
-    val framework: String,
-    val timestamp: Long,
-
-    // Timing Metrics
-    val timeToFirstToken: Long? = null,
-    val totalGenerationTime: Long,
-    val thinkingTime: Long? = null,
-    val responseTime: Long? = null,
-
-    // Token Metrics
-    val inputTokens: Int,
-    val outputTokens: Int,
-    val thinkingTokens: Int? = null,
-    val responseTokens: Int,
-    val averageTokensPerSecond: Double,
-
-    // Quality Metrics
-    val messageLength: Int,
-    val wasThinkingMode: Boolean = false,
-    val wasInterrupted: Boolean = false,
-    val retryCount: Int = 0,
-    val completionStatus: CompletionStatus,
-
-    // Performance Indicators
-    val tokensPerSecondHistory: List<Double> = emptyList(),
-    val generationMode: GenerationMode,
-
-    // Context Information
-    val contextWindowUsage: Double = 0.0,
-    val generationParameters: GenerationParameters
-)
-
-/**
- * Completion status for messages
- */
-@Serializable
-enum class CompletionStatus {
-    COMPLETE,
-    INTERRUPTED,
-    FAILED,
-    TIMEOUT
-}
-
-/**
- * Generation mode (streaming vs non-streaming)
- */
-@Serializable
-enum class GenerationMode {
-    STREAMING,
-    NON_STREAMING
-}
-
-/**
- * Generation parameters used for the message
- */
-@Serializable
-data class GenerationParameters(
-    val temperature: Double = 0.7,
-    val maxTokens: Int = 500,
-    val topP: Double? = null,
-    val topK: Int? = null
-)
-
-/**
- * Conversation analytics aggregating message metrics
- */
-@Serializable
-data class ConversationAnalytics(
-    val conversationId: String,
-    val startTime: Long,
-    val endTime: Long? = null,
-    val messageCount: Int,
-
-    // Aggregate Metrics
-    val averageTTFT: Double,
-    val averageGenerationSpeed: Double,
-    val totalTokensUsed: Int,
-    val modelsUsed: Set<String>,
-
-    // Efficiency Metrics
-    val thinkingModeUsage: Double, // percentage
-    val completionRate: Double, // successful / total
-    val averageMessageLength: Int,
-
-    // Real-time Metrics
-    val currentModel: String? = null,
-    val ongoingMetrics: MessageAnalytics? = null
-)
-
-/**
- * Performance summary for conversations
- */
-@Serializable
-data class PerformanceSummary(
-    val totalMessages: Int,
-    val averageResponseTime: Double,
-    val averageTokensPerSecond: Double,
-    val totalTokensProcessed: Int,
-    val thinkingModeUsage: Double,
-    val successRate: Double
-) {
     companion object {
-        fun from(messages: List<ChatMessage>): PerformanceSummary {
-            val analyticsMessages = messages.mapNotNull { it.analytics }
-
-            return PerformanceSummary(
-                totalMessages = messages.size,
-                averageResponseTime = if (analyticsMessages.isNotEmpty()) {
-                    analyticsMessages.map { it.totalGenerationTime }.average() / 1000.0
-                } else 0.0,
-                averageTokensPerSecond = if (analyticsMessages.isNotEmpty()) {
-                    analyticsMessages.map { it.averageTokensPerSecond }.average()
-                } else 0.0,
-                totalTokensProcessed = analyticsMessages.sumOf { it.inputTokens + it.outputTokens },
-                thinkingModeUsage = if (analyticsMessages.isNotEmpty()) {
-                    analyticsMessages.count { it.wasThinkingMode }.toDouble() / analyticsMessages.size
-                } else 0.0,
-                successRate = if (analyticsMessages.isNotEmpty()) {
-                    analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }.toDouble() / analyticsMessages.size
-                } else 0.0
-            )
-        }
+        fun fromSDKMessage(
+            message: Message,
+            id: String = UUID.randomUUID().toString()
+        ): ChatMessage = ChatMessage(
+            id = id,
+            role = message.role,
+            content = message.content,
+            thinkingContent = message.thinkingContent,
+            timestamp = message.timestamp,
+            analytics = message.analytics,
+            modelInfo = message.modelInfo,
+            metadata = message.metadata
+        )
     }
 }
 
 /**
- * Conversation data class for persistence
+ * App-specific Conversation that uses ChatMessage instead of Message
  */
 @Serializable
 data class Conversation(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String,
     val title: String? = null,
     val messages: List<ChatMessage> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
@@ -188,3 +80,28 @@ data class Conversation(
     val analytics: ConversationAnalytics? = null,
     val performanceSummary: PerformanceSummary? = null
 )
+
+/**
+ * Helper function to create PerformanceSummary from messages
+ */
+fun createPerformanceSummary(messages: List<ChatMessage>): PerformanceSummary {
+    val analyticsMessages = messages.mapNotNull { it.analytics }
+
+    return SDKPerformanceSummary(
+        totalMessages = messages.size,
+        averageResponseTime = if (analyticsMessages.isNotEmpty()) {
+            analyticsMessages.map { it.totalGenerationTime }.average() / 1000.0
+        } else 0.0,
+        averageTokensPerSecond = if (analyticsMessages.isNotEmpty()) {
+            analyticsMessages.map { it.averageTokensPerSecond }.average()
+        } else 0.0,
+        totalTokensProcessed = analyticsMessages.sumOf { it.inputTokens + it.outputTokens },
+        thinkingModeUsage = if (analyticsMessages.isNotEmpty()) {
+            analyticsMessages.count { it.wasThinkingMode }.toDouble() / analyticsMessages.size
+        } else 0.0,
+        successRate = if (analyticsMessages.isNotEmpty()) {
+            analyticsMessages.count { it.completionStatus == CompletionStatus.COMPLETE }
+                .toDouble() / analyticsMessages.size
+        } else 0.0
+    )
+}

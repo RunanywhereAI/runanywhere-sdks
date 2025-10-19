@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * A message in a conversation - exact match with iOS Message structure
+ * Enhanced with optional analytics and model info for tracking
  */
 @Serializable
 data class Message(
@@ -16,12 +17,24 @@ data class Message(
     /** The content of the message */
     val content: String,
 
+    /** Optional thinking content (for thinking mode models) */
+    val thinkingContent: String? = null,
+
     /** Optional metadata */
     val metadata: Map<String, String>? = null,
 
     /** Timestamp when the message was created */
-    val timestamp: Long = getCurrentTimeMillis()
-)
+    val timestamp: Long = getCurrentTimeMillis(),
+
+    /** Optional analytics data for this message */
+    val analytics: MessageAnalytics? = null,
+
+    /** Optional model information for this message */
+    val modelInfo: MessageModelInfo? = null
+) {
+    /** Helper to check if message is from user */
+    val isFromUser: Boolean get() = role == MessageRole.USER
+}
 
 // MARK: - Message Role
 
@@ -114,3 +127,21 @@ data class Context(
         return tokenCount
     }
 }
+
+// MARK: - Conversation
+
+/**
+ * Conversation data class for persistence
+ * Enhanced with analytics and performance tracking
+ */
+@Serializable
+data class Conversation(
+    val id: String,
+    val title: String? = null,
+    val messages: List<Message> = emptyList(),
+    val createdAt: Long = getCurrentTimeMillis(),
+    val updatedAt: Long = getCurrentTimeMillis(),
+    val modelName: String? = null,
+    val analytics: ConversationAnalytics? = null,
+    val performanceSummary: PerformanceSummary? = null
+)
