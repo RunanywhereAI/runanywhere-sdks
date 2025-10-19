@@ -7,8 +7,10 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.public.extensions.addModelFromURL
 import com.runanywhere.sdk.public.extensions.listAvailableModels
 import com.runanywhere.sdk.public.extensions.loadModelWithInfo
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppServiceProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Application class for RunAnywhere AI sample app
@@ -16,7 +18,10 @@ import kotlinx.coroutines.launch
  */
 class RunAnywhereApplication : Application() {
 
+    @Volatile
     private var isSDKInitialized = false
+
+    @Volatile
     private var initializationError: Throwable? = null
 
     override fun onCreate() {
@@ -119,8 +124,8 @@ class RunAnywhereApplication : Application() {
         Log.i("RunAnywhereApp", "🔧 Registering Service Providers for DEVELOPMENT mode")
 
         try {
-            // Register Llama.cpp service provider
-            com.runanywhere.runanywhereai.llm.LlamaCppServiceProvider.register()
+            // Register Llama.cpp service provider from SDK module
+            LlamaCppServiceProvider.register()
             Log.i("RunAnywhereApp", "✅ Registered LlamaCppServiceProvider")
 
             // TODO: Register WhisperKit/STT provider when available
@@ -242,7 +247,7 @@ class RunAnywhereApplication : Application() {
      * Retry SDK initialization
      */
     suspend fun retryInitialization() {
-        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
             initializeSDK()
         }
     }

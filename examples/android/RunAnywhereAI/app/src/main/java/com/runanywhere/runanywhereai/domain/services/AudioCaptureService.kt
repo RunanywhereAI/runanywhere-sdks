@@ -3,37 +3,44 @@ package com.runanywhere.runanywhereai.domain.services
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.media.AudioFormat
-import android.media.AudioRecord
-import android.media.MediaRecorder
 import androidx.core.app.ActivityCompat
-import kotlinx.coroutines.Dispatchers
+import com.runanywhere.sdk.audio.AndroidAudioCapture
+import com.runanywhere.sdk.audio.AudioCaptureOptions
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlin.coroutines.coroutineContext
 
 /**
  * Service for capturing audio from the device microphone
- * Matches iOS AudioCaptureService functionality
+ * Wrapper around SDK's AndroidAudioCapture for backward compatibility
+ *
+ * **Note**: This is now a thin wrapper. Consider using AndroidAudioCapture directly from the SDK:
+ * ```kotlin
+ * import com.runanywhere.sdk.audio.AndroidAudioCapture
+ * import com.runanywhere.sdk.audio.AudioCaptureOptions
+ *
+ * val audioCapture = AndroidAudioCapture(
+ *     context = context,
+ *     options = AudioCaptureOptions.SPEECH_RECOGNITION
+ * )
+ * ```
  */
-class AudioCaptureService(private val context: Context) {
+class AudioCaptureService(
+    private val context: Context,
+    options: AudioCaptureOptions = AudioCaptureOptions.SPEECH_RECOGNITION
+) {
+
+    // Delegate to SDK's AndroidAudioCapture
+    private val sdkAudioCapture = AndroidAudioCapture(context, options)
 
     companion object {
+        // Constants kept for backward compatibility
         private const val SAMPLE_RATE = 16000 // 16kHz for Whisper compatibility
-        private const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
-        private const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
-        private const val BUFFER_SIZE_MULTIPLIER = 2
     }
 
-    private var audioRecord: AudioRecord? = null
-    private var isRecording = false
-
-    // Check if we have microphone permission
+    /**
+     * Check if we have microphone permission
+     */
     fun hasRecordPermission(): Boolean {
         return ActivityCompat.checkSelfPermission(
             context,
@@ -45,64 +52,22 @@ class AudioCaptureService(private val context: Context) {
      * Start capturing audio and emit audio chunks as a Flow
      * Returns PCM audio data at 16kHz, mono, 16-bit
      */
-    fun startCapture(): Flow<ByteArray> = flow {
-        if (!hasRecordPermission()) {
-            throw SecurityException("Microphone permission not granted")
-        }
-
-        val minBufferSize = AudioRecord.getMinBufferSize(
-            SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT
-        )
-
-        if (minBufferSize == AudioRecord.ERROR || minBufferSize == AudioRecord.ERROR_BAD_VALUE) {
-            throw IllegalStateException("Failed to get minimum buffer size")
-        }
-
-        val bufferSize = minBufferSize * BUFFER_SIZE_MULTIPLIER
-
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT,
-            bufferSize
-        ).apply {
-            if (state != AudioRecord.STATE_INITIALIZED) {
-                throw IllegalStateException("Failed to initialize AudioRecord")
+    fun startCapture(): Flow<ByteArray> {
+        // Convert VoiceAudioChunk to ByteArray for backward compatibility
+        return kotlinx.coroutines.flow.flow {
+            sdkAudioCapture.startContinuousCapture().collect { chunk ->
+                // Convert float samples back to 16-bit PCM bytes
+                val bytes = floatsToBytes(chunk.samples)
+                emit(bytes)
             }
         }
-
-        val buffer = ByteArray(bufferSize)
-
-        withContext(Dispatchers.IO) {
-            audioRecord?.startRecording()
-            isRecording = true
-
-            while (isRecording && coroutineContext.isActive) {
-                val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
-
-                if (bytesRead > 0) {
-                    // Emit a copy of the valid audio data
-                    emit(buffer.copyOfRange(0, bytesRead))
-                }
-            }
-        }
-    }.flowOn(Dispatchers.IO)
+    }
 
     /**
      * Stop audio capture
      */
     fun stopCapture() {
-        isRecording = false
-        audioRecord?.apply {
-            if (state == AudioRecord.STATE_INITIALIZED) {
-                stop()
-                release()
-            }
-        }
-        audioRecord = null
+        sdkAudioCapture.stopCapture()
     }
 
     /**
@@ -128,12 +93,30 @@ class AudioCaptureService(private val context: Context) {
     /**
      * Get the current recording state
      */
-    fun isRecording(): Boolean = isRecording
+    fun isRecording(): Boolean = sdkAudioCapture.isAudioCaptureAvailable()
 
     /**
      * Clean up resources
      */
     fun release() {
-        stopCapture()
+        sdkAudioCapture.stopCapture()
+    }
+
+    // MARK: - Private Helper Methods
+
+    /**
+     * Convert float samples to 16-bit PCM bytes
+     */
+    private fun floatsToBytes(samples: FloatArray): ByteArray {
+        val bytes = ByteArray(samples.size * 2)
+        val buffer = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
+
+        samples.forEach { sample ->
+            val shortValue = (sample * Short.MAX_VALUE).toInt()
+                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+            buffer.putShort(shortValue)
+        }
+
+        return bytes
     }
 }

@@ -1,26 +1,42 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.runanywhereai.domain.models.*
-import com.runanywhere.runanywhereai.domain.services.VoicePipelineService
+import com.runanywhere.runanywhereai.domain.models.SessionState
+import com.runanywhere.sdk.audio.AndroidAudioCapture
+import com.runanywhere.sdk.audio.AudioCaptureOptions
+import com.runanywhere.sdk.components.tts.AndroidTTSService
+import com.runanywhere.sdk.components.TTSOptions
+import com.runanywhere.sdk.events.ModularPipelineEvent
+import com.runanywhere.sdk.public.ModularPipelineConfig
+import com.runanywhere.sdk.public.PipelineComponent
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.VADConfig
+import com.runanywhere.sdk.public.VoiceSTTConfig
+import com.runanywhere.sdk.public.VoiceLLMConfig
+import com.runanywhere.sdk.public.VoiceTTSConfig
+import com.runanywhere.sdk.public.createVoicePipeline
+import com.runanywhere.sdk.voice.ModularVoicePipeline
+import com.runanywhere.sdk.voice.TTSHandler
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-// import dagger.hilt.android.lifecycle.HiltViewModel
-// import javax.inject.Inject
 
 /**
  * ViewModel for Voice Assistant screen
- * Implements complete voice pipeline matching iOS functionality
+ * Uses SDK's ModularVoicePipeline directly (matches iOS pattern)
  */
-// @HiltViewModel
 class VoiceAssistantViewModel(
     application: Application
-    // @Inject private val voicePipelineService: VoicePipelineService
 ) : AndroidViewModel(application) {
 
-    private val voicePipelineService = VoicePipelineService(application.applicationContext)
+    private val context: Context = application.applicationContext
+    private var voicePipeline: ModularVoicePipeline? = null
+    private var audioCapture: AndroidAudioCapture? = null
+    private var pipelineJob: Job? = null
+    private var ttsService: AndroidTTSService? = null
 
     // UI State
     data class UiState(
@@ -50,177 +66,236 @@ class VoiceAssistantViewModel(
         viewModelScope, SharingStarted.Eagerly, null
     )
 
-    // Additional state flows matching iOS
+    // Additional state flows
     val currentTranscript: StateFlow<String> = _uiState.map { it.currentTranscript }.stateIn(
         viewModelScope, SharingStarted.Eagerly, ""
     )
     val assistantResponse: StateFlow<String> = _uiState.map { it.assistantResponse }.stateIn(
         viewModelScope, SharingStarted.Eagerly, ""
     )
-    val audioLevel: StateFlow<Float> = voicePipelineService.audioLevel
+    val audioLevel: StateFlow<Float> = _uiState.map { it.audioLevel }.stateIn(
+        viewModelScope, SharingStarted.Eagerly, 0f
+    )
 
-    init {
-        initializePipeline()
-        observePipelineEvents()
-        observeAudioLevels()
-    }
-
-    private fun initializePipeline() {
+    fun startSession() {
         viewModelScope.launch {
             try {
-                val config = ModularPipelineConfig(
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.CONNECTING,
+                        errorMessage = null,
+                        currentTranscript = "",
+                        assistantResponse = ""
+                    )
+                }
+
+                // Create pipeline configuration
+                val config = ModularPipelineConfig.create(
                     components = listOf(
                         PipelineComponent.VAD,
                         PipelineComponent.STT,
                         PipelineComponent.LLM,
                         PipelineComponent.TTS
                     ),
-                    vadConfig = VADConfig(
-                        sensitivity = 0.5f,
-                        minSpeechDuration = 250,
-                        minSilenceDuration = 500
+                    vad = VADConfig(
+                        energyThreshold = 0.005f // Lower threshold for better detection
                     ),
-                    sttConfig = VoiceSTTConfig(
+                    stt = VoiceSTTConfig(
                         modelId = _uiState.value.whisperModel,
-                        language = "en",
-                        enableRealTime = true
+                        language = "en-US"
                     ),
-                    llmConfig = VoiceLLMConfig(
+                    llm = VoiceLLMConfig(
                         modelId = _uiState.value.currentLLMModel,
-                        maxTokens = 150,
-                        temperature = 0.7f
+                        maxTokens = 100,
+                        systemPrompt = "You are a helpful voice assistant. Keep responses concise and conversational."
                     ),
-                    ttsConfig = VoiceTTSConfig(
+                    tts = VoiceTTSConfig(
                         voice = _uiState.value.ttsVoice
                     )
                 )
 
-                voicePipelineService.initialize(config)
-            } catch (e: Exception) {
-                _uiState.update { it.copy(
-                    errorMessage = "Failed to initialize: ${e.message}",
-                    sessionState = SessionState.ERROR
-                )}
-            }
-        }
-    }
+                // Create the voice pipeline using SDK
+                voicePipeline = RunAnywhere.createVoicePipeline(config)
 
-    private fun observePipelineEvents() {
-        viewModelScope.launch {
-            voicePipelineService.pipelineEvents.collect { event ->
-                when (event) {
-                    is VoicePipelineEvent.VADSpeechStart -> {
-                        _uiState.update { it.copy(
-                            isSpeechDetected = true,
-                            sessionState = SessionState.LISTENING
-                        )}
+                // Initialize TTS service
+                ttsService = AndroidTTSService(context)
+                ttsService?.initialize()
+
+                // Set TTS handler for the pipeline
+                voicePipeline?.setTTSHandler(object : TTSHandler {
+                    override suspend fun initialize() {
+                        // Already initialized above
                     }
-                    is VoicePipelineEvent.VADSpeechEnd -> {
-                        _uiState.update { it.copy(
-                            isSpeechDetected = false,
-                            sessionState = SessionState.PROCESSING
-                        )}
+
+                    override suspend fun synthesize(text: String) {
+                        ttsService?.synthesize(
+                            text, TTSOptions(
+                                language = "en-US",
+                                rate = 1.0f,
+                                pitch = 1.0f,
+                                volume = 1.0f
+                            )
+                        )
                     }
-                    is VoicePipelineEvent.STTPartialTranscript -> {
-                        _uiState.update { it.copy(
-                            currentTranscript = event.text
-                        )}
+
+                    override suspend fun cleanup() {
+                        ttsService?.cleanup()
                     }
-                    is VoicePipelineEvent.STTFinalTranscript -> {
+                })
+
+                // Initialize components
+                _uiState.update { it.copy(sessionState = SessionState.CONNECTING) }
+
+                voicePipeline?.initializeComponents()?.collect { event ->
+                    handleInitializationEvent(event)
+                }
+
+                // Start audio capture
+                val audioCaptureOptions = AudioCaptureOptions()
+                audioCapture = AndroidAudioCapture(context, audioCaptureOptions)
+                val audioStream = audioCapture?.startContinuousCapture()
+
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.CONNECTED,
+                        isListening = true
+                    )
+                }
+
+                // Process audio through pipeline
+                pipelineJob = viewModelScope.launch {
+                    try {
+                        voicePipeline?.process(audioStream!!)?.collect { event ->
+                            handlePipelineEvent(event)
+                        }
+                    } catch (e: Exception) {
                         _uiState.update { it.copy(
-                            currentTranscript = event.text,
-                            sessionState = SessionState.PROCESSING
-                        )}
-                    }
-                    is VoicePipelineEvent.LLMResponse -> {
-                        _uiState.update { it.copy(
-                            assistantResponse = event.text,
-                            sessionState = SessionState.SPEAKING
-                        )}
-                    }
-                    is VoicePipelineEvent.TTSStart -> {
-                        _uiState.update { it.copy(
-                            sessionState = SessionState.SPEAKING
-                        )}
-                    }
-                    is VoicePipelineEvent.TTSComplete -> {
-                        _uiState.update { it.copy(
-                            sessionState = SessionState.CONNECTED
-                        )}
-                    }
-                    is VoicePipelineEvent.Error -> {
-                        _uiState.update { it.copy(
-                            errorMessage = event.message,
+                            errorMessage = "Pipeline error: ${e.message}",
                             sessionState = SessionState.ERROR
                         )}
                     }
+                }
+
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.ERROR,
+                        errorMessage = "Failed to start: ${e.message}",
+                        isListening = false
+                    )
                 }
             }
         }
     }
 
-    private fun observeAudioLevels() {
-        viewModelScope.launch {
-            audioLevel.collect { level ->
-                _uiState.update { it.copy(audioLevel = level) }
+    private fun handleInitializationEvent(event: ModularPipelineEvent) {
+        when (event) {
+            is ModularPipelineEvent.componentInitializing -> {
+                // Component is initializing
             }
+            is ModularPipelineEvent.componentInitialized -> {
+                // Component initialized
+            }
+
+            is ModularPipelineEvent.allComponentsInitialized -> {
+                _uiState.update { it.copy(sessionState = SessionState.CONNECTED) }
+            }
+
+            else -> {}
         }
     }
 
-    fun startSession() {
-        viewModelScope.launch {
-            try {
+    private fun handlePipelineEvent(event: ModularPipelineEvent) {
+        when (event) {
+            is ModularPipelineEvent.vadSpeechStart -> {
                 _uiState.update { it.copy(
-                    sessionState = SessionState.CONNECTING,
-                    errorMessage = null,
-                    currentTranscript = "",
-                    assistantResponse = ""
-                )}
-
-                voicePipelineService.startPipeline()
-
-                _uiState.update { it.copy(
-                    sessionState = SessionState.CONNECTED,
-                    isListening = true
-                )}
-            } catch (e: Exception) {
-                _uiState.update { it.copy(
-                    sessionState = SessionState.ERROR,
-                    errorMessage = "Failed to start: ${e.message}",
-                    isListening = false
+                    isSpeechDetected = true,
+                    sessionState = SessionState.LISTENING
                 )}
             }
+
+            is ModularPipelineEvent.vadSpeechEnd -> {
+                _uiState.update { it.copy(
+                    isSpeechDetected = false,
+                    sessionState = SessionState.PROCESSING
+                )}
+            }
+
+            is ModularPipelineEvent.sttPartialTranscript -> {
+                _uiState.update { it.copy(
+                    currentTranscript = event.partial
+                )}
+            }
+            is ModularPipelineEvent.sttFinalTranscript -> {
+                _uiState.update {
+                    it.copy(
+                        currentTranscript = event.transcript,
+                        sessionState = SessionState.PROCESSING
+                    )
+                }
+            }
+
+            is ModularPipelineEvent.llmThinking -> {
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.PROCESSING
+                    )
+                }
+            }
+
+            is ModularPipelineEvent.llmFinalResponse -> {
+                _uiState.update {
+                    it.copy(
+                        assistantResponse = event.text,
+                        sessionState = SessionState.SPEAKING
+                    )
+                }
+            }
+
+            is ModularPipelineEvent.ttsStarted -> {
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.SPEAKING
+                    )
+                }
+            }
+
+            is ModularPipelineEvent.ttsCompleted -> {
+                _uiState.update {
+                    it.copy(
+                        sessionState = SessionState.LISTENING,
+                        currentTranscript = "",
+                        assistantResponse = ""
+                    )
+                }
+            }
+
+            is ModularPipelineEvent.pipelineError -> {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = event.error.message,
+                        sessionState = SessionState.ERROR
+                    )
+                }
+            }
+
+            else -> {}
         }
     }
 
     fun stopSession() {
         viewModelScope.launch {
-            voicePipelineService.stopPipeline()
+            pipelineJob?.cancel()
+            pipelineJob = null
+            audioCapture?.stopCapture()
+
+            voicePipeline?.cleanup()
+            voicePipeline = null
+
             _uiState.update { it.copy(
                 sessionState = SessionState.DISCONNECTED,
                 isListening = false,
                 isSpeechDetected = false
-            )}
-        }
-    }
-
-    // Push-to-talk functionality
-    fun startListening() {
-        viewModelScope.launch {
-            voicePipelineService.startListening()
-            _uiState.update { it.copy(
-                isListening = true,
-                sessionState = SessionState.LISTENING
-            )}
-        }
-    }
-
-    fun stopListening() {
-        viewModelScope.launch {
-            voicePipelineService.stopListening()
-            _uiState.update { it.copy(
-                isListening = false,
-                sessionState = SessionState.PROCESSING
             )}
         }
     }
@@ -238,6 +313,8 @@ class VoiceAssistantViewModel(
 
     override fun onCleared() {
         super.onCleared()
-        voicePipelineService.cleanup()
+        viewModelScope.launch {
+            stopSession()
+        }
     }
 }

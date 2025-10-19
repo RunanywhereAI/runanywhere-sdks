@@ -1,19 +1,22 @@
 package com.runanywhere.sdk.audio
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import androidx.core.app.ActivityCompat
 import com.runanywhere.sdk.foundation.SDKLogger
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import kotlin.coroutines.cancellation.CancellationException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /**
  * Android Audio capture implementation using Android AudioRecord
@@ -21,15 +24,31 @@ import kotlin.coroutines.cancellation.CancellationException
  * This implementation mirrors the iOS AudioCapture class exactly,
  * providing 16kHz mono audio capture with 100ms chunk processing.
  */
-class AndroidAudioCapture(private val context: Context? = null) {
+class AndroidAudioCapture(
+    private val context: Context? = null,
+    private val options: AudioCaptureOptions = AudioCaptureOptions.DEFAULT
+) {
     private val logger = SDKLogger("AndroidAudioCapture")
 
     // Audio configuration matching iOS (16kHz mono, 16-bit)
-    private val sampleRate = 16000
-    private val channels = 1 // Mono
-    private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-    private val channelConfig = AudioFormat.CHANNEL_IN_MONO
-    private val frameSize = channels * 16 / 8 // 2 bytes per frame
+    private val sampleRate = options.sampleRate
+    private val channels = options.channels // Mono
+    private val audioFormat = when (options.audioFormat) {
+        AudioEncoding.PCM_16BIT -> AudioFormat.ENCODING_PCM_16BIT
+        AudioEncoding.PCM_8BIT -> AudioFormat.ENCODING_PCM_8BIT
+        AudioEncoding.PCM_FLOAT -> AudioFormat.ENCODING_PCM_FLOAT
+    }
+    private val channelConfig = when (channels) {
+        1 -> AudioFormat.CHANNEL_IN_MONO
+        2 -> AudioFormat.CHANNEL_IN_STEREO
+        else -> throw AudioCaptureException("Unsupported channel count: $channels")
+    }
+    private val frameSize = channels * when (audioFormat) {
+        AudioFormat.ENCODING_PCM_8BIT -> 1
+        AudioFormat.ENCODING_PCM_16BIT -> 2
+        AudioFormat.ENCODING_PCM_FLOAT -> 4
+        else -> throw AudioCaptureException("Unsupported audio format: $audioFormat")
+    }
 
     // Buffer configuration (iOS pattern: 100ms chunks)
     private val minBufferSize = (sampleRate * 0.1f).toInt() * frameSize // 100ms in bytes
@@ -43,72 +62,77 @@ class AndroidAudioCapture(private val context: Context? = null) {
      * Start continuous audio capture
      * Returns a Flow of VoiceAudioChunk similar to iOS AudioCapture
      */
-    fun startContinuousCapture(): Flow<VoiceAudioChunk> = channelFlow {
-        try {
-            logger.info("Starting continuous audio capture at ${sampleRate}Hz, ${channels} channel(s)")
+    fun startContinuousCapture(): Flow<VoiceAudioChunk> = flow {
+        if (!hasRecordPermission()) {
+            throw AudioCaptureException("Microphone permission not granted")
+        }
 
-            // Initialize audio record
-            val record = initializeAudioRecord()
-            audioRecord = record
+        val audioSource = mapAudioSource(options.audioSource)
 
-            // Start recording
-            record.startRecording()
+        val minBufSize = AudioRecord.getMinBufferSize(
+            sampleRate,
+            channelConfig,
+            audioFormat
+        )
+
+        if (minBufSize == AudioRecord.ERROR || minBufSize == AudioRecord.ERROR_BAD_VALUE) {
+            throw AudioCaptureException("Invalid audio configuration for Android AudioRecord")
+        }
+
+        val bufferSize = minBufSize * options.bufferSizeMultiplier
+
+        audioRecord = AudioRecord(
+            audioSource,
+            sampleRate,
+            channelConfig,
+            audioFormat,
+            bufferSize
+        ).apply {
+            if (state != AudioRecord.STATE_INITIALIZED) {
+                throw AudioCaptureException("Failed to initialize AudioRecord")
+            }
+        }
+
+        val buffer = ByteArray(bufferSize)
+
+        withContext(Dispatchers.IO) {
+            audioRecord?.startRecording()
             isRecording = true
-            sequenceNumber = 0
+            logger.info("Started audio capture: $sampleRate Hz, $channels ch, buffer=$bufferSize bytes")
 
-            logger.info("Audio capture started successfully")
+            while (isRecording && coroutineContext.isActive) {
+                val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
 
-            // Capture loop (similar to iOS audio processing)
-            val buffer = ByteArray(minBufferSize)
+                if (bytesRead > 0) {
+                    // Convert to Float samples for processing
+                    val samples = bytesToFloats(buffer, bytesRead)
 
-            while (isActive && isRecording) {
-                try {
-                    val bytesRead = record.read(buffer, 0, buffer.size)
+                    // Create audio chunk (iOS pattern)
+                    val chunk = VoiceAudioChunk(
+                        samples = samples,
+                        timestamp = System.currentTimeMillis() / 1000.0,
+                        sampleRate = sampleRate,
+                        channels = channels,
+                        sequenceNumber = sequenceNumber++,
+                        isFinal = false
+                    )
 
-                    if (bytesRead > 0) {
-                        // Convert to Float samples for processing
-                        val samples = convertPCMBytesToFloat(buffer, bytesRead)
-
-                        // Create audio chunk (iOS pattern)
-                        val chunk = VoiceAudioChunk(
-                            samples = samples,
-                            timestamp = System.currentTimeMillis() / 1000.0,
-                            sampleRate = sampleRate,
-                            channels = channels,
-                            sequenceNumber = sequenceNumber++,
-                            isFinal = false
-                        )
-
-                        // Send chunk to flow
-                        send(chunk)
-                    }
-
-                } catch (e: CancellationException) {
-                    logger.info("Audio capture cancelled")
-                    break
-                } catch (e: Exception) {
-                    logger.error("Error during audio capture", e)
-                    // Continue capturing unless it's a critical error
-                    if (e is IllegalStateException) {
-                        break
-                    }
+                    // Send chunk to flow
+                    emit(chunk)
+                } else if (bytesRead < 0) {
+                    // Handle error codes
+                    logger.warn("AudioRecord read error: $bytesRead")
                 }
             }
-
-        } catch (e: Exception) {
-            logger.error("Failed to start audio capture", e)
-            throw e
-        } finally {
-            stopCapture()
         }
-    }
+    }.flowOn(Dispatchers.IO)
 
     /**
      * Record audio for a specific duration and return as ByteArray
      * This method is useful for batch transcription
      */
     suspend fun recordAudio(durationMs: Long): ByteArray = withContext(Dispatchers.IO) {
-        logger.info("Recording audio for ${durationMs}ms")
+        logger.info("Recording audio for $durationMs ms")
 
         val record = initializeAudioRecord()
         val audioData = ByteArrayOutputStream()
@@ -177,10 +201,10 @@ class AndroidAudioCapture(private val context: Context? = null) {
 
         try {
             // Use 4x minimum buffer for smooth capture
-            val bufferSize = minBufSize * 4
+            val bufferSize = minBufSize * options.bufferSizeMultiplier
 
             val record = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+                mapAudioSource(options.audioSource),
                 sampleRate,
                 channelConfig,
                 audioFormat,
@@ -208,27 +232,29 @@ class AndroidAudioCapture(private val context: Context? = null) {
      * Convert PCM bytes to float samples
      * Same conversion logic as in JvmAudioCapture for consistency
      */
-    private fun convertPCMBytesToFloat(pcmBytes: ByteArray, bytesRead: Int): FloatArray {
-        val sampleCount = bytesRead / 2 // 16-bit samples = 2 bytes each
-        val floatArray = FloatArray(sampleCount)
-
-        for (i in 0 until sampleCount) {
-            val byteIndex = i * 2
-
-            if (byteIndex + 1 < bytesRead) {
-                // Convert little-endian 16-bit signed integer to float [-1.0, 1.0]
-                val low = pcmBytes[byteIndex].toInt() and 0xFF
-                val high = pcmBytes[byteIndex + 1].toInt()
-                val sample = ((high shl 8) or low).toShort()
-
-                // Normalize to [-1.0, 1.0] range
-                floatArray[i] = sample / 32768.0f
-            } else {
-                floatArray[i] = 0.0f
+    private fun bytesToFloats(pcmBytes: ByteArray, bytesRead: Int): FloatArray {
+        return when (audioFormat) {
+            AudioFormat.ENCODING_PCM_16BIT -> {
+                val shorts = ShortArray(bytesRead / 2)
+                ByteBuffer.wrap(pcmBytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts)
+                FloatArray(shorts.size) { i ->
+                    shorts[i].toFloat() / Short.MAX_VALUE.toFloat()
+                }
             }
-        }
+            AudioFormat.ENCODING_PCM_FLOAT -> {
+                val floats = FloatArray(bytesRead / 4)
+                ByteBuffer.wrap(pcmBytes).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer().get(floats)
+                floats
+            }
 
-        return floatArray
+            AudioFormat.ENCODING_PCM_8BIT -> {
+                FloatArray(bytesRead) { i ->
+                    pcmBytes[i].toFloat() / Byte.MAX_VALUE.toFloat()
+                }
+            }
+
+            else -> throw AudioCaptureException("Unsupported audio format: $audioFormat")
+        }
     }
 
     /**
@@ -286,6 +312,38 @@ class AndroidAudioCapture(private val context: Context? = null) {
         } catch (e: Exception) {
             logger.error("Error getting audio input devices", e)
             listOf("Default Microphone")
+        }
+    }
+
+    /**
+     * Check if we have microphone permission
+     */
+    fun hasRecordPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            context!!,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Map SDK AudioSource to Android MediaRecorder audio source
+     */
+    private fun mapAudioSource(source: AudioSource): Int {
+        return when (source) {
+            AudioSource.DEFAULT -> MediaRecorder.AudioSource.DEFAULT
+            AudioSource.MIC -> MediaRecorder.AudioSource.MIC
+            AudioSource.VOICE_RECOGNITION -> MediaRecorder.AudioSource.VOICE_RECOGNITION
+            AudioSource.VOICE_COMMUNICATION -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            AudioSource.CAMCORDER -> MediaRecorder.AudioSource.CAMCORDER
+            AudioSource.UNPROCESSED -> {
+                // UNPROCESSED requires API 24+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+                    MediaRecorder.AudioSource.UNPROCESSED
+                } else {
+                    logger.warn("UNPROCESSED audio source not available, using DEFAULT")
+                    MediaRecorder.AudioSource.DEFAULT
+                }
+            }
         }
     }
 }

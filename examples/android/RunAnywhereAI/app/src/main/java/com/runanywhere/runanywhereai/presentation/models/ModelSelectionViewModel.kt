@@ -5,11 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.models.DeviceInfo
+import com.runanywhere.sdk.models.collectDeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.collections.find
 
 /**
  * ViewModel for Model Selection Bottom Sheet
@@ -31,12 +34,7 @@ class ModelSelectionViewModel : ViewModel() {
 
     private fun loadDeviceInfo() {
         viewModelScope.launch {
-            val deviceInfo = DeviceInfo(
-                model = Build.MODEL,
-                processor = Build.HARDWARE,
-                androidVersion = "API ${Build.VERSION.SDK_INT}",
-                cores = Runtime.getRuntime().availableProcessors()
-            )
+            val deviceInfo = collectDeviceInfo()
             _uiState.update { it.copy(deviceInfo = deviceInfo) }
         }
     }
@@ -237,7 +235,7 @@ class ModelSelectionViewModel : ViewModel() {
  * UI State for Model Selection Bottom Sheet
  */
 data class ModelSelectionUiState(
-    val deviceInfo: DeviceInfo? = null,
+    val deviceInfo: com.runanywhere.sdk.models.DeviceInfo? = null,
     val models: List<ModelInfo> = emptyList(),
     val frameworks: List<String> = emptyList(),
     val expandedFramework: String? = null,
