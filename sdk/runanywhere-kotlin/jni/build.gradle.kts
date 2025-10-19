@@ -4,7 +4,7 @@ plugins {
 }
 
 group = "com.runanywhere.sdk"
-version = "1.0.0"
+version = "0.1.0"
 
 dependencies {
     // Kotlin
