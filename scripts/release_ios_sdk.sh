@@ -213,7 +213,7 @@ import Foundation
 /// - This file is in .gitignore (not committed to main branch)
 /// - Real tokens are ONLY in release tags (for SPM distribution)
 /// - Token is used ONLY when SDK is in .development mode
-/// - Backend validates token via POST /v1/sdk/init
+/// - Backend validates token via POST /api/v1/devices/register/dev
 ///
 /// Token Properties:
 /// - Format: bt_<uuid>_<timestamp>
