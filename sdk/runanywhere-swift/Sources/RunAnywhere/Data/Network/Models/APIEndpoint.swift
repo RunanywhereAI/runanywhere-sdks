@@ -9,6 +9,7 @@ public enum APIEndpoint: Equatable {
 
     // Device Management
     case registerDevice
+    case devDeviceRegistration
 
     // Model Management
     case modelAssignments(deviceType: String, platform: String)
@@ -34,6 +35,8 @@ public enum APIEndpoint: Equatable {
         // Device Management
         case .registerDevice:
             return "/api/v1/devices/register"
+        case .devDeviceRegistration:
+            return "/api/v1/devices/register/dev"
 
         // Model Management
         case .modelAssignments(let deviceType, let platform):
