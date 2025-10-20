@@ -116,6 +116,7 @@ public extension RunAnywhere {
                 stopSequences: options?.stopSequences ?? [],
                 streamingEnabled: false,
                 preferredExecutionTarget: options?.preferredExecutionTarget,
+                preferredFramework: options?.preferredFramework,
                 structuredOutput: StructuredOutputConfig(
                     type: type,
                     includeSchemaInPrompt: false
@@ -127,11 +128,11 @@ public extension RunAnywhere {
             let userPrompt = handler.buildUserPrompt(for: type, content: prompt)
 
             // Generate the text
-            let generatedText = try await RunAnywhere.generate(userPrompt, options: effectiveOptions)
+            let generationResult = try await RunAnywhere.generate(userPrompt, options: effectiveOptions)
 
             // Parse using StructuredOutputHandler
             let result = try handler.parseStructuredOutput(
-                from: generatedText,
+                from: generationResult.text,
                 type: type
             )
 
@@ -177,6 +178,7 @@ public extension RunAnywhere {
             stopSequences: options?.stopSequences ?? [],
             streamingEnabled: true,
             preferredExecutionTarget: options?.preferredExecutionTarget,
+            preferredFramework: options?.preferredFramework,
             structuredOutput: StructuredOutputConfig(
                 type: type,
                 includeSchemaInPrompt: false
@@ -194,7 +196,8 @@ public extension RunAnywhere {
                     var tokenIndex = 0
 
                     // Stream tokens
-                    for try await token in RunAnywhere.generateStream(userPrompt, options: effectiveOptions) {
+                    let streamingResult = try await RunAnywhere.generateStream(userPrompt, options: effectiveOptions)
+                    for try await token in streamingResult.stream {
                         let streamToken = StreamToken(
                             text: token,
                             timestamp: Date(),
@@ -277,6 +280,7 @@ public extension RunAnywhere {
                 stopSequences: baseOptions.stopSequences,
                 streamingEnabled: baseOptions.streamingEnabled,
                 preferredExecutionTarget: baseOptions.preferredExecutionTarget,
+                preferredFramework: baseOptions.preferredFramework,
                 structuredOutput: structuredOutput,
                 systemPrompt: baseOptions.systemPrompt
             )

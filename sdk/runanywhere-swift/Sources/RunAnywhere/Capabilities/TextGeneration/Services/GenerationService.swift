@@ -152,10 +152,12 @@ public class GenerationService {
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
+        var thinkingTimeMs: TimeInterval? = nil
 
         logger.debug("Model \(modelInfo.name) supports thinking: \(modelInfo.supportsThinking)")
         if modelInfo.supportsThinking {
-            let pattern = ThinkingTagPattern.defaultPattern
+            // Use model-specific pattern or fall back to default
+            let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
             logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
             logger.debug("Raw generated text: \(generatedText)")
 
@@ -165,23 +167,40 @@ public class GenerationService {
 
             logger.debug("Parsed content: \(finalText)")
             logger.debug("Thinking content: \(thinkingContent ?? "None")")
+
+            // For non-streaming, we can estimate thinking took ~60% of generation time if present
+            if thinkingContent != nil && !thinkingContent!.isEmpty {
+                let totalLatency = Date().timeIntervalSince(startTime) * 1000
+                thinkingTimeMs = totalLatency * 0.6
+            }
         } else {
             finalText = generatedText
             thinkingContent = nil
         }
 
-        // Calculate metrics based on final text (without thinking)
+        // Calculate metrics using improved token counting
         let latency = Date().timeIntervalSince(startTime) * 1000 // Convert to milliseconds
-        let estimatedTokens = finalText.split(separator: " ").count
-        let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
+        let tokenCounts = TokenCounter.splitTokenCounts(
+            fullText: generatedText,
+            thinkingContent: thinkingContent,
+            responseContent: finalText
+        )
+
+        let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
+            tokenCount: tokenCounts.totalTokens,
+            elapsedSeconds: latency / 1000.0
+        )
 
         // Get memory usage (placeholder - actual implementation depends on service)
         let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
 
+        // Calculate response time (time after thinking)
+        let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+
         return GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
-            tokensUsed: estimatedTokens,
+            tokensUsed: tokenCounts.totalTokens,
             modelUsed: loadedModel.model.id,
             latencyMs: latency,
             executionTarget: .onDevice,
@@ -189,8 +208,12 @@ public class GenerationService {
             performanceMetrics: PerformanceMetrics(
                 inferenceTimeMs: latency,
                 tokensPerSecond: tokensPerSecond,
-                peakMemoryUsage: memoryUsage
-            )
+                peakMemoryUsage: memoryUsage,
+                thinkingTimeMs: thinkingTimeMs,
+                responseTimeMs: responseTimeMs
+            ),
+            thinkingTokens: tokenCounts.thinkingTokens,
+            responseTokens: tokenCounts.responseTokens
         )
     }
 
@@ -239,8 +262,6 @@ public class GenerationService {
 
         // Calculate metrics
         let latency = Date().timeIntervalSince(startTime) * 1000
-        let estimatedTokens = generatedText.split(separator: " ").count
-        let tokensPerSecond = Double(estimatedTokens) / (latency / 1000.0)
 
         // Get memory usage (placeholder - actual implementation depends on service)
         let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
@@ -248,21 +269,42 @@ public class GenerationService {
         // Parse thinking content if model supports it
         let modelInfo = loadedModel.model
         let (finalText, thinkingContent): (String, String?)
+        var thinkingTimeMs: TimeInterval? = nil
 
         if modelInfo.supportsThinking {
-            let pattern = ThinkingTagPattern.defaultPattern
+            // Use model-specific pattern or fall back to default
+            let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent
+
+            // Estimate thinking time if present
+            if thinkingContent != nil && !thinkingContent!.isEmpty {
+                thinkingTimeMs = latency * 0.6
+            }
         } else {
             finalText = generatedText
             thinkingContent = nil
         }
 
+        // Calculate token counts
+        let tokenCounts = TokenCounter.splitTokenCounts(
+            fullText: generatedText,
+            thinkingContent: thinkingContent,
+            responseContent: finalText
+        )
+
+        let tokensPerSecond = TokenCounter.calculateTokensPerSecond(
+            tokenCount: tokenCounts.totalTokens,
+            elapsedSeconds: latency / 1000.0
+        )
+
+        let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+
         return GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
-            tokensUsed: estimatedTokens,
+            tokensUsed: tokenCounts.totalTokens,
             modelUsed: loadedModel.model.id,
             latencyMs: latency,
             executionTarget: .hybrid,
@@ -270,8 +312,12 @@ public class GenerationService {
             performanceMetrics: PerformanceMetrics(
                 inferenceTimeMs: latency,
                 tokensPerSecond: tokensPerSecond,
-                peakMemoryUsage: memoryUsage
-            )
+                peakMemoryUsage: memoryUsage,
+                thinkingTimeMs: thinkingTimeMs,
+                responseTimeMs: responseTimeMs
+            ),
+            thinkingTokens: tokenCounts.thinkingTokens,
+            responseTokens: tokenCounts.responseTokens
         )
     }
 }

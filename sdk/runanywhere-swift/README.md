@@ -30,12 +30,12 @@
 - 🚀 **Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
 - ⚡ **Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
 - 🧠 **Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
-- 📱 **Cross-Platform** - iOS 14.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
+- 📱 **Cross-Platform** - iOS 16.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
 - 🎛️ **Component Architecture** - Modular components for flexible AI pipeline construction
 
 ## Requirements
 
-- iOS 14.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
+- iOS 16.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
 - Xcode 15.0+
 - Swift 5.9+
 
@@ -51,32 +51,31 @@ Add RunAnywhere to your project directly from GitHub - no package registry neede
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
 3. **Select version rule:**
-   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.13.0`
-   - **Specific Version**: Choose **Exact** and enter `0.13.0`
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.15.2`
+   - **Specific Version**: Choose **Exact** and enter `0.15.2`
    - **Development Branch**: Choose **Branch** and enter `main`
-4. Select the `runanywhere-swift` product
+4. Select products based on your needs:
+   - `RunAnywhere` - Core SDK (required)
+   - `LLMSwift` - GGUF/GGML models (optional, iOS 16+)
+   - `WhisperKitTranscription` - Speech-to-text (optional, iOS 16+)
+   - `FluidAudioDiarization` - Speaker diarization (optional, iOS 17+)
 5. Click **Add Package**
 
 #### Via Package.swift
 
-**Latest Release (Recommended):**
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
-]
-```
-
-**Specific Version:**
-```swift
-dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.13.0")
-]
-```
-
-**Development Branch:**
-```swift
-dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", .branch("main"))
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.2")
+],
+targets: [
+    .target(
+        name: "YourApp",
+        dependencies: [
+            .product(name: "RunAnywhere", package: "runanywhere-sdks"),
+            .product(name: "LLMSwift", package: "runanywhere-sdks"),
+            .product(name: "WhisperKitTranscription", package: "runanywhere-sdks")
+        ]
+    )
 ]
 ```
 

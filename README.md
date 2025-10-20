@@ -68,7 +68,7 @@ The Android Kotlin Multiplatform SDK provides high-performance on-device text ge
 - **🚀 Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
 - **⚡ Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
 - **🧠 Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
-- **📱 Cross-Platform** - iOS 14.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
+- **📱 Cross-Platform** - iOS 16.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
 - **🎛️ Component Architecture** - Modular components for flexible AI pipeline construction
 
 ### Android SDK Features
@@ -123,6 +123,13 @@ try await RunAnywhere.initialize(
 
 // 2. Register framework adapters
 await LLMSwiftServiceProvider.register()
+
+let options = AdapterRegistrationOptions(
+    validateModels: false,
+    autoDownloadInDev: false,
+    showProgress: true
+)
+
 try await RunAnywhere.registerFrameworkAdapter(
     LLMSwiftAdapter(),
     models: [
@@ -133,14 +140,15 @@ try await RunAnywhere.registerFrameworkAdapter(
             name: "SmolLM2 360M",
             memoryRequirement: 500_000_000
         )
-    ]
+    ],
+    options: options
 )
 
 // 3. Download and load model
 try await RunAnywhere.downloadModel("smollm2-360m")
 try await RunAnywhere.loadModel("smollm2-360m")
 
-// 4. Generate text
+// 4. Generate text with analytics
 let result = try await RunAnywhere.generate(
     "Explain quantum computing in simple terms",
     options: RunAnywhereGenerationOptions(
@@ -150,6 +158,8 @@ let result = try await RunAnywhere.generate(
 )
 
 print("Generated: \(result.text)")
+print("Speed: \(result.performanceMetrics.tokensPerSecond) tok/s")
+print("Tokens: \(result.tokensUsed)")
 ```
 
 [View full iOS documentation →](sdk/runanywhere-swift/)
@@ -228,7 +238,7 @@ suspend fun cleanup() {
 ## 📋 System Requirements
 
 ### iOS SDK
-- **Platforms**: iOS 14.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
+- **Platforms**: iOS 16.0+ / macOS 12.0+ / tvOS 14.0+ / watchOS 7.0+
 - **Development**: Xcode 15.0+, Swift 5.9+
 - **Recommended**: iOS 17.0+ for full feature support
 
@@ -251,47 +261,34 @@ Add RunAnywhere to your project:
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`
 3. **Select version rule:**
-   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.13.0`
-   - **Specific Version**: Choose **Exact** and enter `0.13.0`
+   - **Latest Release (Recommended)**: Choose **Up to Next Major** from `0.15.2`
+   - **Specific Version**: Choose **Exact** and enter `0.15.2`
    - **Development Branch**: Choose **Branch** and enter `main`
-4. Select the `runanywhere-swift` product
+4. Select products based on your needs:
+   - `RunAnywhere` - Core SDK (required)
+   - `LLMSwift` - GGUF/GGML models via llama.cpp (optional, iOS 16+)
+   - `WhisperKitTranscription` - Speech-to-text (optional, iOS 16+)
+   - `FluidAudioDiarization` - Speaker diarization (optional, iOS 17+)
 5. Click **Add Package**
 
 #### Via Package.swift
 
-**Latest Release (Recommended):**
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.13.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.2")
+],
+targets: [
+    .target(
+        name: "YourApp",
+        dependencies: [
+            .product(name: "RunAnywhere", package: "runanywhere-sdks"),
+            .product(name: "LLMSwift", package: "runanywhere-sdks"),
+            .product(name: "WhisperKitTranscription", package: "runanywhere-sdks")
+        ]
+    )
 ]
 ```
 
-**Specific Version:**
-```swift
-dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.13.0")
-]
-```
-
-**Development Branch:**
-```swift
-dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", .branch("main"))
-]
-```
-
-
-#### CocoaPods
-
-**Latest Release (Recommended):**
-```ruby
-pod 'RunAnywhere', '~> 0.13'
-```
-
-**Specific Version:**
-```ruby
-pod 'RunAnywhere', '0.13.0'
-```
 
 ### Android SDK
 
@@ -360,11 +357,14 @@ repositories {
 
 ### Privacy-First Chat Application
 ```swift
-// All processing stays on-device
+// All processing stays on-device with analytics
 let result = try await RunAnywhere.generate(
     userMessage,
     options: RunAnywhereGenerationOptions(maxTokens: 150)
 )
+
+print("Response: \(result.text)")
+print("Speed: \(result.performanceMetrics.tokensPerSecond) tok/s")
 ```
 
 ### Voice Assistant
@@ -407,6 +407,78 @@ let quiz = try await RunAnywhere.generateStructured(
     prompt: "Create a quiz about Swift programming",
     options: options
 )
+```
+
+### Analytics & Performance Metrics
+
+All generation methods return comprehensive analytics:
+
+```swift
+let result = try await RunAnywhere.generate(prompt, options: options)
+
+// Access performance metrics
+print("Speed: \(result.performanceMetrics.tokensPerSecond) tok/s")
+print("First token: \(result.performanceMetrics.timeToFirstTokenMs ?? 0)ms")
+print("Total time: \(result.latencyMs)ms")
+print("Memory: \(result.memoryUsed / 1024 / 1024)MB")
+
+// For thinking models (models that support <think> tags)
+if let thinkingTokens = result.thinkingTokens {
+    print("Thinking tokens: \(thinkingTokens)")
+    print("Response tokens: \(result.responseTokens)")
+}
+```
+
+### Streaming with Final Metrics
+
+Streaming returns both real-time tokens and final analytics:
+
+```swift
+let streamResult = try await RunAnywhere.generateStream(prompt, options: options)
+
+// Display tokens in real-time
+for try await token in streamResult.stream {
+    print(token, terminator: "")
+}
+
+// Get complete analytics after streaming finishes
+let metrics = try await streamResult.result.value
+print("\nSpeed: \(metrics.performanceMetrics.tokensPerSecond) tok/s")
+print("Total tokens: \(metrics.tokensUsed)")
+```
+
+### Model Management
+
+```swift
+// Download with progress tracking
+let progressStream = try await RunAnywhere.downloadModelWithProgress("model-id")
+for try await progress in progressStream {
+    print("Progress: \(Int(progress.percentage * 100))%")
+}
+
+// Load and unload models
+try await RunAnywhere.loadModel("model-id")
+try await RunAnywhere.unloadModel()
+
+// List available models
+let models = try await RunAnywhere.listAvailableModels()
+
+// Check current model
+if let current = RunAnywhere.currentModel {
+    print("Currently loaded: \(current.name)")
+}
+```
+
+### Token Estimation
+
+```swift
+let count = RunAnywhere.estimateTokenCount("Your prompt here")
+print("Estimated: \(count) tokens")
+
+// Check if prompt fits in context window
+if count + maxTokens > 4096 {
+    print("Warning: May exceed context limit")
+}
 ```
 
 ## 📖 Documentation
