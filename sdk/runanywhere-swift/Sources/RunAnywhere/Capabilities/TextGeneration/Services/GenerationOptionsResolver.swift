@@ -78,6 +78,7 @@ public struct GenerationOptionsResolver {
             ),
             streamingEnabled: baseOptions.streamingEnabled,
             preferredExecutionTarget: baseOptions.preferredExecutionTarget,
+            preferredFramework: baseOptions.preferredFramework,
             structuredOutput: baseOptions.structuredOutput,
             systemPrompt: baseOptions.systemPrompt
         )

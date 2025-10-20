@@ -1,13 +1,16 @@
 import Foundation
 
 /// Service responsible for loading models
-public class ModelLoadingService {
+/// Actor ensures thread-safe access and prevents concurrent duplicate loads
+public actor ModelLoadingService {
     private let registry: ModelRegistry
     private let adapterRegistry: AdapterRegistry
     private let memoryService: MemoryManager // Using MemoryManager protocol for now
     private let logger = SDKLogger(category: "ModelLoadingService")
 
     private var loadedModels: [String: LoadedModel] = [:]
+    /// Track in-flight loading tasks to prevent duplicate concurrent loads
+    private var inflightLoads: [String: Task<LoadedModel, Error>] = [:]
 
     public init(
         registry: ModelRegistry,
@@ -20,12 +23,53 @@ public class ModelLoadingService {
     }
 
     /// Load a model by identifier
+    /// Concurrent calls for the same model will be deduplicated
     public func loadModel(_ modelId: String) async throws -> LoadedModel {
         logger.info("🚀 Loading model: \(modelId)")
 
         // Check if already loaded
         if let loaded = loadedModels[modelId] {
             logger.info("✅ Model already loaded: \(modelId)")
+            return loaded
+        }
+
+        // Check if a load is already in progress
+        if let existingTask = inflightLoads[modelId] {
+            logger.info("⏳ Model load already in progress, awaiting existing task: \(modelId)")
+            return try await existingTask.value
+        }
+
+        // Create a new loading task
+        let loadTask = Task<LoadedModel, Error> { [weak self] in
+            guard let self = self else {
+                throw SDKError.invalidState("ModelLoadingService deallocated during load")
+            }
+            return try await self.performLoad(modelId: modelId)
+        }
+
+        // Store the task to prevent duplicate loads
+        inflightLoads[modelId] = loadTask
+
+        // Ensure task is removed when complete (success or failure)
+        defer {
+            Task { [weak self] in
+                await self?.cleanupInflightTask(modelId: modelId)
+            }
+        }
+
+        return try await loadTask.value
+    }
+
+    /// Cleanup in-flight task after completion
+    private func cleanupInflightTask(modelId: String) {
+        inflightLoads.removeValue(forKey: modelId)
+    }
+
+    /// Perform the actual model loading
+    private func performLoad(modelId: String) async throws -> LoadedModel {
+        // Double-check if loaded while we were waiting
+        if let loaded = loadedModels[modelId] {
+            logger.info("✅ Model loaded by another task: \(modelId)")
             return loaded
         }
 
@@ -49,6 +93,15 @@ public class ModelLoadingService {
             logger.info("🏗️ Built-in model detected, skipping file check")
         }
 
+        // ModelLoadingService handles LLM models only
+        // STT models are loaded through STTComponent → ModuleRegistry → STT providers
+        if modelInfo.category == .speechRecognition || modelInfo.preferredFramework == .whisperKit {
+            logger.error("❌ Cannot load STT model through ModelLoadingService")
+            throw SDKError.loadingFailed(
+                "Model '\(modelId)' is a speech recognition model. STT models are loaded automatically through STTComponent."
+            )
+        }
+
         // Check memory availability
         let memoryRequired = modelInfo.memoryRequired ?? 1024 * 1024 * 1024 // Default 1GB if not specified
         let canAllocate = try await memoryService.canAllocate(memoryRequired)
@@ -56,10 +109,14 @@ public class ModelLoadingService {
             throw SDKError.loadingFailed("Insufficient memory")
         }
 
-        // Find appropriate adapter
-        logger.info("🚀 Finding adapter for model")
+        // ModelLoadingService handles LLMs only; constrain to text-to-text modality
+        let modality: FrameworkModality = .textToText
 
-        guard let adapter = adapterRegistry.findBestAdapter(for: modelInfo) else {
+        // Find all adapters that can handle this model
+        logger.info("🚀 Finding adapters for model (modality: \(modality))")
+        let adapters = await adapterRegistry.findAllAdapters(for: modelInfo, modality: modality)
+
+        guard !adapters.isEmpty else {
             logger.error("❌ No adapter found for model with preferred framework: \(modelInfo.preferredFramework?.rawValue ?? "none")")
             logger.error("❌ Compatible frameworks: \(modelInfo.compatibleFrameworks.map { $0.rawValue })")
             throw SDKError.frameworkNotAvailable(
@@ -67,33 +124,47 @@ public class ModelLoadingService {
             )
         }
 
-        logger.info("✅ Found adapter for framework: \(adapter.framework.rawValue)")
+        logger.info("✅ Found \(adapters.count) adapter(s) capable of loading this model")
 
-        // Determine modality based on model (for now, default to textToText for LLMs)
-        let modality: FrameworkModality = modelInfo.preferredFramework == .whisperKit ? .voiceToText : .textToText
+        // Try to load with each adapter (primary + fallbacks)
+        var lastError: Error?
+        for (index, adapter) in adapters.enumerated() {
+            let isPrimary = index == 0
+            logger.info(isPrimary ? "🚀 Trying primary adapter: \(adapter.framework.rawValue)" : "🔄 Trying fallback adapter: \(adapter.framework.rawValue)")
 
-        // Load model through adapter
-        logger.info("🚀 Loading model through adapter")
-        let service = try await adapter.loadModel(modelInfo, for: modality)
-        logger.info("✅ Model loaded through adapter")
+            do {
+                let service = try await adapter.loadModel(modelInfo, for: modality)
+                logger.info("✅ Model loaded successfully with \(adapter.framework.rawValue)")
 
-        // Cast to LLMService
-        guard let llmService = service as? LLMService else {
-            throw SDKError.loadingFailed("Adapter returned incompatible service type")
+                // Cast to LLMService (by construction: text-to-text modality)
+                guard let llmService = service as? LLMService else {
+                    throw SDKError.loadingFailed(
+                        "Adapter '\(adapter.framework.rawValue)' did not return an LLMService for text-to-text modality"
+                    )
+                }
+
+                // Create loaded model
+                let loaded = LoadedModel(model: modelInfo, service: llmService)
+
+                // Register loaded model
+                memoryService.registerLoadedModel(
+                    loaded,
+                    size: modelInfo.memoryRequired ?? memoryRequired,
+                    service: llmService
+                )
+                loadedModels[modelId] = loaded
+
+                return loaded
+            } catch {
+                logger.error("❌ Failed to load model with \(adapter.framework.rawValue): \(error.localizedDescription)")
+                lastError = error
+                // Continue to next adapter
+            }
         }
 
-        // Create loaded model
-        let loaded = LoadedModel(model: modelInfo, service: llmService)
-
-        // Register loaded model
-        memoryService.registerLoadedModel(
-            loaded,
-            size: modelInfo.memoryRequired ?? memoryRequired,
-            service: llmService
-        )
-        loadedModels[modelId] = loaded
-
-        return loaded
+        // All adapters failed
+        logger.error("❌ All adapters failed to load model")
+        throw lastError ?? SDKError.loadingFailed("Failed to load model with any available adapter")
     }
 
     /// Unload a model

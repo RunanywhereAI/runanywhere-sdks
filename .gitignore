@@ -237,3 +237,6 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 *.dylib
 *.dll
 *.a
+
+# Backup directories
+examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/

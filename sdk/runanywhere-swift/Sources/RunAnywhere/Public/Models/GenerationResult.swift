@@ -1,5 +1,24 @@
 import Foundation
 
+/// Container for streaming generation with metrics
+/// Provides both the token stream and a task that resolves to final metrics
+public struct StreamingResult {
+    /// Stream of tokens as they are generated
+    public let stream: AsyncThrowingStream<String, Error>
+
+    /// Task that completes with final generation result including metrics
+    /// Resolves after streaming is complete
+    public let result: Task<GenerationResult, Error>
+
+    public init(
+        stream: AsyncThrowingStream<String, Error>,
+        result: Task<GenerationResult, Error>
+    ) {
+        self.stream = stream
+        self.result = result
+    }
+}
+
 /// Result of a text generation request
 public struct GenerationResult {
     /// Generated text (with thinking content removed if extracted)
@@ -38,6 +57,14 @@ public struct GenerationResult {
     /// Structured output validation result (if structured output was requested)
     public var structuredOutputValidation: StructuredOutputValidation?
 
+    // MARK: - Thinking Mode Token Metrics
+
+    /// Number of tokens used for thinking/reasoning (if model supports thinking mode)
+    public let thinkingTokens: Int?
+
+    /// Number of tokens in the actual response content (excluding thinking)
+    public let responseTokens: Int
+
     /// Initializer
     internal init(
         text: String,
@@ -51,7 +78,9 @@ public struct GenerationResult {
         hardwareUsed: HardwareAcceleration = .cpu,
         memoryUsed: Int64 = 0,
         performanceMetrics: PerformanceMetrics,
-        structuredOutputValidation: StructuredOutputValidation? = nil
+        structuredOutputValidation: StructuredOutputValidation? = nil,
+        thinkingTokens: Int? = nil,
+        responseTokens: Int? = nil
     ) {
         self.text = text
         self.thinkingContent = thinkingContent
@@ -65,5 +94,7 @@ public struct GenerationResult {
         self.memoryUsed = memoryUsed
         self.performanceMetrics = performanceMetrics
         self.structuredOutputValidation = structuredOutputValidation
+        self.thinkingTokens = thinkingTokens
+        self.responseTokens = responseTokens ?? tokensUsed
     }
 }

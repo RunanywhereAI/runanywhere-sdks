@@ -13,6 +13,11 @@ public struct STTOptions: Sendable {
     public let enableTimestamps: Bool
     public let vocabularyFilter: [String]
     public let audioFormat: AudioFormat
+    /// Preferred framework for transcription
+    /// When multiple STT providers are registered (e.g., WhisperKit, WhisperCPP),
+    /// this can be used to select a specific framework.
+    /// Currently reserved for future use when dynamic provider selection is implemented.
+    public let preferredFramework: LLMFramework?
 
     public init(
         language: String = "en",
@@ -22,7 +27,8 @@ public struct STTOptions: Sendable {
         maxSpeakers: Int? = nil,
         enableTimestamps: Bool = true,
         vocabularyFilter: [String] = [],
-        audioFormat: AudioFormat = .pcm
+        audioFormat: AudioFormat = .pcm,
+        preferredFramework: LLMFramework? = nil
     ) {
         self.language = language
         self.detectLanguage = detectLanguage
@@ -32,6 +38,7 @@ public struct STTOptions: Sendable {
         self.enableTimestamps = enableTimestamps
         self.vocabularyFilter = vocabularyFilter
         self.audioFormat = audioFormat
+        self.preferredFramework = preferredFramework
     }
 }
 
@@ -601,8 +608,13 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             maxSpeakers: nil,
             enableTimestamps: sttConfiguration.enableTimestamps,
             vocabularyFilter: sttConfiguration.vocabularyList,
-            audioFormat: input.format
+            audioFormat: input.format,
+            preferredFramework: nil  // Use default provider selection
         )
+
+        // Note: preferredFramework in STTOptions can be used in createService() for provider selection
+        // Currently, the service is already created during component initialization
+        // Future enhancement: Support dynamic provider switching based on preferredFramework
 
         // Get audio data
         let audioData: Data

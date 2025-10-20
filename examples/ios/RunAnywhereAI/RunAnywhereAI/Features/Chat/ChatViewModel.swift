@@ -321,85 +321,34 @@ class ChatViewModel: ObservableObject {
                 logger.info("📝 Generation options created, useStreaming: \(self.useStreaming)")
 
                 if useStreaming {
-                    // Use streaming generation for real-time updates
+                    // Use streaming generation with SDK metrics tracking
                     var fullResponse = ""
                     var isInThinkingMode = false
                     var thinkingContent = ""
                     var responseContent = ""
-                    var _ = Date() // lastTokenTime tracking for future use
-                    let _ : TimeInterval = 30.0 // 30 seconds timeout for thinking (not used yet)
 
-                    // Analytics tracking
-                    let startTime = Date()
-                    var firstTokenTime: Date? = nil
-                    var thinkingStartTime: Date? = nil
-                    var thinkingEndTime: Date? = nil
-                    var tokensPerSecondHistory: [Double] = []
-                    var totalTokensReceived = 0
-                    var wasInterrupted = false
-
-                    logger.info("📤 Sending prompt to SDK.generateStream")
-                    let stream = RunAnywhere.generateStream(fullPrompt, options: options)
+                    logger.info("📤 Sending prompt to SDK.generateStream (with analytics)")
+                    let streamingResult = try await RunAnywhere.generateStream(fullPrompt, options: options)
+                    let stream = streamingResult.stream
+                    let metricsTask = streamingResult.result
 
                     // Stream tokens as they arrive
                     for try await token in stream {
                         fullResponse += token
-                        // Track token timing (lastTokenTime could be used for timeout detection)
-                        totalTokensReceived += 1
 
-                        // Track first token time
-                        if firstTokenTime == nil {
-                            firstTokenTime = Date()
-                        }
-
-                        // Calculate real-time tokens per second every 10 tokens
-                        if totalTokensReceived % 10 == 0 {
-                            let elapsed = Date().timeIntervalSince(firstTokenTime ?? startTime)
-                            if elapsed > 0 {
-                                let currentSpeed = Double(totalTokensReceived) / elapsed
-                                tokensPerSecondHistory.append(currentSpeed)
-                            }
-                        }
-
-                        // Check for thinking tags
-                        if fullResponse.contains("<think>") && !isInThinkingMode {
-                            isInThinkingMode = true
-                            thinkingStartTime = Date()
-                            logger.info("🧠 Entering thinking mode")
-                        }
-
-                        if isInThinkingMode {
-                            if fullResponse.contains("</think>") {
-                                // Extract thinking and response content
-                                if let thinkingStart = fullResponse.range(of: "<think>"),
-                                   let thinkingEnd = fullResponse.range(of: "</think>") {
-                                    thinkingContent = String(fullResponse[thinkingStart.upperBound..<thinkingEnd.lowerBound])
-                                    responseContent = String(fullResponse[thinkingEnd.upperBound...])
-                                    isInThinkingMode = false
-                                    thinkingEndTime = Date()
-                                    logger.info("🧠 Exiting thinking mode - found closing tag")
-                                }
-                            } else {
-                                // Still in thinking mode, extract current thinking content
-                                if let thinkingStart = fullResponse.range(of: "<think>") {
-                                    thinkingContent = String(fullResponse[thinkingStart.upperBound...])
-                                }
-                            }
-                        } else {
-                            // Not in thinking mode, show response tokens directly
-                            responseContent = fullResponse.replacingOccurrences(of: "</think>", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                        }
+                        // SDK handles thinking content parsing automatically
+                        // Display content is already cleaned by SDK
+                        responseContent = fullResponse
 
                         // Update the assistant message with current content
                         await MainActor.run {
                             if messageIndex < self.messages.count {
                                 let currentMessage = self.messages[messageIndex]
-                                let displayContent = isInThinkingMode ? "" : responseContent
                                 let updatedMessage = Message(
                                     id: currentMessage.id,
                                     role: currentMessage.role,
-                                    content: displayContent,
-                                    thinkingContent: thinkingContent.isEmpty ? nil : thinkingContent.trimmingCharacters(in: .whitespacesAndNewlines),
+                                    content: responseContent,
+                                    thinkingContent: nil, // SDK will provide this in final result
                                     timestamp: currentMessage.timestamp
                                 )
                                 self.messages[messageIndex] = updatedMessage
@@ -412,102 +361,37 @@ class ChatViewModel: ObservableObject {
 
                     logger.info("Streaming completed with response: \(fullResponse)")
 
-                    // Analytics: Mark end time and check for interruption
-                    let endTime = Date()
-                    wasInterrupted = isInThinkingMode && !fullResponse.contains("</think>")
+                    // Get metrics from SDK
+                    let sdkResult = try await metricsTask.value
+                    logger.info("📊 SDK Metrics - Tokens: \(sdkResult.tokensUsed), Thinking: \(sdkResult.thinkingTokens ?? 0), Response: \(sdkResult.responseTokens)")
+                    logger.info("⏱️ SDK Timing - Total: \(sdkResult.latencyMs)ms, Thinking: \(sdkResult.performanceMetrics.thinkingTimeMs ?? 0)ms")
+                    logger.info("🚀 SDK Performance - Speed: \(sdkResult.performanceMetrics.tokensPerSecond) tok/s")
 
-                    // Handle edge case: Stream ended while still in thinking mode (token limit reached)
-                    if isInThinkingMode && !fullResponse.contains("</think>") {
-                        logger.warning("⚠️ Stream ended while in thinking mode - handling gracefully")
-                        wasInterrupted = true
-
-                        // Check if we have any thinking content to show
-                        if !thinkingContent.isEmpty {
-                            // Show the partial thinking content and treat the rest as response
-                            let remainingContent = fullResponse
-                                .replacingOccurrences(of: "<think>", with: "")
-                                .replacingOccurrences(of: thinkingContent, with: "")
-                                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                            await MainActor.run {
-                                if messageIndex < self.messages.count {
-                                    // Generate intelligent response based on thinking content
-                                    let intelligentResponse = remainingContent.isEmpty ?
-                                        self.generateThinkingSummaryResponse(from: thinkingContent) : remainingContent
-
-                                    let updatedMessage = Message(
-                                        id: self.messages[messageIndex].id,
-                                        role: self.messages[messageIndex].role,
-                                        content: intelligentResponse,
-                                        thinkingContent: thinkingContent.trimmingCharacters(in: .whitespacesAndNewlines),
-                                        timestamp: self.messages[messageIndex].timestamp
-                                    )
-                                    self.messages[messageIndex] = updatedMessage
-                                }
-                            }
-                        } else {
-                            // No thinking content, treat entire response as regular content
-                            let cleanContent = fullResponse
-                                .replacingOccurrences(of: "<think>", with: "")
-                                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-                            await MainActor.run {
-                                if messageIndex < self.messages.count {
-                                    let fallbackResponse = cleanContent.isEmpty ?
-                                        "I need to think more about this. Could you rephrase your question?" : cleanContent
-
-                                    let updatedMessage = Message(
-                                        id: self.messages[messageIndex].id,
-                                        role: self.messages[messageIndex].role,
-                                        content: fallbackResponse,
-                                        thinkingContent: nil,
-                                        timestamp: self.messages[messageIndex].timestamp
-                                    )
-                                    self.messages[messageIndex] = updatedMessage
-                                }
-                            }
-                        }
-                    } else {
-                        // Normal completion with proper closing tag
-                        if let thinkingRange = fullResponse.range(of: "<think>"),
-                           let thinkingEndRange = fullResponse.range(of: "</think>") {
-                            thinkingContent = String(fullResponse[thinkingRange.upperBound..<thinkingEndRange.lowerBound])
-                            responseContent = String(fullResponse[thinkingEndRange.upperBound...])
-
-                            await MainActor.run {
-                                if messageIndex < self.messages.count {
-                                    let updatedMessage = Message(
-                                        id: self.messages[messageIndex].id,
-                                        role: self.messages[messageIndex].role,
-                                        content: responseContent.trimmingCharacters(in: .whitespacesAndNewlines),
-                                        thinkingContent: thinkingContent.trimmingCharacters(in: .whitespacesAndNewlines),
-                                        timestamp: self.messages[messageIndex].timestamp
-                                    )
-                                    self.messages[messageIndex] = updatedMessage
-                                }
-                            }
+                    // Update final message with SDK-provided thinking content
+                    await MainActor.run {
+                        if messageIndex < self.messages.count {
+                            let currentMessage = self.messages[messageIndex]
+                            let updatedMessage = Message(
+                                id: currentMessage.id,
+                                role: currentMessage.role,
+                                content: sdkResult.text,
+                                thinkingContent: sdkResult.thinkingContent,
+                                timestamp: currentMessage.timestamp
+                            )
+                            self.messages[messageIndex] = updatedMessage
                         }
                     }
 
-                    // Collect analytics for streaming generation
+                    // Convert SDK metrics to app analytics using the existing helper
                     if let conversationId = currentConversation?.id,
                        messageIndex < messages.count {
-                        let finalResponseContent = responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                        let finalThinkingContent = thinkingContent.isEmpty ? nil : thinkingContent.trimmingCharacters(in: .whitespacesAndNewlines)
-
-                        let analytics = collectMessageAnalytics(
+                        let analytics = analyticsFromGenerationResult(
+                            sdkResult,
                             messageId: messages[messageIndex].id.uuidString,
                             conversationId: conversationId,
-                            startTime: startTime,
-                            endTime: endTime,
-                            firstTokenTime: firstTokenTime,
-                            thinkingStartTime: thinkingStartTime,
-                            thinkingEndTime: thinkingEndTime,
+                            startTime: Date(timeIntervalSinceNow: -(sdkResult.latencyMs / 1000)),
                             inputText: prompt,
-                            outputText: finalResponseContent,
-                            thinkingText: finalThinkingContent,
-                            tokensPerSecondHistory: tokensPerSecondHistory,
-                            wasInterrupted: wasInterrupted,
+                            wasInterrupted: false,
                             options: options
                         )
 
@@ -536,54 +420,50 @@ class ChatViewModel: ObservableObject {
                         }
                     }
                 } else {
-                    // Use non-streaming generation to get thinking content
+                    // Use non-streaming generation - SDK returns full metrics
                     let startTime = Date()
-                    let wasInterrupted = false
-                    let resultText = try await RunAnywhere.generate(fullPrompt, options: options)
-                    let endTime = Date()
+                    logger.info("🎯 Using non-streaming generation with SDK metrics")
 
-                    logger.info("Generation completed with result: \(resultText)")
+                    let result = try await RunAnywhere.generate(fullPrompt, options: options)
 
-                    // Update the assistant message with the complete response
+                    logger.info("✅ Generation completed: \(result.text.prefix(100))...")
+                    logger.info("📊 SDK Metrics - Tokens: \(result.tokensUsed), Thinking: \(result.thinkingTokens ?? 0), Response: \(result.responseTokens)")
+                    logger.info("⏱️ SDK Timing - Total: \(result.latencyMs)ms, Thinking: \(result.performanceMetrics.thinkingTimeMs ?? 0)ms")
+
+                    // Update the assistant message with response from SDK
                     await MainActor.run {
                         if messageIndex < self.messages.count {
                             let currentMessage = self.messages[messageIndex]
                             let updatedMessage = Message(
                                 role: currentMessage.role,
-                                content: resultText,
-                                thinkingContent: nil, // No thinking content in simple generation
+                                content: result.text,
+                                thinkingContent: result.thinkingContent,
                                 timestamp: currentMessage.timestamp
                             )
                             self.messages[messageIndex] = updatedMessage
                         }
                     }
 
-                    // Collect analytics for non-streaming generation
+                    // Convert SDK metrics to app analytics
                     if let conversationId = currentConversation?.id,
                        messageIndex < messages.count {
-                        let analytics = collectMessageAnalytics(
+                        let analytics = analyticsFromGenerationResult(
+                            result,
                             messageId: messages[messageIndex].id.uuidString,
                             conversationId: conversationId,
                             startTime: startTime,
-                            endTime: endTime,
-                            firstTokenTime: nil, // Not applicable for non-streaming
-                            thinkingStartTime: nil, // Not tracked separately in non-streaming
-                            thinkingEndTime: nil,
                             inputText: prompt,
-                            outputText: resultText,
-                            thinkingText: nil, // No thinking content in simple generation
-                            tokensPerSecondHistory: [], // Not applicable for non-streaming
-                            wasInterrupted: wasInterrupted,
+                            wasInterrupted: false,
                             options: options
                         )
 
-                        // Update message with analytics
+                        // Update message with analytics from SDK
                         await MainActor.run {
                             if let analytics = analytics, messageIndex < self.messages.count {
                                 let currentMessage = self.messages[messageIndex]
                                 let modelInfo = ModelListViewModel.shared.currentModel != nil ? MessageModelInfo(from: ModelListViewModel.shared.currentModel!) : nil
 
-                                self.logger.info("📊 Attaching analytics to message \(messageIndex): tokens/sec = \(analytics.averageTokensPerSecond), time = \(analytics.totalGenerationTime)")
+                                self.logger.info("📊 Using SDK analytics: tokens/sec = \(analytics.averageTokensPerSecond), time = \(analytics.totalGenerationTime)")
 
                                 let updatedMessage = Message(
                                     id: currentMessage.id,
@@ -601,8 +481,6 @@ class ChatViewModel: ObservableObject {
                             }
                         }
                     }
-
-                    // No need to update context - it's managed in messages array
                 }
             } catch {
                 logger.error("❌ Generation failed with error: \(error)")
@@ -918,47 +796,36 @@ class ChatViewModel: ObservableObject {
 
     // MARK: - Analytics Service
 
-    private func collectMessageAnalytics(
+    /// Convert SDK's GenerationResult to MessageAnalytics (NEW - uses SDK metrics!)
+    private func analyticsFromGenerationResult(
+        _ result: GenerationResult,
         messageId: String,
         conversationId: String,
         startTime: Date,
-        endTime: Date,
-        firstTokenTime: Date?,
-        thinkingStartTime: Date?,
-        thinkingEndTime: Date?,
         inputText: String,
-        outputText: String,
-        thinkingText: String?,
-        tokensPerSecondHistory: [Double],
-        wasInterrupted: Bool,
+        wasInterrupted: Bool = false,
         options: RunAnywhereGenerationOptions
     ) -> MessageAnalytics? {
-
         guard let modelName = loadedModelName,
               let currentModel = ModelListViewModel.shared.currentModel else {
             logger.warning("Cannot create analytics - no model info available")
             return nil
         }
 
-        let totalGenerationTime = endTime.timeIntervalSince(startTime)
-        let timeToFirstToken = firstTokenTime?.timeIntervalSince(startTime)
+        // SDK provides timing metrics (convert ms to seconds)
+        let totalGenerationTime = result.latencyMs / 1000.0
+        let timeToFirstToken = result.performanceMetrics.timeToFirstTokenMs.map { $0 / 1000.0 }
+        let thinkingTime = result.performanceMetrics.thinkingTimeMs.map { $0 / 1000.0 }
+        let responseTime = result.performanceMetrics.responseTimeMs.map { $0 / 1000.0 }
 
-        var thinkingTime: TimeInterval? = nil
-        var responseTime: TimeInterval? = nil
+        // SDK provides accurate token counts
+        let inputTokens = RunAnywhere.estimateTokenCount(inputText) // Use SDK's token counter via RunAnywhere namespace
+        let outputTokens = result.tokensUsed
+        let thinkingTokens = result.thinkingTokens
+        let responseTokens = result.responseTokens
 
-        if let thinkingStart = thinkingStartTime, let thinkingEnd = thinkingEndTime {
-            thinkingTime = thinkingEnd.timeIntervalSince(thinkingStart)
-            responseTime = totalGenerationTime - (thinkingTime ?? 0)
-        }
-
-        // Calculate token counts
-        let inputTokens = estimateTokenCount(inputText)
-        let outputTokens = estimateTokenCount(outputText)
-        let thinkingTokens = thinkingText != nil ? estimateTokenCount(thinkingText!) : nil
-        let responseTokens = outputTokens - (thinkingTokens ?? 0)
-
-        // Calculate average tokens per second
-        let averageTokensPerSecond = totalGenerationTime > 0 ? Double(outputTokens) / totalGenerationTime : 0
+        // SDK provides tokens per second
+        let averageTokensPerSecond = result.performanceMetrics.tokensPerSecond
 
         // Determine completion status
         let completionStatus: MessageAnalytics.CompletionStatus = wasInterrupted ? .interrupted : .complete
@@ -971,12 +838,17 @@ class ChatViewModel: ObservableObject {
             topK: nil
         )
 
+        logger.info("📊 Creating analytics from SDK result:")
+        logger.info("  - Total tokens: \(outputTokens) (thinking: \(thinkingTokens ?? 0), response: \(responseTokens))")
+        logger.info("  - Timing: total=\(totalGenerationTime)s, thinking=\(thinkingTime ?? 0)s, response=\(responseTime ?? 0)s")
+        logger.info("  - Speed: \(averageTokensPerSecond) tok/s")
+
         return MessageAnalytics(
             messageId: messageId,
             conversationId: conversationId,
             modelId: currentModel.id,
             modelName: modelName,
-            framework: currentModel.compatibleFrameworks.first?.rawValue ?? "unknown",
+            framework: result.framework?.rawValue ?? currentModel.compatibleFrameworks.first?.rawValue ?? "unknown",
             timestamp: startTime,
             timeToFirstToken: timeToFirstToken,
             totalGenerationTime: totalGenerationTime,
@@ -987,23 +859,19 @@ class ChatViewModel: ObservableObject {
             thinkingTokens: thinkingTokens,
             responseTokens: responseTokens,
             averageTokensPerSecond: averageTokensPerSecond,
-            messageLength: outputText.count,
-            wasThinkingMode: thinkingText != nil,
+            messageLength: result.text.count,
+            wasThinkingMode: result.thinkingContent != nil,
             wasInterrupted: wasInterrupted,
             retryCount: 0,
             completionStatus: completionStatus,
-            tokensPerSecondHistory: tokensPerSecondHistory,
-            generationMode: useStreaming ? .streaming : .nonStreaming,
-            contextWindowUsage: 0.0, // TODO: Calculate based on model context size
+            tokensPerSecondHistory: [], // Not tracked in non-streaming
+            generationMode: .nonStreaming,
+            contextWindowUsage: 0.0,
             generationParameters: generationParameters
         )
     }
 
-    // Simple token estimation (approximate)
-    private func estimateTokenCount(_ text: String) -> Int {
-        // Rough estimation: ~4 characters per token for English text
-        return Int(ceil(Double(text.count) / 4.0))
-    }
+    // Note: collectMessageAnalytics removed - now using SDK metrics directly via analyticsFromGenerationResult
 
     private func updateConversationAnalytics() {
         guard let conversation = currentConversation else { return }

@@ -2,19 +2,28 @@ import Foundation
 
 /// Single registry for all framework adapters (text and voice)
 public final class AdapterRegistry {
+    private let registry = UnifiedServiceRegistry()
+
+    // Legacy storage for backward compatibility
     private var adapters: [LLMFramework: UnifiedFrameworkAdapter] = [:]
     private let queue = DispatchQueue(label: "com.runanywhere.adapterRegistry", attributes: .concurrent)
 
     // MARK: - Registration
 
-    /// Register a unified framework adapter
-    func register(_ adapter: UnifiedFrameworkAdapter) {
-        // First, register the adapter in the concurrent queue
+    /// Register a unified framework adapter with optional priority
+    /// Higher priority adapters are preferred (default: 100)
+    func register(_ adapter: UnifiedFrameworkAdapter, priority: Int = 100) {
+        // Register in new unified registry
+        Task {
+            await registry.register(adapter, priority: priority)
+        }
+
+        // Also register in legacy storage for backward compatibility
         queue.async(flags: .barrier) {
             self.adapters[adapter.framework] = adapter
         }
 
-        // Then call external services outside of the queue to prevent deadlocks
+        // Call external services outside of the queue to prevent deadlocks
         Task {
             // Call the adapter's onRegistration method
             adapter.onRegistration()
@@ -41,9 +50,27 @@ public final class AdapterRegistry {
         }
     }
 
-    /// Find best adapter for a model
-    func findBestAdapter(for model: ModelInfo) -> UnifiedFrameworkAdapter? {
-        queue.sync {
+    /// Find best adapter for a model (uses new unified registry)
+    func findBestAdapter(for model: ModelInfo, modality: FrameworkModality? = nil) async -> UnifiedFrameworkAdapter? {
+        // Determine modality if not provided
+        let targetModality = modality ?? determineModality(for: model)
+
+        // Use unified registry
+        return await registry.findBestAdapter(for: model, modality: targetModality)
+    }
+
+    /// Find all adapters capable of handling a model (NEW)
+    func findAllAdapters(for model: ModelInfo, modality: FrameworkModality? = nil) async -> [UnifiedFrameworkAdapter] {
+        // Determine modality if not provided
+        let targetModality = modality ?? determineModality(for: model)
+
+        // Use unified registry
+        return await registry.findAdapters(for: model, modality: targetModality)
+    }
+
+    /// Synchronous version for backward compatibility
+    func findBestAdapterSync(for model: ModelInfo) -> UnifiedFrameworkAdapter? {
+        return queue.sync {
             // First try preferred framework
             if let preferred = model.preferredFramework,
                let adapter = adapters[preferred],
@@ -61,6 +88,17 @@ public final class AdapterRegistry {
 
             return nil
         }
+    }
+
+    /// Determine modality from model info
+    private func determineModality(for model: ModelInfo) -> FrameworkModality {
+        // Check if it's a speech model
+        if model.category == .speechRecognition || model.id.lowercased().contains("whisper") {
+            return .voiceToText
+        }
+
+        // Default to text-to-text for LLMs
+        return .textToText
     }
 
     /// Get all registered adapters
