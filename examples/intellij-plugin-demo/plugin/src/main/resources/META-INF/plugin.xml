@@ -85,16 +85,6 @@
             <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="RunAnywhere.VoiceCommand" />
         </action>
 
-        <!-- SDK Test Action -->
-        <action id="RunAnywhere.SDKTest"
-                class="com.runanywhere.plugin.actions.SDKTestAction"
-                text="Test RunAnywhere SDK"
-                description="Test RunAnywhere SDK integration"
-                icon="AllIcons.Actions.Lightning">
-            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="RunAnywhere.ModelManager" />
-            <keyboard-shortcut first-keystroke="ctrl shift T" keymap="$default" />
-        </action>
-
         <!-- Group all RunAnywhere actions -->
         <group id="RunAnywhere.ActionGroup"
                text="RunAnywhere"
@@ -104,8 +94,6 @@
             <reference ref="RunAnywhere.VoiceCommand" />
             <reference ref="RunAnywhere.VoiceDictation" />
             <reference ref="RunAnywhere.ModelManager" />
-            <separator />
-            <reference ref="RunAnywhere.SDKTest" />
         </group>
     </actions>
 </idea-plugin>
