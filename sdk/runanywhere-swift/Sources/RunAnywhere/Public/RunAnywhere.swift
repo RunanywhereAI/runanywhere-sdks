@@ -113,6 +113,13 @@ public enum RunAnywhere {
             // Step 5: Setup local services only (no network calls)
             try serviceContainer.setupLocalServices(with: params)
 
+            // Step 6: Register device for development mode (async, non-blocking)
+            if params.environment == .development {
+                Task {
+                    await registerDevDeviceIfNeeded()
+                }
+            }
+
             // Mark as initialized
             isInitialized = true
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
@@ -292,6 +299,108 @@ public enum RunAnywhere {
         }
 
         return false
+    }
+
+    // MARK: - Development Device Registration
+
+    private static let devDeviceRegisteredKey = "com.runanywhere.sdk.devDeviceRegistered"
+
+    /// Check if device is already registered in development mode
+    private static func isDevDeviceRegistered() -> Bool {
+        // Check Keychain first
+        if let registered = KeychainManager.shared.get(devDeviceRegisteredKey),
+           registered == "true" {
+            return true
+        }
+
+        // Fallback to UserDefaults for development
+        return UserDefaults.standard.bool(forKey: devDeviceRegisteredKey)
+    }
+
+    /// Mark device as registered in development mode
+    private static func markDevDeviceAsRegistered() {
+        // Store in both Keychain and UserDefaults
+        try? KeychainManager.shared.set(devDeviceRegisteredKey, value: "true")
+        UserDefaults.standard.set(true, forKey: devDeviceRegisteredKey)
+    }
+
+    /// Register device for development mode (non-blocking, silent failures)
+    private static func registerDevDeviceIfNeeded() async {
+        let logger = SDKLogger(category: "RunAnywhere.DevRegistration")
+
+        // Check opt-out environment variable
+        if ProcessInfo.processInfo.environment["RUNANYWHERE_DISABLE_DEV_REGISTRATION"] == "1" {
+            logger.info("Dev device registration disabled via environment variable")
+            return
+        }
+
+        // Check if already registered
+        if isDevDeviceRegistered() {
+            logger.debug("Device already registered in development mode")
+            return
+        }
+
+        logger.info("Registering device in development mode...")
+
+        do {
+            try await registerDevDevice()
+            markDevDeviceAsRegistered()
+            logger.info("✅ Dev device registration successful")
+        } catch {
+            // Silent failure - don't block SDK initialization
+            logger.warning("Dev device registration failed (non-critical): \(error.localizedDescription)")
+        }
+    }
+
+    /// Perform the actual dev device registration
+    private static func registerDevDevice() async throws {
+        guard let params = initParams else {
+            throw SDKError.notInitialized
+        }
+
+        // Get device info
+        guard let deviceInfo = await DeviceInfoService.shared.getCurrentDeviceInfo() else {
+            throw SDKError.deviceInfoUnavailable
+        }
+
+        // Create registration request
+        let request = DevDeviceRegistrationRequest(
+            deviceId: deviceInfo.id,
+            deviceModel: deviceInfo.deviceModel,
+            osVersion: deviceInfo.osVersion,
+            chipName: deviceInfo.chipName,
+            totalMemory: deviceInfo.totalMemory,
+            hasNeuralEngine: deviceInfo.hasNeuralEngine,
+            architecture: deviceInfo.architecture.rawValue,
+            formFactor: deviceInfo.formFactor.rawValue,
+            sdkVersion: SDKConstants.version,
+            platform: SDKConstants.platform,
+            buildToken: BuildToken.token
+        )
+
+        // Make POST request to dev registration endpoint
+        let url = params.baseURL.appendingPathComponent(APIEndpoint.devDeviceRegistration.path)
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let encoder = JSONEncoder()
+        urlRequest.httpBody = try encoder.encode(request)
+
+        // Perform request
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SDKError.networkError("Invalid response from server")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            throw SDKError.networkError("Registration failed with status code: \(httpResponse.statusCode)")
+        }
+
+        // Parse response (optional, for validation)
+        let decoder = JSONDecoder()
+        let _ = try decoder.decode(DevDeviceRegistrationResponse.self, from: data)
     }
 
     // MARK: - Device ID Management

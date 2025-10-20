@@ -151,6 +151,10 @@ sdk/runanywhere-swift/Configuration/RunAnywhereConfig.prod.json
 sdk/runanywhere-swift/Configuration/*.private.json
 sdk/runanywhere-swift/Configuration/Private/
 
+# Build tokens (auto-generated during releases, should NOT be committed to main)
+# Real tokens are only in release tags, not in main branch
+sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/BuildToken.swift
+
 # Keep example files
 !sdk/runanywhere-swift/Configuration/RunAnywhereConfig.example.json
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
