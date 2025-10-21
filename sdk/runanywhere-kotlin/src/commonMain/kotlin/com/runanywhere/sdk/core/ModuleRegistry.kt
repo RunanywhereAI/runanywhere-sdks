@@ -21,75 +21,101 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
  * ModuleRegistry.shared.registerLLM(LlamaProvider())
  * ```
+ *
+ * Thread Safety:
+ * All operations are synchronized using a mutex to prevent race conditions
+ * during concurrent access. Registration can safely happen from multiple threads.
  */
 object ModuleRegistry {
 
     private val logger = SDKLogger("ModuleRegistry")
 
-    // Provider lists
-    private val sttProviders = mutableListOf<STTServiceProvider>()
-    private val vadProviders = mutableListOf<VADServiceProvider>()
-    private val llmProviders = mutableListOf<LLMServiceProvider>()
-    private val ttsProviders = mutableListOf<TTSServiceProvider>()
-    private val vlmProviders = mutableListOf<VLMServiceProvider>()
-    private val wakeWordProviders = mutableListOf<WakeWordServiceProvider>()
-    private val speakerDiarizationProviders = mutableListOf<SpeakerDiarizationServiceProvider>()
+    // Provider lists - protected by synchronized blocks for thread safety
+    // Matches iOS @MainActor pattern but using Kotlin's synchronized for cross-platform support
+    private val _sttProviders = mutableListOf<STTServiceProvider>()
+    private val _vadProviders = mutableListOf<VADServiceProvider>()
+    private val _llmProviders = mutableListOf<LLMServiceProvider>()
+    private val _ttsProviders = mutableListOf<TTSServiceProvider>()
+    private val _vlmProviders = mutableListOf<VLMServiceProvider>()
+    private val _wakeWordProviders = mutableListOf<WakeWordServiceProvider>()
+    private val _speakerDiarizationProviders = mutableListOf<SpeakerDiarizationServiceProvider>()
 
     // MARK: - Registration Methods
 
     /**
      * Register a Speech-to-Text provider (e.g., WhisperCPP)
+     * Thread-safe: Can be called from any thread
      */
     fun registerSTT(provider: STTServiceProvider) {
-        sttProviders.add(provider)
+        synchronized(_sttProviders) {
+            _sttProviders.add(provider)
+        }
         logger.info("Registered STT provider: ${provider.name}")
     }
 
     /**
      * Register a Voice Activity Detection provider
+     * Thread-safe: Can be called from any thread
      */
     fun registerVAD(provider: VADServiceProvider) {
-        vadProviders.add(provider)
+        synchronized(_vadProviders) {
+            _vadProviders.add(provider)
+        }
         logger.info("Registered VAD provider: ${provider.name}")
     }
 
     /**
      * Register a Language Model provider (e.g., llama.cpp)
+     * Thread-safe: Can be called from any thread
      */
     fun registerLLM(provider: LLMServiceProvider) {
-        llmProviders.add(provider)
+        synchronized(_llmProviders) {
+            _llmProviders.add(provider)
+        }
         logger.info("Registered LLM provider: ${provider.name}")
     }
 
     /**
      * Register a Text-to-Speech provider
+     * Thread-safe: Can be called from any thread
      */
     fun registerTTS(provider: TTSServiceProvider) {
-        ttsProviders.add(provider)
+        synchronized(_ttsProviders) {
+            _ttsProviders.add(provider)
+        }
         logger.info("Registered TTS provider: ${provider.name}")
     }
 
     /**
      * Register a Vision Language Model provider
+     * Thread-safe: Can be called from any thread
      */
     fun registerVLM(provider: VLMServiceProvider) {
-        vlmProviders.add(provider)
+        synchronized(_vlmProviders) {
+            _vlmProviders.add(provider)
+        }
         logger.info("Registered VLM provider: ${provider.name}")
     }
 
     /**
      * Register a Wake Word Detection provider
+     * Thread-safe: Can be called from any thread
      */
     fun registerWakeWord(provider: WakeWordServiceProvider) {
-        wakeWordProviders.add(provider)
+        synchronized(_wakeWordProviders) {
+            _wakeWordProviders.add(provider)
+        }
         logger.info("Registered Wake Word provider: ${provider.name}")
     }
 
     /**
      * Register a Speaker Diarization provider
+     * Thread-safe: Can be called from any thread
      */
     fun registerSpeakerDiarization(provider: SpeakerDiarizationServiceProvider) {
-        speakerDiarizationProviders.add(provider)
+        synchronized(_speakerDiarizationProviders) {
+            _speakerDiarizationProviders.add(provider)
+        }
         logger.info("Registered Speaker Diarization provider: ${provider.name}")
     }
 
@@ -97,78 +123,99 @@ object ModuleRegistry {
 
     /**
      * Get an STT provider for the specified model
+     * Thread-safe: Can be called from any thread
      */
     fun sttProvider(modelId: String? = null): STTServiceProvider? {
-        return if (modelId != null) {
-            sttProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            sttProviders.firstOrNull()
+        return synchronized(_sttProviders) {
+            if (modelId != null) {
+                _sttProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _sttProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get a VAD provider for the specified model
+     * Thread-safe: Can be called from any thread
      */
     fun vadProvider(modelId: String? = null): VADServiceProvider? {
-        return if (modelId != null) {
-            vadProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            vadProviders.firstOrNull()
+        return synchronized(_vadProviders) {
+            if (modelId != null) {
+                _vadProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _vadProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get an LLM provider for the specified model
+     * Thread-safe: Can be called from any thread
      */
     fun llmProvider(modelId: String? = null): LLMServiceProvider? {
-        return if (modelId != null) {
-            llmProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            llmProviders.firstOrNull()
+        return synchronized(_llmProviders) {
+            if (modelId != null) {
+                _llmProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _llmProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get a TTS provider for the specified model
+     * Thread-safe: Can be called from any thread
      */
     fun ttsProvider(modelId: String? = null): TTSServiceProvider? {
-        return if (modelId != null) {
-            ttsProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            ttsProviders.firstOrNull()
+        return synchronized(_ttsProviders) {
+            if (modelId != null) {
+                _ttsProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _ttsProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get a VLM provider for the specified model
+     * Thread-safe: Can be called from any thread
      */
     fun vlmProvider(modelId: String? = null): VLMServiceProvider? {
-        return if (modelId != null) {
-            vlmProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            vlmProviders.firstOrNull()
+        return synchronized(_vlmProviders) {
+            if (modelId != null) {
+                _vlmProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _vlmProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get a Wake Word provider
+     * Thread-safe: Can be called from any thread
      */
     fun wakeWordProvider(modelId: String? = null): WakeWordServiceProvider? {
-        return if (modelId != null) {
-            wakeWordProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            wakeWordProviders.firstOrNull()
+        return synchronized(_wakeWordProviders) {
+            if (modelId != null) {
+                _wakeWordProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _wakeWordProviders.firstOrNull()
+            }
         }
     }
 
     /**
      * Get a Speaker Diarization provider
+     * Thread-safe: Can be called from any thread
      */
     fun speakerDiarizationProvider(modelId: String? = null): SpeakerDiarizationServiceProvider? {
-        return if (modelId != null) {
-            speakerDiarizationProviders.firstOrNull { it.canHandle(modelId) }
-        } else {
-            speakerDiarizationProviders.firstOrNull()
+        return synchronized(_speakerDiarizationProviders) {
+            if (modelId != null) {
+                _speakerDiarizationProviders.firstOrNull { it.canHandle(modelId) }
+            } else {
+                _speakerDiarizationProviders.firstOrNull()
+            }
         }
     }
 
@@ -176,74 +223,86 @@ object ModuleRegistry {
 
     /**
      * Get all registered STT providers
+     * Thread-safe: Returns a snapshot of the current provider list
      */
     val allSTTProviders: List<STTServiceProvider>
-        get() = sttProviders.toList()
+        get() = synchronized(_sttProviders) { _sttProviders.toList() }
 
     /**
      * Get all registered LLM providers
+     * Thread-safe: Returns a snapshot of the current provider list
      */
     val allLLMProviders: List<LLMServiceProvider>
-        get() = llmProviders.toList()
+        get() = synchronized(_llmProviders) { _llmProviders.toList() }
 
     /**
      * Get all registered TTS providers
+     * Thread-safe: Returns a snapshot of the current provider list
      */
     val allTTSProviders: List<TTSServiceProvider>
-        get() = ttsProviders.toList()
+        get() = synchronized(_ttsProviders) { _ttsProviders.toList() }
 
     /**
      * Get all registered VLM providers
+     * Thread-safe: Returns a snapshot of the current provider list
      */
     val allVLMProviders: List<VLMServiceProvider>
-        get() = vlmProviders.toList()
+        get() = synchronized(_vlmProviders) { _vlmProviders.toList() }
 
     // MARK: - Availability Checking
 
     /**
      * Check if STT is available
+     * Thread-safe: Can be called from any thread
      */
     val hasSTT: Boolean
-        get() = sttProviders.isNotEmpty()
+        get() = synchronized(_sttProviders) { _sttProviders.isNotEmpty() }
 
     /**
      * Check if VAD is available
+     * Thread-safe: Can be called from any thread
      */
     val hasVAD: Boolean
-        get() = vadProviders.isNotEmpty()
+        get() = synchronized(_vadProviders) { _vadProviders.isNotEmpty() }
 
     /**
      * Check if LLM is available
+     * Thread-safe: Can be called from any thread
      */
     val hasLLM: Boolean
-        get() = llmProviders.isNotEmpty()
+        get() = synchronized(_llmProviders) { _llmProviders.isNotEmpty() }
 
     /**
      * Check if TTS is available
+     * Thread-safe: Can be called from any thread
      */
     val hasTTS: Boolean
-        get() = ttsProviders.isNotEmpty()
+        get() = synchronized(_ttsProviders) { _ttsProviders.isNotEmpty() }
 
     /**
      * Check if VLM is available
+     * Thread-safe: Can be called from any thread
      */
     val hasVLM: Boolean
-        get() = vlmProviders.isNotEmpty()
+        get() = synchronized(_vlmProviders) { _vlmProviders.isNotEmpty() }
 
     /**
      * Check if Wake Word Detection is available
+     * Thread-safe: Can be called from any thread
      */
     val hasWakeWord: Boolean
-        get() = wakeWordProviders.isNotEmpty()
+        get() = synchronized(_wakeWordProviders) { _wakeWordProviders.isNotEmpty() }
 
     /**
      * Check if Speaker Diarization is available
+     * Thread-safe: Can be called from any thread
      */
     val hasSpeakerDiarization: Boolean
-        get() = speakerDiarizationProviders.isNotEmpty()
+        get() = synchronized(_speakerDiarizationProviders) { _speakerDiarizationProviders.isNotEmpty() }
 
     /**
      * Get list of all registered modules
+     * Thread-safe: Can be called from any thread
      */
     val registeredModules: List<String>
         get() = buildList {
