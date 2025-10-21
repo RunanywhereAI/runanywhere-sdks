@@ -245,13 +245,19 @@ data class CircuitBreakerStatus(
 
 /**
  * Circuit breaker registry for managing multiple circuit breakers
+ *
+ * Thread Safety:
+ * All operations are synchronized to prevent race conditions during
+ * concurrent access. Multiple threads can safely access and create
+ * circuit breakers.
  */
 object CircuitBreakerRegistry {
-    private val circuitBreakers = mutableMapOf<String, CircuitBreaker>()
+    private val _circuitBreakers = mutableMapOf<String, CircuitBreaker>()
     private val logger = SDKLogger("CircuitBreakerRegistry")
 
     /**
      * Get or create a circuit breaker for a service
+     * Thread-safe: Can be called from any thread
      */
     fun getOrCreate(
         name: String,
@@ -259,37 +265,49 @@ object CircuitBreakerRegistry {
         recoveryTimeoutMs: Long = 30_000,
         halfOpenMaxCalls: Int = 3
     ): CircuitBreaker {
-        return circuitBreakers.getOrPut(name) {
-            logger.info("Creating new circuit breaker for service: $name")
-            CircuitBreaker(
-                failureThreshold = failureThreshold,
-                recoveryTimeoutMs = recoveryTimeoutMs,
-                halfOpenMaxCalls = halfOpenMaxCalls,
-                name = name
-            )
+        return synchronized(_circuitBreakers) {
+            _circuitBreakers.getOrPut(name) {
+                logger.info("Creating new circuit breaker for service: $name")
+                CircuitBreaker(
+                    failureThreshold = failureThreshold,
+                    recoveryTimeoutMs = recoveryTimeoutMs,
+                    halfOpenMaxCalls = halfOpenMaxCalls,
+                    name = name
+                )
+            }
         }
     }
 
     /**
      * Get all circuit breaker statuses
+     * Thread-safe: Returns a snapshot of current statuses
      */
     fun getAllStatuses(): Map<String, CircuitBreakerStatus> {
-        return circuitBreakers.mapValues { it.value.getStatus() }
+        return synchronized(_circuitBreakers) {
+            _circuitBreakers.mapValues { it.value.getStatus() }
+        }
     }
 
     /**
      * Reset all circuit breakers
+     * Thread-safe: Can be called from any thread
      */
     suspend fun resetAll() {
         logger.info("Resetting all circuit breakers")
-        circuitBreakers.values.forEach { it.reset() }
+        val breakers = synchronized(_circuitBreakers) {
+            _circuitBreakers.values.toList()
+        }
+        breakers.forEach { it.reset() }
     }
 
     /**
      * Remove a circuit breaker from registry
+     * Thread-safe: Can be called from any thread
      */
     fun remove(name: String) {
-        circuitBreakers.remove(name)
+        synchronized(_circuitBreakers) {
+            _circuitBreakers.remove(name)
+        }
         logger.info("Removed circuit breaker: $name")
     }
 }

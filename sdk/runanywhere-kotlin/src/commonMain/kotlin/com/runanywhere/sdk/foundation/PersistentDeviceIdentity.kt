@@ -22,48 +22,63 @@ object PersistentDeviceIdentity {
     @Volatile
     private var cachedDeviceUUID: String? = null
 
+    // Lock object for synchronizing cache access
+    private val cacheLock = Any()
+
     /**
      * Get a persistent device UUID that survives app reinstalls
      * Uses a multi-layered approach for maximum persistence
      * Matches iOS PersistentDeviceIdentity.getPersistentDeviceUUID()
+     *
+     * Thread Safety:
+     * Uses synchronized block to prevent race conditions when initializing
+     * the cached UUID from multiple threads.
      */
     @OptIn(ExperimentalUuidApi::class)
     fun getPersistentDeviceUUID(): String {
         logger.debug("Attempting to retrieve persistent device UUID")
 
-        // Return cached UUID if available
+        // Double-checked locking pattern for thread-safe lazy initialization
         cachedDeviceUUID?.let {
             logger.debug("Using cached device UUID")
             return it
         }
 
-        return runBlocking {
-            // Strategy 1: Try to get from persistent secure storage (survives app reinstalls)
-            val storedUUID = secureStorage.getSecureString(DEVICE_UUID_KEY)
-            if (storedUUID != null) {
-                logger.info("Retrieved device UUID from persistent secure storage")
-                cachedDeviceUUID = storedUUID
-                return@runBlocking storedUUID
+        return synchronized(cacheLock) {
+            // Check again inside synchronized block
+            cachedDeviceUUID?.let {
+                logger.debug("Using cached device UUID (synchronized check)")
+                return@synchronized it
             }
 
-            // Strategy 2: Use platform-specific vendor UUID if available
-            val vendorUUID = getVendorBasedUUID()
-            if (vendorUUID != null) {
-                logger.info("Retrieved device UUID from vendor identifier")
-                // Store this in persistent storage for future use
-                try {
-                    secureStorage.setSecureString(DEVICE_UUID_KEY, vendorUUID)
-                } catch (e: Exception) {
-                    logger.error("Failed to store vendor UUID", e)
+            runBlocking {
+                // Strategy 1: Try to get from persistent secure storage (survives app reinstalls)
+                val storedUUID = secureStorage.getSecureString(DEVICE_UUID_KEY)
+                if (storedUUID != null) {
+                    logger.info("Retrieved device UUID from persistent secure storage")
+                    cachedDeviceUUID = storedUUID
+                    return@runBlocking storedUUID
                 }
-                cachedDeviceUUID = vendorUUID
-                return@runBlocking vendorUUID
-            }
 
-            // Strategy 3: Generate new UUID and store persistently
-            val newUUID = generateAndStoreNewUUID()
-            logger.info("Generated new device UUID")
-            return@runBlocking newUUID
+                // Strategy 2: Use platform-specific vendor UUID if available
+                val vendorUUID = getVendorBasedUUID()
+                if (vendorUUID != null) {
+                    logger.info("Retrieved device UUID from vendor identifier")
+                    // Store this in persistent storage for future use
+                    try {
+                        secureStorage.setSecureString(DEVICE_UUID_KEY, vendorUUID)
+                    } catch (e: Exception) {
+                        logger.error("Failed to store vendor UUID", e)
+                    }
+                    cachedDeviceUUID = vendorUUID
+                    return@runBlocking vendorUUID
+                }
+
+                // Strategy 3: Generate new UUID and store persistently
+                val newUUID = generateAndStoreNewUUID()
+                logger.info("Generated new device UUID")
+                return@runBlocking newUUID
+            }
         }
     }
 
@@ -120,9 +135,12 @@ object PersistentDeviceIdentity {
 
     /**
      * Clear device identity (for testing or privacy purposes)
+     * Thread-safe: Can be called from any thread
      */
     suspend fun clearDeviceIdentity() {
-        cachedDeviceUUID = null
+        synchronized(cacheLock) {
+            cachedDeviceUUID = null
+        }
         secureStorage.removeSecure(DEVICE_UUID_KEY)
         secureStorage.removeSecure(DEVICE_FINGERPRINT_KEY)
     }
@@ -150,6 +168,7 @@ object PersistentDeviceIdentity {
 
     /**
      * Generate and store a completely new UUID
+     * Note: This is called from within synchronized block in getPersistentDeviceUUID()
      */
     @OptIn(ExperimentalUuidApi::class)
     private suspend fun generateAndStoreNewUUID(): String {
@@ -159,6 +178,7 @@ object PersistentDeviceIdentity {
         } catch (e: Exception) {
             logger.error("Failed to store new UUID", e)
         }
+        // Safe to set here as we're within synchronized block
         cachedDeviceUUID = newUUID
         return newUUID
     }
