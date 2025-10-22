@@ -40,7 +40,7 @@ struct ModelSelectionSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .navigationBarLeading) {
                     #if os(iOS)
                     Button("Cancel") {
                         dismiss()
@@ -55,7 +55,7 @@ struct ModelSelectionSheet: View {
                     #endif
                 }
 
-                ToolbarItemGroup(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("Add Model") {
                         showingAddModelSheet = true
                     }
@@ -64,7 +64,7 @@ struct ModelSelectionSheet: View {
             }
         }
         #if os(macOS)
-        .frame(minWidth: 600, idealWidth: 700, minHeight: 500, idealHeight: 600)
+        .frame(minWidth: AppLayout.sheetMinWidth, idealWidth: AppLayout.sheetIdealWidth, minHeight: AppLayout.sheetMinHeight, idealHeight: AppLayout.sheetIdealHeight)
         #endif
         .sheet(isPresented: $showingAddModelSheet) {
             AddModelFromURLView(onModelAdded: { modelInfo in
@@ -73,7 +73,7 @@ struct ModelSelectionSheet: View {
                 }
             })
             #if os(macOS)
-            .frame(minWidth: 500, idealWidth: 600, minHeight: 400, idealHeight: 500)
+            .frame(minWidth: AppLayout.sheetMinWidth, idealWidth: AppLayout.sheetIdealWidth, minHeight: AppLayout.sheetMinHeight, idealHeight: AppLayout.sheetIdealHeight)
             #endif
         }
         .task {
@@ -90,29 +90,25 @@ struct ModelSelectionSheet: View {
     }
 
     private var loadingOverlay: some View {
-        Color.black.opacity(0.4)
+        AppColors.overlayMedium
             .ignoresSafeArea()
             .overlay {
-                VStack(spacing: 20) {
+                VStack(spacing: AppSpacing.xLarge) {
                     ProgressView()
                         .scaleEffect(1.2)
 
                     Text("Loading Model")
-                        .font(.headline)
+                        .font(AppTypography.headline)
 
                     Text(loadingProgress)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.subheadline)
+                        .foregroundColor(AppColors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
-                .padding(30)
-                #if os(iOS)
-                .background(Color(.systemBackground))
-                #else
-                .background(Color(NSColor.windowBackgroundColor))
-                #endif
-                .cornerRadius(12)
-                .shadow(radius: 10)
+                .padding(AppSpacing.xxLarge)
+                .background(AppColors.backgroundPrimary)
+                .cornerRadius(AppSpacing.cornerRadiusXLarge)
+                .shadow(radius: AppSpacing.shadowXLarge)
             }
     }
 
@@ -156,7 +152,7 @@ struct ModelSelectionSheet: View {
             Label(label, systemImage: systemImage)
             Spacer()
             Text(value)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 
@@ -165,7 +161,7 @@ struct ModelSelectionSheet: View {
             Label("Neural Engine", systemImage: "brain")
             Spacer()
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
+                .foregroundColor(AppColors.statusGreen)
         }
     }
 
@@ -173,24 +169,24 @@ struct ModelSelectionSheet: View {
         HStack {
             ProgressView()
             Text("Loading device info...")
-                .foregroundColor(.secondary)
+                .foregroundColor(AppColors.textSecondary)
         }
     }
 
     private var frameworksSection: some View {
         Section("Available Frameworks") {
             if availableFrameworks.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                     HStack {
                         ProgressView()
                         Text("Loading frameworks...")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(AppColors.textSecondary)
                     }
 
                     Text("No framework adapters are currently registered. Register framework adapters to see available frameworks.")
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.top, 4)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.statusOrange)
+                        .padding(.top, AppSpacing.xSmall)
                 }
             } else {
                 ForEach(availableFrameworks, id: \.self) { framework in
@@ -219,18 +215,18 @@ struct ModelSelectionSheet: View {
             Section("Models for \(expanded.displayName)") {
                 // Show requirements notice for Foundation Models
                 if expanded == .foundationModels {
-                    HStack(spacing: 8) {
+                    HStack(spacing: AppSpacing.smallMedium) {
                         Image(systemName: "info.circle.fill")
-                            .foregroundColor(.blue)
-                            .font(.caption)
-                        VStack(alignment: .leading, spacing: 2) {
+                            .foregroundColor(AppColors.statusBlue)
+                            .font(AppTypography.caption)
+                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
                             Text("iOS 26+ with Apple Intelligence")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                .font(AppTypography.caption)
+                                .foregroundColor(AppColors.textSecondary)
                         }
                         Spacer()
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, AppSpacing.xSmall)
                 }
 
                 // Show models
@@ -260,15 +256,15 @@ struct ModelSelectionSheet: View {
                 }
 
                 if filteredModels.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                         Text("No models available for this framework")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
+                            .foregroundColor(AppColors.textSecondary)
+                            .font(AppTypography.caption)
 
                         if expanded != .foundationModels {
                             Text("Tap 'Add Model' to add a model from URL")
-                                .foregroundColor(.blue)
-                                .font(.caption2)
+                                .foregroundColor(AppColors.statusBlue)
+                                .font(AppTypography.caption2)
                         }
                     }
                 }
@@ -353,43 +349,43 @@ private struct SelectableModelRow: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
                 Text(model.name)
-                    .font(.subheadline)
+                    .font(AppTypography.subheadline)
                     .fontWeight(isSelected ? .semibold : .regular)
 
-                HStack(spacing: 8) {
+                HStack(spacing: AppSpacing.smallMedium) {
                     let size = model.memoryRequired ?? 0
                     if size > 0 {
                         Label(
                             ByteCountFormatter.string(fromByteCount: size, countStyle: .memory),
                             systemImage: "memorychip"
                         )
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
                     }
 
                     let format = model.format
                     Text(format.rawValue.uppercased())
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.2))
-                        .cornerRadius(4)
+                        .font(AppTypography.caption2)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(AppColors.badgeGray)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
 
                     // Show thinking indicator if model supports thinking
                     if model.supportsThinking {
-                        HStack(spacing: 2) {
+                        HStack(spacing: AppSpacing.xxSmall) {
                             Image(systemName: "brain")
-                                .font(.caption2)
+                                .font(AppTypography.caption2)
                             Text("THINKING")
-                                .font(.caption2)
+                                .font(AppTypography.caption2)
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.purple.opacity(0.2))
-                        .foregroundColor(.purple)
-                        .cornerRadius(4)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(AppColors.badgePurple)
+                        .foregroundColor(AppColors.primaryPurple)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
                     } else if model.localPath != nil {
                         Button(action: {
                             Task {
@@ -398,17 +394,17 @@ private struct SelectableModelRow: View {
                                 onModelUpdated()
                             }
                         }) {
-                            HStack(spacing: 2) {
+                            HStack(spacing: AppSpacing.xxSmall) {
                                 Image(systemName: "brain")
-                                    .font(.caption2)
+                                    .font(AppTypography.caption2)
                                 Text("ENABLE")
-                                    .font(.caption2)
+                                    .font(AppTypography.caption2)
                             }
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.orange.opacity(0.2))
-                            .foregroundColor(.orange)
-                            .cornerRadius(4)
+                            .padding(.horizontal, AppSpacing.small)
+                            .padding(.vertical, AppSpacing.xxSmall)
+                            .background(AppColors.badgeOrange)
+                            .foregroundColor(AppColors.primaryOrange)
+                            .cornerRadius(AppSpacing.cornerRadiusSmall)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -417,37 +413,37 @@ private struct SelectableModelRow: View {
                 // Show download status or built-in status
                 if model.preferredFramework == .foundationModels {
                     // Foundation Models are built-in
-                    HStack(spacing: 4) {
+                    HStack(spacing: AppSpacing.xSmall) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.caption2)
+                            .foregroundColor(AppColors.statusGreen)
+                            .font(AppTypography.caption2)
                         Text("Built-in")
-                            .font(.caption2)
-                            .foregroundColor(.green)
+                            .font(AppTypography.caption2)
+                            .foregroundColor(AppColors.statusGreen)
                     }
                 } else if let _ = model.downloadURL {
                     if model.localPath == nil {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             if isDownloading {
                                 ProgressView(value: downloadProgress)
                                     .progressViewStyle(LinearProgressViewStyle())
                                 Text("\(Int(downloadProgress * 100))%")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             } else {
                                 Text("Available for download")
-                                    .font(.caption2)
-                                    .foregroundColor(.blue)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.statusBlue)
                             }
                         }
                     } else {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xSmall) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.caption2)
+                                .foregroundColor(AppColors.statusGreen)
+                                .font(AppTypography.caption2)
                             Text("Downloaded")
-                                .font(.caption2)
-                                .foregroundColor(.green)
+                                .font(AppTypography.caption2)
+                                .foregroundColor(AppColors.statusGreen)
                         }
                     }
                 }
@@ -456,26 +452,26 @@ private struct SelectableModelRow: View {
             Spacer()
 
             // Action buttons based on model state
-            HStack(spacing: 8) {
+            HStack(spacing: AppSpacing.smallMedium) {
                 if model.preferredFramework == .foundationModels {
                     // Foundation Models are built-in, always ready to select
                     Button("Select") {
                         onSelectModel()
                     }
-                    .font(.caption)
+                    .font(AppTypography.caption)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
                 } else if let _ = model.downloadURL, model.localPath == nil {
                     // Model needs to be downloaded
                     if isDownloading {
-                        VStack(spacing: 4) {
+                        VStack(spacing: AppSpacing.xSmall) {
                             ProgressView()
                                 .scaleEffect(0.8)
                             if downloadProgress > 0 {
                                 Text("\(Int(downloadProgress * 100))%")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption2)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
                     } else {
@@ -484,7 +480,7 @@ private struct SelectableModelRow: View {
                                 await downloadModel()
                             }
                         }
-                        .font(.caption)
+                        .font(AppTypography.caption)
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
                         .disabled(isLoading)
@@ -494,14 +490,14 @@ private struct SelectableModelRow: View {
                     Button("Select") {
                         onSelectModel()
                     }
-                    .font(.caption)
+                    .font(AppTypography.caption)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.small)
                     .disabled(isLoading || isSelected)
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, AppSpacing.xSmall)
         .opacity(isLoading && !isSelected ? 0.6 : 1.0)
     }
 

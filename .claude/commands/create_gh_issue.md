@@ -1,5 +1,7 @@
 Create a GitHub issue with the following structure:
 
+gh issue create --repo RunanywhereAI/runanywhere-sdks
+
 ## Required Information:
 1. **Title**: Clear, concise description of the issue (50-80 chars)
 2. **Labels**: Add relevant labels (e.g., ios-sdk, android-sdk, ios-sample, P1/P2/P3, bug, enhancement, etc.)
