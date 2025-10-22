@@ -8,6 +8,7 @@ import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.JvmWhisperJNIModelMapper
 import com.runanywhere.sdk.models.JvmModelStorage
+import com.runanywhere.sdk.models.enums.LLMFramework
 
 /**
  * JVM WhisperJNI STT Service Provider
@@ -33,6 +34,8 @@ class JvmWhisperSTTServiceProvider : STTServiceProvider {
     }
 
     override val name: String = "WhisperJNI-JVM"
+
+    override val framework: LLMFramework = LLMFramework.WHISPER_CPP
 
     override fun canHandle(modelId: String?): Boolean {
         // This provider can handle:

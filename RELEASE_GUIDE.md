@@ -149,7 +149,7 @@ git push origin main
 ### Step 2: Create Git Tag for iOS
 
 ```bash
-# Create annotated tag (recommended)
+# Create annotated tag for iOS (platform-scoped, for organization)
 git tag -a ios/v0.14.0 -m "iOS SDK v0.14.0
 
 Release highlights:
@@ -160,8 +160,23 @@ Release highlights:
 
 Full changelog: https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/CHANGELOG.md#0140"
 
-# Push tag to GitHub
+# Push platform-scoped tag to GitHub
 git push origin ios/v0.14.0
+
+# IMPORTANT: Also create a SemVer tag for Swift Package Manager compatibility
+# SPM requires tags matching X.Y.Z or vX.Y.Z pattern
+git tag -a v0.14.0 -m "iOS SDK v0.14.0
+
+Release highlights:
+- Feature: Add streaming generation support
+- Feature: Model unloading API
+- Fix: Memory leak in model loading
+- Performance: 20% faster token generation
+
+Full changelog: https://github.com/RunanywhereAI/runanywhere-sdks/blob/main/CHANGELOG.md#0140"
+
+# Push SemVer tag for SPM
+git push origin v0.14.0
 ```
 
 ### Step 3: Verify Swift Package Manager
@@ -195,6 +210,10 @@ swift package resolve
 
 # If successful, SPM integration is working
 ```
+
+**Note:** This works because we created the `v0.14.0` SemVer tag in Step 2, which SPM can resolve.
+The `exact: "0.14.0"` requirement will match the `v0.14.0` tag (SPM strips the `v` prefix
+automatically).
 
 ### Step 4: Publish to CocoaPods (Optional)
 

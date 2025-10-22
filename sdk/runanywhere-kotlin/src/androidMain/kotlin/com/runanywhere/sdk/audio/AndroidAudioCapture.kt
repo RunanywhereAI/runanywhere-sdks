@@ -100,29 +100,48 @@ class AndroidAudioCapture(
             isRecording = true
             logger.info("Started audio capture: $sampleRate Hz, $channels ch, buffer=$bufferSize bytes")
 
-            while (isRecording && coroutineContext.isActive) {
-                val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+            try {
+                while (isRecording && coroutineContext.isActive) {
+                    val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
 
-                if (bytesRead > 0) {
-                    // Convert to Float samples for processing
-                    val samples = bytesToFloats(buffer, bytesRead)
+                    if (bytesRead > 0) {
+                        // Convert to Float samples for processing
+                        val samples = bytesToFloats(buffer, bytesRead)
 
-                    // Create audio chunk (iOS pattern)
-                    val chunk = VoiceAudioChunk(
-                        samples = samples,
-                        timestamp = System.currentTimeMillis() / 1000.0,
-                        sampleRate = sampleRate,
-                        channels = channels,
-                        sequenceNumber = sequenceNumber++,
-                        isFinal = false
-                    )
+                        // Create audio chunk (iOS pattern)
+                        val chunk = VoiceAudioChunk(
+                            samples = samples,
+                            timestamp = System.currentTimeMillis() / 1000.0,
+                            sampleRate = sampleRate,
+                            channels = channels,
+                            sequenceNumber = sequenceNumber++,
+                            isFinal = false
+                        )
 
-                    // Send chunk to flow
-                    emit(chunk)
-                } else if (bytesRead < 0) {
-                    // Handle error codes
-                    logger.warn("AudioRecord read error: $bytesRead")
+                        // Send chunk to flow
+                        emit(chunk)
+                    } else if (bytesRead < 0) {
+                        // Handle error codes
+                        logger.warn("AudioRecord read error: $bytesRead")
+                    }
                 }
+            } finally {
+                // Ensure AudioRecord is always released, even on cancellation or error
+                logger.info("Cleaning up audio capture resources")
+                isRecording = false
+                audioRecord?.let { record ->
+                    try {
+                        if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                            record.stop()
+                        }
+                        record.release()
+                        logger.info("AudioRecord stopped and released in finally block")
+                    } catch (e: Exception) {
+                        logger.error("Error releasing AudioRecord in finally block", e)
+                    }
+                }
+                audioRecord = null
+                sequenceNumber = 0
             }
         }
     }.flowOn(Dispatchers.IO)

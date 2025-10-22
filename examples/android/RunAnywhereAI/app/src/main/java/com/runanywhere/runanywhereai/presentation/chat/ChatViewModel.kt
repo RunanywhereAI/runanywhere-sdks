@@ -145,6 +145,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Start generation
         generationJob = viewModelScope.launch {
             try {
+                // Clear metrics from previous generation
+                tokensPerSecondHistory.clear()
+
                 if (currentState.useStreaming) {
                     generateWithStreaming(prompt, assistantMessage.id)
                 } else {
@@ -439,7 +442,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             conversationId = conversationId,
             modelId = _uiState.value.loadedModelName ?: "unknown",
             modelName = _uiState.value.loadedModelName ?: "Unknown",
-            framework = "KMP",
+            framework = com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP,
             timestamp = startTime,
             timeToFirstToken = timeToFirstToken,
             totalGenerationTime = totalGenerationTime,

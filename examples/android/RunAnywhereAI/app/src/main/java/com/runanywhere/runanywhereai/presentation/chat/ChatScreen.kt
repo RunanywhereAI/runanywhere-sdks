@@ -524,7 +524,7 @@ private fun formatTimestamp(timestamp: Long): String {
 @Composable
 fun ModelBadge(
     modelName: String,
-    framework: String
+    framework: com.runanywhere.sdk.models.enums.LLMFramework
 ) {
     Surface(
         color = MaterialTheme.colorScheme.primary,
@@ -560,7 +560,7 @@ fun ModelBadge(
                 color = MaterialTheme.colorScheme.onPrimary
             )
             Text(
-                text = framework,
+                text = framework.displayName,
                 style = AppTypography.caption2,
                 color = MaterialTheme.colorScheme.onPrimary
             )
@@ -675,7 +675,7 @@ fun AnalyticsFooter(
     ) {
         // Timestamp
         Text(
-            text = "12:34 PM",  // TODO: Get actual timestamp
+            text = formatTimestamp(analytics.timestamp),
             style = AppTypography.caption2,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

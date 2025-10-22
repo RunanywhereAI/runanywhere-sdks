@@ -35,7 +35,8 @@ import kotlinx.coroutines.launch
 fun ModelsScreen() {
     val context = LocalContext.current
     val viewModel: ModelManagementViewModel = viewModel {
-        ModelManagementViewModel(ModelRepository(context))
+        val appContext = context.applicationContext
+        ModelManagementViewModel(ModelRepository(appContext))
     }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val modelsByFramework by viewModel.modelsByFramework.collectAsStateWithLifecycle()
@@ -67,9 +68,10 @@ fun ModelsScreen() {
             TopAppBar(
                 title = { Text("Model Management") },
                 actions = {
-                    IconButton(onClick = { viewModel.showAddModelDialog() }) {
-                        Icon(Icons.Default.Add, contentDescription = "Add Model")
-                    }
+                    // TODO: Implement custom model addition feature
+                    // IconButton(onClick = { viewModel.showAddModelDialog() }) {
+                    //     Icon(Icons.Default.Add, contentDescription = "Add Model")
+                    // }
                     IconButton(onClick = { viewModel.refreshModels() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
@@ -171,16 +173,17 @@ fun ModelsScreen() {
         )
     }
 
-    // Add Model Dialog
-    if (uiState.showAddModelDialog) {
-        AddModelDialog(
-            onDismiss = { viewModel.hideAddModelDialog() },
-            onAddModel = { modelName: String, modelUrl: String, framework: LLMFramework, supportsThinking: Boolean ->
-                // TODO: Implement custom model addition
-                viewModel.hideAddModelDialog()
-            }
-        )
-    }
+    // Add Model Dialog - Disabled until custom model addition is implemented
+    // TODO: Implement custom model addition feature (repository + viewModel methods)
+    // if (uiState.showAddModelDialog) {
+    //     AddModelDialog(
+    //         onDismiss = { viewModel.hideAddModelDialog() },
+    //         onAddModel = { modelName: String, modelUrl: String, framework: LLMFramework, supportsThinking: Boolean ->
+    //             viewModel.addCustomModel(modelName, modelUrl, framework, supportsThinking)
+    //             viewModel.hideAddModelDialog()
+    //         }
+    //     )
+    // }
 }
 
 @Composable
@@ -603,12 +606,12 @@ fun ModelActionButton(
             )
         }
         isDownloading -> {
-            OutlinedButton(
-                onClick = { /* Cancel download */ },
-                modifier = Modifier.height(32.dp)
-            ) {
-                Text("Cancel", style = MaterialTheme.typography.labelMedium)
-            }
+            // Show progress indicator during download
+            // TODO: Add cancel button when download cancellation is implemented
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                strokeWidth = 2.dp
+            )
         }
         model.state == ModelState.BUILT_IN || isSelected -> {
             if (isSelected) {

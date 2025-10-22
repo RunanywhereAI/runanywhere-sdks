@@ -7,6 +7,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.models.ModelInfo
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.collectDeviceInfo
+import com.runanywhere.sdk.core.ModuleRegistry
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,9 +71,9 @@ class ModelSelectionViewModel : ViewModel() {
                     llmProviders.forEach { provider ->
                         add(provider.framework.displayName)  // e.g., "llama.cpp"
                     }
-                    // Add STT frameworks
+                    // Add STT frameworks using displayName (now consistent with LLM)
                     sttProviders.forEach { provider ->
-                        add(provider.name)
+                        add(provider.framework.displayName)  // e.g., "whisper.cpp"
                     }
                 }.distinct().sorted()
 

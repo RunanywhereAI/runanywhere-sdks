@@ -9,6 +9,8 @@ import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -74,6 +76,9 @@ class ModelRepository(
             // Use SDK download if available
             if (RunAnywhere.isInitialized) {
                 RunAnywhere.downloadModel(modelId).collect { progress ->
+                    // Check for cancellation before emitting
+                    currentCoroutineContext().ensureActive()
+
                     // SDK returns Float progress (0.0 to 1.0)
                     emit(progress)
                     updateDownloadProgress(modelId, progress)
@@ -81,6 +86,9 @@ class ModelRepository(
             } else {
                 // Mock download progress
                 for (i in 0..100 step 5) {
+                    // Check for cancellation before each iteration
+                    currentCoroutineContext().ensureActive()
+
                     emit(i / 100f)
                     updateDownloadProgress(modelId, i / 100f)
                     kotlinx.coroutines.delay(100)
@@ -92,11 +100,24 @@ class ModelRepository(
             updateModelPath(modelId, localPath)
             updateModelState(modelId, ModelState.DOWNLOADED)
 
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // Download was cancelled - clean up partial files and reset state
+            val partialFile = File(modelsDir, "${modelId}${model.format.extension}")
+            if (partialFile.exists()) {
+                partialFile.delete()
+            }
+            updateModelState(modelId, ModelState.AVAILABLE)
+            // Clear download progress
+            _downloadProgress.update { it - modelId }
+            // Re-throw to propagate cancellation
+            throw e
         } catch (e: Exception) {
             updateModelState(modelId, ModelState.AVAILABLE)
+            // Clear download progress
+            _downloadProgress.update { it - modelId }
             throw e
         } finally {
-            // Clear download progress
+            // Clear download progress (redundant but safe for non-cancellation exits)
             _downloadProgress.update { it - modelId }
         }
     }.flowOn(Dispatchers.IO)
@@ -141,7 +162,10 @@ class ModelRepository(
         model.localPath?.let { path ->
             val file = File(path)
             if (file.exists()) {
-                file.delete()
+                val deleted = file.delete()
+                if (!deleted) {
+                    throw IllegalStateException("Failed to delete model file at $path")
+                }
             }
         }
 

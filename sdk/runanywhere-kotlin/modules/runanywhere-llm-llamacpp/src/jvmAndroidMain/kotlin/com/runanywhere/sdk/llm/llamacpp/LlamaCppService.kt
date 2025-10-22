@@ -1,26 +1,29 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.components.llm.LLMConfiguration
-import com.runanywhere.sdk.components.llm.LLMService
 import com.runanywhere.sdk.components.llm.LLMInput
 import com.runanywhere.sdk.components.llm.LLMOutput
+import com.runanywhere.sdk.components.llm.LLMService
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
  * LlamaCpp service implementation using the new LLamaAndroid wrapper
  * This wraps the low-level streaming API into our SDK interfaces
  */
-actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) : LLMService {
+actual class LlamaCppService actual constructor(private val configuration: LLMConfiguration) :
+    LLMService {
     private val logger = SDKLogger("LlamaCppService")
     private val llama = LLamaAndroid.instance()
     private var modelPath: String? = null
     private var isInitialized = false
+
+    @Volatile
+    private var isCleanedUp = false
 
     actual override suspend fun initialize(modelPath: String?) = withContext(Dispatchers.IO) {
         val actualModelPath = modelPath ?: configuration.modelId
@@ -49,6 +52,14 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             logger.info("✅ Initialized llama.cpp successfully")
         } catch (e: Exception) {
             logger.error("Failed to initialize llama.cpp", e)
+            // Ensure cleanup on initialization failure
+            try {
+                llama.unload()
+            } catch (cleanupException: Exception) {
+                logger.error("Error during cleanup after failed initialization", cleanupException)
+            }
+            isInitialized = false
+            this@LlamaCppService.modelPath = null
             throw IllegalStateException("Failed to initialize llama.cpp: ${e.message}", e)
         }
     }
@@ -118,6 +129,7 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
             isInitialized = false
             modelPath = null
             logger.info("Cleaned up llama.cpp context")
+            isCleanedUp = true
         }
     }
 

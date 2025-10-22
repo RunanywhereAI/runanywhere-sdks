@@ -7,6 +7,7 @@ import com.runanywhere.sdk.components.stt.STTService
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.models.enums.LLMFramework
 
 /**
  * Central registry for external AI module implementations
@@ -330,6 +331,7 @@ interface STTServiceProvider {
     suspend fun createSTTService(configuration: STTConfiguration): STTService
     fun canHandle(modelId: String?): Boolean
     val name: String
+    val framework: LLMFramework
 }
 
 /**
