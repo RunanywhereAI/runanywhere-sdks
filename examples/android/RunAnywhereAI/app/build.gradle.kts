@@ -4,9 +4,6 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
-    id("kotlin-kapt")
-    // TODO: #001 - Add Hilt plugin when configured in project level build.gradle
-    // id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -118,7 +115,8 @@ android {
                 "**/kotlin/**",
                 "kotlin/**",
                 "META-INF/kotlin/**",
-                "META-INF/*.kotlin_module"
+                "META-INF/*.kotlin_module",
+                "META-INF/INDEX.LIST"
             )
         }
 
@@ -141,11 +139,11 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
 
         // Kotlin compiler optimizations
         freeCompilerArgs += listOf(
@@ -157,9 +155,6 @@ android {
         )
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -189,89 +184,146 @@ android {
 }
 
 dependencies {
-    implementation(project(":sdk:runanywhere-android"))
+    // ========================================
+    // SDK Dependencies (Local Modules)
+    // ========================================
+    implementation(project(":sdk:runanywhere-kotlin"))
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
 
+    // ========================================
+    // AndroidX Core & Lifecycle
+    // ========================================
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+
+    // ========================================
+    // Material Design
+    // ========================================
+    implementation(libs.material)
+
+    // ========================================
+    // Compose
+    // ========================================
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
 
+    // ========================================
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.8.5")
+    // ========================================
+    implementation(libs.androidx.navigation.compose)
 
-    // ViewModel
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-
+    // ========================================
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // ========================================
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
 
-    // MediaPipe for LLM inference
-    implementation("com.google.mediapipe:tasks-genai:0.10.14")
+    // ========================================
+    // Serialization & DateTime
+    // ========================================
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kotlinx.datetime)
 
-    // ONNX Runtime
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.0")
+    // ========================================
+    // Networking
+    // ========================================
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging)
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.gson)
+    implementation(libs.gson)
 
-    // Google AI SDK for Gemini Nano
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+    // ========================================
+    // File Management & Storage
+    // ========================================
+    implementation(libs.commons.io)
 
-    // TensorFlow Lite
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
-    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.16.1")
+    // ========================================
+    // Background Work
+    // ========================================
+    implementation(libs.androidx.work.runtime.ktx)
 
-    // OkHttp for model downloads
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // ========================================
+    // Speech Recognition & Audio Processing
+    // ========================================
+    implementation(libs.whisper.jni)
+    implementation(libs.android.vad.webrtc)
+    implementation(libs.prdownloader)
 
-    // Gson for JSON parsing
-    implementation("com.google.code.gson:gson:2.11.0")
-
-    // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-
-    // ExecuTorch runtime (Note: These are placeholder versions as ExecuTorch Android packages may not be published yet)
-    // implementation("org.pytorch:executorch-runtime:0.3.0")
-    // implementation("org.pytorch:executorch-backend-xnnpack:0.3.0")
-    // implementation("org.pytorch:executorch-backend-vulkan:0.3.0")
-
-    // Android AI Core (Note: These dependencies are not yet published)
-    // TODO: #002 - Uncomment when AI Core SDK is publicly available
-    // implementation("com.google.android.gms:play-services-aicore:1.0.0")
-    implementation("androidx.core:core-ktx:1.12.0")
-
-    // picoLLM (Note: Requires Picovoice account and SDK access)
-    // TODO: #003 - Uncomment when picoLLM SDK is available
-    // implementation("ai.picovoice:picollm-android:1.0.0")
-
-    // Room database
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:$roomVersion")
-    implementation("androidx.room:room-ktx:$roomVersion")
-    kapt("androidx.room:room-compiler:$roomVersion")
-
-    // Hilt for dependency injection
-    implementation("com.google.dagger:hilt-android:2.48")
-    kapt("com.google.dagger:hilt-compiler:2.48")
-    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
-
+    // ========================================
     // Security
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // ========================================
+    implementation(libs.androidx.security.crypto)
 
-    // Play Core for dynamic feature delivery
-    implementation("com.google.android.play:core:1.10.3")
-    implementation("com.google.android.play:core-ktx:1.8.1")
+    // ========================================
+    // Permissions
+    // ========================================
+    implementation(libs.accompanist.permissions)
 
+    // ========================================
+    // Database
+    // ========================================
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+
+    // ========================================
+    // Play Services
+    // ========================================
+    implementation(libs.google.play.core)
+    implementation(libs.google.play.core.ktx)
+
+    // ========================================
+    // Logging
+    // ========================================
+    implementation(libs.timber)
+
+    // ========================================
+    // Testing
+    // ========================================
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.mockk)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // ========================================
+    // Kotlin Version Constraints
+    // ========================================
+    constraints {
+        implementation("org.jetbrains.kotlin:kotlin-stdlib") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+        implementation("org.jetbrains.kotlin:kotlin-reflect") {
+            version {
+                strictly(libs.versions.kotlin.get())
+            }
+        }
+    }
 }
 
 detekt {

@@ -22,19 +22,18 @@ struct SimplifiedSettingsView: View {
             #if os(macOS)
             // macOS: Custom layout without Form
             ScrollView {
-            VStack(alignment: .leading, spacing: 30) {
+            VStack(alignment: .leading, spacing: AppSpacing.xxLarge) {
                 Text("Settings")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.bottom, 10)
+                    .font(AppTypography.largeTitleBold)
+                    .padding(.bottom, AppSpacing.medium)
 
                 // SDK Configuration Section
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("SDK Configuration")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                         HStack {
                             Text("Routing Policy")
                                 .frame(width: 150, alignment: .leading)
@@ -48,25 +47,25 @@ struct SimplifiedSettingsView: View {
                             .frame(maxWidth: 400)
                         }
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // Generation Settings Section
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("Generation Settings")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
+                        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                             HStack {
                                 Text("Temperature")
                                     .frame(width: 150, alignment: .leading)
                                 Text("\(String(format: "%.2f", defaultTemperature))")
-                                    .font(.system(.body, design: .monospaced))
-                                    .foregroundColor(.accentColor)
+                                    .font(AppTypography.monospaced)
+                                    .foregroundColor(AppColors.primaryAccent)
                             }
                             HStack {
                                 Text("")
@@ -83,30 +82,30 @@ struct SimplifiedSettingsView: View {
                                 .frame(maxWidth: 200)
                         }
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // API Configuration Section
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("API Configuration")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                         HStack {
                             Text("API Key")
                                 .frame(width: 150, alignment: .leading)
 
                             if !apiKey.isEmpty {
                                 Text("Configured")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
+                                    .foregroundColor(AppColors.statusGreen)
+                                    .font(AppTypography.caption)
                             } else {
                                 Text("Not Set")
-                                    .foregroundColor(.orange)
-                                    .font(.caption)
+                                    .foregroundColor(AppColors.statusOrange)
+                                    .font(AppTypography.caption)
                             }
 
                             Spacer()
@@ -117,18 +116,18 @@ struct SimplifiedSettingsView: View {
                             .buttonStyle(.bordered)
                         }
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // Logging Configuration Section
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("Logging Configuration")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                         HStack {
                             Text("Log Analytics Locally")
                                 .frame(width: 150, alignment: .leading)
@@ -143,35 +142,35 @@ struct SimplifiedSettingsView: View {
                             Spacer()
 
                             Text(analyticsLogToLocal ? "Enabled" : "Disabled")
-                                .font(.caption)
-                                .foregroundColor(analyticsLogToLocal ? .green : .secondary)
+                                .font(AppTypography.caption)
+                                .foregroundColor(analyticsLogToLocal ? AppColors.statusGreen : AppColors.textSecondary)
                         }
 
                         Text("When enabled, analytics events will be logged locally instead of being sent to the server.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(AppTypography.caption)
+                            .foregroundColor(AppColors.textSecondary)
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 // About Section
-                VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: AppSpacing.xLarge) {
                     Text("About")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.headline)
+                        .foregroundColor(AppColors.textSecondary)
 
-                    VStack(alignment: .leading, spacing: 15) {
+                    VStack(alignment: .leading, spacing: AppSpacing.padding15) {
                         HStack {
                             Image(systemName: "cube")
-                                .foregroundColor(.accentColor)
+                                .foregroundColor(AppColors.primaryAccent)
                             VStack(alignment: .leading) {
                                 Text("RunAnywhere SDK")
-                                    .font(.headline)
+                                    .font(AppTypography.headline)
                                 Text("Version 0.1")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
                         }
 
@@ -183,18 +182,18 @@ struct SimplifiedSettingsView: View {
                         }
                         .buttonStyle(.link)
                     }
-                    .padding()
-                    .background(Color(NSColor.controlBackgroundColor))
-                    .cornerRadius(10)
+                    .padding(AppSpacing.large)
+                    .background(AppColors.backgroundSecondary)
+                    .cornerRadius(AppSpacing.cornerRadiusLarge)
                 }
 
                 Spacer()
             }
-            .padding(30)
-            .frame(maxWidth: 800, alignment: .leading)
+            .padding(AppSpacing.xxLarge)
+            .frame(maxWidth: AppLayout.maxContentWidth, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(NSColor.windowBackgroundColor))
+        .background(AppColors.backgroundPrimary)
         #else
         // iOS: Keep the Form-based layout
         Form {
@@ -210,8 +209,8 @@ struct SimplifiedSettingsView: View {
             Section("Generation Settings") {
                 VStack(alignment: .leading) {
                     Text("Temperature: \(String(format: "%.2f", defaultTemperature))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                     Slider(value: $defaultTemperature, in: 0...2, step: 0.1)
                 }
 
@@ -228,12 +227,12 @@ struct SimplifiedSettingsView: View {
                         Spacer()
                         if !apiKey.isEmpty {
                             Text("Configured")
-                                .foregroundColor(.green)
-                                .font(.caption)
+                                .foregroundColor(AppColors.statusGreen)
+                                .font(AppTypography.caption)
                         } else {
                             Text("Not Set")
-                                .foregroundColor(.orange)
-                                .font(.caption)
+                                .foregroundColor(AppColors.statusOrange)
+                                .font(AppTypography.caption)
                         }
                     }
                 }
@@ -248,17 +247,17 @@ struct SimplifiedSettingsView: View {
                     }
 
                 Text("When enabled, analytics events will be logged locally for debugging purposes.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(AppTypography.caption)
+                    .foregroundColor(AppColors.textSecondary)
             }
 
             Section {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
                     Label("RunAnywhere SDK", systemImage: "cube")
-                        .font(.headline)
+                        .font(AppTypography.headline)
                     Text("Version 0.1")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(AppTypography.caption)
+                        .foregroundColor(AppColors.textSecondary)
                 }
 
                 Link(destination: URL(string: "https://docs.runanywhere.ai")!) {
@@ -293,12 +292,12 @@ struct SimplifiedSettingsView: View {
                         Text("RunAnywhere API Key")
                     } footer: {
                         Text("Your API key is stored securely in the keychain")
-                            .font(.caption)
+                            .font(AppTypography.caption)
                     }
                 }
                 #if os(macOS)
                 .formStyle(.grouped)
-                .frame(minWidth: 400, idealWidth: 450, minHeight: 200, idealHeight: 250)
+                .frame(minWidth: AppLayout.macOSMinWidth, idealWidth: 450, minHeight: 200, idealHeight: 250)
                 #endif
                 .navigationTitle("API Key")
                 #if os(iOS)
@@ -337,7 +336,7 @@ struct SimplifiedSettingsView: View {
                 }
             }
             #if os(macOS)
-            .padding()
+            .padding(AppSpacing.large)
             #endif
         }
         .onAppear {

@@ -16,8 +16,8 @@
 ### ✅ iOS SDK - **Available**
 The iOS SDK provides high-performance on-device text generation, complete voice AI pipeline with VAD/STT/LLM/TTS, structured outputs with type-safe JSON generation, and thinking model support for privacy-first AI applications. [View iOS SDK →](sdk/runanywhere-swift/)
 
-### 🏗️ Android SDK - **Coming Soon**
-The Android SDK is under active development. We're bringing the same powerful on-device AI capabilities to Android.
+### ✅ Android SDK - **Available**
+The Android Kotlin Multiplatform SDK provides high-performance on-device text generation with streaming support, comprehensive model management, structured outputs with JSON generation, and thinking model support for privacy-first AI applications. [View Android SDK →](sdk/runanywhere-kotlin/)
 
 ## 🎯 See It In Action
 
@@ -46,13 +46,15 @@ The Android SDK is under active development. We're bringing the same powerful on
 - **[iOS SDK](sdk/runanywhere-swift/)** - Swift Package with comprehensive on-device AI capabilities
 - **[iOS Demo App](examples/ios/RunAnywhereAI/)** - Full-featured sample app showcasing all SDK features
 
-### Android Components (Coming Soon)
-- **[Android SDK](sdk/runanywhere-android/)** - Kotlin-based SDK (in development)
-- **[Android Demo App](examples/android/RunAnywhereAI/)** - Sample app (in development)
+### Android Components (Available Now)
+- **[Android SDK](sdk/runanywhere-kotlin/)** - Kotlin Multiplatform SDK with JVM and Android targets
+- **[Android Demo App](examples/android/RunAnywhereAI/)** - Full-featured sample app showcasing text generation
 
-## ✨ iOS SDK Features
+## ✨ SDK Features
 
-### Core Capabilities
+### iOS SDK Features
+
+#### Core Capabilities
 - **💬 Text Generation** - High-performance on-device text generation with streaming support
 - **🎙️ Voice AI Pipeline** - Complete voice workflow with VAD, STT, LLM, and TTS components
 - **📋 Structured Outputs** - Type-safe JSON generation with schema validation using `Generatable` protocol
@@ -61,13 +63,32 @@ The Android SDK is under active development. We're bringing the same powerful on
 - **📊 Performance Analytics** - Real-time metrics with comprehensive event system
 - **🎯 Intelligent Routing** - Automatic on-device vs cloud decision making
 
-### Technical Highlights
+#### Technical Highlights
 - **🔒 Privacy-First** - All processing happens on-device by default with intelligent cloud routing
 - **🚀 Multi-Framework** - GGUF (llama.cpp), Apple Foundation Models, WhisperKit, Core ML, MLX, TensorFlow Lite
 - **⚡ Native Performance** - Optimized for Apple Silicon with Metal and Neural Engine acceleration
 - **🧠 Smart Memory** - Automatic memory optimization, cleanup, and pressure handling
 - **📱 Cross-Platform** - iOS 16.0+, macOS 12.0+, tvOS 14.0+, watchOS 7.0+
 - **🎛️ Component Architecture** - Modular components for flexible AI pipeline construction
+
+### Android SDK Features
+
+#### Core Capabilities
+- **💬 Text Generation** - High-performance on-device text generation with streaming support via Kotlin Flow
+- **📋 Structured Outputs** - Type-safe JSON generation with schema validation
+- **🧠 Thinking Models** - Support for models with thinking tags (`<think>...</think>`)
+- **🏗️ Model Management** - Automatic model discovery, downloading with progress tracking, and lifecycle management
+- **📊 Performance Analytics** - Real-time metrics with comprehensive event system
+- **🔐 Device Registration** - Lazy device registration with automatic retry logic
+
+#### Technical Highlights
+- **🔒 Privacy-First** - All processing happens on-device by default
+- **🚀 GGUF Support** - llama.cpp integration for quantized models (GGUF/GGML)
+- **⚡ Native Performance** - JNI-based native integration for optimal performance
+- **🔄 Kotlin Flow** - Modern reactive streams for streaming generation
+- **📱 Cross-Platform** - Android 7.0+ (API 24+), JVM desktop applications
+- **🎛️ Component Architecture** - Modular LLM components with provider pattern
+- **✅ SHA-256 Verification** - Automatic model integrity checking on download
 
 ## 🗺️ Roadmap
 
@@ -143,12 +164,77 @@ print("Tokens: \(result.tokensUsed)")
 
 [View full iOS documentation →](sdk/runanywhere-swift/)
 
-### Android SDK (Coming Soon)
+### Android SDK (Available Now)
 
 ```kotlin
-// Android SDK is under active development
-// Check back soon for updates
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppModule
+import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.data.models.SDKEnvironment
+
+// 1. Initialize the SDK
+suspend fun initializeSDK() {
+    // Register LlamaCpp module for GGUF model support
+    LlamaCppModule.register()
+
+    // Initialize SDK
+    RunAnywhere.initialize(
+        apiKey = "dev",           // Any string works in dev mode
+        baseURL = "https://api.runanywhere.ai",
+        environment = SDKEnvironment.DEVELOPMENT
+    )
+}
+
+// 2. Download and load model
+suspend fun setupModel() {
+    // Download model with progress tracking
+    RunAnywhere.downloadModel("smollm2-360m").collect { progress ->
+        println("Download progress: ${(progress * 100).toInt()}%")
+    }
+
+    // Load model
+    val success = RunAnywhere.loadModel("smollm2-360m")
+    if (success) {
+        println("Model loaded successfully")
+    }
+}
+
+// 3. Generate text (non-streaming)
+suspend fun generateText() {
+    val result = RunAnywhere.generate(
+        prompt = "Explain quantum computing in simple terms",
+        options = RunAnywhereGenerationOptions(
+            maxTokens = 100,
+            temperature = 0.7f
+        )
+    )
+    println("Generated: $result")
+}
+
+// 4. Generate text with streaming
+suspend fun streamText() {
+    RunAnywhere.generateStream(
+        prompt = "Explain quantum computing in simple terms",
+        options = RunAnywhereGenerationOptions(
+            maxTokens = 100,
+            temperature = 0.7f
+        )
+    ).collect { token ->
+        print(token) // Print each token as it arrives
+    }
+}
+
+// 5. Get current model info
+val currentModel = RunAnywhere.currentModel
+println("Current model: ${currentModel?.name}")
+
+// 6. Unload model when done
+suspend fun cleanup() {
+    RunAnywhere.unloadModel()
+}
 ```
+
+[View full Android documentation →](sdk/runanywhere-kotlin/)
 
 ## 📋 System Requirements
 
@@ -157,11 +243,12 @@ print("Tokens: \(result.tokensUsed)")
 - **Development**: Xcode 15.0+, Swift 5.9+
 - **Recommended**: iOS 17.0+ for full feature support
 
-### Android SDK (Coming Soon)
+### Android SDK
 - **Minimum SDK**: 24 (Android 7.0)
 - **Target SDK**: 36
-- **Kotlin**: 2.0.21+
+- **Kotlin**: 2.1.21+
 - **Gradle**: 8.11.1+
+- **Java**: 17
 
 ## 🛠️ Installation
 
@@ -204,12 +291,66 @@ targets: [
 ```
 
 
-### Android SDK (Coming Soon)
+### Android SDK
+
+#### Gradle (Kotlin DSL)
+
+**Latest Release (Recommended):**
+```kotlin
+dependencies {
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-android:0.1.0")
+
+    // LlamaCpp module for GGUF model support
+    implementation("com.runanywhere.sdk:runanywhere-llm-llamacpp-android:0.1.0")
+}
+```
+
+**JVM Target (for IntelliJ plugins, desktop apps):**
+```kotlin
+dependencies {
+    implementation("com.runanywhere.sdk:RunAnywhereKotlinSDK-jvm:0.1.0")
+
+    // LlamaCpp module for GGUF model support
+    implementation("com.runanywhere.sdk:runanywhere-llm-llamacpp-jvm:0.1.0")
+}
+```
+
+#### Gradle (Groovy)
 
 ```gradle
-// Coming soon - Latest release will be available here
 dependencies {
-    implementation 'ai.runanywhere:sdk:0.13.0'
+    implementation 'com.runanywhere.sdk:RunAnywhereKotlinSDK-android:0.1.0'
+    implementation 'com.runanywhere.sdk:runanywhere-llm-llamacpp-android:0.1.0'
+}
+```
+
+#### Maven
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.runanywhere.sdk</groupId>
+        <artifactId>RunAnywhereKotlinSDK-jvm</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+    <dependency>
+        <groupId>com.runanywhere.sdk</groupId>
+        <artifactId>runanywhere-llm-llamacpp-jvm</artifactId>
+        <version>0.1.0</version>
+    </dependency>
+</dependencies>
+```
+
+#### Local Maven (for development)
+
+```bash
+# Build and publish to local Maven repository
+cd sdk/runanywhere-kotlin
+./scripts/sdk.sh publish
+
+# Then in your app's build.gradle.kts:
+repositories {
+    mavenLocal()
 }
 ```
 
@@ -349,8 +490,9 @@ if count + maxTokens > 4096 {
 - **[Architecture Overview](sdk/runanywhere-swift/docs/ARCHITECTURE_V2.md)** - Technical deep dive
 
 ### Android SDK
-- **[Android SDK](sdk/runanywhere-android/)** - Coming soon
-- **[Android Sample App](examples/android/RunAnywhereAI/)** - Coming soon
+- **[Android SDK Documentation](sdk/runanywhere-kotlin/)** - Complete API reference and guides
+- **[Android Sample App](examples/android/RunAnywhereAI/)** - Full-featured demo application
+- **[Kotlin SDK Architecture](sdk/runanywhere-kotlin/docs/KOTLIN_SDK_DOCUMENTATION.md)** - Technical deep dive
 
 ## 🤝 Contributing
 
@@ -374,6 +516,15 @@ See our [Contributing Guidelines](CONTRIBUTING.md) for detailed instructions.
 ## 📄 License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+### Third-Party Licenses
+
+This project includes code from third-party open source projects.
+See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the complete list of third-party licenses
+and acknowledgments, including:
+
+- **llama.cpp** (MIT License) - GGUF model support
+- **MLC-LLM** (Apache License 2.0) - Universal LLM deployment engine
 
 ## 💬 Community & Support
 

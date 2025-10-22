@@ -1,0 +1,99 @@
+<idea-plugin>
+    <id>com.runanywhere.stt</id>
+    <name>RunAnywhere Voice Commands</name>
+    <vendor email="support@runanywhere.com" url="https://runanywhere.com">RunAnywhere</vendor>
+    <version>0.1.0</version>
+
+    <description><![CDATA[
+        Voice commands and dictation for IntelliJ IDEA powered by RunAnywhere SDK.
+        <br/><br/>
+        <b>Features:</b>
+        <ul>
+            <li>Voice-to-code dictation with Whisper STT</li>
+            <li>Voice commands for IDE actions</li>
+            <li>On-device Whisper AI models</li>
+            <li>Real-time transcription with VAD</li>
+            <li>Model download and management UI</li>
+            <li>Privacy-first: all processing on-device</li>
+        </ul>
+        <br/>
+        Powered by on-device AI models for privacy and performance.
+    ]]></description>
+
+    <change-notes><![CDATA[
+        <b>Version 0.1.0</b>
+        <ul>
+            <li>Initial release with RunAnywhere SDK integration</li>
+            <li>Voice command support with STT</li>
+            <li>Voice dictation mode</li>
+            <li>Whisper-based transcription</li>
+            <li>Model manager for downloading STT models</li>
+            <li>VAD integration for better speech detection</li>
+        </ul>
+    ]]></change-notes>
+
+    <!-- Minimum IDE version -->
+    <idea-version since-build="242.0" until-build="251.*" />
+
+    <!-- Dependencies -->
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lang</depends>
+
+    <!-- Extensions -->
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Startup Activity -->
+        <postStartupActivity implementation="com.runanywhere.plugin.RunAnywherePlugin" />
+
+        <!-- Notification Group -->
+        <notificationGroup id="RunAnywhere.Notifications" displayType="BALLOON" />
+
+        <!-- STT Tool Window -->
+        <toolWindow id="RunAnywhere STT"
+                    anchor="right"
+                    factoryClass="com.runanywhere.plugin.toolwindow.STTToolWindow"
+                    icon="AllIcons.Actions.Execute" />
+    </extensions>
+
+    <!-- Actions -->
+    <actions>
+        <!-- Voice Command Action -->
+        <action id="RunAnywhere.VoiceCommand"
+                class="com.runanywhere.plugin.actions.VoiceCommandAction"
+                text="Voice Command"
+                description="Start/stop voice recording for transcription"
+                icon="AllIcons.Actions.Execute">
+            <add-to-group group-id="ToolsMenu" anchor="first" />
+            <add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPaste" />
+            <keyboard-shortcut first-keystroke="ctrl shift V" keymap="$default" />
+        </action>
+
+        <!-- Voice Dictation Toggle -->
+        <action id="RunAnywhere.VoiceDictation"
+                class="com.runanywhere.plugin.actions.VoiceDictationAction"
+                text="Toggle Voice Dictation"
+                description="Toggle continuous voice dictation mode">
+            <add-to-group group-id="EditMenu" anchor="last" />
+            <keyboard-shortcut first-keystroke="ctrl shift D" keymap="$default" />
+        </action>
+
+        <!-- Model Manager Action -->
+        <action id="RunAnywhere.ModelManager"
+                class="com.runanywhere.plugin.actions.ModelManagerAction"
+                text="Manage RunAnywhere Models"
+                description="Download and manage AI models"
+                icon="AllIcons.Actions.Download">
+            <add-to-group group-id="ToolsMenu" anchor="after" relative-to-action="RunAnywhere.VoiceCommand" />
+        </action>
+
+        <!-- Group all RunAnywhere actions -->
+        <group id="RunAnywhere.ActionGroup"
+               text="RunAnywhere"
+               description="RunAnywhere voice actions"
+               popup="true">
+            <add-to-group group-id="MainMenu" anchor="after" relative-to-action="ToolsMenu" />
+            <reference ref="RunAnywhere.VoiceCommand" />
+            <reference ref="RunAnywhere.VoiceDictation" />
+            <reference ref="RunAnywhere.ModelManager" />
+        </group>
+    </actions>
+</idea-plugin>
