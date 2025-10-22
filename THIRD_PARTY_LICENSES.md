@@ -284,29 +284,33 @@ This file should be included in all distributed artifacts:
 
 - **AAR**: Include in `assets/` directory via `build.gradle.kts`:
   ```kotlin
+  // Define generated assets directory (in build/ to keep source tree clean)
+  val licenseAssets = layout.buildDirectory.dir("generated/assets/licenses")
+
   android {
       sourceSets {
-          getByName("main") {
-              // Point to the assets directory
-              assets.srcDir("src/main/assets")
+          named("main") {
+              // Point to the generated assets directory
+              assets.srcDir(licenseAssets)
           }
       }
   }
 
-  // Copy THIRD_PARTY_LICENSES.md into assets before packaging
-  tasks.register<Copy>("copyThirdPartyLicenses") {
+  // Copy THIRD_PARTY_LICENSES.md into generated directory before packaging
+  val copyThirdPartyLicenses by tasks.registering(Copy::class) {
       from(rootProject.file("THIRD_PARTY_LICENSES.md"))
-      into("src/main/assets")
+      into(licenseAssets)
   }
 
   tasks.named("preBuild") {
-      dependsOn("copyThirdPartyLicenses")
+      dependsOn(copyThirdPartyLicenses)
   }
   ```
 
-  **Alternative approach** - Copy the file manually:
+  **Alternative approach** - Copy the file manually into assets:
   ```bash
   # Copy the file into your module's assets directory
+  # Note: This will modify tracked files in src/main/assets/
   cp ../../THIRD_PARTY_LICENSES.md src/main/assets/
   ```
 

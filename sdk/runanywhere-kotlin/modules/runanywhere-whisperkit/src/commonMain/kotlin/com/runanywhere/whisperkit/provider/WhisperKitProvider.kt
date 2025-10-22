@@ -3,6 +3,7 @@ package com.runanywhere.whisperkit.provider
 import com.runanywhere.sdk.core.STTServiceProvider
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTService
+import com.runanywhere.sdk.models.enums.LLMFramework
 import com.runanywhere.whisperkit.service.WhisperKitFactory
 import com.runanywhere.whisperkit.models.WhisperModelType
 
@@ -14,6 +15,8 @@ import com.runanywhere.whisperkit.models.WhisperModelType
 class WhisperKitProvider : STTServiceProvider {
 
     override val name: String = "WhisperKit"
+
+    override val framework: LLMFramework = LLMFramework.WHISPER_KIT
 
     /**
      * Creates a WhisperKit service instance that implements the generic STTService interface

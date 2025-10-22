@@ -63,14 +63,20 @@ class RunAnywhereApplication : Application() {
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
 
                 // STEP 1: Register Service Providers (matches iOS pattern)
-                registerServiceProvidersForDevelopment()
+                val providersRegistered = registerServiceProvidersForDevelopment()
+                if (!providersRegistered) {
+                    throw IllegalStateException("Failed to register service providers")
+                }
 
                 // STEP 2: Register models for development
-                registerModelsForDevelopment()
+                val modelsRegistered = registerModelsForDevelopment()
+                if (!modelsRegistered) {
+                    throw IllegalStateException("Failed to register models")
+                }
 
             } else {
                 // Production Mode - Real API key required
-                val apiKey = "testing_api_key"  // TODO: Get from secure storage
+                val apiKey = getSecureApiKey()
                 val baseURL = "https://api.runanywhere.ai"
 
                 RunAnywhere.initialize(
@@ -120,10 +126,10 @@ class RunAnywhereApplication : Application() {
      * 1. Register service providers with ModuleRegistry
      * 2. Register models with their framework associations
      */
-    private fun registerServiceProvidersForDevelopment() {
+    private fun registerServiceProvidersForDevelopment(): Boolean {
         Log.i("RunAnywhereApp", "🔧 Registering Service Providers for DEVELOPMENT mode")
 
-        try {
+        return try {
             // Register Llama.cpp service provider from SDK module
             LlamaCppServiceProvider.register()
             Log.i("RunAnywhereApp", "✅ Registered LlamaCppServiceProvider")
@@ -132,9 +138,10 @@ class RunAnywhereApplication : Application() {
             // TODO: Register TTS provider when available
 
             Log.i("RunAnywhereApp", "🎉 All service providers registered successfully")
-
+            true
         } catch (e: Exception) {
             Log.e("RunAnywhereApp", "❌ Failed to register service providers: ${e.message}")
+            false
         }
     }
 
@@ -142,10 +149,10 @@ class RunAnywhereApplication : Application() {
      * Register models for development mode (matches iOS registerAdaptersForDevelopment)
      * This is Step 2 - models are associated with frameworks via compatibleFrameworks field
      */
-    private suspend fun registerModelsForDevelopment() {
+    private suspend fun registerModelsForDevelopment(): Boolean {
         Log.i("RunAnywhereApp", "📦 Registering models for DEVELOPMENT mode")
 
-        try {
+        return try {
             // Register LLM models (matches iOS LLMSwift models)
             // Note: In Kotlin SDK, addModelFromURL automatically registers the model
 
@@ -228,9 +235,35 @@ class RunAnywhereApplication : Application() {
             // They are registered when needed by the SDK's service container
             // WhisperKit and other framework adapters are handled internally by the SDK
 
+            true
         } catch (e: Exception) {
             Log.e("RunAnywhereApp", "❌ Failed to register models: ${e.message}")
+            false
         }
+    }
+
+    /**
+     * Retrieves API key from secure storage.
+     * In production, this should:
+     * 1. Read from Android EncryptedSharedPreferences or Keystore
+     * 2. Or read from BuildConfig (populated from environment variables in CI/CD)
+     * 3. Never hard-code the key in source code
+     *
+     * For development/demo purposes, we use BuildConfig which can be set via:
+     * - gradle.properties (not committed to version control)
+     * - Environment variables in CI/CD
+     * - Or throw an error to force proper configuration
+     */
+    private fun getSecureApiKey(): String {
+        // TODO: Implement secure API key retrieval before production deployment
+        // Option 1: Read from EncryptedSharedPreferences
+        // Option 2: Read from Android Keystore
+        // Option 3: Read from BuildConfig (populated from environment variables)
+        // Example: return BuildConfig.RUNANYWHERE_API_KEY
+
+        // For now, return a placeholder to allow development/testing
+        // WARNING: This must be replaced with actual secure key retrieval before production
+        return "dev-placeholder-key"
     }
 
     /**

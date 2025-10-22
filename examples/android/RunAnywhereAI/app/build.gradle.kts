@@ -151,14 +151,10 @@ android {
             "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
             "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
-            "-Xjvm-default=all",
-            "-Xskip-metadata-version-check"  // Skip version check to avoid conflicts
+            "-Xjvm-default=all"
         )
     }
 
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.15"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -174,14 +170,9 @@ android {
     lint {
         abortOnError = true
         checkDependencies = true
-        warningsAsErrors = false
+        warningsAsErrors = true
         baseline = file("lint-baseline.xml")
         lintConfig = file("lint.xml")
-
-        // Suppress specific warnings
-        disable += listOf(
-            "NewApi"  // Allow using newer APIs with compatibility checks
-        )
     }
     // Native build disabled for now to focus on Kotlin implementation
     // externalNativeBuild {

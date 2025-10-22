@@ -170,6 +170,7 @@ print("Tokens: \(result.tokensUsed)")
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.llm.llamacpp.LlamaCppModule
 import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.data.models.SDKEnvironment
 
 // 1. Initialize the SDK
 suspend fun initializeSDK() {

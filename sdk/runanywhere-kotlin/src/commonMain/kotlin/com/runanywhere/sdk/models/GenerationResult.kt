@@ -249,7 +249,7 @@ data class MessageAnalytics(
     val conversationId: String,
     val modelId: String,
     val modelName: String,
-    val framework: String,
+    val framework: com.runanywhere.sdk.models.enums.LLMFramework,
     val timestamp: Long,
 
     // Timing Metrics (in milliseconds)
@@ -305,7 +305,7 @@ data class MessageAnalytics(
 data class MessageModelInfo(
     val modelId: String,
     val modelName: String,
-    val framework: String
+    val framework: com.runanywhere.sdk.models.enums.LLMFramework
 )
 
 /**

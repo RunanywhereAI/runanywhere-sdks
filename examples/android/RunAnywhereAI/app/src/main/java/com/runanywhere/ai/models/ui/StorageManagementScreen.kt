@@ -30,7 +30,8 @@ fun StorageManagementScreen(
 ) {
     val context = LocalContext.current
     val viewModel: ModelManagementViewModel = viewModel {
-        ModelManagementViewModel(ModelRepository(context))
+        val appContext = context.applicationContext
+        ModelManagementViewModel(ModelRepository(appContext))
     }
     var storageInfo by remember { mutableStateOf<StorageInfo?>(null) }
     var isLoading by remember { mutableStateOf(true) }
