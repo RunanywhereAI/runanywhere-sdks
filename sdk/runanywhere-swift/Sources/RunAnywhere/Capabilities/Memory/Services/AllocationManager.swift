@@ -14,7 +14,8 @@ class AllocationManager {
     // MARK: - Model Registration
 
     func registerModel(_ model: MemoryLoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
-        modelLock.withLock {
+        // Capture callback reference while under lock, then call outside lock to avoid deadlock
+        let callback = modelLock.withLock { () -> (() -> Void)? in
             let modelInfo = MemoryLoadedModelInfo(
                 model: model,
                 size: size,
@@ -26,9 +27,11 @@ class AllocationManager {
 
             logger.info("Registered model '\(model.name)' with \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
 
-            // Trigger pressure check
-            pressureCallback?()
+            return pressureCallback
         }
+
+        // Call callback outside lock to prevent deadlock if callback re-enters AllocationManager
+        callback?()
     }
 
     func unregisterModel(_ modelId: String) {

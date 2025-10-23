@@ -212,13 +212,6 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Registration")
         logger.info("Starting device registration...")
 
-        // Defer cleanup to ensure isRegistering is always reset
-        defer {
-            Task {
-                await registrationState.clearRegistering()
-            }
-        }
-
         // Skip registration in development mode
         if currentEnvironment == .development {
             let mockDeviceId = "dev-" + generateDeviceIdentifier()
@@ -226,9 +219,11 @@ public enum RunAnywhere {
                 try storeDeviceId(mockDeviceId)
                 await registrationState.setCachedDeviceId(mockDeviceId)
                 logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
+                await registrationState.clearRegistering()
                 return
             } catch {
                 logger.error("Failed to store mock device ID: \(error.localizedDescription)")
+                await registrationState.clearRegistering()
                 throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
             }
         }
@@ -263,6 +258,7 @@ public enum RunAnywhere {
 
                 logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
                 logger.debug("Device registration completed")
+                await registrationState.clearRegistering()
                 return // Success!
 
             } catch {
@@ -272,6 +268,7 @@ public enum RunAnywhere {
                 // Check if error is retryable
                 if !isRetryableError(error) {
                     logger.error("Non-retryable error, stopping registration attempts")
+                    await registrationState.clearRegistering()
                     throw error
                 }
 
@@ -286,6 +283,7 @@ public enum RunAnywhere {
         // All retries exhausted
         let finalError = lastError ?? SDKError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
         logger.error("Device registration failed after all retries: \(finalError.localizedDescription)")
+        await registrationState.clearRegistering()
         throw finalError
     }
 
