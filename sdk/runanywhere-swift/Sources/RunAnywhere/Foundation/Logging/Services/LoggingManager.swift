@@ -27,17 +27,27 @@ public class LoggingManager {
 
     // MARK: - Properties
 
-    /// Current logging configuration
-    public private(set) var configuration = LoggingConfiguration()
+    /// Current logging configuration (protected by lock)
+    private let _configuration = UnfairLockWithState(initialState: LoggingConfiguration())
+
+    public var configuration: LoggingConfiguration {
+        get {
+            _configuration.withLock { (state: LoggingConfiguration) -> LoggingConfiguration in
+                return state
+            }
+        }
+        set {
+            _configuration.withLock { (state: inout LoggingConfiguration) in
+                state = newValue
+            }
+        }
+    }
 
     /// SDK Environment
     private let environment: SDKEnvironment
 
     /// Pulse logger for local debugging and development
     private let pulseLogger = LoggerStore.shared
-
-    /// Lock for thread-safe configuration updates
-    private let configLock = NSLock()
 
     /// Logger for internal use
     private let logger = SDKLogger(category: "LoggingManager")
@@ -56,10 +66,7 @@ public class LoggingManager {
 
     /// Update logging configuration
     public func configure(_ config: LoggingConfiguration) {
-        configLock.lock()
-        defer { configLock.unlock() }
-
-        self.configuration = config
+        _configuration.withLock { $0 = config }
 
         // Remote logging configuration will be handled by external service
         // when implemented (e.g., Sentry, DataDog, etc.)
@@ -67,11 +74,10 @@ public class LoggingManager {
 
     /// Configure SDK logging endpoint (for SDK team debugging)
     public func configureSDKLogging(endpoint: URL?, enabled: Bool = true) {
-        configLock.lock()
-        defer { configLock.unlock() }
-
-        configuration.remoteEndpoint = endpoint
-        configuration.enableRemoteLogging = enabled && endpoint != nil
+        _configuration.withLock { config in
+            config.remoteEndpoint = endpoint
+            config.enableRemoteLogging = enabled && endpoint != nil
+        }
 
         // This will be replaced with external service configuration
         // e.g., Sentry.configure(dsn: endpoint)

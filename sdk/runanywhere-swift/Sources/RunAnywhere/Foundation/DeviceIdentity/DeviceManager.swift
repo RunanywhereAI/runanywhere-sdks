@@ -12,68 +12,65 @@ public class DeviceManager {
     private static let deviceIdKey = "com.runanywhere.sdk.deviceId"
     private static let registrationStateKey = "com.runanywhere.sdk.registrationState"
 
-    private static let lock = NSLock()
+    private static let lock = UnfairLock()
 
     // MARK: - Device ID Management
 
     /// Get stored device ID from local persistence
     /// - Returns: Device ID if exists, nil otherwise
     public static func getStoredDeviceId() -> String? {
-        lock.lock()
-        defer { lock.unlock() }
+        return lock.withLock {
+            // Try keychain first (production), then UserDefaults (development)
+            if let keychainId = try? KeychainManager.shared.getDeviceId() {
+                return keychainId
+            }
 
-        // Try keychain first (production), then UserDefaults (development)
-        if let keychainId = try? KeychainManager.shared.getDeviceId() {
-            return keychainId
+            // Fallback to UserDefaults for development
+            return UserDefaults.standard.string(forKey: deviceIdKey)
         }
-
-        // Fallback to UserDefaults for development
-        return UserDefaults.standard.string(forKey: deviceIdKey)
     }
 
     /// Store device ID in local persistence
     /// - Parameter deviceId: Device ID to store
     /// - Throws: Storage error if unable to persist
     public static func storeDeviceId(_ deviceId: String) throws {
-        lock.lock()
-        defer { lock.unlock() }
+        try lock.withLock {
+            guard !deviceId.isEmpty else {
+                throw SDKError.validationFailed("Device ID cannot be empty")
+            }
 
-        guard !deviceId.isEmpty else {
-            throw SDKError.validationFailed("Device ID cannot be empty")
+            // Store in keychain for production environments
+            if let environment = RunAnywhere.currentEnvironment,
+               environment != .development {
+                try KeychainManager.shared.storeDeviceId(deviceId)
+            }
+
+            // Always store in UserDefaults as fallback
+            UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
+            UserDefaults.standard.synchronize()
+
+            // Mark as registered
+            setRegistrationState(.registered)
+
+            let logger = SDKLogger(category: "DeviceManager")
+            logger.debug("Device ID stored: \(deviceId.prefix(8))...")
         }
-
-        // Store in keychain for production environments
-        if let environment = RunAnywhere.currentEnvironment,
-           environment != .development {
-            try KeychainManager.shared.storeDeviceId(deviceId)
-        }
-
-        // Always store in UserDefaults as fallback
-        UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
-        UserDefaults.standard.synchronize()
-
-        // Mark as registered
-        setRegistrationState(.registered)
-
-        let logger = SDKLogger(category: "DeviceManager")
-        logger.debug("Device ID stored: \(deviceId.prefix(8))...")
     }
 
     /// Clear stored device ID (for testing or reset)
     public static func clearDeviceId() {
-        lock.lock()
-        defer { lock.unlock() }
+        lock.withLock {
+            // Clear from keychain
+            try? KeychainManager.shared.clearDeviceId()
 
-        // Clear from keychain
-        try? KeychainManager.shared.clearDeviceId()
+            // Clear from UserDefaults
+            UserDefaults.standard.removeObject(forKey: deviceIdKey)
+            UserDefaults.standard.removeObject(forKey: registrationStateKey)
+            UserDefaults.standard.synchronize()
 
-        // Clear from UserDefaults
-        UserDefaults.standard.removeObject(forKey: deviceIdKey)
-        UserDefaults.standard.removeObject(forKey: registrationStateKey)
-        UserDefaults.standard.synchronize()
-
-        let logger = SDKLogger(category: "DeviceManager")
-        logger.debug("Device ID cleared")
+            let logger = SDKLogger(category: "DeviceManager")
+            logger.debug("Device ID cleared")
+        }
     }
 
     // MARK: - Registration State
@@ -88,11 +85,10 @@ public class DeviceManager {
     /// Check if device is registered
     /// - Returns: true if device has been registered
     public static func isDeviceRegistered() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-
-        let state = getRegistrationState()
-        return state == .registered && getStoredDeviceId() != nil
+        return lock.withLock {
+            let state = getRegistrationState()
+            return state == .registered && getStoredDeviceId() != nil
+        }
     }
 
     /// Get current registration state

@@ -6,39 +6,37 @@ public class RunAnywhereScope {
 
     // MARK: - Properties
 
-    private let lock = NSLock()
+    private let lock = UnfairLock()
     private var _deviceId: String?
     private var _isRegistering: Bool = false
 
     // MARK: - Thread Isolation
 
     private static let isolationContext = NSMapTable<AnyObject, RunAnywhereScope>.strongToWeakObjects()
-    private static let contextLock = NSLock()
+    private static let contextLock = UnfairLock()
 
     /// Get the current scope for the calling thread
     /// Creates a new scope if none exists for this thread
     /// - Returns: Current thread's scope
     public static func getCurrentScope() -> RunAnywhereScope {
-        contextLock.lock()
-        defer { contextLock.unlock() }
+        return contextLock.withLock {
+            let currentContext = Thread.current
 
-        let currentContext = Thread.current
+            if let scope = isolationContext.object(forKey: currentContext) {
+                return scope
+            }
 
-        if let scope = isolationContext.object(forKey: currentContext) {
-            return scope
+            let newScope = RunAnywhereScope()
+            isolationContext.setObject(newScope, forKey: currentContext)
+            return newScope
         }
-
-        let newScope = RunAnywhereScope()
-        isolationContext.setObject(newScope, forKey: currentContext)
-        return newScope
     }
 
     /// Clear all scopes (for testing)
     public static func clearAllScopes() {
-        contextLock.lock()
-        defer { contextLock.unlock() }
-
-        isolationContext.removeAllObjects()
+        contextLock.withLock {
+            isolationContext.removeAllObjects()
+        }
     }
 
     // MARK: - Device ID Management
@@ -46,19 +44,17 @@ public class RunAnywhereScope {
     /// Get cached device ID for this scope
     /// - Returns: Cached device ID if available
     public func getCachedDeviceId() -> String? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return _deviceId
+        return lock.withLock {
+            return _deviceId
+        }
     }
 
     /// Set device ID in this scope
     /// - Parameter deviceId: Device ID to cache
     public func setCachedDeviceId(_ deviceId: String?) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        _deviceId = deviceId
+        lock.withLock {
+            _deviceId = deviceId
+        }
     }
 
     // MARK: - Registration State
@@ -66,19 +62,17 @@ public class RunAnywhereScope {
     /// Check if registration is in progress
     /// - Returns: true if currently registering
     public func isRegistering() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return _isRegistering
+        return lock.withLock {
+            return _isRegistering
+        }
     }
 
     /// Set registration state
     /// - Parameter registering: true if registration is in progress
     public func setRegistering(_ registering: Bool) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        _isRegistering = registering
+        lock.withLock {
+            _isRegistering = registering
+        }
     }
 
     // MARK: - Scope Information
