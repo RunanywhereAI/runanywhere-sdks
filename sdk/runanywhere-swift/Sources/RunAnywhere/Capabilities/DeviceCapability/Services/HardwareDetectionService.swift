@@ -71,21 +71,36 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     /// Get current device capabilities
     public var capabilities: DeviceCapabilities {
-        return detectorLock.withLock {
-            // Check cache validity
+        // Fast path: check cache under lock
+        if let cached = detectorLock.withLock({ () -> DeviceCapabilities? in
             if let cached = cachedCapabilities,
                let timestamp = cacheTimestamp,
                Date().timeIntervalSince(timestamp) < cacheValidityDuration {
                 return cached
             }
-
-            // Use capability analyzer for fresh detection
-            let capabilities = capabilityAnalyzer.analyzeCapabilities()
-            cachedCapabilities = capabilities
-            cacheTimestamp = Date()
-
-            return capabilities
+            return nil
+        }) {
+            return cached
         }
+
+        // Compute capabilities outside lock (expensive operation)
+        let computed: DeviceCapabilities = {
+            // Check if a custom detector was registered
+            if let detector = detectorLock.withLock({ registeredHardwareDetector }) {
+                return detector.detectCapabilities()
+            } else {
+                // Use default capability analyzer
+                return capabilityAnalyzer.analyzeCapabilities()
+            }
+        }()
+
+        // Update cache under lock
+        detectorLock.withLock {
+            cachedCapabilities = computed
+            cacheTimestamp = Date()
+        }
+
+        return computed
     }
 
     /// Get optimal hardware configuration for a model
