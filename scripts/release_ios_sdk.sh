@@ -44,6 +44,7 @@ sedi() {
 ### CLI flags
 AUTO_YES=0
 BUMP_TYPE=""
+SKIP_BUILD=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -55,12 +56,17 @@ while [[ $# -gt 0 ]]; do
       BUMP_TYPE="${2:-}"
       shift 2
       ;;
+    --skip-build)
+      SKIP_BUILD=1
+      shift
+      ;;
     --help|-h)
       echo "Usage: $0 [OPTIONS]"
       echo ""
       echo "Options:"
       echo "  --yes, -y           Auto-confirm prompts (for CI)"
       echo "  --bump TYPE         Version bump type: major|minor|patch"
+      echo "  --skip-build        Skip build check (for testing)"
       echo "  --help, -h          Show this help"
       echo ""
       echo "Environment Variables:"
@@ -308,6 +314,11 @@ store_build_token_in_backend() {
 
 ### Run tests
 run_tests() {
+  if [[ $SKIP_BUILD -eq 1 ]]; then
+    print_warning "Skipping build check (--skip-build flag)"
+    return
+  fi
+
   print_header "Building Package"
 
   print_info "Running swift build..."
