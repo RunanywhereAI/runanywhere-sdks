@@ -120,6 +120,15 @@ public actor MockNetworkService: NetworkService {
             )
             return try encoder.encode(deviceResponse)
 
+        case .devDeviceRegistration:
+            // Mock response for development device registration
+            let response: [String: Any] = [
+                "success": true,
+                "deviceId": "mock-dev-device-\(UUID().uuidString)",
+                "registeredAt": ISO8601DateFormatter().string(from: Date())
+            ]
+            return try JSONSerialization.data(withJSONObject: response)
+
         case .healthCheck:
             let response = HealthCheckResponse(
                 status: .healthy,

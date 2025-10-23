@@ -25,7 +25,7 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     private var nextSpeakerId: Int = 1
 
     /// Lock for thread safety
-    private let lock = NSLock()
+    private let lock = UnfairLock()
 
     /// Logger
     private let logger = SDKLogger(category: "DefaultSpeakerDiarization")
@@ -37,41 +37,38 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     // MARK: - SpeakerDiarizationProtocol Implementation
 
     public func processAudio(_ samples: [Float]) -> SpeakerInfo {
-        lock.lock()
-        defer { lock.unlock() }
+        return lock.withLock {
+            // Create a simple embedding from audio features
+            let embedding = createSimpleEmbedding(from: samples)
 
-        // Create a simple embedding from audio features
-        let embedding = createSimpleEmbedding(from: samples)
+            // Try to match with existing speakers
+            if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
+                currentSpeaker = matchedSpeaker
+                return matchedSpeaker
+            }
 
-        // Try to match with existing speakers
-        if let matchedSpeaker = findMatchingSpeaker(embedding: embedding) {
-            currentSpeaker = matchedSpeaker
-            return matchedSpeaker
+            // Create new speaker if no match found
+            let newSpeaker = createNewSpeaker(embedding: embedding)
+            currentSpeaker = newSpeaker
+            logger.info("Detected new speaker: \(newSpeaker.id)")
+            return newSpeaker
         }
-
-        // Create new speaker if no match found
-        let newSpeaker = createNewSpeaker(embedding: embedding)
-        currentSpeaker = newSpeaker
-        logger.info("Detected new speaker: \(newSpeaker.id)")
-        return newSpeaker
     }
 
     public func updateSpeakerName(speakerId: String, name: String) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        if var speaker = speakers[speakerId] {
-            speaker.name = name
-            speakers[speakerId] = speaker
-            logger.debug("Updated speaker name: \(speakerId) -> \(name)")
+        lock.withLock {
+            if var speaker = speakers[speakerId] {
+                speaker.name = name
+                speakers[speakerId] = speaker
+                logger.debug("Updated speaker name: \(speakerId) -> \(name)")
+            }
         }
     }
 
     public func getAllSpeakers() -> [SpeakerInfo] {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return Array(speakers.values)
+        return lock.withLock {
+            return Array(speakers.values)
+        }
     }
 
 
@@ -86,14 +83,13 @@ public class DefaultSpeakerDiarization: SpeakerDiarizationService {
     }
 
     public func reset() {
-        lock.lock()
-        defer { lock.unlock() }
-
-        speakers.removeAll()
-        currentSpeaker = nil
-        temporarySpeakerSegments.removeAll()
-        nextSpeakerId = 1
-        logger.debug("Reset speaker diarization state")
+        lock.withLock {
+            speakers.removeAll()
+            currentSpeaker = nil
+            temporarySpeakerSegments.removeAll()
+            nextSpeakerId = 1
+            logger.debug("Reset speaker diarization state")
+        }
     }
 
     // MARK: - Private Methods

@@ -34,7 +34,7 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     /// Registered hardware detector (for backward compatibility)
     private var registeredHardwareDetector: HardwareDetector?
-    private let detectorLock = NSLock()
+    private let detectorLock = UnfairLock()
 
     /// Cached capabilities
     private var cachedCapabilities: DeviceCapabilities?
@@ -62,32 +62,45 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     /// Register a platform-specific hardware detector (backward compatibility)
     public func registerHardwareDetector(_ detector: HardwareDetector) {
-        detectorLock.lock()
-        defer { detectorLock.unlock() }
-
-        self.registeredHardwareDetector = detector
-        self.cachedCapabilities = nil
-        self.cacheTimestamp = nil
+        detectorLock.withLock {
+            self.registeredHardwareDetector = detector
+            self.cachedCapabilities = nil
+            self.cacheTimestamp = nil
+        }
     }
 
     /// Get current device capabilities
     public var capabilities: DeviceCapabilities {
-        detectorLock.lock()
-        defer { detectorLock.unlock() }
-
-        // Check cache validity
-        if let cached = cachedCapabilities,
-           let timestamp = cacheTimestamp,
-           Date().timeIntervalSince(timestamp) < cacheValidityDuration {
+        // Fast path: check cache under lock
+        if let cached = detectorLock.withLock({ () -> DeviceCapabilities? in
+            if let cached = cachedCapabilities,
+               let timestamp = cacheTimestamp,
+               Date().timeIntervalSince(timestamp) < cacheValidityDuration {
+                return cached
+            }
+            return nil
+        }) {
             return cached
         }
 
-        // Use capability analyzer for fresh detection
-        let capabilities = capabilityAnalyzer.analyzeCapabilities()
-        cachedCapabilities = capabilities
-        cacheTimestamp = Date()
+        // Compute capabilities outside lock (expensive operation)
+        let computed: DeviceCapabilities = {
+            // Check if a custom detector was registered
+            if let detector = detectorLock.withLock({ registeredHardwareDetector }) {
+                return detector.detectCapabilities()
+            } else {
+                // Use default capability analyzer
+                return capabilityAnalyzer.analyzeCapabilities()
+            }
+        }()
 
-        return capabilities
+        // Update cache under lock
+        detectorLock.withLock {
+            cachedCapabilities = computed
+            cacheTimestamp = Date()
+        }
+
+        return computed
     }
 
     /// Get optimal hardware configuration for a model
@@ -117,11 +130,10 @@ public final class HardwareCapabilityManager: @unchecked Sendable {
 
     /// Refresh cached capabilities
     public func refreshCapabilities() {
-        detectorLock.lock()
-        defer { detectorLock.unlock() }
-
-        cachedCapabilities = nil
-        cacheTimestamp = nil
+        detectorLock.withLock {
+            cachedCapabilities = nil
+            cacheTimestamp = nil
+        }
     }
 
     // MARK: - Private Methods

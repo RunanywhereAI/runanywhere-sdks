@@ -137,10 +137,37 @@ public enum RunAnywhere {
 
     // MARK: - Lazy Device Registration
 
-    /// Track device registration state (self-contained implementation)
-    private static var _cachedDeviceId: String?
-    private static var _isRegistering: Bool = false
-    private static let registrationLock = NSLock()
+    /// Actor for managing device registration state in a thread-safe manner
+    private actor RegistrationState {
+        var cachedDeviceId: String?
+        var isRegistering: Bool = false
+
+        func getCachedDeviceId() -> String? {
+            return cachedDeviceId
+        }
+
+        func setCachedDeviceId(_ deviceId: String?) {
+            self.cachedDeviceId = deviceId
+        }
+
+        func checkAndSetRegistering() -> Bool {
+            if isRegistering {
+                return false // Already registering
+            }
+            isRegistering = true
+            return true // Successfully set to registering
+        }
+
+        func clearRegistering() {
+            isRegistering = false
+        }
+
+        func getIsRegistering() -> Bool {
+            return isRegistering
+        }
+    }
+
+    private static let registrationState = RegistrationState()
 
     /// Maximum number of registration retry attempts
     private static let maxRegistrationRetries = 3
@@ -151,21 +178,30 @@ public enum RunAnywhere {
     /// Only registers if device ID doesn't exist locally
     /// - Throws: SDKError if registration fails
     private static func ensureDeviceRegistered() async throws {
-        registrationLock.lock()
+        // Check if we have a cached device ID
+        if let cachedId = await registrationState.getCachedDeviceId(), !cachedId.isEmpty {
+            return
+        }
 
-        // Check if we're already registering
-        if _isRegistering {
-            registrationLock.unlock()
+        // Check if device is already registered in local storage
+        if let storedDeviceId = getStoredDeviceId(), !storedDeviceId.isEmpty {
+            await registrationState.setCachedDeviceId(storedDeviceId)
+            return
+        }
+
+        // Try to set registering flag - if already registering, wait for completion
+        let canRegister = await registrationState.checkAndSetRegistering()
+        if !canRegister {
             // Wait for registration to complete with timeout
             var waitAttempts = 0
             let maxWaitAttempts = 50 // 5 seconds total timeout
-            while _isRegistering && waitAttempts < maxWaitAttempts {
+            while await registrationState.getIsRegistering() && waitAttempts < maxWaitAttempts {
                 try await Task.sleep(nanoseconds: 100_000_000) // 100ms
                 waitAttempts += 1
             }
 
             // Check if we have a device ID after waiting
-            if let deviceId = _cachedDeviceId, !deviceId.isEmpty {
+            if let deviceId = await registrationState.getCachedDeviceId(), !deviceId.isEmpty {
                 return
             } else if waitAttempts >= maxWaitAttempts {
                 throw SDKError.timeout("Device registration timeout")
@@ -173,41 +209,21 @@ public enum RunAnywhere {
             return
         }
 
-        // Check if we have a cached device ID
-        if let cachedId = _cachedDeviceId, !cachedId.isEmpty {
-            registrationLock.unlock()
-            return
-        }
-
-        // Check if device is already registered in local storage
-        if let storedDeviceId = getStoredDeviceId(), !storedDeviceId.isEmpty {
-            _cachedDeviceId = storedDeviceId
-            registrationLock.unlock()
-            return
-        }
-
-        // Mark as registering
-        _isRegistering = true
-        registrationLock.unlock()
-
         let logger = SDKLogger(category: "RunAnywhere.Registration")
         logger.info("Starting device registration...")
-
-        // Defer cleanup to ensure _isRegistering is always reset
-        defer {
-            _isRegistering = false
-        }
 
         // Skip registration in development mode
         if currentEnvironment == .development {
             let mockDeviceId = "dev-" + generateDeviceIdentifier()
             do {
                 try storeDeviceId(mockDeviceId)
-                _cachedDeviceId = mockDeviceId
+                await registrationState.setCachedDeviceId(mockDeviceId)
                 logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
+                await registrationState.clearRegistering()
                 return
             } catch {
                 logger.error("Failed to store mock device ID: \(error.localizedDescription)")
+                await registrationState.clearRegistering()
                 throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
             }
         }
@@ -238,10 +254,11 @@ public enum RunAnywhere {
 
                 // Store device ID locally
                 try storeDeviceId(deviceRegistration.deviceId)
-                _cachedDeviceId = deviceRegistration.deviceId
+                await registrationState.setCachedDeviceId(deviceRegistration.deviceId)
 
                 logger.info("Device registered successfully: \(deviceRegistration.deviceId.prefix(8))...")
                 logger.debug("Device registration completed")
+                await registrationState.clearRegistering()
                 return // Success!
 
             } catch {
@@ -251,6 +268,7 @@ public enum RunAnywhere {
                 // Check if error is retryable
                 if !isRetryableError(error) {
                     logger.error("Non-retryable error, stopping registration attempts")
+                    await registrationState.clearRegistering()
                     throw error
                 }
 
@@ -265,6 +283,7 @@ public enum RunAnywhere {
         // All retries exhausted
         let finalError = lastError ?? SDKError.networkError("Device registration failed after \(maxRegistrationRetries) attempts")
         logger.error("Device registration failed after all retries: \(finalError.localizedDescription)")
+        await registrationState.clearRegistering()
         throw finalError
     }
 
@@ -308,7 +327,7 @@ public enum RunAnywhere {
     /// Check if device is already registered in development mode
     private static func isDevDeviceRegistered() -> Bool {
         // Check Keychain first
-        if let registered = KeychainManager.shared.get(devDeviceRegisteredKey),
+        if let registered = try? KeychainManager.shared.retrieve(for: devDeviceRegisteredKey),
            registered == "true" {
             return true
         }
@@ -320,7 +339,7 @@ public enum RunAnywhere {
     /// Mark device as registered in development mode
     private static func markDevDeviceAsRegistered() {
         // Store in both Keychain and UserDefaults
-        try? KeychainManager.shared.set(devDeviceRegisteredKey, value: "true")
+        try? KeychainManager.shared.store("true", for: devDeviceRegisteredKey)
         UserDefaults.standard.set(true, forKey: devDeviceRegisteredKey)
     }
 
@@ -358,28 +377,36 @@ public enum RunAnywhere {
             throw SDKError.notInitialized
         }
 
-        // Get device info
-        guard let deviceInfo = await DeviceInfoService.shared.getCurrentDeviceInfo() else {
-            throw SDKError.deviceInfoUnavailable
-        }
+        // Collect device info using DeviceKitAdapter
+        let deviceAdapter = DeviceKitAdapter()
+        let deviceInfoResult = deviceAdapter.getDeviceInfo()
+        let processorInfo = deviceAdapter.getProcessorInfo()
+        let capabilities = deviceAdapter.getDeviceCapabilities()
+
+        // Get device ID
+        let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
 
         // Create registration request
         let request = DevDeviceRegistrationRequest(
-            deviceId: deviceInfo.id,
-            deviceModel: deviceInfo.deviceModel,
-            osVersion: deviceInfo.osVersion,
-            chipName: deviceInfo.chipName,
-            totalMemory: deviceInfo.totalMemory,
-            hasNeuralEngine: deviceInfo.hasNeuralEngine,
-            architecture: deviceInfo.architecture.rawValue,
-            formFactor: deviceInfo.formFactor.rawValue,
+            deviceId: deviceId,
+            deviceModel: deviceInfoResult.model,
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+            chipName: processorInfo.chipName,
+            totalMemory: Int64(ProcessInfo.processInfo.physicalMemory),
+            hasNeuralEngine: capabilities.hasNeuralEngine,
+            architecture: processorInfo.architecture,
+            formFactor: deviceInfoResult.name,
             sdkVersion: SDKConstants.version,
             platform: SDKConstants.platform,
             buildToken: BuildToken.token
         )
 
         // Make POST request to dev registration endpoint
-        let url = params.baseURL.appendingPathComponent(APIEndpoint.devDeviceRegistration.path)
+        guard let baseURL = params.baseURL else {
+            throw SDKError.invalidConfiguration("Base URL is not configured")
+        }
+
+        let url = baseURL.appendingPathComponent(APIEndpoint.devDeviceRegistration.path)
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -444,7 +471,9 @@ public enum RunAnywhere {
         UserDefaults.standard.synchronize()
 
         // Clear cache
-        _cachedDeviceId = nil
+        Task {
+            await registrationState.setCachedDeviceId(nil)
+        }
     }
 
     /// Generate a unique device identifier
