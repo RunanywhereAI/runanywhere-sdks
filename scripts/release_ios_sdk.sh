@@ -65,7 +65,6 @@ while [[ $# -gt 0 ]]; do
       echo ""
       echo "Environment Variables:"
       echo "  DATABASE_URL        PostgreSQL URL for auto-inserting build token"
-      echo "  SUPABASE_PROJECT_ID Project UUID for build_tokens table"
       echo ""
       exit 0
       ;;
@@ -272,23 +271,13 @@ store_build_token_in_backend() {
 
   print_header "Storing Build Token in Backend"
 
-  # Check if DATABASE_URL and project ID are set
+  # Check if DATABASE_URL is set
   if [[ -z "${DATABASE_URL:-}" ]]; then
     print_warning "DATABASE_URL not set, skipping backend storage"
     print_info "Manually insert into Supabase build_tokens table:"
     echo ""
-    echo "  INSERT INTO build_tokens (token, project_id, platform, label, is_active)"
-    echo "  VALUES ('$build_token', '<your-project-id>', 'ios', 'v$version', TRUE);"
-    echo ""
-    return
-  fi
-
-  if [[ -z "${SUPABASE_PROJECT_ID:-}" ]]; then
-    print_warning "SUPABASE_PROJECT_ID not set, cannot auto-insert"
-    print_info "Set SUPABASE_PROJECT_ID environment variable or manually insert:"
-    echo ""
-    echo "  INSERT INTO build_tokens (token, project_id, platform, label, is_active)"
-    echo "  VALUES ('$build_token', '<your-project-id>', 'ios', 'v$version', TRUE);"
+    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
+    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
     echo ""
     return
   fi
@@ -298,21 +287,21 @@ store_build_token_in_backend() {
     print_warning "psql not found, cannot auto-insert"
     print_info "Install PostgreSQL client or manually insert:"
     echo ""
-    echo "  INSERT INTO build_tokens (token, project_id, platform, label, is_active)"
-    echo "  VALUES ('$build_token', '$SUPABASE_PROJECT_ID', 'ios', 'v$version', TRUE);"
+    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
+    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
     echo ""
     return
   fi
 
   # Insert into database
-  if psql "$DATABASE_URL" -c "INSERT INTO build_tokens (token, project_id, platform, label, is_active) VALUES ('$build_token', '$SUPABASE_PROJECT_ID', 'ios', 'v$version', TRUE);"; then
+  if psql "$DATABASE_URL" -c "INSERT INTO build_tokens (token, platform, label, is_active) VALUES ('$build_token', 'ios', 'v$version', TRUE);"; then
     print_success "Build token stored in Supabase"
   else
     print_warning "Failed to store in backend (non-critical)"
     print_info "Manually insert:"
     echo ""
-    echo "  INSERT INTO build_tokens (token, project_id, platform, label, is_active)"
-    echo "  VALUES ('$build_token', '$SUPABASE_PROJECT_ID', 'ios', 'v$version', TRUE);"
+    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
+    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
     echo ""
   fi
 }
@@ -517,13 +506,13 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
   echo ""
 
   # Reminder if DATABASE_URL not set
-  if [[ -z "${DATABASE_URL:-}" || -z "${SUPABASE_PROJECT_ID:-}" ]]; then
+  if [[ -z "${DATABASE_URL:-}" ]]; then
     print_warning "IMPORTANT: Ensure build token is stored in Supabase!"
     echo ""
     print_info "Run this SQL command on your Supabase database:"
     echo ""
-    echo "  INSERT INTO build_tokens (token, project_id, platform, label, is_active)"
-    echo "  VALUES ('$build_token', '<your-project-id>', 'ios', 'v$new_version', TRUE);"
+    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
+    echo "  VALUES ('$build_token', 'ios', 'v$new_version', TRUE);"
     echo ""
   fi
 
