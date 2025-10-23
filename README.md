@@ -276,7 +276,7 @@ Add RunAnywhere to your project:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.5")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.15.6")
 ],
 targets: [
     .target(
