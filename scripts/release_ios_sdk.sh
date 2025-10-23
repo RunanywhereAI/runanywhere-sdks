@@ -346,6 +346,7 @@ create_github_release() {
   fi
 
   # Create GitHub release
+  # SECURITY NOTE: DO NOT include build token in release notes (it's public)
   print_info "Creating GitHub release..."
   gh release create "$tag_name" \
     --title "RunAnywhere iOS SDK v$new_version" \
@@ -516,6 +517,9 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
     echo ""
   fi
 
+  print_warning "SECURITY REMINDER: Build token shown above is for internal use only"
+  print_warning "DO NOT include the token in public GitHub release notes"
+  echo ""
   print_info "View release: https://github.com/RunanywhereAI/sdks/releases/tag/v$new_version"
 }
 
