@@ -3,7 +3,7 @@ import Foundation
 /// Manages memory allocation and model registration
 class AllocationManager {
     private var loadedModels: [String: MemoryLoadedModelInfo] = [:]
-    private let modelLock: NSLock = NSLock()
+    private let modelLock = UnfairLock()
     private var pressureCallback: (() -> Void)?
     private let logger: SDKLogger = SDKLogger(category: "AllocationManager")
 
@@ -14,40 +14,40 @@ class AllocationManager {
     // MARK: - Model Registration
 
     func registerModel(_ model: MemoryLoadedModel, size: Int64, service: LLMService, priority: MemoryPriority = .normal) {
-        modelLock.lock()
-        defer { modelLock.unlock() }
+        // Capture callback reference while under lock, then call outside lock to avoid deadlock
+        let callback = modelLock.withLock { () -> (() -> Void)? in
+            let modelInfo = MemoryLoadedModelInfo(
+                model: model,
+                size: size,
+                service: service,
+                priority: priority
+            )
 
-        let modelInfo = MemoryLoadedModelInfo(
-            model: model,
-            size: size,
-            service: service,
-            priority: priority
-        )
+            loadedModels[model.id] = modelInfo
 
-        loadedModels[model.id] = modelInfo
+            logger.info("Registered model '\(model.name)' with \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
 
-        logger.info("Registered model '\(model.name)' with \(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))")
+            return pressureCallback
+        }
 
-        // Trigger pressure check
-        pressureCallback?()
+        // Call callback outside lock to prevent deadlock if callback re-enters AllocationManager
+        callback?()
     }
 
     func unregisterModel(_ modelId: String) {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        if let modelInfo = loadedModels.removeValue(forKey: modelId) {
-            logger.info("Unregistered model '\(modelInfo.model.name)'")
+        modelLock.withLock {
+            if let modelInfo = loadedModels.removeValue(forKey: modelId) {
+                logger.info("Unregistered model '\(modelInfo.model.name)'")
+            }
         }
     }
 
     func touchModel(_ modelId: String) {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        if var modelInfo = loadedModels[modelId] {
-            modelInfo.lastUsed = Date()
-            loadedModels[modelId] = modelInfo
+        modelLock.withLock {
+            if var modelInfo = loadedModels[modelId] {
+                modelInfo.lastUsed = Date()
+                loadedModels[modelId] = modelInfo
+            }
         }
     }
 
@@ -88,57 +88,55 @@ class AllocationManager {
     // MARK: - Memory Information
 
     func getTotalModelMemory() -> Int64 {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return loadedModels.values.reduce(0) { $0 + $1.size }
+        return modelLock.withLock {
+            return loadedModels.values.reduce(0) { $0 + $1.size }
+        }
     }
 
     func getLoadedModelCount() -> Int {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return loadedModels.count
+        return modelLock.withLock {
+            return loadedModels.count
+        }
     }
 
     func getLoadedModels() -> [MemoryLoadedModelInfo] {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return Array(loadedModels.values)
+        return modelLock.withLock {
+            return Array(loadedModels.values)
+        }
     }
 
     func isModelLoaded(_ modelId: String) -> Bool {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return loadedModels[modelId] != nil
+        return modelLock.withLock {
+            return loadedModels[modelId] != nil
+        }
     }
 
     func getModelMemoryUsage(_ modelId: String) -> Int64? {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return loadedModels[modelId]?.size
+        return modelLock.withLock {
+            return loadedModels[modelId]?.size
+        }
     }
 
     func getModelsForEviction() -> [MemoryLoadedModelInfo] {
-        modelLock.lock()
-        defer { modelLock.unlock() }
-
-        return Array(loadedModels.values)
+        return modelLock.withLock {
+            return Array(loadedModels.values)
+        }
     }
 
     // MARK: - Model Unloading
 
     func unloadModel(_ modelId: String) async -> Int64 {
-        modelLock.lock()
-        guard let modelInfo = loadedModels[modelId] else {
-            modelLock.unlock()
+        let modelInfo = modelLock.withLock { () -> MemoryLoadedModelInfo? in
+            guard let info = loadedModels[modelId] else {
+                return nil
+            }
+            loadedModels.removeValue(forKey: modelId)
+            return info
+        }
+
+        guard let modelInfo = modelInfo else {
             return 0
         }
-        loadedModels.removeValue(forKey: modelId)
-        modelLock.unlock()
 
         let size = modelInfo.size
         let sizeString = ByteCountFormatter.string(fromByteCount: size, countStyle: .memory)
@@ -191,9 +189,9 @@ class AllocationManager {
     }
 
     private func freeMemory(needed: Int64, requesterPriority: MemoryPriority) async -> Int64 {
-        modelLock.lock()
-        let models = Array(loadedModels.values)
-        modelLock.unlock()
+        let models = modelLock.withLock {
+            return Array(loadedModels.values)
+        }
 
         // Sort models by eviction priority
         let sortedModels = models.sorted { lhs, rhs in
