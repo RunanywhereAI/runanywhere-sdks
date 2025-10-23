@@ -445,7 +445,7 @@ main() {
 
 - Updated version to $new_version
 - Updated documentation
-- See CHANGELOG.md for details
+- See CHANGELOG.md for details"
 
   print_success "Committed version updates to main"
 
@@ -473,7 +473,7 @@ SECURITY: BuildToken.swift is in .gitignore and NOT in main branch.
 This file is ONLY included in release tags for SPM distribution.
 
 Token: $build_token
-Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 
   print_success "Committed BuildToken.swift in worktree"
 
