@@ -67,25 +67,58 @@ public enum SDKEnvironment: String, CaseIterable, Sendable {
     }
 }
 
+/// Supabase configuration for development device analytics
+/// Internal - automatically configured based on environment
+internal struct SupabaseConfig: Sendable {
+    /// Supabase project URL
+    let projectURL: URL
+
+    /// Supabase anon/public API key (safe to expose in client apps)
+    let anonKey: String
+
+    /// Get Supabase configuration for the given environment
+    /// - Parameter environment: The SDK environment
+    /// - Returns: Supabase configuration if applicable for this environment
+    static func configuration(for environment: SDKEnvironment) -> SupabaseConfig? {
+        switch environment {
+        case .development:
+            // Development mode: Use RunAnywhere's public Supabase for dev analytics
+            return SupabaseConfig(
+                projectURL: URL(string: "https://fhtgjtxuoikwwouxqzrn.supabase.co")!,
+                anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E"
+            )
+        case .staging, .production:
+            // Production/Staging: No Supabase, use traditional backend
+            return nil
+        }
+    }
+}
+
 /// SDK initialization parameters
 public struct SDKInitParams {
     /// API key for authentication
     public let apiKey: String
 
-    /// Base URL for API requests (optional for development mode)
-    public let baseURL: URL?
+    /// Base URL for API requests (required for cross-platform consistency)
+    /// Note: In development mode, this is accepted but Supabase is used internally for dev analytics
+    public let baseURL: URL
 
     /// Environment mode (development/staging/production)
     public let environment: SDKEnvironment
 
+    /// Internal Supabase configuration (auto-configured based on environment)
+    internal var supabaseConfig: SupabaseConfig? {
+        return SupabaseConfig.configuration(for: environment)
+    }
+
     /// Create initialization parameters
     /// - Parameters:
     ///   - apiKey: Your RunAnywhere API key (can be empty for development)
-    ///   - baseURL: Base URL for API requests (optional for development)
+    ///   - baseURL: Base URL for API requests (required, even in development mode)
     ///   - environment: Environment mode (default: production)
     public init(
         apiKey: String,
-        baseURL: URL? = nil,
+        baseURL: URL,
         environment: SDKEnvironment = .production
     ) {
         self.apiKey = apiKey
@@ -108,11 +141,5 @@ public struct SDKInitParams {
             throw SDKError.validationFailed("Invalid base URL: \(baseURL)")
         }
         self.init(apiKey: apiKey, baseURL: url, environment: environment)
-    }
-
-    /// Development mode initializer (no URL required)
-    /// - Parameter apiKey: Optional API key for development
-    public static func development(apiKey: String = "dev-mode") -> SDKInitParams {
-        SDKInitParams(apiKey: apiKey, baseURL: nil, environment: .development)
     }
 }

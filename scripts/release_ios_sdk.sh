@@ -270,46 +270,32 @@ update_version_references() {
   fi
 }
 
-### Store build token in Supabase (optional)
-store_build_token_in_backend() {
+### Display SQL command for manual Supabase insertion
+show_build_token_sql() {
   local version="$1"
   local build_token="$2"
 
-  print_header "Storing Build Token in Backend"
+  print_header "Manual Supabase Setup Required"
 
-  # Check if DATABASE_URL is set
-  if [[ -z "${DATABASE_URL:-}" ]]; then
-    print_warning "DATABASE_URL not set, skipping backend storage"
-    print_info "Manually insert into Supabase build_tokens table:"
-    echo ""
-    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
-    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
-    echo ""
-    return
-  fi
-
-  # Check for psql
-  if ! command -v psql >/dev/null; then
-    print_warning "psql not found, cannot auto-insert"
-    print_info "Install PostgreSQL client or manually insert:"
-    echo ""
-    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
-    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
-    echo ""
-    return
-  fi
-
-  # Insert into database
-  if psql "$DATABASE_URL" -c "INSERT INTO build_tokens (token, platform, label, is_active) VALUES ('$build_token', 'ios', 'v$version', TRUE);"; then
-    print_success "Build token stored in Supabase"
-  else
-    print_warning "Failed to store in backend (non-critical)"
-    print_info "Manually insert:"
-    echo ""
-    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
-    echo "  VALUES ('$build_token', 'ios', 'v$version', TRUE);"
-    echo ""
-  fi
+  echo ""
+  print_warning "⚠️  IMPORTANT: You must manually insert this build token into Supabase"
+  echo ""
+  print_info "Run this SQL command in your Supabase SQL Editor:"
+  echo ""
+  echo -e "${GREEN}-------------------------------------------------------------------${NC}"
+  echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
+  echo -e "VALUES ("
+  echo -e "  '$build_token',"
+  echo -e "  'ios',"
+  echo -e "  'v$version',"
+  echo -e "  TRUE,"
+  echo -e "  'iOS SDK v$version - Released $(date +%Y-%m-%d)'"
+  echo -e ");${NC}"
+  echo -e "${GREEN}-------------------------------------------------------------------${NC}"
+  echo ""
+  echo ""
+  print_info "This ensures only valid SDKs can register devices to your database."
+  echo ""
 }
 
 ### Run tests
@@ -425,8 +411,8 @@ main() {
   build_token="$(generate_build_token)"
   print_success "Generated build token: $build_token"
 
-  # Store in backend (optional)
-  store_build_token_in_backend "$new_version" "$build_token"
+  # Show SQL command for manual Supabase insertion
+  show_build_token_sql "$new_version" "$build_token"
 
   # Run tests before making any changes
   run_tests
@@ -517,17 +503,22 @@ Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
   echo "  ]"
   echo ""
 
-  # Reminder if DATABASE_URL not set
-  if [[ -z "${DATABASE_URL:-}" ]]; then
-    print_warning "IMPORTANT: Ensure build token is stored in Supabase!"
-    echo ""
-    print_info "Run this SQL command on your Supabase database:"
-    echo ""
-    echo "  INSERT INTO build_tokens (token, platform, label, is_active)"
-    echo "  VALUES ('$build_token', 'ios', 'v$new_version', TRUE);"
-    echo ""
-  fi
-
+  # Final reminder to insert build token
+  print_warning "═══════════════════════════════════════════════════════════"
+  print_warning "⚠️  FINAL REMINDER: Insert build token into Supabase!"
+  print_warning "═══════════════════════════════════════════════════════════"
+  echo ""
+  echo -e "${YELLOW}INSERT INTO build_tokens (token, platform, label, is_active, notes)"
+  echo -e "VALUES ("
+  echo -e "  '$build_token',"
+  echo -e "  'ios',"
+  echo -e "  'v$new_version',"
+  echo -e "  TRUE,"
+  echo -e "  'iOS SDK v$new_version - Released $(date +%Y-%m-%d)'"
+  echo -e ");${NC}"
+  echo ""
+  print_warning "Without this, the new SDK release will NOT be able to register devices!"
+  echo ""
   print_warning "SECURITY REMINDER: Build token shown above is for internal use only"
   print_warning "DO NOT include the token in public GitHub release notes"
   echo ""
