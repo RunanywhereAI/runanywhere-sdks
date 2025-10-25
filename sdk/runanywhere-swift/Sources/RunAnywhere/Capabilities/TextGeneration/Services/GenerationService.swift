@@ -134,6 +134,20 @@ public class GenerationService {
         } catch {
             logger.error("❌ Generation failed with error: \(error)")
 
+            // Submit analytics for failed generation (non-blocking)
+            let latency = Date().timeIntervalSince(startTime) * 1000
+            Task {
+                await RunAnywhere.submitGenerationAnalytics(
+                    generationId: UUID().uuidString,
+                    modelId: loadedModel.model.id,
+                    performanceMetrics: PerformanceMetrics(inferenceTimeMs: latency),
+                    inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                    outputTokens: 0,
+                    success: false,
+                    executionTarget: ExecutionTarget.onDevice.rawValue
+                )
+            }
+
             // Enhanced error handling - if it's a timeout or framework error, provide helpful fallback
             if let frameworkError = error as? FrameworkError {
                 logger.warning("🔄 Framework error detected: \(frameworkError)")
@@ -197,7 +211,7 @@ public class GenerationService {
         // Calculate response time (time after thinking)
         let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
 
-        return GenerationResult(
+        let result = GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
             tokensUsed: tokenCounts.totalTokens,
@@ -215,6 +229,21 @@ public class GenerationService {
             thinkingTokens: tokenCounts.thinkingTokens,
             responseTokens: tokenCounts.responseTokens
         )
+
+        // Submit analytics (non-blocking)
+        Task {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 
     private func generateInCloud(
@@ -223,7 +252,7 @@ public class GenerationService {
         provider: String?
     ) async throws -> GenerationResult {
         // Placeholder implementation
-        return GenerationResult(
+        let result = GenerationResult(
             text: "Generated text in cloud",
             tokensUsed: 10,
             modelUsed: "cloud-model",
@@ -235,6 +264,21 @@ public class GenerationService {
                 tokensPerSecond: 20.0
             )
         )
+
+        // Submit analytics (non-blocking)
+        Task {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 
     private func generateHybrid(
@@ -301,7 +345,7 @@ public class GenerationService {
 
         let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
 
-        return GenerationResult(
+        let result = GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
             tokensUsed: tokenCounts.totalTokens,
@@ -319,5 +363,20 @@ public class GenerationService {
             thinkingTokens: tokenCounts.thinkingTokens,
             responseTokens: tokenCounts.responseTokens
         )
+
+        // Submit analytics (non-blocking)
+        Task {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 }

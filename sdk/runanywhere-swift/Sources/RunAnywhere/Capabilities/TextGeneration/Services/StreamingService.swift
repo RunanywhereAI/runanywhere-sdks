@@ -63,13 +63,28 @@ public class StreamingService {
                 thinkingEndTime = Date()
             }
 
-            func recordError(_ err: Error) {
+            func recordError(_ err: Error, modelName: String?, prompt: String) {
                 error = err
                 resultContinuation?.resume(throwing: err)
                 resultContinuation = nil
+
+                // Submit analytics for failed generation (non-blocking)
+                if let modelName = modelName {
+                    Task {
+                        await RunAnywhere.submitGenerationAnalytics(
+                            generationId: UUID().uuidString,
+                            modelId: modelName,
+                            performanceMetrics: PerformanceMetrics(),
+                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                            outputTokens: 0,
+                            success: false,
+                            executionTarget: "unknown"
+                        )
+                    }
+                }
             }
 
-            func recordStreamComplete(modelName: String, framework: LLMFramework?) {
+            func recordStreamComplete(modelName: String, framework: LLMFramework?, prompt: String) {
                 self.modelName = modelName
                 self.framework = framework
                 self.isComplete = true
@@ -79,6 +94,19 @@ public class StreamingService {
                     let result = buildResultSync(modelUsed: modelName, framework: framework)
                     continuation.resume(returning: result)
                     resultContinuation = nil
+
+                    // Submit analytics (non-blocking)
+                    Task {
+                        await RunAnywhere.submitGenerationAnalytics(
+                            generationId: UUID().uuidString,
+                            modelId: result.modelUsed,
+                            performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                            outputTokens: result.tokensUsed,
+                            success: true,
+                            executionTarget: result.executionTarget.rawValue
+                        )
+                    }
                 }
             }
 
@@ -155,6 +183,7 @@ public class StreamingService {
         // Create the token stream
         let stream = AsyncThrowingStream<String, Error> { continuation in
             Task {
+                var modelName: String?
                 do {
                     // Get remote configuration
                     let remoteConfig = RunAnywhere.configurationData?.generation
@@ -169,6 +198,8 @@ public class StreamingService {
                     guard let loadedModel = generationService.getCurrentModel() else {
                         throw SDKError.modelNotFound("No model is currently loaded")
                     }
+
+                    modelName = loadedModel.model.name
 
                     // Prepare prompt
                     let effectivePrompt = optionsResolver.preparePrompt(prompt, withOptions: resolvedOptions)
@@ -237,10 +268,11 @@ public class StreamingService {
                     // After stream finishes, signal completion to result task
                     await collector.recordStreamComplete(
                         modelName: loadedModel.model.name,
-                        framework: loadedModel.model.compatibleFrameworks.first
+                        framework: loadedModel.model.compatibleFrameworks.first,
+                        prompt: prompt
                     )
                 } catch {
-                    await collector.recordError(error)
+                    await collector.recordError(error, modelName: modelName, prompt: prompt)
                     continuation.finish(throwing: error)
                 }
             }

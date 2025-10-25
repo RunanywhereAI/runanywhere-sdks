@@ -40,10 +40,8 @@ public final class KeychainManager {
         // Store API key
         try store(params.apiKey, for: KeychainKey.apiKey.rawValue)
 
-        // Store base URL (if available)
-        if let baseURL = params.baseURL {
-            try store(baseURL.absoluteString, for: KeychainKey.baseURL.rawValue)
-        }
+        // Store base URL
+        try store(params.baseURL.absoluteString, for: KeychainKey.baseURL.rawValue)
 
         // Store environment
         try store(params.environment.rawValue, for: KeychainKey.environment.rawValue)

@@ -1,4 +1,5 @@
 // swift-tools-version: 5.9
+// FORCE REBUILD: v0.15.7-dev-analytics-fix
 import PackageDescription
 
 let package = Package(

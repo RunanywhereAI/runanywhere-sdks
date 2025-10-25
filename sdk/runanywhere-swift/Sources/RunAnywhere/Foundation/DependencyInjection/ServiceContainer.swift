@@ -528,12 +528,8 @@ public class ServiceContainer {
 
         // Step 2: Create API client and authentication service for production/staging
         if params.environment != .development {
-            guard let baseURL = params.baseURL else {
-                throw SDKError.validationFailed("Base URL is required for \(params.environment.description)")
-            }
-
             let apiClient = APIClient(
-                baseURL: baseURL,
+                baseURL: params.baseURL,
                 apiKey: params.apiKey
             )
 

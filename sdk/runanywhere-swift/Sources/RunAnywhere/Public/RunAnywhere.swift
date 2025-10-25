@@ -82,7 +82,9 @@ public enum RunAnywhere {
     /// - Parameter params: SDK initialization parameters
     private static func initialize(with params: SDKInitParams) throws {
         // Return early if already initialized
-        guard !isInitialized else { return }
+        guard !isInitialized else {
+            return
+        }
 
         let logger = SDKLogger(category: "RunAnywhere.Init")
         EventBus.shared.publish(SDKInitializationEvent.started)
@@ -97,6 +99,9 @@ public enum RunAnywhere {
 
             // Step 2: Initialize logging system
             RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
+
+            // VERSION MARKER - to verify SPM is using latest code
+            logger.info("🔧 SDK CODE VERSION: v0.15.7-dev-analytics-fix (with Supabase registration)")
 
             // Step 3: Store parameters locally
             initParams = params
@@ -113,17 +118,31 @@ public enum RunAnywhere {
             // Step 5: Setup local services only (no network calls)
             try serviceContainer.setupLocalServices(with: params)
 
-            // Step 6: Register device for development mode (async, non-blocking)
-            if params.environment == .development {
-                Task {
-                    await registerDevDeviceIfNeeded()
-                }
-            }
-
             // Mark as initialized
             isInitialized = true
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
+            logger.info("🔍 ABOUT TO CHECK ENVIRONMENT: \(params.environment) == .development? \(params.environment == .development)")
             EventBus.shared.publish(SDKInitializationEvent.completed)
+
+            // Step 6: Device registration (after marking as initialized)
+            // For development mode: Register immediately with Supabase for dev analytics
+            // For production/staging: Lazy registration on first API call
+            logger.info("📊 Checking environment for device registration: \(params.environment.rawValue)")
+            if params.environment == .development {
+                logger.info("🔄 Development mode - triggering device registration with Supabase...")
+
+                // Trigger device registration in background (non-blocking)
+                // Note: ensureDeviceRegistered() checks if already registered and skips if so
+                Task.detached(priority: .userInitiated) {
+                    do {
+                        try await ensureDeviceRegistered()
+                        SDKLogger(category: "RunAnywhere.Init").info("✅ Device registered successfully with Supabase")
+                    } catch {
+                        SDKLogger(category: "RunAnywhere.Init").warning("⚠️ Device registration failed (non-critical): \(error.localizedDescription)")
+                        // Don't fail SDK initialization if device registration fails
+                    }
+                }
+            }
 
         } catch {
             logger.error("❌ SDK initialization failed: \(error.localizedDescription)")
@@ -178,15 +197,33 @@ public enum RunAnywhere {
     /// Only registers if device ID doesn't exist locally
     /// - Throws: SDKError if registration fails
     private static func ensureDeviceRegistered() async throws {
+        let logger = SDKLogger(category: "RunAnywhere.DeviceReg")
+
         // Check if we have a cached device ID
-        if let cachedId = await registrationState.getCachedDeviceId(), !cachedId.isEmpty {
+        let cachedId = await registrationState.getCachedDeviceId()
+        if let cachedId = cachedId, !cachedId.isEmpty {
+            logger.debug("Device already registered (cached): \(cachedId.prefix(8))...")
             return
         }
 
         // Check if device is already registered in local storage
-        if let storedDeviceId = getStoredDeviceId(), !storedDeviceId.isEmpty {
+        let storedDeviceId = getStoredDeviceId()
+        if let storedDeviceId = storedDeviceId, !storedDeviceId.isEmpty {
+            logger.debug("Found stored device ID: \(storedDeviceId.prefix(8))...")
             await registrationState.setCachedDeviceId(storedDeviceId)
-            return
+
+            // In development mode, still need to check if registered to Supabase
+            let isDevRegistered = isDevDeviceRegistered()
+            if currentEnvironment == .development && !isDevRegistered {
+                logger.info("📝 Device ID exists but not registered to Supabase - will register now")
+                // Device ID exists but not registered to Supabase yet - continue with registration
+            } else {
+                logger.debug("Device already fully registered (devRegistered=\(isDevRegistered))")
+                // Already fully registered (or not in dev mode)
+                return
+            }
+        } else {
+            logger.info("📝 No device ID found - will create and register")
         }
 
         // Try to set registering flag - if already registering, wait for completion
@@ -209,22 +246,43 @@ public enum RunAnywhere {
             return
         }
 
-        let logger = SDKLogger(category: "RunAnywhere.Registration")
         logger.info("Starting device registration...")
 
-        // Skip registration in development mode
+        // In development mode, register to Supabase (dev analytics)
         if currentEnvironment == .development {
-            let mockDeviceId = "dev-" + generateDeviceIdentifier()
+            logger.info("📝 Development mode - registering device for dev analytics...")
+
             do {
-                try storeDeviceId(mockDeviceId)
-                await registrationState.setCachedDeviceId(mockDeviceId)
-                logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
+                // Call dev registration with Supabase
+                try await registerDevDevice()
+
+                // Get or generate device ID
+                let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
+                try storeDeviceId(deviceId)
+                await registrationState.setCachedDeviceId(deviceId)
+
+                // Mark as registered
+                markDevDeviceAsRegistered()
+
+                logger.info("✅ Dev device registration successful")
                 await registrationState.clearRegistering()
                 return
             } catch {
-                logger.error("Failed to store mock device ID: \(error.localizedDescription)")
-                await registrationState.clearRegistering()
-                throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
+                // Non-critical error - create mock device ID and continue
+                logger.warning("Dev device registration failed (non-critical): \(error.localizedDescription)")
+
+                let mockDeviceId = "dev-" + generateDeviceIdentifier()
+                do {
+                    try storeDeviceId(mockDeviceId)
+                    await registrationState.setCachedDeviceId(mockDeviceId)
+                    logger.info("Using mock device ID for development: \(mockDeviceId.prefix(8))...")
+                    await registrationState.clearRegistering()
+                    return
+                } catch {
+                    logger.error("Failed to store mock device ID: \(error.localizedDescription)")
+                    await registrationState.clearRegistering()
+                    throw SDKError.storageError("Failed to store device ID: \(error.localizedDescription)")
+                }
             }
         }
 
@@ -355,11 +413,11 @@ public enum RunAnywhere {
 
         // Check if already registered
         if isDevDeviceRegistered() {
-            logger.debug("Device already registered in development mode")
+            logger.info("✅ Device already registered in development mode (skipping)")
             return
         }
 
-        logger.info("Registering device in development mode...")
+        logger.info("📝 Registering device in development mode...")
 
         do {
             try await registerDevDevice()
@@ -383,10 +441,16 @@ public enum RunAnywhere {
         let processorInfo = deviceAdapter.getProcessorInfo()
         let capabilities = deviceAdapter.getDeviceCapabilities()
 
-        // Get device ID
+        // Get or generate device ID
         let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
 
+        // Store device ID if it was newly generated
+        if getStoredDeviceId() == nil {
+            try storeDeviceId(deviceId)
+        }
+
         // Create registration request
+        print("📝 [REGISTRATION] Registering device with SDK version: \(SDKConstants.version)")
         let request = DevDeviceRegistrationRequest(
             deviceId: deviceId,
             deviceModel: deviceInfoResult.model,
@@ -400,12 +464,20 @@ public enum RunAnywhere {
             platform: SDKConstants.platform,
             buildToken: BuildToken.token
         )
+        print("📝 [REGISTRATION] Request created with version: \(request.sdkVersion)")
 
-        // Make POST request to dev registration endpoint
-        guard let baseURL = params.baseURL else {
-            throw SDKError.invalidConfiguration("Base URL is not configured")
+        // Choose registration method based on configuration
+        if let supabaseConfig = params.supabaseConfig {
+            // Use Supabase REST API (automatic in development mode)
+            try await registerDevDeviceViaSupabase(request: request, config: supabaseConfig)
+        } else {
+            // Use traditional backend (production/staging)
+            try await registerDevDeviceViaBackend(request: request, baseURL: params.baseURL)
         }
+    }
 
+    /// Register device via traditional backend
+    private static func registerDevDeviceViaBackend(request: DevDeviceRegistrationRequest, baseURL: URL) async throws {
         let url = baseURL.appendingPathComponent(APIEndpoint.devDeviceRegistration.path)
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -421,7 +493,7 @@ public enum RunAnywhere {
             throw SDKError.networkError("Invalid response from server")
         }
 
-        guard httpResponse.statusCode == 200 else {
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             throw SDKError.networkError("Registration failed with status code: \(httpResponse.statusCode)")
         }
 
@@ -430,19 +502,204 @@ public enum RunAnywhere {
         let _ = try decoder.decode(DevDeviceRegistrationResponse.self, from: data)
     }
 
+    /// Register device via Supabase REST API
+    private static func registerDevDeviceViaSupabase(request: DevDeviceRegistrationRequest, config: SupabaseConfig) async throws {
+        let logger = SDKLogger(category: "RunAnywhere.DevRegistration")
+
+        // Supabase REST API endpoint: POST /rest/v1/sdk_devices
+        let url = config.projectURL
+            .appendingPathComponent("rest")
+            .appendingPathComponent("v1")
+            .appendingPathComponent("sdk_devices")
+
+        logger.info("📤 Sending device registration to Supabase: \(url.absoluteString)")
+        logger.debug("Device ID: \(request.deviceId)")
+        logger.debug("Build Token: \(request.buildToken)")
+        logger.debug("Platform: \(request.platform)")
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(config.anonKey, forHTTPHeaderField: "apikey")
+        urlRequest.setValue("Bearer \(config.anonKey)", forHTTPHeaderField: "Authorization")
+        // Use UPSERT: resolution=merge-duplicates updates existing record based on unique constraint
+        urlRequest.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        urlRequest.httpBody = try encoder.encode(request)
+
+        logger.debug("Request body size: \(urlRequest.httpBody?.count ?? 0) bytes")
+
+        // Perform request
+        logger.info("🌐 Making POST request to Supabase...")
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            logger.error("❌ Invalid response from Supabase")
+            throw SDKError.networkError("Invalid response from Supabase")
+        }
+
+        logger.info("📥 Supabase response: HTTP \(httpResponse.statusCode)")
+
+        // Supabase returns 201 for successful inserts
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            // Try to extract error message from Supabase response
+            var errorMessage = "Registration failed with status code: \(httpResponse.statusCode)"
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = errorData["message"] as? String {
+                errorMessage = message
+                logger.error("❌ Supabase error: \(message)")
+            }
+
+            // Also log the raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                logger.debug("Response body: \(responseString)")
+            }
+
+            throw SDKError.networkError(errorMessage)
+        }
+
+        logger.info("✅ Device successfully registered with Supabase!")
+    }
+
+    // MARK: - Analytics Submission
+
+    /// Submit generation analytics via Supabase (development mode)
+    private static func submitAnalyticsViaSupabase(
+        request: DevAnalyticsSubmissionRequest,
+        config: SupabaseConfig
+    ) async throws {
+        let logger = SDKLogger(category: "RunAnywhere.Analytics")
+
+        let url = config.projectURL
+            .appendingPathComponent("rest")
+            .appendingPathComponent("v1")
+            .appendingPathComponent("sdk_generation_analytics")
+
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue(config.anonKey, forHTTPHeaderField: "apikey")
+        urlRequest.setValue("Bearer \(config.anonKey)", forHTTPHeaderField: "Authorization")
+
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        urlRequest.httpBody = try encoder.encode(request)
+
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SDKError.networkError("Invalid response from Supabase")
+        }
+
+        logger.info("📊 Analytics HTTP Response: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            var errorMessage = "Analytics submission failed: \(httpResponse.statusCode)"
+            if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                logger.error("❌ Supabase error response: \(errorData)")
+                if let message = errorData["message"] as? String {
+                    errorMessage = message
+                }
+            }
+            throw SDKError.networkError(errorMessage)
+        }
+
+        logger.info("✅ Analytics Supabase submission successful")
+    }
+
+    /// Submit generation analytics via backend (production mode - future)
+    private static func submitAnalyticsViaBackend(
+        request: DevAnalyticsSubmissionRequest,
+        baseURL: URL
+    ) async throws {
+        let url = baseURL.appendingPathComponent(APIEndpoint.devAnalytics.path)
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let encoder = JSONEncoder()
+        urlRequest.httpBody = try encoder.encode(request)
+
+        let (_, response) = try await URLSession.shared.data(for: urlRequest)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            throw SDKError.networkError("Analytics submission failed")
+        }
+    }
+
+    /// Submit generation analytics (public API)
+    /// - Note: Only submits in development mode; fails silently on errors
+    public static func submitGenerationAnalytics(
+        generationId: String,
+        modelId: String,
+        performanceMetrics: PerformanceMetrics,
+        inputTokens: Int,
+        outputTokens: Int,
+        success: Bool,
+        executionTarget: String
+    ) async {
+        guard let params = initParams else { return }
+        guard params.environment == .development else { return }
+
+        // Non-blocking background submission
+        Task.detached(priority: .background) {
+            do {
+                let deviceId = getStoredDeviceId() ?? "unknown"
+
+                let request = DevAnalyticsSubmissionRequest(
+                    generationId: generationId,
+                    deviceId: deviceId,
+                    modelId: modelId,
+                    timeToFirstTokenMs: performanceMetrics.timeToFirstTokenMs,
+                    tokensPerSecond: performanceMetrics.tokensPerSecond,
+                    totalGenerationTimeMs: performanceMetrics.inferenceTimeMs,
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    success: success,
+                    executionTarget: executionTarget,
+                    buildToken: BuildToken.token,
+                    sdkVersion: SDKConstants.version,
+                    timestamp: ISO8601DateFormatter().string(from: Date())
+                )
+
+
+                if let supabaseConfig = params.supabaseConfig {
+                    try await submitAnalyticsViaSupabase(request: request, config: supabaseConfig)
+                } else {
+                    try await submitAnalyticsViaBackend(request: request, baseURL: params.baseURL)
+                }
+            } catch {
+                // Fail silently - analytics should never break the SDK
+                print("⚠️ [ANALYTICS] Submission failed (non-critical): \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Device ID Management
 
     private static let deviceIdKey = "com.runanywhere.sdk.deviceId"
 
     /// Get stored device ID from local persistence
     private static func getStoredDeviceId() -> String? {
-        // Try keychain first (production), then UserDefaults (development)
+        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
+
+        // Try keychain first (survives app reinstalls)
         if let keychainId = KeychainManager.shared.retrieveDeviceUUID() {
+            logger.info("📱 Retrieved device ID from Keychain: \(keychainId)")
             return keychainId
         }
 
-        // Fallback to UserDefaults
-        return UserDefaults.standard.string(forKey: deviceIdKey)
+        // Fallback to UserDefaults (does NOT survive app uninstall)
+        if let userDefaultsId = UserDefaults.standard.string(forKey: deviceIdKey) {
+            logger.info("📱 Retrieved device ID from UserDefaults: \(userDefaultsId)")
+            return userDefaultsId
+        }
+
+        logger.info("📱 No stored device ID found")
+        return nil
     }
 
     /// Store device ID in local persistence
@@ -451,14 +708,16 @@ public enum RunAnywhere {
             throw SDKError.validationFailed("Device ID cannot be empty")
         }
 
-        // Store in keychain for production environments
-        if let environment = currentEnvironment, environment != .development {
-            try KeychainManager.shared.storeDeviceUUID(deviceId)
-        }
+        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
 
-        // Always store in UserDefaults as fallback
+        // ALWAYS store in keychain (persists across app reinstalls)
+        try KeychainManager.shared.storeDeviceUUID(deviceId)
+        logger.info("💾 Stored device ID in Keychain: \(deviceId)")
+
+        // Also store in UserDefaults as fallback for quick access
         UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
         UserDefaults.standard.synchronize()
+        logger.info("💾 Stored device ID in UserDefaults: \(deviceId)")
     }
 
     /// Clear stored device ID
@@ -478,14 +737,19 @@ public enum RunAnywhere {
 
     /// Generate a unique device identifier
     private static func generateDeviceIdentifier() -> String {
+        let logger = SDKLogger(category: "RunAnywhere.DeviceID")
+
         #if os(iOS) || os(tvOS) || os(watchOS)
         if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
+            logger.info("🆔 Generated device ID from identifierForVendor: \(vendorId)")
             return vendorId
         }
         #endif
 
         // Fallback to random UUID
-        return UUID().uuidString
+        let randomId = UUID().uuidString
+        logger.warning("⚠️ Using random UUID (identifierForVendor unavailable): \(randomId)")
+        return randomId
     }
 
     // MARK: - Text Generation (Clean Async/Await Interface)

@@ -18,35 +18,31 @@ public enum NetworkServiceFactory {
 
         switch environment {
         case .development:
-            logger.info("🔧 Creating MockNetworkService for DEVELOPMENT environment")
-            logger.info("All network calls will return mock data without hitting real servers")
-            return MockNetworkService()
+            logger.info("🔧 Creating APIClient for DEVELOPMENT environment")
+            logger.info("Using development server: \(params.baseURL.absoluteString)")
+            logger.info("⚠️ Development mode will still make real network calls for device registration")
+
+            return APIClient(
+                baseURL: params.baseURL,
+                apiKey: params.apiKey
+            )
 
         case .staging:
-            guard let baseURL = params.baseURL else {
-                logger.warning("⚠️ No baseURL provided for STAGING environment, using mock service")
-                return MockNetworkService()
-            }
-
             logger.info("🌐 Creating APIClient for STAGING environment")
-            logger.info("Using staging server: \(baseURL.absoluteString)")
+            logger.info("Using staging server: \(params.baseURL.absoluteString)")
 
             // Staging uses real network but might have different configuration
             return APIClient(
-                baseURL: baseURL,
+                baseURL: params.baseURL,
                 apiKey: params.apiKey
             )
 
         case .production:
-            guard let baseURL = params.baseURL else {
-                fatalError("❌ Production environment requires a valid baseURL")
-            }
-
             logger.info("🚀 Creating APIClient for PRODUCTION environment")
-            logger.info("Using production server: \(baseURL.absoluteString)")
+            logger.info("Using production server: \(params.baseURL.absoluteString)")
 
             return APIClient(
-                baseURL: baseURL,
+                baseURL: params.baseURL,
                 apiKey: params.apiKey
             )
         }
@@ -87,10 +83,11 @@ public enum NetworkServiceFactory {
 /// Extension to help determine if mocks should be used
 public extension SDKEnvironment {
     /// Determine if network mocks should be used for this environment
+    /// Note: Development mode now uses real network calls for device registration
     var shouldUseMockNetwork: Bool {
         switch self {
         case .development:
-            return true
+            return false // Changed: development now uses real network calls
         case .staging, .production:
             return false
         }
@@ -100,7 +97,7 @@ public extension SDKEnvironment {
     var requiresBaseURL: Bool {
         switch self {
         case .development:
-            return false
+            return true // Changed: development now requires baseURL for real network calls
         case .staging, .production:
             return true
         }
