@@ -6,6 +6,51 @@ This guide shows you how to create a new Android app with a simple text chat int
 
 ---
 
+## ⚠️ Critical Dependencies Checklist
+
+**Before you start, make sure you have ALL of these:**
+
+✅ **Kotlin 2.1.0+** in `gradle/libs.versions.toml`
+
+```toml
+[versions]
+kotlin = "2.1.0"
+```
+
+✅ **Core SDK Dependencies:**
+
+- Kotlinx Coroutines 1.10.2
+- Kotlinx Serialization JSON 1.7.3
+- Kotlinx DateTime 0.6.1
+
+✅ **Networking Stack (ALL 5 required):**
+
+- Ktor Client Core 3.0.3
+- Ktor Client OkHttp 3.0.3
+- Ktor Client Content Negotiation 3.0.3
+- Ktor Client Logging 3.0.3
+- Ktor Serialization Kotlinx JSON 3.0.3
+
+✅ **HTTP Stack:**
+
+- OkHttp 4.12.0
+- OkHttp Logging Interceptor 4.12.0
+- Retrofit 2.11.0
+- Retrofit Gson Converter 2.11.0
+- Gson 2.11.0
+- Okio 3.9.1
+
+✅ **AndroidX Components:**
+
+- WorkManager 2.10.0
+- Room Runtime 2.6.1
+- Room KTX 2.6.1
+- Security Crypto 1.1.0-alpha06
+
+**Missing ANY of these will cause runtime crashes!**
+
+---
+
 ## 🚀 TL;DR - Quick Copy-Paste
 
 **1. Download BOTH SDK AARs:**
@@ -31,22 +76,61 @@ Place BOTH AAR files in `app/libs/`:
 - `app/libs/RunAnywhereKotlinSDK-release.aar`
 - `app/libs/runanywhere-llm-llamacpp-release.aar`
 
-**3. Add to app `build.gradle.kts`:**
+**3. Update Kotlin version in `gradle/libs.versions.toml`:**
+
+```toml
+[versions]
+kotlin = "2.1.0"  # Required for Ktor 3.x
+```
+
+**4. Add to app `build.gradle.kts`:**
 
 ```kotlin
 dependencies {
-    // Core SDK
-    implementation(files("libs/RunAnywhereKotlinSDK-release.aar"))
+  // RunAnywhere SDK - Local AARs from GitHub Release
+  implementation(files("libs/RunAnywhereKotlinSDK-release.aar"))
+  implementation(files("libs/runanywhere-llm-llamacpp-release.aar"))
 
-    // LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
-    implementation(files("libs/runanywhere-llm-llamacpp-release.aar"))
+  // Required SDK dependencies (transitive dependencies from AARs)
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+  implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
-    // Required dependency
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+  // Ktor for networking (required by SDK)
+  implementation("io.ktor:ktor-client-core:3.0.3")
+  implementation("io.ktor:ktor-client-okhttp:3.0.3")
+  implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+  implementation("io.ktor:ktor-client-logging:3.0.3")
+  implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+
+  // OkHttp (required by SDK)
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
+  implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+  // Retrofit (required by SDK)
+  implementation("com.squareup.retrofit2:retrofit:2.11.0")
+  implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+
+  // Gson (required by SDK)
+  implementation("com.google.code.gson:gson:2.11.0")
+
+  // Okio (required by SDK)
+  implementation("com.squareup.okio:okio:3.9.1")
+
+  // AndroidX WorkManager (required by SDK)
+  implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+  // AndroidX Room (required by SDK)
+  implementation("androidx.room:room-runtime:2.6.1")
+  implementation("androidx.room:room-ktx:2.6.1")
+
+  // AndroidX Security (required by SDK)
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
 }
 ```
 
-**4. That's it!** Scroll down for complete setup instructions.
+**5. That's it!** Scroll down for complete setup instructions.
 
 **📦 What's Included:**
 
@@ -62,70 +146,120 @@ dependencies {
 - Android Studio (latest version)
 - JDK 17+
 - Minimum Android SDK 24 (Android 7.0)
+- **Kotlin 2.1.0 or higher** (required for Ktor 3.x dependencies)
 
 ---
 
 ## Step 1: Add SDK Dependency
 
-### Option A: Via JitPack (Recommended - No Authentication Required)
+### Download Local AARs from GitHub Release
 
-**⚠️ First build takes 2-3 minutes while JitPack builds the SDK. Subsequent syncs are instant.**
+**Download the AAR files:**
 
-In your **project-level** `settings.gradle.kts`:
+1. [RunAnywhereKotlinSDK-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/RunAnywhereKotlinSDK-release.aar) (
+   Core SDK - 3.9MB)
+2. [runanywhere-llm-llamacpp-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/runanywhere-llm-llamacpp-release.aar) (
+   LLM Module - 2.1MB)
 
-```kotlin
-dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://jitpack.io") }
-    }
-}
+Or download via command line:
+
+```bash
+cd your-project/app/libs
+curl -L -o RunAnywhereKotlinSDK-release.aar \
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/RunAnywhereKotlinSDK-release.aar
+
+curl -L -o runanywhere-llm-llamacpp-release.aar \
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/runanywhere-llm-llamacpp-release.aar
 ```
 
-In your **app-level** `build.gradle.kts`:
+**Place the AARs:**
+
+Create `app/libs/` directory if it doesn't exist, and place both AAR files there:
+
+- `app/libs/RunAnywhereKotlinSDK-release.aar`
+- `app/libs/runanywhere-llm-llamacpp-release.aar`
+
+**Update Kotlin version** in `gradle/libs.versions.toml`:
+
+```toml
+[versions]
+kotlin = "2.1.0"  # or higher - required for Ktor 3.x
+```
+
+**Configure your app-level** `build.gradle.kts`:
 
 ```kotlin
 android {
-    namespace = "com.example.myapp"
-    compileSdk = 36
+  namespace = "com.example.myapp"
+  compileSdk = 36
 
-    defaultConfig {
-        applicationId = "com.example.myapp"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-    }
+  defaultConfig {
+    applicationId = "com.example.myapp"
+    minSdk = 24
+    targetSdk = 36
+    versionCode = 1
+    versionName = "1.0"
+  }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+  }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+  kotlinOptions {
+    jvmTarget = "17"
+  }
 }
 
 dependencies {
-    // RunAnywhere SDK - Core (v0.1.0-alpha)
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-kotlin:android-v0.1.0-alpha")
+  // RunAnywhere SDK - Local AARs from GitHub Release
+  implementation(files("libs/RunAnywhereKotlinSDK-release.aar"))
+  implementation(files("libs/runanywhere-llm-llamacpp-release.aar"))
 
-    // RunAnywhere SDK - LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-llm-llamacpp:android-v0.1.0-alpha")
+  // Required SDK dependencies (transitive dependencies from AARs)
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+  implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
 
-    // Required: Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+  // Ktor for networking (required by SDK)
+  implementation("io.ktor:ktor-client-core:3.0.3")
+  implementation("io.ktor:ktor-client-okhttp:3.0.3")
+  implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+  implementation("io.ktor:ktor-client-logging:3.0.3")
+  implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
 
-    // Optional: Jetpack Compose (for UI in this quickstart)
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+  // OkHttp (required by SDK)
+  implementation("com.squareup.okhttp3:okhttp:4.12.0")
+  implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+  // Retrofit (required by SDK)
+  implementation("com.squareup.retrofit2:retrofit:2.11.0")
+  implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+
+  // Gson (required by SDK)
+  implementation("com.google.code.gson:gson:2.11.0")
+
+  // Okio (required by SDK)
+  implementation("com.squareup.okio:okio:3.9.1")
+
+  // AndroidX WorkManager (required by SDK)
+  implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+  // AndroidX Room (required by SDK)
+  implementation("androidx.room:room-runtime:2.6.1")
+  implementation("androidx.room:room-ktx:2.6.1")
+
+  // AndroidX Security (required by SDK)
+  implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+  // Optional: Jetpack Compose (for UI in this quickstart)
+  implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+  implementation("androidx.compose.ui:ui")
+  implementation("androidx.compose.material3:material3")
+  implementation("androidx.compose.ui:ui-tooling-preview")
+  implementation("androidx.activity:activity-compose:1.8.2")
+  implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 }
 ```
 
@@ -150,26 +284,26 @@ In `AndroidManifest.xml`:
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required Permissions -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28" />
+  <!-- Required Permissions -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+          android:maxSdkVersion="28" />
 
-    <application
-        android:name=".MyApplication"
-        android:largeHeap="true"
-        android:label="@string/app_name"
-        android:theme="@style/Theme.MyApp">
+  <application
+          android:name=".MyApplication"
+          android:largeHeap="true"
+          android:label="@string/app_name"
+          android:theme="@style/Theme.MyApp">
 
-        <activity
+    <activity
             android:name=".MainActivity"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
 </manifest>
 ```
 
@@ -593,6 +727,59 @@ addModelFromURL(
 
 ## Troubleshooting
 
+### NoClassDefFoundError: io.ktor.client.HttpClientJvmKt
+
+- **Cause:** Missing Ktor HTTP Client dependencies
+- **Solution:** Add the following to your `build.gradle.kts`:
+  ```kotlin
+  implementation("io.ktor:ktor-client-core:3.0.3")
+  implementation("io.ktor:ktor-client-okhttp:3.0.3")
+  implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+  implementation("io.ktor:ktor-client-logging:3.0.3")
+  implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+  ```
+- **Important:** Ktor 3.x requires Kotlin 2.1.0+. Update `gradle/libs.versions.toml`:
+  ```toml
+  [versions]
+  kotlin = "2.1.0"
+  ```
+- Sync Gradle and rebuild the project
+
+### NoSuchMethodError: getHttpTimeout() in HttpTimeoutKt
+
+- **Cause:** Ktor version mismatch or Kotlin version too old
+- **Solution 1 (Recommended):** Use Ktor 3.0.3 with Kotlin 2.1.0+:
+  ```kotlin
+  implementation("io.ktor:ktor-client-core:3.0.3")
+  implementation("io.ktor:ktor-client-okhttp:3.0.3")
+  implementation("io.ktor:ktor-client-content-negotiation:3.0.3")
+  implementation("io.ktor:ktor-client-logging:3.0.3")
+  implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.3")
+  ```
+  And update `gradle/libs.versions.toml`:
+  ```toml
+  [versions]
+  kotlin = "2.1.0"
+  ```
+- **Solution 2 (If you must use Kotlin 2.0.x):** Use Ktor 2.3.12:
+  ```kotlin
+  implementation("io.ktor:ktor-client-android:2.3.12")
+  implementation("io.ktor:ktor-client-core:2.3.12")
+  implementation("io.ktor:ktor-client-cio:2.3.12")
+  ```
+- Sync Gradle and rebuild the project
+
+### Kotlin version incompatibility errors
+
+- **Cause:** Ktor 3.x requires Kotlin 2.1.0+, but your project uses an older version
+- **Solution:** Update Kotlin in `gradle/libs.versions.toml`:
+  ```toml
+  [versions]
+  kotlin = "2.1.0"  # or higher
+  ```
+- **Alternative:** Use Ktor 2.3.12 if you must stay on Kotlin 2.0.x (see above)
+- Sync Gradle and rebuild the project
+
 ### Model download fails
 - Check internet connection
 - Ensure `INTERNET` permission in manifest
@@ -632,9 +819,9 @@ addModelFromURL(
 ```kotlin
 // Initialization
 RunAnywhere.initialize(
-    context: Context,
-    apiKey: String,
-    environment: SDKEnvironment
+  context: Context,
+  apiKey: String,
+  environment: SDKEnvironment
 )
 
 // Model Management
@@ -661,7 +848,8 @@ suspend fun addModelFromURL(url: String, name: String, type: String)
 ## Summary
 
 **5-Minute Setup:**
-1. Add JitPack dependency
+
+1. Add Local AARs from GitHub Release
 2. Update AndroidManifest (permissions + Application class)
 3. Create Application class with SDK init
 4. Register models in `registerModels()`
@@ -681,3 +869,6 @@ suspend fun addModelFromURL(url: String, name: String, type: String)
 
 - GitHub Issues: https://github.com/RunAnywhere/sdks/issues
 - Documentation: See `CLAUDE.md` and `README.md` in the SDK repository
+
+SETUP.md
+Displaying SETUP.md.
