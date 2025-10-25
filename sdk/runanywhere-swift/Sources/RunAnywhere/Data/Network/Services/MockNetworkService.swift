@@ -214,6 +214,14 @@ public actor MockNetworkService: NetworkService {
                 "preferredModels": [] as [String]
             ]
             return try JSONSerialization.data(withJSONObject: preferences)
+
+        case .devAnalytics:
+            // Mock response for analytics submission
+            let response: [String: Any] = [
+                "success": true,
+                "analyticsId": "mock-analytics-\(UUID().uuidString)"
+            ]
+            return try JSONSerialization.data(withJSONObject: response)
         }
     }
 
