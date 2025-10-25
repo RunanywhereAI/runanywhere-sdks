@@ -28,7 +28,7 @@ data class LlamaModelConfig(
 class LLamaAndroid {
     private val logger = SDKLogger("LLamaAndroid")
 
-    private val threadLocalState: ThreadLocal<State> = ThreadLocal.withInitial { State.Idle }
+    internal val threadLocalState: ThreadLocal<State> = ThreadLocal.withInitial { State.Idle }
 
     private val runLoop: CoroutineDispatcher = Executors.newSingleThreadExecutor {
         thread(start = false, name = "Llama-RunLoop") {
@@ -70,6 +70,7 @@ class LLamaAndroid {
     private external fun new_batch(nTokens: Int, embd: Int, nSeqMax: Int): Long
     private external fun free_batch(batch: Long)
     private external fun new_sampler(temperature: Float, minP: Float, topK: Int): Long
+    private external fun new_sampler_with_grammar(temperature: Float, minP: Float, topK: Int, grammar: Long): Long
     private external fun free_sampler(sampler: Long)
     private external fun system_info(): String
 
@@ -187,6 +188,57 @@ class LLamaAndroid {
     }.flowOn(runLoop)
 
     /**
+     * Generate text with grammar constraints
+     *
+     * @param message Prompt to generate from
+     * @param grammar Grammar handle for constrained generation
+     * @param config Optional model config for temperature/sampling
+     * @param parseSpecialTokens Whether to parse special tokens in prompt
+     * @return Flow of generated tokens
+     */
+    fun sendWithGrammar(
+        message: String,
+        grammar: Long,
+        config: LlamaModelConfig? = null,
+        parseSpecialTokens: Boolean = true
+    ): Flow<String> = flow {
+        when (val state = threadLocalState.get()) {
+            is State.Loaded -> {
+                // Create new sampler with grammar
+                val temperature = config?.temperature ?: 0.7f
+                val minP = config?.minP ?: 0.05f
+                val topK = config?.topK ?: 40
+
+                logger.info("Creating grammar-constrained sampler: temp=$temperature, minP=$minP, topK=$topK, grammar=$grammar")
+                val grammarSampler = new_sampler_with_grammar(temperature, minP, topK, grammar)
+
+                try {
+                    val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, nlen))
+                    while (ncur.value <= nlen) {
+                        // Use grammar sampler instead of default sampler
+                        val str = completion_loop(state.context, state.batch, grammarSampler, nlen, ncur)
+                        if (str == null) {
+                            break
+                        }
+                        if (str.isNotEmpty()) {
+                            emit(str)
+                        }
+                    }
+                    kv_cache_clear(state.context)
+                } finally {
+                    // Free the temporary grammar sampler
+                    free_sampler(grammarSampler)
+                    logger.debug("Grammar sampler freed")
+                }
+            }
+            else -> {
+                logger.error("Cannot generate: model not loaded")
+                throw IllegalStateException("Model not loaded")
+            }
+        }
+    }.flowOn(runLoop)
+
+    /**
      * Unload model and free resources
      */
     suspend fun unload() {
@@ -278,7 +330,7 @@ class LLamaAndroid {
         }
 
         // State management
-        private sealed interface State {
+        internal sealed interface State {
             data object Idle : State
             data class Loaded(val model: Long, val context: Long, val batch: Long, val sampler: Long) : State
         }

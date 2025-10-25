@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.*
 
 /**
  * LlamaCpp service implementation using the new LLamaAndroid wrapper
@@ -344,5 +345,201 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         prompt.append("Assistant: ")
 
         return prompt.toString()
+    }
+
+    // ============================================================================
+    // Tool Calling Support (Grammar-Based Constrained Generation)
+    // ============================================================================
+
+    /**
+     * Generate text with grammar-based tool calling support
+     *
+     * @param prompt User prompt/question
+     * @param tools List of available tools (optional if tools are in options)
+     * @param options Generation options (can include tools parameter)
+     * @return Tool call result with detected tool calls
+     */
+    suspend fun generateWithTools(
+        prompt: String,
+        tools: List<Tool>? = null,
+        options: RunAnywhereGenerationOptions? = null
+    ): ToolCallResult = withContext(Dispatchers.IO) {
+        if (!isInitialized) {
+            throw IllegalStateException("LlamaCppService not initialized")
+        }
+
+        // Get tools from parameter or options (parameter takes precedence)
+        val effectiveTools = tools ?: options?.tools ?: emptyList()
+
+        if (effectiveTools.isEmpty()) {
+            logger.warn("No tools provided for generateWithTools()")
+            return@withContext ToolCallResult(
+                success = false,
+                text = "Error: No tools provided",
+                toolCalls = emptyList(),
+                mode = ToolCallingMode.GRAMMAR_BASED
+            )
+        }
+
+        logger.info("🛠️ generateWithTools() called with ${effectiveTools.size} tools")
+
+        try {
+            // Generate JSON schema from tools
+            val jsonSchema = Tool.generateSchema(effectiveTools)
+
+            // Convert to JSON string using simple serialization
+            val json = kotlinx.serialization.json.Json { prettyPrint = false }
+            val schemaJson = json.encodeToString(
+                kotlinx.serialization.serializer(),
+                jsonSchema
+            )
+
+            logger.info("📋 JSON Schema generated: ${schemaJson.take(200)}...")
+
+            // Get model pointer from llama instance (we need to expose this)
+            val state = llama.threadLocalState.get()
+            val modelPointer = when (state) {
+                is LLamaAndroid.Companion.State.Loaded -> state.model
+                else -> throw IllegalStateException("Model not loaded")
+            }
+
+            // Create grammar from schema
+            Grammar.fromSchema(modelPointer, schemaJson).use { grammar ->
+                logger.info("✅ Grammar created successfully")
+
+                // Build messages with tool instruction
+                val userMessage = Message(role = MessageRole.USER, content = prompt)
+                val systemMessage = Message(
+                    role = MessageRole.SYSTEM,
+                    content = buildToolSystemPrompt(effectiveTools)
+                )
+
+                val formattedPrompt = buildPrompt(
+                    listOf(systemMessage, userMessage),
+                    systemPrompt = null
+                )
+
+                logger.info("📝 Tool calling prompt length: ${formattedPrompt.length}")
+
+                // Generate with grammar constraints
+                val result = StringBuilder()
+                val effectiveOptions = options ?: RunAnywhereGenerationOptions(
+                    maxTokens = configuration.maxTokens,
+                    temperature = 0.7f
+                )
+
+                val config = LlamaModelConfig(
+                    temperature = effectiveOptions.temperature,
+                    topK = 40,
+                    minP = 0.05f
+                )
+
+                llama.sendWithGrammar(
+                    formattedPrompt,
+                    grammar.handle,
+                    config,
+                    parseSpecialTokens = true
+                ).collect { token ->
+                    result.append(token)
+                }
+
+                val generatedText = result.toString()
+                logger.info("✅ Generation complete, response length: ${generatedText.length}")
+                logger.info("📄 Response: ${generatedText.take(300)}...")
+
+                // Parse tool calls from JSON response
+                val toolCalls = parseToolCalls(generatedText)
+
+                ToolCallResult(
+                    success = true,
+                    text = generatedText,
+                    toolCalls = toolCalls,
+                    mode = ToolCallingMode.GRAMMAR_BASED
+                )
+            }
+
+        } catch (e: Exception) {
+            logger.error("❌ Tool calling failed", e)
+            ToolCallResult(
+                success = false,
+                text = "Error: ${e.message}",
+                toolCalls = emptyList(),
+                mode = ToolCallingMode.GRAMMAR_BASED
+            )
+        }
+    }
+
+    /**
+     * Build system prompt for tool calling
+     */
+    private fun buildToolSystemPrompt(tools: List<Tool>): String {
+        val toolDescriptions = tools.joinToString("\n") { tool ->
+            val params = tool.parameters.properties.entries.joinToString(", ") { (name, param) ->
+                val req = if (param.required) "(required)" else "(optional)"
+                "$name: ${param.type.toJsonSchemaType()} $req - ${param.description}"
+            }
+            "- ${tool.name}: ${tool.description}\n  Parameters: $params"
+        }
+
+        return """
+You are an AI assistant with access to tools. You can call tools to help answer user questions.
+
+Available tools:
+$toolDescriptions
+
+To call a tool, respond with ONLY a JSON object in this format:
+{
+  "tool_calls": [
+    {
+      "id": "call_1",
+      "name": "tool_name",
+      "arguments": {"param1": "value1", "param2": "value2"}
+    }
+  ]
+}
+
+Rules:
+1. Output ONLY valid JSON (no other text)
+2. Each tool call must have a unique ID
+3. Provide all required parameters
+4. You can call multiple tools in one response
+        """.trimIndent()
+    }
+
+    /**
+     * Parse tool calls from JSON response
+     */
+    private fun parseToolCalls(jsonResponse: String): List<ToolCall> {
+        return try {
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+            // Parse JSON
+            val jsonElement = json.parseToJsonElement(jsonResponse)
+            val jsonObject = jsonElement.jsonObject
+
+            // Extract tool_calls array
+            val toolCallsArray = jsonObject["tool_calls"]?.jsonArray ?: return emptyList()
+
+            // Parse each tool call
+            toolCallsArray.mapNotNull { element ->
+                try {
+                    val callObj = element.jsonObject
+                    ToolCall(
+                        id = callObj["id"]?.jsonPrimitive?.content ?: "",
+                        name = callObj["name"]?.jsonPrimitive?.content ?: "",
+                        arguments = callObj["arguments"]?.jsonObject?.mapValues { (_, value) ->
+                            value.jsonPrimitive.content
+                        } ?: emptyMap()
+                    )
+                } catch (e: Exception) {
+                    logger.error("Failed to parse tool call: ${element}", e)
+                    null
+                }
+            }
+
+        } catch (e: Exception) {
+            logger.error("Failed to parse tool calls from response", e)
+            emptyList()
+        }
     }
 }
