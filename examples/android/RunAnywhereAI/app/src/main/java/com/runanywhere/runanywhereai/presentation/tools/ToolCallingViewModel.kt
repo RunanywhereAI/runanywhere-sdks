@@ -13,65 +13,63 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.random.Random
 
-data class ToolCallingState(
+/**
+ * UI State for Tool Calling screen
+ */
+data class ToolCallingUiState(
     val isLoading: Boolean = false,
-    val userInput: String = "",
-    val lastResponse: String? = null,
-    val lastToolCalls: List<ToolCall> = emptyList(),
-    val executionResults: List<String> = emptyList(),
-    val error: String? = null
+    val isModelLoaded: Boolean = true, // Will be updated from SDK
+    val input: String = "",
+    val results: List<ToolExecutionResult> = emptyList(),
+    val errorMessage: String? = null
+)
+
+/**
+ * Result of a tool execution
+ */
+data class ToolExecutionResult(
+    val query: String,
+    val success: Boolean,
+    val toolCalls: List<ToolCall>,
+    val executionResults: Map<String, String>, // tool name -> result
+    val responseText: String?
 )
 
 /**
  * ViewModel demonstrating grammar-based tool calling
  *
  * Shows how to:
- * - Define tools with parameters
- * - Use grammar-based constrained generation
+ * - Define tools with parameters using DSL
+ * - Use grammar-based constrained generation (100% valid JSON)
  * - Execute tools and display results
  */
 class ToolCallingViewModel : ViewModel() {
 
-    private val _state = MutableStateFlow(ToolCallingState())
-    val state: StateFlow<ToolCallingState> = _state.asStateFlow()
+    private val _uiState = MutableStateFlow(ToolCallingUiState())
+    val uiState: StateFlow<ToolCallingUiState> = _uiState.asStateFlow()
 
-    // Define available tools
+    // Define available tools with DSL
     private val availableTools = listOf(
-        // Weather tool
-        tool("get_weather", "Get current weather for a location") {
-            stringParameter(
-                name = "location",
-                description = "City name and optional country (e.g., 'Tokyo, Japan')",
-                required = true
-            )
-            stringParameter(
-                name = "units",
-                description = "Temperature units: 'celsius' or 'fahrenheit'",
-                required = false,
-                enum = listOf("celsius", "fahrenheit")
-            )
-        },
-
         // Time tool
         tool("get_current_time", "Get the current date and time") {
             stringParameter(
                 name = "timezone",
-                description = "Timezone (e.g., 'America/New_York', 'Asia/Tokyo')",
+                description = "Timezone (e.g., 'America/New_York', 'Asia/Tokyo'). Leave empty for system timezone.",
                 required = false
             )
         },
 
         // Calculator tool
-        tool("calculate", "Perform mathematical calculations") {
+        tool("calculate", "Perform simple mathematical calculations") {
             stringParameter(
                 name = "expression",
-                description = "Mathematical expression to evaluate (e.g., '2 + 2', '15 * 7')",
+                description = "Mathematical expression to evaluate (e.g., '2 + 2', '15 * 7', '100 / 5')",
                 required = true
             )
         },
 
         // Random number tool
-        tool("random_number", "Generate a random number") {
+        tool("generate_random_number", "Generate a random number within a specified range") {
             intParameter(
                 name = "min",
                 description = "Minimum value (inclusive)",
@@ -85,24 +83,39 @@ class ToolCallingViewModel : ViewModel() {
         }
     )
 
+    init {
+        // Check if model is loaded
+        checkModelStatus()
+    }
+
+    private fun checkModelStatus() {
+        viewModelScope.launch {
+            try {
+                val isLoaded = RunAnywhere.isInitialized
+                _uiState.value = _uiState.value.copy(isModelLoaded = isLoaded)
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(isModelLoaded = false)
+            }
+        }
+    }
+
     fun updateInput(text: String) {
-        _state.value = _state.value.copy(userInput = text)
+        _uiState.value = _uiState.value.copy(input = text)
     }
 
     fun generateWithTools() {
-        val input = _state.value.userInput
+        val input = _uiState.value.input
         if (input.isBlank()) return
 
         viewModelScope.launch {
-            _state.value = _state.value.copy(
+            _uiState.value = _uiState.value.copy(
                 isLoading = true,
-                error = null,
-                lastToolCalls = emptyList(),
-                executionResults = emptyList()
+                errorMessage = null
             )
 
             try {
                 // Generate with grammar-based tool calling
+                // Grammar ensures 100% valid JSON output
                 val result = RunAnywhere.generateWithTools(
                     prompt = input,
                     tools = availableTools,
@@ -113,37 +126,42 @@ class ToolCallingViewModel : ViewModel() {
                     )
                 )
 
-                if (result.success && result.toolCalls.isNotEmpty()) {
+                if (result.success) {
                     // Execute detected tool calls
-                    val executionResults = result.toolCalls.map { toolCall ->
-                        executeToolMock(toolCall)
+                    val executionResults = mutableMapOf<String, String>()
+
+                    result.toolCalls.forEach { toolCall ->
+                        val toolResult = executeToolMock(toolCall)
+                        executionResults[toolCall.name] = toolResult
                     }
 
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        lastResponse = result.text,
-                        lastToolCalls = result.toolCalls,
-                        executionResults = executionResults
+                    // Add to results list
+                    val newResult = ToolExecutionResult(
+                        query = input,
+                        success = true,
+                        toolCalls = result.toolCalls,
+                        executionResults = executionResults,
+                        responseText = result.text
                     )
-                } else if (result.success) {
-                    _state.value = _state.value.copy(
+
+                    _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        lastResponse = result.text ?: "No response",
-                        lastToolCalls = emptyList(),
-                        executionResults = emptyList()
+                        results = _uiState.value.results + newResult,
+                        input = "" // Clear input after successful execution
                     )
                 } else {
-                    _state.value = _state.value.copy(
+                    _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        error = "Generation failed: ${result.text}"
+                        errorMessage = "Generation failed: ${result.text ?: "Unknown error"}"
                     )
                 }
 
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    error = "Error: ${e.message}"
+                    errorMessage = "Error: ${e.message ?: "Unknown error"}"
                 )
+                e.printStackTrace()
             }
         }
     }
@@ -154,36 +172,32 @@ class ToolCallingViewModel : ViewModel() {
      */
     private fun executeToolMock(toolCall: ToolCall): String {
         return when (toolCall.name) {
-            "get_weather" -> {
-                val location = toolCall.arguments["location"] ?: "Unknown"
-                val units = toolCall.arguments["units"] ?: "celsius"
-                val temp = (15..30).random()
-                val symbol = if (units == "celsius") "°C" else "°F"
-                "Weather in $location: $temp$symbol, Partly cloudy with light winds"
-            }
-
             "get_current_time" -> {
-                val timezone = toolCall.arguments["timezone"] ?: "System"
+                val timezone = toolCall.arguments["timezone"]
                 val now = LocalDateTime.now()
                 val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                "Current time ($timezone): ${now.format(formatter)}"
+                if (timezone.isNullOrBlank()) {
+                    "Current time (System timezone): ${now.format(formatter)}"
+                } else {
+                    "Current time ($timezone): ${now.format(formatter)}"
+                }
             }
 
             "calculate" -> {
                 val expression = toolCall.arguments["expression"] ?: "0"
                 try {
                     val result = evaluateSimpleExpression(expression)
-                    "Result: $expression = $result"
+                    "$expression = $result"
                 } catch (e: Exception) {
-                    "Error evaluating '$expression': ${e.message}"
+                    "Error: Invalid expression '$expression'"
                 }
             }
 
-            "random_number" -> {
+            "generate_random_number" -> {
                 val min = toolCall.arguments["min"]?.toIntOrNull() ?: 0
                 val max = toolCall.arguments["max"]?.toIntOrNull() ?: 100
                 val random = Random.nextInt(min, max + 1)
-                "Random number between $min and $max: $random"
+                "Generated: $random (range: $min-$max)"
             }
 
             else -> "Unknown tool: ${toolCall.name}"
@@ -192,7 +206,7 @@ class ToolCallingViewModel : ViewModel() {
 
     /**
      * Simple expression evaluator for demo
-     * Only handles basic arithmetic
+     * Only handles basic arithmetic: +, -, *, /
      */
     private fun evaluateSimpleExpression(expr: String): Double {
         val clean = expr.replace(" ", "")
@@ -219,6 +233,9 @@ class ToolCallingViewModel : ViewModel() {
     }
 
     fun clearResults() {
-        _state.value = ToolCallingState()
+        _uiState.value = _uiState.value.copy(
+            results = emptyList(),
+            errorMessage = null
+        )
     }
 }

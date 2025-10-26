@@ -29,6 +29,7 @@ function(build_library_variant target_name cpu_flags)
     add_library(${target_name} SHARED
         src/llama-android.cpp
         src/cpu_features.cpp
+        src/grammar_jni.cpp
     )
 
     # Link llama.cpp libraries

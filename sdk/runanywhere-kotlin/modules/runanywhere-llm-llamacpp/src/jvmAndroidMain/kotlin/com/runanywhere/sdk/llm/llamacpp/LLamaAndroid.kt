@@ -57,7 +57,9 @@ class LLamaAndroid {
         }
     }.asCoroutineDispatcher()
 
-    private val nlen: Int = 256
+    // Maximum tokens to generate (not total sequence length)
+    // This will be added to ncur to get the actual stop point
+    private val maxTokensToGenerate: Int = 512
 
     // Native method declarations
     private external fun log_to_android()
@@ -91,6 +93,8 @@ class LLamaAndroid {
     ): String?
 
     private external fun kv_cache_clear(context: Long)
+
+    private external fun reset_sampler(sampler: Long)
 
     private external fun apply_chat_template(
         model: Long,
@@ -168,9 +172,12 @@ class LLamaAndroid {
     fun send(message: String, parseSpecialTokens: Boolean = true): Flow<String> = flow {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
-                val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, nlen))
-                while (ncur.value <= nlen) {
-                    val str = completion_loop(state.context, state.batch, state.sampler, nlen, ncur)
+                val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, maxTokensToGenerate))
+                val stopAt = ncur.value + maxTokensToGenerate
+                logger.debug("Generation started: ncur=${ncur.value}, stopAt=$stopAt")
+
+                while (ncur.value <= stopAt) {
+                    val str = completion_loop(state.context, state.batch, state.sampler, stopAt, ncur)
                     if (str == null) {
                         break
                     }
@@ -213,10 +220,13 @@ class LLamaAndroid {
                 val grammarSampler = new_sampler_with_grammar(temperature, minP, topK, grammar)
 
                 try {
-                    val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, nlen))
-                    while (ncur.value <= nlen) {
+                    val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, maxTokensToGenerate))
+                    val stopAt = ncur.value + maxTokensToGenerate
+                    logger.debug("Generation started: ncur=${ncur.value}, stopAt=$stopAt")
+
+                    while (ncur.value <= stopAt) {
                         // Use grammar sampler instead of default sampler
-                        val str = completion_loop(state.context, state.batch, grammarSampler, nlen, ncur)
+                        val str = completion_loop(state.context, state.batch, grammarSampler, stopAt, ncur)
                         if (str == null) {
                             break
                         }
@@ -229,6 +239,96 @@ class LLamaAndroid {
                     // Free the temporary grammar sampler
                     free_sampler(grammarSampler)
                     logger.debug("Grammar sampler freed")
+                }
+            }
+            else -> {
+                logger.error("Cannot generate: model not loaded")
+                throw IllegalStateException("Model not loaded")
+            }
+        }
+    }.flowOn(runLoop)
+
+    /**
+     * Generate text with grammar constraints from JSON schema
+     * Handles grammar creation and generation on the same thread to avoid thread-local state issues
+     *
+     * @param message Prompt to generate from
+     * @param schemaJson JSON schema string for grammar
+     * @param config Optional model config for temperature/sampling
+     * @param parseSpecialTokens Whether to parse special tokens in prompt
+     * @return Flow of generated tokens
+     */
+    fun sendWithGrammarSchema(
+        message: String,
+        schemaJson: String,
+        config: LlamaModelConfig? = null,
+        parseSpecialTokens: Boolean = true
+    ): Flow<String> = flow {
+        when (val state = threadLocalState.get()) {
+            is State.Loaded -> {
+                // Create grammar from schema on the same thread
+                // CRITICAL: Do NOT use .use {} because the grammar will be added to the chain
+                // and the chain will take ownership and free it automatically
+                val grammar = Grammar.fromSchema(state.model, schemaJson)
+                logger.info("✅ Grammar created successfully from schema")
+
+                // Create new sampler chain with grammar
+                // The grammar will be added to the chain, and the chain takes ownership
+                val temperature = config?.temperature ?: 0.7f
+                val minP = config?.minP ?: 0.05f
+                val topK = config?.topK ?: 40
+
+                logger.info("Creating grammar-constrained sampler chain: temp=$temperature, minP=$minP, topK=$topK")
+                val samplerChain = new_sampler_with_grammar(temperature, minP, topK, grammar.handle)
+
+                try {
+                    val ncur = IntVar(completion_init(state.context, state.batch, message, parseSpecialTokens, maxTokensToGenerate))
+                    val stopAt = ncur.value + maxTokensToGenerate
+                    logger.info("🚀 Generation starting: ncur=${ncur.value}, stopAt=$stopAt, maxTokens=$maxTokensToGenerate")
+
+                    var tokenCount = 0
+                    val generatedText = StringBuilder()
+
+                    while (ncur.value <= stopAt) {
+                        val str = completion_loop(state.context, state.batch, samplerChain, stopAt, ncur)
+                        tokenCount++
+
+                        if (str == null) {
+                            logger.info("⏹️ Generation stopped at token $tokenCount (ncur=${ncur.value}, EOS or limit reached)")
+                            break
+                        }
+
+                        // Log progress every 10 tokens and on special characters
+                        if (tokenCount % 10 == 0 || str.contains("}") || str.contains("]")) {
+                            logger.debug("Token $tokenCount (ncur=${ncur.value}): '$str' - Total length: ${generatedText.length}")
+                        }
+
+                        generatedText.append(str)
+
+                        if (str.isNotEmpty()) {
+                            emit(str)
+                        }
+
+                        // Safety: Check if we've generated a reasonable amount for tool calls
+                        // Tool calls are typically small JSON objects, shouldn't exceed 2000 chars
+                        if (generatedText.length > 2000) {
+                            logger.warn("⚠️ Generated text exceeds 2000 chars, stopping early to prevent runaway generation")
+                            break
+                        }
+                    }
+
+                    logger.info("✅ Generation complete: tokenCount=$tokenCount, ncur=${ncur.value}, stopAt=$stopAt, totalChars=${generatedText.length}")
+                    logger.debug("📄 Generated text: ${generatedText.toString().take(500)}")
+                    kv_cache_clear(state.context)
+                } finally {
+                    // Reset sampler state before freeing to clear grammar state
+                    reset_sampler(samplerChain)
+
+                    // Free the sampler chain (which automatically frees the grammar since it owns it)
+                    free_sampler(samplerChain)
+                    logger.debug("Sampler chain freed (grammar included)")
+                    // CRITICAL: Do NOT call grammar.close() here! The chain already freed it.
+                    // Calling grammar.close() would cause double-free and SIGSEGV crash.
                 }
             }
             else -> {

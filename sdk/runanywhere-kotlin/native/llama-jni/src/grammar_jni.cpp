@@ -1,3 +1,40 @@
+/**
+ * grammar_jni.cpp - Grammar-Based Constrained Generation for Tool Calling
+ *
+ * ⚠️ DEPRECATED - This implementation is no longer used in production
+ *
+ * STATUS: Preserved for reference, switched to prompt-based approach
+ * REASON: llama.cpp grammar bugs causing SIGABRT crashes
+ * SEE: GRAMMAR_IMPLEMENTATION_NOTES.md for full investigation details
+ *
+ * WHAT THIS FILE DOES:
+ * - Converts JSON schemas to GBNF (Grammar-Based Natural Format) rules
+ * - Creates grammar samplers that constrain LLM output to valid JSON
+ * - Builds sampler chains with grammar as the final constraint
+ *
+ * WHY IT DIDN'T WORK:
+ * 1. llama.cpp grammar stack bugs (unfixed as of Oct 2025)
+ * 2. Chat template interference with Qwen2 models
+ * 3. Missing additionalProperties: false in schemas
+ * 4. Complex C++ debugging for mobile crashes
+ *
+ * WHAT WE LEARNED:
+ * - Grammar guarantees valid JSON but crashes make it unusable in production
+ * - Prompt-based approaches with few-shot examples are more reliable
+ * - Production reliability > theoretical guarantees
+ * - Small models (0.5B) work better with few-shot examples than grammar rules
+ *
+ * OWNERSHIP SEMANTICS (CRITICAL):
+ * - Grammar sampler created by createGrammar()
+ * - Passed to new_sampler_with_grammar()
+ * - Added to chain via llama_sampler_chain_add()
+ * - ⚠️ CHAIN TAKES OWNERSHIP - do not free grammar separately!
+ * - When chain is freed, it automatically frees all child samplers
+ * - Double-free causes SIGSEGV crash
+ *
+ * PRESERVED FOR: Reference, future llama.cpp improvements, research
+ */
+
 #include <android/log.h>
 #include <jni.h>
 #include <string>
@@ -55,7 +92,8 @@ Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_jsonSchemaToGBNF(
     }
 }
 
-// JNI: Create grammar from GBNF string
+// JNI: Create grammar sampler from GBNF string
+// Note: The new llama.cpp API uses samplers for grammar, not separate grammar objects
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_createGrammar(
@@ -88,39 +126,35 @@ Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_createGrammar(
             return 0;
         }
 
-        LOGi("Creating grammar from GBNF rules...");
+        LOGi("Creating grammar sampler from GBNF rules...");
 
-        // Parse GBNF rules into llama_grammar
-        auto parsed_grammar = grammar_parser::parse(gbnf);
-
-        // Create grammar instance
-        auto grammar_rules = parsed_grammar.c_rules();
-
-        llama_grammar* grammar = llama_grammar_init(
-            grammar_rules.data(),
-            grammar_rules.size(),
-            parsed_grammar.symbol_ids.at("root")
+        // Use the new sampler API for grammar
+        // This creates a sampler that constrains output to the grammar
+        llama_sampler* grammar_sampler = llama_sampler_init_grammar(
+            model,
+            gbnf,
+            "root"  // Grammar root rule
         );
 
         env->ReleaseStringUTFChars(j_gbnf, gbnf);
 
-        if (!grammar) {
-            LOGe("Failed to create grammar");
+        if (!grammar_sampler) {
+            LOGe("Failed to create grammar sampler");
             env->ThrowNew(
                 env->FindClass("java/lang/RuntimeException"),
-                "Failed to create grammar from GBNF rules"
+                "Failed to create grammar sampler from GBNF rules"
             );
             return 0;
         }
 
-        LOGi("Grammar created successfully");
+        LOGi("Grammar sampler created successfully");
 
-        return reinterpret_cast<jlong>(grammar);
+        return reinterpret_cast<jlong>(grammar_sampler);
 
     } catch (const std::exception& e) {
         env->ReleaseStringUTFChars(j_gbnf, gbnf);
 
-        LOGe("Error creating grammar: %s", e.what());
+        LOGe("Error creating grammar sampler: %s", e.what());
 
         jclass exceptionClass = env->FindClass("java/lang/RuntimeException");
         env->ThrowNew(exceptionClass, e.what());
@@ -129,7 +163,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_createGrammar(
     }
 }
 
-// JNI: Free grammar
+// JNI: Free grammar sampler
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_freeGrammar(
@@ -137,14 +171,19 @@ Java_com_runanywhere_sdk_llm_llamacpp_GrammarBridge_freeGrammar(
     jobject /* this */,
     jlong grammar_pointer
 ) {
-    auto grammar = reinterpret_cast<llama_grammar*>(grammar_pointer);
-    if (grammar) {
-        LOGi("Freeing grammar");
-        llama_grammar_free(grammar);
+    auto grammar_sampler = reinterpret_cast<llama_sampler*>(grammar_pointer);
+    if (grammar_sampler) {
+        LOGi("Freeing grammar sampler");
+        llama_sampler_free(grammar_sampler);
     }
 }
 
-// JNI: Create sampler with grammar constraints
+// JNI: Create sampler chain WITH grammar
+// IMPORTANT: The grammar sampler is ADDED TO THE CHAIN and the chain TAKES OWNERSHIP
+// - When llama_sampler_chain_add() is called, the chain takes ownership of the sampler
+// - When the chain is freed, it automatically frees all samplers added to it
+// - DO NOT call llama_sampler_free() on the grammar separately - it will cause double-free!
+// - The Kotlin code must NOT call grammar.close() after creating the chain
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1sampler_1with_1grammar(
@@ -155,56 +194,55 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1sampler_1with_1grammar(
     jint top_k,
     jlong grammar_pointer
 ) {
-    auto grammar = reinterpret_cast<llama_grammar*>(grammar_pointer);
+    auto grammar_sampler = reinterpret_cast<llama_sampler*>(grammar_pointer);
 
-    LOGi("Creating sampler with grammar: temp=%.2f, min_p=%.2f, top_k=%d, grammar=%p",
-         temperature, min_p, top_k, grammar);
+    LOGi("Creating sampler chain with grammar: temp=%.2f, min_p=%.2f, top_k=%d, grammar=%p",
+         temperature, min_p, top_k, grammar_sampler);
 
     auto sparams = llama_sampler_chain_default_params();
     sparams.no_perf = true;
-    llama_sampler* smpl = llama_sampler_chain_init(sparams);
+    llama_sampler* chain = llama_sampler_chain_init(sparams);
 
     // Add sampling strategies based on parameters
+    // IMPORTANT: Grammar sampler must be LAST in the chain!
+    // Order: temp -> min_p -> top_k -> dist/greedy -> GRAMMAR
     if (temperature > 0.0f) {
         // Temperature-based sampling
-        llama_sampler_chain_add(smpl, llama_sampler_init_temp(temperature));
+        llama_sampler_chain_add(chain, llama_sampler_init_temp(temperature));
 
         // Add min-P sampling if specified
         if (min_p > 0.0f && min_p < 1.0f) {
-            llama_sampler_chain_add(smpl, llama_sampler_init_min_p(min_p, 1));
+            llama_sampler_chain_add(chain, llama_sampler_init_min_p(min_p, 1));
         }
 
         // Add top-K sampling if specified
         if (top_k > 0) {
-            llama_sampler_chain_add(smpl, llama_sampler_init_top_k(top_k));
-        }
-
-        // Add grammar constraints BEFORE distribution sampler
-        if (grammar) {
-            llama_sampler_chain_add(smpl, llama_sampler_init_grammar(
-                llama_get_model(nullptr), // We'll use grammar instance directly
-                grammar,
-                nullptr
-            ));
-            LOGi("Grammar sampler added to chain");
+            llama_sampler_chain_add(chain, llama_sampler_init_top_k(top_k));
         }
 
         // Distribution sampler for probabilistic selection
-        llama_sampler_chain_add(smpl, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+        llama_sampler_chain_add(chain, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+
+        // Add grammar constraints LAST (after distribution sampler)
+        // CRITICAL: Grammar must be last to properly constrain token selection
+        // Chain takes ownership! Do not free grammar separately after this!
+        if (grammar_sampler) {
+            llama_sampler_chain_add(chain, grammar_sampler);
+            LOGi("Grammar sampler added to chain as LAST sampler (ownership transferred)");
+        }
 
     } else {
         // Greedy sampling (deterministic)
-        // Even with greedy, apply grammar constraints
-        if (grammar) {
-            llama_sampler_chain_add(smpl, llama_sampler_init_grammar(
-                llama_get_model(nullptr),
-                grammar,
-                nullptr
-            ));
+        llama_sampler_chain_add(chain, llama_sampler_init_greedy());
+
+        // Add grammar AFTER greedy sampler
+        if (grammar_sampler) {
+            llama_sampler_chain_add(chain, grammar_sampler);
+            LOGi("Grammar sampler added to greedy chain as LAST sampler (ownership transferred)");
         }
-        llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
-        LOGi("Created greedy sampler with grammar");
     }
 
-    return reinterpret_cast<jlong>(smpl);
+    LOGi("Sampler chain created with %d samplers", grammar_sampler ? 1 : 0);
+
+    return reinterpret_cast<jlong>(chain);
 }

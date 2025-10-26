@@ -382,81 +382,73 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         }
 
         logger.info("🛠️ generateWithTools() called with ${effectiveTools.size} tools")
+        logger.info("📊 LlamaCppService state - isInitialized: $isInitialized, modelPath: $modelPath")
+
+        // Ensure service is initialized
+        if (!isInitialized) {
+            throw IllegalStateException("LlamaCppService not initialized. Model must be loaded before calling generateWithTools().")
+        }
 
         try {
             // Generate JSON schema from tools
             val jsonSchema = Tool.generateSchema(effectiveTools)
 
-            // Convert to JSON string using simple serialization
-            val json = kotlinx.serialization.json.Json { prettyPrint = false }
-            val schemaJson = json.encodeToString(
-                kotlinx.serialization.serializer(),
-                jsonSchema
-            )
+            // Convert to JSON string manually (avoid serialization issues with Any type)
+            val schemaJson = buildJsonString(jsonSchema)
 
             logger.info("📋 JSON Schema generated: ${schemaJson.take(200)}...")
 
-            // Get model pointer from llama instance (we need to expose this)
-            val state = llama.threadLocalState.get()
-            val modelPointer = when (state) {
-                is LLamaAndroid.Companion.State.Loaded -> state.model
-                else -> throw IllegalStateException("Model not loaded")
+            // Build messages with tool instruction
+            val userMessage = Message(role = MessageRole.USER, content = prompt)
+            val systemMessage = Message(
+                role = MessageRole.SYSTEM,
+                content = buildToolSystemPrompt(effectiveTools)
+            )
+
+            val formattedPrompt = buildPrompt(
+                listOf(systemMessage, userMessage),
+                systemPrompt = null
+            )
+
+            logger.info("📝 Tool calling prompt length: ${formattedPrompt.length}")
+
+            // Generate with grammar constraints
+            val result = StringBuilder()
+            val effectiveOptions = options ?: RunAnywhereGenerationOptions(
+                maxTokens = configuration.maxTokens,
+                temperature = 0.7f
+            )
+
+            val config = LlamaModelConfig(
+                temperature = effectiveOptions.temperature,
+                topK = 40,
+                minP = 0.05f
+            )
+
+            // Use sendWithGrammarSchema which handles grammar creation and generation
+            // on the same thread, avoiding thread-local state issues
+            llama.sendWithGrammarSchema(
+                formattedPrompt,
+                schemaJson,
+                config,
+                parseSpecialTokens = true
+            ).collect { token ->
+                result.append(token)
             }
 
-            // Create grammar from schema
-            Grammar.fromSchema(modelPointer, schemaJson).use { grammar ->
-                logger.info("✅ Grammar created successfully")
+            val generatedText = result.toString()
+            logger.info("✅ Generation complete, response length: ${generatedText.length}")
+            logger.info("📄 Response: ${generatedText.take(300)}...")
 
-                // Build messages with tool instruction
-                val userMessage = Message(role = MessageRole.USER, content = prompt)
-                val systemMessage = Message(
-                    role = MessageRole.SYSTEM,
-                    content = buildToolSystemPrompt(effectiveTools)
-                )
+            // Parse tool calls from JSON response
+            val toolCalls = parseToolCalls(generatedText)
 
-                val formattedPrompt = buildPrompt(
-                    listOf(systemMessage, userMessage),
-                    systemPrompt = null
-                )
-
-                logger.info("📝 Tool calling prompt length: ${formattedPrompt.length}")
-
-                // Generate with grammar constraints
-                val result = StringBuilder()
-                val effectiveOptions = options ?: RunAnywhereGenerationOptions(
-                    maxTokens = configuration.maxTokens,
-                    temperature = 0.7f
-                )
-
-                val config = LlamaModelConfig(
-                    temperature = effectiveOptions.temperature,
-                    topK = 40,
-                    minP = 0.05f
-                )
-
-                llama.sendWithGrammar(
-                    formattedPrompt,
-                    grammar.handle,
-                    config,
-                    parseSpecialTokens = true
-                ).collect { token ->
-                    result.append(token)
-                }
-
-                val generatedText = result.toString()
-                logger.info("✅ Generation complete, response length: ${generatedText.length}")
-                logger.info("📄 Response: ${generatedText.take(300)}...")
-
-                // Parse tool calls from JSON response
-                val toolCalls = parseToolCalls(generatedText)
-
-                ToolCallResult(
-                    success = true,
-                    text = generatedText,
-                    toolCalls = toolCalls,
-                    mode = ToolCallingMode.GRAMMAR_BASED
-                )
-            }
+            ToolCallResult(
+                success = true,
+                text = generatedText,
+                toolCalls = toolCalls,
+                mode = ToolCallingMode.GRAMMAR_BASED
+            )
 
         } catch (e: Exception) {
             logger.error("❌ Tool calling failed", e)
@@ -540,6 +532,36 @@ Rules:
         } catch (e: Exception) {
             logger.error("Failed to parse tool calls from response", e)
             emptyList()
+        }
+    }
+
+    /**
+     * Build JSON string from Map<String, Any>
+     * Handles nested maps and lists without requiring serialization
+     */
+    private fun buildJsonString(obj: Any?): String {
+        return when (obj) {
+            null -> "null"
+            is String -> "\"${obj.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+            is Number -> obj.toString()
+            is Boolean -> obj.toString()
+            is Map<*, *> -> {
+                obj.entries.joinToString(
+                    separator = ",",
+                    prefix = "{",
+                    postfix = "}"
+                ) { (key, value) ->
+                    "\"$key\":${buildJsonString(value)}"
+                }
+            }
+            is List<*> -> {
+                obj.joinToString(
+                    separator = ",",
+                    prefix = "[",
+                    postfix = "]"
+                ) { buildJsonString(it) }
+            }
+            else -> "\"$obj\""
         }
     }
 }

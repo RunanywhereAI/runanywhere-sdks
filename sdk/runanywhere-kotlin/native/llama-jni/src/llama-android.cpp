@@ -317,11 +317,29 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1loop(
     if (!la_int_var_value) la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I");
     if (!la_int_var_inc) la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V");
 
+    const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
+
+    // Log every 50 tokens to track progress
+    static int log_counter = 0;
+    if (log_counter++ % 50 == 0) {
+        LOGi("completion_loop: n_cur=%d, n_len=%d", n_cur, n_len);
+    }
+
     // Sample the most likely token
+    // NOTE: llama_sampler_sample() internally calls llama_sampler_accept() on the sampler,
+    // which automatically propagates to ALL samplers in the chain including the grammar sampler.
+    // DO NOT call llama_sampler_accept() again here - calling it twice will corrupt the grammar
+    // state machine, causing it to advance twice per token and eventually crash with SIGABRT
+    // when EOG arrives while the grammar is in a non-terminal state.
     const auto new_token_id = llama_sampler_sample(sampler, context, -1);
 
-    const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
-    if (llama_token_is_eog(model, new_token_id) || n_cur == n_len) {
+    if (llama_token_is_eog(model, new_token_id)) {
+        LOGi("EOG token detected at position %d, token_id=%d", n_cur, new_token_id);
+        return nullptr;
+    }
+
+    if (n_cur == n_len) {
+        LOGi("Reached n_len limit at position %d", n_cur);
         return nullptr;
     }
 
@@ -515,4 +533,15 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_kv_1cache_1clear(JNIEnv *, jobject, jlong context) {
     llama_kv_cache_clear(reinterpret_cast<llama_context *>(context));
+}
+
+// JNI: Reset sampler state (clears grammar state, repetition penalties, etc.)
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_reset_1sampler(JNIEnv *, jobject, jlong sampler_pointer) {
+    auto sampler = reinterpret_cast<llama_sampler *>(sampler_pointer);
+    if (sampler) {
+        llama_sampler_reset(sampler);
+        LOGi("Sampler state reset (grammar and other stateful samplers cleared)");
+    }
 }

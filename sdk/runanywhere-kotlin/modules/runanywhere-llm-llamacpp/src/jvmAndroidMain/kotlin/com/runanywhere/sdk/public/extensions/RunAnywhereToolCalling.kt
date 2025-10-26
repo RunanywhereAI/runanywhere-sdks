@@ -67,22 +67,32 @@ suspend fun RunAnywhere.generateWithTools(
     val effectiveTools = tools ?: options?.tools ?: emptyList()
     logger.info("generateWithTools() called with ${effectiveTools.size} tools")
 
-    // Ensure SDK is initialized
-    if (!this.isInitialized) {
-        throw IllegalStateException("RunAnywhere SDK not initialized. Call initialize() first.")
+    // Get the currently loaded model from the generation service
+    // This is the model that was loaded via RunAnywhere.loadModel()
+    val serviceContainer = ServiceContainer.shared
+    val currentModel = serviceContainer.generationService.getCurrentModel()
+    logger.info("Current model: ${currentModel?.model?.id}")
+
+    if (currentModel == null) {
+        throw IllegalStateException(
+            "No model currently loaded. Please call RunAnywhere.loadModel(modelId) before using generateWithTools()."
+        )
     }
 
-    // Get LLM service from service container
-    val serviceContainer = ServiceContainer.shared
-    val llmComponent = serviceContainer.llmComponent
-        ?: throw IllegalStateException("LLM component not available")
+    // Get the LLM service from the loaded model
+    val llmService = currentModel.service
+    logger.info("Retrieved LLM service from loaded model: ${llmService?.javaClass?.name}")
 
-    // Access service through public getter
-    val llmService = try {
-        llmComponent.getService() as? LlamaCppService
+    val llamaCppService = try {
+        llmService as? LlamaCppService
     } catch (e: Exception) {
+        logger.error("Failed to cast service to LlamaCppService: ${e.message}")
         null
-    } ?: throw IllegalStateException("LLM service not initialized or not available")
+    } ?: throw IllegalStateException(
+        "LLM service is not a LlamaCppService. " +
+        "Service type: ${llmService?.javaClass?.name}. " +
+        "Tool calling is currently only supported with llama.cpp models."
+    )
 
     // Validate tools
     if (effectiveTools.isEmpty()) {
@@ -92,7 +102,7 @@ suspend fun RunAnywhere.generateWithTools(
     logger.info("Using LlamaCppService for grammar-based tool calling")
 
     // Delegate to LlamaCppService
-    return llmService.generateWithTools(prompt, tools, options)
+    return llamaCppService.generateWithTools(prompt, tools, options)
 }
 
 /**
