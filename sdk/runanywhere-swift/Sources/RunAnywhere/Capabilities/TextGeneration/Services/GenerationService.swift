@@ -134,6 +134,20 @@ public class GenerationService {
         } catch {
             logger.error("❌ Generation failed with error: \(error)")
 
+            // Submit analytics for failed generation (non-blocking, silent failures)
+            let latency = Date().timeIntervalSince(startTime) * 1000
+            Task.detached(priority: .background) {
+                await RunAnywhere.submitGenerationAnalytics(
+                    generationId: UUID().uuidString,
+                    modelId: loadedModel.model.id,
+                    performanceMetrics: PerformanceMetrics(inferenceTimeMs: latency),
+                    inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                    outputTokens: 0,
+                    success: false,
+                    executionTarget: ExecutionTarget.onDevice.rawValue
+                )
+            }
+
             // Enhanced error handling - if it's a timeout or framework error, provide helpful fallback
             if let frameworkError = error as? FrameworkError {
                 logger.warning("🔄 Framework error detected: \(frameworkError)")
@@ -159,14 +173,16 @@ public class GenerationService {
             // Use model-specific pattern or fall back to default
             let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
             logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
-            logger.debug("Raw generated text: \(generatedText)")
+            logger.debug("Raw generated text length: \(generatedText.count) chars")
 
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent
 
-            logger.debug("Parsed content: \(finalText)")
-            logger.debug("Thinking content: \(thinkingContent ?? "None")")
+            logger.debug("Parsed content length: \(finalText.count) chars")
+            if let thinking = thinkingContent {
+                logger.debug("Thinking content length: \(thinking.count) chars")
+            }
 
             // For non-streaming, we can estimate thinking took ~60% of generation time if present
             if thinkingContent != nil && !thinkingContent!.isEmpty {
@@ -197,7 +213,7 @@ public class GenerationService {
         // Calculate response time (time after thinking)
         let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
 
-        return GenerationResult(
+        let result = GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
             tokensUsed: tokenCounts.totalTokens,
@@ -215,6 +231,21 @@ public class GenerationService {
             thinkingTokens: tokenCounts.thinkingTokens,
             responseTokens: tokenCounts.responseTokens
         )
+
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics,
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 
     private func generateInCloud(
@@ -223,7 +254,7 @@ public class GenerationService {
         provider: String?
     ) async throws -> GenerationResult {
         // Placeholder implementation
-        return GenerationResult(
+        let result = GenerationResult(
             text: "Generated text in cloud",
             tokensUsed: 10,
             modelUsed: "cloud-model",
@@ -235,6 +266,21 @@ public class GenerationService {
                 tokensPerSecond: 20.0
             )
         )
+
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics,
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 
     private func generateHybrid(
@@ -301,7 +347,7 @@ public class GenerationService {
 
         let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
 
-        return GenerationResult(
+        let result = GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
             tokensUsed: tokenCounts.totalTokens,
@@ -319,5 +365,20 @@ public class GenerationService {
             thinkingTokens: tokenCounts.thinkingTokens,
             responseTokens: tokenCounts.responseTokens
         )
+
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
+            await RunAnywhere.submitGenerationAnalytics(
+                generationId: UUID().uuidString,
+                modelId: result.modelUsed,
+                performanceMetrics: result.performanceMetrics,
+                inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                outputTokens: result.tokensUsed,
+                success: true,
+                executionTarget: result.executionTarget.rawValue
+            )
+        }
+
+        return result
     }
 }

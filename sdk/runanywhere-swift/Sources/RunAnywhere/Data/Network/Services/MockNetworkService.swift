@@ -10,7 +10,7 @@ public actor MockNetworkService: NetworkService {
     private let mockDelay: UInt64 = 500_000_000 // 0.5 seconds to simulate network delay
 
     public init() {
-        logger.info("MockNetworkService initialized - all network calls will return mock data")
+        logger.debug("MockNetworkService initialized - all network calls will return mock data")
     }
 
     // MARK: - NetworkService Protocol
@@ -214,6 +214,14 @@ public actor MockNetworkService: NetworkService {
                 "preferredModels": [] as [String]
             ]
             return try JSONSerialization.data(withJSONObject: preferences)
+
+        case .devAnalytics:
+            // Mock response for analytics submission
+            let response: [String: Any] = [
+                "success": true,
+                "analyticsId": "mock-analytics-\(UUID().uuidString)"
+            ]
+            return try JSONSerialization.data(withJSONObject: response)
         }
     }
 
