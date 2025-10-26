@@ -68,9 +68,9 @@ public class StreamingService {
                 resultContinuation?.resume(throwing: err)
                 resultContinuation = nil
 
-                // Submit analytics for failed generation (non-blocking)
+                // Submit analytics for failed generation (non-blocking, silent failures)
                 if let modelName = modelName {
-                    Task {
+                    Task.detached(priority: .background) {
                         await RunAnywhere.submitGenerationAnalytics(
                             generationId: UUID().uuidString,
                             modelId: modelName,
@@ -95,12 +95,12 @@ public class StreamingService {
                     continuation.resume(returning: result)
                     resultContinuation = nil
 
-                    // Submit analytics (non-blocking)
-                    Task {
+                    // Submit analytics (non-blocking, silent failures)
+                    Task.detached(priority: .background) {
                         await RunAnywhere.submitGenerationAnalytics(
                             generationId: UUID().uuidString,
                             modelId: result.modelUsed,
-                            performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                            performanceMetrics: result.performanceMetrics,
                             inputTokens: RunAnywhere.estimateTokenCount(prompt),
                             outputTokens: result.tokensUsed,
                             success: true,

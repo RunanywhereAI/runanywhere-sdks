@@ -134,9 +134,9 @@ public class GenerationService {
         } catch {
             logger.error("❌ Generation failed with error: \(error)")
 
-            // Submit analytics for failed generation (non-blocking)
+            // Submit analytics for failed generation (non-blocking, silent failures)
             let latency = Date().timeIntervalSince(startTime) * 1000
-            Task {
+            Task.detached(priority: .background) {
                 await RunAnywhere.submitGenerationAnalytics(
                     generationId: UUID().uuidString,
                     modelId: loadedModel.model.id,
@@ -173,14 +173,16 @@ public class GenerationService {
             // Use model-specific pattern or fall back to default
             let pattern = modelInfo.thinkingPattern ?? ThinkingTagPattern.defaultPattern
             logger.debug("Using thinking pattern: \(pattern.openingTag)...\(pattern.closingTag)")
-            logger.debug("Raw generated text: \(generatedText)")
+            logger.debug("Raw generated text length: \(generatedText.count) chars")
 
             let parseResult = ThinkingParser.parse(text: generatedText, pattern: pattern)
             finalText = parseResult.content
             thinkingContent = parseResult.thinkingContent
 
-            logger.debug("Parsed content: \(finalText)")
-            logger.debug("Thinking content: \(thinkingContent ?? "None")")
+            logger.debug("Parsed content length: \(finalText.count) chars")
+            if let thinking = thinkingContent {
+                logger.debug("Thinking content length: \(thinking.count) chars")
+            }
 
             // For non-streaming, we can estimate thinking took ~60% of generation time if present
             if thinkingContent != nil && !thinkingContent!.isEmpty {
@@ -230,12 +232,12 @@ public class GenerationService {
             responseTokens: tokenCounts.responseTokens
         )
 
-        // Submit analytics (non-blocking)
-        Task {
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
             await RunAnywhere.submitGenerationAnalytics(
                 generationId: UUID().uuidString,
                 modelId: result.modelUsed,
-                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                performanceMetrics: result.performanceMetrics,
                 inputTokens: RunAnywhere.estimateTokenCount(prompt),
                 outputTokens: result.tokensUsed,
                 success: true,
@@ -265,12 +267,12 @@ public class GenerationService {
             )
         )
 
-        // Submit analytics (non-blocking)
-        Task {
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
             await RunAnywhere.submitGenerationAnalytics(
                 generationId: UUID().uuidString,
                 modelId: result.modelUsed,
-                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                performanceMetrics: result.performanceMetrics,
                 inputTokens: RunAnywhere.estimateTokenCount(prompt),
                 outputTokens: result.tokensUsed,
                 success: true,
@@ -364,12 +366,12 @@ public class GenerationService {
             responseTokens: tokenCounts.responseTokens
         )
 
-        // Submit analytics (non-blocking)
-        Task {
+        // Submit analytics (non-blocking, silent failures)
+        Task.detached(priority: .background) {
             await RunAnywhere.submitGenerationAnalytics(
                 generationId: UUID().uuidString,
                 modelId: result.modelUsed,
-                performanceMetrics: result.performanceMetrics ?? PerformanceMetrics(),
+                performanceMetrics: result.performanceMetrics,
                 inputTokens: RunAnywhere.estimateTokenCount(prompt),
                 outputTokens: result.tokensUsed,
                 success: true,

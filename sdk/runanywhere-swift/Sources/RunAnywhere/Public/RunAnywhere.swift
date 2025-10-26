@@ -100,9 +100,6 @@ public enum RunAnywhere {
             // Step 2: Initialize logging system
             RunAnywhere.setLogLevel(params.environment.defaultLogLevel)
 
-            // VERSION MARKER - to verify SPM is using latest code
-            logger.info("🔧 SDK CODE VERSION: v0.15.7-dev-analytics-fix (with Supabase registration)")
-
             // Step 3: Store parameters locally
             initParams = params
             currentEnvironment = params.environment
@@ -121,15 +118,13 @@ public enum RunAnywhere {
             // Mark as initialized
             isInitialized = true
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
-            logger.info("🔍 ABOUT TO CHECK ENVIRONMENT: \(params.environment) == .development? \(params.environment == .development)")
             EventBus.shared.publish(SDKInitializationEvent.completed)
 
             // Step 6: Device registration (after marking as initialized)
             // For development mode: Register immediately with Supabase for dev analytics
             // For production/staging: Lazy registration on first API call
-            logger.info("📊 Checking environment for device registration: \(params.environment.rawValue)")
             if params.environment == .development {
-                logger.info("🔄 Development mode - triggering device registration with Supabase...")
+                logger.debug("Development mode - triggering device registration!")
 
                 // Trigger device registration in background (non-blocking)
                 // Note: ensureDeviceRegistered() checks if already registered and skips if so
@@ -215,7 +210,7 @@ public enum RunAnywhere {
             // In development mode, still need to check if registered to Supabase
             let isDevRegistered = isDevDeviceRegistered()
             if currentEnvironment == .development && !isDevRegistered {
-                logger.info("📝 Device ID exists but not registered to Supabase - will register now")
+                logger.debug("Device ID exists but not registered - will register now")
                 // Device ID exists but not registered to Supabase yet - continue with registration
             } else {
                 logger.debug("Device already fully registered (devRegistered=\(isDevRegistered))")
@@ -223,7 +218,7 @@ public enum RunAnywhere {
                 return
             }
         } else {
-            logger.info("📝 No device ID found - will create and register")
+            logger.debug("No device ID found - will create and register")
         }
 
         // Try to set registering flag - if already registering, wait for completion
@@ -246,22 +241,25 @@ public enum RunAnywhere {
             return
         }
 
-        logger.info("Starting device registration...")
+        logger.debug("Starting device registration...")
 
         // In development mode, register to Supabase (dev analytics)
         if currentEnvironment == .development {
-            logger.info("📝 Development mode - registering device for dev analytics...")
+            logger.debug("Development mode - registering device for dev analytics...")
 
             do {
                 // Call dev registration with Supabase
+                // This will throw if registration fails, and will store device ID if it succeeds
                 try await registerDevDevice()
 
-                // Get or generate device ID
-                let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
-                try storeDeviceId(deviceId)
+                // Get the device ID that was just registered (must exist now)
+                guard let deviceId = getStoredDeviceId() else {
+                    throw SDKError.storageError("Device ID not found after successful registration")
+                }
+
                 await registrationState.setCachedDeviceId(deviceId)
 
-                // Mark as registered
+                // Mark as registered ONLY after successful Supabase registration
                 markDevDeviceAsRegistered()
 
                 logger.info("✅ Dev device registration successful")
@@ -441,16 +439,12 @@ public enum RunAnywhere {
         let processorInfo = deviceAdapter.getProcessorInfo()
         let capabilities = deviceAdapter.getDeviceCapabilities()
 
-        // Get or generate device ID
+        // Get or generate device ID (but DON'T store it yet - only after successful registration)
         let deviceId = getStoredDeviceId() ?? generateDeviceIdentifier()
+        let isNewDevice = getStoredDeviceId() == nil
 
-        // Store device ID if it was newly generated
-        if getStoredDeviceId() == nil {
-            try storeDeviceId(deviceId)
-        }
-
-        // Create registration request
-        print("📝 [REGISTRATION] Registering device with SDK version: \(SDKConstants.version)")
+        // Create registration request with current timestamp for UPSERT
+        let now = ISO8601DateFormatter().string(from: Date())
         let request = DevDeviceRegistrationRequest(
             deviceId: deviceId,
             deviceModel: deviceInfoResult.model,
@@ -462,17 +456,23 @@ public enum RunAnywhere {
             formFactor: deviceInfoResult.name,
             sdkVersion: SDKConstants.version,
             platform: SDKConstants.platform,
-            buildToken: BuildToken.token
+            buildToken: BuildToken.token,
+            lastSeenAt: now  // Will be updated on every registration via UPSERT
         )
-        print("📝 [REGISTRATION] Request created with version: \(request.sdkVersion)")
 
         // Choose registration method based on configuration
+        // IMPORTANT: Only proceed with storage if registration succeeds (throws on failure)
         if let supabaseConfig = params.supabaseConfig {
             // Use Supabase REST API (automatic in development mode)
             try await registerDevDeviceViaSupabase(request: request, config: supabaseConfig)
         } else {
             // Use traditional backend (production/staging)
             try await registerDevDeviceViaBackend(request: request, baseURL: params.baseURL)
+        }
+
+        // ✅ Registration succeeded! Now store device ID if it was newly generated
+        if isNewDevice {
+            try storeDeviceId(deviceId)
         }
     }
 
@@ -512,10 +512,8 @@ public enum RunAnywhere {
             .appendingPathComponent("v1")
             .appendingPathComponent("sdk_devices")
 
-        logger.info("📤 Sending device registration to Supabase: \(url.absoluteString)")
+        logger.debug("Sending device registration)")
         logger.debug("Device ID: \(request.deviceId)")
-        logger.debug("Build Token: \(request.buildToken)")
-        logger.debug("Platform: \(request.platform)")
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -529,10 +527,7 @@ public enum RunAnywhere {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         urlRequest.httpBody = try encoder.encode(request)
 
-        logger.debug("Request body size: \(urlRequest.httpBody?.count ?? 0) bytes")
-
         // Perform request
-        logger.info("🌐 Making POST request to Supabase...")
         let (data, response) = try await URLSession.shared.data(for: urlRequest)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -540,7 +535,7 @@ public enum RunAnywhere {
             throw SDKError.networkError("Invalid response from Supabase")
         }
 
-        logger.info("📥 Supabase response: HTTP \(httpResponse.statusCode)")
+        logger.debug("Supabase response: HTTP \(httpResponse.statusCode)")
 
         // Supabase returns 201 for successful inserts
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
@@ -593,12 +588,12 @@ public enum RunAnywhere {
             throw SDKError.networkError("Invalid response from Supabase")
         }
 
-        logger.info("📊 Analytics HTTP Response: \(httpResponse.statusCode)")
+        logger.debug("Analytics HTTP Response: \(httpResponse.statusCode)")
 
         guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
             var errorMessage = "Analytics submission failed: \(httpResponse.statusCode)"
             if let errorData = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                logger.error("❌ Supabase error response: \(errorData)")
+                logger.debug("error response: \(errorData)")
                 if let message = errorData["message"] as? String {
                     errorMessage = message
                 }
@@ -606,7 +601,7 @@ public enum RunAnywhere {
             throw SDKError.networkError(errorMessage)
         }
 
-        logger.info("✅ Analytics Supabase submission successful")
+        logger.debug("Analytics submission successful")
     }
 
     /// Submit generation analytics via backend (production mode - future)
@@ -673,7 +668,7 @@ public enum RunAnywhere {
                 }
             } catch {
                 // Fail silently - analytics should never break the SDK
-                print("⚠️ [ANALYTICS] Submission failed (non-critical): \(error.localizedDescription)")
+                SDKLogger(category: "RunAnywhere.Analytics").debug("Analytics submission failed (non-critical): \(error.localizedDescription)")
             }
         }
     }
@@ -694,11 +689,11 @@ public enum RunAnywhere {
 
         // Fallback to UserDefaults (does NOT survive app uninstall)
         if let userDefaultsId = UserDefaults.standard.string(forKey: deviceIdKey) {
-            logger.info("📱 Retrieved device ID from UserDefaults: \(userDefaultsId)")
+            logger.debug("Retrieved device ID from UserDefaults: \(userDefaultsId)")
             return userDefaultsId
         }
 
-        logger.info("📱 No stored device ID found")
+        logger.debug("No stored device ID found")
         return nil
     }
 
@@ -712,12 +707,12 @@ public enum RunAnywhere {
 
         // ALWAYS store in keychain (persists across app reinstalls)
         try KeychainManager.shared.storeDeviceUUID(deviceId)
-        logger.info("💾 Stored device ID in Keychain: \(deviceId)")
+        logger.debug("Stored device ID in Keychain: \(deviceId)")
 
         // Also store in UserDefaults as fallback for quick access
         UserDefaults.standard.set(deviceId, forKey: deviceIdKey)
         UserDefaults.standard.synchronize()
-        logger.info("💾 Stored device ID in UserDefaults: \(deviceId)")
+        logger.debug("Stored device ID in UserDefaults: \(deviceId)")
     }
 
     /// Clear stored device ID
@@ -741,14 +736,14 @@ public enum RunAnywhere {
 
         #if os(iOS) || os(tvOS) || os(watchOS)
         if let vendorId = UIDevice.current.identifierForVendor?.uuidString {
-            logger.info("🆔 Generated device ID from identifierForVendor: \(vendorId)")
+            logger.debug("Generated device ID from identifierForVendor: \(vendorId)")
             return vendorId
         }
         #endif
 
         // Fallback to random UUID
         let randomId = UUID().uuidString
-        logger.warning("⚠️ Using random UUID (identifierForVendor unavailable): \(randomId)")
+        logger.debug("Using random UUID (identifierForVendor unavailable): \(randomId)")
         return randomId
     }
 

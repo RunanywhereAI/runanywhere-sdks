@@ -10,7 +10,7 @@ public actor MockNetworkService: NetworkService {
     private let mockDelay: UInt64 = 500_000_000 // 0.5 seconds to simulate network delay
 
     public init() {
-        logger.info("MockNetworkService initialized - all network calls will return mock data")
+        logger.debug("MockNetworkService initialized - all network calls will return mock data")
     }
 
     // MARK: - NetworkService Protocol

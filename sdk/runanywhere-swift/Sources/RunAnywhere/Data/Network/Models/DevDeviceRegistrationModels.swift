@@ -17,6 +17,7 @@ public struct DevDeviceRegistrationRequest: Codable {
     let sdkVersion: String
     let platform: String
     let buildToken: String
+    let lastSeenAt: String  // ISO 8601 timestamp for UPSERT updates
 
     enum CodingKeys: String, CodingKey {
         // Use snake_case for Supabase compatibility
@@ -31,6 +32,7 @@ public struct DevDeviceRegistrationRequest: Codable {
         case sdkVersion = "sdk_version"
         case platform
         case buildToken = "build_token"
+        case lastSeenAt = "last_seen_at"
     }
 }
 
