@@ -84,12 +84,14 @@ struct RunAnywhereAIApp: App {
             // Initialize SDK based on environment
             if environment == .development {
                 // Development Mode - No API key needed!
+                // Note: baseURL is required for cross-platform consistency with Kotlin SDK
+                // In development mode, dev analytics are automatically sent to Supabase internally
                 try RunAnywhere.initialize(
                     apiKey: "dev",  // Any string works in dev mode
-                    baseURL: "localhost",  // Not used in dev mode
+                    baseURL: "localhost",  // Required but not used
                     environment: .development
                 )
-                logger.info("✅ SDK initialized in DEVELOPMENT mode")
+                logger.info("✅ SDK initialized in DEVELOPMENT mode (dev analytics enabled)")
 
                 // Register adapters WITH custom models for development
                 await registerAdaptersForDevelopment()

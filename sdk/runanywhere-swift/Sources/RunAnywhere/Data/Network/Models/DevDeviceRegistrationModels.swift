@@ -4,6 +4,7 @@ import Foundation
 
 /// Request model for development device registration
 /// This is used when SDK is initialized in development mode
+/// Supports both traditional backend and Supabase formats
 public struct DevDeviceRegistrationRequest: Codable {
     let deviceId: String
     let deviceModel: String
@@ -16,19 +17,22 @@ public struct DevDeviceRegistrationRequest: Codable {
     let sdkVersion: String
     let platform: String
     let buildToken: String
+    let lastSeenAt: String  // ISO 8601 timestamp for UPSERT updates
 
     enum CodingKeys: String, CodingKey {
-        case deviceId = "deviceId"
-        case deviceModel = "deviceModel"
-        case osVersion = "osVersion"
-        case chipName = "chipName"
-        case totalMemory = "totalMemory"
-        case hasNeuralEngine = "hasNeuralEngine"
+        // Use snake_case for Supabase compatibility
+        case deviceId = "device_id"
+        case deviceModel = "device_model"
+        case osVersion = "os_version"
+        case chipName = "chip_name"
+        case totalMemory = "total_memory"
+        case hasNeuralEngine = "has_neural_engine"
         case architecture
-        case formFactor = "formFactor"
-        case sdkVersion = "sdkVersion"
+        case formFactor = "form_factor"
+        case sdkVersion = "sdk_version"
         case platform
-        case buildToken = "buildToken"
+        case buildToken = "build_token"
+        case lastSeenAt = "last_seen_at"
     }
 }
 
