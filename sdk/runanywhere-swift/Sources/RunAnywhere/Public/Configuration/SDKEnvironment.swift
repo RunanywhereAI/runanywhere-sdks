@@ -83,6 +83,7 @@ internal struct SupabaseConfig: Sendable {
         switch environment {
         case .development:
             // Development mode: Use RunAnywhere's public Supabase for dev analytics
+            // Note: Anon key is safe to include in client code - data access is controlled by RLS policies
             return SupabaseConfig(
                 projectURL: URL(string: "https://fhtgjtxuoikwwouxqzrn.supabase.co")!,
                 anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodGdqdHh1b2lrd3dvdXhxenJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjExOTkwNzIsImV4cCI6MjA3Njc3NTA3Mn0.aIssX-t8CIqt8zoctNhMS8fm3wtH-DzsQiy9FunqD9E"
