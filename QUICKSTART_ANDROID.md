@@ -10,18 +10,18 @@ This guide shows you how to create a new Android app with a simple text chat int
 
 **1. Download BOTH SDK AARs:**
 
-[Download RunAnywhereKotlinSDK-release-clean.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.1-alpha/RunAnywhereKotlinSDK-release-clean.aar) (Core SDK - 4.0MB)
+[Download RunAnywhereKotlinSDK-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.2-alpha/RunAnywhereKotlinSDK-release.aar) (Core SDK - 4.0MB)
 
-[Download runanywhere-llm-llamacpp-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.1-alpha/runanywhere-llm-llamacpp-release.aar) (LLM Module - 2.1MB)
+[Download runanywhere-llm-llamacpp-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.2-alpha/runanywhere-llm-llamacpp-release.aar) (LLM Module - 2.1MB)
 
 Or via command line:
 
 ```bash
 curl -L -o RunAnywhereKotlinSDK-release.aar \
-  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.1-alpha/RunAnywhereKotlinSDK-release-clean.aar
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.2-alpha/RunAnywhereKotlinSDK-release.aar
 
 curl -L -o runanywhere-llm-llamacpp-release.aar \
-  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.1-alpha/runanywhere-llm-llamacpp-release.aar
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.2-alpha/runanywhere-llm-llamacpp-release.aar
 ```
 
 **2. Add to your project:**
@@ -55,11 +55,15 @@ dependencies {
   - Variants: Baseline, fp16, dotprod, v8.4, i8mm, sve, i8mm+sve
   - Runtime CPU feature detection automatically selects best variant
 
-**🆕 New in v0.1.1-alpha:**
+**🆕 New in v0.1.2-alpha:**
 
-- Prompt-based tool calling with few-shot examples
-- Analytics improvements with device registration
-- JVM platform fixes for cross-platform compatibility
+- **Device ID Persistence Fix**: Device ID now correctly persists across app restarts (was showing as "unknown")
+- Improved analytics reliability with consistent device identification
+- Enhanced device registration system
+
+**Previous releases:**
+
+- v0.1.1-alpha: Prompt-based tool calling, analytics improvements, JVM platform fixes
 
 ---
 
@@ -116,11 +120,11 @@ android {
 }
 
 dependencies {
-  // RunAnywhere SDK - Core (v0.1.1-alpha)
-  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-kotlin:android-v0.1.1-alpha")
+  // RunAnywhere SDK - Core (v0.1.2-alpha)
+  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-kotlin:android-v0.1.2-alpha")
 
   // RunAnywhere SDK - LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
-  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-llm-llamacpp:android-v0.1.1-alpha")
+  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-llm-llamacpp:android-v0.1.2-alpha")
 
   // Required: Kotlin Coroutines
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
@@ -142,9 +146,9 @@ dependencies {
   - Baseline, fp16, dotprod, v8.4, i8mm, sve, i8mm+sve variants
   - Runtime CPU feature detection selects best variant automatically
 
-**🔖 Latest Release:** `android-v0.1.1-alpha`
+**🔖 Latest Release:** `android-v0.1.2-alpha`
 
-**📄 Release Notes:** [GitHub Release](https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/android-v0.1.1-alpha)
+**📄 Release Notes:** [GitHub Release](https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/android-v0.1.2-alpha)
 
 ---
 

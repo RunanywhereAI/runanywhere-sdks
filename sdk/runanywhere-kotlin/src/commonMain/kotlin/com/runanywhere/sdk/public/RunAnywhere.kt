@@ -612,6 +612,10 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     protected suspend fun ensureDeviceRegistered() {
         // First check: Quick check without lock
         if (_isDeviceRegistered.value && _cachedDeviceId?.isNotEmpty() == true) {
+            // Ensure sharedDeviceId is always synced with cachedDeviceId
+            if (sharedDeviceId == null) {
+                sharedDeviceId = _cachedDeviceId
+            }
             return
         }
 
@@ -620,6 +624,8 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // Check if we have a cached device ID
             if (_cachedDeviceId?.isNotEmpty() == true) {
                 _isDeviceRegistered.value = true
+                // Ensure sharedDeviceId is set for analytics
+                sharedDeviceId = _cachedDeviceId
                 return
             }
 
@@ -627,6 +633,8 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             val storedDeviceId = getStoredDeviceId()
             if (!storedDeviceId.isNullOrEmpty()) {
                 _cachedDeviceId = storedDeviceId
+                // CRITICAL FIX: Always set sharedDeviceId when loading from storage
+                sharedDeviceId = storedDeviceId
 
                 // In development mode, check if device was actually registered to Supabase
                 if (_currentEnvironment == SDKEnvironment.DEVELOPMENT && !isDevDeviceRegistered()) {
