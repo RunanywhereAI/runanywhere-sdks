@@ -2,5 +2,20 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/Android_Native_Wake_Word" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/SmolChat-Android" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/android-vad" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/babyagi" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/cbot" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/llama.cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/silero-vad" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/tts-engine" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/vosk-android-demo" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/vosk-api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/whisper-jni" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/whisper.cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/EXTERNAL/whisper_android" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-kotlin/native/llama-jni/llama.cpp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/sdk/runanywhere-kotlin/native/llama-jni/llama.cpp/ggml/src/kompute" vcs="Git" />
   </component>
 </project>

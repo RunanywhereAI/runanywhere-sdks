@@ -55,6 +55,18 @@ data class ToolParametersSchema(
 )
 
 /**
+ * Example of how to use a tool (for few-shot learning)
+ *
+ * @param userQuery Example user query that would trigger this tool
+ * @param arguments Example arguments for the tool call
+ */
+@Serializable
+data class ToolExample(
+    val userQuery: String,
+    val arguments: Map<String, String>
+)
+
+/**
  * Tool definition
  *
  * Represents a function/tool that can be called by the LLM.
@@ -62,12 +74,14 @@ data class ToolParametersSchema(
  * @param name Unique name for the tool
  * @param description What the tool does
  * @param parameters Schema for tool parameters
+ * @param examples Few-shot examples for prompt-based tool calling (optional)
  */
 @Serializable
 data class Tool(
     val name: String,
     val description: String,
-    val parameters: ToolParametersSchema
+    val parameters: ToolParametersSchema,
+    val examples: List<ToolExample> = emptyList()
 ) {
     /**
      * Convert to JSON schema format for grammar generation

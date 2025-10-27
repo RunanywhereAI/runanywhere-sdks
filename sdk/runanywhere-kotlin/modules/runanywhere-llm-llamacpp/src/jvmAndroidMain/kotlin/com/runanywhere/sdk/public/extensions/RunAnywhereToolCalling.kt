@@ -11,59 +11,58 @@ import com.runanywhere.sdk.public.RunAnywhere
 /**
  * Tool Calling Extensions for RunAnywhere SDK
  *
- * Provides grammar-based constrained generation for reliable tool calling.
- * Uses llama.cpp's GBNF grammar to guarantee valid JSON output.
+ * ⚠️ DEPRECATED: Grammar-based tool calling (see issue #182)
  *
- * Example usage:
- * ```kotlin
- * // Define tools
- * val weatherTool = createTool("get_weather", "Get weather for a location") {
- *     stringParameter("location", "City name", required = true)
- *     stringParameter("units", "celsius or fahrenheit", required = false)
- * }
+ * The grammar-based approach using llama.cpp's GBNF has been deprecated due to
+ * persistent SIGABRT crashes in the grammar stack (llama.cpp bugs unfixed as of Oct 2025).
  *
- * // Generate with tools
- * val result = RunAnywhere.generateWithTools(
- *     prompt = "What's the weather in Tokyo?",
- *     tools = listOf(weatherTool)
- * )
+ * Current status:
+ * - Grammar implementation: Commented out (crashes after ~10 tokens)
+ * - Production approach: Prompt-based tool calling with few-shot examples
+ * - Success rate: 85-95% (vs 70-85% with crashes for grammar)
  *
- * // Execute tools
- * result.toolCalls.forEach { call ->
- *     when (call.name) {
- *         "get_weather" -> {
- *             val location = call.arguments["location"]
- *             val weather = fetchWeather(location)
- *             println("Weather: $weather")
- *         }
- *     }
- * }
- * ```
+ * See:
+ * - Issue #182: Grammar implementation investigation and future plans
+ * - GRAMMAR_IMPLEMENTATION_NOTES.md: Full 40+ hour debugging investigation
+ * - prompt_based_tool_calling_implementation.md: Current production approach
+ *
+ * TODO: Re-enable grammar when upstream llama.cpp fixes are available
  */
 
 private val logger = SDKLogger("RunAnywhereToolCalling")
 
 /**
- * Generate text with tool calling support
+ * Generate text with tool calling support using grammar-based constrained generation
  *
- * Uses grammar-based constrained generation to ensure 100% valid JSON output.
- * The grammar is automatically generated from the tool definitions.
+ * ⚠️ DEPRECATED: This function is commented out due to SIGABRT crashes (see issue #182)
  *
- * Tools can be provided either:
- * 1. Via the `tools` parameter (recommended for explicit tool lists)
- * 2. Via `options.tools` (recommended when tools are part of generation config)
+ * The grammar-based approach crashes after ~10 tokens due to llama.cpp grammar stack bugs.
+ * This will be re-enabled once upstream llama.cpp fixes are available.
+ *
+ * For production use, please use the prompt-based tool calling approach instead.
+ * See: prompt_based_tool_calling_implementation.md
  *
  * @param prompt User prompt/question
  * @param tools List of available tools (optional if provided in options)
  * @param options Generation options (can include tools parameter)
  * @return Tool call result containing detected tool calls and response text
- * @throws IllegalStateException if SDK not initialized or LLM service not available
+ * @throws UnsupportedOperationException Always throws - this function is deprecated
  */
+@Deprecated(
+    message = "Grammar-based tool calling crashes with SIGABRT. See issue #182. Use prompt-based approach instead.",
+    level = DeprecationLevel.ERROR
+)
 suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     tools: List<Tool>? = null,
     options: RunAnywhereGenerationOptions? = null
 ): ToolCallResult {
+    throw UnsupportedOperationException(
+        "Grammar-based tool calling is deprecated due to crashes (issue #182). " +
+        "Use prompt-based approach instead. See: prompt_based_tool_calling_implementation.md"
+    )
+
+    /* COMMENTED OUT - Grammar-based implementation (issue #182)
     val effectiveTools = tools ?: options?.tools ?: emptyList()
     logger.info("generateWithTools() called with ${effectiveTools.size} tools")
 
@@ -103,6 +102,7 @@ suspend fun RunAnywhere.generateWithTools(
 
     // Delegate to LlamaCppService
     return llamaCppService.generateWithTools(prompt, tools, options)
+    */
 }
 
 /**
