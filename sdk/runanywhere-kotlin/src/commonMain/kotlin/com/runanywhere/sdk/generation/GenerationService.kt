@@ -7,14 +7,24 @@ import com.runanywhere.sdk.models.LoadedModelWithService
 import com.runanywhere.sdk.components.llm.LLMComponent
 import com.runanywhere.sdk.components.llm.LLMConfiguration
 import com.runanywhere.sdk.models.RunAnywhereGenerationOptions
+import com.runanywhere.sdk.services.analytics.AnalyticsService
+import com.runanywhere.sdk.services.analytics.PerformanceMetrics
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.UUID
 
 /**
  * Service for text generation with LLM models
  * Handles both streaming and non-streaming generation
+ * Automatically submits analytics (matching iOS GenerationService)
+ *
+ * Reference: iOS GenerationService.swift
  */
 class GenerationService(
     private val streamingService: StreamingService = StreamingService()
@@ -23,6 +33,7 @@ class GenerationService(
     private val logger = SDKLogger("GenerationService")
     private val optionsResolver = GenerationOptionsResolver()
     private val mutex = Mutex()
+    private val analyticsScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // Track active generation sessions
     private val activeSessions = mutableMapOf<String, GenerationSession>()
@@ -90,11 +101,32 @@ class GenerationService(
             // Publish generation completed event
             publishGenerationCompleted(sessionId, result)
 
+            // Submit analytics (non-blocking, matching iOS pattern)
+            submitGenerationAnalytics(
+                generationId = sessionId,
+                modelId = resolvedOptions.model ?: "unknown",
+                prompt = prompt,
+                response = response,
+                latencyMs = result.latencyMs,
+                success = true
+            )
+
             return result
 
         } catch (e: Exception) {
             logger.error("Generation failed for session $sessionId: ${e.message}")
             publishGenerationFailed(sessionId, e)
+
+            // Submit analytics for failure
+            submitGenerationAnalytics(
+                generationId = sessionId,
+                modelId = resolvedOptions.model ?: "unknown",
+                prompt = prompt,
+                response = "",
+                latencyMs = System.currentTimeMillis() - session.startTime,
+                success = false
+            )
+
             throw e
         } finally {
             mutex.withLock {
@@ -164,9 +196,30 @@ class GenerationService(
             )
             publishGenerationCompleted(sessionId, result)
 
+            // Submit analytics (non-blocking, matching iOS pattern and non-streaming generate())
+            submitGenerationAnalytics(
+                generationId = sessionId,
+                modelId = resolvedOptions.model ?: "unknown",
+                prompt = prompt,
+                response = session.partialResponse,
+                latencyMs = result.latencyMs,
+                success = true
+            )
+
         } catch (e: Exception) {
             logger.error("Streaming generation failed for session $sessionId: ${e.message}")
             publishGenerationFailed(sessionId, e)
+
+            // Submit analytics for failure (matching non-streaming generate())
+            submitGenerationAnalytics(
+                generationId = sessionId,
+                modelId = resolvedOptions.model ?: "unknown",
+                prompt = prompt,
+                response = "",
+                latencyMs = System.currentTimeMillis() - session.startTime,
+                success = false
+            )
+
             throw e
         } finally {
             mutex.withLock {
@@ -243,6 +296,70 @@ class GenerationService(
     private fun publishGenerationCancelled(sessionId: String) {
         EventBus.publish(SDKGenerationEvent.Cancelled(sessionId))
         logger.debug("Generation cancelled: $sessionId")
+    }
+
+    /**
+     * Submit generation analytics (non-blocking)
+     * Matches iOS GenerationService analytics submission pattern
+     *
+     * Reference: iOS GenerationService.swift
+     */
+    private fun submitGenerationAnalytics(
+        generationId: String,
+        modelId: String,
+        prompt: String,
+        response: String,
+        latencyMs: Long,
+        success: Boolean
+    ) {
+        // Get analytics service from ServiceContainer
+        val analytics = com.runanywhere.sdk.foundation.ServiceContainer.shared.analyticsService
+        if (analytics == null) {
+            logger.warning("⚠️ Analytics service not available, skipping analytics submission")
+            return
+        }
+
+        logger.debug("📊 Submitting generation analytics: generationId=$generationId, modelId=$modelId, success=$success")
+
+        // Non-blocking background submission
+        analyticsScope.launch {
+            try {
+                val inputTokens = estimateTokenCount(prompt)
+                val outputTokens = if (success) estimateTokenCount(response) else 0
+                val tokensPerSecond = if (latencyMs > 0 && outputTokens > 0) {
+                    (outputTokens / (latencyMs / 1000.0))
+                } else {
+                    0.0
+                }
+
+                val performanceMetrics = PerformanceMetrics(
+                    inferenceTimeMs = latencyMs.toDouble(),
+                    tokensPerSecond = tokensPerSecond,
+                    timeToFirstTokenMs = null // TODO: Track in streaming
+                )
+
+                analytics.submitGenerationAnalytics(
+                    generationId = generationId,
+                    modelId = modelId,
+                    performanceMetrics = performanceMetrics,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    success = success,
+                    executionTarget = "onDevice" // Always on-device for now
+                )
+            } catch (e: Exception) {
+                // Fail silently - analytics should never break generation
+                logger.debug("Analytics submission failed (non-critical): ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Estimate token count for text (simple word-based approximation)
+     * Matches iOS estimateTokenCount()
+     */
+    private fun estimateTokenCount(text: String): Int {
+        return text.split(Regex("\\s+")).size.coerceAtLeast(1)
     }
 
     /**
