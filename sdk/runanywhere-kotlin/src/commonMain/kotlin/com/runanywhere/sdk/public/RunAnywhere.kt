@@ -9,10 +9,15 @@ import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.generation.StructuredOutputHandler
 import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.services.analytics.PerformanceMetrics
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -234,16 +239,75 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
 
     private var _currentModel: ModelInfo? = null
 
+    /**
+     * Get current device ID (for analytics and tracking)
+     */
+    val deviceId: String?
+        get() = _cachedDeviceId
+
     companion object {
         private const val MAX_REGISTRATION_RETRIES = 3
         private const val RETRY_DELAY_MS = 2000L
         private const val REGISTRATION_TIMEOUT_MS = 5000L
         private const val POLLING_INTERVAL_MS = 100L
+        private const val DEV_DEVICE_REGISTERED_KEY = "com.runanywhere.sdk.devDeviceRegistered"
+
+        /**
+         * Shared device ID accessible from companion context
+         * Used by ServiceContainer to pass device ID to AnalyticsService
+         */
+        internal var sharedDeviceId: String? = null
+            private set
 
         /**
          * Check if device is registered (for testing/debugging)
          */
         fun isDeviceRegistered(): Boolean = false // Will be overridden by actual instance
+
+        /**
+         * Check if device has been registered to Supabase (development mode only)
+         * Matches iOS: isDevDeviceRegistered()
+         */
+        private suspend fun isDevDeviceRegistered(): Boolean {
+            // Check secure storage first
+            val fromStorage = try {
+                com.runanywhere.sdk.security.SecureStorageFactory.create()
+                    .getSecureString(DEV_DEVICE_REGISTERED_KEY)
+            } catch (e: Exception) {
+                null
+            }
+
+            if (fromStorage == "true") return true
+
+            // Fallback to platform preferences (SharedPreferences/UserDefaults equivalent)
+            return try {
+                com.runanywhere.sdk.storage.createPlatformStorage()
+                    .getBoolean(DEV_DEVICE_REGISTERED_KEY, false)
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+        /**
+         * Mark device as registered to Supabase (development mode only)
+         * Matches iOS: markDevDeviceAsRegistered()
+         */
+        private suspend fun markDevDeviceAsRegistered() {
+            // Store in both secure storage and platform preferences (like iOS)
+            try {
+                com.runanywhere.sdk.security.SecureStorageFactory.create()
+                    .setSecureString(DEV_DEVICE_REGISTERED_KEY, "true")
+            } catch (e: Exception) {
+                // Silent failure - fallback to platform storage
+            }
+
+            try {
+                com.runanywhere.sdk.storage.createPlatformStorage()
+                    .putBoolean(DEV_DEVICE_REGISTERED_KEY, true)
+            } catch (e: Exception) {
+                // Silent failure - non-critical
+            }
+        }
     }
 
     override val isInitialized: Boolean
@@ -278,6 +342,14 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
      *
      * The initialization is atomic - if any step fails, the entire process
      * is rolled back and the SDK remains uninitialized.
+     *
+     * **Note on Development Mode Analytics:**
+     * - Supabase configuration is automatically determined based on environment
+     * - In development mode, analytics are automatically sent to RunAnywhere's public Supabase
+     * - User does NOT need to provide Supabase credentials
+     * - Everything is handled internally by the SDK
+     *
+     * Matches iOS: public init(apiKey:baseURL:environment:)
      */
     override suspend fun initialize(
         apiKey: String,
@@ -295,45 +367,73 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             environment = environment
         )
 
+        initializeWithParams(params)
+    }
+
+    private suspend fun initializeWithParams(params: SDKInitParams) {
         // EventBus.shared.publish(SDKInitializationEvent.Started)
 
         try {
             // Step 1: Validate API key (skip in development mode)
-            if (environment != SDKEnvironment.DEVELOPMENT) {
-                logger.info("Step 1/5: Validating API key")
-                if (apiKey.isEmpty()) {
+            if (params.environment != SDKEnvironment.DEVELOPMENT) {
+                logger.info("Step 1/6: Validating API key")
+                if (params.apiKey.isEmpty()) {
                     throw SDKError.InvalidAPIKey("API key cannot be empty")
                 }
             } else {
-                logger.info("Step 1/5: Skipping API key validation in development mode")
+                logger.info("Step 1/6: Skipping API key validation in development mode")
             }
 
             // Step 2: Initialize logging system
-            logger.info("Step 2/5: Initializing logging system")
-            initializeLogging(environment)
+            logger.info("Step 2/6: Initializing logging system")
+            initializeLogging(params.environment)
 
             // Step 3: Store parameters locally
-            logger.info("Step 3/5: Storing parameters locally")
+            logger.info("Step 3/6: Storing parameters locally")
             _initParams = params
-            _currentEnvironment = environment
+            _currentEnvironment = params.environment
 
             // Only store in secure storage for non-development environments
-            if (environment != SDKEnvironment.DEVELOPMENT) {
+            if (params.environment != SDKEnvironment.DEVELOPMENT) {
                 storeCredentialsSecurely(params)
             }
 
             // Step 4: Initialize local database
-            logger.info("Step 4/5: Initializing local database")
+            logger.info("Step 4/6: Initializing local database")
             initializeDatabase()
 
             // Step 5: Setup local services only (NO network calls)
-            logger.info("Step 5/5: Setting up local services")
+            logger.info("Step 5/6: Setting up local services")
             setupLocalServices()
+
+            // Step 6: Bootstrap services (initialize AnalyticsService, etc.)
+            logger.info("Step 6/6: Bootstrapping services")
+            if (params.environment == SDKEnvironment.DEVELOPMENT) {
+                serviceContainer.bootstrapDevelopmentMode(params)
+            } else {
+                serviceContainer.bootstrap(params)
+            }
 
             // Mark as initialized
             _isInitialized = true
-            logger.info("✅ SDK initialization completed successfully (${environment.name} mode)")
+            logger.info("✅ SDK initialization completed successfully (${params.environment.name} mode)")
             // EventBus.shared.publish(SDKInitializationEvent.Completed)
+
+            // Development mode: Trigger device registration in background (matches iOS)
+            if (params.environment == SDKEnvironment.DEVELOPMENT) {
+                registrationLogger.debug("Development mode - triggering device registration!")
+
+                // Non-blocking background registration (matches iOS Task.detached)
+                GlobalScope.launch(Dispatchers.IO) {
+                    try {
+                        ensureDeviceRegistered()
+                        registrationLogger.info("✅ Device registered successfully with Supabase")
+                    } catch (e: Exception) {
+                        registrationLogger.warning("⚠️ Device registration failed (non-critical): ${e.message}")
+                        // Don't fail SDK initialization if device registration fails
+                    }
+                }
+            }
 
         } catch (error: Exception) {
             logger.error("❌ SDK initialization failed: ${error.message}")
@@ -448,6 +548,58 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
      */
     protected abstract fun generateDeviceIdentifier(): String
 
+    /**
+     * Submit analytics for streaming generation (helper method)
+     * Used by fallback streaming path in generateStream()
+     */
+    private fun submitStreamAnalytics(
+        generationId: String,
+        modelId: String,
+        prompt: String,
+        response: String,
+        latencyMs: Long,
+        success: Boolean
+    ) {
+        val analytics = serviceContainer.analyticsService
+        if (analytics == null) {
+            logger.warning("⚠️ Analytics service not available, skipping analytics submission")
+            return
+        }
+
+        logger.debug("📊 Submitting stream analytics: generationId=$generationId, modelId=$modelId")
+
+        // Non-blocking background submission
+        GlobalScope.launch(Dispatchers.IO) {
+            try {
+                val inputTokens = prompt.split(Regex("\\s+")).size.coerceAtLeast(1)
+                val outputTokens = if (success) response.split(Regex("\\s+")).size.coerceAtLeast(1) else 0
+                val tokensPerSecond = if (latencyMs > 0 && outputTokens > 0) {
+                    (outputTokens / (latencyMs / 1000.0))
+                } else {
+                    0.0
+                }
+
+                val performanceMetrics = PerformanceMetrics(
+                    inferenceTimeMs = latencyMs.toDouble(),
+                    tokensPerSecond = tokensPerSecond,
+                    timeToFirstTokenMs = null
+                )
+
+                analytics.submitGenerationAnalytics(
+                    generationId = generationId,
+                    modelId = modelId,
+                    performanceMetrics = performanceMetrics,
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    success = success,
+                    executionTarget = "onDevice"
+                )
+            } catch (e: Exception) {
+                logger.debug("Analytics submission failed (non-critical): ${e.message}")
+            }
+        }
+    }
+
     // MARK: - Lazy Device Registration Implementation
 
     /**
@@ -475,8 +627,17 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             val storedDeviceId = getStoredDeviceId()
             if (!storedDeviceId.isNullOrEmpty()) {
                 _cachedDeviceId = storedDeviceId
-                _isDeviceRegistered.value = true
-                return
+
+                // In development mode, check if device was actually registered to Supabase
+                if (_currentEnvironment == SDKEnvironment.DEVELOPMENT && !isDevDeviceRegistered()) {
+                    registrationLogger.debug("Device ID exists but not registered to Supabase - will register now")
+                    // Continue with registration (don't return yet)
+                } else {
+                    // Already fully registered (or not in dev mode)
+                    _isDeviceRegistered.value = true
+                    registrationLogger.debug("Device already fully registered (devRegistered=${isDevDeviceRegistered()})")
+                    return
+                }
             }
 
             // Check if already registering
@@ -492,18 +653,47 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         registrationLogger.info("Starting device registration...")
 
         try {
-            // Skip registration in development mode
-            if (_currentEnvironment == SDKEnvironment.DEVELOPMENT) {
-                val mockDeviceId = "dev-${generateDeviceIdentifier()}"
-                storeDeviceId(mockDeviceId)
-                _cachedDeviceId = mockDeviceId
-                _isDeviceRegistered.value = true
-                registrationLogger.info("Using mock device ID for development: ${mockDeviceId.take(8)}...")
-                return
-            }
-
             // Ensure we have init params
             val params = _initParams ?: throw SDKError.NotInitialized
+
+            // Development mode: Register device with Supabase for analytics
+            if (_currentEnvironment == SDKEnvironment.DEVELOPMENT) {
+                registrationLogger.debug("Development mode - triggering device registration!")
+
+                // Generate or retrieve device ID
+                val deviceId = generateDeviceIdentifier()
+
+                // Register device with Supabase (non-blocking but can fail)
+                try {
+                    registerDeviceWithSupabase(deviceId, params)
+
+                    // Success - store the real device ID
+                    storeDeviceId(deviceId)
+                    _cachedDeviceId = deviceId
+                    sharedDeviceId = deviceId  // Update shared device ID for ServiceContainer
+                    markDevDeviceAsRegistered()  // Mark as registered in persistent storage
+                    registrationLogger.info("✅ Device registered successfully with Supabase")
+                    _isDeviceRegistered.value = true
+                } catch (e: Exception) {
+                    // Network failure (no internet, timeout, etc.) - use mock device ID
+                    // Matches iOS behavior: create "dev-" prefixed ID and continue
+                    registrationLogger.warning("⚠️ Device registration failed (non-critical): ${e.message}")
+
+                    val mockDeviceId = "dev-$deviceId"
+                    try {
+                        storeDeviceId(mockDeviceId)
+                        _cachedDeviceId = mockDeviceId
+                        sharedDeviceId = mockDeviceId  // Set mock device ID for analytics
+                        registrationLogger.info("ℹ️ Using mock device ID for development (offline mode): ${mockDeviceId.take(12)}...")
+                        _isDeviceRegistered.value = true  // Mark as registered with mock ID
+                    } catch (storageError: Exception) {
+                        registrationLogger.error("❌ Failed to store mock device ID: ${storageError.message}")
+                        _isDeviceRegistered.value = false
+                        // Don't throw - analytics failure shouldn't block SDK
+                    }
+                }
+                return
+            }
 
             // Registration with retry logic (matches Swift SDK)
             var lastError: Exception? = null
@@ -523,6 +713,7 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                     // Store device ID locally
                     storeDeviceId(deviceRegistration.deviceId)
                     _cachedDeviceId = deviceRegistration.deviceId
+                    sharedDeviceId = deviceRegistration.deviceId  // Update shared device ID
                     _isDeviceRegistered.value = true
 
                     registrationLogger.info("Device registered successfully: ${deviceRegistration.deviceId.take(8)}...")
@@ -583,6 +774,40 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
                         message.contains("network") ||
                         message.contains("dns")
             }
+        }
+    }
+
+    /**
+     * Register device with Supabase for development mode analytics
+     * Matches iOS behavior for dev mode device registration
+     */
+    private suspend fun registerDeviceWithSupabase(deviceId: String, params: SDKInitParams) {
+        val supabaseConfig = params.supabaseConfig
+            ?: throw SDKError.InvalidConfiguration("Supabase configuration required for development mode")
+
+        val supabaseClient = com.runanywhere.sdk.foundation.supabase.SupabaseClient(supabaseConfig)
+
+        try {
+            val deviceInfo = com.runanywhere.sdk.foundation.device.DeviceInfoService()
+
+            val request = com.runanywhere.sdk.data.network.models.DevDeviceRegistrationRequest(
+                deviceId = deviceId,
+                platform = com.runanywhere.sdk.utils.PlatformUtils.getPlatformName(), // "android", "ios", etc.
+                osVersion = deviceInfo.getOSVersion(),
+                deviceModel = deviceInfo.getDeviceModel(),
+                sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION,
+                buildToken = com.runanywhere.sdk.foundation.constants.BuildToken.token,
+                architecture = deviceInfo.getArchitecture(),
+                chipName = deviceInfo.getChipName(),
+                totalMemory = deviceInfo.getTotalMemoryBytes(), // In bytes, matching iOS
+                hasNeuralEngine = null, // Android doesn't have Neural Engine
+                formFactor = deviceInfo.getDeviceModel(), // Use device model as form factor for Android
+                appVersion = null // Can be added later if needed
+            )
+
+            supabaseClient.registerDevice(request).getOrThrow()
+        } finally {
+            supabaseClient.close()
         }
     }
 
@@ -669,6 +894,9 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     ): Flow<String> = flow {
         requireInitialized()
 
+        // ✨ Lazy device registration on first API call (matches Swift SDK)
+        ensureDeviceRegistered()
+
         // Try to use GenerationService for streaming (preferred approach)
         if (serviceContainer.generationService.isReady()) {
             val genOptions = com.runanywhere.sdk.generation.GenerationOptions(
@@ -719,9 +947,38 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         // Use provided options or create defaults
         val genOptions = options ?: com.runanywhere.sdk.models.RunAnywhereGenerationOptions.DEFAULT
 
-        // Stream using LLM component directly
-        llmComponent.streamGenerate(prompt, genOptions.systemPrompt).collect { token ->
-            emit(token)
+        // Track analytics for fallback streaming path
+        val generationId = "gen_${System.currentTimeMillis()}_${(0..9999).random()}"
+        val startTime = System.currentTimeMillis()
+        val responseBuilder = StringBuilder()
+
+        try {
+            // Stream using LLM component directly
+            llmComponent.streamGenerate(prompt, genOptions.systemPrompt).collect { token ->
+                responseBuilder.append(token)
+                emit(token)
+            }
+
+            // Submit analytics after successful streaming (matches GenerationService pattern)
+            submitStreamAnalytics(
+                generationId = generationId,
+                modelId = llmComponent.loadedModelId ?: "unknown",
+                prompt = prompt,
+                response = responseBuilder.toString(),
+                latencyMs = System.currentTimeMillis() - startTime,
+                success = true
+            )
+        } catch (e: Exception) {
+            // Submit analytics for failure
+            submitStreamAnalytics(
+                generationId = generationId,
+                modelId = llmComponent.loadedModelId ?: "unknown",
+                prompt = prompt,
+                response = "",
+                latencyMs = System.currentTimeMillis() - startTime,
+                success = false
+            )
+            throw e
         }
     }
 

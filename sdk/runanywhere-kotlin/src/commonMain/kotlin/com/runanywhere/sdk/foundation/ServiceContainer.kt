@@ -279,12 +279,21 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
 
             try {
-                _analyticsService = AnalyticsService(telemetryRepository, syncCoordinator)
+                // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
+                _analyticsService = AnalyticsService(
+                    telemetryRepository = telemetryRepository,
+                    syncCoordinator = syncCoordinator,
+                    supabaseConfig = params.supabaseConfig,
+                    environment = params.environment
+                )
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
+                logger.info("✅ Analytics service initialized successfully")
             } catch (e: Exception) {
-                logger.warn("Analytics initialization failed (optional): ${e.message}")
+                logger.error("Analytics initialization failed: ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
+                // Analytics is critical in production - throw error
+                throw com.runanywhere.sdk.data.models.SDKError.InitializationFailed("Analytics service initialization failed: ${e.message}")
             }
 
             EventBus.publish(SDKInitializationEvent.StepCompleted(5, "Analytics service setup", currentTimeMillis() - stepStartTime))
@@ -394,17 +403,24 @@ class ServiceContainer {
             EventBus.publish(SDKInitializationEvent.StepCompleted(4, "Model repository sync", currentTimeMillis() - stepStartTime))
             logger.info("✅ Step 4 completed (${models.size} models)")
 
-            // Step 5: Analytics service setup (simplified in dev mode)
+            // Step 5: Analytics service setup (with Supabase in dev mode)
             stepStartTime = currentTimeMillis()
             EventBus.publish(SDKInitializationEvent.StepStarted(5, "Analytics service setup"))
-            logger.info("🔧 Step 5: Analytics service setup (dev mode)...")
+            logger.info("🔧 Step 5: Analytics service setup (dev mode with Supabase)...")
 
             try {
-                _analyticsService = AnalyticsService(telemetryRepository, syncCoordinator)
+                // AnalyticsService will get device ID dynamically from BaseRunAnywhereSDK.sharedDeviceId
+                _analyticsService = AnalyticsService(
+                    telemetryRepository = telemetryRepository,
+                    syncCoordinator = syncCoordinator,
+                    supabaseConfig = params.supabaseConfig,
+                    environment = params.environment
+                )
                 _analyticsService?.initialize()
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitialized)
+                logger.info("✅ Analytics service initialized with Supabase support")
             } catch (e: Exception) {
-                logger.warn("Analytics initialization failed (optional): ${e.message}")
+                logger.warn("Analytics initialization failed (non-critical in dev mode): ${e.message}")
                 EventBus.publish(SDKBootstrapEvent.AnalyticsInitializationFailed(e.message ?: "Unknown error"))
             }
 
