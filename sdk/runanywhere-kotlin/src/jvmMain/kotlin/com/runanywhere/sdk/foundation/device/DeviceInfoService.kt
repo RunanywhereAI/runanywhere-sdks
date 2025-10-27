@@ -48,4 +48,26 @@ actual class DeviceInfoService {
             null
         }
     }
+
+    actual fun getTotalMemoryBytes(): Long? {
+        return try {
+            val osBean = ManagementFactory.getOperatingSystemMXBean()
+            if (osBean is com.sun.management.OperatingSystemMXBean) {
+                osBean.totalMemorySize
+            } else {
+                // Fallback to Runtime max memory
+                Runtime.getRuntime().maxMemory()
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    actual fun getArchitecture(): String? {
+        return try {
+            System.getProperty("os.arch")
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
