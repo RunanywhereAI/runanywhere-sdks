@@ -18,9 +18,9 @@ actual class DeviceInfoService {
     }
 
     actual fun getDeviceModel(): String {
-        // JVM doesn't have a concept of device model, use computer name or "Desktop"
+        // JVM doesn't have a concept of device model, return generic label
         return try {
-            System.getProperty("user.name")?.let { "Desktop ($it)" } ?: "Desktop"
+            "Desktop"
         } catch (e: Exception) {
             "Desktop"
         }
