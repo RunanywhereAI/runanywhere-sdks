@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Performance Metrics**: Fixed time-to-first-token reporting to correctly use milliseconds instead of seconds
+- Removed unused JSONHelpers.swift file for cleaner codebase
+
+### Added
+- **Analytics Enhancement**: Added host app metadata to iOS analytics events (bundle identifier, app name, app version)
+
+### Changed
+- Cleaned up Package.swift debug comments
+
 ## [0.15.7] - 2025-10-25
 
 ## [0.15.6] - 2025-10-22
