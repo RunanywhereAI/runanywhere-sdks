@@ -4,6 +4,10 @@ import com.runanywhere.sdk.data.models.TelemetryData
 import com.runanywhere.sdk.data.models.TelemetryEventType
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.PersistentDeviceIdentity
+import com.runanywhere.sdk.foundation.device.DeviceInfoService
+import com.runanywhere.sdk.utils.SDKConstants
+import com.runanywhere.sdk.data.models.generateUUID
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -32,20 +36,31 @@ object AnalyticsQueueManager {
     private var scope: CoroutineScope? = null
     private const val MAX_RETRIES = 3
 
+    // Context providers
+    private var deviceInfoService: DeviceInfoService? = null
+    private var sessionId: String = generateUUID()
+
     // MARK: - Initialization
 
     /**
-     * Initialize with telemetry repository
+     * Initialize with telemetry repository and optional context providers
      */
-    fun initialize(telemetryRepository: TelemetryRepository) {
+    fun initialize(
+        telemetryRepository: TelemetryRepository,
+        deviceInfoService: DeviceInfoService? = null
+    ) {
         this.telemetryRepository = telemetryRepository
+        this.deviceInfoService = deviceInfoService
+
+        // Generate new session ID on each initialization
+        this.sessionId = generateUUID()
 
         // Recreate scope if it was cancelled or doesn't exist
         if (scope?.isActive != true) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         }
 
-        logger.info("AnalyticsQueueManager initialized")
+        logger.info("AnalyticsQueueManager initialized with sessionId: $sessionId")
 
         // Start flush timer after repository is assigned
         startFlushTimer()
@@ -128,6 +143,11 @@ object AnalyticsQueueManager {
             return@withContext
         }
 
+        // Get context values once per batch
+        val deviceId = getDeviceId()
+        val sdkVersion = SDKConstants.VERSION
+        val osVersion = getOSVersion()
+
         // Convert to telemetry events
         val telemetryEvents = batch.mapNotNull { event ->
             try {
@@ -140,10 +160,10 @@ object AnalyticsQueueManager {
                 TelemetryData(
                     type = eventType,
                     name = event.type,
-                    sessionId = "",
-                    deviceId = "",
-                    sdkVersion = "",
-                    osVersion = "",
+                    sessionId = sessionId, // Use session ID from initialization
+                    deviceId = deviceId,
+                    sdkVersion = sdkVersion,
+                    osVersion = osVersion,
                     properties = mapOf("structured_data" to jsonData),
                     timestamp = event.timestamp
                 )
@@ -182,6 +202,34 @@ object AnalyticsQueueManager {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    /**
+     * Get device ID from PersistentDeviceIdentity
+     * Falls back to a stable placeholder if unavailable
+     */
+    private fun getDeviceId(): String {
+        return try {
+            PersistentDeviceIdentity.getPersistentDeviceUUID()
+        } catch (e: Exception) {
+            logger.error("Failed to get device ID: ${e.message}")
+            "unknown-device" // Stable fallback
+        }
+    }
+
+    /**
+     * Get OS version from DeviceInfoService
+     * Falls back to platform-specific info if service unavailable
+     */
+    private fun getOSVersion(): String {
+        return try {
+            deviceInfoService?.getOSVersion() ?: "Unknown"
+        } catch (e: Exception) {
+            logger.error("Failed to get OS version: ${e.message}")
+            "Unknown"
         }
     }
 }
