@@ -23,9 +23,6 @@ public struct DevAnalyticsSubmissionRequest: Codable, Sendable {
     public let buildToken: String
     public let sdkVersion: String
     public let timestamp: String
-    public let hostAppIdentifier: String?
-    public let hostAppName: String?
-    public let hostAppVersion: String?
 
     public init(
         generationId: String,
@@ -40,10 +37,7 @@ public struct DevAnalyticsSubmissionRequest: Codable, Sendable {
         executionTarget: String,
         buildToken: String,
         sdkVersion: String,
-        timestamp: String,
-        hostAppIdentifier: String? = nil,
-        hostAppName: String? = nil,
-        hostAppVersion: String? = nil
+        timestamp: String
     ) {
         self.generationId = generationId
         self.deviceId = deviceId
@@ -58,9 +52,6 @@ public struct DevAnalyticsSubmissionRequest: Codable, Sendable {
         self.buildToken = buildToken
         self.sdkVersion = sdkVersion
         self.timestamp = timestamp
-        self.hostAppIdentifier = hostAppIdentifier
-        self.hostAppName = hostAppName
-        self.hostAppVersion = hostAppVersion
     }
 
     enum CodingKeys: String, CodingKey {
@@ -77,9 +68,6 @@ public struct DevAnalyticsSubmissionRequest: Codable, Sendable {
         case buildToken = "build_token"
         case sdkVersion = "sdk_version"
         case timestamp
-        case hostAppIdentifier = "host_app_identifier"
-        case hostAppName = "host_app_name"
-        case hostAppVersion = "host_app_version"
     }
 }
 
