@@ -21,10 +21,11 @@ import com.runanywhere.runanywhereai.presentation.storage.StorageScreen
 import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.quiz.QuizScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
+import com.runanywhere.runanywhereai.presentation.tools.ToolCallingScreen
 
 /**
  * Main navigation component matching iOS app structure
- * 5 tabs: Chat, Storage, Settings, Quiz, Voice
+ * 6 tabs: Chat, Storage, Settings, Quiz, Voice, Tools
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +61,10 @@ fun AppNavigation() {
             composable(NavigationRoute.VOICE) {
                 VoiceAssistantScreen()
             }
+
+            composable(NavigationRoute.TOOLS) {
+                ToolCallingScreen()
+            }
         }
     }
 }
@@ -69,7 +74,7 @@ fun BottomNavigationBar(navController: NavController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    // Match iOS tab order and icons exactly: Chat, Storage, Settings, Quiz, Voice
+    // Match iOS tab order and icons exactly: Chat, Storage, Settings, Quiz, Voice, Tools
     val items = listOf(
         BottomNavItem(
             route = NavigationRoute.CHAT,
@@ -100,6 +105,12 @@ fun BottomNavigationBar(navController: NavController) {
             label = "Voice",
             icon = Icons.Outlined.Mic,
             selectedIcon = Icons.Filled.Mic
+        ),
+        BottomNavItem(
+            route = NavigationRoute.TOOLS,
+            label = "Tools",
+            icon = Icons.Outlined.Build,
+            selectedIcon = Icons.Filled.Build
         )
     )
 
@@ -142,6 +153,7 @@ object NavigationRoute {
     const val SETTINGS = "settings"
     const val QUIZ = "quiz"
     const val VOICE = "voice"
+    const val TOOLS = "tools"
 }
 
 /**

@@ -61,7 +61,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_load_1model(JNIEnv *env, jobj
     auto path_to_model = env->GetStringUTFChars(filename, 0);
     LOGi("Loading model from %s", path_to_model);
 
-    auto model = llama_model_load_from_file(path_to_model, model_params);
+    auto model = llama_load_model_from_file(path_to_model, model_params);
     env->ReleaseStringUTFChars(filename, path_to_model);
 
     if (!model) {
@@ -77,7 +77,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_load_1model(JNIEnv *env, jobj
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_free_1model(JNIEnv *, jobject, jlong model) {
-    llama_model_free(reinterpret_cast<llama_model *>(model));
+    llama_free_model(reinterpret_cast<llama_model *>(model));
 }
 
 // JNI: Create context with configurable parameters
@@ -109,7 +109,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_new_1context(
     ctx_params.n_threads_batch = n_threads;
     ctx_params.no_perf         = true;   // Fix: Disable perf tracking for lower overhead (like SmolChat)
 
-    llama_context * context = llama_init_from_model(model, ctx_params);
+    llama_context * context = llama_new_context_with_model(model, ctx_params);
 
     if (!context) {
         LOGe("llama_init_from_model() returned null");
@@ -312,17 +312,34 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_completion_1loop(
     const auto batch   = reinterpret_cast<llama_batch   *>(batch_pointer);
     const auto sampler = reinterpret_cast<llama_sampler *>(sampler_pointer);
     const auto model = llama_get_model(context);
-    const auto vocab = llama_model_get_vocab(model);
 
     if (!la_int_var) la_int_var = env->GetObjectClass(intvar_ncur);
     if (!la_int_var_value) la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I");
     if (!la_int_var_inc) la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V");
 
+    const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
+
+    // Log every 50 tokens to track progress
+    static int log_counter = 0;
+    if (log_counter++ % 50 == 0) {
+        LOGi("completion_loop: n_cur=%d, n_len=%d", n_cur, n_len);
+    }
+
     // Sample the most likely token
+    // NOTE: llama_sampler_sample() internally calls llama_sampler_accept() on the sampler,
+    // which automatically propagates to ALL samplers in the chain including the grammar sampler.
+    // DO NOT call llama_sampler_accept() again here - calling it twice will corrupt the grammar
+    // state machine, causing it to advance twice per token and eventually crash with SIGABRT
+    // when EOG arrives while the grammar is in a non-terminal state.
     const auto new_token_id = llama_sampler_sample(sampler, context, -1);
 
-    const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
-    if (llama_vocab_is_eog(vocab, new_token_id) || n_cur == n_len) {
+    if (llama_token_is_eog(model, new_token_id)) {
+        LOGi("EOG token detected at position %d, token_id=%d", n_cur, new_token_id);
+        return nullptr;
+    }
+
+    if (n_cur == n_len) {
+        LOGi("Reached n_len limit at position %d", n_cur);
         return nullptr;
     }
 
@@ -459,6 +476,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_apply_1chat_1template(
     formatted.resize(1024 * 1024); // 1MB buffer (resize dynamically if needed)
 
     int32_t result = llama_chat_apply_template(
+        model,
         tmpl_to_use,
         messages.data(),
         messages.size(),
@@ -485,6 +503,7 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_apply_1chat_1template(
         formatted.resize(result + 1024); // Add some padding
 
         result = llama_chat_apply_template(
+            model,
             tmpl_to_use,
             messages.data(),
             messages.size(),
@@ -513,5 +532,16 @@ Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_apply_1chat_1template(
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_kv_1cache_1clear(JNIEnv *, jobject, jlong context) {
-    llama_memory_clear(llama_get_memory(reinterpret_cast<llama_context *>(context)), true);
+    llama_kv_cache_clear(reinterpret_cast<llama_context *>(context));
+}
+
+// JNI: Reset sampler state (clears grammar state, repetition penalties, etc.)
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_runanywhere_sdk_llm_llamacpp_LLamaAndroid_reset_1sampler(JNIEnv *, jobject, jlong sampler_pointer) {
+    auto sampler = reinterpret_cast<llama_sampler *>(sampler_pointer);
+    if (sampler) {
+        llama_sampler_reset(sampler);
+        LOGi("Sampler state reset (grammar and other stateful samplers cleared)");
+    }
 }

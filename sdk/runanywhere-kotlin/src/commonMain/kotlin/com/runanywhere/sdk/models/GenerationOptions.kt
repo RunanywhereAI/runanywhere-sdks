@@ -51,7 +51,13 @@ data class RunAnywhereGenerationOptions(
     val seed: Int? = null,
 
     /** Context window size */
-    val contextLength: Int? = null
+    val contextLength: Int? = null,
+
+    /** Tools available for tool calling (grammar-based constrained generation) */
+    val tools: List<Tool> = emptyList(),
+
+    /** Tool calling mode (grammar-based, prompt-based, or auto) */
+    val toolCallingMode: ToolCallingMode = ToolCallingMode.AUTO
 ) {
 
     /**
@@ -150,6 +156,16 @@ data class RunAnywhereGenerationOptions(
             temperature = 0.2f,
             maxTokens = 1500,
             stopSequences = listOf("```", "\n\n\n")
+        )
+
+        /**
+         * Options optimized for tool calling (grammar-based)
+         * Lower temperature for more deterministic tool selection
+         */
+        val TOOL_CALLING = RunAnywhereGenerationOptions(
+            temperature = 0.7f,
+            maxTokens = 300,
+            toolCallingMode = ToolCallingMode.GRAMMAR_BASED
         )
     }
 }
