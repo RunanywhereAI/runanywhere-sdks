@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.8] - 2025-10-31
+
 ### Fixed
 - **Performance Metrics**: Fixed time-to-first-token reporting to correctly use milliseconds instead of seconds
 - Removed unused JSONHelpers.swift file for cleaner codebase
