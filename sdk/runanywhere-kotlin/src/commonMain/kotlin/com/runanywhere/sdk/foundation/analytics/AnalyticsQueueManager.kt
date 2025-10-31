@@ -124,10 +124,7 @@ object AnalyticsQueueManager {
 
         val repository = telemetryRepository
         if (repository == null) {
-            logger.error("No telemetry repository configured")
-            queueMutex.withLock {
-                eventQueue.removeAll(batch)
-            }
+            logger.error("No telemetry repository configured - events will be retried later")
             return@withContext
         }
 
