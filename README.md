@@ -5,8 +5,8 @@
 </p>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![iOS SDK](https://img.shields.io/badge/iOS%20SDK-Available-brightgreen.svg)](sdk/runanywhere-swift/
-[![Android SDK](https://img.shields.io/badge/iOS%20SDK-Available-brightgreen.svg)](sdk/runanywhere-android/)
+[![iOS SDK](https://img.shields.io/badge/iOS%20SDK-Available-brightgreen.svg)](sdk/runanywhere-swift/)
+[![Android SDK](https://img.shields.io/badge/Android%20SDK-Available-brightgreen.svg)](sdk/runanywhere-kotlin/)
 [![GitHub stars](https://img.shields.io/github/stars/RunanywhereAI/runanywhere-sdks?style=social)](https://github.com/RunanywhereAI/runanywhere-sdks)
 
 **Privacy-first, on-device AI SDKs** that bring powerful language models directly to your iOS and Android applications. RunAnywhere enables intelligent AI execution with automatic optimization for performance, privacy, and user experience.
