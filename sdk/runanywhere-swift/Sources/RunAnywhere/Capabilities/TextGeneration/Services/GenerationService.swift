@@ -211,7 +211,11 @@ public class GenerationService {
         let memoryUsage: Int64 = 0 // TODO: Add memory tracking to LLMService protocol
 
         // Calculate response time (time after thinking)
-        let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+        let responseTimeMs: Double? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
+
+        // For non-streaming generation, time-to-first-token equals total latency
+        // since all tokens arrive at once
+        let timeToFirstTokenMs = latency
 
         let result = GenerationResult(
             text: finalText,
@@ -225,6 +229,7 @@ public class GenerationService {
                 inferenceTimeMs: latency,
                 tokensPerSecond: tokensPerSecond,
                 peakMemoryUsage: memoryUsage,
+                timeToFirstTokenMs: timeToFirstTokenMs,
                 thinkingTimeMs: thinkingTimeMs,
                 responseTimeMs: responseTimeMs
             ),
@@ -347,6 +352,9 @@ public class GenerationService {
 
         let responseTimeMs: TimeInterval? = thinkingTimeMs != nil ? (latency - thinkingTimeMs!) : nil
 
+        // For non-streaming hybrid generation, time-to-first-token equals total latency
+        let timeToFirstTokenMs = latency
+
         let result = GenerationResult(
             text: finalText,
             thinkingContent: thinkingContent,
@@ -359,6 +367,7 @@ public class GenerationService {
                 inferenceTimeMs: latency,
                 tokensPerSecond: tokensPerSecond,
                 peakMemoryUsage: memoryUsage,
+                timeToFirstTokenMs: timeToFirstTokenMs,
                 thinkingTimeMs: thinkingTimeMs,
                 responseTimeMs: responseTimeMs
             ),
