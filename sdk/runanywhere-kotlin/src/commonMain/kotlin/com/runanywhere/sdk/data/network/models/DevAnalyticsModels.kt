@@ -53,7 +53,16 @@ data class DevAnalyticsSubmissionRequest(
     val sdkVersion: String,
 
     @SerialName("timestamp")
-    val timestamp: String // ISO8601 format
+    val timestamp: String, // ISO8601 format
+
+    @SerialName("host_app_identifier")
+    val hostAppIdentifier: String? = null,
+
+    @SerialName("host_app_name")
+    val hostAppName: String? = null,
+
+    @SerialName("host_app_version")
+    val hostAppVersion: String? = null
 )
 
 /**
