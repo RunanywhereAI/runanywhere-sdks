@@ -29,21 +29,26 @@ object AnalyticsQueueManager {
     private var telemetryRepository: TelemetryRepository? = null
     private val logger = SDKLogger("AnalyticsQueue")
     private var flushJob: Job? = null
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var scope: CoroutineScope? = null
     private const val MAX_RETRIES = 3
 
     // MARK: - Initialization
-
-    init {
-        startFlushTimer()
-    }
 
     /**
      * Initialize with telemetry repository
      */
     fun initialize(telemetryRepository: TelemetryRepository) {
         this.telemetryRepository = telemetryRepository
+
+        // Recreate scope if it was cancelled or doesn't exist
+        if (scope?.isActive != true) {
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        }
+
         logger.info("AnalyticsQueueManager initialized")
+
+        // Start flush timer after repository is assigned
+        startFlushTimer()
     }
 
     /**
@@ -86,13 +91,13 @@ object AnalyticsQueueManager {
      */
     fun cleanup() {
         flushJob?.cancel()
-        scope.cancel()
+        scope?.cancel()
     }
 
     // MARK: - Private Methods
 
     private fun startFlushTimer() {
-        flushJob = scope.launch {
+        flushJob = scope?.launch {
             while (isActive) {
                 delay(FLUSH_INTERVAL)
                 queueMutex.withLock {
