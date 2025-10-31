@@ -55,12 +55,13 @@ object AnalyticsQueueManager {
      * Enqueue a single analytics event
      */
     suspend fun enqueue(event: AnalyticsEvent) {
-        queueMutex.withLock {
+        val shouldFlush = queueMutex.withLock {
             eventQueue.add(event)
+            eventQueue.size >= BATCH_SIZE
+        }
 
-            if (eventQueue.size >= BATCH_SIZE) {
-                flushBatch()
-            }
+        if (shouldFlush) {
+            flushBatch()
         }
     }
 
@@ -68,12 +69,13 @@ object AnalyticsQueueManager {
      * Enqueue multiple analytics events
      */
     suspend fun enqueueBatch(events: List<AnalyticsEvent>) {
-        queueMutex.withLock {
+        val shouldFlush = queueMutex.withLock {
             eventQueue.addAll(events)
+            eventQueue.size >= BATCH_SIZE
+        }
 
-            if (eventQueue.size >= BATCH_SIZE) {
-                flushBatch()
-            }
+        if (shouldFlush) {
+            flushBatch()
         }
     }
 
@@ -81,9 +83,7 @@ object AnalyticsQueueManager {
      * Force flush all pending events
      */
     suspend fun flush() {
-        queueMutex.withLock {
-            flushBatch()
-        }
+        flushBatch()
     }
 
     /**
@@ -100,17 +100,19 @@ object AnalyticsQueueManager {
         flushJob = scope?.launch {
             while (isActive) {
                 delay(FLUSH_INTERVAL)
-                queueMutex.withLock {
-                    flushBatch()
-                }
+                flushBatch()
             }
         }
     }
 
     private suspend fun flushBatch() {
-        if (eventQueue.isEmpty()) return
+        val batch = queueMutex.withLock {
+            if (eventQueue.isEmpty()) {
+                return // Early return if queue is empty
+            }
+            eventQueue.take(BATCH_SIZE).toList() // Create a copy
+        }
 
-        val batch = eventQueue.take(BATCH_SIZE)
         processBatch(batch)
     }
 
