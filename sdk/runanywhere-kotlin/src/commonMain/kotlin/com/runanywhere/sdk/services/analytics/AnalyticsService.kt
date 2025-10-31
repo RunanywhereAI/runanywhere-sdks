@@ -273,6 +273,9 @@ class AnalyticsService internal constructor(
                 // Get device ID dynamically from BaseRunAnywhereSDK (set during registration)
                 val currentDeviceId = com.runanywhere.sdk.public.BaseRunAnywhereSDK.sharedDeviceId ?: "unknown"
 
+                // Capture host app information
+                val hostAppInfo = com.runanywhere.sdk.foundation.getHostAppInfo()
+
                 val request = DevAnalyticsSubmissionRequest(
                     generationId = generationId,
                     deviceId = currentDeviceId,
@@ -286,7 +289,10 @@ class AnalyticsService internal constructor(
                     executionTarget = executionTarget,
                     buildToken = BuildToken.token,
                     sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION,
-                    timestamp = currentTimeISO8601() // ISO8601 format
+                    timestamp = currentTimeISO8601(), // ISO8601 format
+                    hostAppIdentifier = hostAppInfo.identifier,
+                    hostAppName = hostAppInfo.name,
+                    hostAppVersion = hostAppInfo.version
                 )
 
                 if (supabaseConfig != null) {
