@@ -3,13 +3,13 @@ import Foundation
 /// Detailed performance metrics
 public struct PerformanceMetrics {
     /// Time spent on tokenization (milliseconds)
-    public let tokenizationTimeMs: Double
+    public let tokenizationTimeMs: TimeInterval
 
     /// Time spent on inference (milliseconds)
-    public let inferenceTimeMs: Double
+    public let inferenceTimeMs: TimeInterval
 
     /// Time spent on post-processing (milliseconds)
-    public let postProcessingTimeMs: Double
+    public let postProcessingTimeMs: TimeInterval
 
     /// Tokens generated per second
     public let tokensPerSecond: Double
@@ -18,41 +18,41 @@ public struct PerformanceMetrics {
     public let peakMemoryUsage: Int64
 
     /// Queue wait time if any (milliseconds)
-    public let queueWaitTimeMs: Double
+    public let queueWaitTimeMs: TimeInterval
 
     // MARK: - Thinking Mode Metrics
 
     /// Time to first token (milliseconds) - time from request start to first token
-    public let timeToFirstTokenMs: Double?
+    public let timeToFirstTokenMs: TimeInterval?
 
     /// Time spent in thinking mode (milliseconds) - only if model uses thinking
-    public let thinkingTimeMs: Double?
+    public let thinkingTimeMs: TimeInterval?
 
     /// Time spent generating response content after thinking (milliseconds)
-    public let responseTimeMs: Double?
+    public let responseTimeMs: TimeInterval?
 
     /// Timestamp when thinking started (relative to generation start, in milliseconds)
-    public let thinkingStartTimeMs: Double?
+    public let thinkingStartTimeMs: TimeInterval?
 
     /// Timestamp when thinking ended (relative to generation start, in milliseconds)
-    public let thinkingEndTimeMs: Double?
+    public let thinkingEndTimeMs: TimeInterval?
 
     /// Timestamp when first response token arrived (relative to generation start, in milliseconds)
-    public let firstResponseTokenTimeMs: Double?
+    public let firstResponseTokenTimeMs: TimeInterval?
 
     public init(
-        tokenizationTimeMs: Double = 0,
-        inferenceTimeMs: Double = 0,
-        postProcessingTimeMs: Double = 0,
+        tokenizationTimeMs: TimeInterval = 0,
+        inferenceTimeMs: TimeInterval = 0,
+        postProcessingTimeMs: TimeInterval = 0,
         tokensPerSecond: Double = 0,
         peakMemoryUsage: Int64 = 0,
-        queueWaitTimeMs: Double = 0,
-        timeToFirstTokenMs: Double? = nil,
-        thinkingTimeMs: Double? = nil,
-        responseTimeMs: Double? = nil,
-        thinkingStartTimeMs: Double? = nil,
-        thinkingEndTimeMs: Double? = nil,
-        firstResponseTokenTimeMs: Double? = nil
+        queueWaitTimeMs: TimeInterval = 0,
+        timeToFirstTokenMs: TimeInterval? = nil,
+        thinkingTimeMs: TimeInterval? = nil,
+        responseTimeMs: TimeInterval? = nil,
+        thinkingStartTimeMs: TimeInterval? = nil,
+        thinkingEndTimeMs: TimeInterval? = nil,
+        firstResponseTokenTimeMs: TimeInterval? = nil
     ) {
         self.tokenizationTimeMs = tokenizationTimeMs
         self.inferenceTimeMs = inferenceTimeMs

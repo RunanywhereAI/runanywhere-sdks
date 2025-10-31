@@ -49,8 +49,7 @@ public class StreamingService {
                 fullText += token
                 tokenCount += 1
 
-                // Only set firstTokenTime for non-empty tokens (real tokens from model)
-                if firstTokenTime == nil && !token.isEmpty {
+                if firstTokenTime == nil {
                     firstTokenTime = Date()
                 }
 
