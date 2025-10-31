@@ -117,6 +117,7 @@ public enum RunAnywhere {
 
             // Mark as initialized
             isInitialized = true
+
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
             EventBus.shared.publish(SDKInitializationEvent.completed)
 
@@ -644,6 +645,12 @@ public enum RunAnywhere {
             do {
                 let deviceId = getStoredDeviceId() ?? "unknown"
 
+                // Capture host app information
+                let hostAppIdentifier = Bundle.main.bundleIdentifier
+                let hostAppName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+                    ?? Bundle.main.infoDictionary?["CFBundleName"] as? String
+                let hostAppVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+
                 let request = DevAnalyticsSubmissionRequest(
                     generationId: generationId,
                     deviceId: deviceId,
@@ -657,7 +664,10 @@ public enum RunAnywhere {
                     executionTarget: executionTarget,
                     buildToken: BuildToken.token,
                     sdkVersion: SDKConstants.version,
-                    timestamp: ISO8601DateFormatter().string(from: Date())
+                    timestamp: ISO8601DateFormatter().string(from: Date()),
+                    hostAppIdentifier: hostAppIdentifier,
+                    hostAppName: hostAppName,
+                    hostAppVersion: hostAppVersion
                 )
 
 
