@@ -117,7 +117,6 @@ public enum RunAnywhere {
 
             // Mark as initialized
             isInitialized = true
-
             logger.info("✅ SDK initialization completed successfully (\(params.environment.description) mode)")
             EventBus.shared.publish(SDKInitializationEvent.completed)
 
