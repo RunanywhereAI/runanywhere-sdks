@@ -84,8 +84,10 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
     }
 
     override fun generateDeviceIdentifier(): String {
-        // Use Java UUID for device identifier (same as JVM)
-        return java.util.UUID.randomUUID().toString()
+        // Use PlatformUtils.getDeviceId() which provides a stable device ID
+        // based on Android ID (similar to iOS identifierForVendor)
+        // This ensures the device ID remains the same across app reinstalls
+        return com.runanywhere.sdk.utils.PlatformUtils.getDeviceId()
     }
 
     /**

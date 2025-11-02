@@ -10,17 +10,20 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
  * Android implementation for creating telemetry repository
  * Using in-memory database for now - can be easily swapped with real Room database
  * by changing InMemoryDatabase.getInstance() to RunAnywhereDatabase.getDatabase(context)
+ *
+ * NOTE: In development mode with Supabase, analytics go directly via SupabaseClient,
+ * so NetworkService is not needed. We create a mock NetworkService to avoid errors.
  */
 actual fun createTelemetryRepository(): TelemetryRepository {
     // Get the in-memory database instance
     // TODO: Replace with RunAnywhereDatabase.getDatabase(context) when ready for production
     val database = InMemoryDatabase.getInstance()
 
-    // Create a network service for telemetry
+    // Create a mock network service for development mode
+    // In development mode, analytics are submitted directly to Supabase via AnalyticsService
+    // so this NetworkService is not actually used for analytics
     val networkService = NetworkServiceFactory.create(
-        environment = SDKEnvironment.PRODUCTION,
-        baseURL = null,
-        apiKey = null
+        environment = SDKEnvironment.DEVELOPMENT // Use DEVELOPMENT to avoid base URL requirement
     )
 
     return TelemetryRepositoryImpl(database, networkService)

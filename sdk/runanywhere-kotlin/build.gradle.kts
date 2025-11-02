@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.runanywhere.sdk"
-version = "0.1.0"
+version = "0.1.3"
 
 kotlin {
     // Use Java 17 toolchain across targets

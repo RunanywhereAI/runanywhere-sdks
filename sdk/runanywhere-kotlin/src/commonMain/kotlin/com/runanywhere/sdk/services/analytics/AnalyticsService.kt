@@ -1,8 +1,15 @@
 package com.runanywhere.sdk.services.analytics
 
+import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.TelemetryData
+import com.runanywhere.sdk.data.network.models.DevAnalyticsSubmissionRequest
 import com.runanywhere.sdk.data.repositories.TelemetryRepository
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.constants.BuildToken
+import com.runanywhere.sdk.foundation.supabase.SupabaseClient
+import com.runanywhere.sdk.foundation.supabase.SupabaseConfig
+import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.foundation.currentTimeISO8601
 import com.runanywhere.sdk.services.sync.SyncCoordinator
 import com.runanywhere.sdk.events.EventBus
 import com.runanywhere.sdk.events.SDKInitializationEvent
@@ -14,15 +21,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 
 /**
  * Analytics Service for SDK events tracking
  * Matches iOS AnalyticsService functionality with centralized telemetry
+ *
+ * Reference: iOS RunAnywhere.swift submitGenerationAnalytics()
  */
-class AnalyticsService(
+class AnalyticsService internal constructor(
     private val telemetryRepository: TelemetryRepository?,
-    private val syncCoordinator: SyncCoordinator?
+    private val syncCoordinator: SyncCoordinator?,
+    private val supabaseConfig: SupabaseConfig? = null,
+    private val environment: SDKEnvironment = SDKEnvironment.PRODUCTION
 ) {
     private val logger = SDKLogger("AnalyticsService")
     private val analyticsScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -235,6 +247,88 @@ class AnalyticsService(
     }
 
     /**
+     * Submit generation analytics to Supabase (development mode)
+     * Matches iOS RunAnywhere.submitGenerationAnalytics()
+     *
+     * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift:630
+     */
+    suspend fun submitGenerationAnalytics(
+        generationId: String,
+        modelId: String,
+        performanceMetrics: PerformanceMetrics,
+        inputTokens: Int,
+        outputTokens: Int,
+        success: Boolean,
+        executionTarget: String
+    ) {
+        // Only submit in development mode
+        if (environment != SDKEnvironment.DEVELOPMENT) {
+            logger.debug("Skipping analytics submission (not in development mode)")
+            return
+        }
+
+        // Non-blocking background submission
+        analyticsScope.launch(Dispatchers.IO) {
+            try {
+                // Get device ID dynamically from BaseRunAnywhereSDK (set during registration)
+                val currentDeviceId = com.runanywhere.sdk.public.BaseRunAnywhereSDK.sharedDeviceId ?: "unknown"
+
+                // Capture host app information
+                val hostAppInfo = com.runanywhere.sdk.foundation.getHostAppInfo()
+
+                val request = DevAnalyticsSubmissionRequest(
+                    generationId = generationId,
+                    deviceId = currentDeviceId,
+                    modelId = modelId,
+                    timeToFirstTokenMs = performanceMetrics.timeToFirstTokenMs,
+                    tokensPerSecond = performanceMetrics.tokensPerSecond,
+                    totalGenerationTimeMs = performanceMetrics.inferenceTimeMs.toDouble(),
+                    inputTokens = inputTokens,
+                    outputTokens = outputTokens,
+                    success = success,
+                    executionTarget = executionTarget,
+                    buildToken = BuildToken.token,
+                    sdkVersion = com.runanywhere.sdk.core.SDKConstants.SDK_VERSION,
+                    timestamp = currentTimeISO8601(), // ISO8601 format
+                    hostAppIdentifier = hostAppInfo.identifier,
+                    hostAppName = hostAppInfo.name,
+                    hostAppVersion = hostAppInfo.version
+                )
+
+                if (supabaseConfig != null) {
+                    submitAnalyticsViaSupabase(request, supabaseConfig)
+                } else {
+                    logger.warning("No Supabase config available for analytics submission")
+                }
+            } catch (e: Exception) {
+                // Fail silently - analytics should never break the SDK
+                logger.debug("Analytics submission failed (non-critical): ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Submit analytics via Supabase REST API
+     * Matches iOS submitAnalyticsViaSupabase()
+     */
+    private suspend fun submitAnalyticsViaSupabase(
+        request: DevAnalyticsSubmissionRequest,
+        config: SupabaseConfig
+    ) = withContext(Dispatchers.IO) {
+        val supabaseClient = SupabaseClient(config)
+        try {
+            val result = supabaseClient.submitAnalytics(request)
+            if (result.isSuccess) {
+                logger.debug("📊 Analytics submitted successfully to Supabase")
+            } else {
+                logger.warning("⚠️ Analytics submission failed: ${result.exceptionOrNull()?.message}")
+            }
+        } finally {
+            supabaseClient.close()
+        }
+    }
+
+    /**
      * Get analytics statistics
      */
     suspend fun getAnalyticsStats(): AnalyticsStats {
@@ -262,10 +356,54 @@ class AnalyticsService(
     }
 
     // Helper methods
-    private fun getCurrentSessionId(): String = "session-${System.currentTimeMillis()}"
+    private fun getCurrentSessionId(): String = "session-${currentTimeMillis()}"
     private fun getCurrentUserId(): String? = null // Will be set after authentication
     private fun getDeviceId(): String = "device-id" // Will be provided by DeviceInfoService
 }
+
+/**
+ * Performance metrics for generation analytics
+ * Matches iOS PerformanceMetrics struct
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Models/PerformanceMetrics.swift
+ */
+data class PerformanceMetrics(
+    /** Time spent on tokenization (milliseconds) */
+    val tokenizationTimeMs: Double = 0.0,
+
+    /** Time spent on inference (milliseconds) */
+    val inferenceTimeMs: Double = 0.0,
+
+    /** Time spent on post-processing (milliseconds) */
+    val postProcessingTimeMs: Double = 0.0,
+
+    /** Tokens generated per second */
+    val tokensPerSecond: Double = 0.0,
+
+    /** Peak memory usage during generation */
+    val peakMemoryUsage: Long = 0,
+
+    /** Queue wait time if any (milliseconds) */
+    val queueWaitTimeMs: Double = 0.0,
+
+    /** Time to first token (milliseconds) - time from request start to first token */
+    val timeToFirstTokenMs: Double? = null,
+
+    /** Time spent in thinking mode (milliseconds) - only if model uses thinking */
+    val thinkingTimeMs: Double? = null,
+
+    /** Time spent generating response content after thinking (milliseconds) */
+    val responseTimeMs: Double? = null,
+
+    /** Timestamp when thinking started (relative to generation start, in milliseconds) */
+    val thinkingStartTimeMs: Double? = null,
+
+    /** Timestamp when thinking ended (relative to generation start, in milliseconds) */
+    val thinkingEndTimeMs: Double? = null,
+
+    /** Timestamp when first response token arrived (relative to generation start, in milliseconds) */
+    val firstResponseTokenTimeMs: Double? = null
+)
 
 /**
  * Analytics event definitions matching iOS patterns
@@ -276,37 +414,37 @@ sealed class AnalyticsEvent(
 ) {
     class SDKInitializationStarted : AnalyticsEvent(
         "sdk_initialization_started",
-        mapOf("timestamp" to System.currentTimeMillis())
+        mapOf("timestamp" to currentTimeMillis())
     )
 
     class SDKInitializationCompleted : AnalyticsEvent(
         "sdk_initialization_completed",
-        mapOf("timestamp" to System.currentTimeMillis())
+        mapOf("timestamp" to currentTimeMillis())
     )
 
     class SDKInitializationFailed(error: String) : AnalyticsEvent(
         "sdk_initialization_failed",
-        mapOf("error" to error, "timestamp" to System.currentTimeMillis())
+        mapOf("error" to error, "timestamp" to currentTimeMillis())
     )
 
     class SDKConfigurationLoaded(source: String) : AnalyticsEvent(
         "sdk_configuration_loaded",
-        mapOf("source" to source, "timestamp" to System.currentTimeMillis())
+        mapOf("source" to source, "timestamp" to currentTimeMillis())
     )
 
     class SDKServicesBootstrapped : AnalyticsEvent(
         "sdk_services_bootstrapped",
-        mapOf("timestamp" to System.currentTimeMillis())
+        mapOf("timestamp" to currentTimeMillis())
     )
 
     class ComponentInitialized(component: String) : AnalyticsEvent(
         "component_initialized",
-        mapOf("component" to component, "timestamp" to System.currentTimeMillis())
+        mapOf("component" to component, "timestamp" to currentTimeMillis())
     )
 
     class ComponentInitializationFailed(component: String, error: String) : AnalyticsEvent(
         "component_initialization_failed",
-        mapOf("component" to component, "error" to error, "timestamp" to System.currentTimeMillis())
+        mapOf("component" to component, "error" to error, "timestamp" to currentTimeMillis())
     )
 
     class InitializationStep(
@@ -320,7 +458,7 @@ sealed class AnalyticsEvent(
             "step" to step,
             "duration" to duration,
             "success" to success,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to currentTimeMillis()
         ) + if (errorMessage != null) mapOf("error" to errorMessage) else emptyMap()
     )
 
@@ -336,7 +474,7 @@ sealed class AnalyticsEvent(
             "component" to component,
             "action" to action,
             "success" to success,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to currentTimeMillis()
         ) + (if (duration != null) mapOf("duration" to duration) else emptyMap()) + metadata
     )
 
@@ -352,7 +490,7 @@ sealed class AnalyticsEvent(
             "operation" to operation,
             "duration" to duration,
             "success" to success,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to currentTimeMillis()
         ) + (if (memoryUsage != null) mapOf("memory_usage" to memoryUsage) else emptyMap()) +
           (if (cpuUsage != null) mapOf("cpu_usage" to cpuUsage) else emptyMap())
     )
@@ -366,7 +504,7 @@ sealed class AnalyticsEvent(
         mapOf(
             "operation" to operation,
             "model_id" to modelId,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to currentTimeMillis()
         ) + (if (error != null) mapOf("error" to error) else emptyMap())
     )
 
@@ -377,7 +515,7 @@ sealed class AnalyticsEvent(
         "voice_operation",
         mapOf(
             "operation" to operation,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to currentTimeMillis()
         ) + metadata
     )
 }

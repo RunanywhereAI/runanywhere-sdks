@@ -10,18 +10,18 @@ This guide shows you how to create a new Android app with a simple text chat int
 
 **1. Download BOTH SDK AARs:**
 
-[Download RunAnywhereKotlinSDK-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/RunAnywhereKotlinSDK-release.aar) (Core SDK - 3.9MB)
+[Download RunAnywhereKotlinSDK-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.3-alpha/RunAnywhereKotlinSDK-release.aar) (Core SDK - 4.0MB)
 
-[Download runanywhere-llm-llamacpp-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/runanywhere-llm-llamacpp-release.aar) (LLM Module - 2.1MB)
+[Download runanywhere-llm-llamacpp-release.aar](https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.3-alpha/runanywhere-llm-llamacpp-release.aar) (LLM Module - 2.1MB)
 
 Or via command line:
 
 ```bash
 curl -L -o RunAnywhereKotlinSDK-release.aar \
-  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/RunAnywhereKotlinSDK-release.aar
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.3-alpha/RunAnywhereKotlinSDK-release.aar
 
 curl -L -o runanywhere-llm-llamacpp-release.aar \
-  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.0-alpha/runanywhere-llm-llamacpp-release.aar
+  https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/android/v0.1.3-alpha/runanywhere-llm-llamacpp-release.aar
 ```
 
 **2. Add to your project:**
@@ -35,14 +35,14 @@ Place BOTH AAR files in `app/libs/`:
 
 ```kotlin
 dependencies {
-    // Core SDK
-    implementation(files("libs/RunAnywhereKotlinSDK-release.aar"))
+  // Core SDK
+  implementation(files("libs/RunAnywhereKotlinSDK-release.aar"))
 
-    // LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
-    implementation(files("libs/runanywhere-llm-llamacpp-release.aar"))
+  // LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
+  implementation(files("libs/runanywhere-llm-llamacpp-release.aar"))
 
-    // Required dependency
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+  // Required dependency
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
 ```
 
@@ -50,10 +50,22 @@ dependencies {
 
 **📦 What's Included:**
 
-- **Core SDK** (3.9MB): Component architecture, model management, event system
+- **Core SDK** (4.0MB): Component architecture, model management, event system, analytics, prompt-based tool calling
 - **LlamaCpp Module** (2.1MB): 7 optimized llama.cpp native libraries for ARM64
   - Variants: Baseline, fp16, dotprod, v8.4, i8mm, sve, i8mm+sve
   - Runtime CPU feature detection automatically selects best variant
+
+**🆕 New in v0.1.3-alpha:**
+
+- **Analytics Enhancements**: Real device & session context, host app metadata tracking, offline queue support
+- **Time-to-First-Token Tracking**: Now tracks and reports time-to-first-token metrics for LLM generation
+- **Privacy Protection**: Removed PII leaks in JVM DeviceInfoService (no more username in device model)
+- **Bug Fixes**: Fixed analytics queue deadlock, initialization order issues, and JVM platform missing methods
+
+**Previous releases:**
+
+- v0.1.2-alpha: Device ID persistence fix, improved analytics reliability
+- v0.1.1-alpha: Prompt-based tool calling, analytics improvements, JVM platform fixes
 
 ---
 
@@ -75,12 +87,12 @@ In your **project-level** `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories {
-        google()
-        mavenCentral()
-        maven { url = uri("https://jitpack.io") }
-    }
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+    maven { url = uri("https://jitpack.io") }
+  }
 }
 ```
 
@@ -88,44 +100,44 @@ In your **app-level** `build.gradle.kts`:
 
 ```kotlin
 android {
-    namespace = "com.example.myapp"
-    compileSdk = 36
+  namespace = "com.example.myapp"
+  compileSdk = 36
 
-    defaultConfig {
-        applicationId = "com.example.myapp"
-        minSdk = 24
-        targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
-    }
+  defaultConfig {
+    applicationId = "com.example.myapp"
+    minSdk = 24
+    targetSdk = 36
+    versionCode = 1
+    versionName = "1.0"
+  }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
+  compileOptions {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+  }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
+  kotlinOptions {
+    jvmTarget = "17"
+  }
 }
 
 dependencies {
-    // RunAnywhere SDK - Core (v0.1.0-alpha)
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-kotlin:android-v0.1.0-alpha")
+  // RunAnywhere SDK - Core (v0.1.3-alpha)
+  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-kotlin:android-v0.1.3-alpha")
 
-    // RunAnywhere SDK - LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
-    implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-llm-llamacpp:android-v0.1.0-alpha")
+  // RunAnywhere SDK - LLM Module (includes llama.cpp with 7 ARM64 CPU variants)
+  implementation("com.github.RunanywhereAI.runanywhere-sdks:runanywhere-llm-llamacpp:android-v0.1.3-alpha")
 
-    // Required: Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+  // Required: Kotlin Coroutines
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Optional: Jetpack Compose (for UI in this quickstart)
-    implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+  // Optional: Jetpack Compose (for UI in this quickstart)
+  implementation(platform("androidx.compose:compose-bom:2024.02.00"))
+  implementation("androidx.compose.ui:ui")
+  implementation("androidx.compose.material3:material3")
+  implementation("androidx.compose.ui:ui-tooling-preview")
+  implementation("androidx.activity:activity-compose:1.8.2")
+  implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 }
 ```
 
@@ -136,9 +148,9 @@ dependencies {
   - Baseline, fp16, dotprod, v8.4, i8mm, sve, i8mm+sve variants
   - Runtime CPU feature detection selects best variant automatically
 
-**🔖 Latest Release:** `android-v0.1.0-alpha`
+**🔖 Latest Release:** `android-v0.1.3-alpha`
 
-**📄 Release Notes:** [GitHub Release](https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/android-v0.1.0-alpha)
+**📄 Release Notes:** [GitHub Release](https://github.com/RunanywhereAI/runanywhere-sdks/releases/tag/android-v0.1.3-alpha)
 
 ---
 
@@ -150,26 +162,26 @@ In `AndroidManifest.xml`:
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Required Permissions -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="28" />
+  <!-- Required Permissions -->
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+          android:maxSdkVersion="28" />
 
-    <application
-        android:name=".MyApplication"
-        android:largeHeap="true"
-        android:label="@string/app_name"
-        android:theme="@style/Theme.MyApp">
+  <application
+          android:name=".MyApplication"
+          android:largeHeap="true"
+          android:label="@string/app_name"
+          android:theme="@style/Theme.MyApp">
 
-        <activity
+    <activity
             android:name=".MainActivity"
             android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
 </manifest>
 ```
 
@@ -198,57 +210,57 @@ import kotlinx.coroutines.launch
 
 class MyApplication : Application() {
 
-    override fun onCreate() {
-        super.onCreate()
+  override fun onCreate() {
+    super.onCreate()
 
-        // Initialize SDK asynchronously
-        GlobalScope.launch(Dispatchers.IO) {
-            initializeSDK()
-        }
+    // Initialize SDK asynchronously
+    GlobalScope.launch(Dispatchers.IO) {
+      initializeSDK()
     }
+  }
 
-    private suspend fun initializeSDK() {
-        try {
-            // Step 1: Initialize SDK
-            RunAnywhere.initialize(
-                context = this@MyApplication,
-                apiKey = "dev",  // Any string works in dev mode
-                environment = SDKEnvironment.DEVELOPMENT
-            )
+  private suspend fun initializeSDK() {
+    try {
+      // Step 1: Initialize SDK
+      RunAnywhere.initialize(
+        context = this@MyApplication,
+        apiKey = "dev",  // Any string works in dev mode
+        environment = SDKEnvironment.DEVELOPMENT
+      )
 
-            // Step 2: Register LLM Service Provider
-            LlamaCppServiceProvider.register()
+      // Step 2: Register LLM Service Provider
+      LlamaCppServiceProvider.register()
 
-            // Step 3: Register Models
-            registerModels()
+      // Step 3: Register Models
+      registerModels()
 
-            // Step 4: Scan for previously downloaded models
-            RunAnywhere.scanForDownloadedModels()
+      // Step 4: Scan for previously downloaded models
+      RunAnywhere.scanForDownloadedModels()
 
-            Log.i("MyApp", "SDK initialized successfully")
+      Log.i("MyApp", "SDK initialized successfully")
 
-        } catch (e: Exception) {
-            Log.e("MyApp", "SDK initialization failed: ${e.message}")
-        }
+    } catch (e: Exception) {
+      Log.e("MyApp", "SDK initialization failed: ${e.message}")
     }
+  }
 
-    private suspend fun registerModels() {
-        // Smallest model - great for testing (119 MB)
-        addModelFromURL(
-            url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-            name = "SmolLM2 360M Q8_0",
-            type = "LLM"
-        )
+  private suspend fun registerModels() {
+    // Smallest model - great for testing (119 MB)
+    addModelFromURL(
+      url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+      name = "SmolLM2 360M Q8_0",
+      type = "LLM"
+    )
 
-        // Medium-sized model - better quality (374 MB)
-        addModelFromURL(
-            url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-            name = "Qwen 2.5 0.5B Instruct Q6_K",
-            type = "LLM"
-        )
+    // Medium-sized model - better quality (374 MB)
+    addModelFromURL(
+      url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+      name = "Qwen 2.5 0.5B Instruct Q6_K",
+      type = "LLM"
+    )
 
-        // Add more models as needed
-    }
+    // Add more models as needed
+  }
 }
 ```
 
@@ -269,7 +281,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listAvailableModels
 
 suspend fun getModels(): List<ModelInfo> {
-    return listAvailableModels()
+  return listAvailableModels()
 }
 ```
 
@@ -280,17 +292,17 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
 fun downloadModel(modelId: String) {
-    viewModelScope.launch {
-        RunAnywhere.downloadModel(modelId).collect { progress ->
-            // progress is Float from 0.0 to 1.0
-            val percentage = (progress * 100).toInt()
-            Log.d("Download", "Progress: $percentage%")
+  viewModelScope.launch {
+    RunAnywhere.downloadModel(modelId).collect { progress ->
+      // progress is Float from 0.0 to 1.0
+      val percentage = (progress * 100).toInt()
+      Log.d("Download", "Progress: $percentage%")
 
-            // Update UI with progress
-            _downloadProgress.value = percentage
-        }
-        Log.d("Download", "Model downloaded successfully")
+      // Update UI with progress
+      _downloadProgress.value = percentage
     }
+    Log.d("Download", "Model downloaded successfully")
+  }
 }
 ```
 
@@ -298,16 +310,16 @@ fun downloadModel(modelId: String) {
 
 ```kotlin
 suspend fun loadModel(modelId: String): Boolean {
-    return try {
-        val success = RunAnywhere.loadModel(modelId)
-        if (success) {
-            Log.d("Model", "Model loaded successfully")
-        }
-        success
-    } catch (e: Exception) {
-        Log.e("Model", "Failed to load model: ${e.message}")
-        false
+  return try {
+    val success = RunAnywhere.loadModel(modelId)
+    if (success) {
+      Log.d("Model", "Model loaded successfully")
     }
+    success
+  } catch (e: Exception) {
+    Log.e("Model", "Failed to load model: ${e.message}")
+    false
+  }
 }
 ```
 
@@ -323,13 +335,13 @@ suspend fun loadModel(modelId: String): Boolean {
 import com.runanywhere.sdk.public.RunAnywhere
 
 suspend fun chat(prompt: String): String {
-    return RunAnywhere.generate(prompt)
+  return RunAnywhere.generate(prompt)
 }
 
 // Usage:
 viewModelScope.launch {
-    val response = chat("What is the capital of France?")
-    Log.d("Chat", "Response: $response")
+  val response = chat("What is the capital of France?")
+  Log.d("Chat", "Response: $response")
 }
 ```
 
@@ -339,17 +351,17 @@ viewModelScope.launch {
 import kotlinx.coroutines.flow.Flow
 
 fun chatStreaming(prompt: String): Flow<String> {
-    return RunAnywhere.generateStream(prompt)
+  return RunAnywhere.generateStream(prompt)
 }
 
 // Usage:
 viewModelScope.launch {
-    var fullResponse = ""
-    chatStreaming("Tell me a story").collect { token ->
-        fullResponse += token
-        // Update UI with each token
-        _chatMessage.value = fullResponse
-    }
+  var fullResponse = ""
+  chatStreaming("Tell me a story").collect { token ->
+    fullResponse += token
+    // Update UI with each token
+    _chatMessage.value = fullResponse
+  }
 }
 ```
 
@@ -378,123 +390,123 @@ import kotlinx.coroutines.launch
 
 // Simple Message Data Class
 data class ChatMessage(
-    val text: String,
-    val isUser: Boolean
+  val text: String,
+  val isUser: Boolean
 )
 
 // ViewModel
 class ChatViewModel : ViewModel() {
 
-    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    val messages: StateFlow<List<ChatMessage>> = _messages
+  private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
+  val messages: StateFlow<List<ChatMessage>> = _messages
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+  private val _isLoading = MutableStateFlow(false)
+  val isLoading: StateFlow<Boolean> = _isLoading
 
-    fun sendMessage(text: String) {
-        // Add user message
-        _messages.value += ChatMessage(text, isUser = true)
+  fun sendMessage(text: String) {
+    // Add user message
+    _messages.value += ChatMessage(text, isUser = true)
 
-        viewModelScope.launch {
-            _isLoading.value = true
+    viewModelScope.launch {
+      _isLoading.value = true
 
-            // Generate response with streaming
-            var assistantResponse = ""
-            RunAnywhere.generateStream(text).collect { token ->
-                assistantResponse += token
+      // Generate response with streaming
+      var assistantResponse = ""
+      RunAnywhere.generateStream(text).collect { token ->
+        assistantResponse += token
 
-                // Update assistant message in real-time
-                val currentMessages = _messages.value.toMutableList()
-                if (currentMessages.lastOrNull()?.isUser == false) {
-                    currentMessages[currentMessages.lastIndex] =
-                        ChatMessage(assistantResponse, isUser = false)
-                } else {
-                    currentMessages.add(ChatMessage(assistantResponse, isUser = false))
-                }
-                _messages.value = currentMessages
-            }
-
-            _isLoading.value = false
+        // Update assistant message in real-time
+        val currentMessages = _messages.value.toMutableList()
+        if (currentMessages.lastOrNull()?.isUser == false) {
+          currentMessages[currentMessages.lastIndex] =
+            ChatMessage(assistantResponse, isUser = false)
+        } else {
+          currentMessages.add(ChatMessage(assistantResponse, isUser = false))
         }
+        _messages.value = currentMessages
+      }
+
+      _isLoading.value = false
     }
+  }
 }
 
 // Composable UI
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel) {
-    val messages by viewModel.messages.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    var inputText by remember { mutableStateOf("") }
+  val messages by viewModel.messages.collectAsState()
+  val isLoading by viewModel.isLoading.collectAsState()
+  var inputText by remember { mutableStateOf("") }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(title = { Text("AI Chat") })
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Messages List
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(messages) { message ->
-                    MessageBubble(message)
-                }
-            }
-
-            // Input Field
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Type a message...") },
-                    enabled = !isLoading
-                )
-
-                Button(
-                    onClick = {
-                        if (inputText.isNotBlank()) {
-                            viewModel.sendMessage(inputText)
-                            inputText = ""
-                        }
-                    },
-                    enabled = !isLoading && inputText.isNotBlank()
-                ) {
-                    Text("Send")
-                }
-            }
-        }
+  Scaffold(
+    topBar = {
+      TopAppBar(title = { Text("AI Chat") })
     }
+  ) { padding ->
+    Column(
+      modifier = Modifier
+        .fillMaxSize()
+        .padding(padding)
+    ) {
+      // Messages List
+      LazyColumn(
+        modifier = Modifier.weight(1f),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        items(messages) { message ->
+          MessageBubble(message)
+        }
+      }
+
+      // Input Field
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+      ) {
+        TextField(
+          value = inputText,
+          onValueChange = { inputText = it },
+          modifier = Modifier.weight(1f),
+          placeholder = { Text("Type a message...") },
+          enabled = !isLoading
+        )
+
+        Button(
+          onClick = {
+            if (inputText.isNotBlank()) {
+              viewModel.sendMessage(inputText)
+              inputText = ""
+            }
+          },
+          enabled = !isLoading && inputText.isNotBlank()
+        ) {
+          Text("Send")
+        }
+      }
+    }
+  }
 }
 
 @Composable
 fun MessageBubble(message: ChatMessage) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (message.isUser)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Text(
-            text = message.text,
-            modifier = Modifier.padding(12.dp)
-        )
-    }
+  Card(
+    modifier = Modifier.fillMaxWidth(),
+    colors = CardDefaults.cardColors(
+      containerColor = if (message.isUser)
+        MaterialTheme.colorScheme.primaryContainer
+      else
+        MaterialTheme.colorScheme.secondaryContainer
+    )
+  ) {
+    Text(
+      text = message.text,
+      modifier = Modifier.padding(12.dp)
+    )
+  }
 }
 ```
 
@@ -562,30 +574,30 @@ Copy-paste these into your `registerModels()` function:
 ```kotlin
 // SmolLM2 360M (119 MB) - Fastest, smallest
 addModelFromURL(
-    url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-    name = "SmolLM2 360M Q8_0",
-    type = "LLM"
+  url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+  name = "SmolLM2 360M Q8_0",
+  type = "LLM"
 )
 
 // Qwen 2.5 0.5B (374 MB) - Good balance
 addModelFromURL(
-    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-    name = "Qwen 2.5 0.5B Instruct Q6_K",
-    type = "LLM"
+  url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+  name = "Qwen 2.5 0.5B Instruct Q6_K",
+  type = "LLM"
 )
 
 // Llama 3.2 1B (815 MB) - Better quality
 addModelFromURL(
-    url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K_L.gguf",
-    name = "Llama 3.2 1B Instruct Q6_K",
-    type = "LLM"
+  url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K_L.gguf",
+  name = "Llama 3.2 1B Instruct Q6_K",
+  type = "LLM"
 )
 
 // Qwen 2.5 1.5B (1.2 GB) - Best quality
 addModelFromURL(
-    url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q6_k.gguf",
-    name = "Qwen 2.5 1.5B Instruct Q6_K",
-    type = "LLM"
+  url = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q6_k.gguf",
+  name = "Qwen 2.5 1.5B Instruct Q6_K",
+  type = "LLM"
 )
 ```
 
@@ -632,9 +644,9 @@ addModelFromURL(
 ```kotlin
 // Initialization
 RunAnywhere.initialize(
-    context: Context,
-    apiKey: String,
-    environment: SDKEnvironment
+  context: Context,
+  apiKey: String,
+  environment: SDKEnvironment
 )
 
 // Model Management
