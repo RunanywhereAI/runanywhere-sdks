@@ -190,6 +190,9 @@ class LLamaAndroid {
      * Unload model and free resources
      */
     suspend fun unload() {
+        // Clean up vision resources first
+        cleanupVision()
+
         withContext(runLoop) {
             when (val state = threadLocalState.get()) {
                 is State.Loaded -> {
@@ -214,6 +217,171 @@ class LLamaAndroid {
      */
     val isLoaded: Boolean
         get() = threadLocalState.get() is State.Loaded
+
+    // ============================================================================
+    // CLIP/Vision Methods (NEW)
+    // ============================================================================
+
+    // Vision context (CLIP model)
+    private var clipContext: Long = 0L
+
+    // Current image embeddings
+    private var imageEmbeddingsPtr: Long = 0L
+
+    // CLIP JNI method declarations
+    private external fun clip_model_init(path: String, useGpu: Boolean): Long
+    private external fun clip_model_free(ctx: Long)
+    private external fun clip_image_encode(
+        clipCtx: Long,
+        imageBytes: ByteArray,
+        width: Int,
+        height: Int,
+        nThreads: Int
+    ): Long
+    private external fun clip_get_embeddings(clipCtx: Long, embeddingsPtr: Long): FloatArray
+    private external fun clip_free_embeddings(embeddingsPtr: Long)
+    private external fun clip_get_embed_dim(clipCtx: Long): Int
+    private external fun clip_get_image_size(clipCtx: Long): Int
+    private external fun clip_get_hidden_size(clipCtx: Long): Int
+
+    /**
+     * Load CLIP vision model (mmproj GGUF file)
+     *
+     * @param projectorPath Path to mmproj-model-f16.gguf file
+     * @throws VLMServiceError if loading fails
+     */
+    suspend fun loadVisionModel(projectorPath: String) {
+        withContext(runLoop) {
+            logger.info("Loading CLIP vision model: $projectorPath")
+
+            clipContext = clip_model_init(projectorPath, useGpu = false)
+
+            if (clipContext == 0L) {
+                throw com.runanywhere.sdk.data.models.VLMServiceError.VisionProjectorLoadFailed(
+                    "Failed to load vision projector from: $projectorPath"
+                )
+            }
+
+            val imageSize = clip_get_image_size(clipContext)
+            val embedDim = clip_get_embed_dim(clipContext)
+            val hiddenSize = clip_get_hidden_size(clipContext)
+
+            logger.info("CLIP model loaded: imageSize=${imageSize}x${imageSize}, embedDim=$embedDim, hiddenSize=$hiddenSize")
+        }
+    }
+
+    /**
+     * Encode image to embeddings
+     *
+     * @param imageBytes Raw RGB image bytes (3 bytes per pixel, row-major order)
+     * @param width Image width in pixels
+     * @param height Image height in pixels
+     * @param nThreads Number of threads for encoding (default: 4)
+     * @return Image embeddings as float array
+     * @throws VLMServiceError if encoding fails
+     */
+    suspend fun encodeImage(
+        imageBytes: ByteArray,
+        width: Int,
+        height: Int,
+        nThreads: Int = 4
+    ): FloatArray {
+        return withContext(runLoop) {
+            if (clipContext == 0L) {
+                throw com.runanywhere.sdk.data.models.VLMServiceError.NotInitialized
+            }
+
+            // Verify image size
+            val expectedSize = width * height * 3  // RGB = 3 bytes per pixel
+            if (imageBytes.size != expectedSize) {
+                throw com.runanywhere.sdk.data.models.VLMServiceError.InvalidImageDimensions(
+                    width, height
+                )
+            }
+
+            logger.info("Encoding image: ${width}x${height}, ${imageBytes.size} bytes")
+
+            // Free previous embeddings if any
+            if (imageEmbeddingsPtr != 0L) {
+                clip_free_embeddings(imageEmbeddingsPtr)
+            }
+
+            // Encode image
+            imageEmbeddingsPtr = clip_image_encode(
+                clipContext,
+                imageBytes,
+                width,
+                height,
+                nThreads
+            )
+
+            if (imageEmbeddingsPtr == 0L) {
+                throw com.runanywhere.sdk.data.models.VLMServiceError.ImageEncodingFailed(
+                    "Failed to encode image"
+                )
+            }
+
+            // Get embeddings as array
+            val embeddings = clip_get_embeddings(clipContext, imageEmbeddingsPtr)
+
+            logger.info("Image encoded successfully: ${embeddings.size} dimensions")
+
+            embeddings
+        }
+    }
+
+    /**
+     * Check if vision model is loaded
+     */
+    val isVisionModelLoaded: Boolean
+        get() = clipContext != 0L
+
+    /**
+     * Get expected image size for the loaded CLIP model
+     *
+     * @return Image size (e.g., 336 for 336x336), or 0 if model not loaded
+     */
+    fun getImageSize(): Int {
+        return if (clipContext != 0L) {
+            clip_get_image_size(clipContext)
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Get embedding dimension for the loaded CLIP model
+     *
+     * @return Embedding dimension, or 0 if model not loaded
+     */
+    fun getEmbedDim(): Int {
+        return if (clipContext != 0L) {
+            clip_get_embed_dim(clipContext)
+        } else {
+            0
+        }
+    }
+
+    /**
+     * Cleanup vision resources
+     */
+    private suspend fun cleanupVision() {
+        withContext(runLoop) {
+            if (imageEmbeddingsPtr != 0L) {
+                clip_free_embeddings(imageEmbeddingsPtr)
+                imageEmbeddingsPtr = 0L
+            }
+            if (clipContext != 0L) {
+                clip_model_free(clipContext)
+                clipContext = 0L
+                logger.info("CLIP vision model freed")
+            }
+        }
+    }
+
+    // ============================================================================
+    // End of CLIP/Vision Methods
+    // ============================================================================
 
     /**
      * Load the optimal native library based on CPU features

@@ -29,6 +29,8 @@ function(build_library_variant target_name cpu_flags)
     add_library(${target_name} SHARED
         src/llama-android.cpp
         src/cpu_features.cpp
+        clip_jni.cpp                               # NEW: CLIP JNI bindings
+        ${LLAMA_CPP_DIR}/tools/mtmd/clip.cpp      # NEW: CLIP implementation
     )
 
     # Link llama.cpp libraries
@@ -45,6 +47,7 @@ function(build_library_variant target_name cpu_flags)
         ${LLAMA_CPP_DIR}/common
         ${LLAMA_CPP_DIR}/src
         ${LLAMA_CPP_DIR}
+        ${LLAMA_CPP_DIR}/tools/mtmd                # NEW: CLIP headers
     )
 
     # Optimization flags - matching SmolChat's conservative approach
@@ -64,6 +67,7 @@ function(build_library_variant target_name cpu_flags)
         GGML_VERSION=""
         GGML_USE_CPU
         GGML_USE_CPU_AARCH64
+        STB_IMAGE_IMPLEMENTATION               # NEW: Required for CLIP image loading
     )
 
     # Link-time optimization - matching SmolChat
