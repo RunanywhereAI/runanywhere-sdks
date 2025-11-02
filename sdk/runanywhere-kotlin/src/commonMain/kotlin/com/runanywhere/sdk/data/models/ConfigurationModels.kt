@@ -14,13 +14,25 @@ import kotlinx.datetime.Instant
 /**
  * SDK Initialization Parameters
  * Used during SDK initialization
+ * Matches iOS SDKInitParams exactly
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Configuration/SDKEnvironment.swift:99
  */
 data class SDKInitParams(
     val apiKey: String,
     val baseURL: String? = null,
     val environment: SDKEnvironment = SDKEnvironment.DEVELOPMENT,
     val configuration: ConfigurationData? = null
-)
+) {
+    /**
+     * Internal Supabase configuration (auto-configured based on environment)
+     * User does NOT pass this - it's automatically determined
+     *
+     * Matches iOS: internal var supabaseConfig
+     */
+    internal val supabaseConfig: com.runanywhere.sdk.foundation.supabase.SupabaseConfig?
+        get() = com.runanywhere.sdk.foundation.supabase.SupabaseConfig.configuration(environment)
+}
 
 /**
  * Configuration source enumeration

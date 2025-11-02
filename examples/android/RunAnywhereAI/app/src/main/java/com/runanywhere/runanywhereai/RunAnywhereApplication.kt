@@ -54,6 +54,7 @@ class RunAnywhereApplication : Application() {
             // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
                 // Development Mode - No API key needed!
+                // Supabase analytics are automatically configured for development mode
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
                     apiKey = "dev",  // Any string works in dev mode
@@ -61,6 +62,8 @@ class RunAnywhereApplication : Application() {
                     environment = SDKEnvironment.DEVELOPMENT
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
+                Log.i("RunAnywhereApp", "📊 Analytics: Automatically enabled (RunAnywhere Supabase)")
+                Log.i("RunAnywhereApp", "🔒 No Supabase credentials needed - handled by SDK!")
 
                 // STEP 1: Register Service Providers (matches iOS pattern)
                 val providersRegistered = registerServiceProvidersForDevelopment()
