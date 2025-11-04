@@ -104,7 +104,7 @@ class GenerationService(
             // Submit analytics (non-blocking, matching iOS pattern)
             submitGenerationAnalytics(
                 generationId = sessionId,
-                modelId = resolvedOptions.model ?: "unknown",
+                modelId = currentModel?.model?.id ?: "unknown",
                 prompt = prompt,
                 response = response,
                 latencyMs = result.latencyMs,
@@ -120,7 +120,7 @@ class GenerationService(
             // Submit analytics for failure
             submitGenerationAnalytics(
                 generationId = sessionId,
-                modelId = resolvedOptions.model ?: "unknown",
+                modelId = currentModel?.model?.id ?: "unknown",
                 prompt = prompt,
                 response = "",
                 latencyMs = System.currentTimeMillis() - session.startTime,
@@ -199,7 +199,7 @@ class GenerationService(
             // Submit analytics (non-blocking, matching iOS pattern and non-streaming generate())
             submitGenerationAnalytics(
                 generationId = sessionId,
-                modelId = resolvedOptions.model ?: "unknown",
+                modelId = currentModel?.model?.id ?: "unknown",
                 prompt = prompt,
                 response = session.partialResponse,
                 latencyMs = result.latencyMs,
@@ -213,7 +213,7 @@ class GenerationService(
             // Submit analytics for failure (matching non-streaming generate())
             submitGenerationAnalytics(
                 generationId = sessionId,
-                modelId = resolvedOptions.model ?: "unknown",
+                modelId = currentModel?.model?.id ?: "unknown",
                 prompt = prompt,
                 response = "",
                 latencyMs = System.currentTimeMillis() - session.startTime,
