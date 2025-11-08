@@ -167,14 +167,17 @@ struct RunAnywhereAIApp: App {
                 LLMSwiftAdapter(),
                 models: [
                     // SmolLM2 360M - smallest and fastest
+                    // Explicit modality specification
                     try! ModelRegistration(
                         url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
                         framework: .llamaCpp,
                         id: "smollm2-360m-q8-0",
                         name: "SmolLM2 360M Q8_0",
+                        modality: .textToText,  // ✅ Explicit modality for text generation
                         memoryRequirement: 500_000_000
                     ),
                     // Qwen 2.5 0.5B - small but capable
+                    // Modality auto-inferred from framework (llamaCpp → textToText)
                     try! ModelRegistration(
                         url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
                         framework: .llamaCpp,
@@ -233,15 +236,18 @@ struct RunAnywhereAIApp: App {
                 WhisperKitAdapter.shared,
                 models: [
                     // Whisper Tiny - smallest and fastest
+                    // Explicit modality specification
                     try! ModelRegistration(
                         url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
                         framework: .whisperKit,
                         id: "whisper-tiny",
                         name: "Whisper Tiny",
+                        modality: .voiceToText,  // ✅ Explicit modality for speech recognition
                         format: .mlmodel,  // Explicitly specify Core ML format
                         memoryRequirement: 39_000_000
                     ),
                     // Whisper Base - better quality
+                    // Modality auto-inferred from framework (whisperKit → voiceToText)
                     try! ModelRegistration(
                         url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
                         framework: .whisperKit,

@@ -14,6 +14,9 @@ public struct ModelRegistration {
     /// The framework this model is compatible with
     public let framework: LLMFramework
 
+    /// The specific modality this model performs (optional, auto-inferred from framework if nil)
+    public let modality: FrameworkModality?
+
     /// Model format (auto-detected from URL if nil)
     public let format: ModelFormat?
 
@@ -32,6 +35,7 @@ public struct ModelRegistration {
         framework: LLMFramework,
         id: String? = nil,
         name: String? = nil,
+        modality: FrameworkModality? = nil,
         format: ModelFormat? = nil,
         memoryRequirement: Int64? = nil,
         contextLength: Int? = nil,
@@ -43,6 +47,7 @@ public struct ModelRegistration {
 
         self.url = modelURL
         self.framework = framework
+        self.modality = modality
         self.id = id ?? modelURL.lastPathComponent.replacingOccurrences(of: ".", with: "_")
         self.name = name ?? modelURL.lastPathComponent
         self.format = format ?? ModelFormat.detectFromURL(modelURL)
@@ -57,6 +62,7 @@ public struct ModelRegistration {
         framework: LLMFramework,
         id: String? = nil,
         name: String? = nil,
+        modality: FrameworkModality? = nil,
         format: ModelFormat? = nil,
         memoryRequirement: Int64? = nil,
         contextLength: Int? = nil,
@@ -64,6 +70,7 @@ public struct ModelRegistration {
     ) {
         self.url = url
         self.framework = framework
+        self.modality = modality
         self.id = id ?? url.lastPathComponent.replacingOccurrences(of: ".", with: "_")
         self.name = name ?? url.lastPathComponent
         self.format = format ?? ModelFormat.detectFromURL(url)
@@ -81,6 +88,7 @@ public struct ModelRegistration {
             id: id,
             name: name,
             category: category,
+            modality: modality ?? category.frameworkModality,  // Auto-infer from category if not specified
             format: format ?? .gguf,
             downloadURL: url,
             localPath: nil,

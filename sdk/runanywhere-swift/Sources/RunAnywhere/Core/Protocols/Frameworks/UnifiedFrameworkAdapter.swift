@@ -69,6 +69,14 @@ public extension UnifiedFrameworkAdapter {
         return framework.supportedModalities
     }
 
+    /// Default implementation: validates both format and modality
+    func canHandle(model: ModelInfo) -> Bool {
+        // Check both format AND modality
+        guard supportedFormats.contains(model.format) else { return false }
+        guard supportedModalities.contains(model.modality) else { return false }
+        return true
+    }
+
     /// Default implementation - does nothing
     func onRegistration() {
         // Default: no-op
