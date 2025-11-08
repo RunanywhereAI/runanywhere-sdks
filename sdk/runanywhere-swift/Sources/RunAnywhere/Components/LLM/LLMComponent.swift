@@ -253,14 +253,34 @@ public enum FinishReason: String, Sendable {
 
 /// Protocol for registering external LLM implementations
 public protocol LLMServiceProvider {
+    /// Modalities this provider can handle
+    static var supportedModalities: Set<FrameworkModality> { get }
+
     /// Create an LLM service for the given configuration
     func createLLMService(configuration: LLMConfiguration) async throws -> LLMService
 
-    /// Check if this provider can handle the given model
+    /// Check if this provider can handle the given model ID
     func canHandle(modelId: String?) -> Bool
+
+    /// Check if this provider can handle the given model (validates modality)
+    func canHandle(model: ModelInfo) -> Bool
 
     /// Provider name for identification
     var name: String { get }
+}
+
+// MARK: - LLMServiceProvider Default Implementation
+
+extension LLMServiceProvider {
+    /// Default supported modalities for LLM providers
+    public static var supportedModalities: Set<FrameworkModality> {
+        [.textToText]
+    }
+
+    /// Default implementation: validates model modality
+    public func canHandle(model: ModelInfo) -> Bool {
+        Self.supportedModalities.contains(model.modality)
+    }
 }
 
 // MARK: - LLM Service Wrapper
@@ -339,6 +359,19 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
             throw SDKError.componentNotInitialized(
                 "No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.shared.registerLLM(provider)."
             )
+        }
+
+        // Validate modality compatibility
+        if let modelId = llmConfiguration.modelId,
+           let model = ServiceContainer.shared.modelRegistry.getModel(by: modelId) {
+            guard provider.canHandle(model: model) else {
+                let supportedModalitiesStr = type(of: provider).supportedModalities
+                    .map { $0.rawValue }
+                    .joined(separator: ", ")
+                throw SDKError.invalidConfiguration(
+                    "Model '\(model.name)' has modality '\(model.modality.rawValue)' which is not compatible with LLM service (expects: \(supportedModalitiesStr))"
+                )
+            }
         }
 
         // Create service through provider

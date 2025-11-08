@@ -27,11 +27,21 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     // MARK: - UnifiedFrameworkAdapter Implementation
 
     public func canHandle(model: ModelInfo) -> Bool {
-        // Check if model is for speech recognition and compatible with WhisperKit
-        let canHandle = model.category == .speechRecognition &&
-                       model.compatibleFrameworks.contains(.whisperKit)
-        logger.debug("canHandle(\(model.name, privacy: .public)): \(canHandle)")
-        return canHandle
+        // Check format, modality, and framework compatibility
+        guard supportedFormats.contains(model.format) else {
+            logger.debug("canHandle(\(model.name, privacy: .public)): false - unsupported format \(model.format.rawValue)")
+            return false
+        }
+        guard supportedModalities.contains(model.modality) else {
+            logger.debug("canHandle(\(model.name, privacy: .public)): false - unsupported modality \(model.modality.rawValue)")
+            return false
+        }
+        guard model.compatibleFrameworks.contains(.whisperKit) else {
+            logger.debug("canHandle(\(model.name, privacy: .public)): false - not compatible with WhisperKit")
+            return false
+        }
+        logger.debug("canHandle(\(model.name, privacy: .public)): true")
+        return true
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {

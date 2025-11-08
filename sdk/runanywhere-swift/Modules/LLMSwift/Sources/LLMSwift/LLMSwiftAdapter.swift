@@ -17,6 +17,9 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
         // Check format support
         guard supportedFormats.contains(model.format) else { return false }
 
+        // Check modality support
+        guard supportedModalities.contains(model.modality) else { return false }
+
         // Check quantization compatibility
         if let metadata = model.metadata, let quantization = metadata.quantizationLevel {
             return isQuantizationSupported(quantization.rawValue)

@@ -181,16 +181,48 @@ public final class ModuleRegistry {
 
 /// Provider for Vision Language Model services
 public protocol VLMServiceProvider {
+    /// Modalities this provider can handle
+    static var supportedModalities: Set<FrameworkModality> { get }
+
     func createVLMService(configuration: VLMConfiguration) async throws -> VLMService
     func canHandle(modelId: String?) -> Bool
+    func canHandle(model: ModelInfo) -> Bool
     var name: String { get }
+}
+
+extension VLMServiceProvider {
+    /// Default supported modalities for VLM providers
+    public static var supportedModalities: Set<FrameworkModality> {
+        [.imageToText, .multimodal]
+    }
+
+    /// Default implementation: validates model modality
+    public func canHandle(model: ModelInfo) -> Bool {
+        Self.supportedModalities.contains(model.modality)
+    }
 }
 
 /// Provider for Speaker Diarization services
 public protocol SpeakerDiarizationServiceProvider {
+    /// Modalities this provider can handle
+    static var supportedModalities: Set<FrameworkModality> { get }
+
     func createSpeakerDiarizationService(configuration: SpeakerDiarizationConfiguration) async throws -> SpeakerDiarizationService
     func canHandle(modelId: String?) -> Bool
+    func canHandle(model: ModelInfo) -> Bool
     var name: String { get }
+}
+
+extension SpeakerDiarizationServiceProvider {
+    /// Default supported modalities for Speaker Diarization providers
+    public static var supportedModalities: Set<FrameworkModality> {
+        [.voiceToText]  // Audio processing
+    }
+
+    /// Default implementation: validates model modality
+    public func canHandle(model: ModelInfo) -> Bool {
+        Self.supportedModalities.contains(model.modality)
+    }
 }
 
 

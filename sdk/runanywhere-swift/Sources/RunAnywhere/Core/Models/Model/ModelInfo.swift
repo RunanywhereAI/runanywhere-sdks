@@ -8,6 +8,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public let name: String
     public let category: ModelCategory  // Type of model (language, speech, vision, etc.)
 
+    /// The specific modality this model performs (e.g., text-to-text, voice-to-text)
+    /// Auto-inferred from category if not explicitly specified during initialization
+    public let modality: FrameworkModality
+
     // Format and location
     public let format: ModelFormat
     public let downloadURL: URL?
@@ -56,7 +60,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, category, format, downloadURL, localPath
+        case id, name, category, modality, format, downloadURL, localPath
         case downloadSize, memoryRequired
         case compatibleFrameworks, preferredFramework
         case contextLength, supportsThinking, thinkingPattern
@@ -69,6 +73,7 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         id: String,
         name: String,
         category: ModelCategory,
+        modality: FrameworkModality? = nil,
         format: ModelFormat,
         downloadURL: URL? = nil,
         localPath: URL? = nil,
@@ -91,6 +96,10 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
         self.id = id
         self.name = name
         self.category = category
+
+        // Auto-infer modality from category if not explicitly provided
+        self.modality = modality ?? category.frameworkModality
+
         self.format = format
         self.downloadURL = downloadURL
         self.localPath = localPath
@@ -136,6 +145,7 @@ extension ModelInfo {
         case id
         case name
         case category
+        case modality
         case format
         case downloadURL
         case localPath

@@ -436,14 +436,34 @@ public protocol STTFrameworkAdapter: ComponentAdapter where ServiceType: STTServ
 
 /// Protocol for registering external STT implementations
 public protocol STTServiceProvider {
+    /// Modalities this provider can handle
+    static var supportedModalities: Set<FrameworkModality> { get }
+
     /// Create an STT service for the given configuration
     func createSTTService(configuration: STTConfiguration) async throws -> STTService
 
-    /// Check if this provider can handle the given model
+    /// Check if this provider can handle the given model ID
     func canHandle(modelId: String?) -> Bool
+
+    /// Check if this provider can handle the given model (validates modality)
+    func canHandle(model: ModelInfo) -> Bool
 
     /// Provider name for identification
     var name: String { get }
+}
+
+// MARK: - STTServiceProvider Default Implementation
+
+extension STTServiceProvider {
+    /// Default supported modalities for STT providers
+    public static var supportedModalities: Set<FrameworkModality> {
+        [.voiceToText]
+    }
+
+    /// Default implementation: validates model modality
+    public func canHandle(model: ModelInfo) -> Bool {
+        Self.supportedModalities.contains(model.modality)
+    }
 }
 
 // MARK: - STT Service Wrapper
@@ -492,6 +512,19 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             throw SDKError.componentNotInitialized(
                 "No STT service provider registered. Please register WhisperKitServiceProvider.register()"
             )
+        }
+
+        // Validate modality compatibility
+        if let modelId = sttConfiguration.modelId,
+           let model = ServiceContainer.shared.modelRegistry.getModel(by: modelId) {
+            guard provider.canHandle(model: model) else {
+                let supportedModalitiesStr = type(of: provider).supportedModalities
+                    .map { $0.rawValue }
+                    .joined(separator: ", ")
+                throw SDKError.invalidConfiguration(
+                    "Model '\(model.name)' has modality '\(model.modality.rawValue)' which is not compatible with STT service (expects: \(supportedModalitiesStr))"
+                )
+            }
         }
 
         // Check if model needs downloading

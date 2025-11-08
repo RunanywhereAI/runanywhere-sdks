@@ -157,14 +157,32 @@ public struct WakeWordMetadata: Sendable {
 
 /// Protocol for registering external Wake Word implementations
 public protocol WakeWordServiceProvider {
+    /// Modalities this provider can handle
+    static var supportedModalities: Set<FrameworkModality> { get }
+
     /// Create a wake word service for the given configuration
     func createWakeWordService(configuration: WakeWordConfiguration) async throws -> WakeWordService
 
-    /// Check if this provider can handle the given model
+    /// Check if this provider can handle the given model ID
     func canHandle(modelId: String?) -> Bool
+
+    /// Check if this provider can handle the given model (validates modality)
+    func canHandle(model: ModelInfo) -> Bool
 
     /// Provider name for identification
     var name: String { get }
+}
+
+extension WakeWordServiceProvider {
+    /// Default supported modalities for Wake Word providers
+    public static var supportedModalities: Set<FrameworkModality> {
+        [.voiceToText]
+    }
+
+    /// Default implementation: validates model modality
+    public func canHandle(model: ModelInfo) -> Bool {
+        Self.supportedModalities.contains(model.modality)
+    }
 }
 
 // MARK: - Default Wake Word Service
