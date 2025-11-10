@@ -1,0 +1,64 @@
+name: runanywhere_flutter
+description: "Privacy-first, on-device AI SDK for Flutter - Text generation, voice AI pipeline, and model management"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP client
+  dio: ^5.4.0
+  
+  # Database
+  sqflite: ^2.3.0
+  
+  # File operations
+  path_provider: ^2.1.0
+  path: ^1.8.3
+  
+  # Device info
+  device_info_plus: ^9.1.0
+  
+  # Secure storage
+  flutter_secure_storage: ^9.0.0
+  
+  # Logging
+  logger: ^2.0.2
+  
+  # Dependency injection
+  get_it: ^7.6.4
+  
+  # Streams and reactive programming
+  rxdart: ^0.27.7
+  
+  # JSON serialization
+  json_annotation: ^4.8.1
+  
+  # UUID generation
+  uuid: ^4.2.1
+  
+  # Crypto
+  crypto: ^3.0.3
+  
+  # Archive handling
+  archive: ^3.4.0
+  
+  # Platform channels
+  platform: ^3.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  
+  # Code generation
+  build_runner: ^2.4.7
+  json_serializable: ^6.7.1
+
+flutter:
+  uses-material-design: true
