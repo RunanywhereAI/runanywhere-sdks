@@ -1,45 +1,32 @@
 # RunAnywhere Flutter SDK
 
-**Privacy-first, on-device AI SDK for Flutter** that brings powerful language models directly to your Flutter applications. RunAnywhere enables high-performance text generation, voice AI workflows, and structured outputs - all while keeping user data private and secure on-device.
+A privacy-first, on-device AI SDK for Flutter that brings powerful language models directly to your applications.
 
-## ✨ Features
+## Features
 
-### Core Capabilities
-- 💬 **Text Generation** - High-performance on-device text generation with streaming support
-- 🎙️ **Voice AI Pipeline** - Complete voice workflow with VAD, STT, LLM, and TTS components
-- 📋 **Structured Outputs** - Type-safe JSON generation with schema validation
-- 🏗️ **Model Management** - Automatic model discovery, downloading, and lifecycle management
-- 📊 **Performance Analytics** - Real-time metrics with comprehensive event system
-- 🎯 **Intelligent Routing** - Automatic on-device vs cloud decision making
-
-### Technical Highlights
-- 🔒 **Privacy-First** - All processing happens on-device by default
-- 🚀 **Multi-Framework** - Support for GGUF, CoreML, TensorFlow Lite, WhisperKit, and more
-- ⚡ **Native Performance** - Optimized for mobile platforms
-- 🧠 **Smart Memory** - Automatic memory optimization and cleanup
-- 📱 **Cross-Platform** - iOS, Android, Web, macOS, Linux, Windows
-- 🎛️ **Component Architecture** - Modular components for flexible AI pipeline construction
-
-## Requirements
-
-- Flutter 3.9.2+
-- Dart 3.9.2+
-- iOS 16.0+ / Android API 21+
+- 🤖 **On-Device AI**: Run language models directly on user devices
+- 🔒 **Privacy-First**: All processing happens locally, no data leaves the device
+- ⚡ **Fast & Efficient**: Optimized for mobile performance
+- 🎯 **Structured Output**: Generate type-safe structured data from LLMs
+- 📊 **Analytics**: Track generation performance (development mode)
+- 💾 **Memory Management**: Automatic memory pressure handling
+- 📥 **Model Management**: Download and manage AI models
 
 ## Installation
 
-Add RunAnywhere to your `pubspec.yaml`:
+Add the SDK to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
   runanywhere_flutter:
-    path: ../sdk/runanywhere-flutter  # Or use git URL when published
+    path: ../path/to/runanywhere-flutter
 ```
 
-Then run:
+Or from pub.dev (when published):
 
-```bash
-flutter pub get
+```yaml
+dependencies:
+  runanywhere_flutter: ^0.15.8
 ```
 
 ## Quick Start
@@ -47,118 +34,207 @@ flutter pub get
 ### 1. Initialize the SDK
 
 ```dart
-import 'package:runanywhere_flutter/runanywhere.dart';
+import 'package:runanywhere/runanywhere.dart';
 
-// Development mode (recommended for getting started)
-await RunAnywhere.initialize(
-  apiKey: 'dev',           // Any string works in dev mode
-  baseURL: 'localhost',   // Not used in dev mode
-  environment: SDKEnvironment.development,
-);
+void main() async {
+  await RunAnywhere.initialize(
+    apiKey: 'your-api-key',
+    baseURL: 'https://api.runanywhere.ai',
+    environment: SDKEnvironment.production,
+  );
+}
 ```
 
 ### 2. Generate Text
 
 ```dart
-// Simple chat
+// Simple text generation
 final response = await RunAnywhere.chat('Hello, how are you?');
 print(response);
 
-// Generation with options
-final options = RunAnywhereGenerationOptions(
-  maxTokens: 150,
-  temperature: 0.7,
-);
-
+// With options
 final result = await RunAnywhere.generate(
-  'Explain quantum computing in simple terms',
-  options: options,
+  'Write a short story',
+  options: RunAnywhereGenerationOptions(
+    maxTokens: 500,
+    temperature: 0.7,
+  ),
 );
 
-print('Response: ${result.text}');
-print('Tokens: ${result.tokensUsed}');
-print('Latency: ${result.latencyMs}ms');
+print(result.text);
+print('Tokens used: ${result.tokensUsed}');
 ```
 
 ### 3. Streaming Generation
 
 ```dart
-// Stream tokens in real-time
 final stream = RunAnywhere.generateStream(
-  'Write a short story about AI',
-  options: options,
+  'Tell me a joke',
+  options: RunAnywhereGenerationOptions(),
 );
 
 await for (final token in stream) {
-  print(token, terminator: '');
+  print(token);
 }
 ```
 
-### 4. Voice Transcription
+### 4. Structured Output
 
 ```dart
-// Transcribe audio
-final transcript = await RunAnywhere.transcribe(audioData);
-print('Transcription: $transcript');
+// Define a Generatable type
+class UserProfile implements Generatable {
+  final String name;
+  final int age;
+  final String email;
+
+  UserProfile({required this.name, required this.age, required this.email});
+
+  static String get jsonSchema => '''
+  {
+    "type": "object",
+    "properties": {
+      "name": {"type": "string"},
+      "age": {"type": "integer"},
+      "email": {"type": "string"}
+    },
+    "required": ["name", "age", "email"]
+  }
+  ''';
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    return UserProfile(
+      name: json['name'] as String,
+      age: json['age'] as int,
+      email: json['email'] as String,
+    );
+  }
+}
+
+// Generate structured output
+final profile = await RunAnywhere.generateStructuredOutput<UserProfile>(
+  type: UserProfile,
+  prompt: 'Create a user profile for John Doe, age 30',
+);
 ```
 
 ### 5. Model Management
 
 ```dart
 // Load a model
-await RunAnywhere.loadModel('smollm2-360m');
+await RunAnywhere.loadModel('model-id');
 
-// List available models
+// Get available models
 final models = await RunAnywhere.availableModels();
-for (final model in models) {
-  print('Model: ${model.name}, ID: ${model.id}');
-}
+
+// Get current model
+final currentModel = RunAnywhere.currentModel;
 ```
 
-## Event System
-
-Subscribe to SDK events:
+### 6. Download Models
 
 ```dart
-// Subscribe to generation events
-RunAnywhere.events.subscribe<SDKGenerationEvent>().listen((event) {
-  if (event is SDKGenerationEvent.started) {
-    print('Generation started: ${event.prompt}');
-  } else if (event is SDKGenerationEvent.completed) {
+// Download a model with progress tracking
+final downloadTask = await RunAnywhere.downloadModel('model-id');
+
+await for (final progress in downloadTask.progress) {
+  print('Download progress: ${progress.progress * 100}%');
+}
+
+final localPath = await downloadTask.result;
+print('Model downloaded to: $localPath');
+```
+
+## Event-Driven API
+
+The SDK provides an event bus for reactive programming:
+
+```dart
+// Listen to generation events
+RunAnywhere.events.generationEvents.listen((event) {
+  if (event is SDKGenerationEvent.completed) {
     print('Generation completed: ${event.response}');
+  }
+});
+
+// Listen to model events
+RunAnywhere.events.modelEvents.listen((event) {
+  if (event is SDKModelEvent.loadCompleted) {
+    print('Model loaded: ${event.modelId}');
   }
 });
 ```
 
 ## Architecture
 
-The Flutter SDK follows the same 5-layer architecture as the Swift SDK:
+The SDK follows a modular, protocol-oriented architecture:
 
-1. **Public API Layer** - Clean, user-facing interface
-2. **Capabilities Layer** - Feature-specific business logic
-3. **Core Layer** - Shared domain models and protocols
-4. **Data Layer** - Centralized data persistence and network operations
-5. **Foundation Layer** - Cross-cutting utilities and platform extensions
+- **Core**: Base components, protocols, and types
+- **Capabilities**: High-level services (generation, memory, analytics)
+- **Components**: AI component implementations (LLM, STT, TTS)
+- **Foundation**: Infrastructure (logging, security, device management)
+- **Public**: Public API and configuration
 
-## Development
+## Error Handling
 
-### Building
+The SDK uses typed errors for better error handling:
 
-```bash
-# Build the SDK
-flutter build
-
-# Run tests
-flutter test
-
-# Analyze code
-flutter analyze
+```dart
+try {
+  await RunAnywhere.generate('prompt');
+} on SDKError catch (e) {
+  switch (e.type) {
+    case SDKErrorType.modelNotFound:
+      print('Model not found');
+      break;
+    case SDKErrorType.generationFailed:
+      print('Generation failed');
+      break;
+    default:
+      print('Error: ${e.message}');
+  }
+}
 ```
+
+## Memory Management
+
+The SDK automatically manages memory:
+
+```dart
+// Get memory statistics
+final stats = RunAnywhere.serviceContainer.memoryService.getMemoryStatistics();
+print('Total memory: ${stats.totalMemory}');
+print('Model memory: ${stats.modelMemory}');
+print('Available: ${stats.availableMemory}');
+```
+
+## Analytics
+
+Analytics are automatically submitted in development mode:
+
+```dart
+// Analytics are submitted automatically after generation
+// No manual tracking needed
+```
+
+## Platform Channels
+
+The SDK uses platform channels for native functionality:
+
+- Audio session management (iOS/Android)
+- Microphone permissions
+- Device capabilities
+- Native model loading (when using native SDKs)
+
+## Requirements
+
+- Flutter SDK >= 3.0.0
+- Dart >= 3.0.0
+- iOS 13.0+ / Android API 21+
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](../../../LICENSE) file for details.
+See LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Support
 
-Built with ❤️ by the RunAnywhere team. The Flutter SDK architecture is based on the iOS Swift SDK implementation.
+For issues and questions, please open an issue on GitHub.

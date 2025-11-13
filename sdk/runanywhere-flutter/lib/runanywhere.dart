@@ -1,41 +1,25 @@
 /// RunAnywhere Flutter SDK
-///
-/// Main entry point for the RunAnywhere SDK
-///
-/// Example usage:
-/// ```dart
-/// import 'package:runanywhere_flutter/runanywhere.dart';
-///
-/// // Initialize the SDK
-/// await RunAnywhere.initialize(
-///   apiKey: 'dev',
-///   baseURL: 'localhost',
-///   environment: SDKEnvironment.development,
-/// );
-///
-/// // Generate text
-/// final response = await RunAnywhere.chat('Hello, how are you?');
-/// print(response);
-///
-/// // Stream generation
-/// RunAnywhere.generateStream('Tell me a story').listen((token) {
-///   print(token);
-/// });
-///
-/// // Voice transcription
-/// final transcript = await RunAnywhere.transcribe(audioData);
-/// print(transcript);
-/// ```
-library runanywhere_flutter;
+/// 
+/// Privacy-first, on-device AI SDK for Flutter that brings powerful language
+/// models directly to your applications.
+library runanywhere;
 
-// Public API
 export 'public/runanywhere.dart';
+export 'public/models/models.dart';
+export 'public/errors/errors.dart';
 export 'public/events/event_bus.dart';
 export 'public/events/sdk_event.dart';
-export 'public/errors/sdk_error.dart';
-export 'public/models/configuration/sdk_environment.dart';
-export 'public/models/configuration/sdk_init_params.dart';
-export 'public/models/generation_result.dart';
-export 'public/models/generation_options.dart';
-export 'public/models/model_info.dart';
-export 'public/models/performance_metrics.dart';
+export 'public/events/component_initialization_event.dart';
+export 'public/configuration/configuration.dart';
+export 'core/types/component_state.dart';
+export 'core/types/sdk_component.dart';
+export 'core/module_registry.dart' hide LLMGenerationOptions;
+export 'components/stt/stt_component.dart';
+export 'components/llm/llm_component.dart';
+export 'components/tts/tts_component.dart';
+export 'components/vad/vad_component.dart';
+export 'components/voice_agent/voice_agent_component.dart';
+export 'capabilities/download/download_service.dart';
+export 'capabilities/text_generation/generation_service.dart';
+export 'capabilities/analytics/analytics_service.dart';
+

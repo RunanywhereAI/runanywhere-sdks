@@ -1,63 +1,153 @@
 import '../protocols/component/component.dart';
-import '../models/common/component_state.dart';
-import '../models/common/component_types.dart';
+import '../protocols/component/component_configuration.dart';
+import '../types/component_state.dart';
+import '../types/sdk_component.dart';
+import '../../public/events/event_bus.dart';
+import '../../public/events/component_initialization_event.dart';
+import '../../foundation/dependency_injection/service_container.dart';
 
-/// Base Component class
-/// Similar to Swift SDK's BaseComponent
-abstract class BaseComponent implements Component {
+/// Simplified base component for all SDK components
+abstract class BaseComponent<T> implements Component {
+  /// Current state
+  ComponentState _state = ComponentState.notInitialized;
+
   @override
   ComponentState get state => _state;
-  ComponentState _state = ComponentState.idle;
+
+  /// The service that performs the actual work
+  T? _service;
+
+  T? get service => _service;
+
+  /// Configuration (immutable)
+  final ComponentConfiguration configuration;
+
+  /// Service container for dependency injection
+  final ServiceContainer? serviceContainer;
+
+  /// Event bus for publishing events
+  final EventBus eventBus = EventBus.shared;
+
+  /// Current processing stage
+  String? currentStage;
+
+  /// Initialize the component
+  BaseComponent({
+    required this.configuration,
+    this.serviceContainer,
+  });
 
   @override
-  final ComponentInitParameters parameters;
-
-  BaseComponent({required this.parameters});
-
-  @override
-  Future<void> initialize({ComponentInitParameters? parameters}) async {
-    if (_state != ComponentState.idle) {
-      throw StateError('Component already initialized');
+  Future<void> initialize() async {
+    if (_state != ComponentState.notInitialized) {
+      if (_state == ComponentState.ready) {
+        return; // Already initialized
+      }
+      throw StateError('Cannot initialize from state: $_state');
     }
 
-    _state = ComponentState.initializing;
+    // Emit state change event
+    _updateState(ComponentState.initializing);
+
     try {
-      await doInitialize(parameters ?? this.parameters);
-      _state = ComponentState.ready;
+      // Stage: Validation
+      currentStage = 'validation';
+      eventBus.publish(ComponentInitializationEvent.componentChecking(
+        component: componentType,
+        modelId: null,
+      ));
+      configuration.validate();
+
+      // Stage: Service Creation
+      currentStage = 'service_creation';
+      eventBus.publish(ComponentInitializationEvent.componentInitializing(
+        component: componentType,
+        modelId: null,
+      ));
+      _service = await createService();
+
+      // Stage: Service Initialization
+      currentStage = 'service_initialization';
+      await initializeService();
+
+      // Component ready
+      currentStage = null;
+      _updateState(ComponentState.ready);
+      eventBus.publish(ComponentInitializationEvent.componentReady(
+        component: componentType,
+        modelId: null,
+      ));
     } catch (e) {
-      _state = ComponentState.idle;
+      _updateState(ComponentState.failed);
+      eventBus.publish(ComponentInitializationEvent.componentFailed(
+        component: componentType,
+        error: e,
+      ));
       rethrow;
     }
   }
 
+  /// Create the service (override in subclass)
+  Future<T> createService();
+
+  /// Initialize the service (override if needed)
+  Future<void> initializeService() async {
+    // Default: no-op
+    // Override in subclass if service needs initialization
+  }
+
   @override
-  Future<void> deinitialize() async {
-    if (_state == ComponentState.idle) {
+  Future<void> cleanup() async {
+    if (_state == ComponentState.notInitialized) {
       return;
     }
 
-    _state = ComponentState.deinitializing;
-    try {
-      await doDeinitialize();
-      _state = ComponentState.idle;
-    } catch (e) {
-      _state = ComponentState.ready;
-      rethrow;
+    _state = ComponentState.notInitialized;
+
+    // Allow subclass to perform cleanup
+    await performCleanup();
+
+    // Clear service reference
+    _service = null;
+
+    _state = ComponentState.notInitialized;
+  }
+
+  /// Perform cleanup (override in subclass if needed)
+  Future<void> performCleanup() async {
+    // Default: no-op
+    // Override in subclass for custom cleanup
+  }
+
+  @override
+  bool get isReady => _state == ComponentState.ready;
+
+  /// Ensure component is ready for processing
+  void ensureReady() {
+    if (_state != ComponentState.ready) {
+      throw StateError(
+        '${componentType.value} is not ready. Current state: $_state',
+      );
     }
   }
 
-  @override
-  bool get isInitialized => _state == ComponentState.ready;
+  /// Update state and emit event
+  void _updateState(ComponentState newState) {
+    final oldState = _state;
+    _state = newState;
+    eventBus.publish(ComponentInitializationEvent.componentStateChanged(
+      component: componentType,
+      oldState: oldState,
+      newState: newState,
+    ));
+  }
 
   @override
   Future<void> transitionTo(ComponentState newState) async {
-    _state = newState;
+    _updateState(newState);
   }
 
-  /// Override this method to implement component-specific initialization
-  Future<void> doInitialize(ComponentInitParameters parameters);
-
-  /// Override this method to implement component-specific cleanup
-  Future<void> doDeinitialize();
+  /// Get component type (must be overridden in subclasses)
+  SDKComponent get componentType;
 }
 
