@@ -14,10 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - You should update the plan as you work - check `thoughts/shared/plans/{descriptive_name}.md` if you're running an already created plan via `thoughts/shared/plans/{descriptive_name}.md`
 - After you complete tasks in the plan, you should update and append detailed descriptions of the changes you made, so following tasks can be easily hand over to other engineers.
 - Always make sure that you're using structured types, never use strings directly so that we can keep things consistent and scalable and not make mistakes.
-- Read files FULLY to understand the FULL context. Only use tools when the file is large and you are short on context.
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+- Read files FULLY to understand the FULL context. Only use offset/limit when the file is large and you are short on context.
 - When fixing issues focus on SIMPLICITY, and following Clean SOLID principles, do not add complicated logic unless necessary!
-- When looking up something: It's September 2025 FYI
+- When looking up something: It's December 2025 FYI
 
 ## Swift specific rules:
 - Use the latest Swift 6 APIs always.
@@ -244,6 +243,12 @@ The SDK uses Kotlin Multiplatform to share code across JVM, Android, and Native 
    - `Services.kt` - Service container and dependency injection
    - `STTComponent` - Speech-to-text with Whisper integration
    - `VADComponent` - Voice activity detection
+   - `LLMComponent` - Large language model inference
+   - `TTSComponent` - Text-to-speech synthesis
+   - `VLMComponent` - Vision-language model inference
+   - `VoiceAgentComponent` - Complete voice AI pipeline orchestration
+   - `SpeakerDiarizationComponent` - Multi-speaker identification
+   - `WakeWordComponent` - Wake word detection
    - `ModelManager` - Model downloading and lifecycle
    - `ConfigurationService` - Environment-specific configuration
 
@@ -467,20 +472,23 @@ commonMain/
 ├── components/          # Component implementations
 │   ├── base/           # Base component classes
 │   ├── stt/            # Speech-to-text components
-│   └── vad/            # Voice activity detection
+│   ├── vad/            # Voice activity detection
+│   ├── llm/            # LLM inference components
+│   ├── tts/            # Text-to-speech components
+│   └── speakerdiarization/  # Speaker diarization
 ├── data/               # Data layer
 │   ├── models/         # Data classes and enums
+│   ├── network/        # Network services
 │   └── repositories/   # Repository interfaces
 ├── events/             # Event definitions
 ├── foundation/         # Core infrastructure
 │   ├── ServiceContainer.kt
 │   └── SDKLogger.kt
-├── core/               # Plugin architecture
-│   └── ModuleRegistry.kt
-└── services/           # Service interfaces
-    ├── configuration/
-    ├── analytics/
-    └── modelinfo/
+├── models/             # Model management
+│   ├── ModelManager.kt
+│   └── ModelDownloader.kt
+├── memory/             # Memory management
+└── generation/         # Text generation services
 ```
 
 #### Platform-Specific Structure
