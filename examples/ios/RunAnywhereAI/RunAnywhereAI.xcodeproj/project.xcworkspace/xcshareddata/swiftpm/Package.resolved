@@ -1,5 +1,5 @@
 {
-  "originHash" : "027e9365f9d869a1aa44f5cdfcf338acf960804d3f141af8d4be60bec0d26946",
+  "originHash" : "e21c190261eae05d6e950eff236289375b953fa16d0e1ab44292fba4ce2504aa",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -17,15 +17,6 @@
       "state" : {
         "revision" : "513b9d7e7a1bd46504a1009bbab943b75ce2f195",
         "version" : "5.6.0"
-      }
-    },
-    {
-      "identity" : "executorch",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pytorch/executorch.git",
-      "state" : {
-        "branch" : "swiftpm-0.7.0",
-        "revision" : "2da89130e5e791959f2a3b2a796a54ecac9c545f"
       }
     },
     {
