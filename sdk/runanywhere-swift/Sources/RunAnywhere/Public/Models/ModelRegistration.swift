@@ -74,8 +74,14 @@ public struct ModelRegistration {
 
     /// Convert to ModelInfo for internal use
     internal func toModelInfo() -> ModelInfo {
-        // Determine category based on framework
-        let category = ModelCategory.from(framework: framework)
+        // Determine category - check metadata first, then use framework inference
+        let category: ModelCategory
+        if let categoryString = metadata["category"] as? String,
+           let categoryFromMetadata = ModelCategory(rawValue: categoryString) {
+            category = categoryFromMetadata
+        } else {
+            category = ModelCategory.from(framework: framework)
+        }
 
         return ModelInfo(
             id: id,

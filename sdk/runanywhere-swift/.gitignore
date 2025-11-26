@@ -6,3 +6,9 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+
+# XCFrameworks (Generated binaries - should be built from runanywhere-core, not committed)
+# These are large binary files (235MB) that will be consumed via SPM binary targets or built locally
+*.xcframework/
+XCFrameworks/
+Modules/ONNXRuntime/Sources/RunAnywhereONNX.xcframework/
