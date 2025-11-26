@@ -34,9 +34,16 @@ public final class WhisperKitServiceProvider: STTServiceProvider {
         // WhisperKit can handle whisper models
         guard let modelId = modelId else { return true }
 
+        let lowercased = modelId.lowercased()
+
+        // Exclude ONNX models - they should be handled by ONNXServiceProvider
+        if lowercased.contains("onnx") || lowercased.contains("glados") || lowercased.contains("distil") {
+            return false
+        }
+
         // Check if it's a whisper model
         let whisperPrefixes = ["whisper", "openai-whisper", "whisper-tiny", "whisper-base", "whisper-small", "whisper-medium", "whisper-large"]
-        return whisperPrefixes.contains(where: { modelId.lowercased().contains($0) })
+        return whisperPrefixes.contains(where: { lowercased.contains($0) })
     }
 
     public func createSTTService(configuration: STTConfiguration) async throws -> STTService {

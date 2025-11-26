@@ -55,6 +55,20 @@ struct ContentView: View {
                     Label("Voice", systemImage: "mic")
                 }
                 .tag(4)
+
+            SpeechToTextView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("STT", systemImage: "waveform")
+                }
+                .tag(5)
+
+            TextToSpeechView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("TTS", systemImage: "speaker.wave.2")
+                }
+                .tag(6)
         }
         #if os(macOS)
         .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity,

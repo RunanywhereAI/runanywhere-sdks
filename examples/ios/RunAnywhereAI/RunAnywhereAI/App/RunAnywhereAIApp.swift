@@ -10,6 +10,7 @@ import RunAnywhere
 import LLMSwift
 import WhisperKitTranscription
 import FluidAudioDiarization
+import ONNXRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -254,6 +255,87 @@ struct RunAnywhereAIApp: App {
                 options: lazyOptions  // Use lazy loading options
             )
             logger.info("✅ WhisperKit registered with custom models (lazy loading)")
+
+            // Register ONNX Runtime with STT and TTS models
+            await ONNXServiceProvider.register()
+            try await RunAnywhere.registerFrameworkAdapter(
+                ONNXAdapter.shared,
+                models: [
+                    // === Speech Recognition (STT) Models ===
+                    // Using Sherpa-ONNX Zipformer models (streaming transducer models)
+                    // These are proper sherpa-onnx models, not Whisper
+
+                    // Sherpa-ONNX Zipformer English 20M - Smallest streaming model (~20MB)
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
+                        framework: .onnx,
+                        id: "zipformer-en-20m",
+                        name: "Zipformer English 20M (ONNX)",
+                        format: .onnx,
+                        memoryRequirement: 20_000_000,
+                        metadata: ["category": "speech-recognition", "streaming": "true"]
+                    ),
+
+                    // Sherpa-ONNX Whisper Tiny - For comparison with WhisperKit
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                        framework: .onnx,
+                        id: "sherpa-whisper-tiny-onnx",
+                        name: "Sherpa Whisper Tiny (ONNX)",
+                        format: .onnx,
+                        memoryRequirement: 75_000_000,
+                        metadata: ["category": "speech-recognition"]
+                    ),
+
+                    // Sherpa-ONNX Whisper Small - Better quality
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                        framework: .onnx,
+                        id: "sherpa-whisper-small-onnx",
+                        name: "Sherpa Whisper Small (ONNX)",
+                        format: .onnx,
+                        memoryRequirement: 250_000_000,
+                        metadata: ["category": "speech-recognition"]
+                    ),
+
+                    // === Text-to-Speech (TTS) Models ===
+
+                    // Piper TTS - En US LJSpeech Low quality (smaller, faster)
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2",
+                        framework: .onnx,
+                        id: "piper-en-us-lessac-low",
+                        name: "Piper TTS (US English - Low)",
+                        format: .onnx,
+                        memoryRequirement: 60_000_000,  // ~60MB
+                        metadata: ["category": "speech-synthesis"]
+                    ),
+
+                    // Piper TTS - En US LJSpeech Medium quality (better quality)
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                        framework: .onnx,
+                        id: "piper-en-us-lessac-medium",
+                        name: "Piper TTS (US English - Medium)",
+                        format: .onnx,
+                        memoryRequirement: 100_000_000,  // ~100MB
+                        metadata: ["category": "speech-synthesis"]
+                    ),
+
+                    // Piper TTS - En GB (British English)
+                    try! ModelRegistration(
+                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                        framework: .onnx,
+                        id: "piper-en-gb-alba-medium",
+                        name: "Piper TTS (British English)",
+                        format: .onnx,
+                        memoryRequirement: 100_000_000,  // ~100MB
+                        metadata: ["category": "speech-synthesis"]
+                    )
+                ],
+                options: lazyOptions
+            )
+            logger.info("✅ ONNX Runtime registered with STT (Glados/Whisper) and TTS (Piper) models (lazy loading)")
 
             // Register FluidAudioDiarization
             await FluidAudioDiarizationProvider.register()
