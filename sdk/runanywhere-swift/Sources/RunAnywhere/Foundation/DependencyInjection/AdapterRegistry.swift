@@ -24,7 +24,7 @@ public final class AdapterRegistry {
         }
 
         // Call external services outside of the queue to prevent deadlocks
-        Task {
+        Task { @MainActor in
             // Call the adapter's onRegistration method
             adapter.onRegistration()
 

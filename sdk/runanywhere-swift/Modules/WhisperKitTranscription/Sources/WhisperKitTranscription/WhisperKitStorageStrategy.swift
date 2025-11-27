@@ -1,6 +1,5 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// Custom storage strategy for WhisperKit models that handles downloading and file management
 public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
@@ -35,7 +34,7 @@ public class WhisperKitStorageStrategy: ModelStorageStrategy, DownloadStrategy {
     ]
 
     // Use the SDK's logger directly
-    private let logger = os.Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitDownload")
+    private let logger = SDKLogger(category: "WhisperKitDownload")
 
     public init() {
         // Public initializer for use outside the module

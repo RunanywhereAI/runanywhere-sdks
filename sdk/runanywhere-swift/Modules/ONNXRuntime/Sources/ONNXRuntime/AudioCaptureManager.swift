@@ -1,10 +1,10 @@
 import Foundation
 import AVFoundation
-import os
+import RunAnywhere
 
 /// Manages audio capture from microphone for STT
 public class AudioCaptureManager: ObservableObject {
-    private let logger = Logger(subsystem: "com.runanywhere.onnx", category: "AudioCapture")
+    private let logger = SDKLogger(category: "AudioCapture")
 
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?

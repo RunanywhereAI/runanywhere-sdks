@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Main capability coordinator for voice processing using the new component system
 public class VoiceCapabilityService: @unchecked Sendable {

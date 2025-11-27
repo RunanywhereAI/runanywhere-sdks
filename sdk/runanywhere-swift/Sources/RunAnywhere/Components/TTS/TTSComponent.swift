@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import os
 
 // MARK: - TTS Options
 
@@ -259,7 +258,7 @@ public protocol TTSFrameworkAdapter: ComponentAdapter where ServiceType: TTSServ
 /// System TTS Service implementation using AVSpeechSynthesizer
 public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "SystemTTS")
+    private let logger = SDKLogger(category: "SystemTTS")
     private var speechContinuation: CheckedContinuation<Data, Error>?
     private var _isSynthesizing = false
     private let speechQueue = DispatchQueue(label: "com.runanywhere.tts.speech")

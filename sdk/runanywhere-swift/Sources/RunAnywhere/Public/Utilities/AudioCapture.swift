@@ -1,6 +1,5 @@
 import AVFoundation
 import Foundation
-import os
 
 /// Audio capture utility for voice applications
 ///

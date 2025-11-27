@@ -1,7 +1,6 @@
 import Foundation
 import RunAnywhere
 import LLM
-import os
 
 /// LLMSwift provider for Language Model services (llama.cpp)
 ///
@@ -13,7 +12,7 @@ import os
 /// LLMSwiftServiceProvider.register()
 /// ```
 public final class LLMSwiftServiceProvider: LLMServiceProvider {
-    private let logger = Logger(subsystem: "com.runanywhere.llmswift", category: "LLMSwiftServiceProvider")
+    private let logger = SDKLogger(category: "LLMSwiftServiceProvider")
 
     // MARK: - Singleton for easy registration
 
