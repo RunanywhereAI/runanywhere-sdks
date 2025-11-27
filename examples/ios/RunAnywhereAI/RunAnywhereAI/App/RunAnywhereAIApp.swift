@@ -151,232 +151,159 @@ struct RunAnywhereAIApp: App {
     private func registerAdaptersForDevelopment() async {
         logger.info("📦 Registering adapters with custom models for DEVELOPMENT mode")
 
-        do {
-            // Register LLMSwift with custom GGUF models
-            await LLMSwiftServiceProvider.register()
+        // Register LLMSwift (llama.cpp) with LLM models
+        await RunAnywhere.registerFramework(
+            LLMSwiftAdapter(),
+            models: [
+                try! ModelRegistration(
+                    url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "smollm2-360m-q8-0",
+                    name: "SmolLM2 360M Q8_0",
+                    memoryRequirement: 500_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "qwen-2.5-0.5b-instruct-q6-k",
+                    name: "Qwen 2.5 0.5B Instruct Q6_K",
+                    memoryRequirement: 600_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "llama-3.2-1b-instruct-q6-k",
+                    name: "Llama 3.2 1B Instruct Q6_K",
+                    memoryRequirement: 1_200_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "smollm2-1.7b-instruct-q6-k-l",
+                    name: "SmolLM2 1.7B Instruct Q6_K_L",
+                    memoryRequirement: 1_800_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "qwen-2.5-1.5b-instruct-q6-k",
+                    name: "Qwen 2.5 1.5B Instruct Q6_K",
+                    memoryRequirement: 1_600_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "lfm2-350m-q4-k-m",
+                    name: "LiquidAI LFM2 350M Q4_K_M",
+                    memoryRequirement: 250_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "lfm2-350m-q8-0",
+                    name: "LiquidAI LFM2 350M Q8_0",
+                    memoryRequirement: 400_000_000
+                )
+            ]
+        )
+        logger.info("✅ LLMSwift registered")
 
-            // Create custom adapter registration options with lazy loading
-            let lazyOptions = AdapterRegistrationOptions(
-                validateModels: false,
-                autoDownloadInDev: false,  // Don't auto-download
-                showProgress: true,
-                fallbackToMockModels: true,
-                downloadTimeout: 600
-            )
+        // Register WhisperKit with STT models
+        await RunAnywhere.registerFramework(
+            WhisperKitAdapter.shared,
+            models: [
+                try! ModelRegistration(
+                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
+                    framework: .whisperKit,
+                    modality: .voiceToText,
+                    id: "whisper-tiny",
+                    name: "Whisper Tiny",
+                    format: .mlmodel,
+                    memoryRequirement: 39_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
+                    framework: .whisperKit,
+                    modality: .voiceToText,
+                    id: "whisper-base",
+                    name: "Whisper Base",
+                    format: .mlmodel,
+                    memoryRequirement: 74_000_000
+                )
+            ]
+        )
+        logger.info("✅ WhisperKit registered")
 
-            try await RunAnywhere.registerFrameworkAdapter(
-                LLMSwiftAdapter(),
-                models: [
-                    // SmolLM2 360M - smallest and fastest
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                        framework: .llamaCpp,
-                        id: "smollm2-360m-q8-0",
-                        name: "SmolLM2 360M Q8_0",
-                        memoryRequirement: 500_000_000
-                    ),
-                    // Qwen 2.5 0.5B - small but capable
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-                        framework: .llamaCpp,
-                        id: "qwen-2.5-0.5b-instruct-q6-k",
-                        name: "Qwen 2.5 0.5B Instruct Q6_K",
-                        memoryRequirement: 600_000_000
-                    ),
-                    // Llama 3.2 1B - good quality
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
-                        framework: .llamaCpp,
-                        id: "llama-3.2-1b-instruct-q6-k",
-                        name: "Llama 3.2 1B Instruct Q6_K",
-                        memoryRequirement: 1_200_000_000
-                    ),
-                    // SmolLM2 1.7B - larger but capable
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
-                        framework: .llamaCpp,
-                        id: "smollm2-1.7b-instruct-q6-k-l",
-                        name: "SmolLM2 1.7B Instruct Q6_K_L",
-                        memoryRequirement: 1_800_000_000
-                    ),
-                    // Qwen 2.5 1.5B - good for longer context
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
-                        framework: .llamaCpp,
-                        id: "qwen-2.5-1.5b-instruct-q6-k",
-                        name: "Qwen 2.5 1.5B Instruct Q6_K",
-                        memoryRequirement: 1_600_000_000
-                    ),
-                    // LiquidAI LFM2 350M Q4_K_M - smallest and fastest
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                        framework: .llamaCpp,
-                        id: "lfm2-350m-q4-k-m",
-                        name: "LiquidAI LFM2 350M Q4_K_M",
-                        memoryRequirement: 250_000_000
-                    ),
-                    // LiquidAI LFM2 350M Q8_0 - highest quality
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                        framework: .llamaCpp,
-                        id: "lfm2-350m-q8-0",
-                        name: "LiquidAI LFM2 350M Q8_0",
-                        memoryRequirement: 400_000_000
-                    )
-                ],
-                options: lazyOptions  // Use lazy loading options
-            )
-            logger.info("✅ LLMSwift registered with custom models (lazy loading)")
-
-            // Register WhisperKit with custom models
-            await WhisperKitServiceProvider.register()
-            try await RunAnywhere.registerFrameworkAdapter(
-                WhisperKitAdapter.shared,
-                models: [
-                    // Whisper Tiny - smallest and fastest
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-tiny.en",
-                        framework: .whisperKit,
-                        id: "whisper-tiny",
-                        name: "Whisper Tiny",
-                        format: .mlmodel,  // Explicitly specify Core ML format
-                        memoryRequirement: 39_000_000
-                    ),
-                    // Whisper Base - better quality
-                    try! ModelRegistration(
-                        url: "https://huggingface.co/argmaxinc/whisperkit-coreml/tree/main/openai_whisper-base",
-                        framework: .whisperKit,
-                        id: "whisper-base",
-                        name: "Whisper Base",
-                        format: .mlmodel,  // Explicitly specify Core ML format
-                        memoryRequirement: 74_000_000
-                    )
-                ],
-                options: lazyOptions  // Use lazy loading options
-            )
-            logger.info("✅ WhisperKit registered with custom models (lazy loading)")
-
-            // Register ONNX Runtime with STT and TTS models
-            await ONNXServiceProvider.register()
-            try await RunAnywhere.registerFrameworkAdapter(
-                ONNXAdapter.shared,
-                models: [
-                    // === Speech Recognition (STT) Models ===
-                    // Using Sherpa-ONNX Zipformer models (streaming transducer models)
-                    // These are proper sherpa-onnx models, not Whisper
-
-                    // Sherpa-ONNX Zipformer English 20M - Smallest streaming model (~20MB)
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
-                        framework: .onnx,
-                        id: "zipformer-en-20m",
-                        name: "Zipformer English 20M (ONNX)",
-                        format: .onnx,
-                        memoryRequirement: 20_000_000,
-                        metadata: ["category": "speech-recognition", "streaming": "true"]
-                    ),
-
-                    // Sherpa-ONNX Whisper Tiny - For comparison with WhisperKit
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
-                        framework: .onnx,
-                        id: "sherpa-whisper-tiny-onnx",
-                        name: "Sherpa Whisper Tiny (ONNX)",
-                        format: .onnx,
-                        memoryRequirement: 75_000_000,
-                        metadata: ["category": "speech-recognition"]
-                    ),
-
-                    // Sherpa-ONNX Whisper Small - Better quality
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
-                        framework: .onnx,
-                        id: "sherpa-whisper-small-onnx",
-                        name: "Sherpa Whisper Small (ONNX)",
-                        format: .onnx,
-                        memoryRequirement: 250_000_000,
-                        metadata: ["category": "speech-recognition"]
-                    ),
-
-                    // === Text-to-Speech (TTS) Models ===
-
-                    // Piper TTS - En US LJSpeech Low quality (smaller, faster)
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2",
-                        framework: .onnx,
-                        id: "piper-en-us-lessac-low",
-                        name: "Piper TTS (US English - Low)",
-                        format: .onnx,
-                        memoryRequirement: 60_000_000,  // ~60MB
-                        metadata: ["category": "speech-synthesis"]
-                    ),
-
-                    // Piper TTS - En US LJSpeech Medium quality (better quality)
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
-                        framework: .onnx,
-                        id: "piper-en-us-lessac-medium",
-                        name: "Piper TTS (US English - Medium)",
-                        format: .onnx,
-                        memoryRequirement: 100_000_000,  // ~100MB
-                        metadata: ["category": "speech-synthesis"]
-                    ),
-
-                    // Piper TTS - En GB (British English)
-                    try! ModelRegistration(
-                        url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
-                        framework: .onnx,
-                        id: "piper-en-gb-alba-medium",
-                        name: "Piper TTS (British English)",
-                        format: .onnx,
-                        memoryRequirement: 100_000_000,  // ~100MB
-                        metadata: ["category": "speech-synthesis"]
-                    )
-                ],
-                options: lazyOptions
-            )
-            logger.info("✅ ONNX Runtime registered with STT (Glados/Whisper) and TTS (Piper) models (lazy loading)")
-
-            // Register FluidAudioDiarization
-            await FluidAudioDiarizationProvider.register()
-            logger.info("✅ FluidAudioDiarization registered")
-
-            // Register Foundation Models adapter for iOS 26+ and macOS 26+
-            if #available(iOS 26.0, macOS 26.0, *) {
-                try await RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
-                logger.info("✅ Foundation Models registered")
-            }
-
-            logger.info("🎉 All adapters registered with custom models for development (lazy loading enabled)")
-
-        } catch {
-            logger.error("❌ Failed to register adapters: \(error)")
-        }
-    }
-
-    private func registerAdaptersForProduction() async {
-        logger.info("📦 Registering adapters for PRODUCTION mode")
-        logger.info("📡 Models will be fetched from backend console via API")
-
-        // Register WhisperKit for Speech-to-Text
-        // No hardcoded models - they come from backend
-        await WhisperKitServiceProvider.register()
-        do {
-            try await RunAnywhere.registerFrameworkAdapter(WhisperKitAdapter.shared)
-            logger.info("✅ WhisperKit registered (models from backend)")
-        } catch {
-            logger.error("Failed to register WhisperKit: \(error)")
-        }
-
-        // Register LLMSwift for Language Models
-        // No hardcoded models - they come from backend
-        await LLMSwiftServiceProvider.register()
-        do {
-            try await RunAnywhere.registerFrameworkAdapter(LLMSwiftAdapter())
-            logger.info("✅ LLMSwift registered (models from backend)")
-        } catch {
-            logger.error("Failed to register LLMSwift: \(error)")
-        }
+        // Register ONNX Runtime with STT and TTS models
+        await RunAnywhere.registerFramework(
+            ONNXAdapter.shared,
+            models: [
+                // STT Models
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
+                    framework: .onnx,
+                    modality: .voiceToText,
+                    id: "zipformer-en-20m",
+                    name: "Zipformer English 20M (ONNX)",
+                    format: .onnx,
+                    memoryRequirement: 20_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                    framework: .onnx,
+                    modality: .voiceToText,
+                    id: "sherpa-whisper-tiny-onnx",
+                    name: "Sherpa Whisper Tiny (ONNX)",
+                    format: .onnx,
+                    memoryRequirement: 75_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                    framework: .onnx,
+                    modality: .voiceToText,
+                    id: "sherpa-whisper-small-onnx",
+                    name: "Sherpa Whisper Small (ONNX)",
+                    format: .onnx,
+                    memoryRequirement: 250_000_000
+                ),
+                // TTS Models
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2",
+                    framework: .onnx,
+                    modality: .textToVoice,
+                    id: "piper-en-us-lessac-low",
+                    name: "Piper TTS (US English - Low)",
+                    format: .onnx,
+                    memoryRequirement: 60_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    framework: .onnx,
+                    modality: .textToVoice,
+                    id: "piper-en-us-lessac-medium",
+                    name: "Piper TTS (US English - Medium)",
+                    format: .onnx,
+                    memoryRequirement: 100_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    framework: .onnx,
+                    modality: .textToVoice,
+                    id: "piper-en-gb-alba-medium",
+                    name: "Piper TTS (British English)",
+                    format: .onnx,
+                    memoryRequirement: 100_000_000
+                )
+            ]
+        )
+        logger.info("✅ ONNX Runtime registered")
 
         // Register FluidAudioDiarization
         await FluidAudioDiarizationProvider.register()
@@ -384,12 +311,35 @@ struct RunAnywhereAIApp: App {
 
         // Register Foundation Models adapter for iOS 26+ and macOS 26+
         if #available(iOS 26.0, macOS 26.0, *) {
-            do {
-                try await RunAnywhere.registerFrameworkAdapter(FoundationModelsAdapter())
-                logger.info("✅ Foundation Models registered")
-            } catch {
-                logger.error("Failed to register Foundation Models: \(error)")
-            }
+            await RunAnywhere.registerFramework(FoundationModelsAdapter())
+            logger.info("✅ Foundation Models registered")
+        }
+
+        logger.info("🎉 All adapters registered for development")
+    }
+
+    private func registerAdaptersForProduction() async {
+        logger.info("📦 Registering adapters for PRODUCTION mode")
+        logger.info("📡 Models will be fetched from backend console via API")
+
+        // Register adapters (models come from backend)
+        await RunAnywhere.registerFramework(WhisperKitAdapter.shared)
+        logger.info("✅ WhisperKit registered")
+
+        await RunAnywhere.registerFramework(LLMSwiftAdapter())
+        logger.info("✅ LLMSwift registered")
+
+        await RunAnywhere.registerFramework(ONNXAdapter.shared)
+        logger.info("✅ ONNX Runtime registered")
+
+        // Register FluidAudioDiarization
+        await FluidAudioDiarizationProvider.register()
+        logger.info("✅ FluidAudioDiarization registered")
+
+        // Register Foundation Models adapter for iOS 26+ and macOS 26+
+        if #available(iOS 26.0, macOS 26.0, *) {
+            await RunAnywhere.registerFramework(FoundationModelsAdapter())
+            logger.info("✅ Foundation Models registered")
         }
 
         logger.info("🎉 All adapters registered for production")

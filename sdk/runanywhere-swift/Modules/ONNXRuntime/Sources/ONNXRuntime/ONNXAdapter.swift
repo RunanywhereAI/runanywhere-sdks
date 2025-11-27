@@ -1,10 +1,9 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// ONNX Runtime adapter for multi-modal inference
 public class ONNXAdapter: UnifiedFrameworkAdapter {
-    private let logger: Logger = Logger(subsystem: "com.runanywhere.onnx", category: "ONNXAdapter")
+    private let logger = SDKLogger(category: "ONNXAdapter")
 
     // Singleton instance to ensure caching works across the app
     public static let shared = ONNXAdapter()
@@ -31,12 +30,12 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
         // Check if model is compatible with ONNX Runtime
         let canHandle = model.compatibleFrameworks.contains(.onnx) &&
                        (model.category == .speechRecognition || model.category == .language)
-        logger.debug("canHandle(\(model.name, privacy: .public)): \(canHandle)")
+        logger.debug("canHandle(\(model.name)): \(canHandle)")
         return canHandle
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
-        logger.info("createService for modality: \(modality.rawValue, privacy: .public)")
+        logger.info("createService for modality: \(modality.rawValue)")
         switch modality {
         case .voiceToText:
             // Check if cached service should be cleaned up
@@ -60,13 +59,13 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
             return nil
 
         default:
-            logger.warning("Unsupported modality: \(modality.rawValue, privacy: .public)")
+            logger.warning("Unsupported modality: \(modality.rawValue)")
             return nil
         }
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
-        logger.info("loadModel(\(model.name, privacy: .public)) for modality: \(modality.rawValue, privacy: .public)")
+        logger.info("loadModel(\(model.name)) for modality: \(modality.rawValue)")
         switch modality {
         case .voiceToText:
             // Check if cached service should be cleaned up
@@ -85,7 +84,7 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
 
             // Initialize with model path if available
             let modelPath = model.localPath?.path
-            logger.debug("Model path: \(modelPath ?? "nil", privacy: .public)")
+            logger.debug("Model path: \(modelPath ?? "nil")")
             try await service.initialize(modelPath: modelPath)
             logger.info("ONNXSTTService initialized")
             lastSTTUsage = Date()
@@ -96,7 +95,7 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
             throw SDKError.unsupportedModality(modality.rawValue)
 
         default:
-            logger.error("Unsupported modality: \(modality.rawValue, privacy: .public)")
+            logger.error("Unsupported modality: \(modality.rawValue)")
             throw SDKError.unsupportedModality(modality.rawValue)
         }
     }
@@ -116,8 +115,12 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
         return HardwareConfiguration(primaryAccelerator: .cpu)
     }
 
+    /// Called when adapter is registered with the SDK
+    /// Registers the STT service provider with ModuleRegistry
+    @MainActor
     public func onRegistration() {
-        logger.info("ONNX Runtime adapter registered")
+        ModuleRegistry.shared.registerSTT(ONNXSTTServiceProvider())
+        logger.info("Registered ONNXServiceProvider with ModuleRegistry")
     }
 
     public func getProvidedModels() -> [ModelInfo] {

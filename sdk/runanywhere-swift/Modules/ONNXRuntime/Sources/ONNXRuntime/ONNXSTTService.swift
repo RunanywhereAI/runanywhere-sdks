@@ -1,12 +1,11 @@
 import Foundation
 import RunAnywhere
 import CRunAnywhereONNX  // C wrapper module
-import os
 
 /// ONNX Runtime implementation of STTService for speech-to-text
 /// Uses the unified RunAnywhere backend API
 public class ONNXSTTService: STTService {
-    private let logger: Logger = Logger(subsystem: "com.runanywhere.onnx", category: "ONNXSTTService")
+    private let logger = SDKLogger(category: "ONNXSTTService")
 
     private var backendHandle: ra_backend_handle?
     private var streamHandle: ra_stream_handle?
@@ -43,7 +42,7 @@ public class ONNXSTTService: STTService {
     }
 
     public func initialize(modelPath: String?) async throws {
-        logger.info("Initializing ONNX Runtime with model: \(modelPath ?? "none", privacy: .public)")
+        logger.info("Initializing ONNX Runtime with model: \(modelPath ?? "none")")
 
         // Create ONNX backend
         backendHandle = ra_create_backend("onnx")
