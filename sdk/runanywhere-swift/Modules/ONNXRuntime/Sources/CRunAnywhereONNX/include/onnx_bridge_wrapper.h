@@ -324,6 +324,15 @@ void ra_free_string(char* str);
 const char* ra_get_last_error(void);
 const char* ra_get_version(void);
 
+/**
+ * Extract an archive (tar.bz2, tar.gz, zip) to a destination directory
+ * Uses libarchive for robust cross-platform archive extraction.
+ * @param archive_path Path to the archive file
+ * @param dest_dir Destination directory path
+ * @return RA_SUCCESS or error code
+ */
+ra_result_code ra_extract_archive(const char* archive_path, const char* dest_dir);
+
 #ifdef __cplusplus
 }
 #endif

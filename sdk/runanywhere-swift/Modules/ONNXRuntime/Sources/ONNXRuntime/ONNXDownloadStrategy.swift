@@ -1,5 +1,6 @@
 import Foundation
 import RunAnywhere
+import CRunAnywhereONNX
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives and direct .onnx files
 public class ONNXDownloadStrategy: DownloadStrategy {
@@ -133,7 +134,38 @@ public class ONNXDownloadStrategy: DownloadStrategy {
         progressHandler?(1.0)
     }
 
-    // MARK: - tar.bz2 Archive Download (macOS only)
+    // MARK: - Native Archive Extraction
+
+    /// Extract archive using native libarchive implementation from runanywhere-core
+    /// This handles tar.bz2, tar.gz, tar.xz, and zip formats
+    private func extractArchiveNative(from archiveURL: URL, to destinationURL: URL) throws {
+        // Ensure destination directory exists
+        try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+
+        // Call the native C function from runanywhere-core via CRunAnywhereONNX
+        let result = archiveURL.path.withCString { archivePath in
+            destinationURL.path.withCString { destPath in
+                ra_extract_archive(archivePath, destPath)
+            }
+        }
+
+        // Check result code
+        switch result {
+        case RA_SUCCESS:
+            logger.info("Native archive extraction succeeded")
+        case RA_ERROR_NOT_IMPLEMENTED:
+            logger.error("Archive extraction not implemented in this build")
+            throw DownloadError.extractionFailed("Archive extraction not available (libarchive not linked)")
+        case RA_ERROR_IO:
+            logger.error("Archive extraction I/O error")
+            throw DownloadError.extractionFailed("Archive extraction failed: I/O error")
+        default:
+            logger.error("Archive extraction failed with code: \(result.rawValue)")
+            throw DownloadError.extractionFailed("Archive extraction failed with code: \(result.rawValue)")
+        }
+    }
+
+    // MARK: - tar.bz2 Archive Download
 
     private func downloadTarBz2Archive(
         model: ModelInfo,
@@ -185,13 +217,9 @@ public class ONNXDownloadStrategy: DownloadStrategy {
 
         logger.info("Archive downloaded, extracting to: \(modelFolder.path)")
 
-        // Extract the archive using ArchiveUtility (platform-native implementation)
-        do {
-            try ArchiveUtility.extractTarBz2Archive(from: archivePath, to: modelFolder)
-        } catch {
-            logger.error("Failed to extract archive: \(error.localizedDescription)")
-            throw DownloadError.extractionFailed("tar.bz2 extraction failed: \(error.localizedDescription)")
-        }
+        // Extract the archive using native libarchive implementation from runanywhere-core
+        // This is much more robust than trying to decompress in Swift
+        try extractArchiveNative(from: archivePath, to: modelFolder)
 
         logger.info("Archive extracted successfully to: \(modelFolder.path)")
 
