@@ -157,8 +157,14 @@ struct ModelSelectionSheet: View {
         let allFrameworks = RunAnywhere.getAvailableFrameworks()
 
         // Filter frameworks based on context by checking if they have relevant models
-        let filteredFrameworks = allFrameworks.filter { framework in
+        var filteredFrameworks = allFrameworks.filter { framework in
             shouldShowFramework(framework)
+        }
+
+        // For TTS context, always include System TTS as an option
+        if context == .tts {
+            // Add System TTS at the beginning of the list
+            filteredFrameworks.insert(.systemTTS, at: 0)
         }
 
         await MainActor.run {
@@ -264,79 +270,167 @@ struct ModelSelectionSheet: View {
     @ViewBuilder
     private var modelsSection: some View {
         if let expanded = expandedFramework {
-            // Filter models based on the expanded framework AND context
-            let filteredModels = viewModel.availableModels.filter { model in
-                // First check framework match
-                let frameworkMatch: Bool
-                if expanded == .foundationModels {
-                    frameworkMatch = model.preferredFramework == .foundationModels
-                } else {
-                    frameworkMatch = model.compatibleFrameworks.contains(expanded)
+            // Special handling for System TTS
+            if expanded == .systemTTS {
+                Section("System TTS") {
+                    systemTTSRow
                 }
-
-                // Then check if model's category is relevant to current context
-                let categoryMatch = context.relevantCategories.contains(model.category)
-
-                return frameworkMatch && categoryMatch
-            }
-
-            Section("Models for \(expanded.displayName)") {
-                // Show requirements notice for Foundation Models
-                if expanded == .foundationModels {
-                    HStack(spacing: AppSpacing.smallMedium) {
-                        Image(systemName: "info.circle.fill")
-                            .foregroundColor(AppColors.statusBlue)
-                            .font(AppTypography.caption)
-                        VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
-                            Text("iOS 26+ with Apple Intelligence")
-                                .font(AppTypography.caption)
-                                .foregroundColor(AppColors.textSecondary)
-                        }
-                        Spacer()
+            } else {
+                // Filter models based on the expanded framework AND context
+                let filteredModels = viewModel.availableModels.filter { model in
+                    // First check framework match
+                    let frameworkMatch: Bool
+                    if expanded == .foundationModels {
+                        frameworkMatch = model.preferredFramework == .foundationModels
+                    } else {
+                        frameworkMatch = model.compatibleFrameworks.contains(expanded)
                     }
-                    .padding(.vertical, AppSpacing.xSmall)
+
+                    // Then check if model's category is relevant to current context
+                    let categoryMatch = context.relevantCategories.contains(model.category)
+
+                    return frameworkMatch && categoryMatch
                 }
 
-                // Show models
-                ForEach(filteredModels, id: \.id) { model in
-                    SelectableModelRow(
-                        model: model,
-                        isSelected: selectedModel?.id == model.id,
-                        isLoading: isLoadingModel,
-                        onDownloadCompleted: {
-                            Task {
-                                await viewModel.loadModels()
-                                await loadAvailableFrameworks()
-                            }
-                        },
-                        onSelectModel: {
-                            Task {
-                                await selectAndLoadModel(model)
-                            }
-                        },
-                        onModelUpdated: {
-                            Task {
-                                await viewModel.loadModels()
-                                await loadAvailableFrameworks()
-                            }
-                        }
-                    )
-                }
-
-                if filteredModels.isEmpty {
-                    VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
-                        Text("No models available for this framework")
-                            .foregroundColor(AppColors.textSecondary)
-                            .font(AppTypography.caption)
-
-                        if expanded != .foundationModels {
-                            Text("Tap 'Add Model' to add a model from URL")
+                Section("Models for \(expanded.displayName)") {
+                    // Show requirements notice for Foundation Models
+                    if expanded == .foundationModels {
+                        HStack(spacing: AppSpacing.smallMedium) {
+                            Image(systemName: "info.circle.fill")
                                 .foregroundColor(AppColors.statusBlue)
-                                .font(AppTypography.caption2)
+                                .font(AppTypography.caption)
+                            VStack(alignment: .leading, spacing: AppSpacing.xxSmall) {
+                                Text("iOS 26+ with Apple Intelligence")
+                                    .font(AppTypography.caption)
+                                    .foregroundColor(AppColors.textSecondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, AppSpacing.xSmall)
+                    }
+
+                    // Show models
+                    ForEach(filteredModels, id: \.id) { model in
+                        SelectableModelRow(
+                            model: model,
+                            isSelected: selectedModel?.id == model.id,
+                            isLoading: isLoadingModel,
+                            onDownloadCompleted: {
+                                Task {
+                                    await viewModel.loadModels()
+                                    await loadAvailableFrameworks()
+                                }
+                            },
+                            onSelectModel: {
+                                Task {
+                                    await selectAndLoadModel(model)
+                                }
+                            },
+                            onModelUpdated: {
+                                Task {
+                                    await viewModel.loadModels()
+                                    await loadAvailableFrameworks()
+                                }
+                            }
+                        )
+                    }
+
+                    if filteredModels.isEmpty {
+                        VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
+                            Text("No models available for this framework")
+                                .foregroundColor(AppColors.textSecondary)
+                                .font(AppTypography.caption)
+
+                            if expanded != .foundationModels {
+                                Text("Tap 'Add Model' to add a model from URL")
+                                    .foregroundColor(AppColors.statusBlue)
+                                    .font(AppTypography.caption2)
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// System TTS selection row - uses built-in AVSpeechSynthesizer
+    private var systemTTSRow: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: AppSpacing.xSmall) {
+                Text("Default System Voice")
+                    .font(AppTypography.subheadline)
+
+                HStack(spacing: AppSpacing.smallMedium) {
+                    Label("Built-in", systemImage: "speaker.wave.2.fill")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.textSecondary)
+
+                    Text("AVSpeechSynthesizer")
+                        .font(AppTypography.caption2)
+                        .padding(.horizontal, AppSpacing.small)
+                        .padding(.vertical, AppSpacing.xxSmall)
+                        .background(AppColors.badgeGray)
+                        .cornerRadius(AppSpacing.cornerRadiusSmall)
+                }
+
+                HStack(spacing: AppSpacing.xSmall) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(AppColors.statusGreen)
+                        .font(AppTypography.caption2)
+                    Text("Always available")
+                        .font(AppTypography.caption2)
+                        .foregroundColor(AppColors.statusGreen)
+                }
+            }
+
+            Spacer()
+
+            Button("Select") {
+                Task {
+                    await selectSystemTTS()
+                }
+            }
+            .font(AppTypography.caption)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(isLoadingModel)
+        }
+        .padding(.vertical, AppSpacing.xSmall)
+    }
+
+    /// Select System TTS - no model loading needed
+    private func selectSystemTTS() async {
+        await MainActor.run {
+            isLoadingModel = true
+            loadingProgress = "Configuring System TTS..."
+        }
+
+        // Create a pseudo ModelInfo for System TTS
+        let systemTTSModel = ModelInfo(
+            id: "system-tts",
+            name: "System TTS",
+            category: .speechSynthesis,
+            format: .unknown,
+            downloadURL: nil,
+            compatibleFrameworks: [.systemTTS],
+            preferredFramework: .systemTTS
+        )
+
+        // Brief delay to show loading state
+        try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+
+        await MainActor.run {
+            loadingProgress = "System TTS ready!"
+        }
+
+        try? await Task.sleep(nanoseconds: 200_000_000) // 0.2 seconds
+
+        // Call the callback with the system TTS model
+        await onModelSelected(systemTTSModel)
+
+        await MainActor.run {
+            isLoadingModel = false
+            dismiss()
         }
     }
 
@@ -369,8 +463,33 @@ struct ModelSelectionSheet: View {
                 loadingProgress = "Loading model into memory..."
             }
 
-            // This is where we actually wait for the model to load
-            try await RunAnywhere.loadModel(model.id)
+            // Load model based on the context/modality
+            switch context {
+            case .llm:
+                // LLM models use RunAnywhere.loadModel()
+                try await RunAnywhere.loadModel(model.id)
+
+            case .stt:
+                // STT models use RunAnywhere.loadSTTModel()
+                try await RunAnywhere.loadSTTModel(model.id)
+
+            case .tts:
+                // TTS models use RunAnywhere.loadTTSModel()
+                try await RunAnywhere.loadTTSModel(model.id)
+
+            case .voice:
+                // Voice context handles all three - determine which based on model category
+                switch model.category {
+                case .speechRecognition:
+                    try await RunAnywhere.loadSTTModel(model.id)
+                case .speechSynthesis:
+                    try await RunAnywhere.loadTTSModel(model.id)
+                case .language, .multimodal:
+                    try await RunAnywhere.loadModel(model.id)
+                default:
+                    try await RunAnywhere.loadModel(model.id)
+                }
+            }
 
             await MainActor.run {
                 loadingProgress = "Model loaded successfully!"

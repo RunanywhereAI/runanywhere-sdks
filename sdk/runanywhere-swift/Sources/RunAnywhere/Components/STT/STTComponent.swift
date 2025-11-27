@@ -482,6 +482,19 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     // MARK: - Service Creation
 
     public override func createService() async throws -> STTServiceWrapper {
+        let modelId = sttConfiguration.modelId ?? "unknown"
+        let modelName = modelId  // Could be enhanced to look up display name
+
+        // Notify lifecycle manager
+        await MainActor.run {
+            ModelLifecycleTracker.shared.modelWillLoad(
+                modelId: modelId,
+                modelName: modelName,
+                framework: .whisperKit,  // Default, could be determined from provider
+                modality: .stt
+            )
+        }
+
         // Try to get a registered STT provider from central registry
         // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
         let provider = await MainActor.run {
@@ -489,6 +502,13 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         }
 
         guard let provider = provider else {
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .stt,
+                    error: "No STT service provider registered"
+                )
+            }
             throw SDKError.componentNotInitialized(
                 "No STT service provider registered. Please register WhisperKitServiceProvider.register()"
             )
@@ -500,16 +520,38 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             // Provider should handle model management
         }
 
-        // Create service through provider
-        let sttService = try await provider.createSTTService(configuration: sttConfiguration)
+        do {
+            // Create service through provider
+            let sttService = try await provider.createSTTService(configuration: sttConfiguration)
 
-        // Wrap the service
-        let wrapper = STTServiceWrapper(sttService)
+            // Wrap the service
+            let wrapper = STTServiceWrapper(sttService)
 
-        // Service is already initialized by the provider
-        isModelLoaded = true
+            // Service is already initialized by the provider
+            isModelLoaded = true
 
-        return wrapper
+            // Notify lifecycle manager of successful load
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelDidLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: .whisperKit,
+                    modality: .stt,
+                    memoryUsage: nil
+                )
+            }
+
+            return wrapper
+        } catch {
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .stt,
+                    error: error.localizedDescription
+                )
+            }
+            throw error
+        }
     }
 
     public override func performCleanup() async throws {

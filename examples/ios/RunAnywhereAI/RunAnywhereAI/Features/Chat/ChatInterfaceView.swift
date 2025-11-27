@@ -28,46 +28,100 @@ struct ChatInterfaceView: View {
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatInterfaceView")
 
+    private var hasModelSelected: Bool {
+        viewModel.isModelLoaded && viewModel.loadedModelName != nil
+    }
+
     var body: some View {
         Group {
             #if os(macOS)
             // macOS: No NavigationView to avoid sidebar
-            VStack(spacing: 0) {
-                // Add a custom toolbar for macOS
-                HStack {
-                    Button(action: { showingConversationList = true }) {
-                        Label("Conversations", systemImage: "list.bullet")
+            ZStack {
+                VStack(spacing: 0) {
+                    // Add a custom toolbar for macOS
+                    HStack {
+                        Button(action: { showingConversationList = true }) {
+                            Label("Conversations", systemImage: "list.bullet")
+                        }
+                        .buttonStyle(.bordered)
+
+                        Spacer()
+
+                        Text("Chat")
+                            .font(AppTypography.headline)
+
+                        Spacer()
+
+                        toolbarButtons
                     }
-                    .buttonStyle(.bordered)
+                    .padding(.horizontal, AppSpacing.large)
+                    .padding(.vertical, AppSpacing.smallMedium)
+                    .background(AppColors.backgroundPrimary)
 
-                    Spacer()
+                    // Model Status Banner - Always visible
+                    ModelStatusBanner(
+                        framework: viewModel.selectedFramework,
+                        modelName: viewModel.loadedModelName,
+                        isLoading: viewModel.isGenerating && !hasModelSelected,
+                        onSelectModel: { showingModelSelection = true }
+                    )
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
 
-                    Text(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
-                        .font(AppTypography.headline)
+                    Divider()
 
-                    Spacer()
-
-                    toolbarButtons
+                    if hasModelSelected {
+                        chatMessagesView
+                        inputArea
+                    } else {
+                        Spacer()
+                    }
                 }
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.smallMedium)
-                .background(AppColors.backgroundPrimary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.windowBackgroundColor))
 
-                Divider()
-
-                chatMessagesView
-                inputArea
+                // Overlay when no model is selected
+                if !hasModelSelected && !viewModel.isGenerating {
+                    ModelRequiredOverlay(
+                        modality: .llm,
+                        onSelectModel: { showingModelSelection = true }
+                    )
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(NSColor.windowBackgroundColor))
         #else
         // iOS: Keep NavigationView
         NavigationView {
-            VStack(spacing: 0) {
-                chatMessagesView
-                inputArea
+            ZStack {
+                VStack(spacing: 0) {
+                    // Model Status Banner - Always visible
+                    ModelStatusBanner(
+                        framework: viewModel.selectedFramework,
+                        modelName: viewModel.loadedModelName,
+                        isLoading: viewModel.isGenerating && !hasModelSelected,
+                        onSelectModel: { showingModelSelection = true }
+                    )
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+
+                    Divider()
+
+                    if hasModelSelected {
+                        chatMessagesView
+                        inputArea
+                    } else {
+                        Spacer()
+                    }
+                }
+
+                // Overlay when no model is selected
+                if !hasModelSelected && !viewModel.isGenerating {
+                    ModelRequiredOverlay(
+                        modality: .llm,
+                        onSelectModel: { showingModelSelection = true }
+                    )
+                }
             }
-            .navigationTitle(viewModel.isModelLoaded ? (viewModel.loadedModelName ?? "Chat") : "Chat")
+            .navigationTitle("Chat")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -115,12 +169,6 @@ struct ChatInterfaceView: View {
     private var chatMessagesView: some View {
         ScrollViewReader { proxy in
             VStack(spacing: 0) {
-                // Minimalistic model info bar at top
-                if viewModel.isModelLoaded, let modelName = viewModel.loadedModelName {
-                    modelInfoBar
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
                 ScrollView {
                     if viewModel.messages.isEmpty && !viewModel.isGenerating {
                         // Empty state view
@@ -136,15 +184,9 @@ struct ChatInterfaceView: View {
                                     .font(AppTypography.title2Semibold)
                                     .foregroundColor(AppColors.textPrimary)
 
-                                if viewModel.isModelLoaded {
-                                    Text("Type a message below to get started")
-                                        .font(AppTypography.subheadline)
-                                        .foregroundColor(AppColors.textSecondary)
-                                } else {
-                                    Text("Select a model first, then start chatting")
-                                        .font(AppTypography.subheadline)
-                                        .foregroundColor(AppColors.textSecondary)
-                                }
+                                Text("Type a message below to get started")
+                                    .font(AppTypography.subheadline)
+                                    .foregroundColor(AppColors.textSecondary)
                             }
 
                             Spacer()
@@ -334,28 +376,6 @@ struct ChatInterfaceView: View {
         VStack(spacing: 0) {
             Divider()
 
-            // Show model selection prompt if no model is loaded
-            if !viewModel.isModelLoaded {
-                VStack(spacing: 8) {
-                    Text("Welcome! Select and download a model to start chatting.")
-                        .font(AppTypography.caption)
-                        .foregroundColor(AppColors.textSecondary)
-                        .multilineTextAlignment(.center)
-
-                    Button("Select Model") {
-                        showingModelSelection = true
-                    }
-                    .font(AppTypography.caption)
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                }
-                .padding(.horizontal, AppSpacing.large)
-                .padding(.vertical, AppSpacing.mediumLarge)
-                .background(AppColors.modelFrameworkBg)
-
-                Divider()
-            }
-
             HStack(spacing: AppSpacing.mediumLarge) {
                 TextField("Type a message...", text: $viewModel.currentInput, axis: .vertical)
                     .textFieldStyle(.plain)
@@ -364,7 +384,6 @@ struct ChatInterfaceView: View {
                     .onSubmit {
                         sendMessage()
                     }
-                    .disabled(!viewModel.isModelLoaded)
                     .submitLabel(.send)
 
                 Button(action: sendMessage) {
@@ -428,69 +447,7 @@ struct ChatInterfaceView: View {
         await viewModel.checkModelStatus()
     }
 
-    // MARK: - Scroll Management - Functions inlined to avoid typing issues
-
-    // Minimalistic model info bar
-    private var modelInfoBar: some View {
-        HStack(spacing: AppSpacing.smallMedium) {
-            // Framework indicator
-            if let currentModel = ModelListViewModel.shared.currentModel {
-                Text(currentModel.compatibleFrameworks.first?.rawValue.uppercased() ?? "AI")
-                    .font(AppTypography.monospacedCaption)
-                    .foregroundColor(AppColors.textWhite)
-                    .padding(.horizontal, AppSpacing.small)
-                    .padding(.vertical, AppSpacing.xxSmall)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.blue)
-                    )
-            }
-
-            // Model name (shortened)
-            Text(viewModel.loadedModelName?.components(separatedBy: " ").first ?? "Model")
-                .font(.system(size: 11, weight: .medium, design: .rounded))
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            // Key stats
-            if let currentModel = ModelListViewModel.shared.currentModel {
-                HStack(spacing: AppSpacing.mediumLarge) {
-                    // Model size
-                    HStack(spacing: 3) {
-                        Image(systemName: "internaldrive")
-                            .font(.system(size: AppSpacing.iconSmall))
-                        Text(formatModelSize(currentModel.memoryRequired ?? 0))
-                            .font(AppTypography.rounded10)
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-
-                    // Context length
-                    HStack(spacing: 3) {
-                        Image(systemName: "text.alignleft")
-                            .font(.system(size: AppSpacing.iconSmall))
-                        Text("\(formatNumber(currentModel.contextLength ?? 0))")
-                            .font(AppTypography.rounded10)
-                    }
-                    .foregroundColor(AppColors.textSecondary)
-                }
-            }
-        }
-        .padding(.horizontal, AppSpacing.large)
-        .padding(.vertical, AppSpacing.small)
-        .background(
-            Rectangle()
-                .fill(AppColors.backgroundPrimary.opacity(0.95))
-                .overlay(
-                    Rectangle()
-                        .frame(height: AppSpacing.strokeThin)
-                        .foregroundColor(AppColors.separator)
-                        .offset(y: AppSpacing.mediumLarge)
-                )
-        )
-    }
-
-    // Helper functions for formatting
+    // MARK: - Helper Functions
     private func formatModelSize(_ bytes: Int64) -> String {
         let gb = Double(bytes) / (1024 * 1024 * 1024)
         if gb >= 1.0 {

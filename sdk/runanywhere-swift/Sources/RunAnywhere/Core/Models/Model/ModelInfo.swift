@@ -47,7 +47,22 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     /// Whether this model is downloaded and available locally
     public var isDownloaded: Bool {
         guard let localPath = localPath else { return false }
-        return FileManager.default.fileExists(atPath: localPath.path)
+
+        // Check if the file or directory actually exists on disk
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDirectory)
+
+        // For directories, verify they contain files (not empty)
+        if exists && isDirectory.boolValue {
+            // Check if directory has any content
+            if let contents = try? FileManager.default.contentsOfDirectory(atPath: localPath.path),
+               !contents.isEmpty {
+                return true
+            }
+            return false
+        }
+
+        return exists
     }
 
     /// Whether this model is available for use (downloaded and locally accessible)

@@ -1,20 +1,25 @@
 import Foundation
 import RunAnywhere
 
-/// Custom download strategy for ONNX models that handles .tar.bz2 archives
+/// Custom download strategy for ONNX models that handles .tar.bz2 archives and direct .onnx files
 public class ONNXDownloadStrategy: DownloadStrategy {
     private let logger = SDKLogger(category: "ONNXDownloadStrategy")
 
     public init() {}
 
     public func canHandle(model: ModelInfo) -> Bool {
-        // Handle ONNX models with tar.bz2 archives (sherpa-onnx models)
         guard let url = model.downloadURL else { return false }
+        let urlString = url.absoluteString.lowercased()
 
-        let isTarBz2 = url.absoluteString.hasSuffix(".tar.bz2")
         let isONNX = model.compatibleFrameworks.contains(.onnx)
 
-        let canHandle = isTarBz2 && isONNX
+        // Handle tar.bz2 archives (sherpa-onnx models) - macOS only
+        let isTarBz2 = urlString.hasSuffix(".tar.bz2")
+
+        // Handle direct .onnx files (HuggingFace Piper models) - works on all platforms
+        let isDirectOnnx = urlString.hasSuffix(".onnx")
+
+        let canHandle = isONNX && (isTarBz2 || isDirectOnnx)
         logger.debug("canHandle(\(model.id)): \(canHandle) (url: \(url.absoluteString))")
         return canHandle
     }
@@ -28,6 +33,114 @@ public class ONNXDownloadStrategy: DownloadStrategy {
             throw DownloadError.invalidURL
         }
 
+        let urlString = downloadURL.absoluteString.lowercased()
+
+        if urlString.hasSuffix(".onnx") {
+            // Handle direct ONNX files (download model + config)
+            return try await downloadDirectOnnx(model: model, downloadURL: downloadURL, to: destinationFolder, progressHandler: progressHandler)
+        } else if urlString.hasSuffix(".tar.bz2") {
+            // Handle tar.bz2 archives (macOS only)
+            return try await downloadTarBz2Archive(model: model, downloadURL: downloadURL, to: destinationFolder, progressHandler: progressHandler)
+        } else {
+            throw DownloadError.invalidURL
+        }
+    }
+
+    // MARK: - Direct ONNX File Download (for HuggingFace Piper models)
+
+    /// Downloads direct .onnx files along with their companion .onnx.json config
+    private func downloadDirectOnnx(
+        model: ModelInfo,
+        downloadURL: URL,
+        to destinationFolder: URL,
+        progressHandler: ((Double) -> Void)?
+    ) async throws -> URL {
+        logger.info("Downloading direct ONNX model: \(model.id)")
+
+        // Create model folder
+        let modelFolder = destinationFolder
+        try FileManager.default.createDirectory(at: modelFolder, withIntermediateDirectories: true)
+
+        // Get the model filename from URL
+        let modelFilename = downloadURL.lastPathComponent
+        let modelDestination = modelFolder.appendingPathComponent(modelFilename)
+
+        // Also download the companion .onnx.json config file
+        let configURL = URL(string: downloadURL.absoluteString + ".json")!
+        let configFilename = modelFilename + ".json"
+        let configDestination = modelFolder.appendingPathComponent(configFilename)
+
+        logger.info("Downloading model file: \(modelFilename)")
+        logger.info("Downloading config file: \(configFilename)")
+
+        // Download model file (0% - 45%)
+        try await downloadFile(from: downloadURL, to: modelDestination) { progress in
+            progressHandler?(progress * 0.45)
+        }
+
+        logger.info("Model file downloaded, now downloading config...")
+        progressHandler?(0.5)
+
+        // Download config file (50% - 95%)
+        do {
+            try await downloadFile(from: configURL, to: configDestination) { progress in
+                progressHandler?(0.5 + progress * 0.45)
+            }
+            logger.info("Config file downloaded successfully")
+        } catch {
+            // Config file might not exist for some models, log warning but continue
+            logger.warning("Config file download failed (model may still work): \(error.localizedDescription)")
+        }
+
+        progressHandler?(1.0)
+
+        logger.info("Direct ONNX model download complete: \(modelFolder.path)")
+        return modelFolder
+    }
+
+    /// Helper to download a single file (iOS 14+ compatible)
+    private func downloadFile(from url: URL, to destination: URL, progressHandler: ((Double) -> Void)?) async throws {
+        logger.debug("Downloading file from: \(url.absoluteString)")
+
+        // Download using URLSession with continuation for iOS 14 compatibility
+        let tempURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
+            let task = URLSession.shared.downloadTask(with: url) { (downloadedURL, response, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let httpResponse = response as? HTTPURLResponse,
+                      (200...299).contains(httpResponse.statusCode) else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                guard let downloadedURL = downloadedURL else {
+                    continuation.resume(throwing: DownloadError.invalidResponse)
+                    return
+                }
+
+                continuation.resume(returning: downloadedURL)
+            }
+            task.resume()
+        }
+
+        // Move to destination
+        try? FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: tempURL, to: destination)
+
+        progressHandler?(1.0)
+    }
+
+    // MARK: - tar.bz2 Archive Download (macOS only)
+
+    private func downloadTarBz2Archive(
+        model: ModelInfo,
+        downloadURL: URL,
+        to destinationFolder: URL,
+        progressHandler: ((Double) -> Void)?
+    ) async throws -> URL {
         logger.info("Downloading sherpa-onnx archive for model: \(model.id)")
 
         // Use the provided destination folder

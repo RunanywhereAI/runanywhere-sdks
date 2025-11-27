@@ -28,7 +28,10 @@ let package = Package(
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
                 .linkedLibrary("archive"),
-                .linkedLibrary("bz2")
+                .linkedLibrary("bz2"),
+                // Force-load static library to ensure C++ static initializers run
+                // This is needed for REGISTER_BACKEND macro in onnx_backend.cpp
+                .unsafeFlags(["-ObjC", "-all_load"])
             ]
         ),
         .target(

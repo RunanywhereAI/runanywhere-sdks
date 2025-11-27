@@ -31,6 +31,7 @@ let package = Package(
         .package(path: "../../sdk/runanywhere-swift/Modules/LLMSwift"),
         .package(path: "../../sdk/runanywhere-swift/Modules/WhisperKitTranscription"),
         .package(path: "../../sdk/runanywhere-swift/Modules/FluidAudioDiarization"),
+        .package(path: "../../sdk/runanywhere-swift/Modules/ONNXRuntime"),  // ONNX TTS/STT support
 
         // ===================================
         // TRANSITIVE DEPENDENCIES (auto-included)
@@ -61,6 +62,7 @@ let package = Package(
                 .product(name: "LLMSwift", package: "LLMSwift"),
                 .product(name: "WhisperKitTranscription", package: "WhisperKitTranscription"),
                 .product(name: "FluidAudioDiarization", package: "FluidAudioDiarization"),
+                .product(name: "ONNXRuntime", package: "ONNXRuntime"),  // ONNX TTS/STT support
             ],
             path: "RunAnywhereAI",
             exclude: [

@@ -8,71 +8,60 @@ struct SpeechToTextView: View {
     @StateObject private var viewModel = STTViewModel()
     @State private var showModelPicker = false
 
+    private var hasModelSelected: Bool {
+        viewModel.selectedModelName != nil
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 12) {
+        ZStack {
+            VStack(spacing: 0) {
+                // Header with title
                 HStack {
                     Text("Speech to Text")
                         .font(.title2)
                         .fontWeight(.bold)
 
                     Spacer()
-
-                    // Model selector
-                    Button(action: { showModelPicker = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "waveform")
-                                .font(.caption)
-                            Text(viewModel.selectedModelName ?? "Select Model")
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
-                        .cornerRadius(8)
-                    }
                 }
+                .padding(.horizontal)
+                .padding(.top)
 
-                // Status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 10, height: 10)
-                    Text(statusText)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
+                // Model Status Banner - Always visible
+                ModelStatusBanner(
+                    framework: viewModel.selectedFramework,
+                    modelName: viewModel.selectedModelName,
+                    isLoading: viewModel.isProcessing && viewModel.selectedModelName == nil,
+                    onSelectModel: { showModelPicker = true }
+                )
+                .padding(.horizontal)
+                .padding(.vertical, 8)
 
-            Divider()
+                Divider()
 
-            // Transcription display
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if viewModel.transcription.isEmpty && !viewModel.isRecording {
-                        // Empty state
-                        VStack(spacing: 16) {
-                            Image(systemName: "mic.circle")
-                                .font(.system(size: 64))
-                                .foregroundColor(.secondary.opacity(0.3))
+                // Main content - only enabled when model is selected
+                if hasModelSelected {
+                    // Transcription display
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if viewModel.transcription.isEmpty && !viewModel.isRecording {
+                                // Ready state
+                                VStack(spacing: 16) {
+                                    Image(systemName: "mic.circle")
+                                        .font(.system(size: 64))
+                                        .foregroundColor(.green.opacity(0.5))
 
-                            Text("Tap the microphone to start")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
+                                    Text("Ready to transcribe")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
 
-                            Text("Your speech will appear here in real-time")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 100)
-                    } else {
+                                    Text("Tap the microphone button to start recording")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                            } else {
                         // Live transcription
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
@@ -177,18 +166,28 @@ struct SpeechToTextView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            .padding()
-            .background(Color(.systemBackground))
+                .padding()
+                .background(Color(.systemBackground))
+                } else {
+                    // No model selected - show onboarding
+                    Spacer()
+                }
+            }
+
+            // Overlay when no model is selected
+            if !hasModelSelected && !viewModel.isProcessing {
+                ModelRequiredOverlay(
+                    modality: .stt,
+                    onSelectModel: { showModelPicker = true }
+                )
+            }
         }
         .sheet(isPresented: $showModelPicker) {
-            STTModelPickerView(
-                selectedModelId: $viewModel.selectedModelId,
-                onSelect: { modelInfo in
-                    Task {
-                        await viewModel.loadModel(modelInfo)
-                    }
+            ModelSelectionSheet(context: .stt) { model in
+                Task {
+                    await viewModel.loadModelFromSelection(model)
                 }
-            )
+            }
         }
         .onAppear {
             Task {
@@ -240,6 +239,8 @@ struct SpeechToTextView: View {
 class STTViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere", category: "STT")
 
+    // MARK: - Published Properties
+    @Published var selectedFramework: LLMFramework?
     @Published var selectedModelName: String?
     @Published var selectedModelId: String?
     @Published var transcription: String = ""
@@ -248,12 +249,15 @@ class STTViewModel: ObservableObject {
     @Published var audioLevel: Float = 0.0
     @Published var errorMessage: String?
 
+    // MARK: - Private Properties
     private var sttComponent: STTComponent?
     private var audioEngine: AVAudioEngine?
     private var inputNode: AVAudioInputNode?
     private var audioBuffer = Data()
     private var streamingTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<Data>.Continuation?
+
+    // MARK: - Initialization
 
     func initialize() async {
         logger.info("Initializing STT view model")
@@ -265,13 +269,46 @@ class STTViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Model Loading
+
+    /// Load model from ModelSelectionSheet selection
+    func loadModelFromSelection(_ model: ModelInfo) async {
+        logger.info("Loading STT model from selection: \(model.name)")
+        isProcessing = true
+        errorMessage = nil
+
+        do {
+            // Create STT component with framework-agnostic configuration
+            let config = STTConfiguration(
+                modelId: model.id,
+                language: "en",
+                enablePunctuation: true,
+                enableDiarization: false
+            )
+
+            let component = STTComponent(configuration: config)
+            try await component.initialize()
+
+            sttComponent = component
+            selectedFramework = model.preferredFramework
+            selectedModelName = model.name
+            selectedModelId = model.id
+            logger.info("STT model loaded successfully: \(model.name)")
+        } catch {
+            logger.error("Failed to load STT model: \(error.localizedDescription)")
+            errorMessage = "Failed to load model: \(error.localizedDescription)"
+        }
+
+        isProcessing = false
+    }
+
+    /// Legacy method for STTModelPickerView compatibility
     func loadModel(_ modelInfo: (name: String, id: String)) async {
         logger.info("Loading STT model: \(modelInfo.name) (id: \(modelInfo.id))")
         isProcessing = true
         errorMessage = nil
 
         do {
-            // Create STT component with framework-agnostic configuration
             let config = STTConfiguration(
                 modelId: modelInfo.id,
                 language: "en",
@@ -293,6 +330,8 @@ class STTViewModel: ObservableObject {
 
         isProcessing = false
     }
+
+    // MARK: - Recording
 
     func toggleRecording() async {
         if isRecording {

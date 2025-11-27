@@ -246,12 +246,15 @@ struct RunAnywhereAIApp: App {
             ONNXAdapter.shared,
             models: [
                 // STT Models
+                // NOTE: tar.bz2 extraction is not fully supported on iOS due to lack of native bz2 library
+                // These models will download but fail at extraction on iOS
+                // TODO: Replace with ZIP format models or provide pre-extracted models
                 try! ModelRegistration(
                     url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "zipformer-en-20m",
-                    name: "Zipformer English 20M (ONNX)",
+                    name: "Zipformer English 20M (ONNX) [macOS only]",
                     format: .onnx,
                     memoryRequirement: 20_000_000
                 ),
@@ -260,7 +263,7 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-tiny-onnx",
-                    name: "Sherpa Whisper Tiny (ONNX)",
+                    name: "Sherpa Whisper Tiny (ONNX) [macOS only]",
                     format: .onnx,
                     memoryRequirement: 75_000_000
                 ),
@@ -269,41 +272,41 @@ struct RunAnywhereAIApp: App {
                     framework: .onnx,
                     modality: .voiceToText,
                     id: "sherpa-whisper-small-onnx",
-                    name: "Sherpa Whisper Small (ONNX)",
+                    name: "Sherpa Whisper Small (ONNX) [macOS only]",
                     format: .onnx,
                     memoryRequirement: 250_000_000
                 ),
-                // TTS Models
+                // TTS Models - Using direct ONNX files from HuggingFace (works on iOS and macOS)
                 try! ModelRegistration(
-                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-low.tar.bz2",
+                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx",
                     framework: .onnx,
                     modality: .textToVoice,
                     id: "piper-en-us-lessac-low",
                     name: "Piper TTS (US English - Low)",
                     format: .onnx,
-                    memoryRequirement: 60_000_000
+                    memoryRequirement: 30_000_000
                 ),
                 try! ModelRegistration(
-                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
                     framework: .onnx,
                     modality: .textToVoice,
                     id: "piper-en-us-lessac-medium",
                     name: "Piper TTS (US English - Medium)",
                     format: .onnx,
-                    memoryRequirement: 100_000_000
+                    memoryRequirement: 65_000_000
                 ),
                 try! ModelRegistration(
-                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alba/medium/en_GB-alba-medium.onnx",
                     framework: .onnx,
                     modality: .textToVoice,
                     id: "piper-en-gb-alba-medium",
                     name: "Piper TTS (British English)",
                     format: .onnx,
-                    memoryRequirement: 100_000_000
+                    memoryRequirement: 65_000_000
                 )
             ]
         )
-        logger.info("✅ ONNX Runtime registered")
+        logger.info("✅ ONNX Runtime registered (includes STT and TTS providers)")
 
         // Register FluidAudioDiarization
         await FluidAudioDiarizationProvider.register()
@@ -330,7 +333,7 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ LLMSwift registered")
 
         await RunAnywhere.registerFramework(ONNXAdapter.shared)
-        logger.info("✅ ONNX Runtime registered")
+        logger.info("✅ ONNX Runtime registered (includes STT and TTS providers)")
 
         // Register FluidAudioDiarization
         await FluidAudioDiarizationProvider.register()

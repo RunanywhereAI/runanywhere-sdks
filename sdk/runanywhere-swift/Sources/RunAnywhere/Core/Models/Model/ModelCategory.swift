@@ -135,6 +135,10 @@ public extension ModelCategory {
             // These are general frameworks that could be any category
             // Default to multimodal since they can handle various types
             return .multimodal
+
+        // System TTS is a speech synthesis framework
+        case .systemTTS:
+            return .speechSynthesis
         }
     }
 

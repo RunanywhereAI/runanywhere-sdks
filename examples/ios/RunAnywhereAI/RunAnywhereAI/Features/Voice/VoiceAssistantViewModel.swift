@@ -21,6 +21,26 @@ class VoiceAssistantViewModel: ObservableObject {
     @Published var whisperModel: String = "Whisper Base"
     @Published var isListening: Bool = false
 
+    // MARK: - Model Selection State (for Voice Pipeline Setup)
+    @Published var sttModel: (framework: LLMFramework, name: String)?
+    @Published var llmModel: (framework: LLMFramework, name: String)?
+    @Published var ttsModel: (framework: LLMFramework, name: String)?
+
+    // MARK: - Model Loading State (from SDK lifecycle tracker)
+    @Published var sttModelState: ModelLoadState = .notLoaded
+    @Published var llmModelState: ModelLoadState = .notLoaded
+    @Published var ttsModelState: ModelLoadState = .notLoaded
+
+    /// Check if all required models are selected for the voice pipeline
+    var allModelsReady: Bool {
+        sttModel != nil && llmModel != nil && ttsModel != nil
+    }
+
+    /// Check if all models are actually loaded in memory
+    var allModelsLoaded: Bool {
+        sttModelState.isLoaded && llmModelState.isLoaded && ttsModelState.isLoaded
+    }
+
     // Session state for UI
     enum SessionState: Equatable {
         case disconnected
@@ -71,13 +91,16 @@ class VoiceAssistantViewModel: ObservableObject {
             return
         }
 
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
+
         // Get current LLM model info
         updateModelInfo()
 
         // Set the Whisper model display name
         updateWhisperModelName()
 
-        // Listen for model changes
+        // Listen for model changes (legacy support)
         NotificationCenter.default.addObserver(
             forName: Notification.Name("ModelLoaded"),
             object: nil,
@@ -91,6 +114,78 @@ class VoiceAssistantViewModel: ObservableObject {
         logger.info("Voice assistant initialized")
         currentStatus = "Ready to listen"
         isInitialized = true
+    }
+
+    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to loaded models via the SDK's lifecycle tracker
+        ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
+
+                // Update STT model state
+                if let sttState = modelsByModality[.stt] {
+                    self.sttModelState = sttState.state
+                    if sttState.state.isLoaded {
+                        self.sttModel = (framework: sttState.framework, name: sttState.modelName)
+                        self.whisperModel = sttState.modelName
+                        self.logger.info("✅ STT model loaded: \(sttState.modelName)")
+                    }
+                } else {
+                    self.sttModelState = .notLoaded
+                }
+
+                // Update LLM model state
+                if let llmState = modelsByModality[.llm] {
+                    self.llmModelState = llmState.state
+                    if llmState.state.isLoaded {
+                        self.llmModel = (framework: llmState.framework, name: llmState.modelName)
+                        self.currentLLMModel = llmState.modelName
+                        self.logger.info("✅ LLM model loaded: \(llmState.modelName)")
+                    }
+                } else {
+                    self.llmModelState = .notLoaded
+                }
+
+                // Update TTS model state
+                if let ttsState = modelsByModality[.tts] {
+                    self.ttsModelState = ttsState.state
+                    if ttsState.state.isLoaded {
+                        self.ttsModel = (framework: ttsState.framework, name: ttsState.modelName)
+                        self.logger.info("✅ TTS model loaded: \(ttsState.modelName)")
+                    }
+                } else {
+                    self.ttsModelState = .notLoaded
+                }
+
+                // Log overall state
+                self.logger.info("📊 Voice pipeline state - STT: \(self.sttModelState.isLoaded), LLM: \(self.llmModelState.isLoaded), TTS: \(self.ttsModelState.isLoaded)")
+            }
+            .store(in: &cancellables)
+
+        // Check initial state
+        let modelsByModality = ModelLifecycleTracker.shared.modelsByModality
+        if let sttState = modelsByModality[.stt] {
+            sttModelState = sttState.state
+            if sttState.state.isLoaded {
+                sttModel = (framework: sttState.framework, name: sttState.modelName)
+                whisperModel = sttState.modelName
+            }
+        }
+        if let llmState = modelsByModality[.llm] {
+            llmModelState = llmState.state
+            if llmState.state.isLoaded {
+                llmModel = (framework: llmState.framework, name: llmState.modelName)
+                currentLLMModel = llmState.modelName
+            }
+        }
+        if let ttsState = modelsByModality[.tts] {
+            ttsModelState = ttsState.state
+            if ttsState.state.isLoaded {
+                ttsModel = (framework: ttsState.framework, name: ttsState.modelName)
+            }
+        }
     }
 
     private func updateModelInfo() {
@@ -127,6 +222,28 @@ class VoiceAssistantViewModel: ObservableObject {
             whisperModel = whisperModelName.replacingOccurrences(of: "-", with: " ").capitalized
         }
         logger.info("Using Whisper model: \(self.whisperModel)")
+    }
+
+    // MARK: - Model Selection for Voice Pipeline
+
+    /// Set the STT model for voice pipeline
+    func setSTTModel(_ model: ModelInfo) {
+        sttModel = (framework: model.preferredFramework ?? .whisperKit, name: model.name)
+        whisperModel = model.name
+        logger.info("Set STT model: \(model.name)")
+    }
+
+    /// Set the LLM model for voice pipeline
+    func setLLMModel(_ model: ModelInfo) {
+        llmModel = (framework: model.preferredFramework ?? .llamaCpp, name: model.name)
+        currentLLMModel = model.name
+        logger.info("Set LLM model: \(model.name)")
+    }
+
+    /// Set the TTS model for voice pipeline
+    func setTTSModel(_ model: ModelInfo) {
+        ttsModel = (framework: model.preferredFramework ?? .onnx, name: model.name)
+        logger.info("Set TTS model: \(model.name)")
     }
 
     // MARK: - Conversation Control

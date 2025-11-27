@@ -912,16 +912,204 @@ public enum RunAnywhere {
             // Lazy device registration on first API call
             try await ensureDeviceRegistered()
 
+            // Get model info for lifecycle tracking
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .llamaCpp
+            let modelName = modelInfo?.name ?? modelId
+
+            // Notify lifecycle manager
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelWillLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .llm
+                )
+            }
+
             let loadedModel = try await serviceContainer.modelLoadingService.loadModel(modelId)
 
             // IMPORTANT: Set the loaded model in the generation service
             serviceContainer.generationService.setCurrentModel(loadedModel)
 
+            // Notify lifecycle manager of successful load
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelDidLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .llm,
+                    memoryUsage: modelInfo?.memoryRequired
+                )
+            }
+
             EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
+            // Notify lifecycle manager of failure
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .llm,
+                    error: error.localizedDescription
+                )
+            }
             EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
             throw error
         }
+    }
+
+    /// Load an STT (Speech-to-Text) model by ID
+    /// This initializes the STT component and loads the model into memory
+    /// - Parameter modelId: The model identifier
+    public static func loadSTTModel(_ modelId: String) async throws {
+        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+
+        do {
+            // Ensure initialized
+            guard isInitialized else {
+                throw SDKError.notInitialized
+            }
+
+            // Get model info for lifecycle tracking
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .whisperKit
+            let modelName = modelInfo?.name ?? modelId
+
+            // Notify lifecycle manager
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelWillLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .stt
+                )
+            }
+
+            // Create STT configuration
+            let sttConfig = STTConfiguration(modelId: modelId)
+
+            // Create and initialize STT component on MainActor
+            let sttComponent = await MainActor.run {
+                STTComponent(configuration: sttConfig)
+            }
+            try await sttComponent.initialize()
+
+            // Store the component for later use
+            await MainActor.run {
+                _loadedSTTComponent = sttComponent
+            }
+
+            // Notify lifecycle manager of successful load
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelDidLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .stt,
+                    memoryUsage: modelInfo?.memoryRequired
+                )
+            }
+
+            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
+        } catch {
+            // Notify lifecycle manager of failure
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .stt,
+                    error: error.localizedDescription
+                )
+            }
+            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
+            throw error
+        }
+    }
+
+    /// Load a TTS (Text-to-Speech) model by ID
+    /// This initializes the TTS component and loads the model into memory
+    /// - Parameter modelId: The model identifier (voice name)
+    public static func loadTTSModel(_ modelId: String) async throws {
+        EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
+
+        do {
+            // Ensure initialized
+            guard isInitialized else {
+                throw SDKError.notInitialized
+            }
+
+            // Get model info for lifecycle tracking
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .onnx
+            let modelName = modelInfo?.name ?? modelId
+
+            // Notify lifecycle manager
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelWillLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .tts
+                )
+            }
+
+            // Create TTS configuration
+            let ttsConfig = TTSConfiguration(voice: modelId)
+
+            // Create and initialize TTS component on MainActor
+            let ttsComponent = await MainActor.run {
+                TTSComponent(configuration: ttsConfig)
+            }
+            try await ttsComponent.initialize()
+
+            // Store the component for later use
+            await MainActor.run {
+                _loadedTTSComponent = ttsComponent
+            }
+
+            // Notify lifecycle manager of successful load
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelDidLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .tts,
+                    memoryUsage: modelInfo?.memoryRequired
+                )
+            }
+
+            EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
+        } catch {
+            // Notify lifecycle manager of failure
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .tts,
+                    error: error.localizedDescription
+                )
+            }
+            EventBus.shared.publish(SDKModelEvent.loadFailed(modelId: modelId, error: error))
+            throw error
+        }
+    }
+
+    // MARK: - Loaded Component Storage
+
+    @MainActor
+    private static var _loadedSTTComponent: STTComponent?
+
+    @MainActor
+    private static var _loadedTTSComponent: TTSComponent?
+
+    /// Get the currently loaded STT component
+    @MainActor
+    public static var loadedSTTComponent: STTComponent? {
+        return _loadedSTTComponent
+    }
+
+    /// Get the currently loaded TTS component
+    @MainActor
+    public static var loadedTTSComponent: TTSComponent? {
+        return _loadedTTSComponent
     }
 
     /// Get available models

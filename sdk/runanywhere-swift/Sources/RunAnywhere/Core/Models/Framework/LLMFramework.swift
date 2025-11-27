@@ -15,6 +15,7 @@ public enum LLMFramework: String, CaseIterable, Codable, Sendable {
     case mediaPipe = "MediaPipe"
     case whisperKit = "WhisperKit"
     case openAIWhisper = "OpenAIWhisper"
+    case systemTTS = "SystemTTS"
 
     /// Human-readable display name for the framework
     public var displayName: String {
@@ -32,6 +33,7 @@ public enum LLMFramework: String, CaseIterable, Codable, Sendable {
         case .mediaPipe: return "MediaPipe"
         case .whisperKit: return "WhisperKit"
         case .openAIWhisper: return "OpenAI Whisper"
+        case .systemTTS: return "System TTS"
         }
     }
 }
