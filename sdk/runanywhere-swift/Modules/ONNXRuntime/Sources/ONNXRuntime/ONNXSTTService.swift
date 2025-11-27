@@ -11,7 +11,7 @@ public class ONNXSTTService: STTService {
     private var streamHandle: ra_stream_handle?
     private var _isReady: Bool = false
     private var _currentModel: String?
-    private var supportsStreaming: Bool = false
+    private var _supportsStreaming: Bool = false
 
     // MARK: - STTService Protocol
 
@@ -21,6 +21,12 @@ public class ONNXSTTService: STTService {
 
     public var currentModel: String? {
         return _currentModel
+    }
+
+    /// Whether this service supports live/streaming transcription
+    /// ONNX Whisper models are offline/batch only, so this returns false
+    public var supportsStreaming: Bool {
+        return _supportsStreaming
     }
 
     public init() {
@@ -105,7 +111,7 @@ public class ONNXSTTService: STTService {
             }
 
             _currentModel = modelPath
-            supportsStreaming = ra_stt_supports_streaming(backendHandle)
+            _supportsStreaming = ra_stt_supports_streaming(backendHandle)
             logger.info("STT model loaded, streaming supported: \(self.supportsStreaming)")
         }
 
@@ -164,12 +170,45 @@ public class ONNXSTTService: STTService {
         }
 
         guard supportsStreaming else {
-            logger.warning("Stream transcribe not supported, using batch transcription")
+            logger.warning("Stream transcribe not supported, using periodic batch transcription")
+
+            // For batch-only models, process audio in periodic chunks
+            // This provides a more responsive "live" experience
             var allAudioData = Data()
+            var accumulatedTranscript = ""
+            var lastProcessedSize = 0
+            let batchThreshold = 48000 * 2 * 3  // ~3 seconds of audio at 48kHz Int16 (288KB)
+
             for try await chunk in audioStream {
                 allAudioData.append(chunk)
+
+                // Process periodically when we have enough new audio
+                let newDataSize = allAudioData.count - lastProcessedSize
+                if newDataSize >= batchThreshold {
+                    logger.info("Processing batch chunk: \(allAudioData.count) bytes total")
+
+                    do {
+                        let result = try await transcribe(audioData: allAudioData, options: options)
+                        if !result.transcript.isEmpty {
+                            accumulatedTranscript = result.transcript
+                            onPartial(accumulatedTranscript)
+                            logger.debug("Partial transcription: \(accumulatedTranscript)")
+                        }
+                    } catch {
+                        logger.error("Periodic batch transcription failed: \(error.localizedDescription)")
+                    }
+
+                    lastProcessedSize = allAudioData.count
+                }
             }
-            return try await transcribe(audioData: allAudioData, options: options)
+
+            // Final transcription with all audio
+            logger.info("Final batch transcription: \(allAudioData.count) bytes")
+            let result = try await transcribe(audioData: allAudioData, options: options)
+            if !result.transcript.isEmpty {
+                onPartial(result.transcript)
+            }
+            return result
         }
 
         logger.info("Using streaming transcription")
@@ -288,7 +327,7 @@ public class ONNXSTTService: STTService {
 
         _isReady = false
         _currentModel = nil
-        supportsStreaming = false
+        _supportsStreaming = false
     }
 
     // MARK: - Private Helpers
