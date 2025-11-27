@@ -9,8 +9,8 @@ import AppKit
 
 struct VoiceAssistantView: View {
     @StateObject private var viewModel = VoiceAssistantViewModel()
-    @State private var showTranscriptionView = false
     @State private var showModelInfo = false
+    @State private var showModelSelection = false
 
     var body: some View {
         Group {
@@ -19,11 +19,11 @@ struct VoiceAssistantView: View {
             VStack(spacing: 0) {
             // Custom toolbar for macOS
             HStack {
-                // Transcription mode button
+                // Model selection button
                 Button(action: {
-                    showTranscriptionView = true
+                    showModelSelection = true
                 }) {
-                    Label("Transcription", systemImage: "text.quote")
+                    Label("Models", systemImage: "cube")
                 }
                 .buttonStyle(.bordered)
 
@@ -214,11 +214,11 @@ struct VoiceAssistantView: View {
         VStack(spacing: 0) {
             // Minimal header with subtle controls
             HStack {
-                // Transcription mode button - subtle, top left
+                // Model selection button - subtle, top left
                 Button(action: {
-                    showTranscriptionView = true
+                    showModelSelection = true
                 }) {
-                    Image(systemName: "text.quote")
+                    Image(systemName: "cube")
                         .font(.system(size: 18))
                         .foregroundColor(.secondary)
                         .padding(10)
@@ -410,8 +410,11 @@ struct VoiceAssistantView: View {
         .background(Color(.systemBackground))
             #endif
         }
-        .sheet(isPresented: $showTranscriptionView) {
-            TranscriptionView()
+        .sheet(isPresented: $showModelSelection) {
+            ModelSelectionSheet(context: .voice) { model in
+                // Model selected - the voice assistant will use this
+                // For now, just close the sheet. Voice pipeline has its own model management.
+            }
         }
         .onAppear {
             Task {
