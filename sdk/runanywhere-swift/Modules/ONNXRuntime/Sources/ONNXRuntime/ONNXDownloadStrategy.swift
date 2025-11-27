@@ -1,6 +1,5 @@
 import Foundation
 import RunAnywhere
-import CRunAnywhereONNX
 import os
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives
@@ -74,30 +73,29 @@ public class ONNXDownloadStrategy: DownloadStrategy {
 
         logger.info("Archive downloaded, extracting to: \(modelFolder.path)")
 
-        // Extract the archive using ra_extract_tar_bz2
-        let extractPath = modelFolder.path
-        let status = ra_extract_tar_bz2(archivePath.path, extractPath)
-
-        guard status == 0 else {
-            logger.error("Failed to extract archive: status \(status)")
-            throw DownloadError.extractionFailed("tar.bz2 extraction failed with status \(status)")
+        // Extract the archive using ArchiveUtility (platform-native implementation)
+        do {
+            try ArchiveUtility.extractTarBz2Archive(from: archivePath, to: modelFolder)
+        } catch {
+            logger.error("Failed to extract archive: \(error.localizedDescription)")
+            throw DownloadError.extractionFailed("tar.bz2 extraction failed: \(error.localizedDescription)")
         }
 
-        logger.info("Archive extracted successfully to: \(extractPath)")
+        logger.info("Archive extracted successfully to: \(modelFolder.path)")
 
         // Clean up the archive
         try? FileManager.default.removeItem(at: archivePath)
 
         // Find the extracted model directory
         // Sherpa-ONNX archives typically extract to a subdirectory with the model name
-        let contents = try FileManager.default.contentsOfDirectory(atPath: extractPath)
+        let contents = try FileManager.default.contentsOfDirectory(atPath: modelFolder.path)
         logger.debug("Extracted contents: \(contents.joined(separator: ", "))")
 
         // If there's a single subdirectory, the actual model files are in there
-        var modelURL = URL(fileURLWithPath: extractPath)
+        var modelURL = modelFolder
         if contents.count == 1,
            let subdirName = contents.first {
-            let subdirPath = (extractPath as NSString).appendingPathComponent(subdirName)
+            let subdirPath = modelFolder.appendingPathComponent(subdirName).path
             var isDirectory: ObjCBool = false
             if FileManager.default.fileExists(atPath: subdirPath, isDirectory: &isDirectory),
                isDirectory.boolValue {

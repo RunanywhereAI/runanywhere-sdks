@@ -37,18 +37,26 @@ public enum ONNXError: Error, LocalizedError {
         switch code {
         case 0: // RA_SUCCESS
             fatalError("Should not create error from success code")
-        case -1: // RA_ERROR_INVALID_HANDLE
-            return .invalidHandle
-        case -2: // RA_ERROR_INIT_FAILED
+        case -1: // RA_ERROR_INIT_FAILED
             return .initializationFailed
-        case -3: // RA_ERROR_MODEL_LOAD_FAILED
+        case -2: // RA_ERROR_MODEL_LOAD_FAILED
             return .modelLoadFailed("Unknown path")
-        case -4: // RA_ERROR_INFERENCE_FAILED
+        case -3: // RA_ERROR_INFERENCE_FAILED
             return .inferenceFailed("Unknown reason")
+        case -4: // RA_ERROR_INVALID_HANDLE
+            return .invalidHandle
         case -5: // RA_ERROR_INVALID_PARAMS
             return .invalidParameters
-        case -6: // RA_ERROR_NOT_IMPLEMENTED
+        case -6: // RA_ERROR_OUT_OF_MEMORY
+            return .inferenceFailed("Out of memory")
+        case -7: // RA_ERROR_NOT_IMPLEMENTED
             return .notImplemented
+        case -8: // RA_ERROR_CANCELLED
+            return .inferenceFailed("Cancelled")
+        case -9: // RA_ERROR_TIMEOUT
+            return .inferenceFailed("Timeout")
+        case -10: // RA_ERROR_IO
+            return .inferenceFailed("IO error")
         default:
             return .unknown(code)
         }
