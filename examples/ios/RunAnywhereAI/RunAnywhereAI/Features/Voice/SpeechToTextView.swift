@@ -3,6 +3,8 @@ import RunAnywhere
 import AVFoundation
 import os
 
+// Using STTMode from RunAnywhere SDK
+
 /// Dedicated Speech-to-Text view with real-time transcription
 struct SpeechToTextView: View {
     @StateObject private var viewModel = STTViewModel()
@@ -36,6 +38,32 @@ struct SpeechToTextView: View {
                 .padding(.horizontal)
                 .padding(.vertical, 8)
 
+                // Mode selection - Batch vs Live
+                if hasModelSelected {
+                    Picker("Mode", selection: $viewModel.selectedMode) {
+                        Text("Batch").tag(STTMode.batch)
+                        Text("Live").tag(STTMode.live)
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+
+                    HStack {
+                        Image(systemName: viewModel.selectedMode.icon)
+                            .foregroundColor(.secondary)
+                        Text(viewModel.selectedMode.description)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        if !viewModel.supportsLiveMode && viewModel.selectedMode == .live {
+                            Text("(will use batch)")
+                                .font(.caption)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(.horizontal)
+                }
+
                 Divider()
 
                 // Main content - only enabled when model is selected
@@ -43,7 +71,7 @@ struct SpeechToTextView: View {
                     // Transcription display
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
-                            if viewModel.transcription.isEmpty && !viewModel.isRecording {
+                            if viewModel.transcription.isEmpty && !viewModel.isRecording && !viewModel.isTranscribing {
                                 // Ready state
                                 VStack(spacing: 16) {
                                     Image(systemName: "mic.circle")
@@ -58,6 +86,22 @@ struct SpeechToTextView: View {
                                         .font(.subheadline)
                                         .foregroundColor(.secondary)
                                         .multilineTextAlignment(.center)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 80)
+                            } else if viewModel.isTranscribing && viewModel.transcription.isEmpty {
+                                // Processing state (batch mode)
+                                VStack(spacing: 16) {
+                                    ProgressView()
+                                        .scaleEffect(1.5)
+
+                                    Text("Processing audio...")
+                                        .font(.headline)
+                                        .foregroundColor(.primary)
+
+                                    Text("Transcribing your recording")
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding(.top, 80)
@@ -76,7 +120,7 @@ struct SpeechToTextView: View {
                                         Circle()
                                             .fill(Color.red)
                                             .frame(width: 8, height: 8)
-                                        Text("LIVE")
+                                        Text("RECORDING")
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundColor(.red)
@@ -84,6 +128,19 @@ struct SpeechToTextView: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(Color.red.opacity(0.1))
+                                    .cornerRadius(4)
+                                } else if viewModel.isTranscribing {
+                                    HStack(spacing: 6) {
+                                        ProgressView()
+                                            .scaleEffect(0.6)
+                                        Text("TRANSCRIBING")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.orange)
+                                    }
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.1))
                                     .cornerRadius(4)
                                 }
                             }
@@ -147,10 +204,10 @@ struct SpeechToTextView: View {
                 }) {
                     ZStack {
                         Circle()
-                            .fill(viewModel.isRecording ? Color.red : Color.blue)
+                            .fill(viewModel.isRecording ? Color.red : (viewModel.isTranscribing ? Color.orange : Color.blue))
                             .frame(width: 72, height: 72)
 
-                        if viewModel.isProcessing {
+                        if viewModel.isProcessing || viewModel.isTranscribing {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         } else {
@@ -160,9 +217,9 @@ struct SpeechToTextView: View {
                         }
                     }
                 }
-                .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing)
+                .disabled(viewModel.selectedModelName == nil || viewModel.isProcessing || viewModel.isTranscribing)
 
-                Text(viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording")
+                Text(viewModel.isTranscribing ? "Processing transcription..." : (viewModel.isRecording ? "Tap to stop recording" : "Tap to start recording"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -246,8 +303,17 @@ class STTViewModel: ObservableObject {
     @Published var transcription: String = ""
     @Published var isRecording = false
     @Published var isProcessing = false
+    @Published var isTranscribing = false
     @Published var audioLevel: Float = 0.0
     @Published var errorMessage: String?
+    @Published var selectedMode: STTMode = .batch
+
+    // MARK: - Computed Properties
+
+    /// Whether the underlying STT service supports true live/streaming transcription
+    var supportsLiveMode: Bool {
+        sttComponent?.supportsStreaming ?? false
+    }
 
     // MARK: - Private Properties
     private var sttComponent: STTComponent?
@@ -256,6 +322,7 @@ class STTViewModel: ObservableObject {
     private var audioBuffer = Data()
     private var streamingTask: Task<Void, Never>?
     private var audioContinuation: AsyncStream<Data>.Continuation?
+    private var recordedSampleRate: Double = 48000
 
     // MARK: - Initialization
 
@@ -342,7 +409,7 @@ class STTViewModel: ObservableObject {
     }
 
     func startRecording() async {
-        logger.info("Starting recording")
+        logger.info("Starting recording in \(self.selectedMode.rawValue) mode")
         errorMessage = nil
         audioBuffer = Data()
         transcription = ""
@@ -358,108 +425,79 @@ class STTViewModel: ObservableObject {
             try audioSession.setCategory(.record, mode: .measurement)
             try audioSession.setActive(true)
 
-            // Create audio engine FIRST
+            // Create audio engine
             let engine = AVAudioEngine()
             let inputNode = engine.inputNode
             let inputFormat = inputNode.outputFormat(forBus: 0)
+            recordedSampleRate = inputFormat.sampleRate
 
-            print("[AUDIO-ENGINE] Input format: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount), isInterleaved=\(inputFormat.isInterleaved)")
+            print("[AUDIO-ENGINE] Input format: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)")
 
-            // Create audio stream for real-time transcription
-            let audioStream = AsyncStream<Data> { continuation in
-                self.audioContinuation = continuation
-            }
-
-            // Install tap to capture audio and send to stream
-            print("[AUDIO-ENGINE] Installing tap on input node...")
-            inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-                print("[AUDIO-TAP] Callback invoked! frameLength=\(buffer.frameLength)")
-                guard let self = self else {
-                    print("[AUDIO-TAP] self is nil, returning")
-                    return
+            if selectedMode == .live {
+                // Live mode: Create audio stream for real-time transcription
+                let audioStream = AsyncStream<Data> { continuation in
+                    self.audioContinuation = continuation
                 }
 
-                // Convert buffer to Data - check if we have float or int16 data
-                let data: Data?
-                if let floatData = buffer.floatChannelData {
-                    // Float format
-                    let frameCount = Int(buffer.frameLength)
-                    let channelCount = Int(buffer.format.channelCount)
-                    var samples: [Int16] = []
-                    samples.reserveCapacity(frameCount * channelCount)
-
-                    // Convert float to int16
-                    for channel in 0..<channelCount {
-                        let channelBuffer = floatData[channel]
-                        for frame in 0..<frameCount {
-                            let sample = channelBuffer[frame]
-                            let int16Sample = Int16(max(-1.0, min(1.0, sample)) * Float(Int16.max))
-                            samples.append(int16Sample)
+                // Install tap for live streaming
+                inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                    guard let self = self else { return }
+                    if let audioData = self.convertBufferToData(buffer) {
+                        Task { @MainActor in
+                            self.audioContinuation?.yield(audioData)
+                            self.audioBuffer.append(audioData)
+                            self.updateAudioLevel(buffer)
                         }
                     }
-
-                    data = Data(bytes: samples, count: samples.count * MemoryLayout<Int16>.size)
-                    print("[AUDIO-TAP] Converted float to int16, data size: \(data?.count ?? 0) bytes")
-                } else if let int16Data = buffer.int16ChannelData {
-                    // Int16 format (already what we need)
-                    let dataSize = Int(buffer.frameLength * buffer.format.streamDescription.pointee.mBytesPerFrame)
-                    data = Data(bytes: int16Data.pointee, count: dataSize)
-                    print("[AUDIO-TAP] Already int16, data size: \(data?.count ?? 0) bytes")
-                } else {
-                    print("[AUDIO-TAP] ERROR: No audio data available!")
-                    data = nil
                 }
 
-                if let audioData = data {
-                    Task { @MainActor in
-                        // Send audio chunk to streaming transcription
-                        print("[AUDIO-TAP] Yielding audio chunk: \(audioData.count) bytes")
-                        self.audioContinuation?.yield(audioData)
+                // Start streaming transcription task using SDK's liveTranscribe API
+                streamingTask = Task { @MainActor in
+                    do {
+                        print("[LIVE-MODE] Starting transcription stream (supportsStreaming: \(component.supportsStreaming))")
 
-                        self.audioBuffer.append(audioData)
+                        // Create options for live transcription
+                        let options = STTOptions(
+                            language: "en",
+                            enablePunctuation: true,
+                            audioFormat: .pcm,
+                            sampleRate: 16000
+                        )
 
-                        // Calculate audio level for visualization
-                        if let floatData = buffer.floatChannelData {
-                            var sum: Float = 0.0
-                            for i in 0..<Int(buffer.frameLength) {
-                                let sample = floatData.pointee[i]
-                                sum += sample * sample
-                            }
-                            let rms = sqrt(sum / Float(buffer.frameLength))
-                            let dbLevel = 20 * log10(rms + 0.0001)
-                            self.audioLevel = max(0, min(1, (dbLevel + 60) / 60))
+                        // Use the SDK's liveTranscribe API
+                        let transcriptionStream = component.liveTranscribe(audioStream, options: options)
+                        for try await partialText in transcriptionStream {
+                            self.transcription = partialText
+                            self.logger.debug("Partial: \(partialText)")
+                        }
+                        print("[LIVE-MODE] Transcription stream completed")
+                    } catch {
+                        if !Task.isCancelled {
+                            self.logger.error("Streaming failed: \(error.localizedDescription)")
+                            self.errorMessage = "Streaming failed: \(error.localizedDescription)"
+                        }
+                    }
+                }
+            } else {
+                // Batch mode: Just collect audio data
+                inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
+                    guard let self = self else { return }
+                    if let audioData = self.convertBufferToData(buffer) {
+                        Task { @MainActor in
+                            self.audioBuffer.append(audioData)
+                            self.updateAudioLevel(buffer)
                         }
                     }
                 }
             }
-            print("[AUDIO-ENGINE] Tap installed successfully")
 
             // Start the audio engine
-            print("[AUDIO-ENGINE] Starting audio engine...")
             try engine.start()
-            print("[AUDIO-ENGINE] Audio engine started successfully, isRunning=\(engine.isRunning)")
+            print("[AUDIO-ENGINE] Audio engine started, isRunning=\(engine.isRunning)")
 
             self.audioEngine = engine
             self.inputNode = inputNode
             isRecording = true
-
-            // NOW start streaming transcription task (AFTER audio engine is running)
-            streamingTask = Task { @MainActor in
-                do {
-                    print("[STREAMING-TASK] Starting transcription stream consumption")
-                    let transcriptionStream = component.streamTranscribe(audioStream, language: "en")
-
-                    for try await partialText in transcriptionStream {
-                        // Update transcription in real-time
-                        self.transcription = partialText
-                        self.logger.debug("Partial transcription: \(partialText)")
-                    }
-                    print("[STREAMING-TASK] Transcription stream completed")
-                } catch {
-                    self.logger.error("Streaming transcription failed: \(error.localizedDescription)")
-                    self.errorMessage = "Streaming failed: \(error.localizedDescription)"
-                }
-            }
 
         } catch {
             logger.error("Failed to start recording: \(error.localizedDescription)")
@@ -467,29 +505,104 @@ class STTViewModel: ObservableObject {
         }
     }
 
-    func stopRecording() async {
-        logger.info("Stopping recording")
+    /// Convert AVAudioPCMBuffer to Data (Int16 PCM)
+    private func convertBufferToData(_ buffer: AVAudioPCMBuffer) -> Data? {
+        guard let floatData = buffer.floatChannelData else { return nil }
 
-        // Stop audio engine
+        let frameCount = Int(buffer.frameLength)
+        var samples: [Int16] = []
+        samples.reserveCapacity(frameCount)
+
+        // Convert float to int16 (mono - use first channel)
+        let channelBuffer = floatData[0]
+        for frame in 0..<frameCount {
+            let sample = channelBuffer[frame]
+            let int16Sample = Int16(max(-1.0, min(1.0, sample)) * Float(Int16.max))
+            samples.append(int16Sample)
+        }
+
+        return Data(bytes: samples, count: samples.count * MemoryLayout<Int16>.size)
+    }
+
+    /// Update audio level for visualization
+    private func updateAudioLevel(_ buffer: AVAudioPCMBuffer) {
+        guard let floatData = buffer.floatChannelData else { return }
+        var sum: Float = 0.0
+        for i in 0..<Int(buffer.frameLength) {
+            let sample = floatData.pointee[i]
+            sum += sample * sample
+        }
+        let rms = sqrt(sum / Float(buffer.frameLength))
+        let dbLevel = 20 * log10(rms + 0.0001)
+        audioLevel = max(0, min(1, (dbLevel + 60) / 60))
+    }
+
+    func stopRecording() async {
+        logger.info("Stopping recording in \(self.selectedMode.rawValue) mode")
+
+        // Stop audio engine first
         inputNode?.removeTap(onBus: 0)
         audioEngine?.stop()
         audioEngine = nil
         inputNode = nil
 
-        // Finish the audio stream
-        audioContinuation?.finish()
-        audioContinuation = nil
-
-        // Cancel streaming task
-        streamingTask?.cancel()
-        streamingTask = nil
-
-        try? AVAudioSession.sharedInstance().setActive(false)
-
         isRecording = false
         audioLevel = 0.0
 
+        if selectedMode == .live {
+            // Live mode: Finish the audio stream and wait for transcription
+            audioContinuation?.finish()
+            audioContinuation = nil
+
+            // Wait for streaming task to complete (don't cancel it!)
+            if let task = streamingTask {
+                _ = await task.result
+            }
+            streamingTask = nil
+        } else {
+            // Batch mode: Transcribe the collected audio
+            await performBatchTranscription()
+        }
+
+        try? AVAudioSession.sharedInstance().setActive(false)
         logger.info("Recording stopped. Transcription: \(self.transcription)")
+    }
+
+    /// Perform batch transcription on collected audio
+    private func performBatchTranscription() async {
+        guard let component = sttComponent else {
+            errorMessage = "No STT model loaded"
+            return
+        }
+
+        guard !self.audioBuffer.isEmpty else {
+            errorMessage = "No audio recorded"
+            return
+        }
+
+        logger.info("Starting batch transcription of \(self.audioBuffer.count) bytes")
+        isTranscribing = true
+        transcription = ""
+
+        do {
+            // Create transcription options using the SDK's STTOptions
+            let options = STTOptions(
+                language: "en",
+                enablePunctuation: true,
+                audioFormat: .pcm,
+                sampleRate: 16000  // STT models expect 16kHz
+            )
+
+            // Use the STT component's transcribe method with options
+            let output = try await component.transcribe(audioBuffer, options: options)
+            transcription = output.text
+            logger.info("Batch transcription complete: \(output.text)")
+        } catch {
+            logger.error("Batch transcription failed: \(error.localizedDescription)")
+            errorMessage = "Transcription failed: \(error.localizedDescription)"
+        }
+
+        isTranscribing = false
     }
 }
 
