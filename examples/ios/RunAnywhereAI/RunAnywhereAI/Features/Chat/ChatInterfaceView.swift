@@ -87,7 +87,7 @@ struct ChatInterfaceView: View {
             ConversationListView()
         }
         .sheet(isPresented: $showingModelSelection) {
-            ModelSelectionSheet { model in
+            ModelSelectionSheet(context: .llm) { model in
                 await handleModelSelected(model)
             }
         }

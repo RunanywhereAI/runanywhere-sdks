@@ -8,6 +8,38 @@
 import SwiftUI
 import RunAnywhere
 
+// MARK: - Model Selection Context
+
+/// Context for filtering frameworks and models based on the current experience/modality
+enum ModelSelectionContext {
+    case llm       // Chat experience - show LLM frameworks (llama.cpp, Foundation Models)
+    case stt       // Speech-to-Text - show STT frameworks (WhisperKit, ONNX STT)
+    case tts       // Text-to-Speech - show TTS frameworks (ONNX TTS/Piper, System TTS)
+    case voice     // Voice Assistant - show all voice-related (LLM + STT + TTS)
+
+    var title: String {
+        switch self {
+        case .llm: return "Select LLM Model"
+        case .stt: return "Select STT Model"
+        case .tts: return "Select TTS Model"
+        case .voice: return "Select Model"
+        }
+    }
+
+    var relevantCategories: Set<ModelCategory> {
+        switch self {
+        case .llm:
+            return [.language, .multimodal]
+        case .stt:
+            return [.speechRecognition]
+        case .tts:
+            return [.speechSynthesis]
+        case .voice:
+            return [.language, .multimodal, .speechRecognition, .speechSynthesis]
+        }
+    }
+}
+
 struct ModelSelectionSheet: View {
     @StateObject private var viewModel = ModelListViewModel.shared
     @StateObject private var deviceInfo = DeviceInfoService.shared
@@ -20,9 +52,13 @@ struct ModelSelectionSheet: View {
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
 
+    /// The modality context for filtering frameworks and models
+    let context: ModelSelectionContext
+
     let onModelSelected: (ModelInfo) async -> Void
 
-    init(onModelSelected: @escaping (ModelInfo) async -> Void) {
+    init(context: ModelSelectionContext = .llm, onModelSelected: @escaping (ModelInfo) async -> Void) {
+        self.context = context
         self.onModelSelected = onModelSelected
     }
 
@@ -35,7 +71,7 @@ struct ModelSelectionSheet: View {
                     loadingOverlay
                 }
             }
-            .navigationTitle("Select Model")
+            .navigationTitle(context.title)
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -118,10 +154,35 @@ struct ModelSelectionSheet: View {
     }
 
     private func loadAvailableFrameworks() async {
-        let frameworks = RunAnywhere.getAvailableFrameworks()
-        await MainActor.run {
-            self.availableFrameworks = frameworks
+        let allFrameworks = RunAnywhere.getAvailableFrameworks()
+
+        // Filter frameworks based on context by checking if they have relevant models
+        let filteredFrameworks = allFrameworks.filter { framework in
+            shouldShowFramework(framework)
         }
+
+        await MainActor.run {
+            self.availableFrameworks = filteredFrameworks
+        }
+    }
+
+    /// Determines if a framework should be shown based on the current context
+    private func shouldShowFramework(_ framework: LLMFramework) -> Bool {
+        // Get models for this framework
+        let modelsForFramework = viewModel.availableModels.filter { model in
+            if framework == .foundationModels {
+                return model.preferredFramework == .foundationModels
+            } else {
+                return model.compatibleFrameworks.contains(framework)
+            }
+        }
+
+        // Check if any model's category matches the context's relevant categories
+        let hasRelevantModels = modelsForFramework.contains { model in
+            context.relevantCategories.contains(model.category)
+        }
+
+        return hasRelevantModels
     }
 
     private var deviceStatusSection: some View {
@@ -203,13 +264,20 @@ struct ModelSelectionSheet: View {
     @ViewBuilder
     private var modelsSection: some View {
         if let expanded = expandedFramework {
-            // Filter models based on the expanded framework
+            // Filter models based on the expanded framework AND context
             let filteredModels = viewModel.availableModels.filter { model in
+                // First check framework match
+                let frameworkMatch: Bool
                 if expanded == .foundationModels {
-                    return model.preferredFramework == .foundationModels
+                    frameworkMatch = model.preferredFramework == .foundationModels
                 } else {
-                    return model.compatibleFrameworks.contains(expanded)
+                    frameworkMatch = model.compatibleFrameworks.contains(expanded)
                 }
+
+                // Then check if model's category is relevant to current context
+                let categoryMatch = context.relevantCategories.contains(model.category)
+
+                return frameworkMatch && categoryMatch
             }
 
             Section("Models for \(expanded.displayName)") {
