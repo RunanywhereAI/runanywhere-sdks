@@ -1,10 +1,10 @@
 import Foundation
 import LLM
-import os.log
+import RunAnywhere
 
 /// Utility for determining the appropriate LLM template based on model characteristics
 public struct LLMSwiftTemplateResolver {
-    private static let logger = Logger(subsystem: "com.runanywhere.llmswift", category: "TemplateResolver")
+    private static let logger = SDKLogger(category: "TemplateResolver")
 
     /// Determine the appropriate template for a model
     /// - Parameters:

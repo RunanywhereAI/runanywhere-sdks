@@ -1,12 +1,11 @@
 import Foundation
 import RunAnywhere
 import LLM
-import os.log
 
 public class LLMSwiftService: LLMService {
     private var llm: LLM?
     private var modelPath: String?
-    private let logger = Logger(subsystem: "com.runanywhere.llmswift", category: "LLMSwiftService")
+    private let logger = SDKLogger(category: "LLMSwiftService")
 
     public var isReady: Bool { llm != nil }
     public var currentModel: String? { modelPath?.components(separatedBy: "/").last }

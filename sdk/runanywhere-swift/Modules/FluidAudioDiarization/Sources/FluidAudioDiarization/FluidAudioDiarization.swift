@@ -1,7 +1,6 @@
 import Foundation
 @preconcurrency import RunAnywhere
 import FluidAudio
-import os
 
 // Define the missing type locally until it's added to the SDK
 public struct SpeakerDiarizationResult {
@@ -51,7 +50,7 @@ public class FluidAudioDiarization: SpeakerDiarizationService {
     private let diarizerManager: DiarizerManager
     private var speakers: [String: SpeakerInfo] = [:]
     private var currentSpeaker: SpeakerInfo?
-    private let logger: Logger = Logger(subsystem: "com.runanywhere.sdk", category: "FluidAudioDiarization")
+    private let logger = SDKLogger(category: "FluidAudioDiarization")
     private let diarizationQueue: DispatchQueue = DispatchQueue(label: "com.runanywhere.fluidaudio.diarization", attributes: .concurrent)
 
     // Audio buffering for minimum chunk size (3 seconds recommended)

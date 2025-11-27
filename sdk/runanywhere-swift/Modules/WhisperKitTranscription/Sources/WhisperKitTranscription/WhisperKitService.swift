@@ -2,11 +2,10 @@ import Foundation
 import RunAnywhere
 import AVFoundation
 import WhisperKit
-import os
 
 /// WhisperKit implementation of STTService
 public class WhisperKitService: STTService {
-    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitService")
+    private let logger = SDKLogger(category: "WhisperKitService")
 
     // MARK: - Properties
 
@@ -28,11 +27,11 @@ public class WhisperKitService: STTService {
 
     public func initialize(modelPath: String?) async throws {
         logger.info("Starting initialization...")
-        logger.debug("Model path requested: \(modelPath ?? "default", privacy: .public)")
+        logger.debug("Model path requested: \(modelPath ?? "default")")
 
         // Skip initialization if already initialized with the same model
         if isInitialized && whisperKit != nil && currentModelPath == (modelPath ?? "whisper-base") {
-            logger.info("✅ WhisperKit already initialized with model: \(self.currentModelPath ?? "unknown", privacy: .public)")
+            logger.info("✅ WhisperKit already initialized with model: \(self.currentModelPath ?? "unknown")")
             return
         }
 
@@ -71,8 +70,8 @@ public class WhisperKitService: STTService {
             logger.info("✅ Successfully initialized WhisperKit")
             logger.debug("isInitialized: \(self.isInitialized)")
         } catch {
-            logger.error("❌ Failed to initialize WhisperKit: \(error, privacy: .public)")
-            logger.error("Error details: \(error.localizedDescription, privacy: .public)")
+            logger.error("❌ Failed to initialize WhisperKit: \(error)")
+            logger.error("Error details: \(error.localizedDescription)")
             throw VoiceError.transcriptionFailed(error)
         }
     }
@@ -102,7 +101,7 @@ public class WhisperKitService: STTService {
         options: STTOptions
     ) async throws -> STTResult {
         logger.info("transcribe() called with \(samples.count) samples")
-        logger.debug("Options - Language: \(options.language, privacy: .public)")
+        logger.debug("Options - Language: \(options.language)")
 
         guard isInitialized, let whisperKit = whisperKit else {
             logger.error("❌ Service not initialized!")

@@ -1,12 +1,11 @@
 import Foundation
 import AVFoundation
-import os
 
 /// Temporary bridge handler for VAD to work with existing VoicePipelineManager
 /// This will be removed once VoicePipelineManager is refactored to use the new component architecture
 @MainActor
 public final class VADHandler {
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "VADHandler")
+    private let logger = SDKLogger(category: "VADHandler")
     private var vadComponent: VADComponent?
 
     public init() {}

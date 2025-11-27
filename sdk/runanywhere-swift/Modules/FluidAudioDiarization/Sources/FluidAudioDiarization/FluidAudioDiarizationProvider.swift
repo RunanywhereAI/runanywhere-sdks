@@ -1,6 +1,5 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// FluidAudioDiarization provider for Speaker Diarization services
 ///
@@ -12,7 +11,7 @@ import os
 /// FluidAudioDiarizationProvider.register()
 /// ```
 public final class FluidAudioDiarizationProvider: SpeakerDiarizationServiceProvider {
-    private let logger = Logger(subsystem: "com.runanywhere.fluiddiarization", category: "FluidAudioDiarizationProvider")
+    private let logger = SDKLogger(category: "FluidAudioDiarizationProvider")
 
     // MARK: - Singleton for easy registration
 

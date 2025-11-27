@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Handles progressive TTS for streaming text generation
 /// Speaks complete sentences as they become available during streaming

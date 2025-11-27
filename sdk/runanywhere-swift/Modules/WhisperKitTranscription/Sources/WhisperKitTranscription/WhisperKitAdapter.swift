@@ -1,10 +1,9 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// WhisperKit adapter for voice transcription
 public class WhisperKitAdapter: UnifiedFrameworkAdapter {
-    private let logger: Logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitAdapter")
+    private let logger = SDKLogger(category: "WhisperKitAdapter")
 
     // Singleton instance to ensure caching works across the app
     public static let shared = WhisperKitAdapter()
@@ -30,12 +29,12 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         // Check if model is for speech recognition and compatible with WhisperKit
         let canHandle = model.category == .speechRecognition &&
                        model.compatibleFrameworks.contains(.whisperKit)
-        logger.debug("canHandle(\(model.name, privacy: .public)): \(canHandle)")
+        logger.debug("canHandle(\(model.name)): \(canHandle)")
         return canHandle
     }
 
     public func createService(for modality: FrameworkModality) -> Any? {
-        logger.info("createService for modality: \(modality.rawValue, privacy: .public)")
+        logger.info("createService for modality: \(modality.rawValue)")
         switch modality {
         case .voiceToText:
             // Check if cached service should be cleaned up
@@ -53,13 +52,13 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
             lastWhisperKitUsage = Date()
             return service
         default:
-            logger.warning("Unsupported modality: \(modality.rawValue, privacy: .public)")
+            logger.warning("Unsupported modality: \(modality.rawValue)")
             return nil
         }
     }
 
     public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
-        logger.info("loadModel(\(model.name, privacy: .public)) for modality: \(modality.rawValue, privacy: .public)")
+        logger.info("loadModel(\(model.name)) for modality: \(modality.rawValue)")
         switch modality {
         case .voiceToText:
             // Check if cached service should be cleaned up
@@ -78,13 +77,13 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
 
             // Initialize with model path if available
             let modelPath = model.localPath?.path
-            logger.debug("Model path: \(modelPath ?? "nil", privacy: .public)")
+            logger.debug("Model path: \(modelPath ?? "nil")")
             try await service.initialize(modelPath: modelPath)
             logger.info("WhisperKitService initialized")
             lastWhisperKitUsage = Date()
             return service
         default:
-            logger.error("Unsupported modality: \(modality.rawValue, privacy: .public)")
+            logger.error("Unsupported modality: \(modality.rawValue)")
             throw SDKError.unsupportedModality(modality.rawValue)
         }
     }
@@ -108,8 +107,8 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
         self.storageStrategy = WhisperKitStorageStrategy()
 
         logger.info("WhisperKitAdapter initialized")
-        logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
-        logger.info("Supported formats: \(self.supportedFormats.map { $0.rawValue }.joined(separator: ", "), privacy: .public)")
+        logger.info("Supported modalities: \(self.supportedModalities.map { $0.rawValue }.joined(separator: ", "))")
+        logger.info("Supported formats: \(self.supportedFormats.map { $0.rawValue }.joined(separator: ", "))")
     }
 
     // MARK: - Model Registration

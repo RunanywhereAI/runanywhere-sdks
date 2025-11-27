@@ -1,6 +1,5 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// WhisperKit provider for Speech-to-Text services
 ///
@@ -12,7 +11,7 @@ import os
 /// WhisperKitServiceProvider.register()
 /// ```
 public final class WhisperKitServiceProvider: STTServiceProvider {
-    private let logger = Logger(subsystem: "com.runanywhere.whisperkit", category: "WhisperKitServiceProvider")
+    private let logger = SDKLogger(category: "WhisperKitServiceProvider")
 
     // MARK: - Singleton for easy registration
 

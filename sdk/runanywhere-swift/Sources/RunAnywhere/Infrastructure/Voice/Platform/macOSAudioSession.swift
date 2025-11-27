@@ -1,7 +1,6 @@
 import Foundation
 #if os(macOS)
 import AVFoundation
-import os
 
 /// macOS-specific audio session management for voice processing
 public class macOSAudioSession {
