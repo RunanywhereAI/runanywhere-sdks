@@ -14,6 +14,9 @@ public struct ModelRegistration {
     /// The framework this model is compatible with
     public let framework: LLMFramework
 
+    /// The modality/capability this model provides (STT, TTS, text-to-text, etc.)
+    public let modality: FrameworkModality
+
     /// Model format (auto-detected from URL if nil)
     public let format: ModelFormat?
 
@@ -23,19 +26,16 @@ public struct ModelRegistration {
     /// Maximum context length (optional)
     public let contextLength: Int?
 
-    /// Additional metadata
-    public let metadata: [String: Any]
-
     /// Public initializer with URL string
     public init(
         url: String,
         framework: LLMFramework,
+        modality: FrameworkModality,
         id: String? = nil,
         name: String? = nil,
         format: ModelFormat? = nil,
         memoryRequirement: Int64? = nil,
-        contextLength: Int? = nil,
-        metadata: [String: Any] = [:]
+        contextLength: Int? = nil
     ) throws {
         guard let modelURL = URL(string: url) else {
             throw SDKError.invalidConfiguration("Invalid model URL: \(url)")
@@ -43,50 +43,41 @@ public struct ModelRegistration {
 
         self.url = modelURL
         self.framework = framework
+        self.modality = modality
         self.id = id ?? modelURL.lastPathComponent.replacingOccurrences(of: ".", with: "_")
         self.name = name ?? modelURL.lastPathComponent
         self.format = format ?? ModelFormat.detectFromURL(modelURL)
         self.memoryRequirement = memoryRequirement
         self.contextLength = contextLength
-        self.metadata = metadata
     }
 
     /// Public initializer with URL
     public init(
         url: URL,
         framework: LLMFramework,
+        modality: FrameworkModality,
         id: String? = nil,
         name: String? = nil,
         format: ModelFormat? = nil,
         memoryRequirement: Int64? = nil,
-        contextLength: Int? = nil,
-        metadata: [String: Any] = [:]
+        contextLength: Int? = nil
     ) {
         self.url = url
         self.framework = framework
+        self.modality = modality
         self.id = id ?? url.lastPathComponent.replacingOccurrences(of: ".", with: "_")
         self.name = name ?? url.lastPathComponent
         self.format = format ?? ModelFormat.detectFromURL(url)
         self.memoryRequirement = memoryRequirement
         self.contextLength = contextLength
-        self.metadata = metadata
     }
 
     /// Convert to ModelInfo for internal use
     internal func toModelInfo() -> ModelInfo {
-        // Determine category - check metadata first, then use framework inference
-        let category: ModelCategory
-        if let categoryString = metadata["category"] as? String,
-           let categoryFromMetadata = ModelCategory(rawValue: categoryString) {
-            category = categoryFromMetadata
-        } else {
-            category = ModelCategory.from(framework: framework)
-        }
-
         return ModelInfo(
             id: id,
             name: name,
-            category: category,
+            category: ModelCategory.from(modality: modality),
             format: format ?? .gguf,
             downloadURL: url,
             localPath: nil,
@@ -96,60 +87,6 @@ public struct ModelRegistration {
             preferredFramework: framework,
             contextLength: contextLength,
             supportsThinking: false
-        )
-    }
-}
-
-/// Options for adapter registration
-public struct AdapterRegistrationOptions {
-    /// Whether to validate models before registration
-    public let validateModels: Bool
-
-    /// Whether to auto-download models in development mode
-    public let autoDownloadInDev: Bool
-
-    /// Whether to show download progress
-    public let showProgress: Bool
-
-    /// Whether to fall back to mock models on failure
-    public let fallbackToMockModels: Bool
-
-    /// Download timeout in seconds
-    public let downloadTimeout: TimeInterval
-
-    public init(
-        validateModels: Bool = true,
-        autoDownloadInDev: Bool = false,  // Default to false for lazy loading
-        showProgress: Bool = true,
-        fallbackToMockModels: Bool = false,
-        downloadTimeout: TimeInterval = 300
-    ) {
-        self.validateModels = validateModels
-        self.autoDownloadInDev = autoDownloadInDev
-        self.showProgress = showProgress
-        self.fallbackToMockModels = fallbackToMockModels
-        self.downloadTimeout = downloadTimeout
-    }
-
-    /// Default options for development mode
-    public static var development: AdapterRegistrationOptions {
-        return AdapterRegistrationOptions(
-            validateModels: false,
-            autoDownloadInDev: false,  // Changed to false for lazy loading
-            showProgress: true,
-            fallbackToMockModels: true,
-            downloadTimeout: 600
-        )
-    }
-
-    /// Default options for production mode
-    public static var production: AdapterRegistrationOptions {
-        return AdapterRegistrationOptions(
-            validateModels: true,
-            autoDownloadInDev: false,
-            showProgress: false,
-            fallbackToMockModels: false,
-            downloadTimeout: 300
         )
     }
 }

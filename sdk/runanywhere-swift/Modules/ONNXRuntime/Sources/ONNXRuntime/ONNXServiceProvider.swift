@@ -1,10 +1,9 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// Service provider for ONNX Runtime STT capabilities
-public struct ONNXServiceProvider: STTServiceProvider {
-    private static let logger = Logger(subsystem: "com.runanywhere.onnx", category: "ONNXServiceProvider")
+public struct ONNXSTTServiceProvider: STTServiceProvider {
+    private static let logger = SDKLogger(category: "ONNXServiceProvider")
 
     public let name: String = "ONNX Runtime"
     public let version: String = "1.23.2"
@@ -78,7 +77,7 @@ public struct ONNXServiceProvider: STTServiceProvider {
     @MainActor
     public static func register(priority: Int = 100) async {
         logger.info("Registering ONNX Runtime STT provider with priority \(priority)")
-        let provider = ONNXServiceProvider()
+        let provider = ONNXSTTServiceProvider()
         ModuleRegistry.shared.registerSTT(provider, priority: priority)
         logger.info("ONNX Runtime STT provider registered")
     }

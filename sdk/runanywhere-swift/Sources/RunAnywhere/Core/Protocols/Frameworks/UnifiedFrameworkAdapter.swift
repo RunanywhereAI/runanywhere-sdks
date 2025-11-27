@@ -43,7 +43,8 @@ public protocol UnifiedFrameworkAdapter {
     func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration
 
     /// Called when the adapter is registered with the SDK
-    /// Adapters can use this to perform initialization tasks
+    /// Adapters should register their service providers with ModuleRegistry here
+    @MainActor
     func onRegistration()
 
     /// Get models provided by this adapter
@@ -70,8 +71,9 @@ public extension UnifiedFrameworkAdapter {
     }
 
     /// Default implementation - does nothing
+    @MainActor
     func onRegistration() {
-        // Default: no-op
+        // Default: no-op - adapters should override to register their service providers
     }
 
     /// Default implementation - returns empty array

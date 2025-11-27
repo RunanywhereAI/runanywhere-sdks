@@ -13,6 +13,13 @@ public class LLMSwiftAdapter: UnifiedFrameworkAdapter {
 
     public init() {}
 
+    /// Register the LLM service provider with ModuleRegistry
+    @MainActor
+    public func onRegistration() {
+        ModuleRegistry.shared.registerLLM(LLMSwiftServiceProvider.shared)
+        logger.info("Registered LLMSwiftServiceProvider with ModuleRegistry")
+    }
+
     public func canHandle(model: ModelInfo) -> Bool {
         // Check format support
         guard supportedFormats.contains(model.format) else { return false }

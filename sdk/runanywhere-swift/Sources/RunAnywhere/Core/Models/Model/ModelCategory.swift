@@ -112,6 +112,18 @@ public extension ModelCategory {
         }
     }
 
+    /// Determine category from a FrameworkModality (non-failable)
+    static func from(modality: FrameworkModality) -> ModelCategory {
+        switch modality {
+        case .textToText: return .language
+        case .voiceToText: return .speechRecognition
+        case .textToVoice: return .speechSynthesis
+        case .imageToText: return .vision
+        case .textToImage: return .imageGeneration
+        case .multimodal: return .multimodal
+        }
+    }
+
     /// Determine category from a framework
     static func from(framework: LLMFramework) -> ModelCategory {
         switch framework {

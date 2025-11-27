@@ -118,11 +118,11 @@ public class WhisperKitAdapter: UnifiedFrameworkAdapter {
     private let storageStrategy: WhisperKitStorageStrategy
 
     /// Called when adapter is registered with the SDK
-    /// This method will be called automatically by the SDK when the adapter is registered
+    /// Registers the STT service provider with ModuleRegistry
+    @MainActor
     public func onRegistration() {
-        logger.info("✅ WhisperKitAdapter registered")
-        // Models will come from remote configuration or be added by users
-        // We only provide the download strategy for WhisperKit models
+        ModuleRegistry.shared.registerSTT(WhisperKitServiceProvider.shared)
+        logger.info("Registered WhisperKitServiceProvider with ModuleRegistry")
     }
 
     /// Get models provided by this adapter

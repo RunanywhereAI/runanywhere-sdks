@@ -1,10 +1,9 @@
 import Foundation
 import RunAnywhere
-import os
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives
 public class ONNXDownloadStrategy: DownloadStrategy {
-    private let logger = Logger(subsystem: "com.runanywhere.onnx", category: "ONNXDownloadStrategy")
+    private let logger = SDKLogger(category: "ONNXDownloadStrategy")
 
     public init() {}
 
@@ -16,7 +15,7 @@ public class ONNXDownloadStrategy: DownloadStrategy {
         let isONNX = model.compatibleFrameworks.contains(.onnx)
 
         let canHandle = isTarBz2 && isONNX
-        logger.debug("canHandle(\(model.id)): \(canHandle) (url: \(url.absoluteString, privacy: .public))")
+        logger.debug("canHandle(\(model.id)): \(canHandle) (url: \(url.absoluteString))")
         return canHandle
     }
 
