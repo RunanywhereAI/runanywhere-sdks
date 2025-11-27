@@ -4,22 +4,20 @@ import CRunAnywhereONNX  // C wrapper module
 import os
 
 /// ONNX Runtime implementation of STTService for speech-to-text
+/// Uses the unified RunAnywhere backend API
 public class ONNXSTTService: STTService {
     private let logger: Logger = Logger(subsystem: "com.runanywhere.onnx", category: "ONNXSTTService")
 
-    private var handle: UnsafeMutableRawPointer?
+    private var backendHandle: ra_backend_handle?
+    private var streamHandle: ra_stream_handle?
     private var _isReady: Bool = false
     private var _currentModel: String?
-
-    // Sherpa-ONNX handles for streaming STT
-    private var sherpaRecognizer: UnsafeMutableRawPointer?
-    private var sherpaStream: UnsafeMutableRawPointer?
-    private var isSherpaModel: Bool = false
+    private var supportsStreaming: Bool = false
 
     // MARK: - STTService Protocol
 
     public var isReady: Bool {
-        return _isReady && (handle != nil || sherpaRecognizer != nil)
+        return _isReady && backendHandle != nil
     }
 
     public var currentModel: String? {
@@ -31,19 +29,14 @@ public class ONNXSTTService: STTService {
     }
 
     deinit {
-        // Synchronously clean up to avoid retain cycle
-        // Clean up sherpa-onnx resources
-        if let stream = sherpaStream {
-            ra_sherpa_destroy_stream(stream)
+        // Clean up stream
+        if let stream = streamHandle, let backend = backendHandle {
+            ra_stt_destroy_stream(backend, stream)
         }
 
-        if let recognizer = sherpaRecognizer {
-            ra_sherpa_destroy_recognizer(recognizer)
-        }
-
-        // Clean up standard ONNX handle
-        if let handle = handle {
-            ra_onnx_destroy(handle)
+        // Clean up backend
+        if let backend = backendHandle {
+            ra_destroy(backend)
         }
 
         logger.info("ONNXSTTService deallocated")
@@ -52,20 +45,69 @@ public class ONNXSTTService: STTService {
     public func initialize(modelPath: String?) async throws {
         logger.info("Initializing ONNX Runtime with model: \(modelPath ?? "none", privacy: .public)")
 
-        // Check if this is a sherpa-onnx model
-        if let modelPath = modelPath {
-            isSherpaModel = detectSherpaModel(path: modelPath)
+        // Create ONNX backend
+        backendHandle = ra_create_backend("onnx")
+        guard backendHandle != nil else {
+            logger.error("Failed to create ONNX backend")
+            throw ONNXError.initializationFailed
+        }
 
-            if isSherpaModel {
-                logger.info("Detected sherpa-onnx model, using streaming recognizer")
-                try await initializeSherpaModel(path: modelPath)
-            } else {
-                logger.info("Using standard ONNX Runtime for model")
-                try await initializeStandardModel(path: modelPath)
+        // Initialize backend
+        let initStatus = ra_initialize(backendHandle, nil)
+        guard initStatus == RA_SUCCESS else {
+            logger.error("Failed to initialize ONNX backend: \(initStatus.rawValue)")
+            ra_destroy(backendHandle)
+            backendHandle = nil
+            throw ONNXError.from(code: Int32(initStatus.rawValue))
+        }
+
+        // Load STT model if path provided
+        if let modelPath = modelPath {
+            // Detect model type
+            let modelType = detectModelType(path: modelPath)
+            logger.info("Detected model type: \(modelType)")
+
+            // Prepare model directory path
+            var modelDir = modelPath
+            let fileManager = FileManager.default
+            var isDirectory: ObjCBool = false
+
+            if fileManager.fileExists(atPath: modelPath, isDirectory: &isDirectory) && !isDirectory.boolValue {
+                modelDir = (modelPath as NSString).deletingLastPathComponent
             }
-        } else {
-            // No model path provided, use standard ONNX runtime
-            try await initializeStandardModel(path: nil)
+
+            // Handle tar.bz2 archives using platform-native ArchiveUtility
+            if modelPath.hasSuffix(".tar.bz2") {
+                let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let pathNS = modelPath as NSString
+                let modelName = ((pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString).lastPathComponent
+                let extractURL = documentsPath.appendingPathComponent("sherpa-models/\(modelName)")
+
+                logger.info("Extracting model archive to: \(extractURL.path)")
+
+                do {
+                    try ArchiveUtility.extractTarBz2Archive(
+                        from: URL(fileURLWithPath: modelPath),
+                        to: extractURL
+                    )
+                } catch {
+                    logger.error("Failed to extract model archive: \(error.localizedDescription)")
+                    throw ONNXError.modelLoadFailed("Failed to extract archive: \(error.localizedDescription)")
+                }
+
+                modelDir = extractURL.path
+            }
+
+            // Load STT model
+            let loadStatus = ra_stt_load_model(backendHandle, modelDir, modelType, nil)
+            guard loadStatus == RA_SUCCESS else {
+                logger.error("Failed to load STT model: \(loadStatus.rawValue)")
+                throw ONNXError.modelLoadFailed(modelPath)
+            }
+
+            _currentModel = modelPath
+            supportsStreaming = ra_stt_supports_streaming(backendHandle)
+            logger.info("STT model loaded, streaming supported: \(self.supportsStreaming)")
         }
 
         _isReady = true
@@ -73,303 +115,33 @@ public class ONNXSTTService: STTService {
     }
 
     public func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult {
-        guard isReady else {
+        guard isReady, let backend = backendHandle else {
             throw ONNXError.invalidHandle
         }
 
         logger.info("Transcribing audio: \(audioData.count) bytes")
 
-        if isSherpaModel, let recognizer = sherpaRecognizer {
-            return try await transcribeWithSherpa(audioData: audioData, recognizer: recognizer, options: options)
-        } else if let handle = handle {
-            return try await transcribeStandard(audioData: audioData, handle: handle, options: options)
-        } else {
-            throw ONNXError.invalidHandle
-        }
-    }
-
-    public func streamTranscribe<S>(
-        audioStream: S,
-        options: STTOptions,
-        onPartial: @escaping (String) -> Void
-    ) async throws -> STTTranscriptionResult where S : AsyncSequence, S.Element == Data {
-        guard isReady else {
-            throw ONNXError.invalidHandle
-        }
-
-        if isSherpaModel, let recognizer = sherpaRecognizer {
-            // True streaming with sherpa-onnx
-            logger.info("Using sherpa-onnx streaming transcription")
-            return try await streamTranscribeWithSherpa(
-                audioStream: audioStream,
-                recognizer: recognizer,
-                options: options,
-                onPartial: onPartial
-            )
-        } else {
-            // Fallback to batch processing for non-sherpa models
-            logger.warning("Stream transcribe not available for non-sherpa models, using batch transcription")
-
-            var allAudioData = Data()
-            for try await chunk in audioStream {
-                allAudioData.append(chunk)
-            }
-
-            return try await transcribe(audioData: allAudioData, options: options)
-        }
-    }
-
-    public func cleanup() async {
-        logger.info("Cleaning up ONNX Runtime")
-
-        // Clean up sherpa-onnx resources
-        if let stream = sherpaStream {
-            ra_sherpa_destroy_stream(stream)
-            sherpaStream = nil
-        }
-
-        if let recognizer = sherpaRecognizer {
-            ra_sherpa_destroy_recognizer(recognizer)
-            sherpaRecognizer = nil
-        }
-
-        // Clean up standard ONNX handle
-        if let handle = handle {
-            ra_onnx_destroy(handle)
-            self.handle = nil
-        }
-
-        _isReady = false
-        _currentModel = nil
-        isSherpaModel = false
-    }
-
-    // MARK: - Private Helpers - Model Detection
-
-    private func detectSherpaModel(path: String) -> Bool {
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-
-        logger.debug("Detecting model type for path: \(path)")
-
-        // If path is a file (not directory), get the parent directory
-        var modelDir = path
-        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-            // Path is a file, use its parent directory
-            modelDir = (path as NSString).deletingLastPathComponent
-            logger.debug("Path is a file, using parent directory: \(modelDir)")
-        }
-
-        // Check if parent directory exists and is a directory
-        if !fileManager.fileExists(atPath: modelDir, isDirectory: &isDirectory) || !isDirectory.boolValue {
-            logger.error("Model directory does not exist or is not a directory: \(modelDir)")
-            return false
-        }
-
-        // Check if path is a directory (extracted sherpa model)
-        logger.debug("Checking directory for sherpa-onnx model: \(modelDir)")
-
-        // List directory contents for debugging
-        do {
-            let contents = try fileManager.contentsOfDirectory(atPath: modelDir)
-            logger.debug("Directory contents: \(contents.joined(separator: ", "))")
-        } catch {
-            logger.error("Failed to list directory contents: \(error)")
-        }
-
-        // Check for typical sherpa-onnx Zipformer files
-        let encoderPath = (modelDir as NSString).appendingPathComponent("encoder-epoch-99-avg-1.onnx")
-        let decoderPath = (modelDir as NSString).appendingPathComponent("decoder-epoch-99-avg-1.onnx")
-        let tokensPath = (modelDir as NSString).appendingPathComponent("tokens.txt")
-
-            if fileManager.fileExists(atPath: encoderPath) ||
-               fileManager.fileExists(atPath: decoderPath) ||
-               fileManager.fileExists(atPath: tokensPath) {
-                logger.info("Detected Zipformer-style sherpa-onnx model")
-                return true
-            }
-
-            // Check for whisper-style sherpa models (various naming patterns)
-            let whisperPatterns = [
-                "tiny.en-encoder.onnx",
-                "tiny-encoder.onnx",
-                "base.en-encoder.onnx",
-                "base-encoder.onnx",
-                "small.en-encoder.onnx",
-                "small-encoder.onnx",
-                "encoder.onnx"  // Generic encoder name
-            ]
-
-        for pattern in whisperPatterns {
-            let whisperEncoder = (modelDir as NSString).appendingPathComponent(pattern)
-            if fileManager.fileExists(atPath: whisperEncoder) {
-                logger.info("Detected Whisper-style sherpa-onnx model with pattern: \(pattern)")
-                return true
-            }
-        }
-
-        // Check for any .onnx files - if directory contains multiple .onnx files, likely sherpa model
-        do {
-            let contents = try fileManager.contentsOfDirectory(atPath: modelDir)
-            let onnxFiles = contents.filter { $0.hasSuffix(".onnx") }
-
-            // If there are multiple .onnx files or tokens.txt, treat as sherpa model
-            if onnxFiles.count > 1 || contents.contains("tokens.txt") {
-                logger.info("Found sherpa-indicative files, treating as sherpa model: \(onnxFiles.joined(separator: ", "))")
-                return true
-            }
-        } catch {
-            logger.error("Failed to check for .onnx files: \(error)")
-        }
-
-        // Check if path is a .tar.bz2 archive (sherpa model archive)
-        if path.hasSuffix(".tar.bz2") {
-            logger.info("Detected .tar.bz2 archive, treating as sherpa model")
-            return true
-        }
-
-        logger.info("No sherpa-onnx model detected, using standard ONNX Runtime")
-        return false
-    }
-
-    // MARK: - Standard ONNX Initialization
-
-    private func initializeStandardModel(path: String?) async throws {
-        // Create ONNX Runtime instance
-        handle = ra_onnx_create()
-        guard handle != nil else {
-            logger.error("Failed to create ONNX Runtime handle")
-            throw ONNXError.initializationFailed
-        }
-
-        // Initialize with default configuration
-        let status = ra_onnx_initialize(handle, nil)
-        guard status == 0 else { // RA_SUCCESS = 0
-            logger.error("Failed to initialize ONNX Runtime: \(status)")
-            ra_onnx_destroy(handle)
-            handle = nil
-            throw ONNXError.from(code: status)
-        }
-
-        // Load model if path provided
-        if let modelPath = path {
-            let loadStatus = ra_onnx_load_model(handle, modelPath)
-            guard loadStatus == 0 else {
-                logger.error("Failed to load model: \(loadStatus)")
-                throw ONNXError.modelLoadFailed(modelPath)
-            }
-            _currentModel = modelPath
-        }
-    }
-
-    // MARK: - Sherpa-ONNX Initialization
-
-    private func initializeSherpaModel(path: String) async throws {
-        var modelDir = path
-        let fileManager = FileManager.default
-        var isDirectory: ObjCBool = false
-
-        // If path is a file (not directory), get the parent directory
-        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue {
-            // Path is a file, use its parent directory for sherpa-onnx
-            modelDir = (path as NSString).deletingLastPathComponent
-            logger.info("Path is a file, using parent directory for sherpa-onnx: \(modelDir)")
-        }
-
-        // If path is a .tar.bz2 archive, extract it first
-        if path.hasSuffix(".tar.bz2") {
-            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let pathNS = path as NSString
-            let modelName = ((pathNS.deletingPathExtension as NSString).deletingPathExtension as NSString).lastPathComponent
-            let extractPath = documentsPath.appendingPathComponent("sherpa-models/\(modelName)").path
-
-            logger.info("Extracting sherpa model archive to: \(extractPath)")
-
-            let status = ra_extract_tar_bz2(path, extractPath)
-            guard status == 0 else {
-                logger.error("Failed to extract model archive: \(status)")
-                throw ONNXError.modelLoadFailed("Failed to extract archive")
-            }
-
-            modelDir = extractPath
-        }
-
-        // Create sherpa-onnx recognizer with auto-detected configuration
-        logger.info("Creating sherpa-onnx recognizer from: \(modelDir)")
-
-        // Auto-detect model files in the directory
-        let contents = try fileManager.contentsOfDirectory(atPath: modelDir)
-        logger.debug("Model directory contents: \(contents.joined(separator: ", "))")
-
-        // Find encoder, decoder, and tokens files
-        let encoderFile = contents.first { $0.contains("encoder") && $0.hasSuffix(".onnx") && !$0.contains("int8") }
-        let decoderFile = contents.first { $0.contains("decoder") && $0.hasSuffix(".onnx") && !$0.contains("int8") }
-        let tokensFile = contents.first { $0.contains("tokens") && $0.hasSuffix(".txt") }
-
-        // Build JSON configuration
-        var configDict: [String: Any] = [
-            "num_threads": 2,
-            "enable_endpoint_detection": true,
-            "rule1_min_trailing_silence": 2.4,
-            "rule2_min_trailing_silence": 1.2,
-            "rule3_min_utterance_length": 20.0
-        ]
-
-        if let encoder = encoderFile, let decoder = decoderFile, let tokens = tokensFile {
-            logger.info("Auto-detected model files - encoder: \(encoder), decoder: \(decoder), tokens: \(tokens)")
-            configDict["encoder"] = (modelDir as NSString).appendingPathComponent(encoder)
-            configDict["decoder"] = (modelDir as NSString).appendingPathComponent(decoder)
-            configDict["tokens"] = (modelDir as NSString).appendingPathComponent(tokens)
-        }
-
-        // Convert to JSON string
-        let jsonData = try JSONSerialization.data(withJSONObject: configDict, options: [])
-        let configJSON = String(data: jsonData, encoding: .utf8)
-
-        logger.debug("Sherpa config JSON: \(configJSON ?? "nil")")
-        sherpaRecognizer = ra_sherpa_create_recognizer(modelDir, configJSON)
-
-        guard sherpaRecognizer != nil else {
-            logger.error("Failed to create sherpa-onnx recognizer")
-            throw ONNXError.initializationFailed
-        }
-
-        _currentModel = path
-        logger.info("Sherpa-ONNX recognizer created successfully")
-    }
-
-    // MARK: - Standard Transcription
-
-    private func transcribeStandard(
-        audioData: Data,
-        handle: UnsafeMutableRawPointer,
-        options: STTOptions
-    ) async throws -> STTTranscriptionResult {
-        // Prepare audio configuration
-        var audioConfig = ra_audio_config(
-            sample_rate: Int32(options.audioFormat.sampleRate),
-            channels: 1,  // Mono
-            bits_per_sample: 16,
-            format: RA_AUDIO_FORMAT_PCM
-        )
+        // Convert audio data to float32 samples
+        let samples = try convertToFloat32Samples(audioData: audioData)
+        let sampleRate: Int32 = 16000
 
         var resultPtr: UnsafeMutablePointer<CChar>? = nil
 
-        // Call C bridge function
-        let status = audioData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
-            ra_onnx_transcribe(
-                handle,
-                bytes.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                audioData.count,
-                &audioConfig,
+        // Call STT transcribe
+        let status = samples.withUnsafeBufferPointer { buffer in
+            ra_stt_transcribe(
+                backend,
+                buffer.baseAddress,
+                buffer.count,
+                sampleRate,
                 options.language,
                 &resultPtr
             )
         }
 
-        guard status == 0, let resultPtr = resultPtr else {
-            logger.error("Transcription failed with status: \(status)")
-            throw ONNXError.from(code: status)
+        guard status == RA_SUCCESS, let resultPtr = resultPtr else {
+            logger.error("Transcription failed with status: \(status.rawValue)")
+            throw ONNXError.from(code: Int32(status.rawValue))
         }
 
         defer {
@@ -380,147 +152,119 @@ public class ONNXSTTService: STTService {
         let resultJSON = String(cString: resultPtr)
         logger.debug("Transcription result JSON: \(resultJSON)")
 
-        guard let jsonData = resultJSON.data(using: .utf8) else {
-            throw ONNXError.transcriptionFailed("Invalid JSON encoding")
-        }
-
-        let result = try JSONDecoder().decode(TranscriptionResult.self, from: jsonData)
-
-        return STTTranscriptionResult(
-            transcript: result.text,
-            confidence: Float(result.confidence),
-            timestamps: nil,
-            language: result.language,
-            alternatives: nil
-        )
+        return try parseTranscriptionResult(json: resultJSON, language: options.language)
     }
 
-    // MARK: - Sherpa-ONNX Transcription
-
-    private func transcribeWithSherpa(
-        audioData: Data,
-        recognizer: UnsafeMutableRawPointer,
-        options: STTOptions
-    ) async throws -> STTTranscriptionResult {
-        // Create a stream for this transcription
-        guard let stream = ra_sherpa_create_stream(recognizer) else {
-            logger.error("Failed to create sherpa stream")
-            throw ONNXError.initializationFailed
-        }
-
-        defer {
-            ra_sherpa_destroy_stream(stream)
-        }
-
-        // Convert audio data to float32 samples (also resamples from 48kHz to 16kHz)
-        let samples = try convertToFloat32Samples(audioData: audioData)
-        // sherpa-onnx expects 16kHz audio, we downsample from 48kHz in convertToFloat32Samples
-        let sampleRate: Int32 = 16000
-
-        // Feed audio to stream
-        samples.withUnsafeBufferPointer { buffer in
-            ra_sherpa_accept_waveform(stream, sampleRate, buffer.baseAddress, Int32(buffer.count))
-        }
-
-        // Signal input finished
-        ra_sherpa_input_finished(stream)
-
-        // Decode until ready
-        while ra_sherpa_is_ready(recognizer, stream) != 0 {
-            ra_sherpa_decode(recognizer, stream)
-        }
-
-        // Get final result
-        let resultText = String(cString: ra_sherpa_get_result(recognizer, stream))
-
-        logger.info("Sherpa transcription result: \(resultText)")
-
-        return STTTranscriptionResult(
-            transcript: resultText,
-            confidence: 1.0,  // Sherpa doesn't provide confidence
-            timestamps: nil,
-            language: options.language,
-            alternatives: nil
-        )
-    }
-
-    // MARK: - Streaming Transcription with Sherpa
-
-    private func streamTranscribeWithSherpa<S>(
+    public func streamTranscribe<S>(
         audioStream: S,
-        recognizer: UnsafeMutableRawPointer,
         options: STTOptions,
         onPartial: @escaping (String) -> Void
     ) async throws -> STTTranscriptionResult where S : AsyncSequence, S.Element == Data {
-        // Create a stream for this transcription
-        guard let stream = ra_sherpa_create_stream(recognizer) else {
-            logger.error("Failed to create sherpa stream")
+        guard isReady, let backend = backendHandle else {
+            throw ONNXError.invalidHandle
+        }
+
+        guard supportsStreaming else {
+            logger.warning("Stream transcribe not supported, using batch transcription")
+            var allAudioData = Data()
+            for try await chunk in audioStream {
+                allAudioData.append(chunk)
+            }
+            return try await transcribe(audioData: allAudioData, options: options)
+        }
+
+        logger.info("Using streaming transcription")
+
+        // Create streaming session
+        guard let stream = ra_stt_create_stream(backend, nil) else {
+            logger.error("Failed to create STT stream")
             throw ONNXError.initializationFailed
         }
 
+        streamHandle = stream
         defer {
-            ra_sherpa_destroy_stream(stream)
+            ra_stt_destroy_stream(backend, stream)
+            streamHandle = nil
         }
 
-        // sherpa-onnx expects 16kHz audio, we downsample from 48kHz in convertToFloat32Samples
         let sampleRate: Int32 = 16000
         var lastResult = ""
         var chunkCount = 0
 
-        print("[SHERPA-SWIFT] Starting to process audio stream...")
+        logger.info("Starting to process audio stream...")
 
         // Process audio chunks as they arrive
         for try await audioChunk in audioStream {
             chunkCount += 1
-            print("[SHERPA-SWIFT] Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
+            logger.debug("Received audio chunk #\(chunkCount), size: \(audioChunk.count) bytes")
 
-            // Convert chunk to float32 samples (also resamples from 48kHz to 16kHz)
+            // Convert chunk to float32 samples
             let samples = try convertToFloat32Samples(audioData: audioChunk)
-            print("[SHERPA-SWIFT] Converted to \(samples.count) float32 samples at 16kHz")
 
             // Feed audio to stream
-            samples.withUnsafeBufferPointer { buffer in
-                print("[SHERPA-SWIFT] Calling ra_sherpa_accept_waveform with \(buffer.count) samples at 16kHz")
-                ra_sherpa_accept_waveform(stream, sampleRate, buffer.baseAddress, Int32(buffer.count))
-                print("[SHERPA-SWIFT] ra_sherpa_accept_waveform returned")
+            let feedStatus = samples.withUnsafeBufferPointer { buffer in
+                ra_stt_feed_audio(
+                    backend,
+                    stream,
+                    buffer.baseAddress,
+                    buffer.count,
+                    sampleRate
+                )
+            }
+
+            if feedStatus != RA_SUCCESS {
+                logger.error("Failed to feed audio: \(feedStatus.rawValue)")
+                continue
             }
 
             // Decode if ready
-            if ra_sherpa_is_ready(recognizer, stream) != 0 {
-                ra_sherpa_decode(recognizer, stream)
+            if ra_stt_is_ready(backend, stream) {
+                var resultPtr: UnsafeMutablePointer<CChar>? = nil
+                let decodeStatus = ra_stt_decode(backend, stream, &resultPtr)
 
-                // Get partial result
-                let partialText = String(cString: ra_sherpa_get_result(recognizer, stream))
+                if decodeStatus == RA_SUCCESS, let resultPtr = resultPtr {
+                    defer { ra_free_string(resultPtr) }
+                    let partialJSON = String(cString: resultPtr)
 
-                if partialText != lastResult && !partialText.isEmpty {
-                    lastResult = partialText
-                    onPartial(partialText)
-                    logger.debug("Partial result: \(partialText)")
+                    // Parse partial result
+                    if let data = partialJSON.data(using: .utf8),
+                       let json = try? JSONDecoder().decode(PartialResult.self, from: data),
+                       !json.text.isEmpty, json.text != lastResult {
+                        lastResult = json.text
+                        onPartial(json.text)
+                        logger.debug("Partial result: \(json.text)")
+                    }
                 }
             }
 
             // Check for endpoint detection
-            if ra_sherpa_is_endpoint(recognizer, stream) != 0 {
+            if ra_stt_is_endpoint(backend, stream) {
                 logger.info("Endpoint detected")
                 break
             }
         }
 
         // Signal input finished
-        ra_sherpa_input_finished(stream)
+        ra_stt_input_finished(backend, stream)
 
         // Final decode
-        while ra_sherpa_is_ready(recognizer, stream) != 0 {
-            ra_sherpa_decode(recognizer, stream)
+        while ra_stt_is_ready(backend, stream) {
+            var resultPtr: UnsafeMutablePointer<CChar>? = nil
+            if ra_stt_decode(backend, stream, &resultPtr) == RA_SUCCESS, let resultPtr = resultPtr {
+                defer { ra_free_string(resultPtr) }
+                let finalJSON = String(cString: resultPtr)
+                if let data = finalJSON.data(using: .utf8),
+                   let json = try? JSONDecoder().decode(PartialResult.self, from: data),
+                   !json.text.isEmpty {
+                    lastResult = json.text
+                }
+            }
         }
 
-        // Get final result
-        let finalText = String(cString: ra_sherpa_get_result(recognizer, stream))
-
-        logger.info("Final sherpa transcription: \(finalText)")
+        logger.info("Final transcription: \(lastResult)")
 
         return STTTranscriptionResult(
-            transcript: finalText.isEmpty ? lastResult : finalText,
+            transcript: lastResult,
             confidence: 1.0,
             timestamps: nil,
             language: options.language,
@@ -528,52 +272,134 @@ public class ONNXSTTService: STTService {
         )
     }
 
-    // MARK: - Audio Conversion
+    public func cleanup() async {
+        logger.info("Cleaning up ONNX Runtime")
+
+        // Clean up stream
+        if let stream = streamHandle, let backend = backendHandle {
+            ra_stt_destroy_stream(backend, stream)
+            streamHandle = nil
+        }
+
+        // Clean up backend
+        if let backend = backendHandle {
+            ra_destroy(backend)
+            backendHandle = nil
+        }
+
+        _isReady = false
+        _currentModel = nil
+        supportsStreaming = false
+    }
+
+    // MARK: - Private Helpers
+
+    private func detectModelType(path: String) -> String {
+        let fileManager = FileManager.default
+        var isDirectory: ObjCBool = false
+
+        var modelDir = path
+        if fileManager.fileExists(atPath: path, isDirectory: &isDirectory) && !isDirectory.boolValue {
+            modelDir = (path as NSString).deletingLastPathComponent
+        }
+
+        // Check for model files
+        if let contents = try? fileManager.contentsOfDirectory(atPath: modelDir) {
+            // Zipformer detection
+            if contents.contains(where: { $0.contains("encoder-epoch") && $0.hasSuffix(".onnx") }) {
+                return "zipformer"
+            }
+
+            // Whisper detection
+            if contents.contains(where: { $0.contains("whisper") || ($0.contains("encoder") && contents.contains(where: { $0.contains("decoder") })) }) {
+                return "whisper"
+            }
+
+            // Paraformer detection
+            if contents.contains(where: { $0.contains("paraformer") }) {
+                return "paraformer"
+            }
+        }
+
+        // Archive detection
+        if path.hasSuffix(".tar.bz2") {
+            if path.contains("zipformer") || path.contains("sherpa") {
+                return "zipformer"
+            }
+        }
+
+        // Default to whisper
+        return "whisper"
+    }
+
+    private func parseTranscriptionResult(json: String, language: String?) throws -> STTTranscriptionResult {
+        guard let jsonData = json.data(using: .utf8) else {
+            throw ONNXError.transcriptionFailed("Invalid JSON encoding")
+        }
+
+        let result = try JSONDecoder().decode(TranscriptionResult.self, from: jsonData)
+
+        return STTTranscriptionResult(
+            transcript: result.text,
+            confidence: Float(result.confidence ?? 1.0),
+            timestamps: nil,
+            language: result.language ?? language,
+            alternatives: nil
+        )
+    }
 
     private func convertToFloat32Samples(audioData: Data) throws -> [Float] {
         // Assuming input is Int16 PCM at 48kHz
-        // Need to resample to 16kHz for sherpa-onnx (downsample by factor of 3)
+        // Resample to 16kHz for STT (downsample by factor of 3)
         let int16Count = audioData.count / MemoryLayout<Int16>.size
         var samples: [Float] = []
-        samples.reserveCapacity(int16Count / 3) // Downsample by 3x (48kHz -> 16kHz)
+        samples.reserveCapacity(int16Count / 3)
 
         audioData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
             let int16Buffer = bytes.bindMemory(to: Int16.self)
 
-            // Simple downsampling: take every 3rd sample to go from 48kHz to 16kHz
+            // Simple downsampling: take every 3rd sample (48kHz -> 16kHz)
             var i = 0
             while i < int16Count {
-                // Normalize Int16 to Float32 range [-1, 1]
                 let normalized = Float(int16Buffer[i]) / Float(Int16.max)
                 samples.append(normalized)
-                i += 3 // Skip 2 samples to downsample 48kHz -> 16kHz
+                i += 3
             }
         }
 
-        print("[AUDIO-CONVERT] Converted \(int16Count) samples at 48kHz to \(samples.count) samples at 16kHz")
+        logger.debug("Converted \(int16Count) samples at 48kHz to \(samples.count) samples at 16kHz")
         return samples
     }
 }
 
 // MARK: - Supporting Types
 
-/// Internal structure matching C bridge JSON output
 private struct TranscriptionResult: Codable {
     let text: String
-    let confidence: Double
-    let language: String
-    let metadata: Metadata
+    let confidence: Double?
+    let language: String?
+    let metadata: Metadata?
 
     struct Metadata: Codable {
-        let processingTimeMs: Double
-        let audioDurationMs: Double
-        let realTimeFactor: Double
+        let processingTimeMs: Double?
+        let audioDurationMs: Double?
+        let realTimeFactor: Double?
 
         enum CodingKeys: String, CodingKey {
             case processingTimeMs = "processing_time_ms"
             case audioDurationMs = "audio_duration_ms"
             case realTimeFactor = "real_time_factor"
         }
+    }
+}
+
+private struct PartialResult: Codable {
+    let text: String
+    let isFinal: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case text
+        case isFinal = "is_final"
     }
 }
 

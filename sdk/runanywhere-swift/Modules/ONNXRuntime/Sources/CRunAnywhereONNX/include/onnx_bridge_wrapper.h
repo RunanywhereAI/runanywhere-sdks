@@ -1,8 +1,13 @@
 #ifndef ONNX_BRIDGE_WRAPPER_H
 #define ONNX_BRIDGE_WRAPPER_H
 
-// This wrapper re-exports the XCFramework headers with proper types
-// to avoid module.modulemap conflicts in Xcode builds
+/**
+ * RunAnywhere Unified Bridge API
+ *
+ * This is the C API that Swift uses to interact with ML backends.
+ * It provides a capability-based interface where backends can implement
+ * any subset of capabilities (STT, TTS, VAD, Text Generation, etc.)
+ */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,8 +17,9 @@
 extern "C" {
 #endif
 
-// Opaque handle types
-typedef void* ra_onnx_handle;
+// =============================================================================
+// COMMON TYPES
+// =============================================================================
 
 // Result codes
 typedef enum {
@@ -25,27 +31,35 @@ typedef enum {
     RA_ERROR_INVALID_PARAMS = -5,
     RA_ERROR_OUT_OF_MEMORY = -6,
     RA_ERROR_NOT_IMPLEMENTED = -7,
+    RA_ERROR_CANCELLED = -8,
+    RA_ERROR_TIMEOUT = -9,
+    RA_ERROR_IO = -10,
     RA_ERROR_UNKNOWN = -99
 } ra_result_code;
 
-// Modality types
+// Device types
 typedef enum {
-    RA_MODALITY_TEXT_TO_TEXT = 0,
-    RA_MODALITY_VOICE_TO_TEXT = 1,
-    RA_MODALITY_TEXT_TO_VOICE = 2,
-    RA_MODALITY_IMAGE_TO_TEXT = 3,
-    RA_MODALITY_TEXT_TO_IMAGE = 4,
-    RA_MODALITY_MULTIMODAL = 5
-} ra_modality_type;
+    RA_DEVICE_CPU = 0,
+    RA_DEVICE_GPU = 1,
+    RA_DEVICE_NEURAL_ENGINE = 2,
+    RA_DEVICE_METAL = 3,
+    RA_DEVICE_CUDA = 4,
+    RA_DEVICE_NNAPI = 5,
+    RA_DEVICE_COREML = 6,
+    RA_DEVICE_VULKAN = 7,
+    RA_DEVICE_UNKNOWN = 99
+} ra_device_type;
 
 // Audio format types
 typedef enum {
-    RA_AUDIO_FORMAT_PCM = 0,
-    RA_AUDIO_FORMAT_WAV = 1,
-    RA_AUDIO_FORMAT_MP3 = 2,
-    RA_AUDIO_FORMAT_FLAC = 3,
-    RA_AUDIO_FORMAT_AAC = 4,
-    RA_AUDIO_FORMAT_OPUS = 5
+    RA_AUDIO_FORMAT_PCM_F32 = 0,
+    RA_AUDIO_FORMAT_PCM_S16 = 1,
+    RA_AUDIO_FORMAT_PCM_S32 = 2,
+    RA_AUDIO_FORMAT_WAV = 10,
+    RA_AUDIO_FORMAT_MP3 = 11,
+    RA_AUDIO_FORMAT_FLAC = 12,
+    RA_AUDIO_FORMAT_AAC = 13,
+    RA_AUDIO_FORMAT_OPUS = 14
 } ra_audio_format;
 
 // Audio configuration
@@ -56,59 +70,67 @@ typedef struct {
     ra_audio_format format;
 } ra_audio_config;
 
-// Core ONNX Runtime functions
-ra_onnx_handle ra_onnx_create(void);
-int ra_onnx_initialize(ra_onnx_handle handle, const char* config_json);
-int ra_onnx_load_model(ra_onnx_handle handle, const char* model_path);
-int ra_onnx_is_model_loaded(ra_onnx_handle handle);
-void ra_onnx_destroy(ra_onnx_handle handle);
-void ra_free_string(char* str);
+// Capability types
+typedef enum {
+    RA_CAP_TEXT_GENERATION = 0,
+    RA_CAP_EMBEDDINGS = 1,
+    RA_CAP_STT = 2,
+    RA_CAP_TTS = 3,
+    RA_CAP_VAD = 4,
+    RA_CAP_DIARIZATION = 5
+} ra_capability_type;
 
-// Modality functions
-int ra_onnx_set_modality(ra_onnx_handle handle, ra_modality_type modality);
-ra_modality_type ra_onnx_get_modality(ra_onnx_handle handle);
+// =============================================================================
+// HANDLE TYPES
+// =============================================================================
 
-// ASR/STT (Speech-to-Text) functions
-int ra_onnx_transcribe(
-    ra_onnx_handle handle,
-    const uint8_t* audio_data,
-    size_t audio_size,
-    const ra_audio_config* audio_config,
-    const char* language,
-    char** result_json
-);
+typedef void* ra_backend_handle;
+typedef void* ra_stream_handle;
 
-// TTS (Text-to-Speech) functions
-int ra_onnx_synthesize(
-    ra_onnx_handle handle,
-    const char* text,
-    const char* voice_id,
-    const ra_audio_config* audio_config,
-    float rate,
-    float pitch,
-    uint8_t** audio_data,
-    size_t* audio_size,
-    double* duration_ms
-);
+// =============================================================================
+// CALLBACKS
+// =============================================================================
 
-void ra_free_audio_data(uint8_t* audio_data);
+typedef bool (*ra_text_stream_callback)(const char* token, void* user_data);
+typedef bool (*ra_stt_stream_callback)(const char* text, bool is_final, void* user_data);
+typedef bool (*ra_tts_stream_callback)(const float* samples, size_t num_samples, bool is_final, void* user_data);
+typedef void (*ra_vad_stream_callback)(bool is_speech, float probability, double timestamp_ms, void* user_data);
 
-// LLM (Text generation) functions
-int ra_onnx_generate_text(
-    ra_onnx_handle handle,
-    const char* messages_json,
+// =============================================================================
+// BACKEND LIFECYCLE
+// =============================================================================
+
+const char** ra_get_available_backends(int* count);
+ra_backend_handle ra_create_backend(const char* backend_name);
+ra_result_code ra_initialize(ra_backend_handle handle, const char* config_json);
+bool ra_is_initialized(ra_backend_handle handle);
+void ra_destroy(ra_backend_handle handle);
+char* ra_get_backend_info(ra_backend_handle handle);
+bool ra_supports_capability(ra_backend_handle handle, ra_capability_type capability);
+int ra_get_capabilities(ra_backend_handle handle, ra_capability_type* capabilities, int max_count);
+ra_device_type ra_get_device(ra_backend_handle handle);
+size_t ra_get_memory_usage(ra_backend_handle handle);
+
+// =============================================================================
+// TEXT GENERATION
+// =============================================================================
+
+ra_result_code ra_text_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+bool ra_text_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_text_unload_model(ra_backend_handle handle);
+
+ra_result_code ra_text_generate(
+    ra_backend_handle handle,
+    const char* prompt,
     const char* system_prompt,
     int max_tokens,
     float temperature,
     char** result_json
 );
 
-// Streaming callbacks
-typedef void (*ra_text_stream_callback)(const char* token, void* user_data);
-
-int ra_onnx_generate_text_stream(
-    ra_onnx_handle handle,
-    const char* messages_json,
+ra_result_code ra_text_generate_stream(
+    ra_backend_handle handle,
+    const char* prompt,
     const char* system_prompt,
     int max_tokens,
     float temperature,
@@ -116,130 +138,191 @@ int ra_onnx_generate_text_stream(
     void* user_data
 );
 
-//------------------------------------------------------------------------------
-// Sherpa-ONNX Streaming STT Functions
-//------------------------------------------------------------------------------
+void ra_text_cancel(ra_backend_handle handle);
 
-// Opaque handle for sherpa-onnx recognizer
-typedef void* ra_sherpa_recognizer_handle;
-typedef void* ra_sherpa_stream_handle;
+// =============================================================================
+// EMBEDDINGS
+// =============================================================================
 
-/**
- * @brief Create a sherpa-onnx online recognizer for streaming STT
- * @param model_dir Path to directory containing sherpa-onnx model files
- * @param config_json Optional JSON configuration (can be NULL)
- * @return Handle to recognizer, or NULL on failure
- */
-ra_sherpa_recognizer_handle ra_sherpa_create_recognizer(
-    const char* model_dir,
+ra_result_code ra_embed_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+bool ra_embed_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_embed_unload_model(ra_backend_handle handle);
+
+ra_result_code ra_embed_text(
+    ra_backend_handle handle,
+    const char* text,
+    float** embedding,
+    int* dimensions
+);
+
+ra_result_code ra_embed_batch(
+    ra_backend_handle handle,
+    const char** texts,
+    int num_texts,
+    float*** embeddings,
+    int* dimensions
+);
+
+int ra_embed_get_dimensions(ra_backend_handle handle);
+void ra_free_embedding(float* embedding);
+void ra_free_embeddings(float** embeddings, int count);
+
+// =============================================================================
+// SPEECH-TO-TEXT (STT)
+// =============================================================================
+
+ra_result_code ra_stt_load_model(
+    ra_backend_handle handle,
+    const char* model_path,
+    const char* model_type,
     const char* config_json
 );
 
-/**
- * @brief Create a stream for the recognizer
- * @param recognizer The recognizer handle
- * @return Handle to stream, or NULL on failure
- */
-ra_sherpa_stream_handle ra_sherpa_create_stream(
-    ra_sherpa_recognizer_handle recognizer
-);
+bool ra_stt_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_stt_unload_model(ra_backend_handle handle);
 
-/**
- * @brief Feed audio samples to the stream
- * @param stream The stream handle
- * @param sample_rate Sample rate in Hz (e.g., 16000)
- * @param samples Float32 audio samples normalized to [-1, 1]
- * @param num_samples Number of samples
- */
-void ra_sherpa_accept_waveform(
-    ra_sherpa_stream_handle stream,
+ra_result_code ra_stt_transcribe(
+    ra_backend_handle handle,
+    const float* audio_samples,
+    size_t num_samples,
     int sample_rate,
+    const char* language,
+    char** result_json
+);
+
+bool ra_stt_supports_streaming(ra_backend_handle handle);
+
+ra_stream_handle ra_stt_create_stream(ra_backend_handle handle, const char* config_json);
+
+ra_result_code ra_stt_feed_audio(
+    ra_backend_handle handle,
+    ra_stream_handle stream,
     const float* samples,
-    int num_samples
+    size_t num_samples,
+    int sample_rate
 );
 
-/**
- * @brief Check if stream is ready for decoding
- * @param recognizer The recognizer handle
- * @param stream The stream handle
- * @return 1 if ready, 0 otherwise
- */
-int ra_sherpa_is_ready(
-    ra_sherpa_recognizer_handle recognizer,
-    ra_sherpa_stream_handle stream
+bool ra_stt_is_ready(ra_backend_handle handle, ra_stream_handle stream);
+
+ra_result_code ra_stt_decode(ra_backend_handle handle, ra_stream_handle stream, char** result_json);
+
+bool ra_stt_is_endpoint(ra_backend_handle handle, ra_stream_handle stream);
+
+void ra_stt_input_finished(ra_backend_handle handle, ra_stream_handle stream);
+
+void ra_stt_reset_stream(ra_backend_handle handle, ra_stream_handle stream);
+
+void ra_stt_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
+
+void ra_stt_cancel(ra_backend_handle handle);
+
+// =============================================================================
+// TEXT-TO-SPEECH (TTS)
+// =============================================================================
+
+ra_result_code ra_tts_load_model(
+    ra_backend_handle handle,
+    const char* model_path,
+    const char* model_type,
+    const char* config_json
 );
 
-/**
- * @brief Decode the stream (run neural network)
- * @param recognizer The recognizer handle
- * @param stream The stream handle
- */
-void ra_sherpa_decode(
-    ra_sherpa_recognizer_handle recognizer,
-    ra_sherpa_stream_handle stream
+bool ra_tts_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_tts_unload_model(ra_backend_handle handle);
+
+ra_result_code ra_tts_synthesize(
+    ra_backend_handle handle,
+    const char* text,
+    const char* voice_id,
+    float speed_rate,
+    float pitch_shift,
+    float** audio_samples,
+    size_t* num_samples,
+    int* sample_rate
 );
 
-/**
- * @brief Get the current transcription result
- * @param recognizer The recognizer handle
- * @param stream The stream handle
- * @return Transcription text (do not free - internal pointer)
- */
-const char* ra_sherpa_get_result(
-    ra_sherpa_recognizer_handle recognizer,
-    ra_sherpa_stream_handle stream
+ra_result_code ra_tts_synthesize_stream(
+    ra_backend_handle handle,
+    const char* text,
+    const char* voice_id,
+    float speed_rate,
+    float pitch_shift,
+    ra_tts_stream_callback callback,
+    void* user_data
 );
 
-/**
- * @brief Signal that no more audio will be provided
- * @param stream The stream handle
- */
-void ra_sherpa_input_finished(ra_sherpa_stream_handle stream);
+bool ra_tts_supports_streaming(ra_backend_handle handle);
+char* ra_tts_get_voices(ra_backend_handle handle);
+void ra_tts_cancel(ra_backend_handle handle);
+void ra_free_audio(float* audio_samples);
 
-/**
- * @brief Check if endpoint is detected (end of speech)
- * @param recognizer The recognizer handle
- * @param stream The stream handle
- * @return 1 if endpoint detected, 0 otherwise
- */
-int ra_sherpa_is_endpoint(
-    ra_sherpa_recognizer_handle recognizer,
-    ra_sherpa_stream_handle stream
+// =============================================================================
+// VOICE ACTIVITY DETECTION (VAD)
+// =============================================================================
+
+ra_result_code ra_vad_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+bool ra_vad_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_vad_unload_model(ra_backend_handle handle);
+
+ra_result_code ra_vad_process(
+    ra_backend_handle handle,
+    const float* samples,
+    size_t num_samples,
+    int sample_rate,
+    bool* is_speech,
+    float* probability
 );
 
-/**
- * @brief Reset the stream state
- * @param recognizer The recognizer handle
- * @param stream The stream handle
- */
-void ra_sherpa_reset(
-    ra_sherpa_recognizer_handle recognizer,
-    ra_sherpa_stream_handle stream
+ra_result_code ra_vad_detect_segments(
+    ra_backend_handle handle,
+    const float* samples,
+    size_t num_samples,
+    int sample_rate,
+    char** result_json
 );
 
-/**
- * @brief Destroy a stream
- * @param stream The stream handle
- */
-void ra_sherpa_destroy_stream(ra_sherpa_stream_handle stream);
+ra_stream_handle ra_vad_create_stream(ra_backend_handle handle, const char* config_json);
 
-/**
- * @brief Destroy a recognizer
- * @param recognizer The recognizer handle
- */
-void ra_sherpa_destroy_recognizer(ra_sherpa_recognizer_handle recognizer);
+ra_result_code ra_vad_feed_stream(
+    ra_backend_handle handle,
+    ra_stream_handle stream,
+    const float* samples,
+    size_t num_samples,
+    int sample_rate,
+    bool* is_speech,
+    float* probability
+);
 
-//------------------------------------------------------------------------------
-// Archive Extraction Utilities
-//------------------------------------------------------------------------------
+void ra_vad_destroy_stream(ra_backend_handle handle, ra_stream_handle stream);
+void ra_vad_reset(ra_backend_handle handle);
 
-/**
- * @brief Extract a tar.bz2 archive
- * @param archive_path Path to the .tar.bz2 file
- * @param dest_dir Destination directory for extraction
- * @return RA_SUCCESS on success, error code otherwise
- */
-int ra_extract_tar_bz2(const char* archive_path, const char* dest_dir);
+// =============================================================================
+// SPEAKER DIARIZATION
+// =============================================================================
+
+ra_result_code ra_diarize_load_model(ra_backend_handle handle, const char* model_path, const char* config_json);
+bool ra_diarize_is_model_loaded(ra_backend_handle handle);
+ra_result_code ra_diarize_unload_model(ra_backend_handle handle);
+
+ra_result_code ra_diarize(
+    ra_backend_handle handle,
+    const float* samples,
+    size_t num_samples,
+    int sample_rate,
+    int min_speakers,
+    int max_speakers,
+    char** result_json
+);
+
+void ra_diarize_cancel(ra_backend_handle handle);
+
+// =============================================================================
+// UTILITY FUNCTIONS
+// =============================================================================
+
+void ra_free_string(char* str);
+const char* ra_get_last_error(void);
+const char* ra_get_version(void);
 
 #ifdef __cplusplus
 }
