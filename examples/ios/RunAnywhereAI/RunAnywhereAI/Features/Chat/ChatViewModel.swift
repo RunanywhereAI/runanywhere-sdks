@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import RunAnywhere
+import Combine
 import os.log
 
 // MARK: - Analytics Models
@@ -161,10 +162,12 @@ enum ChatError: LocalizedError {
 
 @MainActor
 class ChatViewModel: ObservableObject {
+    // MARK: - Published Properties
     @Published var messages: [Message] = []
     @Published var isGenerating = false
     @Published var currentInput = ""
     @Published var error: Error?
+    @Published var selectedFramework: LLMFramework?
     @Published var isModelLoaded = false
     @Published var loadedModelName: String?
     @Published var useStreaming = true  // Enable streaming for real-time token display
@@ -173,6 +176,7 @@ class ChatViewModel: ObservableObject {
     private let conversationStore = ConversationStore.shared
     private var generationTask: Task<Void, Never>?
     @Published var currentConversation: Conversation?
+    private var lifecycleCancellable: AnyCancellable?
 
     private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "ChatViewModel")
 
@@ -186,12 +190,15 @@ class ChatViewModel: ObservableObject {
         currentConversation = conversation
         messages = [] // Start with empty messages array
 
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
+
         // Add system message only if model is already loaded
         if isModelLoaded {
             addSystemMessage()
         }
 
-        // Listen for model loaded notifications
+        // Listen for model loaded notifications (legacy support)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(modelLoaded(_:)),
@@ -214,6 +221,47 @@ class ChatViewModel: ObservableObject {
 
         // Delay analytics initialization to avoid crash during SDK startup
         // Analytics will be initialized when the view appears or when first used
+    }
+
+    /// Subscribe to SDK's model lifecycle tracker for real-time model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to loaded models via the SDK's lifecycle tracker
+        lifecycleCancellable = ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
+
+                // Check if LLM is loaded
+                if let llmState = modelsByModality[.llm] {
+                    let wasLoaded = self.isModelLoaded
+                    self.isModelLoaded = llmState.state.isLoaded
+                    self.loadedModelName = llmState.modelName
+                    self.selectedFramework = llmState.framework
+
+                    // Log state change
+                    if llmState.state.isLoaded && !wasLoaded {
+                        self.logger.info("✅ LLM model loaded via lifecycle tracker: \(llmState.modelName)")
+                        // Add system message when model becomes loaded
+                        if self.messages.first?.role != .system {
+                            self.addSystemMessage()
+                        }
+                    } else if llmState.state.isLoading {
+                        self.logger.info("⏳ LLM model loading: \(llmState.modelName)")
+                    }
+                } else {
+                    self.isModelLoaded = false
+                    self.loadedModelName = nil
+                    self.selectedFramework = nil
+                }
+            }
+
+        // Also check initial state
+        if let llmState = ModelLifecycleTracker.shared.modelsByModality[.llm] {
+            isModelLoaded = llmState.state.isLoaded
+            loadedModelName = llmState.modelName
+            selectedFramework = llmState.framework
+            logger.info("📊 Initial LLM state: loaded=\(self.isModelLoaded), model=\(self.loadedModelName ?? "none")")
+        }
     }
 
     private func addSystemMessage() {
@@ -581,7 +629,8 @@ class ChatViewModel: ObservableObject {
             if let currentModel = modelListViewModel.currentModel {
                 self.isModelLoaded = true
                 self.loadedModelName = currentModel.name
-                self.logger.info("✅ Model status updated: '\(currentModel.name)' is loaded")
+                self.selectedFramework = currentModel.preferredFramework
+                self.logger.info("✅ Model status updated: '\(currentModel.name)' is loaded with framework: \(currentModel.preferredFramework?.displayName ?? "unknown")")
 
                 // Ensure the model is actually loaded in the SDK (but don't block the UI update)
                 Task {
@@ -593,12 +642,14 @@ class ChatViewModel: ObservableObject {
                         await MainActor.run {
                             self.isModelLoaded = false
                             self.loadedModelName = nil
+                            self.selectedFramework = nil
                         }
                     }
                 }
             } else {
                 self.isModelLoaded = false
                 self.loadedModelName = nil
+                self.selectedFramework = nil
                 self.logger.info("❌ No current model in ModelListViewModel")
             }
 
@@ -618,6 +669,7 @@ class ChatViewModel: ObservableObject {
                 await MainActor.run {
                     self.isModelLoaded = true
                     self.loadedModelName = model.name
+                    self.selectedFramework = model.preferredFramework
                     // Update system message to reflect loaded model
                     if self.messages.first?.role == .system {
                         self.messages.removeFirst()

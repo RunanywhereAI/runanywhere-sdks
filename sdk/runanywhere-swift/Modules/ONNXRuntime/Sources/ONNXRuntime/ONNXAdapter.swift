@@ -12,16 +12,18 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
 
     public let framework: LLMFramework = .onnx
 
-    public let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToText]
+    public let supportedModalities: Set<FrameworkModality> = [.voiceToText, .textToVoice, .textToText]
 
     public let supportedFormats: [ModelFormat] = [.onnx, .ort]
 
     // Cache service instances to avoid re-initialization
     private var cachedSTTService: ONNXSTTService?
+    private var cachedTTSService: ONNXTTSService?
     private var cachedLLMService: Any? // Reserved for future LLM implementation
 
     // Track last usage for smart cleanup
     private var lastSTTUsage: Date?
+    private var lastTTSUsage: Date?
     private let cacheTimeout: TimeInterval = 300 // 5 minutes
 
     // MARK: - UnifiedFrameworkAdapter Implementation
@@ -29,7 +31,9 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
     public func canHandle(model: ModelInfo) -> Bool {
         // Check if model is compatible with ONNX Runtime
         let canHandle = model.compatibleFrameworks.contains(.onnx) &&
-                       (model.category == .speechRecognition || model.category == .language)
+                       (model.category == .speechRecognition ||
+                        model.category == .speechSynthesis ||
+                        model.category == .language)
         logger.debug("canHandle(\(model.name)): \(canHandle)")
         return canHandle
     }
@@ -52,6 +56,21 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
             cachedSTTService = service
             lastSTTUsage = Date()
             return service
+
+        case .textToVoice:
+            // Check if cached service should be cleaned up
+            cleanupStaleCache()
+
+            // Return cached instance if available
+            if let cached = cachedTTSService {
+                logger.info("Returning cached ONNXTTSService for text-to-voice")
+                lastTTSUsage = Date()
+                return cached
+            }
+            // Note: TTS service requires a model path, so we just return nil here
+            // The actual service creation happens in loadModel
+            logger.info("TTS service requires model path - use loadModel instead")
+            return nil
 
         case .textToText:
             // Reserved for future LLM implementation
@@ -90,6 +109,25 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
             lastSTTUsage = Date()
             return service
 
+        case .textToVoice:
+            // Check if cached service should be cleaned up
+            cleanupStaleCache()
+
+            // Get model path
+            guard let modelPath = model.localPath?.path else {
+                logger.error("TTS model path not available")
+                throw SDKError.modelNotFound("TTS model path not available")
+            }
+
+            // Create new TTS service with model path
+            logger.info("Creating ONNXTTSService with model path: \(modelPath)")
+            let service = ONNXTTSService(modelPath: modelPath)
+            try await service.initialize()
+            cachedTTSService = service
+            lastTTSUsage = Date()
+            logger.info("ONNXTTSService initialized")
+            return service
+
         case .textToText:
             logger.error("LLM support not yet implemented")
             throw SDKError.unsupportedModality(modality.rawValue)
@@ -116,11 +154,12 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
     }
 
     /// Called when adapter is registered with the SDK
-    /// Registers the STT service provider with ModuleRegistry
+    /// Registers the STT and TTS service providers with ModuleRegistry
     @MainActor
     public func onRegistration() {
         ModuleRegistry.shared.registerSTT(ONNXSTTServiceProvider())
-        logger.info("Registered ONNXServiceProvider with ModuleRegistry")
+        ModuleRegistry.shared.registerTTS(ONNXTTSServiceProvider())
+        logger.info("Registered ONNXSTTServiceProvider and ONNXTTSServiceProvider with ModuleRegistry")
     }
 
     public func getProvidedModels() -> [ModelInfo] {
@@ -150,6 +189,14 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
             logger.info("Cleaning up stale ONNXSTTService cache")
             cachedSTTService = nil
             lastSTTUsage = nil
+        }
+
+        // Clean up TTS service if not used recently
+        if let lastUsage = lastTTSUsage,
+           Date().timeIntervalSince(lastUsage) > cacheTimeout {
+            logger.info("Cleaning up stale ONNXTTSService cache")
+            cachedTTSService = nil
+            lastTTSUsage = nil
         }
     }
 }

@@ -9,48 +9,38 @@ struct TextToSpeechView: View {
     @State private var showModelPicker = false
     @State private var inputText: String = "Hello! This is a text to speech test."
 
+    private var hasModelSelected: Bool {
+        viewModel.selectedModelName != nil
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            VStack(spacing: 12) {
+        ZStack {
+            VStack(spacing: 0) {
+                // Header with title
                 HStack {
                     Text("Text to Speech")
                         .font(.title2)
                         .fontWeight(.bold)
 
                     Spacer()
-
-                    // Model selector
-                    Button(action: { showModelPicker = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "speaker.wave.2")
-                                .font(.caption)
-                            Text(viewModel.selectedModelName ?? "Select Model")
-                                .font(.caption)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.purple.opacity(0.1))
-                        .foregroundColor(.purple)
-                        .cornerRadius(8)
-                    }
                 }
+                .padding(.horizontal)
+                .padding(.top)
 
-                // Status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 10, height: 10)
-                    Text(statusText)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding()
-            .background(Color(.systemBackground))
+                // Model Status Banner - Always visible
+                ModelStatusBanner(
+                    framework: viewModel.selectedFramework,
+                    modelName: viewModel.selectedModelName,
+                    isLoading: viewModel.isGenerating && viewModel.selectedModelName == nil,
+                    onSelectModel: { showModelPicker = true }
+                )
+                .padding(.horizontal)
+                .padding(.vertical, 8)
 
-            Divider()
+                Divider()
+
+                // Main content - only enabled when model is selected
+                if hasModelSelected {
 
             // Input and output area
             ScrollView {
@@ -170,7 +160,7 @@ struct TextToSpeechView: View {
 
                 // Action buttons
                 HStack(spacing: 20) {
-                    // Generate button
+                    // Generate/Speak button
                     Button(action: {
                         Task {
                             await viewModel.generateSpeech(text: inputText)
@@ -182,10 +172,11 @@ struct TextToSpeechView: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(0.8)
                             } else {
-                                Image(systemName: "waveform.circle.fill")
+                                Image(systemName: viewModel.isSystemTTS ? "speaker.wave.2.fill" : "waveform.circle.fill")
                                     .font(.system(size: 20))
                             }
-                            Text("Generate")
+                            // System TTS plays directly, so button says "Speak" instead of "Generate"
+                            Text(viewModel.isSystemTTS ? "Speak" : "Generate")
                                 .fontWeight(.semibold)
                         }
                         .frame(width: 140, height: 50)
@@ -195,7 +186,7 @@ struct TextToSpeechView: View {
                     }
                     .disabled(inputText.isEmpty || viewModel.selectedModelName == nil || viewModel.isGenerating)
 
-                    // Play/Stop button
+                    // Play/Stop button (only available for non-System TTS models)
                     Button(action: {
                         Task {
                             await viewModel.togglePlayback()
@@ -212,25 +203,43 @@ struct TextToSpeechView: View {
                         .foregroundColor(.white)
                         .cornerRadius(25)
                     }
-                    .disabled(!viewModel.hasGeneratedAudio)
+                    .disabled(!viewModel.hasGeneratedAudio || viewModel.isSystemTTS)
+                    .opacity(viewModel.isSystemTTS ? 0.5 : 1.0)
                 }
 
-                Text(viewModel.isGenerating ? "Generating speech..." : viewModel.isPlaying ? "Playing..." : "Ready")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                // Status text
+                if viewModel.isSystemTTS {
+                    Text(viewModel.isGenerating ? "Speaking..." : "System TTS plays directly")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text(viewModel.isGenerating ? "Generating speech..." : viewModel.isPlaying ? "Playing..." : "Ready")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
-            .padding()
-            .background(Color(.systemBackground))
+                .padding()
+                .background(Color(.systemBackground))
+                } else {
+                    // No model selected - show spacer
+                    Spacer()
+                }
+            }
+
+            // Overlay when no model is selected
+            if !hasModelSelected && !viewModel.isGenerating {
+                ModelRequiredOverlay(
+                    modality: .tts,
+                    onSelectModel: { showModelPicker = true }
+                )
+            }
         }
         .sheet(isPresented: $showModelPicker) {
-            TTSModelPickerView(
-                selectedModelId: $viewModel.selectedModelId,
-                onSelect: { modelInfo in
-                    Task {
-                        await viewModel.loadModel(modelInfo)
-                    }
+            ModelSelectionSheet(context: .tts) { model in
+                Task {
+                    await viewModel.loadModelFromSelection(model)
                 }
-            )
+            }
         }
         .onAppear {
             Task {
@@ -297,6 +306,8 @@ struct TextToSpeechView: View {
 class TTSViewModel: ObservableObject {
     private let logger = Logger(subsystem: "com.runanywhere", category: "TTS")
 
+    // MARK: - Published Properties
+    @Published var selectedFramework: LLMFramework?
     @Published var selectedModelName: String?
     @Published var selectedModelId: String?
     @Published var isGenerating = false
@@ -309,6 +320,7 @@ class TTSViewModel: ObservableObject {
     @Published var currentTime: Double = 0.0
     @Published var duration: Double = 0.0
     @Published var playbackProgress: Double = 0.0
+    @Published var isSystemTTS = false // System TTS plays directly, no replay available
 
     private var ttsComponent: TTSComponent?
     private var audioPlayer: AVAudioPlayer?
@@ -357,6 +369,40 @@ class TTSViewModel: ObservableObject {
         isGenerating = false
     }
 
+    /// Load a model from the unified model selection sheet
+    func loadModelFromSelection(_ model: ModelInfo) async {
+        logger.info("Loading TTS model from selection: \(model.name)")
+        isGenerating = true
+        errorMessage = nil
+
+        do {
+            // Create TTS component with framework-agnostic configuration
+            let config = TTSConfiguration(
+                voice: model.id,
+                language: "en-US",
+                speakingRate: Float(speechRate),
+                pitch: Float(pitch),
+                volume: 1.0
+            )
+
+            let component = TTSComponent(configuration: config)
+            try await component.initialize()
+
+            ttsComponent = component
+            selectedFramework = model.preferredFramework
+            selectedModelName = model.name
+            selectedModelId = model.id
+            // Track if this is System TTS (plays directly, no audio data for replay)
+            isSystemTTS = model.preferredFramework == .systemTTS
+            logger.info("TTS model loaded successfully: \(model.name) with framework: \(model.preferredFramework?.displayName ?? "unknown")")
+        } catch {
+            logger.error("Failed to load TTS model: \(error.localizedDescription)")
+            errorMessage = "Failed to load model: \(error.localizedDescription)"
+        }
+
+        isGenerating = false
+    }
+
     func generateSpeech(text: String) async {
         logger.info("Generating speech for text: \(text)")
         isGenerating = true
@@ -371,18 +417,31 @@ class TTSViewModel: ObservableObject {
             // Use framework-agnostic TTSComponent
             let output = try await component.synthesize(text, language: "en-US")
 
-            // Create audio player from generated audio
-            try await createAudioPlayer(from: output.audioData)
+            // System TTS plays audio directly via AVSpeechSynthesizer - it returns empty data
+            // Only create audio player for frameworks that return actual audio data (e.g., ONNX/Piper)
+            if output.audioData.isEmpty {
+                // System TTS - audio already played directly
+                logger.info("System TTS playback completed (direct playback)")
+                metadata = TTSMetadata(
+                    durationMs: output.duration * 1000,
+                    audioSize: 0,
+                    sampleRate: 16000
+                )
+                // Don't set hasGeneratedAudio since there's no audio to replay
+            } else {
+                // ONNX/Piper TTS - create audio player for playback
+                try await createAudioPlayer(from: output.audioData)
 
-            // Set metadata
-            metadata = TTSMetadata(
-                durationMs: output.duration * 1000,
-                audioSize: output.audioData.count,
-                sampleRate: 22050
-            )
+                // Set metadata
+                metadata = TTSMetadata(
+                    durationMs: output.duration * 1000,
+                    audioSize: output.audioData.count,
+                    sampleRate: 22050
+                )
 
-            hasGeneratedAudio = true
-            duration = output.duration
+                hasGeneratedAudio = true
+                duration = output.duration
+            }
             logger.info("Speech generation complete")
         } catch {
             logger.error("Speech generation failed: \(error.localizedDescription)")

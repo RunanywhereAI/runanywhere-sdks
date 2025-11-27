@@ -423,10 +423,20 @@ public class SimplifiedFileManager {
                         }
 
                         // If no single file found, check if it's a directory-based model
-                        // Return the folder path itself for directory-based models
+                        // Return the folder path only if it contains actual model files
                         if FileManager.default.fileExists(atPath: folderURL.path) {
-                            logger.info("Found directory-based model \(modelId) at: \(folderURL.path)")
-                            return folderURL
+                            // Validate the folder contains model files (not just an empty/incomplete download)
+                            let folderContents = modelFolder.files
+                            let hasOnnxFiles = folderContents.contains { $0.extension == "onnx" }
+                            let hasGgufFiles = folderContents.contains { $0.extension == "gguf" }
+                            let hasBinFiles = folderContents.contains { $0.extension == "bin" }
+
+                            if hasOnnxFiles || hasGgufFiles || hasBinFiles {
+                                logger.info("Found directory-based model \(modelId) at: \(folderURL.path)")
+                                return folderURL
+                            } else {
+                                logger.warning("Model folder exists but contains no valid model files: \(folderURL.path)")
+                            }
                         }
                     }
                 }
