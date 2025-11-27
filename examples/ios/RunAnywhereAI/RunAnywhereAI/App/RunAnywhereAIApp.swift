@@ -276,18 +276,9 @@ struct RunAnywhereAIApp: App {
                     format: .onnx,
                     memoryRequirement: 250_000_000
                 ),
-                // TTS Models - Using direct ONNX files from HuggingFace (works on iOS and macOS)
+                // TTS Models - Using sherpa-onnx tar.bz2 packages (includes model, tokens, and espeak-ng-data)
                 try! ModelRegistration(
-                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/low/en_US-lessac-low.onnx",
-                    framework: .onnx,
-                    modality: .textToVoice,
-                    id: "piper-en-us-lessac-low",
-                    name: "Piper TTS (US English - Low)",
-                    format: .onnx,
-                    memoryRequirement: 30_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
                     framework: .onnx,
                     modality: .textToVoice,
                     id: "piper-en-us-lessac-medium",
@@ -296,7 +287,7 @@ struct RunAnywhereAIApp: App {
                     memoryRequirement: 65_000_000
                 ),
                 try! ModelRegistration(
-                    url: "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_GB/alba/medium/en_GB-alba-medium.onnx",
+                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
                     framework: .onnx,
                     modality: .textToVoice,
                     id: "piper-en-gb-alba-medium",
