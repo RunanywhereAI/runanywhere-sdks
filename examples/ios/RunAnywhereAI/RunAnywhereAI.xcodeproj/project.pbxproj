@@ -12,6 +12,7 @@
 		54760D392E57E06100A03191 /* WhisperKitTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 54760D382E57E06100A03191 /* WhisperKitTranscription */; };
 		5479377E2E57DF7600CB9251 /* LLMSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5479377D2E57DF7600CB9251 /* LLMSwift */; };
 		548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */ = {isa = PBXBuildFile; productRef = 548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */; };
+		54EADC0B2ED965F500705E74 /* AppleFoundationalModels in Frameworks */ = {isa = PBXBuildFile; productRef = 54EADC0A2ED965F500705E74 /* AppleFoundationalModels */; };
 		58ABEDD22ED16DA40058D033 /* ONNXRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* ONNXRuntime */; };
 /* End PBXBuildFile section */
 
@@ -66,6 +67,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				543028462E442716008361DD /* LLM in Frameworks */,
+				54EADC0B2ED965F500705E74 /* AppleFoundationalModels in Frameworks */,
 				58ABEDD22ED16DA40058D033 /* ONNXRuntime in Frameworks */,
 				548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */,
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
@@ -149,6 +151,7 @@
 				54760D382E57E06100A03191 /* WhisperKitTranscription */,
 				541C59D92E63772A00DD7839 /* RunAnywhere */,
 				58ABEDD12ED16DA40058D033 /* ONNXRuntime */,
+				54EADC0A2ED965F500705E74 /* AppleFoundationalModels */,
 			);
 			productName = RunAnywhereAI;
 			productReference = 5480A1F02E2F250200337F2F /* RunAnywhereAI.app */;
@@ -236,6 +239,7 @@
 				5479377C2E57DF7600CB9251 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/LLMSwift" */,
 				54760D372E57E06100A03191 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/WhisperKitTranscription" */,
 				58ABEDD02ED16DA40058D033 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/ONNXRuntime" */,
+				54EADC092ED965F500705E74 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/AppleFoundationalModels" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5480A1F12E2F250200337F2F /* Products */;
@@ -701,6 +705,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization";
 		};
+		54EADC092ED965F500705E74 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/AppleFoundationalModels" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../sdk/runanywhere-swift/Modules/AppleFoundationalModels";
+		};
 		58ABEDD02ED16DA40058D033 /* XCLocalSwiftPackageReference "../../../sdk/runanywhere-swift/Modules/ONNXRuntime" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sdk/runanywhere-swift/Modules/ONNXRuntime";
@@ -732,6 +740,10 @@
 		548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FluidAudioDiarization;
+		};
+		54EADC0A2ED965F500705E74 /* AppleFoundationalModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AppleFoundationalModels;
 		};
 		58ABEDD12ED16DA40058D033 /* ONNXRuntime */ = {
 			isa = XCSwiftPackageProductDependency;

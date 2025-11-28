@@ -7,87 +7,13 @@ import OSLog
 import FoundationModels
 #endif
 
-/// Adapter for Apple's native Foundation Models framework (iOS 26.0+)
-/// Uses Apple's built-in language models without requiring external model files
-@available(iOS 26.0, macOS 26.0, *)
-public class FoundationModelsAdapter: UnifiedFrameworkAdapter {
-    public var framework: LLMFramework { .foundationModels }
-    public let supportedModalities: Set<FrameworkModality> = [.textToText]
-    public var supportedFormats: [ModelFormat] {
-        // Foundation Models doesn't use file formats - it's built-in
-        [.mlmodel, .mlpackage]
-    }
-
-    private var hardwareConfig: HardwareConfiguration?
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FoundationModels")
-
-    public init() {}
-
-    public func canHandle(model: ModelInfo) -> Bool {
-        // Foundation Models doesn't need external model files
-        // It can handle any request as it uses Apple's built-in models
-        guard #available(iOS 26.0, macOS 26.0, *) else { return false }
-
-        // Check if the model name indicates it's for Foundation Models
-        return model.name.lowercased().contains("foundation") ||
-               model.name.lowercased().contains("apple") ||
-               model.id == "foundation-models-default"
-    }
-
-    public func createService() -> LLMService {
-        return FoundationModelsService(hardwareConfig: hardwareConfig)
-    }
-
-    public func createService(for modality: FrameworkModality) -> Any? {
-        guard modality == .textToText else { return nil }
-        return FoundationModelsService(hardwareConfig: hardwareConfig)
-    }
-
-    public func loadModel(_ model: ModelInfo, for modality: FrameworkModality) async throws -> Any {
-        guard modality == .textToText else {
-            throw LLMServiceError.modelNotFound("modality not supported")
-        }
-        // Foundation Models doesn't need to load external models
-        // It uses Apple's built-in models
-        let service = FoundationModelsService(hardwareConfig: hardwareConfig)
-        try await service.initialize(modelPath: "built-in")
-        return service
-    }
-
-    public func loadModel(_ model: ModelInfo) async throws -> LLMService {
-        // Foundation Models doesn't need to load external models
-        // It uses Apple's built-in models
-        let service = FoundationModelsService(hardwareConfig: hardwareConfig)
-        try await service.initialize(modelPath: "built-in")
-        return service
-    }
-
-    public func configure(with hardware: HardwareConfiguration) async {
-        self.hardwareConfig = hardware
-    }
-
-    public func estimateMemoryUsage(for model: ModelInfo) -> Int64 {
-        // Foundation Models memory is managed by the system
-        // Estimate based on typical usage
-        return 500_000_000 // 500MB typical for system models
-    }
-
-    public func optimalConfiguration(for model: ModelInfo) -> HardwareConfiguration {
-        return HardwareConfiguration(
-            primaryAccelerator: .neuralEngine,
-            memoryMode: .balanced,
-            threadCount: 2
-        )
-    }
-}
-
 /// Service implementation for Apple's Foundation Models
 @available(iOS 26.0, macOS 26.0, *)
-class FoundationModelsService: LLMService {
+public class FoundationModelsService: LLMService {
     private var hardwareConfig: HardwareConfiguration?
     private var _currentModel: String?
     private var _isReady = false
-    private let logger = Logger(subsystem: "com.runanywhere.RunAnywhereAI", category: "FoundationModels")
+    private let logger = Logger(subsystem: "com.runanywhere.FoundationModels", category: "FoundationModelsService")
 
     #if canImport(FoundationModels)
     // The actual FoundationModels types
@@ -95,14 +21,14 @@ class FoundationModelsService: LLMService {
     private var session: Any? // Will be cast to LanguageModelSession when used
     #endif
 
-    var isReady: Bool { _isReady }
-    var currentModel: String? { _currentModel }
+    public var isReady: Bool { _isReady }
+    public var currentModel: String? { _currentModel }
 
-    init(hardwareConfig: HardwareConfiguration?) {
+    public init(hardwareConfig: HardwareConfiguration?) {
         self.hardwareConfig = hardwareConfig
     }
 
-    func initialize(modelPath: String?) async throws {
+    public func initialize(modelPath: String?) async throws {
         logger.info("Initializing Apple Foundation Models (iOS 26+/macOS 26+)")
 
         #if canImport(FoundationModels)
@@ -166,7 +92,7 @@ class FoundationModelsService: LLMService {
         #endif
     }
 
-    func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
+    public func generate(prompt: String, options: RunAnywhereGenerationOptions) async throws -> String {
         guard isReady else {
             throw LLMServiceError.notInitialized
         }
@@ -199,14 +125,14 @@ class FoundationModelsService: LLMService {
             switch error {
             case .exceededContextWindowSize:
                 logger.error("Exceeded context window size - please reduce prompt length")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.contextLengthExceeded
             default:
                 logger.error("Other generation error: \(error)")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.generationFailed(error)
             }
         } catch {
             logger.error("Generation failed: \(error)")
-            throw LLMServiceError.notInitialized
+            throw LLMServiceError.generationFailed(error)
         }
         #else
         // Foundation Models framework not available
@@ -215,7 +141,7 @@ class FoundationModelsService: LLMService {
         #endif
     }
 
-    func streamGenerate(
+    public func streamGenerate(
         prompt: String,
         options: RunAnywhereGenerationOptions,
         onToken: @escaping (String) -> Void
@@ -264,14 +190,14 @@ class FoundationModelsService: LLMService {
             switch error {
             case .exceededContextWindowSize:
                 logger.error("Exceeded context window size during streaming")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.contextLengthExceeded
             default:
                 logger.error("Other streaming error: \(error)")
-                throw LLMServiceError.notInitialized
+                throw LLMServiceError.generationFailed(error)
             }
         } catch {
             logger.error("Streaming generation failed: \(error)")
-            throw LLMServiceError.notInitialized
+            throw LLMServiceError.generationFailed(error)
         }
         #else
         // Foundation Models framework not available
@@ -280,7 +206,7 @@ class FoundationModelsService: LLMService {
         #endif
     }
 
-    func cleanup() async {
+    public func cleanup() async {
         logger.info("Cleaning up Foundation Models")
 
         #if canImport(FoundationModels)
@@ -293,7 +219,7 @@ class FoundationModelsService: LLMService {
         _currentModel = nil
     }
 
-    func getModelMemoryUsage() async throws -> Int64 {
+    public func getModelMemoryUsage() async throws -> Int64 {
         return 500_000_000 // 500MB estimate for Foundation Models
     }
 }

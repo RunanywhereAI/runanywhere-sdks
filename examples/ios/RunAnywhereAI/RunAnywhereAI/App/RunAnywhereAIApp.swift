@@ -15,6 +15,10 @@ import ONNXRuntime
 import UIKit
 #endif
 import os
+// Import Foundation Models adapter from SDK (requires iOS 26+ / macOS 26+)
+#if canImport(FoundationModelsAdapter)
+import FoundationModelsAdapter
+#endif
 
 @main
 struct RunAnywhereAIApp: App {
@@ -304,10 +308,12 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ FluidAudioDiarization registered")
 
         // Register Foundation Models adapter for iOS 26+ and macOS 26+
+        #if canImport(FoundationModelsAdapter)
         if #available(iOS 26.0, macOS 26.0, *) {
             await RunAnywhere.registerFramework(FoundationModelsAdapter())
             logger.info("✅ Foundation Models registered")
         }
+        #endif
 
         logger.info("🎉 All adapters registered for development")
     }
@@ -331,10 +337,12 @@ struct RunAnywhereAIApp: App {
         logger.info("✅ FluidAudioDiarization registered")
 
         // Register Foundation Models adapter for iOS 26+ and macOS 26+
+        #if canImport(FoundationModelsAdapter)
         if #available(iOS 26.0, macOS 26.0, *) {
             await RunAnywhere.registerFramework(FoundationModelsAdapter())
             logger.info("✅ Foundation Models registered")
         }
+        #endif
 
         logger.info("🎉 All adapters registered for production")
     }

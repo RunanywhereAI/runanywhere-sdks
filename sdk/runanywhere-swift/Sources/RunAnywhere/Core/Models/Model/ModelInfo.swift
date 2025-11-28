@@ -48,6 +48,11 @@ public struct ModelInfo: Codable, RepositoryEntity, FetchableRecord, Persistable
     public var isDownloaded: Bool {
         guard let localPath = localPath else { return false }
 
+        // Built-in models (e.g., Apple Foundation Models) are always available
+        if localPath.scheme == "builtin" {
+            return true
+        }
+
         // Check if the file or directory actually exists on disk
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: localPath.path, isDirectory: &isDirectory)
