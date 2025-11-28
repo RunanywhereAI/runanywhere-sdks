@@ -25,13 +25,14 @@ let package = Package(
         // ===================================
 
         // Core RunAnywhere SDK
-        .package(path: "../../sdk/runanywhere-swift"),
+        .package(path: "../../../sdk/runanywhere-swift"),
 
         // AI Framework Modules (local plugins)
-        .package(path: "../../sdk/runanywhere-swift/Modules/LLMSwift"),
-        .package(path: "../../sdk/runanywhere-swift/Modules/WhisperKitTranscription"),
-        .package(path: "../../sdk/runanywhere-swift/Modules/FluidAudioDiarization"),
-        .package(path: "../../sdk/runanywhere-swift/Modules/ONNXRuntime"),  // ONNX TTS/STT support
+        .package(path: "../../../sdk/runanywhere-swift/Modules/LLMSwift"),
+        .package(path: "../../../sdk/runanywhere-swift/Modules/WhisperKitTranscription"),
+        .package(path: "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization"),
+        .package(path: "../../../sdk/runanywhere-swift/Modules/ONNXRuntime"),  // ONNX TTS/STT support
+        .package(path: "../../../sdk/runanywhere-swift/Modules/AppleFoundationalModels"),  // Apple Foundation Models (iOS 26+)
 
         // ===================================
         // TRANSITIVE DEPENDENCIES (auto-included)
@@ -52,6 +53,7 @@ let package = Package(
         // - LLM.swift 2.0.1 (via LLMSwift module)
         // - WhisperKit 0.13.1 (via WhisperKitTranscription module)
         // - FluidAudio (via FluidAudioDiarization module)
+        // - Apple FoundationModels (via FoundationModels module, requires iOS 26+)
         // ===================================
     ],
     targets: [
@@ -63,6 +65,7 @@ let package = Package(
                 .product(name: "WhisperKitTranscription", package: "WhisperKitTranscription"),
                 .product(name: "FluidAudioDiarization", package: "FluidAudioDiarization"),
                 .product(name: "ONNXRuntime", package: "ONNXRuntime"),  // ONNX TTS/STT support
+                .product(name: "AppleFoundationalModels", package: "AppleFoundationalModels"),  // Apple Foundation Models (iOS 26+)
             ],
             path: "RunAnywhereAI",
             exclude: [
