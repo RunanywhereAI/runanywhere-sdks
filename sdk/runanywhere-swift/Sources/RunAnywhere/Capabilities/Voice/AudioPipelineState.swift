@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Represents the current state of the audio pipeline to prevent feedback loops
 public enum AudioPipelineState: String, CaseIterable {
@@ -55,7 +54,7 @@ public actor AudioPipelineStateManager {
     }
 
     private let configuration: Configuration
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "AudioPipelineState")
+    private let logger = SDKLogger(category: "AudioPipelineState")
 
     public init(configuration: Configuration = Configuration()) {
         self.configuration = configuration

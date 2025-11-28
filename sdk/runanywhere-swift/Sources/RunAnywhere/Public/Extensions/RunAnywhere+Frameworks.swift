@@ -4,115 +4,66 @@ import Foundation
 
 public extension RunAnywhere {
 
-    /// Register a framework adapter with event reporting
-    /// - Parameter adapter: The framework adapter to register
-    static func registerFrameworkAdapter(_ adapter: UnifiedFrameworkAdapter) {
-        // Access service container directly
-        RunAnywhere.serviceContainer.adapterRegistry.register(adapter)
-
-        // Refresh download strategies to pick up the newly registered adapter's strategy
-        RunAnywhere.serviceContainer.downloadService.refreshStrategies()
-
-        Task {
-            events.publish(SDKFrameworkEvent.adapterRegistered(
-                framework: adapter.framework,
-                name: String(describing: adapter)
-            ))
-        }
-    }
-
-    /// Register a framework adapter with custom models
+    /// Register a framework adapter with its models
+    ///
+    /// This is the primary API for registering frameworks with the SDK.
+    /// The adapter's `onRegistration()` method will be called to register service providers.
+    ///
+    /// Example:
+    /// ```swift
+    /// try await RunAnywhere.registerFramework(
+    ///     LLMSwiftAdapter(),
+    ///     models: [
+    ///         ModelRegistration(
+    ///             url: "https://huggingface.co/.../SmolLM2-360M.Q8_0.gguf",
+    ///             framework: .llamaCpp,
+    ///             modality: .textToText,
+    ///             id: "smollm2-360m",
+    ///             name: "SmolLM2 360M"
+    ///         )
+    ///     ]
+    /// )
+    /// ```
+    ///
     /// - Parameters:
     ///   - adapter: The framework adapter to register
-    ///   - models: Array of custom models to register with this adapter
-    ///   - options: Registration options (defaults based on environment)
-    @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
-    static func registerFrameworkAdapter(
+    ///   - models: Array of models to register with this adapter
+    @MainActor
+    static func registerFramework(
         _ adapter: UnifiedFrameworkAdapter,
-        models: [ModelRegistration] = [],
-        options: AdapterRegistrationOptions? = nil
-    ) async throws {
+        models: [ModelRegistration] = []
+    ) async {
         let logger = SDKLogger(category: "RunAnywhere.Frameworks")
 
-        // Determine options based on environment
-        let registrationOptions = options ?? (currentEnvironment == .development ? .development : .production)
-
-        // Register the adapter first
+        // 1. Register the adapter with AdapterRegistry
         RunAnywhere.serviceContainer.adapterRegistry.register(adapter)
 
-        // Publish adapter registration event
+        // 2. Call onRegistration() to let adapter register its service providers
+        adapter.onRegistration()
+
+        // 3. Refresh download strategies
+        RunAnywhere.serviceContainer.downloadService.refreshStrategies()
+
+        // 4. Publish adapter registration event
         events.publish(SDKFrameworkEvent.adapterRegistered(
             framework: adapter.framework,
             name: String(describing: adapter)
         ))
 
-        // Refresh download strategies to pick up the newly registered adapter's strategy
-        RunAnywhere.serviceContainer.downloadService.refreshStrategies()
+        logger.info("Registered \(adapter.framework) with \(models.count) models")
 
-        logger.info("Registered adapter for \(adapter.framework) with \(models.count) custom models")
-
-        // Register custom models if provided
+        // 5. Register models
         for modelReg in models {
             let modelInfo = modelReg.toModelInfo()
 
-            // Validate model if needed
-            if registrationOptions.validateModels {
-                // Check if adapter can handle this model
-                guard adapter.canHandle(model: modelInfo) else {
-                    logger.error("Adapter \(adapter.framework) cannot handle model \(modelInfo.id)")
-                    if !registrationOptions.fallbackToMockModels {
-                        throw SDKError.invalidConfiguration("Model \(modelInfo.id) is not compatible with \(adapter.framework)")
-                    }
-                    continue
-                }
-            }
-
-            // Register the model persistently (both in memory and database)
             if let registryService = RunAnywhere.serviceContainer.modelRegistry as? RegistryService {
                 await registryService.registerModelPersistently(modelInfo)
-                logger.info("Registered and saved model: \(modelInfo.id) for framework: \(modelReg.framework)")
             } else {
-                // Fallback to memory-only registration
                 RunAnywhere.serviceContainer.modelRegistry.registerModel(modelInfo)
-                logger.warning("Model \(modelInfo.id) registered in memory only (persistence not available)")
             }
 
-            // Auto-download in development mode if enabled
-            if currentEnvironment == .development && registrationOptions.autoDownloadInDev {
-                logger.info("Auto-downloading model \(modelInfo.id) in development mode")
-
-                do {
-                    if registrationOptions.showProgress {
-                        // Download with progress
-                        let progressStream = try await RunAnywhere.downloadModelWithProgress(modelInfo.id)
-
-                        // Consume the progress stream (in real app, this would update UI)
-                        for try await progress in progressStream {
-                            logger.debug("Download progress for \(modelInfo.id): \(Int(progress.percentage * 100))%")
-
-                            // Publish download progress event
-                            events.publish(SDKModelEvent.downloadProgress(
-                                modelId: modelInfo.id,
-                                progress: progress.percentage
-                            ))
-                        }
-                    } else {
-                        // Silent download
-                        try await RunAnywhere.downloadModel(modelInfo.id)
-                    }
-
-                    logger.info("Successfully downloaded model: \(modelInfo.id)")
-                } catch {
-                    logger.error("Failed to auto-download model \(modelInfo.id): \(error)")
-
-                    if !registrationOptions.fallbackToMockModels {
-                        throw error
-                    }
-                }
-            }
+            logger.debug("Registered model: \(modelInfo.id)")
         }
-
-        logger.info("Framework adapter registration complete for \(adapter.framework)")
     }
 
     /// Get registered adapters with event reporting

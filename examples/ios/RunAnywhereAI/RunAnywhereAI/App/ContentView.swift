@@ -12,6 +12,7 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            // Tab 0: Chat (LLM)
             ChatInterfaceView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
@@ -19,20 +20,38 @@ struct ContentView: View {
                 }
                 .tag(0)
 
-            StorageView()
+            // Tab 1: Speech-to-Text
+            SpeechToTextView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tabItem {
-                    Label("Storage", systemImage: "externaldrive")
+                    Label("STT", systemImage: "waveform")
                 }
                 .tag(1)
 
+            // Tab 2: Text-to-Speech
+            TextToSpeechView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("TTS", systemImage: "speaker.wave.2")
+                }
+                .tag(2)
+
+            // Tab 3: Voice Assistant (STT + LLM + TTS)
+            VoiceAssistantView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tabItem {
+                    Label("Voice", systemImage: "mic")
+                }
+                .tag(3)
+
+            // Tab 4: Combined Settings (includes Storage)
             Group {
                 #if os(macOS)
-                SimplifiedSettingsView()
+                CombinedSettingsView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #else
                 NavigationView {
-                    SimplifiedSettingsView()
+                    CombinedSettingsView()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #endif
@@ -40,21 +59,7 @@ struct ContentView: View {
             .tabItem {
                 Label("Settings", systemImage: "gear")
             }
-            .tag(2)
-
-            QuizView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tabItem {
-                    Label("Quiz", systemImage: "questionmark.circle")
-                }
-                .tag(3)
-
-            VoiceAssistantView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .tabItem {
-                    Label("Voice", systemImage: "mic")
-                }
-                .tag(4)
+            .tag(4)
         }
         #if os(macOS)
         .frame(minWidth: 800, idealWidth: 1200, maxWidth: .infinity,

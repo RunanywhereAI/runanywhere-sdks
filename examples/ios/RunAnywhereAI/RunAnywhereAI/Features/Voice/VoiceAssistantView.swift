@@ -9,8 +9,11 @@ import AppKit
 
 struct VoiceAssistantView: View {
     @StateObject private var viewModel = VoiceAssistantViewModel()
-    @State private var showTranscriptionView = false
     @State private var showModelInfo = false
+    @State private var showModelSelection = false
+    @State private var showSTTModelSelection = false
+    @State private var showLLMModelSelection = false
+    @State private var showTTSModelSelection = false
 
     var body: some View {
         Group {
@@ -19,11 +22,11 @@ struct VoiceAssistantView: View {
             VStack(spacing: 0) {
             // Custom toolbar for macOS
             HStack {
-                // Transcription mode button
+                // Model selection button
                 Button(action: {
-                    showTranscriptionView = true
+                    showModelSelection = true
                 }) {
-                    Label("Transcription", systemImage: "text.quote")
+                    Label("Models", systemImage: "cube")
                 }
                 .buttonStyle(.bordered)
 
@@ -211,207 +214,256 @@ struct VoiceAssistantView: View {
             .background(Color(NSColor.windowBackgroundColor))
             #else
         // iOS: Keep original layout
-        VStack(spacing: 0) {
-            // Minimal header with subtle controls
-            HStack {
-                // Transcription mode button - subtle, top left
-                Button(action: {
-                    showTranscriptionView = true
-                }) {
-                    Image(systemName: "text.quote")
-                        .font(.system(size: 18))
-                        .foregroundColor(.secondary)
-                        .padding(10)
-                        .background(Color(.tertiarySystemBackground))
-                        .clipShape(Circle())
-                }
-
-                Spacer()
-
-                // Status indicator - minimal
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                    Text(statusText)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                // Model info toggle - subtle, top right
-                Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
-                        showModelInfo.toggle()
+        ZStack {
+            // Show setup view when not all models are loaded
+            if !viewModel.allModelsLoaded {
+                VoicePipelineSetupView(
+                    sttModel: Binding(
+                        get: { viewModel.sttModel },
+                        set: { viewModel.sttModel = $0 }
+                    ),
+                    llmModel: Binding(
+                        get: { viewModel.llmModel },
+                        set: { viewModel.llmModel = $0 }
+                    ),
+                    ttsModel: Binding(
+                        get: { viewModel.ttsModel },
+                        set: { viewModel.ttsModel = $0 }
+                    ),
+                    sttLoadState: viewModel.sttModelState,
+                    llmLoadState: viewModel.llmModelState,
+                    ttsLoadState: viewModel.ttsModelState,
+                    onSelectSTT: { showSTTModelSelection = true },
+                    onSelectLLM: { showLLMModelSelection = true },
+                    onSelectTTS: { showTTSModelSelection = true },
+                    onStartVoice: {
+                        // All models loaded, nothing to do here
+                        // The view will automatically switch to main voice UI
                     }
-                }) {
-                    Image(systemName: showModelInfo ? "info.circle.fill" : "info.circle")
-                        .font(.system(size: 18))
-                        .foregroundColor(.secondary)
-                        .padding(10)
-                        .background(Color(.tertiarySystemBackground))
-                        .clipShape(Circle())
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 10)
-
-            // Expandable model info (hidden by default)
-            if showModelInfo {
-                VStack(spacing: 8) {
-                    HStack(spacing: 15) {
-                        // Compact model badges
-                        ModelBadge(icon: "brain", label: "LLM", value: viewModel.currentLLMModel.isEmpty ? "Loading..." : viewModel.currentLLMModel, color: .blue)
-                        ModelBadge(icon: "waveform", label: "STT", value: viewModel.whisperModel, color: .green)
-                        ModelBadge(icon: "speaker.wave.2", label: "TTS", value: "System", color: .purple)
-                    }
-                    .padding(.horizontal, 20)
-
-                    Text("Experimental Feature")
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                }
-                .padding(.bottom, 15)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-
-            // Main conversation area
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // User message
-                        if !viewModel.currentTranscript.isEmpty {
-                            ConversationBubble(
-                                speaker: "You",
-                                message: viewModel.currentTranscript,
-                                isUser: true
-                            )
-                            .id("user")
+                )
+            } else {
+                // Main voice assistant UI (only shown when all models are ready)
+                VStack(spacing: 0) {
+                    // Minimal header with subtle controls
+                    HStack {
+                        // Model selection button - subtle, top left
+                        Button(action: {
+                            showModelSelection = true
+                        }) {
+                            Image(systemName: "cube")
+                                .font(.system(size: 18))
+                                .foregroundColor(.secondary)
+                                .padding(10)
+                                .background(Color(.tertiarySystemBackground))
+                                .clipShape(Circle())
                         }
 
-                        // Assistant response - with increased height
-                        if !viewModel.assistantResponse.isEmpty {
-                            ConversationBubble(
-                                speaker: "Assistant",
-                                message: viewModel.assistantResponse,
-                                isUser: false
-                            )
-                            .id("assistant")
-                        }
+                        Spacer()
 
-                        // Placeholder when empty
-                        if viewModel.currentTranscript.isEmpty && viewModel.assistantResponse.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "mic.circle")
-                                    .font(.system(size: 48))
-                                    .foregroundColor(.secondary.opacity(0.3))
-                                Text("Tap the microphone to start")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 100)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 20)
-                }
-                .onChange(of: viewModel.assistantResponse) { _ in
-                    withAnimation {
-                        proxy.scrollTo("assistant", anchor: .bottom)
-                    }
-                }
-            }
-
-            Spacer()
-
-            // Minimal control area
-            VStack(spacing: 20) {
-                // Error message (if any)
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 20)
-                }
-
-                // Main mic button
-                HStack {
-                    Spacer()
-
-                    Button(action: {
-                        Task {
-                            if viewModel.sessionState == .listening ||
-                               viewModel.sessionState == .speaking ||
-                               viewModel.sessionState == .processing ||
-                               viewModel.sessionState == .connecting {
-                                await viewModel.stopConversation()
-                            } else {
-                                await viewModel.startConversation()
-                            }
-                        }
-                    }) {
-                        ZStack {
-                            // Background circle
+                        // Status indicator - minimal
+                        HStack(spacing: 6) {
                             Circle()
-                                .fill(micButtonColor)
-                                .frame(width: 72, height: 72)
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                            Text(statusText)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
 
-                            // Pulsing effect when active
-                            if viewModel.isSpeechDetected {
-                                Circle()
-                                    .stroke(Color.white.opacity(0.4), lineWidth: 2)
-                                    .scaleEffect(viewModel.isSpeechDetected ? 1.3 : 1.0)
-                                    .opacity(viewModel.isSpeechDetected ? 0 : 0.8)
-                                    .animation(
-                                        .easeOut(duration: 1.0).repeatForever(autoreverses: false),
-                                        value: viewModel.isSpeechDetected
-                                    )
+                        Spacer()
+
+                        // Model info toggle - subtle, top right
+                        Button(action: {
+                            withAnimation(.spring(response: 0.3)) {
+                                showModelInfo.toggle()
                             }
+                        }) {
+                            Image(systemName: showModelInfo ? "info.circle.fill" : "info.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(.secondary)
+                                .padding(10)
+                                .background(Color(.tertiarySystemBackground))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+                    .padding(.bottom, 10)
 
-                            // Icon
-                            if viewModel.sessionState == .connecting ||
-                               (viewModel.isProcessing && !viewModel.isListening) {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(1.2)
-                            } else {
-                                Image(systemName: micButtonIcon)
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.white)
+                    // Expandable model info (hidden by default)
+                    if showModelInfo {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 15) {
+                                // Compact model badges
+                                ModelBadge(icon: "brain", label: "LLM", value: viewModel.llmModel?.name ?? "Not set", color: .blue)
+                                ModelBadge(icon: "waveform", label: "STT", value: viewModel.sttModel?.name ?? "Not set", color: .green)
+                                ModelBadge(icon: "speaker.wave.2", label: "TTS", value: viewModel.ttsModel?.name ?? "Not set", color: .purple)
+                            }
+                            .padding(.horizontal, 20)
+
+                            Text("Experimental Feature")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(8)
+                        }
+                        .padding(.bottom, 15)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+
+                    // Main conversation area
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 20) {
+                                // User message
+                                if !viewModel.currentTranscript.isEmpty {
+                                    ConversationBubble(
+                                        speaker: "You",
+                                        message: viewModel.currentTranscript,
+                                        isUser: true
+                                    )
+                                    .id("user")
+                                }
+
+                                // Assistant response - with increased height
+                                if !viewModel.assistantResponse.isEmpty {
+                                    ConversationBubble(
+                                        speaker: "Assistant",
+                                        message: viewModel.assistantResponse,
+                                        isUser: false
+                                    )
+                                    .id("assistant")
+                                }
+
+                                // Placeholder when empty
+                                if viewModel.currentTranscript.isEmpty && viewModel.assistantResponse.isEmpty {
+                                    VStack(spacing: 12) {
+                                        Image(systemName: "mic.circle")
+                                            .font(.system(size: 48))
+                                            .foregroundColor(.secondary.opacity(0.3))
+                                        Text("Tap the microphone to start")
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 100)
+                                }
+                            }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 20)
+                        }
+                        .onChange(of: viewModel.assistantResponse) { _ in
+                            withAnimation {
+                                proxy.scrollTo("assistant", anchor: .bottom)
                             }
                         }
                     }
 
                     Spacer()
+
+                    // Minimal control area
+                    VStack(spacing: 20) {
+                        // Error message (if any)
+                        if let error = viewModel.errorMessage {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                        }
+
+                        // Main mic button
+                        HStack {
+                            Spacer()
+
+                            Button(action: {
+                                Task {
+                                    if viewModel.sessionState == .listening ||
+                                       viewModel.sessionState == .speaking ||
+                                       viewModel.sessionState == .processing ||
+                                       viewModel.sessionState == .connecting {
+                                        await viewModel.stopConversation()
+                                    } else {
+                                        await viewModel.startConversation()
+                                    }
+                                }
+                            }) {
+                                ZStack {
+                                    // Background circle
+                                    Circle()
+                                        .fill(micButtonColor)
+                                        .frame(width: 72, height: 72)
+
+                                    // Pulsing effect when active
+                                    if viewModel.isSpeechDetected {
+                                        Circle()
+                                            .stroke(Color.white.opacity(0.4), lineWidth: 2)
+                                            .scaleEffect(viewModel.isSpeechDetected ? 1.3 : 1.0)
+                                            .opacity(viewModel.isSpeechDetected ? 0 : 0.8)
+                                            .animation(
+                                                .easeOut(duration: 1.0).repeatForever(autoreverses: false),
+                                                value: viewModel.isSpeechDetected
+                                            )
+                                    }
+
+                                    // Icon
+                                    if viewModel.sessionState == .connecting ||
+                                       (viewModel.isProcessing && !viewModel.isListening) {
+                                        ProgressView()
+                                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                            .scaleEffect(1.2)
+                                    } else {
+                                        Image(systemName: micButtonIcon)
+                                            .font(.system(size: 28))
+                                            .foregroundColor(.white)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+                        }
+
+                        // Subtle instruction text
+                        Text(instructionText)
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                            .multilineTextAlignment(.center)
+
+                        Text("⚠️ This feature is under active development")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                            .italic()
+                            .padding(.horizontal, 40)
+                    }
+                    .padding(.bottom, 30)
                 }
-
-                // Subtle instruction text
-                Text(instructionText)
-                    .font(.caption2)
-                    .foregroundColor(.secondary.opacity(0.7))
-                    .multilineTextAlignment(.center)
-
-                Text("⚠️ This feature is under active development")
-                    .font(.caption2)
-                    .foregroundColor(.orange)
-                    .italic()
-                    .padding(.horizontal, 40)
+                .background(Color(.systemBackground))
             }
-            .padding(.bottom, 30)
         }
-        .background(Color(.systemBackground))
             #endif
         }
-        .sheet(isPresented: $showTranscriptionView) {
-            TranscriptionView()
+        .sheet(isPresented: $showModelSelection) {
+            ModelSelectionSheet(context: .voice) { model in
+                // Model selected - the voice assistant will use this
+                // For now, just close the sheet. Voice pipeline has its own model management.
+            }
+        }
+        .sheet(isPresented: $showSTTModelSelection) {
+            ModelSelectionSheet(context: .stt) { model in
+                viewModel.setSTTModel(model)
+            }
+        }
+        .sheet(isPresented: $showLLMModelSelection) {
+            ModelSelectionSheet(context: .llm) { model in
+                viewModel.setLLMModel(model)
+            }
+        }
+        .sheet(isPresented: $showTTSModelSelection) {
+            ModelSelectionSheet(context: .tts) { model in
+                viewModel.setTTSModel(model)
+            }
         }
         .onAppear {
             Task {

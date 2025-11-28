@@ -28,6 +28,15 @@ class TranscriptionViewModel: ObservableObject {
     @Published var currentSpeaker: SpeakerInfo?
     @Published var enableSpeakerDiarization: Bool = true
 
+    // MARK: - Model Loading State (from SDK lifecycle tracker)
+    @Published var sttModelState: ModelLoadState = .notLoaded
+    @Published var selectedFramework: LLMFramework?
+
+    /// Check if STT model is loaded
+    var isModelLoaded: Bool {
+        sttModelState.isLoaded
+    }
+
     // MARK: - Transcription State
     private var voicePipeline: ModularVoicePipeline?
     private let whisperModelName: String = "whisper-base"
@@ -67,6 +76,9 @@ class TranscriptionViewModel: ObservableObject {
             return
         }
 
+        // Subscribe to model lifecycle changes from SDK
+        subscribeToModelLifecycle()
+
         // Set the Whisper model display name
         updateWhisperModelName()
 
@@ -76,6 +88,45 @@ class TranscriptionViewModel: ObservableObject {
 
         logger.info("Transcription service initialized")
         isInitialized = true
+    }
+
+    /// Subscribe to SDK's model lifecycle tracker for STT model state updates
+    private func subscribeToModelLifecycle() {
+        // Observe changes to STT model via the SDK's lifecycle tracker
+        ModelLifecycleTracker.shared.$modelsByModality
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] modelsByModality in
+                guard let self = self else { return }
+
+                // Update STT model state
+                if let sttState = modelsByModality[.stt] {
+                    self.sttModelState = sttState.state
+                    self.selectedFramework = sttState.framework
+                    if sttState.state.isLoaded {
+                        self.whisperModel = sttState.modelName
+                        self.currentStatus = "Ready (\(sttState.modelName))"
+                        self.logger.info("✅ STT model loaded: \(sttState.modelName)")
+                    } else if sttState.state.isLoading {
+                        self.currentStatus = "Loading model..."
+                        self.logger.info("⏳ STT model loading: \(sttState.modelName)")
+                    }
+                } else {
+                    self.sttModelState = .notLoaded
+                    self.selectedFramework = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        // Check initial state
+        if let sttState = ModelLifecycleTracker.shared.modelsByModality[.stt] {
+            sttModelState = sttState.state
+            selectedFramework = sttState.framework
+            if sttState.state.isLoaded {
+                whisperModel = sttState.modelName
+                currentStatus = "Ready (\(sttState.modelName))"
+            }
+            logger.info("📊 Initial STT state: loaded=\(self.sttModelState.isLoaded), model=\(self.whisperModel)")
+        }
     }
 
     private func updateWhisperModelName() {

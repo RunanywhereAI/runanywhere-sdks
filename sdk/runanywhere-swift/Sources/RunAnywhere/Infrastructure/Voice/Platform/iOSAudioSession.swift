@@ -1,7 +1,6 @@
 import Foundation
 #if os(iOS) || os(tvOS) || os(watchOS)
 import AVFoundation
-import os
 
 /// iOS-specific audio session management for voice processing
 public class IOSAudioSession {

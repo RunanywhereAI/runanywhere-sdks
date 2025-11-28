@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Manages voice session lifecycle
 public class VoiceSessionManager {

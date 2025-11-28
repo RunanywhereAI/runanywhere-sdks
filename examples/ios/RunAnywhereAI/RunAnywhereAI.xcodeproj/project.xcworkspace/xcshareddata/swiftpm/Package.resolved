@@ -1,5 +1,5 @@
 {
-  "originHash" : "e21c190261eae05d6e950eff236289375b953fa16d0e1ab44292fba4ce2504aa",
+  "originHash" : "054f2aaa65b7c7f1818c5e362e5784e5dd6d2b676ea8374575a80184a7fccbc3",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/devicekit/DeviceKit.git",
       "state" : {
-        "revision" : "513b9d7e7a1bd46504a1009bbab943b75ce2f195",
-        "version" : "5.6.0"
+        "revision" : "581df61650bc457ec00373a592a84be3e7468eb1",
+        "version" : "5.7.0"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/johnmai-dev/Jinja",
       "state" : {
-        "revision" : "bb238dd96fbe4c18014f3107c00edd6edb15428e",
-        "version" : "1.2.4"
+        "revision" : "5c0a87846dfd36ca6621795ad2f09fdaab82b739",
+        "version" : "1.3.0"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-argument-parser.git",
       "state" : {
-        "revision" : "0fbc8848e389af3bb55c182bc19ca9d5dc2f255b",
-        "version" : "1.4.0"
+        "revision" : "cdd0ef3755280949551dc26dee5de9ddeda89f54",
+        "version" : "1.6.2"
       }
     },
     {
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
       "state" : {
-        "revision" : "f70225981241859eb4aa1a18a75531d26637c8cc",
-        "version" : "1.4.0"
+        "revision" : "40d25bbb2fc5b557a9aa8512210bded327c0f60d",
+        "version" : "1.5.0"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "334e682869394ee239a57dbe9262bff3cd9495bd",
-        "version" : "3.14.0"
+        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
+        "version" : "3.15.1"
       }
     },
     {
@@ -121,10 +121,10 @@
     {
       "identity" : "swift-transformers",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-transformers",
+      "location" : "https://github.com/huggingface/swift-transformers.git",
       "state" : {
-        "revision" : "e5bf0627bd134cf8ddc407cda403ae84207af959",
-        "version" : "0.1.22"
+        "revision" : "8a83416cc00ab07a5de9991e6ad817a9b8588d20",
+        "version" : "0.1.15"
       }
     },
     {
@@ -139,10 +139,10 @@
     {
       "identity" : "zipfoundation",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/weichsel/ZIPFoundation",
+      "location" : "https://github.com/weichsel/ZIPFoundation.git",
       "state" : {
-        "revision" : "02b6abe5f6eef7e3cbd5f247c5cc24e246efcfe0",
-        "version" : "0.9.19"
+        "revision" : "22787ffb59de99e5dc1fbfe80b19c97a904ad48d",
+        "version" : "0.9.20"
       }
     }
   ],
