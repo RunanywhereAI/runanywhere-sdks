@@ -109,10 +109,6 @@ public final class DatabaseManager {
             try Migration001_InitialSchema.migrate(db)
         }
 
-        migrator.registerMigration("v2_add_thinking_pattern") { db in
-            try Migration002_AddThinkingPattern.migrate(db)
-        }
-
         // Run migrations
         try migrator.migrate(dbQueue)
 
