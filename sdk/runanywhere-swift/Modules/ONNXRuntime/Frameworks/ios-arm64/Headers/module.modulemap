@@ -1,5 +1,0 @@
-module RunAnywhere {
-    header "runanywhere_bridge.h"
-    header "types.h"
-    export *
-}
