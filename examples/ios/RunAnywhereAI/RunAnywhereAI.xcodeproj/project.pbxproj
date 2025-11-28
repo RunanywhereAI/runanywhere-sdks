@@ -12,7 +12,6 @@
 		54760D392E57E06100A03191 /* WhisperKitTranscription in Frameworks */ = {isa = PBXBuildFile; productRef = 54760D382E57E06100A03191 /* WhisperKitTranscription */; };
 		5479377E2E57DF7600CB9251 /* LLMSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5479377D2E57DF7600CB9251 /* LLMSwift */; };
 		548CA0772E56D0DC0061CCF5 /* FluidAudioDiarization in Frameworks */ = {isa = PBXBuildFile; productRef = 548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */; };
-		587E11F52ED16B6C00B006B3 /* ONNXRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 587E11F42ED16B6C00B006B3 /* ONNXRuntime */; };
 		58ABEDD22ED16DA40058D033 /* ONNXRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 58ABEDD12ED16DA40058D033 /* ONNXRuntime */; };
 /* End PBXBuildFile section */
 
@@ -72,7 +71,6 @@
 				541C59DA2E63772A00DD7839 /* RunAnywhere in Frameworks */,
 				54760D392E57E06100A03191 /* WhisperKitTranscription in Frameworks */,
 				5479377E2E57DF7600CB9251 /* LLMSwift in Frameworks */,
-				587E11F52ED16B6C00B006B3 /* ONNXRuntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -150,7 +148,6 @@
 				5479377D2E57DF7600CB9251 /* LLMSwift */,
 				54760D382E57E06100A03191 /* WhisperKitTranscription */,
 				541C59D92E63772A00DD7839 /* RunAnywhere */,
-				587E11F42ED16B6C00B006B3 /* ONNXRuntime */,
 				58ABEDD12ED16DA40058D033 /* ONNXRuntime */,
 			);
 			productName = RunAnywhereAI;
@@ -735,10 +732,6 @@
 		548CA0762E56D0DC0061CCF5 /* FluidAudioDiarization */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = FluidAudioDiarization;
-		};
-		587E11F42ED16B6C00B006B3 /* ONNXRuntime */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ONNXRuntime;
 		};
 		58ABEDD12ED16DA40058D033 /* ONNXRuntime */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -45,7 +45,7 @@ public struct ONNXSTTServiceProvider: STTServiceProvider {
 
         Self.logger.debug("Checking if can handle model: \(modelId)")
 
-        // Explicitly handle ONNX models (Glados/Distil-Whisper for STT, Piper for TTS)
+        // Explicitly handle ONNX models (Glados/Distil-Whisper for STT)
         if lowercased.contains("onnx") || lowercased.hasSuffix(".onnx") {
             Self.logger.debug("Model \(modelId) matches ONNX pattern")
             return true
@@ -60,12 +60,6 @@ public struct ONNXSTTServiceProvider: STTServiceProvider {
         // Handle Glados/Distil-Whisper models (these are ONNX-based)
         if lowercased.contains("glados") || lowercased.contains("distil") {
             Self.logger.debug("Model \(modelId) matches Glados/Distil pattern")
-            return true
-        }
-
-        // Handle Piper TTS models (these are ONNX-based)
-        if lowercased.contains("piper") {
-            Self.logger.debug("Model \(modelId) matches Piper TTS pattern")
             return true
         }
 

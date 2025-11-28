@@ -431,8 +431,6 @@ class STTViewModel: ObservableObject {
             let inputFormat = inputNode.outputFormat(forBus: 0)
             recordedSampleRate = inputFormat.sampleRate
 
-            print("[AUDIO-ENGINE] Input format: sampleRate=\(inputFormat.sampleRate), channels=\(inputFormat.channelCount)")
-
             if selectedMode == .live {
                 // Live mode: Create audio stream for real-time transcription
                 let audioStream = AsyncStream<Data> { continuation in
@@ -445,7 +443,6 @@ class STTViewModel: ObservableObject {
                     if let audioData = self.convertBufferToData(buffer) {
                         Task { @MainActor in
                             self.audioContinuation?.yield(audioData)
-                            self.audioBuffer.append(audioData)
                             self.updateAudioLevel(buffer)
                         }
                     }
@@ -454,8 +451,6 @@ class STTViewModel: ObservableObject {
                 // Start streaming transcription task using SDK's liveTranscribe API
                 streamingTask = Task { @MainActor in
                     do {
-                        print("[LIVE-MODE] Starting transcription stream (supportsStreaming: \(component.supportsStreaming))")
-
                         // Create options for live transcription
                         let options = STTOptions(
                             language: "en",
@@ -470,7 +465,6 @@ class STTViewModel: ObservableObject {
                             self.transcription = partialText
                             self.logger.debug("Partial: \(partialText)")
                         }
-                        print("[LIVE-MODE] Transcription stream completed")
                     } catch {
                         if !Task.isCancelled {
                             self.logger.error("Streaming failed: \(error.localizedDescription)")
@@ -493,7 +487,6 @@ class STTViewModel: ObservableObject {
 
             // Start the audio engine
             try engine.start()
-            print("[AUDIO-ENGINE] Audio engine started, isRunning=\(engine.isRunning)")
 
             self.audioEngine = engine
             self.inputNode = inputNode
@@ -726,7 +719,6 @@ struct STTModelPickerView: View {
             availableModels = allModels.filter { $0.category == .speechRecognition }
             isLoading = false
         } catch {
-            print("Failed to load STT models: \(error)")
             availableModels = []
             isLoading = false
         }

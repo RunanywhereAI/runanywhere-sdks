@@ -16,54 +16,50 @@ if target.nil?
   exit 1
 end
 
-# Libraries to add
+# Libraries to add (using modern API)
 libraries = [
-  'libarchive',
-  'libbz2',
-  'libc++'
+  'archive',   # libarchive -> archive
+  'bz2',       # libbz2 -> bz2
+  'c++'        # libc++ -> c++
 ]
 
-# Frameworks to add
+# Frameworks to add (using modern API)
 frameworks = [
   'Accelerate'
 ]
 
-# Add libraries
+# Track what was added
+added_libraries = []
+added_frameworks = []
+
+# Add libraries using modern xcodeproj API
+# add_system_library_tbd handles duplicate detection automatically
 libraries.each do |lib|
   # Check if already exists
   existing = target.frameworks_build_phase.files.find do |file|
-    file.display_name == "#{lib}.tbd" || file.display_name == "#{lib}.dylib"
+    file.display_name == "lib#{lib}.tbd" || file.display_name == "lib#{lib}.dylib"
   end
 
-  next if existing
-
-  # Add library
-  file_ref = project.frameworks_group.new_file("usr/lib/#{lib}.tbd")
-  file_ref.name = "#{lib}.tbd"
-  file_ref.source_tree = 'SDKROOT'
-
-  build_file = target.frameworks_build_phase.add_file_reference(file_ref)
-
-  puts "✅ Added #{lib}.tbd to RunAnywhereAI target"
+  unless existing
+    target.add_system_library_tbd(lib)
+    added_libraries << lib
+    puts "✅ Added lib#{lib}.tbd to RunAnywhereAI target"
+  end
 end
 
-# Add frameworks
+# Add frameworks using modern xcodeproj API
+# add_system_framework handles duplicate detection automatically
 frameworks.each do |framework|
   # Check if already exists
   existing = target.frameworks_build_phase.files.find do |file|
     file.display_name == "#{framework}.framework"
   end
 
-  next if existing
-
-  # Add framework
-  file_ref = project.frameworks_group.new_file("System/Library/Frameworks/#{framework}.framework")
-  file_ref.name = "#{framework}.framework"
-  file_ref.source_tree = 'SDKROOT'
-
-  build_file = target.frameworks_build_phase.add_file_reference(file_ref)
-
-  puts "✅ Added #{framework}.framework to RunAnywhereAI target"
+  unless existing
+    target.add_system_framework(framework)
+    added_frameworks << framework
+    puts "✅ Added #{framework}.framework to RunAnywhereAI target"
+  end
 end
 
 # Save the project
@@ -71,5 +67,5 @@ project.save
 
 puts ""
 puts "✅ Successfully updated RunAnywhereAI.xcodeproj"
-puts "   Added libraries: #{libraries.join(', ')}"
-puts "   Added frameworks: #{frameworks.join(', ')}"
+puts "   Libraries: #{libraries.join(', ')}"
+puts "   Frameworks: #{frameworks.join(', ')}"
