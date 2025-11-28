@@ -3,6 +3,7 @@ import AVFoundation
 import RunAnywhere
 
 /// Manages audio capture from microphone for STT
+#if os(iOS) || os(tvOS) || os(watchOS)
 public class AudioCaptureManager: ObservableObject {
     private let logger = SDKLogger(category: "AudioCapture")
 
@@ -187,6 +188,33 @@ public class AudioCaptureManager: ObservableObject {
         stopRecording()
     }
 }
+#else
+// macOS stub - AudioCaptureManager is iOS-only
+// On macOS, use AVCaptureSession or other APIs for audio capture
+public class AudioCaptureManager: ObservableObject {
+    private let logger = SDKLogger(category: "AudioCapture")
+
+    @Published public var isRecording = false
+    @Published public var audioLevel: Float = 0.0
+
+    public init() {
+        logger.info("AudioCaptureManager initialized (macOS stub)")
+    }
+
+    public func requestPermission() async -> Bool {
+        logger.warning("AudioCaptureManager is not available on macOS")
+        return false
+    }
+
+    public func startRecording(onAudioData: @escaping (Data) -> Void) throws {
+        throw AudioCaptureError.platformNotSupported
+    }
+
+    public func stopRecording() {
+        // No-op on macOS
+    }
+}
+#endif
 
 // MARK: - Errors
 
@@ -194,6 +222,7 @@ public enum AudioCaptureError: LocalizedError {
     case permissionDenied
     case formatConversionFailed
     case engineStartFailed
+    case platformNotSupported
 
     public var errorDescription: String? {
         switch self {
@@ -203,6 +232,8 @@ public enum AudioCaptureError: LocalizedError {
             return "Failed to convert audio format"
         case .engineStartFailed:
             return "Failed to start audio engine"
+        case .platformNotSupported:
+            return "Audio capture is not supported on this platform"
         }
     }
 }
