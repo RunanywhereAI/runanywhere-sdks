@@ -9,8 +9,8 @@ let package = Package(
     name: "RunAnywhereAI",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v14),      // Minimum iOS 14 for broad compatibility
-        .macOS(.v12)     // Minimum macOS 12
+        .iOS(.v17),      // Minimum iOS 17 (required by FluidAudio)
+        .macOS(.v14)     // Minimum macOS 14 (required by FluidAudio)
     ],
     products: [
         // The main app library
@@ -21,18 +21,11 @@ let package = Package(
     ],
     dependencies: [
         // ===================================
-        // LOCAL SDK DEPENDENCIES (4 total)
+        // SINGLE SDK DEPENDENCY
         // ===================================
-
-        // Core RunAnywhere SDK
+        // All modules are now consolidated in the main RunAnywhere SDK.
+        // Users pick which products they need from this single package.
         .package(path: "../../../sdk/runanywhere-swift"),
-
-        // AI Framework Modules (local plugins)
-        .package(path: "../../../sdk/runanywhere-swift/Modules/LLMSwift"),
-        .package(path: "../../../sdk/runanywhere-swift/Modules/WhisperKitTranscription"),
-        .package(path: "../../../sdk/runanywhere-swift/Modules/FluidAudioDiarization"),
-        .package(path: "../../../sdk/runanywhere-swift/Modules/ONNXRuntime"),  // ONNX TTS/STT support
-        .package(path: "../../../sdk/runanywhere-swift/Modules/AppleFoundationalModels"),  // Apple Foundation Models (iOS 26+)
 
         // ===================================
         // TRANSITIVE DEPENDENCIES (auto-included)
@@ -49,23 +42,26 @@ let package = Package(
         // - swift-crypto 3.14.0 (cryptography)
         // - Pulse 4.2.7 (logging)
         //
-        // Via AI Modules:
-        // - LLM.swift 2.0.1 (via LLMSwift module)
-        // - WhisperKit 0.13.1 (via WhisperKitTranscription module)
-        // - FluidAudio (via FluidAudioDiarization module)
-        // - Apple FoundationModels (via FoundationModels module, requires iOS 26+)
+        // Via Optional Modules:
+        // - LLM.swift 2.0.1 (via RunAnywhereLLM)
+        // - WhisperKit 0.13.1 (via RunAnywhereWhisperKit)
+        // - FluidAudio (via RunAnywhereFluidAudio)
+        // - ONNX Runtime binary (via RunAnywhereONNX)
         // ===================================
     ],
     targets: [
         .target(
             name: "RunAnywhereAI",
             dependencies: [
+                // Core SDK (always needed)
                 .product(name: "RunAnywhere", package: "runanywhere-swift"),
-                .product(name: "LLMSwift", package: "LLMSwift"),
-                .product(name: "WhisperKitTranscription", package: "WhisperKitTranscription"),
-                .product(name: "FluidAudioDiarization", package: "FluidAudioDiarization"),
-                .product(name: "ONNXRuntime", package: "ONNXRuntime"),  // ONNX TTS/STT support
-                .product(name: "AppleFoundationalModels", package: "AppleFoundationalModels"),  // Apple Foundation Models (iOS 26+)
+
+                // Optional modules - pick what you need:
+                .product(name: "RunAnywhereONNX", package: "runanywhere-swift"),           // ONNX STT/TTS/VAD
+                .product(name: "RunAnywhereLLM", package: "runanywhere-swift"),            // Local LLM inference
+                .product(name: "RunAnywhereWhisperKit", package: "runanywhere-swift"),     // CoreML STT
+                .product(name: "RunAnywhereFluidAudio", package: "runanywhere-swift"),     // Speaker Diarization
+                .product(name: "RunAnywhereAppleAI", package: "runanywhere-swift"),        // Apple Intelligence (iOS 26+)
             ],
             path: "RunAnywhereAI",
             exclude: [
