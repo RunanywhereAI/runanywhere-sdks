@@ -11,7 +11,6 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
     private var modelPath: String?
     private var _isSynthesizing: Bool = false
     private var _isReady: Bool = false
-    private var modelSampleRate: Int32 = 22050
 
     // MARK: - Initialization
 
@@ -159,7 +158,6 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
 
         _isReady = true
         logger.info("ONNX TTS initialized successfully")
-        logger.info("  Sample rate: \(self.modelSampleRate) Hz")
     }
 
     public func synthesize(text: String, options: TTSOptions) async throws -> Data {

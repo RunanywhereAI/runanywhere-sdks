@@ -7,7 +7,6 @@ public struct ONNXSTTServiceProvider: STTServiceProvider {
 
     public let name: String = "ONNX Runtime"
     public let version: String = "1.23.2"
-    public let supportedLanguages: [String] = ["en", "es", "fr", "de", "it", "pt", "zh", "ja", "ko"]  // Depends on model
 
     public init() {}
 

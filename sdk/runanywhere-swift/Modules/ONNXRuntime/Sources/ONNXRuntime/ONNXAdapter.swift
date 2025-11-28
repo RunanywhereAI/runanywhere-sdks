@@ -19,7 +19,6 @@ public class ONNXAdapter: UnifiedFrameworkAdapter {
     // Cache service instances to avoid re-initialization
     private var cachedSTTService: ONNXSTTService?
     private var cachedTTSService: ONNXTTSService?
-    private var cachedLLMService: Any? // Reserved for future LLM implementation
 
     // Track last usage for smart cleanup
     private var lastSTTUsage: Date?

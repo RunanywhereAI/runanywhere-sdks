@@ -440,16 +440,3 @@ private struct PartialResult: Codable {
         case isFinal = "is_final"
     }
 }
-
-/// Metadata for transcription results
-public struct TranscriptionMetadata {
-    public let processingTimeMs: Double
-    public let audioDurationMs: Double
-    public let realTimeFactor: Double
-
-    public init(processingTimeMs: Double, audioDurationMs: Double, realTimeFactor: Double) {
-        self.processingTimeMs = processingTimeMs
-        self.audioDurationMs = audioDurationMs
-        self.realTimeFactor = realTimeFactor
-    }
-}

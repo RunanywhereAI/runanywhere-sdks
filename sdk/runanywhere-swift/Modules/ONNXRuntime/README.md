@@ -202,16 +202,6 @@ ONNXRuntime Module
 
 **Solution**: Ensure model file exists and is a valid ONNX file (.onnx extension)
 
-### Transcription Returns Stub Text
-
-```swift
-// Output: "Audio transcription not yet implemented"
-```
-
-**Cause**: The C++ backend's audio preprocessing is not yet fully implemented (marked as TODO in onnx_bridge.cpp)
-
-**Workaround**: This is expected behavior until audio preprocessing (mel spectrogram) is implemented
-
 ### Memory Issues
 
 ```swift
@@ -224,8 +214,9 @@ ONNXRuntime Module
 
 - [x] Basic STT infrastructure
 - [x] Whisper model support
-- [ ] Audio preprocessing (mel spectrogram)
-- [ ] Streaming transcription
+- [x] Audio preprocessing (mel spectrogram)
+- [x] Streaming transcription
+- [x] TTS support (Piper/VITS)
 - [ ] LLM support
 - [ ] CoreML acceleration
 - [ ] Quantized models support

@@ -13,62 +13,16 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Include common types (ra_result_code, ra_device_type, ra_audio_format, ra_audio_config)
+#include "types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 // =============================================================================
-// COMMON TYPES
+// CAPABILITY TYPES
 // =============================================================================
-
-// Result codes
-typedef enum {
-    RA_SUCCESS = 0,
-    RA_ERROR_INIT_FAILED = -1,
-    RA_ERROR_MODEL_LOAD_FAILED = -2,
-    RA_ERROR_INFERENCE_FAILED = -3,
-    RA_ERROR_INVALID_HANDLE = -4,
-    RA_ERROR_INVALID_PARAMS = -5,
-    RA_ERROR_OUT_OF_MEMORY = -6,
-    RA_ERROR_NOT_IMPLEMENTED = -7,
-    RA_ERROR_CANCELLED = -8,
-    RA_ERROR_TIMEOUT = -9,
-    RA_ERROR_IO = -10,
-    RA_ERROR_UNKNOWN = -99
-} ra_result_code;
-
-// Device types
-typedef enum {
-    RA_DEVICE_CPU = 0,
-    RA_DEVICE_GPU = 1,
-    RA_DEVICE_NEURAL_ENGINE = 2,
-    RA_DEVICE_METAL = 3,
-    RA_DEVICE_CUDA = 4,
-    RA_DEVICE_NNAPI = 5,
-    RA_DEVICE_COREML = 6,
-    RA_DEVICE_VULKAN = 7,
-    RA_DEVICE_UNKNOWN = 99
-} ra_device_type;
-
-// Audio format types
-typedef enum {
-    RA_AUDIO_FORMAT_PCM_F32 = 0,
-    RA_AUDIO_FORMAT_PCM_S16 = 1,
-    RA_AUDIO_FORMAT_PCM_S32 = 2,
-    RA_AUDIO_FORMAT_WAV = 10,
-    RA_AUDIO_FORMAT_MP3 = 11,
-    RA_AUDIO_FORMAT_FLAC = 12,
-    RA_AUDIO_FORMAT_AAC = 13,
-    RA_AUDIO_FORMAT_OPUS = 14
-} ra_audio_format;
-
-// Audio configuration
-typedef struct {
-    int sample_rate;
-    int channels;
-    int bits_per_sample;
-    ra_audio_format format;
-} ra_audio_config;
 
 // Capability types
 typedef enum {
