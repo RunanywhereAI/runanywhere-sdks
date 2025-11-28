@@ -34,6 +34,7 @@ public final class ModuleRegistry {
 
     private var sttProviders: [PrioritizedProvider<STTServiceProvider>] = []
     private var llmProviders: [PrioritizedProvider<LLMServiceProvider>] = []
+    private var ttsProviders: [PrioritizedProvider<TTSServiceProvider>] = []
     private var speakerDiarizationProviders: [SpeakerDiarizationServiceProvider] = []
     private var vlmProviders: [VLMServiceProvider] = []
     private var wakeWordProviders: [WakeWordServiceProvider] = []
@@ -64,6 +65,18 @@ public final class ModuleRegistry {
             lhs.priority > rhs.priority
         }
         print("[ModuleRegistry] Registered LLM provider: \(provider.name) with priority: \(priority)")
+    }
+
+    /// Register a Text-to-Speech provider with optional priority (e.g., ONNX TTS)
+    /// Higher priority providers are preferred (default: 100)
+    public func registerTTS(_ provider: TTSServiceProvider, priority: Int = 100) {
+        let prioritizedProvider = PrioritizedProvider(provider: provider, priority: priority)
+        ttsProviders.append(prioritizedProvider)
+        // Sort by priority (higher first)
+        ttsProviders.sort { lhs, rhs in
+            lhs.priority > rhs.priority
+        }
+        print("[ModuleRegistry] Registered TTS provider: \(provider.name) with priority: \(priority)")
     }
 
     /// Register a Speaker Diarization provider (e.g., FluidAudioDiarization)
@@ -118,6 +131,22 @@ public final class ModuleRegistry {
         return llmProviders.map { $0.provider }
     }
 
+    /// Get a TTS provider for the specified model (returns highest priority match)
+    public func ttsProvider(for modelId: String? = nil) -> TTSServiceProvider? {
+        if let modelId = modelId {
+            return ttsProviders.first(where: { $0.provider.canHandle(modelId: modelId) })?.provider
+        }
+        return ttsProviders.first?.provider
+    }
+
+    /// Get ALL TTS providers that can handle the specified model (sorted by priority)
+    public func allTTSProviders(for modelId: String? = nil) -> [TTSServiceProvider] {
+        if let modelId = modelId {
+            return ttsProviders.filter { $0.provider.canHandle(modelId: modelId) }.map { $0.provider }
+        }
+        return ttsProviders.map { $0.provider }
+    }
+
     /// Get a Speaker Diarization provider
     public func speakerDiarizationProvider(for modelId: String? = nil) -> SpeakerDiarizationServiceProvider? {
         if let modelId = modelId {
@@ -150,6 +179,9 @@ public final class ModuleRegistry {
     /// Check if LLM is available
     public var hasLLM: Bool { !llmProviders.isEmpty }
 
+    /// Check if TTS is available
+    public var hasTTS: Bool { !ttsProviders.isEmpty }
+
     /// Check if Speaker Diarization is available
     public var hasSpeakerDiarization: Bool { !speakerDiarizationProviders.isEmpty }
 
@@ -164,6 +196,7 @@ public final class ModuleRegistry {
         var modules: [String] = []
         if hasSTT { modules.append("STT") }
         if hasLLM { modules.append("LLM") }
+        if hasTTS { modules.append("TTS") }
         if hasSpeakerDiarization { modules.append("SpeakerDiarization") }
         if hasVLM { modules.append("VLM") }
         if hasWakeWord { modules.append("WakeWord") }
@@ -177,7 +210,15 @@ public final class ModuleRegistry {
 // - STTServiceProvider in STTComponent.swift
 // - LLMServiceProvider in LLMComponent.swift
 // - WakeWordServiceProvider in WakeWordComponent.swift
-// - VLMServiceProvider and SpeakerDiarizationServiceProvider defined below
+// - VLMServiceProvider, TTSServiceProvider, and SpeakerDiarizationServiceProvider defined below
+
+/// Provider for Text-to-Speech services
+public protocol TTSServiceProvider {
+    func createTTSService(configuration: TTSConfiguration) async throws -> TTSService
+    func canHandle(modelId: String?) -> Bool
+    var name: String { get }
+    var version: String { get }
+}
 
 /// Provider for Vision Language Model services
 public protocol VLMServiceProvider {

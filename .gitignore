@@ -132,7 +132,7 @@ sdk/runanywhere-kotlin/.idea/
 *~
 
 # Claude
-.claude/settings.local.json
+.claude/
 
 # Temporary files
 *.tmp
@@ -240,3 +240,4 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 
 # Backup directories
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
+comments/

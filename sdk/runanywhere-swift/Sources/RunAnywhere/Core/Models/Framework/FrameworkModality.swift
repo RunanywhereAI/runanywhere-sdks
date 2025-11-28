@@ -54,6 +54,10 @@ extension LLMFramework {
         // Text-focused frameworks
         case .swiftTransformers, .foundationModels:
             return .textToText
+
+        // System TTS
+        case .systemTTS:
+            return .textToVoice
         }
     }
 
@@ -85,6 +89,10 @@ extension LLMFramework {
 
         case .mediaPipe:
             return [.textToText, .voiceToText, .imageToText]
+
+        // System TTS - text-to-voice only
+        case .systemTTS:
+            return [.textToVoice]
         }
     }
 

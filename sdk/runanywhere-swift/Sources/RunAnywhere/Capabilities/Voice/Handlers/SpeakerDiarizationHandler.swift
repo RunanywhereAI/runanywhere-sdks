@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Handles speaker diarization processing in the voice pipeline
 public class SpeakerDiarizationHandler {

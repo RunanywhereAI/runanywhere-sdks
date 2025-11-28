@@ -1,5 +1,4 @@
 import Foundation
-import os
 
 /// Handles Speech-to-Text processing in the voice pipeline
 public class STTHandler {

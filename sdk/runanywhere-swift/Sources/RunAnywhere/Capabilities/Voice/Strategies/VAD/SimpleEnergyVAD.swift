@@ -1,14 +1,13 @@
 import Foundation
 import AVFoundation
 import Accelerate
-import os
 
 /// Simple energy-based Voice Activity Detection
 /// Based on WhisperKit's EnergyVAD implementation but simplified for real-time audio processing
 public class SimpleEnergyVAD: NSObject, VADService {
     // MARK: - Properties
 
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "SimpleEnergyVAD")
+    private let logger = SDKLogger(category: "SimpleEnergyVAD")
 
     /// Energy threshold for voice activity detection (0.0 to 1.0)
     /// Values above this threshold indicate voice activity

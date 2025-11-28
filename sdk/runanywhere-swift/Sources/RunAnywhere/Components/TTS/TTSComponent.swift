@@ -1,6 +1,5 @@
 import Foundation
 import AVFoundation
-import os
 
 // MARK: - TTS Options
 
@@ -259,7 +258,7 @@ public protocol TTSFrameworkAdapter: ComponentAdapter where ServiceType: TTSServ
 /// System TTS Service implementation using AVSpeechSynthesizer
 public final class SystemTTSService: NSObject, TTSService, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
-    private let logger = Logger(subsystem: "com.runanywhere.sdk", category: "SystemTTS")
+    private let logger = SDKLogger(category: "SystemTTS")
     private var speechContinuation: CheckedContinuation<Data, Error>?
     private var _isSynthesizing = false
     private let speechQueue = DispatchQueue(label: "com.runanywhere.tts.speech")
@@ -403,16 +402,29 @@ public final class DefaultTTSAdapter: ComponentAdapter {
     }
 }
 
+// MARK: - TTS Service Wrapper
+
+/// Wrapper class to allow protocol-based TTS service to work with BaseComponent
+public final class TTSServiceWrapper: ServiceWrapper {
+    public typealias ServiceProtocol = any TTSService
+    public var wrappedService: (any TTSService)?
+
+    public init(_ service: (any TTSService)? = nil) {
+        self.wrappedService = service
+    }
+}
+
 // MARK: - TTS Component
 
 /// Text-to-Speech component following the clean architecture
 @MainActor
-public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sendable {
+public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Sendable {
 
     // MARK: - Properties
 
     public override class var componentType: SDKComponent { .tts }
 
+    private let logger = SDKLogger(category: "TTSComponent")
     private let ttsConfiguration: TTSConfiguration
     private var currentVoice: String?
 
@@ -426,20 +438,99 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
 
     // MARK: - Service Creation
 
-    public override func createService() async throws -> SystemTTSService {
+    public override func createService() async throws -> TTSServiceWrapper {
+        let modelId = ttsConfiguration.voice
+        let modelName = modelId
+
+        logger.info("Creating TTS service for modelId: \(modelId)")
+
+        // Try to get a registered TTS provider from central registry
+        // Need to access ModuleRegistry on MainActor since it's @MainActor isolated
+        let provider = await MainActor.run {
+            let p = ModuleRegistry.shared.ttsProvider(for: modelId)
+            if let p = p {
+                logger.info("Found TTS provider: \(p.name) for modelId: \(modelId)")
+            } else {
+                logger.info("No TTS provider found for modelId: \(modelId), will use system TTS fallback")
+                // Log all registered TTS providers for debugging
+                let allProviders = ModuleRegistry.shared.allTTSProviders()
+                logger.info("Registered TTS providers count: \(allProviders.count)")
+                for provider in allProviders {
+                    logger.info("  - \(provider.name), canHandle(\(modelId)): \(provider.canHandle(modelId: modelId))")
+                }
+            }
+            return p
+        }
+
+        // Determine framework based on provider availability
+        // If a provider handles it, it's likely ONNX; otherwise it's system TTS
+        let framework: LLMFramework = provider != nil ? .onnx : .systemTTS
+        logger.info("Determined framework: \(framework.displayName)")
+
+        // Notify lifecycle manager
+        await MainActor.run {
+            ModelLifecycleTracker.shared.modelWillLoad(
+                modelId: modelId,
+                modelName: modelName,
+                framework: framework,
+                modality: .tts
+            )
+        }
+
         // Emit checking event
         eventBus.publish(ComponentInitializationEvent.componentChecking(
             component: Self.componentType,
-            modelId: nil // TTS typically doesn't use model files
+            modelId: modelId
         ))
 
-        // Fallback to default adapter (system TTS)
-        let defaultAdapter = DefaultTTSAdapter()
-        return try await defaultAdapter.createTTSService(configuration: ttsConfiguration)
+        do {
+            let ttsService: any TTSService
+
+            if let provider = provider {
+                // Use registered provider (e.g., ONNXTTSServiceProvider)
+                logger.info("Creating TTS service via provider: \(provider.name)")
+                ttsService = try await provider.createTTSService(configuration: ttsConfiguration)
+                logger.info("TTS service created successfully via provider")
+            } else {
+                // Fallback to default adapter (system TTS)
+                logger.info("Creating TTS service via DefaultTTSAdapter (system TTS)")
+                let defaultAdapter = DefaultTTSAdapter()
+                ttsService = try await defaultAdapter.createTTSService(configuration: ttsConfiguration)
+                logger.info("TTS service created successfully via DefaultTTSAdapter")
+            }
+
+            // Wrap the service
+            let wrapper = TTSServiceWrapper(ttsService)
+
+            // Notify lifecycle manager of successful load
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelDidLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework,
+                    modality: .tts,
+                    memoryUsage: nil
+                )
+            }
+
+            logger.info("TTS component service creation completed successfully")
+            return wrapper
+        } catch {
+            logger.error("TTS service creation failed: \(error)")
+            logger.error("Error type: \(type(of: error))")
+            await MainActor.run {
+                ModelLifecycleTracker.shared.modelLoadFailed(
+                    modelId: modelId,
+                    modality: .tts,
+                    error: error.localizedDescription
+                )
+            }
+            throw error
+        }
     }
 
     public override func initializeService() async throws {
-        guard let service = service else { return }
+        guard let wrappedService = service?.wrappedService else { return }
 
         // Track initialization
         // Track voice loading
@@ -448,7 +539,7 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
             modelId: nil
         ))
 
-        try await service.initialize()
+        try await wrappedService.initialize()
     }
 
     // MARK: - Public API
@@ -482,7 +573,7 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
     public func process(_ input: TTSInput) async throws -> TTSOutput {
         try ensureReady()
 
-        guard let ttsService = service else {
+        guard let ttsService = service?.wrappedService else {
             throw SDKError.componentNotReady("TTS service not available")
         }
 
@@ -542,7 +633,7 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
                 do {
                     try ensureReady()
 
-                    guard let ttsService = service else {
+                    guard let ttsService = service?.wrappedService else {
                         continuation.finish(throwing: SDKError.componentNotReady("TTS service not available"))
                         return
                     }
@@ -575,29 +666,29 @@ public final class TTSComponent: BaseComponent<SystemTTSService>, @unchecked Sen
 
     /// Get available voices
     public func getAvailableVoices() -> [String] {
-        return service?.availableVoices ?? []
+        return service?.wrappedService?.availableVoices ?? []
     }
 
     /// Stop current synthesis
     public func stopSynthesis() {
-        service?.stop()
+        service?.wrappedService?.stop()
     }
 
     /// Check if currently synthesizing
     public var isSynthesizing: Bool {
-        return service?.isSynthesizing ?? false
+        return service?.wrappedService?.isSynthesizing ?? false
     }
 
     /// Get service for compatibility
-    public func getService() -> TTSService? {
-        return service
+    public func getService() -> (any TTSService)? {
+        return service?.wrappedService
     }
 
     // MARK: - Cleanup
 
     public override func performCleanup() async throws {
-        service?.stop()
-        await service?.cleanup()
+        service?.wrappedService?.stop()
+        await service?.wrappedService?.cleanup()
         currentVoice = nil
     }
 
