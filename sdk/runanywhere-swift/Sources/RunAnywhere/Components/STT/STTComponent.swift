@@ -830,11 +830,9 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    print("[STTComponent] streamTranscribe called")
                     try ensureReady()
 
                     guard let service = sttService else {
-                        print("[STTComponent] ERROR: STT service not available")
                         continuation.finish(throwing: SDKError.componentNotReady("STT service not available"))
                         return
                     }
@@ -849,15 +847,12 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                         audioFormat: .pcm
                     )
 
-                    print("[STTComponent] Calling service.streamTranscribe...")
                     let result = try await service.streamTranscribe(
                         audioStream: audioStream,
                         options: options
                     ) { partial in
-                        print("[STTComponent] Yielding partial: \(partial)")
                         continuation.yield(partial)
                     }
-                    print("[STTComponent] service.streamTranscribe completed with result: \(result.transcript)")
 
                     // Yield final result
                     continuation.yield(result.transcript)

@@ -13,8 +13,6 @@ public final class ONNXTTSService: NSObject, TTSService, @unchecked Sendable {
     private var _isReady: Bool = false
     private var modelSampleRate: Int32 = 22050
 
-    private let synthesisQueue = DispatchQueue(label: "com.runanywhere.onnx.tts.synthesis")
-
     // MARK: - Initialization
 
     public override init() {

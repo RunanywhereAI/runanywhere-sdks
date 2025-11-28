@@ -326,6 +326,11 @@ class TTSViewModel: ObservableObject {
     private var audioPlayer: AVAudioPlayer?
     private var playbackTimer: Timer?
 
+    deinit {
+        playbackTimer?.invalidate()
+        audioPlayer?.stop()
+    }
+
     func initialize() async {
         logger.info("Initializing TTS view model")
 
@@ -432,11 +437,14 @@ class TTSViewModel: ObservableObject {
                 // ONNX/Piper TTS - create audio player for playback
                 try await createAudioPlayer(from: output.audioData)
 
+                // Get sample rate from audio player format, fall back to 22050 (Piper default)
+                let actualSampleRate = Int(audioPlayer?.format.sampleRate ?? 22050)
+
                 // Set metadata
                 metadata = TTSMetadata(
                     durationMs: output.duration * 1000,
                     audioSize: output.audioData.count,
-                    sampleRate: 22050
+                    sampleRate: actualSampleRate
                 )
 
                 hasGeneratedAudio = true
@@ -467,15 +475,11 @@ class TTSViewModel: ObservableObject {
 
         // Start playback timer
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            guard let self = self, let player = self.audioPlayer else { return }
-
             Task { @MainActor in
+                guard let self = self, let player = self.audioPlayer else { return }
                 self.currentTime = player.currentTime
                 self.playbackProgress = player.currentTime / player.duration
-            }
-
-            if !player.isPlaying {
-                Task { @MainActor in
+                if !player.isPlaying {
                     self.stopPlayback()
                 }
             }
