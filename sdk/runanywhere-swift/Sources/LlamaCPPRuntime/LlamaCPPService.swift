@@ -1,6 +1,6 @@
 import Foundation
 import RunAnywhere
-import RunAnywhereLlamaCPP
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// Error types for LlamaCPP operations
 public enum LlamaCPPError: Error, LocalizedError {
@@ -290,7 +290,7 @@ public class LlamaCPPService {
     /// - Returns: JSON string with model information
     public func getModelInfo() -> String? {
         guard let backend = backendHandle else { return nil }
-        guard let infoPtr = ra_text_get_model_info(backend) else { return nil }
+        guard let infoPtr = ra_get_backend_info(backend) else { return nil }
         let info = String(cString: infoPtr)
         ra_free_string(infoPtr)
         return info

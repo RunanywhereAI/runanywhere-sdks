@@ -1,6 +1,6 @@
 import Foundation
 import RunAnywhere
-import RunAnywhereONNX  // XCFramework C API module
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// ONNX Runtime implementation of TTSService for text-to-speech
 /// Uses the unified RunAnywhere backend API with Sherpa-ONNX VITS/Piper models

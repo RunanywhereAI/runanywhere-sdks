@@ -1,4 +1,0 @@
-module CRunAnywhereONNX {
-    header "onnx_bridge_wrapper.h"
-    export *
-}

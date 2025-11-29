@@ -1,6 +1,6 @@
 import Foundation
 import RunAnywhere
-import RunAnywhereONNX  // XCFramework C API module
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives and direct .onnx files
 /// Also implements ModelStorageStrategy for proper model detection in nested directories
@@ -281,7 +281,7 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         // Ensure destination directory exists
         try FileManager.default.createDirectory(at: destinationURL, withIntermediateDirectories: true)
 
-        // Call the native C function from runanywhere-core via CRunAnywhereONNX
+        // Call the native C function from runanywhere-core via CRunAnywhereCore
         let result = archiveURL.path.withCString { archivePath in
             destinationURL.path.withCString { destPath in
                 ra_extract_archive(archivePath, destPath)
