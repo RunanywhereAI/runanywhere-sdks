@@ -1,4 +1,4 @@
-package com.runanywhere.sdk.core.llamacpp
+package com.runanywhere.sdk.native.bridge
 
 /**
  * LlamaCPP Native Bridge
