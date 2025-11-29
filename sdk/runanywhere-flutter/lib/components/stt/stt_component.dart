@@ -110,10 +110,9 @@ class STTComponent extends BaseComponent<STTService> {
 
     return STTOutput(
       transcript: result.transcript,
-      confidence: result.confidence,
+      confidence: result.confidence ?? 0.0,
       segments: [],
       timestamp: DateTime.now(),
     );
   }
 }
-
