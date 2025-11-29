@@ -26,6 +26,60 @@ enum class STTServiceAudioFormat {
     FLOAT_ARRAY
 }
 
+// MARK: - STT Mode
+
+/**
+ * Transcription mode for speech-to-text (matches iOS STTMode exactly)
+ */
+enum class STTMode(val value: String) {
+    /**
+     * Batch mode: Record all audio first, then transcribe everything at once
+     * Best for: Short recordings, offline processing, higher accuracy
+     */
+    BATCH("batch"),
+
+    /**
+     * Live/Streaming mode: Transcribe audio in real-time as it's recorded
+     * Best for: Live captions, real-time feedback, long recordings
+     */
+    LIVE("live");
+
+    /**
+     * Display name for UI (matches iOS displayName)
+     */
+    val displayName: String
+        get() = when (this) {
+            BATCH -> "Batch"
+            LIVE -> "Live"
+        }
+
+    /**
+     * Description of the mode (matches iOS description)
+     */
+    val description: String
+        get() = when (this) {
+            BATCH -> "Record audio, then transcribe all at once"
+            LIVE -> "Real-time transcription as you speak"
+        }
+
+    /**
+     * Icon identifier for the mode (matches iOS icon)
+     * Uses SF Symbol names for cross-platform icon lookup
+     */
+    val icon: String
+        get() = when (this) {
+            BATCH -> "waveform.badge.mic"
+            LIVE -> "waveform"
+        }
+
+    companion object {
+        /**
+         * Create STTMode from string value
+         */
+        fun fromValue(value: String): STTMode? = entries.find { it.value == value }
+    }
+}
+
 // MARK: - STT Options
 
 /**

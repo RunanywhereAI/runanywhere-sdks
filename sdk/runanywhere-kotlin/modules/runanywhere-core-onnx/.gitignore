@@ -1,0 +1,13 @@
+# Downloaded native libraries (auto-downloaded from GitHub releases)
+src/main/jniLibs/
+
+# Build artifacts
+build/
+.gradle/
+
+# IDE
+*.iml
+.idea/
+
+# Generated files
+.cxx/

@@ -38,3 +38,7 @@ project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhe
 // Include SDK modules
 include(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp")
 project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp")
+
+// Include RunAnywhere Core ONNX module - provides native ONNX Runtime backend via JNI
+include(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-onnx")
