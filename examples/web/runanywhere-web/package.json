@@ -1,0 +1,53 @@
+{
+  "name": "runanywhere-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@radix-ui/react-icons": "^1.3.2",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-progress": "^1.1.7",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slider": "^1.3.6",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@runanywhere/core": "file:../../../sdk/runanywhere-web/packages/core",
+    "@runanywhere/llm": "file:../../../sdk/runanywhere-web/packages/llm",
+    "@runanywhere/llm-openai": "file:../../../sdk/runanywhere-web/packages/llm-openai",
+    "@runanywhere/react": "file:../../../sdk/runanywhere-web/packages/react",
+    "@runanywhere/stt-whisper": "file:../../../sdk/runanywhere-web/packages/stt-whisper",
+    "@runanywhere/stt-whisper-web": "file:../../../sdk/runanywhere-web/packages/stt-whisper-web",
+    "@runanywhere/transcription": "file:../../../sdk/runanywhere-web/packages/transcription",
+    "@runanywhere/tts": "file:../../../sdk/runanywhere-web/packages/tts",
+    "@runanywhere/tts-webspeech": "file:../../../sdk/runanywhere-web/packages/tts-webspeech",
+    "@runanywhere/vad-silero": "file:../../../sdk/runanywhere-web/packages/vad-silero",
+    "@runanywhere/voice": "file:../../../sdk/runanywhere-web/packages/voice",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.541.0",
+    "next": "15.5.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "tailwind-merge": "^3.3.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.0",
+    "ignore-loader": "^0.1.2",
+    "postcss": "^8.5.6",
+    "puppeteer": "^24.17.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5"
+  }
+}
