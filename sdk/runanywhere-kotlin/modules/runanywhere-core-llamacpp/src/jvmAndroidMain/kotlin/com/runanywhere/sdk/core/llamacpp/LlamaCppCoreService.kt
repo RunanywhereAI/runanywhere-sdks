@@ -337,7 +337,7 @@ class LlamaCppCoreService {
     private fun ensureModelLoaded() {
         if (!RunAnywhereBridge.nativeTextIsModelLoaded(backendHandle)) {
             throw NativeBridgeException(
-                NativeResultCode.ERROR_MODEL_NOT_LOADED,
+                NativeResultCode.ERROR_INVALID_PARAMS,
                 "No model loaded. Call loadModel() first."
             )
         }

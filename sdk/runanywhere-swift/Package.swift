@@ -6,7 +6,7 @@ let package = Package(
     // NOTE: Platform minimums are set to support all modules.
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
-    //   - WhisperKit, LLMSwift: iOS 16+ / macOS 13+
+    //   - WhisperKit, LlamaCPPRuntime: iOS 16+ / macOS 13+
     //   - FluidAudio: iOS 17+ / macOS 14+
     //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
     platforms: [
@@ -51,15 +51,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // LLM.swift Backend - DISABLED (conflicts with LlamaCPP symbols)
-        // Use RunAnywhereLlamaCPP instead for LLM inference
-        // =================================================================
-        // .library(
-        //     name: "RunAnywhereLLM",
-        //     targets: ["LLMSwift"]
-        // ),
-
-        // =================================================================
         // Apple Foundation Models - Apple Intelligence (iOS 26+)
         // =================================================================
         .library(
@@ -88,9 +79,6 @@ let package = Package(
 
         // WhisperKit dependency
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
-
-        // LLM.swift dependency - DISABLED (conflicts with LlamaCPP symbols)
-        // .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
 
         // FluidAudio dependency
         .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
@@ -191,19 +179,6 @@ let package = Package(
             ],
             path: "Sources/WhisperKitTranscription"
         ),
-
-        // =================================================================
-        // LLM.swift Backend - DISABLED (conflicts with LlamaCPP symbols)
-        // Use LlamaCPPRuntime instead
-        // =================================================================
-        // .target(
-        //     name: "LLMSwift",
-        //     dependencies: [
-        //         "RunAnywhere",
-        //         .product(name: "LLM", package: "LLM.swift"),
-        //     ],
-        //     path: "Sources/LLMSwift"
-        // ),
 
         // =================================================================
         // Apple Foundation Models (iOS 16+ build, iOS 26+ runtime)

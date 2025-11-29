@@ -17,10 +17,6 @@ let package = Package(
         ),
         // Optional adapter modules
         .library(
-            name: "LLMSwift",
-            targets: ["LLMSwift"]
-        ),
-        .library(
             name: "WhisperKitTranscription",
             targets: ["WhisperKitTranscription"]
         ),
@@ -41,7 +37,6 @@ let package = Package(
         .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
 
         // Adapter module dependencies
-        .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.5.0"),
     ],
@@ -66,16 +61,6 @@ let package = Package(
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ]
-        ),
-
-        // LLMSwift adapter target (requires iOS 16+)
-        .target(
-            name: "LLMSwift",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "LLM", package: "LLM.swift")
-            ],
-            path: "sdk/runanywhere-swift/Modules/LLMSwift/Sources/LLMSwift"
         ),
 
         // WhisperKit adapter target (requires iOS 16+)
