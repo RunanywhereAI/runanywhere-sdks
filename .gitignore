@@ -157,7 +157,6 @@ proguard/
 *.log
 .navigation/
 captures/
-*.iml
 *.jks
 *.keystore
 .externalNativeBuild
@@ -184,6 +183,14 @@ lint/reports/
 *.rar
 hs_err_pid*
 
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock
+**/ios/Flutter/ephemeral/
+
+thoughts/shared/plans/
 thoughts
 local/
 examples/web/
