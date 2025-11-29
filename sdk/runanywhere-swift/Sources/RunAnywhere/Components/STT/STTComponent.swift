@@ -5,18 +5,34 @@ import Foundation
 
 /// Options for speech-to-text transcription
 public struct STTOptions: Sendable {
+    /// Language code for transcription (e.g., "en", "es", "fr")
     public let language: String
+
+    /// Whether to auto-detect the spoken language
     public let detectLanguage: Bool
+
+    /// Enable automatic punctuation in transcription
     public let enablePunctuation: Bool
+
+    /// Enable speaker diarization (identify different speakers)
     public let enableDiarization: Bool
+
+    /// Maximum number of speakers to identify (requires enableDiarization)
     public let maxSpeakers: Int?
+
+    /// Enable word-level timestamps
     public let enableTimestamps: Bool
+
+    /// Custom vocabulary words to improve recognition
     public let vocabularyFilter: [String]
+
+    /// Audio format of input data
     public let audioFormat: AudioFormat
-    /// Preferred framework for transcription
-    /// When multiple STT providers are registered (e.g., WhisperKit, WhisperCPP),
-    /// this can be used to select a specific framework.
-    /// Currently reserved for future use when dynamic provider selection is implemented.
+
+    /// Sample rate of input audio (default: 16000 Hz for STT models)
+    public let sampleRate: Int
+
+    /// Preferred framework for transcription (WhisperKit, ONNX, etc.)
     public let preferredFramework: LLMFramework?
 
     public init(
@@ -28,6 +44,7 @@ public struct STTOptions: Sendable {
         enableTimestamps: Bool = true,
         vocabularyFilter: [String] = [],
         audioFormat: AudioFormat = .pcm,
+        sampleRate: Int = 16000,
         preferredFramework: LLMFramework? = nil
     ) {
         self.language = language
@@ -38,7 +55,13 @@ public struct STTOptions: Sendable {
         self.enableTimestamps = enableTimestamps
         self.vocabularyFilter = vocabularyFilter
         self.audioFormat = audioFormat
+        self.sampleRate = sampleRate
         self.preferredFramework = preferredFramework
+    }
+
+    /// Create options with default settings for a specific language
+    public static func `default`(language: String = "en") -> STTOptions {
+        STTOptions(language: language)
     }
 }
 
@@ -152,6 +175,42 @@ public enum STTServiceAudioFormat {
     case floatArray // Service prefers Float array samples
 }
 
+// MARK: - STT Mode
+
+/// Transcription mode for speech-to-text
+public enum STTMode: String, CaseIterable, Sendable {
+    /// Batch mode: Record all audio first, then transcribe everything at once
+    /// Best for: Short recordings, offline processing, higher accuracy
+    case batch = "batch"
+
+    /// Live/Streaming mode: Transcribe audio in real-time as it's recorded
+    /// Best for: Live captions, real-time feedback, long recordings
+    case live = "live"
+
+    public var displayName: String {
+        switch self {
+        case .batch: return "Batch"
+        case .live: return "Live"
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .batch:
+            return "Record audio, then transcribe all at once"
+        case .live:
+            return "Real-time transcription as you speak"
+        }
+    }
+
+    public var icon: String {
+        switch self {
+        case .batch: return "waveform.badge.mic"
+        case .live: return "waveform"
+        }
+    }
+}
+
 // MARK: - STT Service Protocol
 
 /// Protocol for speech-to-text services
@@ -159,10 +218,11 @@ public protocol STTService: AnyObject {
     /// Initialize the service with optional model path
     func initialize(modelPath: String?) async throws
 
-    /// Transcribe audio data
+    /// Transcribe audio data (batch mode)
     func transcribe(audioData: Data, options: STTOptions) async throws -> STTTranscriptionResult
 
-    /// Stream transcription for real-time processing
+    /// Stream transcription for real-time processing (live mode)
+    /// Falls back to batch mode if streaming is not supported
     func streamTranscribe<S: AsyncSequence>(
         audioStream: S,
         options: STTOptions,
@@ -174,6 +234,10 @@ public protocol STTService: AnyObject {
 
     /// Get current model identifier
     var currentModel: String? { get }
+
+    /// Whether this service supports live/streaming transcription
+    /// If false, streamTranscribe will fall back to batch mode
+    var supportsStreaming: Bool { get }
 
     /// Cleanup resources
     func cleanup() async
@@ -471,6 +535,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     private let sttConfiguration: STTConfiguration
     private var isModelLoaded = false
     private var modelPath: String?
+    private var providerName: String = "Unknown"  // Store the provider name for telemetry
 
     // MARK: - Initialization
 
@@ -523,6 +588,9 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         do {
             // Create service through provider
             let sttService = try await provider.createSTTService(configuration: sttConfiguration)
+
+            // Store provider name for telemetry
+            self.providerName = provider.name
 
             // Wrap the service
             let wrapper = STTServiceWrapper(sttService)
@@ -592,9 +660,39 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         return service?.wrappedService
     }
 
-    // MARK: - Public API
+    // MARK: - Capabilities
 
-    /// Transcribe audio data
+    /// Whether the underlying service supports live/streaming transcription
+    /// If false, `liveTranscribe` will internally fall back to batch processing
+    public var supportsStreaming: Bool {
+        sttService?.supportsStreaming ?? false
+    }
+
+    /// Get the recommended transcription mode based on service capabilities
+    public var recommendedMode: STTMode {
+        supportsStreaming ? .live : .batch
+    }
+
+    // MARK: - Batch Transcription API
+
+    /// Transcribe audio data in batch mode
+    /// - Parameters:
+    ///   - audioData: Raw audio data (Int16 PCM)
+    ///   - options: Transcription options (language, punctuation, etc.)
+    /// - Returns: Transcription output with text, confidence, and metadata
+    public func transcribe(_ audioData: Data, options: STTOptions = .default()) async throws -> STTOutput {
+        try ensureReady()
+
+        let input = STTInput(
+            audioData: audioData,
+            format: options.audioFormat,
+            language: options.language,
+            options: options
+        )
+        return try await process(input)
+    }
+
+    /// Transcribe audio data with simple parameters (convenience method)
     public func transcribe(_ audioData: Data, format: AudioFormat = .wav, language: String? = nil) async throws -> STTOutput {
         try ensureReady()
 
@@ -628,6 +726,22 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             vadOutput: vadOutput
         )
         return try await process(input)
+    }
+
+    // MARK: - Live/Streaming Transcription API
+
+    /// Live transcription with real-time partial results
+    /// - Parameters:
+    ///   - audioStream: Async sequence of audio data chunks
+    ///   - options: Transcription options
+    /// - Returns: Async stream of transcription text (partial and final results)
+    /// - Note: If the service doesn't support streaming, this will collect all audio
+    ///         and return a single result when the stream completes
+    public func liveTranscribe<S: AsyncSequence>(
+        _ audioStream: S,
+        options: STTOptions = .default()
+    ) -> AsyncThrowingStream<String, Error> where S.Element == Data {
+        return streamTranscribe(audioStream, language: options.language)
     }
 
     /// Process STT input
@@ -670,8 +784,11 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
         // Track processing time
         let startTime = Date()
-        let modelId = service.currentModel ?? "unknown"
+
+        // Calculate audio length for telemetry
         let audioLength = estimateAudioLength(dataSize: audioData.count, format: input.format, sampleRate: sttConfiguration.sampleRate)
+        let modelId = sttConfiguration.modelId ?? "unknown"
+        let frameworkName = self.providerName
 
         // Perform transcription with error telemetry
         let result: STTTranscriptionResult
@@ -685,7 +802,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
                 let eventData = STTTranscriptionTelemetryData(
                     modelId: modelId,
                     modelName: modelId,
-                    framework: "WhisperKit",
+                    framework: frameworkName,
                     device: deviceInfo.device,
                     osVersion: deviceInfo.osVersion,
                     platform: deviceInfo.platform,
@@ -741,32 +858,26 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             metadata: metadata
         )
 
-        // Submit telemetry for STT transcription completion (production mode)
-        let transcript = result.transcript
-        let confidence = result.confidence ?? 0.9
-        let language = result.language
+        // Submit success telemetry for batch transcription
+        let wordCount = result.transcript.split(separator: " ").count
+        let realTimeFactor = audioLength > 0 ? processingTime / audioLength : 0
         Task.detached(priority: .background) {
             let deviceInfo = TelemetryDeviceInfo.current
-            let processingTimeMs = processingTime * 1000
-            let audioDurationMs = audioLength * 1000
-            let realTimeFactor = audioLength > 0 ? processingTime / audioLength : 0
-            let wordCount = transcript.split(separator: " ").count
-
             let eventData = STTTranscriptionTelemetryData(
                 modelId: modelId,
                 modelName: modelId,
-                framework: "WhisperKit",
+                framework: frameworkName,
                 device: deviceInfo.device,
                 osVersion: deviceInfo.osVersion,
                 platform: deviceInfo.platform,
                 sdkVersion: SDKConstants.version,
-                processingTimeMs: processingTimeMs,
+                processingTimeMs: processingTime * 1000,
                 success: true,
-                audioDurationMs: audioDurationMs,
+                audioDurationMs: audioLength * 1000,
                 realTimeFactor: realTimeFactor,
                 wordCount: wordCount,
-                confidence: Double(confidence),
-                language: language,
+                confidence: result.confidence.map { Double($0) },
+                language: result.language,
                 isStreaming: false
             )
             let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
@@ -784,6 +895,10 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     ) -> AsyncThrowingStream<String, Error> where S.Element == Data {
         AsyncThrowingStream { continuation in
             Task {
+                let startTime = Date()
+                let modelId = self.sttConfiguration.modelId ?? "unknown"
+                let frameworkName = self.providerName
+
                 do {
                     try ensureReady()
 
@@ -811,8 +926,62 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
                     // Yield final result
                     continuation.yield(result.transcript)
+
+                    // Submit success telemetry for streaming transcription
+                    let processingTime = Date().timeIntervalSince(startTime)
+                    let wordCount = result.transcript.split(separator: " ").count
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = STTTranscriptionTelemetryData(
+                            modelId: modelId,
+                            modelName: modelId,
+                            framework: frameworkName,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: processingTime * 1000,
+                            success: true,
+                            audioDurationMs: nil,  // Unknown for streaming
+                            realTimeFactor: nil,
+                            wordCount: wordCount,
+                            confidence: result.confidence.map { Double($0) },
+                            language: result.language,
+                            isStreaming: true
+                        )
+                        let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
+                    }
+
                     continuation.finish()
                 } catch {
+                    // Submit failure telemetry for streaming transcription
+                    let processingTime = Date().timeIntervalSince(startTime)
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = STTTranscriptionTelemetryData(
+                            modelId: modelId,
+                            modelName: modelId,
+                            framework: frameworkName,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: processingTime * 1000,
+                            success: false,
+                            errorMessage: error.localizedDescription,
+                            audioDurationMs: nil,
+                            realTimeFactor: nil,
+                            wordCount: nil,
+                            confidence: nil,
+                            language: nil,
+                            isStreaming: true
+                        )
+                        let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
+                    }
                     continuation.finish(throwing: error)
                 }
             }

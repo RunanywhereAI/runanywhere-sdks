@@ -99,26 +99,15 @@ public actor AnalyticsQueueManager {
             let mirror = Mirror(reflecting: event.eventData)
             for child in mirror.children {
                 if let label = child.label {
-                    // Convert value to string representation
-                    let value: String
-                    if let stringValue = child.value as? String {
-                        value = stringValue
-                    } else if let intValue = child.value as? Int {
-                        value = String(intValue)
-                    } else if let doubleValue = child.value as? Double {
-                        value = String(format: "%.3f", doubleValue)
-                    } else if let floatValue = child.value as? Float {
-                        value = String(format: "%.3f", floatValue)
-                    } else if let boolValue = child.value as? Bool {
-                        value = String(boolValue)
-                    } else if let int64Value = child.value as? Int64 {
-                        value = String(int64Value)
-                    } else {
-                        value = String(describing: child.value)
+                    // Convert value to string representation, handling Optionals properly
+                    let value: String? = Self.extractValue(from: child.value)
+
+                    // Only add non-nil values to properties
+                    if let value = value {
+                        // Convert camelCase to snake_case for backend
+                        let snakeKey = label.camelCaseToSnakeCase()
+                        properties[snakeKey] = value
                     }
-                    // Convert camelCase to snake_case for backend
-                    let snakeKey = label.camelCaseToSnakeCase()
-                    properties[snakeKey] = value
                 }
             }
 
@@ -156,7 +145,7 @@ public actor AnalyticsQueueManager {
 
             } catch {
                 attempt += 1
-                logger.error("Failed to process batch (attempt \(attempt)/\(maxRetries)): \(error)")
+                logger.warning("Failed to process batch (attempt \(attempt)/\(maxRetries)): \(error)")
                 if attempt < maxRetries {
                     // Exponential backoff
                     let delay = pow(2.0, Double(attempt))
@@ -166,6 +155,48 @@ public actor AnalyticsQueueManager {
                     eventQueue.removeFirst(min(batch.count, eventQueue.count))
                 }
             }
+        }
+    }
+}
+
+// MARK: - Value Extraction Helper
+
+extension AnalyticsQueueManager {
+    /// Extract value from Any, properly unwrapping Optionals
+    static func extractValue(from value: Any) -> String? {
+        // Use Mirror to check if it's an Optional
+        let mirror = Mirror(reflecting: value)
+        if mirror.displayStyle == .optional {
+            // It's an Optional - check if it has a value
+            if let child = mirror.children.first {
+                // Recursively extract the wrapped value
+                return extractValue(from: child.value)
+            } else {
+                // Optional is nil
+                return nil
+            }
+        }
+
+        // Not an Optional, convert directly
+        if let stringValue = value as? String {
+            return stringValue
+        } else if let intValue = value as? Int {
+            return String(intValue)
+        } else if let doubleValue = value as? Double {
+            return String(format: "%.3f", doubleValue)
+        } else if let floatValue = value as? Float {
+            return String(format: "%.3f", floatValue)
+        } else if let boolValue = value as? Bool {
+            return String(boolValue)
+        } else if let int64Value = value as? Int64 {
+            return String(int64Value)
+        } else {
+            // Fallback - avoid "Optional(...)" strings
+            let description = String(describing: value)
+            if description == "nil" || description.hasPrefix("Optional(") {
+                return nil
+            }
+            return description
         }
     }
 }
