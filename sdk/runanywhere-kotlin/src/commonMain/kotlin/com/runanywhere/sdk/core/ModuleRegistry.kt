@@ -2,10 +2,12 @@ package com.runanywhere.sdk.core
 
 import com.runanywhere.sdk.components.base.SDKComponent
 import com.runanywhere.sdk.components.llm.LLMServiceProvider
+import com.runanywhere.sdk.components.llm.ModelCompatibilityResult
 import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTService
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
+import com.runanywhere.sdk.data.models.HardwareConfiguration
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.models.enums.LLMFramework
 
@@ -357,12 +359,51 @@ interface TTSServiceProvider {
 
 /**
  * Provider for Vision Language Model services
+ * Enhanced to match LLMServiceProvider capabilities
+ *
+ * Note: Providers should NOT hardcode model lists. Model discovery should happen
+ * through ModelRegistry or provider-specific logic.
  */
 interface VLMServiceProvider {
-    suspend fun analyze(image: ByteArray, prompt: String?): com.runanywhere.sdk.components.VLMOutput
-    suspend fun generateFromImage(image: ByteArray, prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): String
-    fun canHandle(modelId: String): Boolean = true
+    /** Create a VLM service for the given configuration */
+    suspend fun createVLMService(configuration: com.runanywhere.sdk.components.VLMConfiguration): com.runanywhere.sdk.components.VLMService
+
+    /** Check if this provider can handle the given model */
+    fun canHandle(modelId: String?): Boolean
+
+    /** Provider name for identification */
     val name: String
+
+    /** Framework this provider supports */
+    val framework: LLMFramework
+
+    /** Check model compatibility with detailed validation */
+    fun validateModelCompatibility(modelPath: String, projectorPath: String?): ModelCompatibilityResult
+
+    /** Download model with progress tracking (both LLM and vision projector) */
+    suspend fun downloadModel(
+        modelId: String,
+        onProgress: (Float) -> Unit = {}
+    ): com.runanywhere.sdk.data.models.ModelInfo
+
+    /** Estimate memory requirements for model (LLM + projector) */
+    fun estimateMemoryRequirements(modelPath: String, projectorPath: String?): Long
+
+    /** Get optimal hardware configuration for model */
+    fun getOptimalConfiguration(modelPath: String): HardwareConfiguration
+
+    /** Create ModelInfo from model ID */
+    fun createModelInfo(modelId: String): com.runanywhere.sdk.data.models.ModelInfo
+
+    /** Legacy analyze method for backward compatibility */
+    suspend fun analyze(image: ByteArray, prompt: String?): com.runanywhere.sdk.components.VLMOutput {
+        throw UnsupportedOperationException("Use createVLMService instead")
+    }
+
+    /** Legacy generateFromImage method for backward compatibility */
+    suspend fun generateFromImage(image: ByteArray, prompt: String, options: com.runanywhere.sdk.generation.GenerationOptions): String {
+        throw UnsupportedOperationException("Use createVLMService instead")
+    }
 }
 
 /**
