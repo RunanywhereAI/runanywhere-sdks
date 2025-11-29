@@ -121,15 +121,25 @@ let package = Package(
         ),
 
         // =================================================================
+        // C Bridge Module - Exposes unified xcframework C APIs to Swift
+        // =================================================================
+        .target(
+            name: "CRunAnywhereCore",
+            dependencies: ["RunAnywhereCoreBinary"],
+            path: "Sources/CRunAnywhereCore",
+            publicHeadersPath: "include"
+        ),
+
+        // =================================================================
         // ONNX Runtime Backend
         // Provides: STT (streaming), TTS, VAD, Speaker Diarization
-        // The xcframework exposes module "RunAnywhereONNX" with C headers
         // =================================================================
         .target(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "RunAnywhereONNXBinary",
+                "CRunAnywhereCore",
+                "RunAnywhereCoreBinary",
             ],
             path: "Sources/ONNXRuntime",
             linkerSettings: [
@@ -141,25 +151,16 @@ let package = Package(
             ]
         ),
 
-        // ONNX Runtime Binary (local path for development with namespaced headers)
-        // Includes: ONNX Runtime + Sherpa-ONNX + Bridge layer
-        // Build with: cd runanywhere-core && ./scripts/build-ios-backend.sh onnx
-        // Copy to: sdks/sdk/runanywhere-swift/Binaries/
-        .binaryTarget(
-            name: "RunAnywhereONNXBinary",
-            path: "Binaries/RunAnywhereONNX.xcframework"
-        ),
-
         // =================================================================
         // LlamaCPP Runtime Backend
         // Provides: Text Generation (LLM) with GGUF models
-        // The xcframework exposes module "RunAnywhereLlamaCPP" with C headers
         // =================================================================
         .target(
             name: "LlamaCPPRuntime",
             dependencies: [
                 "RunAnywhere",
-                "RunAnywhereLlamaCPPBinary",
+                "CRunAnywhereCore",
+                "RunAnywhereCoreBinary",
             ],
             path: "Sources/LlamaCPPRuntime",
             linkerSettings: [
@@ -171,13 +172,11 @@ let package = Package(
             ]
         ),
 
-        // LlamaCPP Binary (local path for development, switch to URL for release)
-        // Includes: llama.cpp + ggml + Bridge layer
-        // Build with: cd runanywhere-core && ./scripts/build-ios-backend.sh llamacpp
-        // Copy to: sdks/sdk/runanywhere-swift/Binaries/
+        // Unified Binary xcframework (ONNX + LlamaCPP)
+        // Build with: cd runanywhere-core && ./scripts/build-ios-core.sh
         .binaryTarget(
-            name: "RunAnywhereLlamaCPPBinary",
-            path: "Binaries/RunAnywhereLlamaCPP.xcframework"
+            name: "RunAnywhereCoreBinary",
+            path: "Binaries/RunAnywhereCore.xcframework"
         ),
 
         // =================================================================
