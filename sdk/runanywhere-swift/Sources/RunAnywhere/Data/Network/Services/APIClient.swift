@@ -32,8 +32,6 @@ public actor APIClient: NetworkService {
             delegate: URLSessionProxyDelegate(),
             delegateQueue: nil
         )
-
-        logger.info("APIClient initialized with baseURL: \(baseURL.absoluteString)")
     }
 
     // MARK: - Public Methods
@@ -74,8 +72,6 @@ public actor APIClient: NetworkService {
             // No authorization header needed for authentication endpoint
         }
 
-        logger.debug("POST request to: \(endpoint.path)")
-
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -99,12 +95,6 @@ public actor APIClient: NetworkService {
                 }
             }
 
-            logger.error("API error: \(httpResponse.statusCode)", metadata: [
-                "url": url.absoluteString,
-                "method": "POST",
-                "statusCode": httpResponse.statusCode,
-                "endpoint": endpoint.path
-            ])
             throw RepositoryError.syncFailure(errorMessage)
         }
 
@@ -135,8 +125,6 @@ public actor APIClient: NetworkService {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
 
-        logger.debug("GET request to: \(endpoint.path)")
-
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -155,12 +143,6 @@ public actor APIClient: NetworkService {
                 }
             }
 
-            logger.error("API error: \(httpResponse.statusCode)", metadata: [
-                "url": url.absoluteString,
-                "method": "GET",
-                "statusCode": httpResponse.statusCode,
-                "endpoint": endpoint.path
-            ])
             throw RepositoryError.syncFailure(errorMessage)
         }
 

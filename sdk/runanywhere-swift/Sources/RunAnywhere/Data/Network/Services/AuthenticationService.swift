@@ -273,6 +273,9 @@ public actor AuthenticationService {
         // Get chip info based on device model
         let (chipName, performanceCores, efficiencyCores, neuralEngineCores) = getChipInfo(for: deviceModel)
 
+        // Get persistent device UUID for deduplication
+        let deviceUUID = PersistentDeviceIdentity.getPersistentDeviceUUID()
+
         return DeviceRegistrationInfo(
             architecture: architecture,
             availableMemory: Int64(processInfo.physicalMemory / 2), // Available memory estimate
@@ -282,6 +285,7 @@ public actor AuthenticationService {
             coreCount: coreCount,
             deviceModel: deviceModel,
             deviceName: deviceName,
+            deviceUUID: deviceUUID,
             efficiencyCores: efficiencyCores,
             formFactor: formFactor,
             gpuFamily: "apple",

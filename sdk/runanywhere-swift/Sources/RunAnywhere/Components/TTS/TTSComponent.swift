@@ -598,8 +598,39 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
         // Track processing time
         let startTime = Date()
 
-        // Perform synthesis
-        let audioData = try await ttsService.synthesize(text: textToSynthesize, options: options)
+        // Perform synthesis with error telemetry
+        let audioData: Data
+        do {
+            audioData = try await ttsService.synthesize(text: textToSynthesize, options: options)
+        } catch {
+            // Submit failure telemetry
+            let processingTime = Date().timeIntervalSince(startTime)
+            Task.detached(priority: .background) {
+                let deviceInfo = TelemetryDeviceInfo.current
+                let eventData = TTSSynthesisTelemetryData(
+                    modelId: self.ttsConfiguration.voice,
+                    modelName: self.ttsConfiguration.voice,
+                    framework: "ONNX",
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: processingTime * 1000,
+                    success: false,
+                    errorMessage: error.localizedDescription,
+                    characterCount: textToSynthesize.count,
+                    charactersPerSecond: nil,
+                    audioSizeBytes: nil,
+                    sampleRate: options.sampleRate,
+                    voice: options.voice,
+                    outputDurationMs: nil
+                )
+                let event = TTSEvent(type: .synthesisCompleted, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+                await AnalyticsQueueManager.shared.flush()
+            }
+            throw error
+        }
 
         let processingTime = Date().timeIntervalSince(startTime)
 
@@ -613,13 +644,43 @@ public final class TTSComponent: BaseComponent<TTSServiceWrapper>, @unchecked Se
             characterCount: textToSynthesize.count
         )
 
-        return TTSOutput(
+        let output = TTSOutput(
             audioData: audioData,
             format: ttsConfiguration.audioFormat,
             duration: duration,
             phonemeTimestamps: nil, // Would be extracted from service if available
             metadata: metadata
         )
+
+        // Submit telemetry for TTS synthesis completion (production mode)
+        Task.detached(priority: .background) {
+            let deviceInfo = TelemetryDeviceInfo.current
+            let processingTimeMs = processingTime * 1000
+            let charactersPerSecond = processingTime > 0 ? Double(textToSynthesize.count) / processingTime : 0
+
+            let eventData = TTSSynthesisTelemetryData(
+                modelId: self.ttsConfiguration.voice,
+                modelName: self.ttsConfiguration.voice,
+                framework: "ONNX",
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion,
+                platform: deviceInfo.platform,
+                sdkVersion: SDKConstants.version,
+                processingTimeMs: processingTimeMs,
+                success: true,
+                characterCount: textToSynthesize.count,
+                charactersPerSecond: charactersPerSecond,
+                audioSizeBytes: audioData.count,
+                sampleRate: options.sampleRate,
+                voice: options.voice,
+                outputDurationMs: duration * 1000
+            )
+            let event = TTSEvent(type: .synthesisCompleted, eventData: eventData)
+            await AnalyticsQueueManager.shared.enqueue(event)
+            await AnalyticsQueueManager.shared.flush()
+        }
+
+        return output
     }
 
     /// Stream synthesis for long text

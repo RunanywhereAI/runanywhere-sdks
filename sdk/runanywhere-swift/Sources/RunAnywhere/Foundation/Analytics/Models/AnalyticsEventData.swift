@@ -204,28 +204,108 @@ public struct GenerationStartData: AnalyticsEventData {
 
 }
 
-/// Generation completion event data
+/// Generation completion event data with full telemetry fields
 public struct GenerationCompletionData: AnalyticsEventData {
-    public let generationId: String
+    // Model info
     public let modelId: String
-    public let executionTarget: String
-    public let inputTokens: Int
-    public let outputTokens: Int
-    public let totalTimeMs: Double
-    public let timeToFirstTokenMs: Double
-    public let tokensPerSecond: Double
+    public let modelName: String?
+    public let framework: String?
 
+    // Device info
+    public let device: String?
+    public let osVersion: String?
+    public let platform: String?
+    public let sdkVersion: String?
+
+    // Common performance metrics
+    public let processingTimeMs: Double?
+    public let success: Bool
+    public let errorMessage: String?
+    public let errorCode: String?
+
+    // LLM-specific fields
+    public let inputTokens: Int?
+    public let outputTokens: Int?
+    public let totalTokens: Int?
+    public let tokensPerSecond: Double?
+    public let timeToFirstTokenMs: Double?
+    public let promptEvalTimeMs: Double?
+    public let generationTimeMs: Double?
+    public let contextLength: Int?
+    public let temperature: Double?
+    public let maxTokens: Int?
+
+    /// Legacy initializer for backward compatibility
     public init(generationId: String, modelId: String, executionTarget: String, inputTokens: Int, outputTokens: Int, totalTimeMs: Double, timeToFirstTokenMs: Double, tokensPerSecond: Double) {
-        self.generationId = generationId
         self.modelId = modelId
-        self.executionTarget = executionTarget
+        self.modelName = nil
+        self.framework = nil
+        self.device = nil
+        self.osVersion = nil
+        self.platform = nil
+        self.sdkVersion = nil
+        self.processingTimeMs = totalTimeMs
+        self.success = true
+        self.errorMessage = nil
+        self.errorCode = nil
         self.inputTokens = inputTokens
         self.outputTokens = outputTokens
-        self.totalTimeMs = totalTimeMs
-        self.timeToFirstTokenMs = timeToFirstTokenMs
+        self.totalTokens = inputTokens + outputTokens
         self.tokensPerSecond = tokensPerSecond
+        self.timeToFirstTokenMs = timeToFirstTokenMs
+        self.promptEvalTimeMs = nil
+        self.generationTimeMs = totalTimeMs
+        self.contextLength = nil
+        self.temperature = nil
+        self.maxTokens = nil
     }
 
+    /// Full initializer with all telemetry fields
+    public init(
+        modelId: String,
+        modelName: String?,
+        framework: String?,
+        device: String?,
+        osVersion: String?,
+        platform: String?,
+        sdkVersion: String?,
+        processingTimeMs: Double?,
+        success: Bool,
+        errorMessage: String? = nil,
+        errorCode: String? = nil,
+        inputTokens: Int?,
+        outputTokens: Int?,
+        totalTokens: Int?,
+        tokensPerSecond: Double?,
+        timeToFirstTokenMs: Double?,
+        promptEvalTimeMs: Double? = nil,
+        generationTimeMs: Double?,
+        contextLength: Int? = nil,
+        temperature: Double? = nil,
+        maxTokens: Int? = nil
+    ) {
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.device = device
+        self.osVersion = osVersion
+        self.platform = platform
+        self.sdkVersion = sdkVersion
+        self.processingTimeMs = processingTimeMs
+        self.success = success
+        self.errorMessage = errorMessage
+        self.errorCode = errorCode
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = totalTokens
+        self.tokensPerSecond = tokensPerSecond
+        self.timeToFirstTokenMs = timeToFirstTokenMs
+        self.promptEvalTimeMs = promptEvalTimeMs
+        self.generationTimeMs = generationTimeMs
+        self.contextLength = contextLength
+        self.temperature = temperature
+        self.maxTokens = maxTokens
+    }
 }
 
 /// Streaming update event data
@@ -251,17 +331,67 @@ public struct FirstTokenData: AnalyticsEventData {
     }
 }
 
-/// Model loading event data
+/// Model loading event data with full telemetry fields
 public struct ModelLoadingData: AnalyticsEventData {
+    // Model info
     public let modelId: String
-    public let loadTimeMs: Double
+    public let modelName: String?
+    public let framework: String?
+
+    // Device info
+    public let device: String?
+    public let osVersion: String?
+    public let platform: String?
+    public let sdkVersion: String?
+
+    // Performance metrics
+    public let processingTimeMs: Double?
     public let success: Bool
+    public let errorMessage: String?
     public let errorCode: String?
 
-    public init(modelId: String, loadTimeMs: Double, success: Bool, errorCode: String? = nil) {
+    public init(
+        modelId: String,
+        loadTimeMs: Double,
+        success: Bool,
+        errorCode: String? = nil
+    ) {
         self.modelId = modelId
-        self.loadTimeMs = loadTimeMs
+        self.modelName = nil
+        self.framework = nil
+        self.device = nil
+        self.osVersion = nil
+        self.platform = nil
+        self.sdkVersion = nil
+        self.processingTimeMs = loadTimeMs
         self.success = success
+        self.errorMessage = nil
+        self.errorCode = errorCode
+    }
+
+    public init(
+        modelId: String,
+        modelName: String?,
+        framework: String?,
+        device: String?,
+        osVersion: String?,
+        platform: String?,
+        sdkVersion: String?,
+        processingTimeMs: Double?,
+        success: Bool,
+        errorMessage: String? = nil,
+        errorCode: String? = nil
+    ) {
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.device = device
+        self.osVersion = osVersion
+        self.platform = platform
+        self.sdkVersion = sdkVersion
+        self.processingTimeMs = processingTimeMs
+        self.success = success
+        self.errorMessage = errorMessage
         self.errorCode = errorCode
     }
 }
@@ -274,6 +404,145 @@ public struct ModelUnloadingData: AnalyticsEventData {
     public init(modelId: String) {
         self.modelId = modelId
         self.timestamp = Date().timeIntervalSince1970
+    }
+}
+
+// MARK: - TTS Operation Event Data
+
+/// TTS synthesis completion event data with full telemetry fields for backend
+public struct TTSSynthesisTelemetryData: AnalyticsEventData {
+    // Model info
+    public let modelId: String
+    public let modelName: String?
+    public let framework: String?
+
+    // Device info
+    public let device: String?
+    public let osVersion: String?
+    public let platform: String?
+    public let sdkVersion: String?
+
+    // Common performance metrics
+    public let processingTimeMs: Double?
+    public let success: Bool
+    public let errorMessage: String?
+    public let errorCode: String?
+
+    // TTS-specific fields
+    public let characterCount: Int?
+    public let charactersPerSecond: Double?
+    public let audioSizeBytes: Int?
+    public let sampleRate: Int?
+    public let voice: String?
+    public let outputDurationMs: Double?
+
+    public init(
+        modelId: String,
+        modelName: String?,
+        framework: String?,
+        device: String?,
+        osVersion: String?,
+        platform: String?,
+        sdkVersion: String?,
+        processingTimeMs: Double?,
+        success: Bool,
+        errorMessage: String? = nil,
+        errorCode: String? = nil,
+        characterCount: Int?,
+        charactersPerSecond: Double?,
+        audioSizeBytes: Int?,
+        sampleRate: Int?,
+        voice: String?,
+        outputDurationMs: Double?
+    ) {
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.device = device
+        self.osVersion = osVersion
+        self.platform = platform
+        self.sdkVersion = sdkVersion
+        self.processingTimeMs = processingTimeMs
+        self.success = success
+        self.errorMessage = errorMessage
+        self.errorCode = errorCode
+        self.characterCount = characterCount
+        self.charactersPerSecond = charactersPerSecond
+        self.audioSizeBytes = audioSizeBytes
+        self.sampleRate = sampleRate
+        self.voice = voice
+        self.outputDurationMs = outputDurationMs
+    }
+}
+
+// MARK: - STT Operation Event Data
+
+/// STT transcription completion event data with full telemetry fields for backend
+public struct STTTranscriptionTelemetryData: AnalyticsEventData {
+    // Model info
+    public let modelId: String
+    public let modelName: String?
+    public let framework: String?
+
+    // Device info
+    public let device: String?
+    public let osVersion: String?
+    public let platform: String?
+    public let sdkVersion: String?
+
+    // Common performance metrics
+    public let processingTimeMs: Double?
+    public let success: Bool
+    public let errorMessage: String?
+    public let errorCode: String?
+
+    // STT-specific fields
+    public let audioDurationMs: Double?
+    public let realTimeFactor: Double?
+    public let wordCount: Int?
+    public let confidence: Double?
+    public let language: String?
+    public let isStreaming: Bool?
+    public let segmentIndex: Int?
+
+    public init(
+        modelId: String,
+        modelName: String?,
+        framework: String?,
+        device: String?,
+        osVersion: String?,
+        platform: String?,
+        sdkVersion: String?,
+        processingTimeMs: Double?,
+        success: Bool,
+        errorMessage: String? = nil,
+        errorCode: String? = nil,
+        audioDurationMs: Double?,
+        realTimeFactor: Double?,
+        wordCount: Int?,
+        confidence: Double?,
+        language: String?,
+        isStreaming: Bool? = false,
+        segmentIndex: Int? = nil
+    ) {
+        self.modelId = modelId
+        self.modelName = modelName
+        self.framework = framework
+        self.device = device
+        self.osVersion = osVersion
+        self.platform = platform
+        self.sdkVersion = sdkVersion
+        self.processingTimeMs = processingTimeMs
+        self.success = success
+        self.errorMessage = errorMessage
+        self.errorCode = errorCode
+        self.audioDurationMs = audioDurationMs
+        self.realTimeFactor = realTimeFactor
+        self.wordCount = wordCount
+        self.confidence = confidence
+        self.language = language
+        self.isStreaming = isStreaming
+        self.segmentIndex = segmentIndex
     }
 }
 

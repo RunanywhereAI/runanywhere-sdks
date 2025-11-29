@@ -260,6 +260,19 @@ public class ServiceContainer {
         }
     }
 
+    /// TTS Analytics Service - using unified pattern
+    private var _ttsAnalytics: TTSAnalyticsService?
+    public var ttsAnalytics: TTSAnalyticsService {
+        get async {
+            if let service = _ttsAnalytics {
+                return service
+            }
+            let service = TTSAnalyticsService(queueManager: analyticsQueueManager)
+            _ttsAnalytics = service
+            return service
+        }
+    }
+
     // MARK: - Public Service Access
 
     /// Get memory service
@@ -380,7 +393,9 @@ public class ServiceContainer {
                 apiClient: client
             )
             await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics initialized")
+            logger.info("Analytics initialized with remote data source")
+        } else {
+            logger.warning("Analytics not initialized - API client is nil")
         }
 
         // Return the loaded configuration or create a default one
@@ -552,10 +567,12 @@ public class ServiceContainer {
                 apiClient: client
             )
             await analyticsQueueManager.initialize(telemetryRepository: telemetryRepo)
-            logger.info("Analytics initialized")
+            logger.info("Analytics initialized with remote data source")
+        } else {
+            logger.warning("Analytics not initialized - API client is nil")
         }
 
-        logger.info("✅ Network services initialization completed")
+        logger.info("Network services initialization completed")
     }
 
     /// Reset service container state (for testing)
@@ -572,5 +589,6 @@ public class ServiceContainer {
         _generationAnalytics = nil
         _sttAnalytics = nil
         _voiceAnalytics = nil
+        _ttsAnalytics = nil
     }
 }
