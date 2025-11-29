@@ -1,17 +1,17 @@
-package com.runanywhere.sdk.core.bridge
-
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+package com.runanywhere.sdk.native.bridge
 
 /**
- * ONNXCoreService - High-level service wrapper for RunAnywhere Core ONNX backend.
+ * NativeCoreService - Interface for all RunAnywhere Core native backends.
  *
- * This is the Kotlin equivalent of ONNXAdapter/ONNXSTTService/ONNXTTSService in the Swift SDK.
- * It provides a clean, coroutine-based API on top of the low-level JNI bindings.
+ * This is the generic interface that ALL native backends (ONNX, TFLite, CoreML, etc.)
+ * must implement. It provides a unified API for ML capabilities across different runtimes.
+ *
+ * This is the Kotlin equivalent of UnifiedFrameworkAdapter in the Swift SDK.
  *
  * Usage:
  * ```kotlin
- * val service = ONNXCoreService()
+ * // Create backend-specific implementation
+ * val service: NativeCoreService = ONNXCoreService()  // or TFLiteCoreService, etc.
  * service.initialize()
  *
  * // Load STT model
@@ -24,13 +24,14 @@ import kotlinx.coroutines.withContext
  * service.destroy()
  * ```
  */
-expect class ONNXCoreService() {
+interface NativeCoreService {
+
     /**
-     * Initialize the ONNX backend.
+     * Initialize the native backend.
      * Must be called before any other operations.
      *
      * @param configJson Optional JSON configuration
-     * @throws RunAnywhereException if initialization fails
+     * @throws NativeBridgeException if initialization fails
      */
     suspend fun initialize(configJson: String? = null)
 
@@ -42,17 +43,17 @@ expect class ONNXCoreService() {
     /**
      * Get supported capabilities.
      */
-    val supportedCapabilities: List<Capability>
+    val supportedCapabilities: List<NativeCapability>
 
     /**
      * Check if a specific capability is supported.
      */
-    fun supportsCapability(capability: Capability): Boolean
+    fun supportsCapability(capability: NativeCapability): Boolean
 
     /**
      * Get device type being used.
      */
-    val deviceType: DeviceType
+    val deviceType: NativeDeviceType
 
     /**
      * Get current memory usage in bytes.
@@ -69,7 +70,7 @@ expect class ONNXCoreService() {
      * @param modelPath Path to the model directory
      * @param modelType Model type (e.g., "whisper", "zipformer", "paraformer")
      * @param configJson Optional JSON configuration
-     * @throws RunAnywhereException if loading fails
+     * @throws NativeBridgeException if loading fails
      */
     suspend fun loadSTTModel(modelPath: String, modelType: String, configJson: String? = null)
 
@@ -90,7 +91,7 @@ expect class ONNXCoreService() {
      * @param sampleRate Sample rate (e.g., 16000)
      * @param language ISO 639-1 language code or null for auto-detect
      * @return Transcription result as JSON string
-     * @throws RunAnywhereException if transcription fails
+     * @throws NativeBridgeException if transcription fails
      */
     suspend fun transcribe(
         audioSamples: FloatArray,
@@ -113,7 +114,7 @@ expect class ONNXCoreService() {
      * @param modelPath Path to the model directory
      * @param modelType Model type (e.g., "piper", "vits")
      * @param configJson Optional JSON configuration
-     * @throws RunAnywhereException if loading fails
+     * @throws NativeBridgeException if loading fails
      */
     suspend fun loadTTSModel(modelPath: String, modelType: String, configJson: String? = null)
 
@@ -134,15 +135,15 @@ expect class ONNXCoreService() {
      * @param voiceId Voice identifier or null for default
      * @param speedRate Speed rate (1.0 = normal)
      * @param pitchShift Pitch shift in semitones
-     * @return TTSSynthesisResult with audio samples and sample rate
-     * @throws RunAnywhereException if synthesis fails
+     * @return NativeTTSSynthesisResult with audio samples and sample rate
+     * @throws NativeBridgeException if synthesis fails
      */
     suspend fun synthesize(
         text: String,
         voiceId: String? = null,
         speedRate: Float = 1.0f,
         pitchShift: Float = 0.0f
-    ): TTSSynthesisResult
+    ): NativeTTSSynthesisResult
 
     /**
      * Get available TTS voices as JSON array.
@@ -176,9 +177,9 @@ expect class ONNXCoreService() {
      *
      * @param audioSamples Float32 audio samples
      * @param sampleRate Sample rate
-     * @return VADResult with speech status and probability
+     * @return NativeVADResult with speech status and probability
      */
-    suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): VADResult
+    suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): NativeVADResult
 
     /**
      * Detect speech segments in audio.

@@ -31,7 +31,8 @@ android {
         // }
 
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // Only arm64-v8a for now (RunAnywhere Core ONNX is built for arm64-v8a)
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -189,6 +190,7 @@ dependencies {
     // ========================================
     implementation(project(":sdk:runanywhere-kotlin"))
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))
 
     // ========================================
     // AndroidX Core & Lifecycle

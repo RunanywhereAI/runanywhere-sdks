@@ -1,10 +1,12 @@
-package com.runanywhere.sdk.core.bridge
+package com.runanywhere.sdk.native.bridge
 
 /**
- * Capability types supported by RunAnywhere Core backends.
+ * Capability types supported by RunAnywhere Core native backends.
  * Maps directly to ra_capability_type in runanywhere_bridge.h
+ *
+ * This is a generic definition used by all native backends (ONNX, TFLite, CoreML, etc.)
  */
-enum class Capability(val value: Int) {
+enum class NativeCapability(val value: Int) {
     TEXT_GENERATION(0),
     EMBEDDINGS(1),
     STT(2),
@@ -13,15 +15,15 @@ enum class Capability(val value: Int) {
     DIARIZATION(5);
 
     companion object {
-        fun fromValue(value: Int): Capability? = entries.find { it.value == value }
+        fun fromValue(value: Int): NativeCapability? = entries.find { it.value == value }
     }
 }
 
 /**
- * Device types used by backends.
+ * Device types used by native backends.
  * Maps directly to ra_device_type in types.h
  */
-enum class DeviceType(val value: Int) {
+enum class NativeDeviceType(val value: Int) {
     CPU(0),
     GPU(1),
     NEURAL_ENGINE(2),
@@ -33,7 +35,7 @@ enum class DeviceType(val value: Int) {
     ONNX(8);
 
     companion object {
-        fun fromValue(value: Int): DeviceType = entries.find { it.value == value } ?: CPU
+        fun fromValue(value: Int): NativeDeviceType = entries.find { it.value == value } ?: CPU
     }
 }
 
@@ -41,7 +43,7 @@ enum class DeviceType(val value: Int) {
  * Result codes from C API operations.
  * Maps directly to ra_result_code in types.h
  */
-enum class ResultCode(val value: Int) {
+enum class NativeResultCode(val value: Int) {
     SUCCESS(0),
     ERROR_INIT_FAILED(-1),
     ERROR_MODEL_LOAD_FAILED(-2),
@@ -58,6 +60,6 @@ enum class ResultCode(val value: Int) {
     val isSuccess: Boolean get() = this == SUCCESS
 
     companion object {
-        fun fromValue(value: Int): ResultCode = entries.find { it.value == value } ?: ERROR_UNKNOWN
+        fun fromValue(value: Int): NativeResultCode = entries.find { it.value == value } ?: ERROR_UNKNOWN
     }
 }
