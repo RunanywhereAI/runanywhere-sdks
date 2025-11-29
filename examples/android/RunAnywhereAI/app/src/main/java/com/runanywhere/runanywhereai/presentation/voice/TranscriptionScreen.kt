@@ -23,10 +23,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 fun TranscriptionScreen(
     viewModel: TranscriptionViewModel = viewModel()
 ) {
-    val isRecording by viewModel.isRecording.collectAsState()
+    val isTranscribing by viewModel.isTranscribing.collectAsState()
     val transcriptionText by viewModel.transcriptionText.collectAsState()
     val partialTranscript by viewModel.partialTranscript.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val isInitialized by viewModel.isInitialized.collectAsState()
 
     Column(
@@ -55,7 +55,7 @@ fun TranscriptionScreen(
 
                 Text(
                     text = if (isInitialized) {
-                        if (isRecording) "Listening..." else "Ready"
+                        if (isTranscribing) "Listening..." else "Ready"
                     } else {
                         "Initializing SDK..."
                     },
@@ -73,13 +73,13 @@ fun TranscriptionScreen(
             // Record/Stop Button
             FloatingActionButton(
                 onClick = {
-                    if (isRecording) {
-                        viewModel.stopRecording()
+                    if (isTranscribing) {
+                        viewModel.stopTranscription()
                     } else {
-                        viewModel.startRecording()
+                        viewModel.startTranscription()
                     }
                 },
-                containerColor = if (isRecording) {
+                containerColor = if (isTranscribing) {
                     MaterialTheme.colorScheme.error
                 } else {
                     MaterialTheme.colorScheme.primary
@@ -87,8 +87,8 @@ fun TranscriptionScreen(
                 modifier = Modifier.size(64.dp)
             ) {
                 Icon(
-                    imageVector = if (isRecording) Icons.Default.MicOff else Icons.Default.Mic,
-                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
+                    imageVector = if (isTranscribing) Icons.Default.MicOff else Icons.Default.Mic,
+                    contentDescription = if (isTranscribing) "Stop Recording" else "Start Recording",
                     modifier = Modifier.size(32.dp),
                     tint = Color.White
                 )
@@ -96,7 +96,7 @@ fun TranscriptionScreen(
 
             // Clear Button
             FloatingActionButton(
-                onClick = { viewModel.clearTranscription() },
+                onClick = { viewModel.clearTranscripts() },
                 containerColor = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(64.dp)
             ) {
@@ -179,7 +179,7 @@ fun TranscriptionScreen(
         }
 
         // Error Display
-        error?.let { errorMessage ->
+        errorMessage?.let { error ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -192,7 +192,7 @@ fun TranscriptionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = errorMessage,
+                        text = error,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onErrorContainer,
                         modifier = Modifier.weight(1f)
