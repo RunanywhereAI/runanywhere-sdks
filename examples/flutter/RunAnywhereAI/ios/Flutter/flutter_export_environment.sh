@@ -1,7 +1,7 @@
 #!/bin/sh
 # This is a generated file; do not edit or check into version control.
-export "FLUTTER_ROOT=/Users/programming.com/flutter"
-export "FLUTTER_APPLICATION_PATH=/Users/programming.com/Downloads/runanywhere-sdks-main/examples/flutter/RunAnywhereAI"
+export "FLUTTER_ROOT=/Users/sanchitmonga/flutter"
+export "FLUTTER_APPLICATION_PATH=/Users/sanchitmonga/development/ODLM/runanywhere-all/sdks/examples/flutter/RunAnywhereAI"
 export "COCOAPODS_PARALLEL_CODE_SIGN=true"
 export "FLUTTER_TARGET=lib/main.dart"
 export "FLUTTER_BUILD_DIR=build"
