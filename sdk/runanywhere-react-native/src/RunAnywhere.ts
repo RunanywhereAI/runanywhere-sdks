@@ -7,15 +7,14 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/RunAnywhere.swift
  */
 
-import { SDKError } from './errors';
 import { EventBus } from './events';
 import { requireNativeModule, isNativeModuleAvailable } from './native';
+import { SDKEnvironment } from './types';
 import type {
   GenerationOptions,
   GenerationResult,
   LLMFramework,
   ModelInfo,
-  SDKEnvironment,
   SDKInitOptions,
   STTOptions,
   STTResult,
@@ -134,10 +133,76 @@ export const RunAnywhere = {
    * ```
    */
   async initialize(options: SDKInitOptions): Promise<void> {
-    const native = requireNativeModule();
-    const environment = options.environment ?? 'production';
+    const environment = options.environment ?? SDKEnvironment.Production;
 
-    await native.initialize(options.apiKey, options.baseURL, environment);
+    // Check if native module is available and has the initialize method
+    if (!isNativeModuleAvailable()) {
+      // In development mode without native module, just log and continue
+      // This allows the app to run in a limited capacity for development
+      if (__DEV__) {
+        console.warn(
+          '[RunAnywhere] Native module not available. ' +
+            'Running in limited development mode. ' +
+            'Build the native module for full functionality.'
+        );
+      }
+      // Store initialization state in JS for development
+      (this as any)._initialized = true;
+      (this as any)._environment = environment;
+      return;
+    }
+
+    // Get native module and check if required methods exist
+    const native = requireNativeModule();
+    if (typeof native.createBackend !== 'function' || typeof native.initialize !== 'function') {
+      // Native module exists but required methods are not available
+      // This can happen with TurboModules that aren't fully set up
+      if (__DEV__) {
+        console.warn(
+          '[RunAnywhere] Native module found but required methods not available. ' +
+            'Running in limited development mode.'
+        );
+      }
+      (this as any)._initialized = true;
+      (this as any)._environment = environment;
+      return;
+    }
+
+    // First, create the ONNX backend
+    // The native initialize method requires a backend to exist
+    const backendCreated = await native.createBackend('onnx');
+    if (!backendCreated) {
+      if (__DEV__) {
+        console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
+        (this as any)._initialized = true;
+        (this as any)._environment = environment;
+        return;
+      }
+      throw new Error('Failed to create backend');
+    }
+
+    // Native initialize expects JSON config string
+    const configJson = JSON.stringify({
+      apiKey: options.apiKey,
+      baseURL: options.baseURL,
+      environment: environment,
+    });
+
+    const result = await native.initialize(configJson);
+    if (!result) {
+      if (__DEV__) {
+        // In development mode, continue even if initialize returns false
+        // This allows testing without full backend setup
+        console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');
+        (this as any)._initialized = true;
+        (this as any)._environment = environment;
+        return;
+      }
+      throw new Error('Failed to initialize SDK');
+    }
+
+    (this as any)._initialized = true;
+    (this as any)._environment = environment;
   },
 
   /**

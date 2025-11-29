@@ -8,8 +8,9 @@
  */
 
 // Main SDK
+import { RunAnywhere as _RunAnywhere } from './RunAnywhere';
 export { RunAnywhere, Conversation } from './RunAnywhere';
-export default RunAnywhere;
+export default _RunAnywhere;
 
 // Types
 export * from './types';
@@ -46,3 +47,30 @@ export {
   requireNativeModule,
 } from './native';
 export type { NativeRunAnywhereModule } from './native';
+
+// Components (following Swift SDK architecture)
+export {
+  // STT Component
+  STTComponent,
+  createSTTComponent,
+  STTMode,
+  DEFAULT_STT_CONFIG,
+  type STTConfiguration,
+  type STTInput,
+  type STTOutput,
+  type STTStreamHandle,
+  type WordTimestamp,
+  type TranscriptionAlternative,
+  type TranscriptionMetadata,
+  // TTS Component
+  TTSComponent,
+  createTTSComponent,
+  DEFAULT_TTS_CONFIG,
+  type TTSComponentConfiguration,
+  type TTSInput,
+  type TTSOutput,
+  type TTSOptions,
+  type PhonemeTimestamp,
+  type SynthesisMetadata,
+  type VoiceInfo,
+} from './components';

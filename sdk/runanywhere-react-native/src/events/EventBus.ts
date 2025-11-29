@@ -7,7 +7,7 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Events/EventBus.swift
  */
 
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { NativeEventEmitter, NativeModules } from 'react-native';
 import type {
   AnySDKEvent,
   ComponentInitializationEvent,
@@ -333,6 +333,22 @@ class EventBusImpl {
   publish(eventType: string, event: AnySDKEvent): void {
     const eventName = `RunAnywhere_SDK${eventType}` as NativeEventName;
     this.handleNativeEvent(eventName, event);
+  }
+
+  /**
+   * Emit a model event
+   * Helper method for components to emit model-related events
+   */
+  emitModel(event: SDKModelEvent): void {
+    this.handleNativeEvent(NativeEventNames.SDK_MODEL, event);
+  }
+
+  /**
+   * Emit a voice event
+   * Helper method for components to emit voice-related events
+   */
+  emitVoice(event: SDKVoiceEvent): void {
+    this.handleNativeEvent(NativeEventNames.SDK_VOICE, event);
   }
 
   // ============================================================================

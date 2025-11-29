@@ -420,47 +420,50 @@ jsi::Value RunAnywhereModule::get(jsi::Runtime& rt, const jsi::PropNameID& name)
 }
 
 std::vector<jsi::PropNameID> RunAnywhereModule::getPropertyNames(jsi::Runtime& rt) {
-    return {
-        // Backend Lifecycle
-        jsi::PropNameID::forUtf8(rt, "createBackend"),
-        jsi::PropNameID::forUtf8(rt, "initialize"),
-        jsi::PropNameID::forUtf8(rt, "destroy"),
-        jsi::PropNameID::forUtf8(rt, "isInitialized"),
-        jsi::PropNameID::forUtf8(rt, "getBackendInfo"),
-        // Capability Query
-        jsi::PropNameID::forUtf8(rt, "supportsCapability"),
-        jsi::PropNameID::forUtf8(rt, "getCapabilities"),
-        jsi::PropNameID::forUtf8(rt, "getDeviceType"),
-        jsi::PropNameID::forUtf8(rt, "getMemoryUsage"),
-        // Text Generation
-        jsi::PropNameID::forUtf8(rt, "loadTextModel"),
-        jsi::PropNameID::forUtf8(rt, "isTextModelLoaded"),
-        jsi::PropNameID::forUtf8(rt, "unloadTextModel"),
-        jsi::PropNameID::forUtf8(rt, "generate"),
-        jsi::PropNameID::forUtf8(rt, "generateStream"),
-        jsi::PropNameID::forUtf8(rt, "cancelGeneration"),
-        // STT
-        jsi::PropNameID::forUtf8(rt, "loadSTTModel"),
-        jsi::PropNameID::forUtf8(rt, "isSTTModelLoaded"),
-        jsi::PropNameID::forUtf8(rt, "unloadSTTModel"),
-        jsi::PropNameID::forUtf8(rt, "transcribe"),
-        jsi::PropNameID::forUtf8(rt, "createSTTStream"),
-        jsi::PropNameID::forUtf8(rt, "feedSTTAudio"),
-        jsi::PropNameID::forUtf8(rt, "decodeSTT"),
-        jsi::PropNameID::forUtf8(rt, "destroySTTStream"),
-        // TTS
-        jsi::PropNameID::forUtf8(rt, "loadTTSModel"),
-        jsi::PropNameID::forUtf8(rt, "synthesize"),
-        // VAD
-        jsi::PropNameID::forUtf8(rt, "loadVADModel"),
-        jsi::PropNameID::forUtf8(rt, "processVAD"),
-        // Utilities
-        jsi::PropNameID::forUtf8(rt, "getLastError"),
-        jsi::PropNameID::forUtf8(rt, "getVersion"),
-        // Events
-        jsi::PropNameID::forUtf8(rt, "addListener"),
-        jsi::PropNameID::forUtf8(rt, "removeListeners"),
-    };
+    std::vector<jsi::PropNameID> props;
+    props.reserve(35);
+
+    // Backend Lifecycle
+    props.push_back(jsi::PropNameID::forUtf8(rt, "createBackend"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "initialize"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "destroy"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isInitialized"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getBackendInfo"));
+    // Capability Query
+    props.push_back(jsi::PropNameID::forUtf8(rt, "supportsCapability"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getCapabilities"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getDeviceType"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getMemoryUsage"));
+    // Text Generation
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadTextModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isTextModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadTextModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "generate"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "generateStream"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "cancelGeneration"));
+    // STT
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadSTTModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "isSTTModelLoaded"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "unloadSTTModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "transcribe"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "createSTTStream"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "feedSTTAudio"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "decodeSTT"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "destroySTTStream"));
+    // TTS
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadTTSModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "synthesize"));
+    // VAD
+    props.push_back(jsi::PropNameID::forUtf8(rt, "loadVADModel"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "processVAD"));
+    // Utilities
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getLastError"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "getVersion"));
+    // Events
+    props.push_back(jsi::PropNameID::forUtf8(rt, "addListener"));
+    props.push_back(jsi::PropNameID::forUtf8(rt, "removeListeners"));
+
+    return props;
 }
 
 // ============================================================================

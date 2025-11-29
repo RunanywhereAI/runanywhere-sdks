@@ -15,6 +15,8 @@ export enum SDKErrorCode {
   NotImplemented = 'NOT_IMPLEMENTED',
   InvalidAPIKey = 'INVALID_API_KEY',
   ModelNotFound = 'MODEL_NOT_FOUND',
+  ModelNotLoaded = 'MODEL_NOT_LOADED',
+  ModelLoadFailed = 'MODEL_LOAD_FAILED',
   LoadingFailed = 'LOADING_FAILED',
   GenerationFailed = 'GENERATION_FAILED',
   GenerationTimeout = 'GENERATION_TIMEOUT',
@@ -29,10 +31,17 @@ export enum SDKErrorCode {
   NetworkError = 'NETWORK_ERROR',
   InvalidState = 'INVALID_STATE',
   ComponentNotInitialized = 'COMPONENT_NOT_INITIALIZED',
+  ComponentNotReady = 'COMPONENT_NOT_READY',
   Timeout = 'TIMEOUT',
   ServerError = 'SERVER_ERROR',
   StorageError = 'STORAGE_ERROR',
   InvalidConfiguration = 'INVALID_CONFIGURATION',
+  // STT specific errors
+  TranscriptionFailed = 'TRANSCRIPTION_FAILED',
+  StreamCreationFailed = 'STREAM_CREATION_FAILED',
+  // TTS specific errors
+  SynthesisFailed = 'SYNTHESIS_FAILED',
+  VoiceNotFound = 'VOICE_NOT_FOUND',
   Unknown = 'UNKNOWN',
 }
 
