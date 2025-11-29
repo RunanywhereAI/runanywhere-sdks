@@ -47,17 +47,17 @@ public enum APIEndpoint: Equatable {
 
         // Core endpoints
         case .configuration:
-            return "/v1/configuration"
+            return "/api/v1/configuration"
         case .telemetry:
-            return "/v1/telemetry"
+            return "/api/v1/sdk/telemetry"
         case .models:
-            return "/v1/models"
+            return "/api/v1/models"
         case .deviceInfo:
-            return "/v1/device"
+            return "/api/v1/device"
         case .generationHistory:
-            return "/v1/history"
+            return "/api/v1/history"
         case .userPreferences:
-            return "/v1/preferences"
+            return "/api/v1/preferences"
         }
     }
 }
