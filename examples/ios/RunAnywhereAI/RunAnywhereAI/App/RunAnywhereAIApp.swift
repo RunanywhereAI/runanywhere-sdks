@@ -7,7 +7,6 @@
 
 import SwiftUI
 import RunAnywhere
-// import LLMSwift  // Commented out - using LlamaCPP Core instead
 import WhisperKitTranscription
 import FluidAudioDiarization
 import ONNXRuntime
@@ -184,6 +183,30 @@ struct RunAnywhereAIApp: App {
                     id: "mistral-7b-q4-k-m",
                     name: "Mistral 7B Instruct Q4_K_M",
                     memoryRequirement: 4_000_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "qwen-2.5-0.5b-instruct-q6-k",
+                    name: "Qwen 2.5 0.5B Instruct Q6_K",
+                    memoryRequirement: 600_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "lfm2-350m-q4-k-m",
+                    name: "LiquidAI LFM2 350M Q4_K_M",
+                    memoryRequirement: 250_000_000
+                ),
+                try! ModelRegistration(
+                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework: .llamaCpp,
+                    modality: .textToText,
+                    id: "lfm2-350m-q8-0",
+                    name: "LiquidAI LFM2 350M Q8_0",
+                    memoryRequirement: 400_000_000
                 )
             ]
         )
