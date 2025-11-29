@@ -271,7 +271,7 @@ class _AddModelFromURLViewState extends State<AddModelFromURLView> {
                 ),
                 Text(
                   '<thinking>...</thinking>',
-                  style: AppTypography.monospacedCaption(context).copyWith(
+                  style: AppTypography.monospacedCaption.copyWith(
                     color: AppColors.textSecondary(context),
                   ),
                 ),

@@ -24,7 +24,7 @@ dependencies:
   # UUID generation
   uuid: ^4.0.0
   # Device information
-  device_info_plus: ^9.1.0
+  device_info_plus: ^10.0.0
   # App package info
   package_info_plus: ^4.2.0
 
