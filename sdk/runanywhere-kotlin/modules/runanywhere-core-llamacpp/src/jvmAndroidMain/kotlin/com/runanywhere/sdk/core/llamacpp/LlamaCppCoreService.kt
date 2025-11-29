@@ -214,7 +214,7 @@ class LlamaCppCoreService {
      * @param prompt The prompt text
      * @param systemPrompt Optional system prompt
      * @param maxTokens Maximum tokens to generate (default: 256)
-     * @param temperature Sampling temperature (default: 0.7)
+     * @param temperature Sampling temperature (default: 0.8, matches LLM.swift)
      * @return Generated text
      * @throws NativeBridgeException if generation fails
      */
@@ -222,7 +222,7 @@ class LlamaCppCoreService {
         prompt: String,
         systemPrompt: String? = null,
         maxTokens: Int = 256,
-        temperature: Float = 0.7f
+        temperature: Float = 0.8f  // Match LLM.swift default
     ): String {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
@@ -248,7 +248,7 @@ class LlamaCppCoreService {
      * @param prompt The prompt text
      * @param systemPrompt Optional system prompt
      * @param maxTokens Maximum tokens to generate (default: 256)
-     * @param temperature Sampling temperature (default: 0.7)
+     * @param temperature Sampling temperature (default: 0.8, matches LLM.swift)
      * @param onToken Callback for each generated token, return false to cancel
      * @throws NativeBridgeException if generation fails
      */
@@ -256,7 +256,7 @@ class LlamaCppCoreService {
         prompt: String,
         systemPrompt: String? = null,
         maxTokens: Int = 256,
-        temperature: Float = 0.7f,
+        temperature: Float = 0.8f,  // Match LLM.swift default
         onToken: (String) -> Boolean
     ) {
         withContext(Dispatchers.IO) {
@@ -292,14 +292,14 @@ class LlamaCppCoreService {
      * @param prompt The prompt text
      * @param systemPrompt Optional system prompt
      * @param maxTokens Maximum tokens to generate (default: 256)
-     * @param temperature Sampling temperature (default: 0.7)
+     * @param temperature Sampling temperature (default: 0.8, matches LLM.swift)
      * @return Flow of generated tokens
      */
     fun generateFlow(
         prompt: String,
         systemPrompt: String? = null,
         maxTokens: Int = 256,
-        temperature: Float = 0.7f
+        temperature: Float = 0.8f  // Match LLM.swift default
     ): Flow<String> = callbackFlow {
         try {
             generateStream(prompt, systemPrompt, maxTokens, temperature) { token ->
