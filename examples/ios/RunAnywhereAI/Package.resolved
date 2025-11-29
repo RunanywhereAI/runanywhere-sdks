@@ -33,7 +33,7 @@
       "location" : "https://github.com/FluidInference/FluidAudio.git",
       "state" : {
         "branch" : "main",
-        "revision" : "fe8f6bfc975bc8435851a87c80764fef641a7361"
+        "revision" : "d540f0092da772e19715dfdfbb606ee8fc3b6023"
       }
     },
     {
@@ -52,15 +52,6 @@
       "state" : {
         "revision" : "5c0a87846dfd36ca6621795ad2f09fdaab82b739",
         "version" : "1.3.0"
-      }
-    },
-    {
-      "identity" : "llm.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/eastriverlee/LLM.swift",
-      "state" : {
-        "revision" : "4c4e909ac4758c628c9cd263a0c25b6edff5526d",
-        "version" : "2.0.1"
       }
     },
     {
@@ -106,15 +97,6 @@
       "state" : {
         "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
         "version" : "3.15.1"
-      }
-    },
-    {
-      "identity" : "swift-syntax",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-syntax.git",
-      "state" : {
-        "revision" : "4799286537280063c85a32f09884cfbca301b1a1",
-        "version" : "602.0.0"
       }
     },
     {
