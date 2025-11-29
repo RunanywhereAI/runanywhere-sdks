@@ -1,0 +1,4 @@
+module CRunAnywhereLlamaCPP {
+    header "llamacpp_bridge_wrapper.h"
+    export *
+}

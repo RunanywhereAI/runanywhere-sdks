@@ -7,10 +7,11 @@
 
 import SwiftUI
 import RunAnywhere
-import LLMSwift
+// import LLMSwift  // Commented out - using LlamaCPP Core instead
 import WhisperKitTranscription
 import FluidAudioDiarization
 import ONNXRuntime
+import LlamaCPPRuntime
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -155,9 +156,10 @@ struct RunAnywhereAIApp: App {
     private func registerAdaptersForDevelopment() async {
         logger.info("📦 Registering adapters with custom models for DEVELOPMENT mode")
 
-        // Register LLMSwift (llama.cpp) with LLM models
+        // Register LlamaCPP Core (runanywhere-core backend) with LLM models
+        // This provides native C++ llama.cpp performance with Metal acceleration
         await RunAnywhere.registerFramework(
-            LLMSwiftAdapter(),
+            LlamaCPPCoreAdapter(),
             models: [
                 try! ModelRegistration(
                     url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
@@ -168,56 +170,24 @@ struct RunAnywhereAIApp: App {
                     memoryRequirement: 500_000_000
                 ),
                 try! ModelRegistration(
-                    url: "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    url: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
                     framework: .llamaCpp,
                     modality: .textToText,
-                    id: "qwen-2.5-0.5b-instruct-q6-k",
-                    name: "Qwen 2.5 0.5B Instruct Q6_K",
-                    memoryRequirement: 600_000_000
+                    id: "llama2-7b-q4-k-m",
+                    name: "Llama 2 7B Chat Q4_K_M",
+                    memoryRequirement: 4_000_000_000
                 ),
                 try! ModelRegistration(
-                    url: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
+                    url: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
                     framework: .llamaCpp,
                     modality: .textToText,
-                    id: "llama-3.2-1b-instruct-q6-k",
-                    name: "Llama 3.2 1B Instruct Q6_K",
-                    memoryRequirement: 1_200_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
-                    framework: .llamaCpp,
-                    modality: .textToText,
-                    id: "smollm2-1.7b-instruct-q6-k-l",
-                    name: "SmolLM2 1.7B Instruct Q6_K_L",
-                    memoryRequirement: 1_800_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
-                    framework: .llamaCpp,
-                    modality: .textToText,
-                    id: "qwen-2.5-1.5b-instruct-q6-k",
-                    name: "Qwen 2.5 1.5B Instruct Q6_K",
-                    memoryRequirement: 1_600_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                    framework: .llamaCpp,
-                    modality: .textToText,
-                    id: "lfm2-350m-q4-k-m",
-                    name: "LiquidAI LFM2 350M Q4_K_M",
-                    memoryRequirement: 250_000_000
-                ),
-                try! ModelRegistration(
-                    url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                    framework: .llamaCpp,
-                    modality: .textToText,
-                    id: "lfm2-350m-q8-0",
-                    name: "LiquidAI LFM2 350M Q8_0",
-                    memoryRequirement: 400_000_000
+                    id: "mistral-7b-q4-k-m",
+                    name: "Mistral 7B Instruct Q4_K_M",
+                    memoryRequirement: 4_000_000_000
                 )
             ]
         )
-        logger.info("✅ LLMSwift registered")
+        logger.info("✅ LlamaCPP Core registered (runanywhere-core backend)")
 
         // Register WhisperKit with STT models
         await RunAnywhere.registerFramework(
@@ -326,8 +296,8 @@ struct RunAnywhereAIApp: App {
         await RunAnywhere.registerFramework(WhisperKitAdapter.shared)
         logger.info("✅ WhisperKit registered")
 
-        await RunAnywhere.registerFramework(LLMSwiftAdapter())
-        logger.info("✅ LLMSwift registered")
+        await RunAnywhere.registerFramework(LlamaCPPCoreAdapter())
+        logger.info("✅ LlamaCPP Core registered")
 
         await RunAnywhere.registerFramework(ONNXAdapter.shared)
         logger.info("✅ ONNX Runtime registered (includes STT and TTS providers)")

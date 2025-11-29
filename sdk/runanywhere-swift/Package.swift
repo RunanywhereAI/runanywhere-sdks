@@ -34,6 +34,15 @@ let package = Package(
         ),
 
         // =================================================================
+        // LlamaCPP Backend - adds LLM text generation
+        // Uses GGUF models with Metal acceleration
+        // =================================================================
+        .library(
+            name: "RunAnywhereLlamaCPP",
+            targets: ["LlamaCPPRuntime"]
+        ),
+
+        // =================================================================
         // WhisperKit Backend - CoreML-based STT (iOS 16+)
         // =================================================================
         .library(
@@ -42,12 +51,13 @@ let package = Package(
         ),
 
         // =================================================================
-        // LLM.swift Backend - Local LLM inference (iOS 16+)
+        // LLM.swift Backend - DISABLED (conflicts with LlamaCPP symbols)
+        // Use RunAnywhereLlamaCPP instead for LLM inference
         // =================================================================
-        .library(
-            name: "RunAnywhereLLM",
-            targets: ["LLMSwift"]
-        ),
+        // .library(
+        //     name: "RunAnywhereLLM",
+        //     targets: ["LLMSwift"]
+        // ),
 
         // =================================================================
         // Apple Foundation Models - Apple Intelligence (iOS 26+)
@@ -79,8 +89,8 @@ let package = Package(
         // WhisperKit dependency
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
 
-        // LLM.swift dependency
-        .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
+        // LLM.swift dependency - DISABLED (conflicts with LlamaCPP symbols)
+        // .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
 
         // FluidAudio dependency
         .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
@@ -113,12 +123,12 @@ let package = Package(
         // =================================================================
         // ONNX Runtime Backend
         // Provides: STT (streaming), TTS, VAD, Speaker Diarization
+        // The xcframework exposes module "RunAnywhereONNX" with C headers
         // =================================================================
         .target(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereONNX",
                 "RunAnywhereONNXBinary",
             ],
             path: "Sources/ONNXRuntime",
@@ -131,23 +141,43 @@ let package = Package(
             ]
         ),
 
-        // C bridge wrapper for ONNX (imports headers from xcframework)
+        // ONNX Runtime Binary (local path for development with namespaced headers)
+        // Includes: ONNX Runtime + Sherpa-ONNX + Bridge layer
+        // Build with: cd runanywhere-core && ./scripts/build-ios-backend.sh onnx
+        // Copy to: sdks/sdk/runanywhere-swift/Binaries/
+        .binaryTarget(
+            name: "RunAnywhereONNXBinary",
+            path: "Binaries/RunAnywhereONNX.xcframework"
+        ),
+
+        // =================================================================
+        // LlamaCPP Runtime Backend
+        // Provides: Text Generation (LLM) with GGUF models
+        // The xcframework exposes module "RunAnywhereLlamaCPP" with C headers
+        // =================================================================
         .target(
-            name: "CRunAnywhereONNX",
-            dependencies: [],
-            path: "Sources/CRunAnywhereONNX",
-            publicHeadersPath: "include",
-            cSettings: [
-                .headerSearchPath("include")
+            name: "LlamaCPPRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "RunAnywhereLlamaCPPBinary",
+            ],
+            path: "Sources/LlamaCPPRuntime",
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .unsafeFlags(["-ObjC", "-all_load"])
             ]
         ),
 
-        // ONNX Runtime Binary (downloaded from runanywhere-binaries)
-        // Includes: ONNX Runtime + Sherpa-ONNX + Bridge layer
+        // LlamaCPP Binary (local path for development, switch to URL for release)
+        // Includes: llama.cpp + ggml + Bridge layer
+        // Build with: cd runanywhere-core && ./scripts/build-ios-backend.sh llamacpp
+        // Copy to: sdks/sdk/runanywhere-swift/Binaries/
         .binaryTarget(
-            name: "RunAnywhereONNXBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.27a4832-sherpa/RunAnywhereONNX.xcframework.zip",
-            checksum: "62b2887a6d53360ed8d96a5080a98419d3c486f6be94bfe5e9f82415bb6a1fbe"
+            name: "RunAnywhereLlamaCPPBinary",
+            path: "Binaries/RunAnywhereLlamaCPP.xcframework"
         ),
 
         // =================================================================
@@ -164,17 +194,17 @@ let package = Package(
         ),
 
         // =================================================================
-        // LLM.swift Backend (iOS 16+, macOS 13+)
-        // Provides: Local LLM inference with GGUF models
+        // LLM.swift Backend - DISABLED (conflicts with LlamaCPP symbols)
+        // Use LlamaCPPRuntime instead
         // =================================================================
-        .target(
-            name: "LLMSwift",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "LLM", package: "LLM.swift"),
-            ],
-            path: "Sources/LLMSwift"
-        ),
+        // .target(
+        //     name: "LLMSwift",
+        //     dependencies: [
+        //         "RunAnywhere",
+        //         .product(name: "LLM", package: "LLM.swift"),
+        //     ],
+        //     path: "Sources/LLMSwift"
+        // ),
 
         // =================================================================
         // Apple Foundation Models (iOS 16+ build, iOS 26+ runtime)

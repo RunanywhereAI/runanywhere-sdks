@@ -1,6 +1,6 @@
 import Foundation
 import RunAnywhere
-import CRunAnywhereONNX
+import RunAnywhereONNX  // XCFramework C API module
 
 /// Custom download strategy for ONNX models that handles .tar.bz2 archives and direct .onnx files
 /// Also implements ModelStorageStrategy for proper model detection in nested directories
