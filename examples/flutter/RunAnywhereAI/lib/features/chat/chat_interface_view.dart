@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:provider/provider.dart';
-import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere/runanywhere.dart' hide LLMFramework;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/design_system/app_colors.dart';
@@ -11,6 +11,9 @@ import '../../core/models/app_types.dart';
 import '../../core/services/conversation_store.dart';
 import '../../core/services/model_manager.dart';
 import '../../core/utilities/constants.dart';
+import '../models/model_selection_sheet.dart';
+import '../models/model_status_components.dart';
+import '../models/model_types.dart';
 
 /// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
 ///
@@ -30,6 +33,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   // Messages
   final List<ChatMessage> _messages = [];
   String _currentStreamingContent = '';
+  // TODO: Use when SDK supports thinking content in streaming
+  // ignore:unused_field
   String _currentThinkingContent = '';
 
   // State
@@ -300,59 +305,36 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     );
   }
 
+  void _showModelSelectionSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => ModelSelectionSheet(
+        context: ModelSelectionContext.llm,
+        onModelSelected: (model) async {
+          // TODO: Load model via RunAnywhere SDK
+          // await context.read<ModelManager>().loadModel(model.id);
+        },
+      ),
+    );
+  }
+
   Widget _buildModelStatusBanner(ModelManager modelManager) {
-    if (!modelManager.isModelLoaded) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppSpacing.mediumLarge),
-        color: AppColors.badgeOrange,
-        child: Row(
-          children: [
-            Icon(
-              Icons.warning,
-              size: AppSpacing.iconRegular,
-              color: AppColors.statusOrange,
-            ),
-            const SizedBox(width: AppSpacing.smallMedium),
-            const Expanded(
-              child: Text('No model loaded. Select a model to start chatting.'),
-            ),
-            TextButton(
-              onPressed: () {
-                // TODO: Show model selection
-              },
-              child: const Text('Select Model'),
-            ),
-          ],
-        ),
-      );
+    // Map ModelManager state to LLMFramework for the shared component
+    LLMFramework? framework;
+    if (modelManager.isModelLoaded) {
+      // TODO: Get actual framework from ModelManager when SDK provides it
+      framework = LLMFramework.llamaCpp;
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.mediumLarge),
-      color: AppColors.badgeGreen,
-      child: Row(
-        children: [
-          Icon(
-            Icons.check_circle,
-            size: AppSpacing.iconRegular,
-            color: AppColors.statusGreen,
-          ),
-          const SizedBox(width: AppSpacing.smallMedium),
-          Expanded(
-            child: Text(
-              'Model: ${modelManager.loadedModelName ?? "Unknown"}',
-              style: AppTypography.subheadline(context),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              // TODO: Show model selection
-            },
-            child: const Text('Change'),
-          ),
-        ],
+    return Padding(
+      padding: const EdgeInsets.all(AppSpacing.large),
+      child: ModelStatusBanner(
+        framework: framework,
+        modelName: modelManager.loadedModelName,
+        isLoading: modelManager.isLoading,
+        onSelectModel: _showModelSelectionSheet,
       ),
     );
   }
@@ -428,23 +410,8 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   }
 
   Widget _buildTypingIndicator() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.large,
-        vertical: AppSpacing.smallMedium,
-      ),
-      child: Row(
-        children: [
-          _TypingDots(),
-          const SizedBox(width: AppSpacing.smallMedium),
-          Text(
-            'AI is thinking...',
-            style: AppTypography.caption(context).copyWith(
-              color: AppColors.primaryPurple,
-            ),
-          ),
-        ],
-      ),
+    return const TypingIndicatorView(
+      statusText: 'AI is thinking...',
     );
   }
 
@@ -556,7 +523,6 @@ class _MessageBubble extends StatefulWidget {
 
 class _MessageBubbleState extends State<_MessageBubble> {
   bool _showThinking = false;
-  bool _showAnalytics = false;
 
   @override
   Widget build(BuildContext context) {
@@ -718,64 +684,6 @@ class _MessageBubbleState extends State<_MessageBubble> {
           ],
         ],
       ),
-    );
-  }
-}
-
-/// Typing indicator dots
-class _TypingDots extends StatefulWidget {
-  @override
-  State<_TypingDots> createState() => _TypingDotsState();
-}
-
-class _TypingDotsState extends State<_TypingDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(3, (index) {
-            final delay = index * 0.2;
-            final value = ((_controller.value + delay) % 1.0);
-            final scale = 0.5 + (0.5 * (1 - (value - 0.5).abs() * 2));
-
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              child: Transform.scale(
-                scale: scale,
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryPurple,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 }
