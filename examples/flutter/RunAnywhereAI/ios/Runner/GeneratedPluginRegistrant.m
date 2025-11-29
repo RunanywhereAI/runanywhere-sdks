@@ -18,6 +18,18 @@
 @import flutter_secure_storage;
 #endif
 
+#if __has_include(<flutter_tts/FlutterTtsPlugin.h>)
+#import <flutter_tts/FlutterTtsPlugin.h>
+#else
+@import flutter_tts;
+#endif
+
+#if __has_include(<package_info_plus/FPPPackageInfoPlusPlugin.h>)
+#import <package_info_plus/FPPPackageInfoPlusPlugin.h>
+#else
+@import package_info_plus;
+#endif
+
 #if __has_include(<path_provider_foundation/PathProviderPlugin.h>)
 #import <path_provider_foundation/PathProviderPlugin.h>
 #else
@@ -47,6 +59,8 @@
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
   [FPPDeviceInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPDeviceInfoPlusPlugin"]];
   [FlutterSecureStoragePlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterSecureStoragePlugin"]];
+  [FlutterTtsPlugin registerWithRegistrar:[registry registrarForPlugin:@"FlutterTtsPlugin"]];
+  [FPPPackageInfoPlusPlugin registerWithRegistrar:[registry registrarForPlugin:@"FPPPackageInfoPlusPlugin"]];
   [PathProviderPlugin registerWithRegistrar:[registry registrarForPlugin:@"PathProviderPlugin"]];
   [PermissionHandlerPlugin registerWithRegistrar:[registry registrarForPlugin:@"PermissionHandlerPlugin"]];
   [RecordIosPlugin registerWithRegistrar:[registry registrarForPlugin:@"RecordIosPlugin"]];

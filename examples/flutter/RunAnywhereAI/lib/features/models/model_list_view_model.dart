@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:runanywhere/runanywhere.dart';
+// ignore: unused_import
+import 'package:runanywhere/runanywhere.dart' hide ModelInfo, LLMFramework, ModelCategory;
 
 import 'model_types.dart';
 
