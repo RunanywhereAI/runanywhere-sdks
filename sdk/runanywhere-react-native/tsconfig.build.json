@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig",
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "lib/typescript"
+  },
+  "include": ["src"]
+}
