@@ -15,7 +15,7 @@ The RunAnywhere Swift SDK is a modular, multi-backend AI SDK for iOS/macOS that 
 │  RunAnywhere          │ Core SDK (required base)                │
 │  RunAnywhereONNX      │ ONNX Runtime backend (STT, TTS, VAD)    │
 │  RunAnywhereWhisperKit│ CoreML-based STT (WhisperKit)           │
-│  RunAnywhereLLM       │ llama.cpp backend (GGUF models)         │
+│  RunAnywhereLlamaCPP  │ llama.cpp backend (GGUF models)         │
 │  RunAnywhereAppleAI   │ Apple Intelligence (iOS 26+)            │
 │  RunAnywhereFluidAudio│ Speaker diarization                     │
 └─────────────────────────────────────────────────────────────────┘
@@ -44,8 +44,8 @@ Sources/
 │       └── DependencyInjection/      # Service container
 ├── ONNXRuntime/                      # ONNX Backend
 ├── WhisperKitTranscription/          # WhisperKit Backend
-├── LLMSwift/                         # llama.cpp Backend
-└── CRunAnywhereONNX/                 # C Bridge Headers
+├── LlamaCPPRuntime/                  # llama.cpp Backend
+└── CRunAnywhereCore/                 # C Bridge Headers
 ```
 
 ---
@@ -447,7 +447,7 @@ public final class VoiceAgentComponent: BaseComponent {
 |--------|-----------|---------|
 | ONNX | `.onnx` | ONNX Runtime |
 | CoreML | `.mlmodel`, `.mlpackage` | WhisperKit, CoreML |
-| GGUF | `.gguf` | LLM.swift (llama.cpp) |
+| GGUF | `.gguf` | LlamaCPP Runtime |
 | TFLite | `.tflite` | TensorFlow Lite |
 
 ### Model Discovery & Loading
@@ -465,25 +465,19 @@ let sttService = ModuleRegistry.shared.sttProvider(for: "whisper-base-onnx")
 
 ---
 
-## LlamaCPP Integration (LLM.swift)
+## LlamaCPP Integration
 
-### Package Dependency
-
-```swift
-.package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1")
-```
-
-### LLMSwift Adapter
+### LlamaCPP Adapter
 
 ```swift
-public final class LLMSwiftAdapter: UnifiedFrameworkAdapter {
+public final class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
     public var framework: LLMFramework { .llamaCpp }
     public var supportedModalities: Set<FrameworkModality> { [.textToText] }
     public var supportedFormats: [ModelFormat] { [.gguf, .ggml] }
 
     public func createService(for modality: FrameworkModality) -> Any? {
         guard modality == .textToText else { return nil }
-        return LLMSwiftService()
+        return LlamaCPPService()
     }
 }
 ```

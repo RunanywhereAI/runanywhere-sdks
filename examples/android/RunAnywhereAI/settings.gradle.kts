@@ -36,8 +36,9 @@ include(":sdk:runanywhere-kotlin:jni")
 project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
 
 // Include SDK modules
-include(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp")
-project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp")
+// RunAnywhere Core LlamaCPP module - native LlamaCPP backend with chat template support
+include(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
 
 // Include RunAnywhere Core ONNX module - provides native ONNX Runtime backend via JNI
 include(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx")

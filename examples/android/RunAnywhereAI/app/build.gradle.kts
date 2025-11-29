@@ -123,6 +123,18 @@ android {
 
         jniLibs {
             useLegacyPackaging = false
+            // Handle duplicate native libraries from runanywhere-core modules
+            // Both llamacpp and onnx modules may include shared core libraries
+            pickFirsts += listOf(
+                "lib/arm64-v8a/librunanywhere_bridge.so",
+                "lib/arm64-v8a/librunanywhere_jni.so",
+                "lib/armeabi-v7a/librunanywhere_bridge.so",
+                "lib/armeabi-v7a/librunanywhere_jni.so",
+                "lib/x86/librunanywhere_bridge.so",
+                "lib/x86/librunanywhere_jni.so",
+                "lib/x86_64/librunanywhere_bridge.so",
+                "lib/x86_64/librunanywhere_jni.so"
+            )
         }
     }
 
@@ -189,7 +201,8 @@ dependencies {
     // SDK Dependencies (Local Modules)
     // ========================================
     implementation(project(":sdk:runanywhere-kotlin"))
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-llm-llamacpp"))
+    // Using runanywhere-core-llamacpp which includes chat template support (fixes Qwen/LFM2)
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp"))
     implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))
 
     // ========================================

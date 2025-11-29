@@ -13,7 +13,10 @@ import com.runanywhere.sdk.models.enums.ModelCategory
 import com.runanywhere.sdk.models.enums.ModelFormat
 
 /**
- * LlamaCpp provider for Language Model services (llama.cpp)
+ * LlamaCpp provider for Language Model services via RunAnywhere Core.
+ *
+ * This provider wraps runanywhere-core's LlamaCPP backend which includes
+ * proper chat template support for all models (Qwen, LFM2, Llama, etc.)
  *
  * Usage:
  * ```kotlin
@@ -31,12 +34,12 @@ object LlamaCppServiceProvider : LLMServiceProvider {
      */
     fun register() {
         ModuleRegistry.shared.registerLLM(this)
-        logger.info("✅ LlamaCppServiceProvider registered")
+        logger.info("LlamaCppServiceProvider registered (RunAnywhere Core backend)")
     }
 
     // MARK: - LLMServiceProvider Protocol
 
-    override val name: String = "LlamaCpp (llama.cpp)"
+    override val name: String = "LlamaCpp (RunAnywhere Core)"
 
     override val framework: LLMFramework = LLMFramework.LLAMA_CPP
 
@@ -50,13 +53,11 @@ object LlamaCppServiceProvider : LLMServiceProvider {
 
     override fun canHandle(modelId: String?): Boolean {
         // LlamaCpp is the primary LLM provider and handles all GGUF/GGML models
-        // We accept all model identifiers since we're the main provider
-        // The actual path will be resolved later from the ModelInfo
         return true
     }
 
     override suspend fun createLLMService(configuration: LLMConfiguration): LLMService {
-        logger.info("Creating LlamaCpp service")
+        logger.info("Creating LlamaCpp service (RunAnywhere Core backend)")
 
         // Create the service
         val service = LlamaCppService(configuration)
@@ -65,10 +66,9 @@ object LlamaCppServiceProvider : LLMServiceProvider {
         val modelId = configuration.modelId
         if (!modelId.isNullOrEmpty() && modelId != "default") {
             logger.info("Initializing with model: $modelId")
-            // The modelId might be a path or just an identifier
             service.initialize(modelId)
         } else {
-            logger.info("Using default model - service will use currently loaded model or be initialized later")
+            logger.info("Using default model - service will be initialized later")
         }
 
         logger.info("LlamaCpp service created successfully")
@@ -101,7 +101,7 @@ object LlamaCppServiceProvider : LLMServiceProvider {
 
         return ModelCompatibilityResult(
             isCompatible = true,
-            details = "Model is compatible with Llama.cpp",
+            details = "Model is compatible with Llama.cpp (RunAnywhere Core)",
             memoryRequired = memoryRequired,
             recommendedConfiguration = getOptimalConfiguration(model),
             warnings = warnings
@@ -109,18 +109,16 @@ object LlamaCppServiceProvider : LLMServiceProvider {
     }
 
     override suspend fun downloadModel(modelId: String, onProgress: (Float) -> Unit): ModelInfo {
-        // Delegate to SDK's download service
         throw UnsupportedOperationException("Use RunAnywhere.downloadModel() instead")
     }
 
     override fun estimateMemoryRequirements(model: ModelInfo): Long {
-        // Use model's declared memory requirement or estimate from download size
         return model.memoryRequired ?: model.downloadSize ?: 1_000_000_000L
     }
 
     override fun getOptimalConfiguration(model: ModelInfo): HardwareConfiguration {
         return HardwareConfiguration(
-            preferGPU = false,  // CPU-only for now
+            preferGPU = false, // CPU-only for now
             minMemoryMB = (estimateMemoryRequirements(model) / 1024 / 1024).toInt(),
             recommendedThreads = Runtime.getRuntime().availableProcessors()
         )
@@ -144,9 +142,6 @@ object LlamaCppServiceProvider : LLMServiceProvider {
         )
     }
 
-    /**
-     * Get available system memory (helper method)
-     */
     private fun getAvailableSystemMemory(): Long {
         return Runtime.getRuntime().maxMemory()
     }

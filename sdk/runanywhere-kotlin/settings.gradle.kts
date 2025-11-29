@@ -34,8 +34,8 @@ include(":jni")
 // WhisperKit module - standalone STT module using WhisperJNI
 include(":modules:runanywhere-whisperkit")
 
-// LlamaCpp module - provides LLM capabilities via llama.cpp
-include(":modules:runanywhere-llm-llamacpp")
+// Old LlamaCpp module removed - now using runanywhere-core-llamacpp
+// which provides the same capabilities via runanywhere-core C++ with chat template support
 
 // MLC-LLM module - provides LLM capabilities via MLC-LLM framework
 // Note: This module depends on mlc4j (MLC-LLM native library) which is included conditionally
