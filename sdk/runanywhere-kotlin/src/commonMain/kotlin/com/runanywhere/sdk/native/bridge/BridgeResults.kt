@@ -1,10 +1,10 @@
-package com.runanywhere.sdk.core.bridge
+package com.runanywhere.sdk.native.bridge
 
 /**
- * Result from TTS synthesis operation.
+ * Result from TTS synthesis operation via native backend.
  * Contains audio samples and sample rate.
  */
-data class TTSSynthesisResult(
+data class NativeTTSSynthesisResult(
     val samples: FloatArray,
     val sampleRate: Int
 ) {
@@ -12,7 +12,7 @@ data class TTSSynthesisResult(
         if (this === other) return true
         if (other == null || this::class != other::class) return false
 
-        other as TTSSynthesisResult
+        other as NativeTTSSynthesisResult
 
         if (!samples.contentEquals(other.samples)) return false
         if (sampleRate != other.sampleRate) return false
@@ -28,18 +28,18 @@ data class TTSSynthesisResult(
 }
 
 /**
- * Result from VAD process operation.
+ * Result from VAD process operation via native backend.
  * Contains speech detection status and probability.
  */
-data class VADResult(
+data class NativeVADResult(
     val isSpeech: Boolean,
     val probability: Float
 )
 
 /**
- * Exception thrown when a RunAnywhere operation fails.
+ * Exception thrown when a native RunAnywhere operation fails.
  */
-class RunAnywhereException(
-    val resultCode: ResultCode,
+class NativeBridgeException(
+    val resultCode: NativeResultCode,
     message: String? = null
-) : Exception(message ?: "Operation failed with code: ${resultCode.name}")
+) : Exception(message ?: "Native operation failed with code: ${resultCode.name}")

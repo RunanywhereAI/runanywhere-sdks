@@ -5,10 +5,19 @@
  * It mirrors the architecture of runanywhere-swift's CRunAnywhereONNX module.
  *
  * Architecture:
- *   Kotlin Service Layer (ONNXCoreService) -> JNI Bindings (RunAnywhereBridge)
+ *   Kotlin Service Layer (ONNXCoreService) -> JNI Bindings (RunAnywhareBridge)
  *     -> Native Library (librunanywhere_jni.so) -> C API (runanywhere_bridge.h)
  *       -> C++ Backend (runanywhere_onnx)
+ *
+ * Build modes:
+ *   - Remote (default): Downloads pre-built native libraries from GitHub releases
+ *   - Local: Builds from runanywhere-core source (requires NDK and CMake)
+ *
+ * To use local mode: ./gradlew build -Prunanywhere.native.local=true
  */
+
+import java.net.URL
+import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -16,6 +25,33 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     `maven-publish`
 }
+
+// =============================================================================
+// Configuration
+// =============================================================================
+
+// Version of pre-built native libraries to download
+val nativeLibVersion = project.findProperty("runanywhere.native.version")?.toString()
+    ?: file("VERSION").takeIf { it.exists() }?.readText()?.trim()
+    ?: "0.0.1-dev"
+
+// Use local build mode (requires runanywhere-core to be built locally)
+val useLocalBuild = project.findProperty("runanywhere.native.local")?.toString()?.toBoolean() ?: false
+
+// GitHub configuration for downloads
+val githubOrg = project.findProperty("runanywhere.github.org")?.toString() ?: "RunanywhereAI"
+val githubRepo = project.findProperty("runanywhere.github.repo")?.toString() ?: "runanywhere-binaries"
+
+// Local runanywhere-core path (for local builds)
+val runAnywhereCoreDir = project.projectDir.resolve("../../../../../runanywhere-core")
+
+// Native libraries directory
+val jniLibsDir = file("src/main/jniLibs")
+val downloadedLibsDir = file("build/downloaded-libs")
+
+// =============================================================================
+// Kotlin Multiplatform Configuration
+// =============================================================================
 
 kotlin {
     jvm {
@@ -65,6 +101,10 @@ kotlin {
     }
 }
 
+// =============================================================================
+// Android Configuration
+// =============================================================================
+
 android {
     namespace = "com.runanywhere.sdk.core.onnx"
     compileSdk = 36
@@ -78,17 +118,6 @@ android {
             // Target ARM 64-bit only (modern Android devices)
             abiFilters += listOf("arm64-v8a")
         }
-
-        externalNativeBuild {
-            cmake {
-                // CMake arguments for building the JNI layer
-                arguments += "-DCMAKE_BUILD_TYPE=Release"
-
-                // Path to runanywhere-core for headers and pre-built libs
-                val runAnywhereCoreDir = rootProject.projectDir.resolve("../../../runanywhere-core")
-                arguments += "-DRUNANYWHERE_CORE_DIR=${runAnywhereCoreDir.absolutePath}"
-            }
-        }
     }
 
     buildTypes {
@@ -101,15 +130,6 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            // Point to the JNI CMakeLists.txt in runanywhere-core
-            val jniCMakePath = rootProject.projectDir.resolve("../../../runanywhere-core/src/bridge/jni/CMakeLists.txt")
-            path = jniCMakePath
-            version = "3.22.1"
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -119,33 +139,201 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
-        // Include pre-built .so files from runanywhere-core dist
         jniLibs {
             useLegacyPackaging = true
         }
     }
 
-    // Copy pre-built libraries from runanywhere-core/dist/android into jniLibs
+    // Configure jniLibs source based on build mode
     sourceSets {
         getByName("main") {
-            val runAnywhereCoreDir = rootProject.projectDir.resolve("../../../runanywhere-core")
-            val distDir = runAnywhereCoreDir.resolve("dist/android/onnx")
-
-            if (distDir.exists()) {
-                jniLibs.srcDirs(distDir)
+            if (useLocalBuild) {
+                // Local mode: use locally built libraries from runanywhere-core/dist
+                val distDir = runAnywhereCoreDir.resolve("dist/android/onnx")
+                if (distDir.exists()) {
+                    jniLibs.srcDirs(distDir)
+                    logger.lifecycle("Using local native libraries from: $distDir")
+                } else {
+                    logger.warn("Local libraries not found at: $distDir")
+                    logger.warn("Run: cd runanywhere-core && ./scripts/build-android-backend.sh onnx")
+                }
+            } else {
+                // Remote mode: use downloaded libraries
+                jniLibs.srcDirs(jniLibsDir)
+                logger.lifecycle("Using downloaded native libraries from: $jniLibsDir")
             }
         }
     }
 }
 
+// =============================================================================
+// Download Native Libraries Task
+// =============================================================================
+
+/**
+ * Task to download pre-built native libraries from GitHub releases
+ */
+val downloadNativeLibs by tasks.registering {
+    description = "Downloads pre-built native libraries from GitHub releases"
+    group = "build setup"
+
+    val versionFile = file("$jniLibsDir/.version")
+    val zipFile = file("$downloadedLibsDir/RunAnywhereONNX-android.zip")
+
+    outputs.dir(jniLibsDir)
+    outputs.upToDateWhen {
+        versionFile.exists() && versionFile.readText().trim() == nativeLibVersion
+    }
+
+    doLast {
+        if (useLocalBuild) {
+            logger.lifecycle("Skipping download - using local build mode")
+            return@doLast
+        }
+
+        val currentVersion = if (versionFile.exists()) versionFile.readText().trim() else ""
+        if (currentVersion == nativeLibVersion) {
+            logger.lifecycle("Native libraries version $nativeLibVersion already downloaded")
+            return@doLast
+        }
+
+        logger.lifecycle("Downloading native libraries version $nativeLibVersion...")
+
+        val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/RunAnywhereONNX-android.zip"
+
+        // Create download directory
+        downloadedLibsDir.mkdirs()
+
+        // Download the ZIP file
+        try {
+            logger.lifecycle("Downloading from: $downloadUrl")
+            URL(downloadUrl).openStream().use { input ->
+                zipFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
+        } catch (e: Exception) {
+            logger.error("Failed to download native libraries: ${e.message}")
+            logger.error("URL: $downloadUrl")
+            logger.lifecycle("")
+            logger.lifecycle("Options:")
+            logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
+            logger.lifecycle("  2. Build locally: ./scripts/download-native-libs.sh")
+            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.native.local=true")
+            throw GradleException("Failed to download native libraries", e)
+        }
+
+        // Clear existing jniLibs
+        jniLibsDir.deleteRecursively()
+        jniLibsDir.mkdirs()
+
+        // Extract the ZIP
+        logger.lifecycle("Extracting native libraries...")
+        copy {
+            from(zipTree(zipFile))
+            into(downloadedLibsDir)
+        }
+
+        // Move libraries to jniLibs directory
+        // ZIP structure: onnx/<abi>/lib*.so -> jniLibs/<abi>/lib*.so
+        val onnxDir = file("$downloadedLibsDir/onnx")
+        if (onnxDir.exists()) {
+            onnxDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+                val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
+                targetAbiDir.mkdirs()
+                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                    soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
+                    logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
+                }
+            }
+        }
+
+        // Write version marker
+        versionFile.writeText(nativeLibVersion)
+        logger.lifecycle("Native libraries version $nativeLibVersion installed")
+    }
+}
+
+// Make preBuild depend on download task when not using local build
+if (!useLocalBuild) {
+    tasks.matching { it.name == "preBuild" }.configureEach {
+        dependsOn(downloadNativeLibs)
+    }
+}
+
+/**
+ * Task to clean downloaded native libraries
+ */
+val cleanNativeLibs by tasks.registering(Delete::class) {
+    description = "Removes downloaded native libraries"
+    group = "build"
+    delete(jniLibsDir)
+    delete(downloadedLibsDir)
+}
+
+tasks.named("clean") {
+    dependsOn(cleanNativeLibs)
+}
+
+/**
+ * Task to print native library info
+ */
+val printNativeLibInfo by tasks.registering {
+    description = "Prints information about native library configuration"
+    group = "help"
+
+    doLast {
+        println()
+        println("RunAnywhere Core ONNX - Native Library Configuration")
+        println("=" .repeat(60))
+        println()
+        println("Build Mode:        ${if (useLocalBuild) "LOCAL" else "REMOTE"}")
+        println("Native Version:    $nativeLibVersion")
+        println("GitHub Org:        $githubOrg")
+        println("GitHub Repo:       $githubRepo")
+        println()
+        println("Directories:")
+        println("  jniLibs:         $jniLibsDir")
+        println("  downloaded:      $downloadedLibsDir")
+        if (useLocalBuild) {
+            println("  runanywhere-core: $runAnywhereCoreDir")
+        }
+        println()
+
+        val versionFile = file("$jniLibsDir/.version")
+        if (versionFile.exists()) {
+            println("Installed Version: ${versionFile.readText().trim()}")
+        } else {
+            println("Installed Version: (not installed)")
+        }
+
+        println()
+        println("Libraries:")
+        jniLibsDir.listFiles()?.filter { it.isDirectory }?.forEach { abiDir ->
+            println("  ${abiDir.name}/")
+            abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                println("    ${soFile.name} (${soFile.length() / 1024}KB)")
+            }
+        }
+        println()
+    }
+}
+
+// =============================================================================
 // Include third-party licenses in JVM JAR
+// =============================================================================
+
 tasks.named<Jar>("jvmJar") {
     from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
         into("META-INF")
     }
 }
 
-// Configure publishing
+// =============================================================================
+// Publishing Configuration
+// =============================================================================
+
 publishing {
     publications.withType<MavenPublication> {
         pom {

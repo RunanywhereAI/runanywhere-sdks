@@ -1,22 +1,39 @@
-package com.runanywhere.sdk.core.bridge
+package com.runanywhere.sdk.core.onnx
 
+import com.runanywhere.sdk.native.bridge.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * JVM/Android implementation of ONNXCoreService.
+ * ONNX Runtime implementation of NativeCoreService.
  *
- * This implementation wraps the JNI bridge (RunAnywhereBridge) and provides
- * a clean, coroutine-based API on top of native calls.
+ * This provides the ONNX Runtime backend for RunAnywhere Core.
+ * It wraps the JNI bridge (RunAnywhereBridge) and implements the generic
+ * NativeCoreService interface.
  *
  * Thread Safety:
  * - All public methods are thread-safe via mutex
  * - Native operations run on IO dispatcher
  * - Handle is protected by mutex to prevent use-after-free
+ *
+ * Usage:
+ * ```kotlin
+ * val service = ONNXCoreService()
+ * service.initialize()
+ *
+ * // Load STT model
+ * service.loadSTTModel("/path/to/model", "zipformer")
+ *
+ * // Transcribe audio
+ * val result = service.transcribe(audioSamples, 16000)
+ *
+ * // Cleanup
+ * service.destroy()
+ * ```
  */
-actual class ONNXCoreService {
+class ONNXCoreService : NativeCoreService {
     private var backendHandle: Long = 0
     private val mutex = Mutex()
 
@@ -29,7 +46,7 @@ actual class ONNXCoreService {
     // Lifecycle
     // =============================================================================
 
-    actual suspend fun initialize(configJson: String?) {
+    override suspend fun initialize(configJson: String?) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle != 0L) {
@@ -40,54 +57,55 @@ actual class ONNXCoreService {
                 // Create backend
                 backendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
                 if (backendHandle == 0L) {
-                    throw RunAnywhereException(
-                        ResultCode.ERROR_INIT_FAILED,
+                    throw NativeBridgeException(
+                        NativeResultCode.ERROR_INIT_FAILED,
                         "Failed to create ONNX backend"
                     )
                 }
 
                 // Initialize backend
-                val result = ResultCode.fromValue(
+                val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
                 )
                 if (!result.isSuccess) {
                     val error = RunAnywhereBridge.nativeGetLastError()
                     RunAnywhereBridge.nativeDestroy(backendHandle)
                     backendHandle = 0
-                    throw RunAnywhereException(result, error.ifEmpty { "Initialization failed" })
+                    throw NativeBridgeException(result, error.ifEmpty { "Initialization failed" })
                 }
             }
         }
     }
 
-    actual val isInitialized: Boolean
+    override val isInitialized: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeIsInitialized(backendHandle)
 
-    actual val supportedCapabilities: List<Capability>
+    override val supportedCapabilities: List<NativeCapability>
         get() {
             if (backendHandle == 0L) return emptyList()
             return RunAnywhereBridge.nativeGetCapabilities(backendHandle)
-                .mapNotNull { Capability.fromValue(it) }
+                .toList()
+                .mapNotNull { NativeCapability.fromValue(it) }
         }
 
-    actual fun supportsCapability(capability: Capability): Boolean {
+    override fun supportsCapability(capability: NativeCapability): Boolean {
         if (backendHandle == 0L) return false
         return RunAnywhereBridge.nativeSupportsCapability(backendHandle, capability.value)
     }
 
-    actual val deviceType: DeviceType
+    override val deviceType: NativeDeviceType
         get() {
-            if (backendHandle == 0L) return DeviceType.CPU
-            return DeviceType.fromValue(RunAnywhereBridge.nativeGetDevice(backendHandle))
+            if (backendHandle == 0L) return NativeDeviceType.CPU
+            return NativeDeviceType.fromValue(RunAnywhereBridge.nativeGetDevice(backendHandle))
         }
 
-    actual val memoryUsage: Long
+    override val memoryUsage: Long
         get() {
             if (backendHandle == 0L) return 0
             return RunAnywhereBridge.nativeGetMemoryUsage(backendHandle)
         }
 
-    actual fun destroy() {
+    override fun destroy() {
         if (backendHandle != 0L) {
             RunAnywhereBridge.nativeDestroy(backendHandle)
             backendHandle = 0
@@ -98,24 +116,24 @@ actual class ONNXCoreService {
     // STT Operations
     // =============================================================================
 
-    actual suspend fun loadSTTModel(modelPath: String, modelType: String, configJson: String?) {
+    override suspend fun loadSTTModel(modelPath: String, modelType: String, configJson: String?) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = ResultCode.fromValue(
+                val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeSTTLoadModel(backendHandle, modelPath, modelType, configJson)
                 )
                 if (!result.isSuccess) {
-                    throw RunAnywhereException(result, RunAnywhereBridge.nativeGetLastError())
+                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
             }
         }
     }
 
-    actual val isSTTModelLoaded: Boolean
+    override val isSTTModelLoaded: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeSTTIsModelLoaded(backendHandle)
 
-    actual suspend fun unloadSTTModel() {
+    override suspend fun unloadSTTModel() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle != 0L) {
@@ -125,7 +143,7 @@ actual class ONNXCoreService {
         }
     }
 
-    actual suspend fun transcribe(
+    override suspend fun transcribe(
         audioSamples: FloatArray,
         sampleRate: Int,
         language: String?
@@ -138,39 +156,39 @@ actual class ONNXCoreService {
                     audioSamples,
                     sampleRate,
                     language
-                ) ?: throw RunAnywhereException(
-                    ResultCode.ERROR_INFERENCE_FAILED,
+                ) ?: throw NativeBridgeException(
+                    NativeResultCode.ERROR_INFERENCE_FAILED,
                     RunAnywhereBridge.nativeGetLastError()
                 )
             }
         }
     }
 
-    actual val supportsSTTStreaming: Boolean
+    override val supportsSTTStreaming: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeSTTSupportsStreaming(backendHandle)
 
     // =============================================================================
     // TTS Operations
     // =============================================================================
 
-    actual suspend fun loadTTSModel(modelPath: String, modelType: String, configJson: String?) {
+    override suspend fun loadTTSModel(modelPath: String, modelType: String, configJson: String?) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = ResultCode.fromValue(
+                val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeTTSLoadModel(backendHandle, modelPath, modelType, configJson)
                 )
                 if (!result.isSuccess) {
-                    throw RunAnywhereException(result, RunAnywhereBridge.nativeGetLastError())
+                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
             }
         }
     }
 
-    actual val isTTSModelLoaded: Boolean
+    override val isTTSModelLoaded: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeTTSIsModelLoaded(backendHandle)
 
-    actual suspend fun unloadTTSModel() {
+    override suspend fun unloadTTSModel() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle != 0L) {
@@ -180,12 +198,12 @@ actual class ONNXCoreService {
         }
     }
 
-    actual suspend fun synthesize(
+    override suspend fun synthesize(
         text: String,
         voiceId: String?,
         speedRate: Float,
         pitchShift: Float
-    ): TTSSynthesisResult {
+    ): NativeTTSSynthesisResult {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
@@ -195,15 +213,15 @@ actual class ONNXCoreService {
                     voiceId,
                     speedRate,
                     pitchShift
-                ) ?: throw RunAnywhereException(
-                    ResultCode.ERROR_INFERENCE_FAILED,
+                ) ?: throw NativeBridgeException(
+                    NativeResultCode.ERROR_INFERENCE_FAILED,
                     RunAnywhereBridge.nativeGetLastError()
                 )
             }
         }
     }
 
-    actual suspend fun getVoices(): String {
+    override suspend fun getVoices(): String {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle == 0L) return@withContext "[]"
@@ -216,24 +234,24 @@ actual class ONNXCoreService {
     // VAD Operations
     // =============================================================================
 
-    actual suspend fun loadVADModel(modelPath: String?, configJson: String?) {
+    override suspend fun loadVADModel(modelPath: String?, configJson: String?) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = ResultCode.fromValue(
+                val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeVADLoadModel(backendHandle, modelPath, configJson)
                 )
                 if (!result.isSuccess) {
-                    throw RunAnywhereException(result, RunAnywhereBridge.nativeGetLastError())
+                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
             }
         }
     }
 
-    actual val isVADModelLoaded: Boolean
+    override val isVADModelLoaded: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeVADIsModelLoaded(backendHandle)
 
-    actual suspend fun unloadVADModel() {
+    override suspend fun unloadVADModel() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle != 0L) {
@@ -243,26 +261,26 @@ actual class ONNXCoreService {
         }
     }
 
-    actual suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): VADResult {
+    override suspend fun processVAD(audioSamples: FloatArray, sampleRate: Int): NativeVADResult {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
                 RunAnywhereBridge.nativeVADProcess(backendHandle, audioSamples, sampleRate)
-                    ?: throw RunAnywhereException(
-                        ResultCode.ERROR_INFERENCE_FAILED,
+                    ?: throw NativeBridgeException(
+                        NativeResultCode.ERROR_INFERENCE_FAILED,
                         RunAnywhereBridge.nativeGetLastError()
                     )
             }
         }
     }
 
-    actual suspend fun detectVADSegments(audioSamples: FloatArray, sampleRate: Int): String {
+    override suspend fun detectVADSegments(audioSamples: FloatArray, sampleRate: Int): String {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
                 RunAnywhereBridge.nativeVADDetectSegments(backendHandle, audioSamples, sampleRate)
-                    ?: throw RunAnywhereException(
-                        ResultCode.ERROR_INFERENCE_FAILED,
+                    ?: throw NativeBridgeException(
+                        NativeResultCode.ERROR_INFERENCE_FAILED,
                         RunAnywhereBridge.nativeGetLastError()
                     )
             }
@@ -273,24 +291,24 @@ actual class ONNXCoreService {
     // Embedding Operations
     // =============================================================================
 
-    actual suspend fun loadEmbeddingModel(modelPath: String, configJson: String?) {
+    override suspend fun loadEmbeddingModel(modelPath: String, configJson: String?) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
-                val result = ResultCode.fromValue(
+                val result = NativeResultCode.fromValue(
                     RunAnywhereBridge.nativeEmbedLoadModel(backendHandle, modelPath, configJson)
                 )
                 if (!result.isSuccess) {
-                    throw RunAnywhereException(result, RunAnywhereBridge.nativeGetLastError())
+                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
                 }
             }
         }
     }
 
-    actual val isEmbeddingModelLoaded: Boolean
+    override val isEmbeddingModelLoaded: Boolean
         get() = backendHandle != 0L && RunAnywhereBridge.nativeEmbedIsModelLoaded(backendHandle)
 
-    actual suspend fun unloadEmbeddingModel() {
+    override suspend fun unloadEmbeddingModel() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 if (backendHandle != 0L) {
@@ -300,20 +318,20 @@ actual class ONNXCoreService {
         }
     }
 
-    actual suspend fun embed(text: String): FloatArray {
+    override suspend fun embed(text: String): FloatArray {
         return withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
                 RunAnywhereBridge.nativeEmbedText(backendHandle, text)
-                    ?: throw RunAnywhereException(
-                        ResultCode.ERROR_INFERENCE_FAILED,
+                    ?: throw NativeBridgeException(
+                        NativeResultCode.ERROR_INFERENCE_FAILED,
                         RunAnywhereBridge.nativeGetLastError()
                     )
             }
         }
     }
 
-    actual val embeddingDimensions: Int
+    override val embeddingDimensions: Int
         get() {
             if (backendHandle == 0L) return 0
             return RunAnywhereBridge.nativeEmbedGetDimensions(backendHandle)
@@ -325,8 +343,8 @@ actual class ONNXCoreService {
 
     private fun ensureInitialized() {
         if (backendHandle == 0L) {
-            throw RunAnywhereException(
-                ResultCode.ERROR_INVALID_HANDLE,
+            throw NativeBridgeException(
+                NativeResultCode.ERROR_INVALID_HANDLE,
                 "Backend not initialized. Call initialize() first."
             )
         }
@@ -352,9 +370,9 @@ actual class ONNXCoreService {
         /**
          * Extract an archive to a destination directory.
          */
-        fun extractArchive(archivePath: String, destDir: String): ResultCode {
+        fun extractArchive(archivePath: String, destDir: String): NativeResultCode {
             RunAnywhereBridge.loadLibrary()
-            return ResultCode.fromValue(
+            return NativeResultCode.fromValue(
                 RunAnywhereBridge.nativeExtractArchive(archivePath, destDir)
             )
         }
