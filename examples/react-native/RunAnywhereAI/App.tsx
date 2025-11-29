@@ -21,7 +21,9 @@ import TabNavigator from './src/navigation/TabNavigator';
 import { Colors } from './src/theme/colors';
 import { Typography } from './src/theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from './src/theme/spacing';
-import MockSDK from './src/services/MockSDK';
+
+// Import RunAnywhere SDK
+import { RunAnywhere, SDKEnvironment } from 'runanywhere-react-native';
 
 /**
  * App initialization state
@@ -79,21 +81,19 @@ const App: React.FC = () => {
 
   /**
    * Initialize the SDK
-   * TODO: Replace with actual RunAnywhere SDK initialization
    */
   const initializeSDK = async () => {
     setInitState('loading');
     setError(null);
 
     try {
-      // TODO: Replace with actual SDK initialization
-      // await RunAnywhere.initialize({
-      //   apiKey: 'your-api-key',
-      //   baseURL: 'https://api.runanywhere.com',
-      //   environment: SDKEnvironment.Production,
-      // });
-
-      await MockSDK.initialize('mock-api-key');
+      // Initialize RunAnywhere SDK
+      // In development mode, authentication is bypassed
+      await RunAnywhere.initialize({
+        apiKey: '', // Empty in development mode
+        baseURL: 'https://api.runanywhere.com',
+        environment: SDKEnvironment.Development,
+      });
       setInitState('ready');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';

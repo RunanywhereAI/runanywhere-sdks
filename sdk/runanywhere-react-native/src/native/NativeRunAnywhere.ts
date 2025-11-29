@@ -5,7 +5,7 @@
  * These types define the interface between JS and native code.
  */
 
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, Platform, TurboModuleRegistry } from 'react-native';
 import type {
   GenerationOptions,
   GenerationResult,
@@ -191,20 +191,36 @@ export interface NativeRunAnywhereModule {
  * Get the native module with proper typing
  */
 function getNativeModule(): NativeRunAnywhereModule | null {
-  const module = NativeModules.RunAnywhereModule;
-
-  if (!module) {
-    if (__DEV__) {
-      console.warn(
-        '[RunAnywhere] Native module not found. ' +
-          'Make sure the native module is properly linked. ' +
-          `Platform: ${Platform.OS}`
-      );
+  // Try TurboModuleRegistry first (New Architecture with codegen)
+  try {
+    const turboModule = TurboModuleRegistry.get<NativeRunAnywhereModule>('RunAnywhere');
+    if (turboModule) {
+      return turboModule;
     }
-    return null;
+  } catch {
+    // TurboModuleRegistry not available or module not found
   }
 
-  return module as NativeRunAnywhereModule;
+  // Try NativeModules (New Architecture without codegen or Old Architecture)
+  const nativeModule = NativeModules.RunAnywhere;
+  if (nativeModule) {
+    return nativeModule as NativeRunAnywhereModule;
+  }
+
+  // Fallback to alternative module name
+  const altModule = NativeModules.RunAnywhereModule;
+  if (altModule) {
+    return altModule as NativeRunAnywhereModule;
+  }
+
+  if (__DEV__) {
+    console.warn(
+      '[RunAnywhere] Native module not found. ' +
+        'Make sure the native module is properly linked. ' +
+        `Platform: ${Platform.OS}`
+    );
+  }
+  return null;
 }
 
 /**

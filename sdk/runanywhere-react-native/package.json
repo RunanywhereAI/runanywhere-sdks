@@ -1,5 +1,5 @@
 {
-  "name": "@runanywhere/react-native-sdk",
+  "name": "runanywhere-react-native",
   "version": "0.1.0",
   "description": "RunAnywhere SDK for React Native - On-device AI with intelligent routing",
   "main": "lib/commonjs/index",

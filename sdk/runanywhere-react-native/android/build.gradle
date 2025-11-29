@@ -11,6 +11,13 @@ buildscript {
     }
 }
 
+// =============================================================================
+// XCFramework/Native Library Configuration
+// =============================================================================
+// Update these values when new versions are released
+def ONNX_NATIVE_VERSION = "0.0.1-dev.e2ac4eb"
+def ONNX_NATIVE_CHECKSUM = "" // TODO: Add checksum verification
+
 def isNewArchitectureEnabled() {
     return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
 }
@@ -37,6 +44,63 @@ def supportsNamespace() {
     return (major == 7 && minor >= 3) || major >= 8
 }
 
+// =============================================================================
+// Download Native Libraries Task
+// =============================================================================
+def nativeLibsDir = file("${projectDir}/src/main/jniLibs")
+def nativeLibsZip = file("${buildDir}/tmp/RunAnywhereONNX-android.zip")
+
+task downloadNativeLibs {
+    description = "Downloads RunAnywhere native libraries for Android"
+
+    outputs.dir(nativeLibsDir)
+
+    doLast {
+        def downloadUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v${ONNX_NATIVE_VERSION}/RunAnywhereONNX-android.zip"
+
+        // Check if already downloaded
+        if (file("${nativeLibsDir}/arm64-v8a/librunanywhere_jni.so").exists()) {
+            println "Native libraries already exist, skipping download."
+            return
+        }
+
+        println "Downloading RunAnywhere native libraries from: ${downloadUrl}"
+
+        // Create directories
+        nativeLibsZip.parentFile.mkdirs()
+        nativeLibsDir.mkdirs()
+
+        // Download
+        ant.get(src: downloadUrl, dest: nativeLibsZip, verbose: true)
+
+        // Extract
+        println "Extracting native libraries..."
+        copy {
+            from zipTree(nativeLibsZip)
+            into nativeLibsDir
+            // The zip contains onnx/<abi>/*.so structure, flatten it
+            eachFile { fcd ->
+                // Path like: onnx/arm64-v8a/libfoo.so -> arm64-v8a/libfoo.so
+                def segments = fcd.relativePath.segments
+                if (segments.length >= 3 && segments[0] == 'onnx') {
+                    fcd.relativePath = new RelativePath(!fcd.isDirectory(), segments.drop(1) as String[])
+                }
+            }
+            includeEmptyDirs = false
+        }
+
+        // Cleanup
+        nativeLibsZip.delete()
+
+        println "Native libraries installed successfully!"
+    }
+}
+
+// Ensure native libs are downloaded before build
+tasks.matching { it.name.startsWith('compile') || it.name.startsWith('merge') }.all {
+    dependsOn downloadNativeLibs
+}
+
 android {
     if (supportsNamespace()) {
         namespace "com.runanywhere.reactnative"
@@ -54,6 +118,11 @@ android {
         minSdkVersion getExtOrIntegerDefault('minSdkVersion')
         targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
         buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+
+        // NDK ABI filters - only include arm64 for now
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildFeatures {
@@ -81,6 +150,9 @@ android {
 
     sourceSets {
         main {
+            // JNI libs location
+            jniLibs.srcDirs = ['src/main/jniLibs']
+
             if (isNewArchitectureEnabled()) {
                 java.srcDirs += [
                     "src/newarch",
@@ -103,9 +175,6 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
-
-    // TODO: Add RunAnywhere Kotlin SDK dependency when available
-    // implementation "com.runanywhere.sdk:RunAnywhereKotlinSDK:0.1.0"
 }
 
 if (isNewArchitectureEnabled()) {

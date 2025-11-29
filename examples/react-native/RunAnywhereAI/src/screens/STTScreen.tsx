@@ -2,6 +2,8 @@
  * STTScreen - Tab 1: Speech-to-Text
  *
  * Reference: iOS Features/Voice/SpeechToTextView.swift
+ *
+ * Uses RunAnywhere SDK for on-device speech recognition.
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
@@ -21,7 +23,12 @@ import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from '../theme
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
 import { ModelInfo, ModelModality, ModelCategory } from '../types/model';
 import { STTMode, STTResult } from '../types/voice';
-import MockSDK from '../services/MockSDK';
+
+// Import RunAnywhere SDK
+import {
+  RunAnywhere,
+  type STTResult as SDKSTTResult,
+} from 'runanywhere-react-native';
 
 export const STTScreen: React.FC = () => {
   // State
@@ -35,8 +42,17 @@ export const STTScreen: React.FC = () => {
 
   // Check for loaded model on mount
   useEffect(() => {
-    const model = MockSDK.getCurrentSTTModel();
-    setCurrentModel(model);
+    const checkModel = async () => {
+      try {
+        const model = await RunAnywhere.currentModel();
+        if (model) {
+          setCurrentModel(model as unknown as ModelInfo);
+        }
+      } catch (error) {
+        console.log('No STT model loaded yet:', error);
+      }
+    };
+    checkModel();
   }, []);
 
   /**
@@ -59,14 +75,13 @@ export const STTScreen: React.FC = () => {
 
   /**
    * Load a model
-   * TODO: Replace with RunAnywhere.loadSTTModel()
    */
   const loadModel = async (modelId: string) => {
     try {
       setIsModelLoading(true);
-      await MockSDK.loadModel(modelId);
-      const model = MockSDK.getCurrentSTTModel();
-      setCurrentModel(model);
+      await RunAnywhere.loadSTTModel(modelId);
+      const model = await RunAnywhere.currentModel();
+      setCurrentModel(model as unknown as ModelInfo);
     } catch (error) {
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
@@ -76,7 +91,9 @@ export const STTScreen: React.FC = () => {
 
   /**
    * Toggle recording
-   * TODO: Implement actual audio recording
+   * Note: In a real app, you would implement actual audio recording
+   * using react-native-audio-recorder-player or similar library.
+   * This demo uses mock audio data for demonstration.
    */
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
@@ -85,10 +102,12 @@ export const STTScreen: React.FC = () => {
       setIsProcessing(true);
 
       try {
-        // TODO: Replace with actual audio data
-        const result = await MockSDK.transcribe('mock_audio_data');
+        // In a real implementation, audioData would come from actual recording
+        // For now, we'll use a placeholder - the SDK expects base64 audio
+        const audioBase64 = ''; // TODO: Replace with actual recorded audio
+        const result = await RunAnywhere.transcribe(audioBase64);
         setTranscript(result.text);
-        setConfidence(result.confidence);
+        setConfidence(result.confidence ?? null);
       } catch (error) {
         Alert.alert('Error', `Transcription failed: ${error}`);
       } finally {
@@ -96,8 +115,7 @@ export const STTScreen: React.FC = () => {
       }
     } else {
       // Start recording
-      // TODO: Request microphone permissions
-      // TODO: Start actual audio recording
+      // TODO: Implement actual audio recording with microphone permissions
       setIsRecording(true);
       setTranscript('');
       setConfidence(null);

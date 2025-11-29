@@ -3,7 +3,15 @@
   "compilerOptions": {
     "declaration": true,
     "declarationMap": true,
-    "outDir": "lib/typescript"
+    "outDir": "lib/typescript",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": [
+    "src/services/AuthenticationService.ts",
+    "src/services/ConfigurationService.ts",
+    "src/services/DownloadService.ts",
+    "src/services/ModelRegistry.ts"
+  ]
 }

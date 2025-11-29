@@ -21,8 +21,12 @@ import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight, Layout } from '../theme/spacing';
 import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
 import { ModelInfo, ModelModality } from '../types/model';
-import { TTSConfiguration } from '../types/voice';
-import MockSDK from '../services/MockSDK';
+
+// Import RunAnywhere SDK
+import {
+  RunAnywhere,
+  type TTSConfiguration as SDKTTSConfiguration,
+} from 'runanywhere-react-native';
 
 export const TTSScreen: React.FC = () => {
   // State
@@ -43,8 +47,17 @@ export const TTSScreen: React.FC = () => {
 
   // Check for loaded model on mount
   useEffect(() => {
-    const model = MockSDK.getCurrentTTSModel();
-    setCurrentModel(model);
+    const checkModel = async () => {
+      try {
+        const model = await RunAnywhere.currentModel();
+        if (model) {
+          setCurrentModel(model as unknown as ModelInfo);
+        }
+      } catch (error) {
+        console.log('No TTS model loaded yet:', error);
+      }
+    };
+    checkModel();
   }, []);
 
   /**
@@ -67,14 +80,13 @@ export const TTSScreen: React.FC = () => {
 
   /**
    * Load a model
-   * TODO: Replace with RunAnywhere.loadTTSModel()
    */
   const loadModel = async (modelId: string) => {
     try {
       setIsModelLoading(true);
-      await MockSDK.loadModel(modelId);
-      const model = MockSDK.getCurrentTTSModel();
-      setCurrentModel(model);
+      await RunAnywhere.loadTTSModel(modelId);
+      const model = await RunAnywhere.currentModel();
+      setCurrentModel(model as unknown as ModelInfo);
     } catch (error) {
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
@@ -84,7 +96,6 @@ export const TTSScreen: React.FC = () => {
 
   /**
    * Generate speech
-   * TODO: Replace with RunAnywhere.synthesize()
    */
   const handleGenerate = useCallback(async () => {
     if (!text.trim() || !currentModel) return;
@@ -93,21 +104,24 @@ export const TTSScreen: React.FC = () => {
     setAudioGenerated(false);
 
     try {
-      const config: TTSConfiguration = {
+      const sdkConfig: SDKTTSConfiguration = {
         voice: 'default',
         rate: speed,
         pitch: pitch,
         volume: volume,
       };
 
-      const result = await MockSDK.synthesize(text, config);
-      setDuration(result.duration);
+      // SDK returns base64 encoded audio
+      const audioBase64 = await RunAnywhere.synthesize(text, sdkConfig);
+      // Estimate duration based on text length (rough estimate)
+      const estimatedDuration = text.length * 0.05; // ~50ms per character
+      setDuration(estimatedDuration);
       setAudioGenerated(true);
 
       // Auto-play
-      // TODO: Implement actual audio playback
+      // TODO: Implement actual audio playback using react-native-sound or similar
       setIsPlaying(true);
-      setTimeout(() => setIsPlaying(false), result.duration * 1000);
+      setTimeout(() => setIsPlaying(false), estimatedDuration * 1000);
     } catch (error) {
       Alert.alert('Error', `Failed to generate speech: ${error}`);
     } finally {
