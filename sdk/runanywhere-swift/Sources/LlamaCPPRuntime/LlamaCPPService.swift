@@ -51,7 +51,7 @@ public struct LlamaCPPGenerationConfig {
 
     public init(
         maxTokens: Int = 256,
-        temperature: Float = 0.7,
+        temperature: Float = 0.8,  // Match LLM.swift default
         systemPrompt: String? = nil
     ) {
         self.maxTokens = maxTokens
