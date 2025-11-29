@@ -378,6 +378,21 @@ class STTComponent(
         return service?.wrappedService
     }
 
+    // MARK: - Capabilities (matches iOS)
+
+    /**
+     * Whether the underlying service supports live/streaming transcription
+     * If false, `streamTranscribe` will internally fall back to batch processing
+     */
+    val supportsStreaming: Boolean
+        get() = service?.wrappedService?.supportsStreaming ?: false
+
+    /**
+     * Get the recommended transcription mode based on service capabilities
+     */
+    val recommendedMode: STTMode
+        get() = if (supportsStreaming) STTMode.LIVE else STTMode.BATCH
+
     // MARK: - Private Helpers
 
     private fun requireReady() {
