@@ -535,6 +535,7 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     private let sttConfiguration: STTConfiguration
     private var isModelLoaded = false
     private var modelPath: String?
+    private var providerName: String = "Unknown"  // Store the provider name for telemetry
 
     // MARK: - Initialization
 
@@ -587,6 +588,9 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         do {
             // Create service through provider
             let sttService = try await provider.createSTTService(configuration: sttConfiguration)
+
+            // Store provider name for telemetry
+            self.providerName = provider.name
 
             // Wrap the service
             let wrapper = STTServiceWrapper(sttService)
@@ -781,8 +785,44 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
         // Track processing time
         let startTime = Date()
 
-        // Perform transcription
-        let result = try await service.transcribe(audioData: audioData, options: options)
+        // Calculate audio length for telemetry
+        let audioLength = estimateAudioLength(dataSize: audioData.count, format: input.format, sampleRate: sttConfiguration.sampleRate)
+        let modelId = sttConfiguration.modelId ?? "unknown"
+        let frameworkName = self.providerName
+
+        // Perform transcription with error telemetry
+        let result: STTTranscriptionResult
+        do {
+            result = try await service.transcribe(audioData: audioData, options: options)
+        } catch {
+            // Submit failure telemetry
+            let processingTime = Date().timeIntervalSince(startTime)
+            Task.detached(priority: .background) {
+                let deviceInfo = TelemetryDeviceInfo.current
+                let eventData = STTTranscriptionTelemetryData(
+                    modelId: modelId,
+                    modelName: modelId,
+                    framework: frameworkName,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: processingTime * 1000,
+                    success: false,
+                    errorMessage: error.localizedDescription,
+                    audioDurationMs: audioLength * 1000,
+                    realTimeFactor: nil,
+                    wordCount: nil,
+                    confidence: nil,
+                    language: nil,
+                    isStreaming: false
+                )
+                let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+                await AnalyticsQueueManager.shared.flush()
+            }
+            throw error
+        }
 
         let processingTime = Date().timeIntervalSince(startTime)
 
@@ -803,16 +843,13 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             )
         }
 
-        // Calculate audio length (estimate based on data size and format)
-        let audioLength = estimateAudioLength(dataSize: audioData.count, format: input.format, sampleRate: sttConfiguration.sampleRate)
-
         let metadata = TranscriptionMetadata(
-            modelId: service.currentModel ?? "unknown",
+            modelId: modelId,
             processingTime: processingTime,
             audioLength: audioLength
         )
 
-        return STTOutput(
+        let output = STTOutput(
             text: result.transcript,
             confidence: result.confidence ?? 0.9,
             wordTimestamps: wordTimestamps,
@@ -820,6 +857,35 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
             alternatives: alternatives,
             metadata: metadata
         )
+
+        // Submit success telemetry for batch transcription
+        let wordCount = result.transcript.split(separator: " ").count
+        let realTimeFactor = audioLength > 0 ? processingTime / audioLength : 0
+        Task.detached(priority: .background) {
+            let deviceInfo = TelemetryDeviceInfo.current
+            let eventData = STTTranscriptionTelemetryData(
+                modelId: modelId,
+                modelName: modelId,
+                framework: frameworkName,
+                device: deviceInfo.device,
+                osVersion: deviceInfo.osVersion,
+                platform: deviceInfo.platform,
+                sdkVersion: SDKConstants.version,
+                processingTimeMs: processingTime * 1000,
+                success: true,
+                audioDurationMs: audioLength * 1000,
+                realTimeFactor: realTimeFactor,
+                wordCount: wordCount,
+                confidence: result.confidence.map { Double($0) },
+                language: result.language,
+                isStreaming: false
+            )
+            let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+            await AnalyticsQueueManager.shared.enqueue(event)
+            await AnalyticsQueueManager.shared.flush()
+        }
+
+        return output
     }
 
     /// Stream transcription
@@ -829,6 +895,10 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
     ) -> AsyncThrowingStream<String, Error> where S.Element == Data {
         AsyncThrowingStream { continuation in
             Task {
+                let startTime = Date()
+                let modelId = self.sttConfiguration.modelId ?? "unknown"
+                let frameworkName = self.providerName
+
                 do {
                     try ensureReady()
 
@@ -856,8 +926,62 @@ public final class STTComponent: BaseComponent<STTServiceWrapper>, @unchecked Se
 
                     // Yield final result
                     continuation.yield(result.transcript)
+
+                    // Submit success telemetry for streaming transcription
+                    let processingTime = Date().timeIntervalSince(startTime)
+                    let wordCount = result.transcript.split(separator: " ").count
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = STTTranscriptionTelemetryData(
+                            modelId: modelId,
+                            modelName: modelId,
+                            framework: frameworkName,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: processingTime * 1000,
+                            success: true,
+                            audioDurationMs: nil,  // Unknown for streaming
+                            realTimeFactor: nil,
+                            wordCount: wordCount,
+                            confidence: result.confidence.map { Double($0) },
+                            language: result.language,
+                            isStreaming: true
+                        )
+                        let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
+                    }
+
                     continuation.finish()
                 } catch {
+                    // Submit failure telemetry for streaming transcription
+                    let processingTime = Date().timeIntervalSince(startTime)
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = STTTranscriptionTelemetryData(
+                            modelId: modelId,
+                            modelName: modelId,
+                            framework: frameworkName,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: processingTime * 1000,
+                            success: false,
+                            errorMessage: error.localizedDescription,
+                            audioDurationMs: nil,
+                            realTimeFactor: nil,
+                            wordCount: nil,
+                            confidence: nil,
+                            language: nil,
+                            isStreaming: true
+                        )
+                        let event = STTEvent(type: .transcriptionCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
+                    }
                     continuation.finish(throwing: error)
                 }
             }

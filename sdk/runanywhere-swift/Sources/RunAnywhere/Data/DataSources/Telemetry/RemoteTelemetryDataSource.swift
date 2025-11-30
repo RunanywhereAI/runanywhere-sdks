@@ -16,7 +16,6 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
 
     public func isAvailable() async -> Bool {
         guard apiClient != nil else {
-            logger.debug("API client not configured for telemetry")
             return false
         }
 
@@ -52,8 +51,6 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
             throw DataSourceError.notAvailable
         }
 
-        logger.debug("Sending telemetry event: \(entity.id)")
-
         return try await operationHelper.withTimeout {
             // Send telemetry event to API
             // In real implementation, this would be:
@@ -64,7 +61,6 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
             // return response
 
             // For now, return the same entity
-            self.logger.debug("Telemetry send not yet implemented")
             return entity
         }
     }
@@ -85,33 +81,32 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
             throw DataSourceError.notAvailable
         }
 
-        logger.info("Syncing \(batch.count) telemetry items")
-
         var syncedIds: [String] = []
 
-        // For telemetry, we can batch sync using POST to the regular endpoint
-        // Since telemetry is typically high-volume, we send in batches
-        struct TelemetryBatch: Encodable {
-            let events: [TelemetryData]
-            let deviceId: String
-            let timestamp: Date
-        }
+        // Convert TelemetryData to typed TelemetryEventPayload for API transmission
+        // Backend expects typed fields, not a properties dictionary
+        let typedEvents = batch.map { TelemetryEventPayload(from: $0) }
 
-        let telemetryBatch = TelemetryBatch(
-            events: batch,
+        let batchRequest = TelemetryBatchRequest(
+            events: typedEvents,
             deviceId: PersistentDeviceIdentity.getPersistentDeviceUUID(),
             timestamp: Date()
         )
 
         do {
-            // Use regular POST to telemetry endpoint with batch
-            let _: [String: Bool] = try await apiClient.post(
+            // POST typed batch to telemetry endpoint
+            let response: TelemetryBatchResponse = try await apiClient.post(
                 .telemetry,
-                telemetryBatch,
+                batchRequest,
                 requiresAuth: true
             )
-            syncedIds = batch.map { $0.id }
-            logger.info("Successfully synced batch of \(batch.count) telemetry items")
+
+            if response.success {
+                syncedIds = batch.map { $0.id }
+            } else {
+                // Still mark as synced to avoid infinite retries
+                syncedIds = batch.map { $0.id }
+            }
         } catch {
             logger.error("Failed to sync telemetry batch: \(error)")
         }
@@ -127,16 +122,15 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
         return try await operationHelper.withTimeout {
             // Test telemetry endpoint availability
             // let _: [String: Bool] = try await apiClient.get(APIEndpoint.telemetryHealth)
-            self.logger.debug("Telemetry service connection test skipped (not implemented)")
             return true // Assume available for telemetry
         }
     }
 
     // MARK: - Telemetry-specific methods
 
-    /// Send batch of telemetry events
+    /// Send batch of telemetry events (immediate send, no local storage)
     public func sendBatch(_ events: [TelemetryData]) async throws {
-        guard apiClient != nil else {
+        guard let apiClient = apiClient else {
             throw DataSourceError.notAvailable
         }
 
@@ -144,18 +138,25 @@ public actor RemoteTelemetryDataSource: RemoteDataSource {
             return
         }
 
-        logger.info("Sending batch of \(events.count) telemetry events")
+        // Convert to typed payloads
+        let typedEvents = events.map { TelemetryEventPayload(from: $0) }
 
-        try await operationHelper.withTimeout {
-            // Send batch to API
-            // let _: [String: Any] = try await apiClient.post(
-            //     APIEndpoint.telemetryBatch,
-            //     body: ["events": events]
-            // )
+        let batchRequest = TelemetryBatchRequest(
+            events: typedEvents,
+            deviceId: PersistentDeviceIdentity.getPersistentDeviceUUID(),
+            timestamp: Date()
+        )
 
-            self.logger.debug("Telemetry batch send not yet implemented")
+        let response: TelemetryBatchResponse = try await operationHelper.withTimeout {
+            try await apiClient.post(
+                .telemetry,
+                batchRequest,
+                requiresAuth: true
+            )
         }
 
-        logger.info("Successfully sent \(events.count) telemetry events")
+        if !response.success {
+            logger.warning("Telemetry send partial failure: \(response.errors?.joined(separator: ", ") ?? "unknown")")
+        }
     }
 }

@@ -254,15 +254,6 @@ struct RunAnywhereAIApp: App {
                 // These models will download but fail at extraction on iOS
                 // TODO: Replace with ZIP format models or provide pre-extracted models
                 try! ModelRegistration(
-                    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2",
-                    framework: .onnx,
-                    modality: .voiceToText,
-                    id: "zipformer-en-20m",
-                    name: "Zipformer English 20M (ONNX) [macOS only]",
-                    format: .onnx,
-                    memoryRequirement: 20_000_000
-                ),
-                try! ModelRegistration(
                     url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
                     framework: .onnx,
                     modality: .voiceToText,
