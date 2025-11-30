@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:runanywhere/runanywhere.dart' show MessageRole;
 
 import '../models/app_types.dart';
 

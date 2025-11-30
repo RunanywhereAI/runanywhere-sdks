@@ -64,12 +64,8 @@ extension FileSizeFormatter on int {
   }
 }
 
-/// Message role for chat conversations
-enum MessageRole {
-  system,
-  user,
-  assistant,
-}
+// MessageRole is now provided by the RunAnywhere SDK
+// import 'package:runanywhere/runanywhere.dart' show MessageRole;
 
 /// Completion status for message generation
 enum CompletionStatus {

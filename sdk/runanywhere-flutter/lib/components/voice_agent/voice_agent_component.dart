@@ -4,7 +4,6 @@ import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/types/component_state.dart';
 import '../../core/protocols/component/component_configuration.dart';
-import '../../core/module_registry.dart' show STTOptions, VADService, VADResult;
 import '../../public/events/sdk_event.dart';
 import '../vad/vad_component.dart';
 import '../vad/vad_configuration.dart';
@@ -132,26 +131,15 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
       // STT Processing
       final stt = sttComponent;
       if (stt != null && stt.service != null) {
-        final sttInput = STTInput(
-          audioData: audioData,
-          options: STTOptions(),
-        );
-        final sttResult = await stt.transcribe(sttInput);
-        result.transcription = sttResult.transcript;
-        eventBus.publish(SDKVoiceEvent.transcriptionFinal(text: sttResult.transcript));
+        final sttResult = await stt.transcribe(audioData.toList());
+        result.transcription = sttResult.text;
+        eventBus.publish(SDKVoiceEvent.transcriptionFinal(text: sttResult.text));
       }
 
       // LLM Processing
       final llm = llmComponent;
       if (llm != null && llm.service != null && result.transcription != null) {
-        final llmInput = LLMInput(
-          prompt: result.transcription!,
-          options: LLMGenerationOptions(
-            maxTokens: agentParams.llmConfig.contextLength,
-            temperature: 0.7,
-          ),
-        );
-        final llmResult = await llm.generate(llmInput);
+        final llmResult = await llm.generate(result.transcription!);
         result.response = llmResult.text;
         eventBus.publish(SDKVoiceEvent.responseGenerated(text: llmResult.text));
       }
@@ -200,10 +188,8 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
     if (stt == null || stt.service == null) {
       return null;
     }
-    final result = await stt.transcribe(
-      STTInput(audioData: audioData, options: STTOptions()),
-    );
-    return result.transcript;
+    final result = await stt.transcribe(audioData.toList());
+    return result.text;
   }
 
   /// Process only through LLM
@@ -212,15 +198,7 @@ class VoiceAgentComponent extends BaseComponent<VoiceAgentService> {
     if (llm == null || llm.service == null) {
       return null;
     }
-    final result = await llm.generate(
-      LLMInput(
-        prompt: prompt,
-        options: LLMGenerationOptions(
-          maxTokens: agentParams.llmConfig.contextLength,
-          temperature: 0.7,
-        ),
-      ),
-    );
+    final result = await llm.generate(prompt);
     return result.text;
   }
 

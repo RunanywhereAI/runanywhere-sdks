@@ -33,32 +33,21 @@ enum ModelCategory {
   speakerDiarization,
 }
 
-/// Framework type
+/// Framework type for AI inference
+/// Matches iOS LLMFramework from shared types
 enum LLMFramework {
-  llamaCpp,
-  whisperKit,
-  foundationModels,
-  coreML,
-  mlx,
-  tensorFlowLite,
-}
+  llamaCpp('llama.cpp'),
+  onnx('ONNX'),
+  coreML('CoreML'),
+  tensorflowLite('TFLite'),
+  foundationModels('FoundationModels'),
+  whisperKit('WhisperKit'),
+  systemTTS('SystemTTS'),
+  mlx('MLX');
 
-extension LLMFrameworkExtension on LLMFramework {
-  String get value {
-    switch (this) {
-      case LLMFramework.llamaCpp:
-        return 'llama.cpp';
-      case LLMFramework.whisperKit:
-        return 'WhisperKit';
-      case LLMFramework.foundationModels:
-        return 'Foundation Models';
-      case LLMFramework.coreML:
-        return 'Core ML';
-      case LLMFramework.mlx:
-        return 'MLX';
-      case LLMFramework.tensorFlowLite:
-        return 'TensorFlow Lite';
-    }
-  }
-}
+  final String displayName;
+  const LLMFramework(this.displayName);
 
+  /// Legacy getter for backward compatibility
+  String get value => displayName;
+}
