@@ -1,24 +1,23 @@
 /**
- * RunAnywhere Core LlamaCPP Module
+ * RunAnywhere Core JNI Module
  *
- * This module provides the LlamaCPP backend for RunAnywhere Core.
- * It depends on runanywhere-core-jni for the shared JNI bridge.
+ * This module provides the unified JNI bridge to the RunAnywhere Core C++ library.
+ * It contains the shared JNI bindings that work with ALL backends (ONNX, LlamaCPP, etc.).
  *
  * Architecture:
- *   LlamaCppCoreService -> RunAnywhereBridge (from jni module)
- *     -> librunanywhere_jni.so (from jni module)
- *     -> librunanywhere_bridge.so (from jni module)
- *     -> librunanywhere_llamacpp.so (THIS module)
- *     -> libomp.so, libc++_shared.so (THIS module)
+ *   Kotlin Service Layer -> RunAnywhereBridge (this module)
+ *     -> Native Library (librunanywhere_jni.so) -> C API (runanywhere_bridge.h)
+ *       -> Backend-specific libraries (via backend modules)
  *
- * This module provides ONLY the LlamaCPP-specific native libraries:
- *   - librunanywhere_llamacpp.so (LlamaCPP backend implementation)
- *   - libomp.so (OpenMP for parallelization)
- *   - libc++_shared.so (C++ standard library)
+ * This module provides:
+ *   - librunanywhere_jni.so (JNI bridge)
+ *   - librunanywhere_bridge.so (C API bridge)
+ *
+ * Backend modules (runanywhere-core-onnx, runanywhere-core-llamacpp) add their specific libraries.
  *
  * Build modes:
  *   - Remote (default): Downloads pre-built native libraries from GitHub releases
- *   - Local: Uses locally built libraries from runanywhere-core/dist/android/llamacpp
+ *   - Local: Uses locally built libraries from runanywhere-core/dist/android/jni
  *
  * To use local mode: ./gradlew build -Prunanywhere.native.local=true
  */
@@ -28,7 +27,6 @@ import java.net.URL
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.serialization)
     `maven-publish`
 }
 
@@ -75,27 +73,21 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                // Core SDK dependency for interfaces and models
+                // Core SDK dependency for result types (NativeTTSSynthesisResult, etc.)
                 api(project.parent!!.parent!!)
                 implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
             }
         }
 
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation(libs.kotlinx.coroutines.test)
             }
         }
 
         // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
-            dependencies {
-                // Use shared JNI bridge from the jni module
-                api(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-jni"))
-            }
         }
 
         val jvmMain by getting {
@@ -116,7 +108,9 @@ kotlin {
 // =============================================================================
 
 android {
-    namespace = "com.runanywhere.sdk.core.llamacpp"
+    // Note: Can't use "native" in namespace (Java keyword), but Kotlin package name
+    // MUST be com.runanywhere.sdk.native.bridge to match JNI function registration
+    namespace = "com.runanywhere.sdk.jni.bridge"
     compileSdk = 36
 
     defaultConfig {
@@ -158,19 +152,19 @@ android {
     sourceSets {
         getByName("main") {
             if (useLocalBuild) {
-                // Local mode: use locally built libraries from runanywhere-core/dist
-                val distDir = runAnywhereCoreDir.resolve("dist/android/llamacpp")
+                // Local mode: use locally built JNI libraries from runanywhere-core/dist/android/jni
+                val distDir = runAnywhereCoreDir.resolve("dist/android/jni")
                 if (distDir.exists()) {
                     jniLibs.srcDirs(distDir)
-                    logger.lifecycle("Using local native libraries from: $distDir")
+                    logger.lifecycle("JNI module: Using local native libraries from: $distDir")
                 } else {
-                    logger.warn("Local libraries not found at: $distDir")
-                    logger.warn("Run: cd runanywhere-core && ./scripts/build-android-backend.sh llamacpp")
+                    logger.warn("JNI module: Local libraries not found at: $distDir")
+                    logger.warn("Run: cd runanywhere-core && ./scripts/build-android.sh all")
                 }
             } else {
                 // Remote mode: use downloaded libraries
                 jniLibs.srcDirs(jniLibsDir)
-                logger.lifecycle("Using downloaded native libraries from: $jniLibsDir")
+                logger.lifecycle("JNI module: Using downloaded native libraries from: $jniLibsDir")
             }
         }
     }
@@ -181,14 +175,14 @@ android {
 // =============================================================================
 
 /**
- * Task to download pre-built native libraries from GitHub releases
+ * Task to download pre-built JNI libraries from GitHub releases
  */
 val downloadNativeLibs by tasks.registering {
-    description = "Downloads pre-built native libraries from GitHub releases"
+    description = "Downloads pre-built JNI bridge libraries from GitHub releases"
     group = "build setup"
 
     val versionFile = file("$jniLibsDir/.version")
-    val zipFile = file("$downloadedLibsDir/RunAnywhereLlamaCPP-android.zip")
+    val zipFile = file("$downloadedLibsDir/RunAnywhereJNI-android.zip")
 
     outputs.dir(jniLibsDir)
     outputs.upToDateWhen {
@@ -203,13 +197,13 @@ val downloadNativeLibs by tasks.registering {
 
         val currentVersion = if (versionFile.exists()) versionFile.readText().trim() else ""
         if (currentVersion == nativeLibVersion) {
-            logger.lifecycle("Native libraries version $nativeLibVersion already downloaded")
+            logger.lifecycle("JNI libraries version $nativeLibVersion already downloaded")
             return@doLast
         }
 
-        logger.lifecycle("Downloading native libraries version $nativeLibVersion...")
+        logger.lifecycle("Downloading JNI libraries version $nativeLibVersion...")
 
-        val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/RunAnywhereLlamaCPP-android.zip"
+        val downloadUrl = "https://github.com/$githubOrg/$githubRepo/releases/download/v$nativeLibVersion/RunAnywhereJNI-android.zip"
 
         // Create download directory
         downloadedLibsDir.mkdirs()
@@ -224,14 +218,14 @@ val downloadNativeLibs by tasks.registering {
             }
             logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
         } catch (e: Exception) {
-            logger.error("Failed to download native libraries: ${e.message}")
+            logger.error("Failed to download JNI libraries: ${e.message}")
             logger.error("URL: $downloadUrl")
             logger.lifecycle("")
             logger.lifecycle("Options:")
             logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
-            logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android-backend.sh llamacpp")
+            logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android.sh all")
             logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.native.local=true")
-            throw GradleException("Failed to download native libraries", e)
+            throw GradleException("Failed to download JNI libraries", e)
         }
 
         // Clear existing jniLibs
@@ -239,17 +233,17 @@ val downloadNativeLibs by tasks.registering {
         jniLibsDir.mkdirs()
 
         // Extract the ZIP
-        logger.lifecycle("Extracting native libraries...")
+        logger.lifecycle("Extracting JNI libraries...")
         copy {
             from(zipTree(zipFile))
             into(downloadedLibsDir)
         }
 
         // Move libraries to jniLibs directory
-        // ZIP structure: llamacpp/<abi>/lib*.so -> jniLibs/<abi>/lib*.so
-        val llamacppDir = file("$downloadedLibsDir/llamacpp")
-        if (llamacppDir.exists()) {
-            llamacppDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+        // ZIP structure: jni/<abi>/lib*.so -> jniLibs/<abi>/lib*.so
+        val jniDir = file("$downloadedLibsDir/jni")
+        if (jniDir.exists()) {
+            jniDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
                 val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
                 targetAbiDir.mkdirs()
                 abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
@@ -261,7 +255,7 @@ val downloadNativeLibs by tasks.registering {
 
         // Write version marker
         versionFile.writeText(nativeLibVersion)
-        logger.lifecycle("Native libraries version $nativeLibVersion installed")
+        logger.lifecycle("JNI libraries version $nativeLibVersion installed")
     }
 }
 
@@ -276,7 +270,7 @@ if (!useLocalBuild) {
  * Task to clean downloaded native libraries
  */
 val cleanNativeLibs by tasks.registering(Delete::class) {
-    description = "Removes downloaded native libraries"
+    description = "Removes downloaded JNI libraries"
     group = "build"
     delete(jniLibsDir)
     delete(downloadedLibsDir)
@@ -290,24 +284,22 @@ tasks.named("clean") {
  * Task to print native library info
  */
 val printNativeLibInfo by tasks.registering {
-    description = "Prints information about native library configuration"
+    description = "Prints information about JNI library configuration"
     group = "help"
 
     doLast {
         println()
-        println("RunAnywhere Core LlamaCPP - Native Library Configuration")
+        println("RunAnywhere Core JNI - Native Library Configuration")
         println("=" .repeat(60))
         println()
         println("Build Mode:        ${if (useLocalBuild) "LOCAL" else "REMOTE"}")
         println("Native Version:    $nativeLibVersion")
-        println("GitHub Org:        $githubOrg")
-        println("GitHub Repo:       $githubRepo")
         println()
         println("Directories:")
         println("  jniLibs:         $jniLibsDir")
-        println("  downloaded:      $downloadedLibsDir")
         if (useLocalBuild) {
             println("  runanywhere-core: $runAnywhereCoreDir")
+            println("  dist dir:        ${runAnywhereCoreDir.resolve("dist/android/jni")}")
         }
         println()
 
@@ -319,7 +311,7 @@ val printNativeLibInfo by tasks.registering {
         }
 
         println()
-        println("Libraries:")
+        println("Libraries (shared JNI bridge):")
         jniLibsDir.listFiles()?.filter { it.isDirectory }?.forEach { abiDir ->
             println("  ${abiDir.name}/")
             abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
@@ -331,24 +323,14 @@ val printNativeLibInfo by tasks.registering {
 }
 
 // =============================================================================
-// Include third-party licenses in JVM JAR
-// =============================================================================
-
-tasks.named<Jar>("jvmJar") {
-    from(rootProject.file("THIRD_PARTY_LICENSES.md")) {
-        into("META-INF")
-    }
-}
-
-// =============================================================================
 // Publishing Configuration
 // =============================================================================
 
 publishing {
     publications.withType<MavenPublication> {
         pom {
-            name.set("RunAnywhere Core LlamaCPP Module")
-            description.set("Native LlamaCPP backend for RunAnywhere SDK via JNI")
+            name.set("RunAnywhere Core JNI Module")
+            description.set("Unified JNI bridge for RunAnywhere Core C++ library")
             url.set("https://github.com/RunanywhereAI/runanywhere-sdks")
 
             licenses {

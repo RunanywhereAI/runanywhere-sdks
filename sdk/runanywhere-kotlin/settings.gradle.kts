@@ -41,14 +41,19 @@ include(":modules:runanywhere-whisperkit")
 // Note: This module depends on mlc4j (MLC-LLM native library) which is included conditionally
 include(":modules:runanywhere-llm-mlc")
 
+// RunAnywhere Core JNI module - unified JNI bridge for all backends
+// Contains the shared JNI layer (librunanywhere_jni.so, librunanywhere_bridge.so)
+// All backend modules depend on this module
+include(":modules:runanywhere-core-jni")
+
 // RunAnywhere Core ONNX module - provides native ONNX Runtime backend via JNI
-// This module wraps runanywhere-core C++ library for Android
-// Similar to CRunAnywhereONNX in the Swift SDK
+// This module adds ONNX-specific libraries (librunanywhere_onnx.so, libonnxruntime.so)
+// Depends on runanywhere-core-jni for the shared JNI bridge
 include(":modules:runanywhere-core-onnx")
 
 // RunAnywhere Core LlamaCPP module - provides native LlamaCPP backend via JNI
-// This module wraps runanywhere-core C++ library for Android
-// Similar to CRunAnywhereLlamaCPP in the Swift SDK
+// This module adds LlamaCPP-specific libraries (librunanywhere_llamacpp.so, libomp.so)
+// Depends on runanywhere-core-jni for the shared JNI bridge
 include(":modules:runanywhere-core-llamacpp")
 
 // MLC4J - Native MLC-LLM library (Git submodule inside MLC module)

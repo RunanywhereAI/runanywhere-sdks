@@ -36,6 +36,10 @@ include(":sdk:runanywhere-kotlin:jni")
 project(":sdk:runanywhere-kotlin:jni").projectDir = file("../../../sdk/runanywhere-kotlin/jni")
 
 // Include SDK modules
+// RunAnywhere Core JNI module - unified JNI bridge for all backends (REQUIRED)
+include(":sdk:runanywhere-kotlin:modules:runanywhere-core-jni")
+project(":sdk:runanywhere-kotlin:modules:runanywhere-core-jni").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-jni")
+
 // RunAnywhere Core LlamaCPP module - native LlamaCPP backend with chat template support
 include(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp")
 project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp").projectDir = file("../../../sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp")
