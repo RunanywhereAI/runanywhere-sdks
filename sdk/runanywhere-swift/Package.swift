@@ -161,10 +161,11 @@ let package = Package(
         ),
 
         // Unified Binary xcframework (ONNX + LlamaCPP)
-        // Build with: cd runanywhere-core && ./scripts/build-ios-core.sh
+        // Remote distribution from runanywhere-binaries releases
         .binaryTarget(
             name: "RunAnywhereCoreBinary",
-            path: "Binaries/RunAnywhereCore.xcframework"
+            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
+            checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
         ),
 
         // =================================================================
