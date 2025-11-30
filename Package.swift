@@ -17,10 +17,6 @@ let package = Package(
         ),
         // Optional adapter modules
         .library(
-            name: "LLMSwift",
-            targets: ["LLMSwift"]
-        ),
-        .library(
             name: "WhisperKitTranscription",
             targets: ["WhisperKitTranscription"]
         ),
@@ -41,15 +37,22 @@ let package = Package(
         .package(url: "https://github.com/kean/Pulse", from: "4.0.0"),
 
         // Adapter module dependencies
-        .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.5.0"),
     ],
     targets: [
+        // RunAnywhereCore binary (C++ core library)
+        .binaryTarget(
+            name: "RunAnywhereCore",
+            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+            checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
+        ),
+
         // Core SDK target
         .target(
             name: "RunAnywhere",
             dependencies: [
+                "RunAnywhereCore",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),
@@ -66,16 +69,6 @@ let package = Package(
             swiftSettings: [
                 .define("SWIFT_PACKAGE")
             ]
-        ),
-
-        // LLMSwift adapter target (requires iOS 16+)
-        .target(
-            name: "LLMSwift",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "LLM", package: "LLM.swift")
-            ],
-            path: "sdk/runanywhere-swift/Modules/LLMSwift/Sources/LLMSwift"
         ),
 
         // WhisperKit adapter target (requires iOS 16+)

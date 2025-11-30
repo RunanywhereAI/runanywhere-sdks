@@ -35,7 +35,7 @@ public struct RunAnywhereGenerationOptions: Sendable {
     /// Initialize generation options
     /// - Parameters:
     ///   - maxTokens: Maximum tokens to generate (default: 100)
-    ///   - temperature: Sampling temperature (default: 0.7)
+    ///   - temperature: Sampling temperature (default: 0.8, matches LLM.swift)
     ///   - topP: Top-p sampling (default: 1.0)
 ///   - enableRealTimeTracking: Enable real-time cost tracking (default: true)
     ///   - stopSequences: Stop generation at these sequences (default: empty)
@@ -46,7 +46,7 @@ public struct RunAnywhereGenerationOptions: Sendable {
     ///   - systemPrompt: System prompt for AI behavior (optional)
     public init(
         maxTokens: Int = 100,
-        temperature: Float = 0.7,
+        temperature: Float = 0.8,
         topP: Float = 1.0,
 enableRealTimeTracking: Bool = true,
         stopSequences: [String] = [],

@@ -1,19 +1,25 @@
 /**
  * RunAnywhere Core ONNX Module
  *
- * This module provides JNI bindings to the RunAnywhere Core C++ library with ONNX Runtime backend.
- * It mirrors the architecture of runanywhere-swift's CRunAnywhereONNX module.
+ * This module provides the ONNX Runtime backend for RunAnywhere Core.
+ * It depends on runanywhere-core-jni for the shared JNI bridge.
  *
  * Architecture:
- *   Kotlin Service Layer (ONNXCoreService) -> JNI Bindings (RunAnywhareBridge)
- *     -> Native Library (librunanywhere_jni.so) -> C API (runanywhere_bridge.h)
- *       -> C++ Backend (runanywhere_onnx)
+ *   ONNXCoreService -> RunAnywhereBridge (from jni module)
+ *     -> librunanywhere_jni.so (from jni module)
+ *     -> librunanywhere_bridge.so (from jni module)
+ *     -> librunanywhere_onnx.so (THIS module)
+ *     -> libonnxruntime.so (THIS module)
+ *
+ * This module provides ONLY the ONNX-specific native libraries:
+ *   - librunanywhere_onnx.so (ONNX backend implementation)
+ *   - libonnxruntime.so (ONNX Runtime dependency)
  *
  * Build modes:
  *   - Remote (default): Downloads pre-built native libraries from GitHub releases
- *   - Local: Builds from runanywhere-core source (requires NDK and CMake)
+ *   - Local: Uses locally built libraries from runanywhere-core/dist/android/onnx
  *
- * To use local mode: ./gradlew build -Prunanywhere.native.local=true
+ * To use local mode: ./gradlew build -Prunanywhere.testLocal=true
  */
 
 import java.net.URL
@@ -36,7 +42,7 @@ val nativeLibVersion = project.findProperty("runanywhere.native.version")?.toStr
     ?: "0.0.1-dev"
 
 // Use local build mode (requires runanywhere-core to be built locally)
-val useLocalBuild = project.findProperty("runanywhere.native.local")?.toString()?.toBoolean() ?: false
+val useLocalBuild = project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean() ?: false
 
 // GitHub configuration for downloads
 val githubOrg = project.findProperty("runanywhere.github.org")?.toString() ?: "RunanywhereAI"
@@ -48,6 +54,26 @@ val runAnywhereCoreDir = project.projectDir.resolve("../../../../../runanywhere-
 // Native libraries directory
 val jniLibsDir = file("src/main/jniLibs")
 val downloadedLibsDir = file("build/downloaded-libs")
+
+// =============================================================================
+// Project Path Resolution
+// =============================================================================
+// When included as a subproject in composite builds (e.g., from example app),
+// the module path changes. This function resolves the correct path for sibling modules.
+fun resolveModulePath(moduleName: String): String {
+    // Try to find the module with different path prefixes
+    val possiblePaths = listOf(
+        ":modules:$moduleName",                           // When building SDK directly
+        ":sdk:runanywhere-kotlin:modules:$moduleName",    // When included from example app
+    )
+    for (path in possiblePaths) {
+        if (project.findProject(path) != null) {
+            return path
+        }
+    }
+    // Default to the most common path
+    return ":modules:$moduleName"
+}
 
 // =============================================================================
 // Kotlin Multiplatform Configuration
@@ -86,6 +112,10 @@ kotlin {
         // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
+            dependencies {
+                // Use shared JNI bridge from the jni module
+                api(project(resolveModulePath("runanywhere-core-jni")))
+            }
         }
 
         val jvmMain by getting {
@@ -220,7 +250,7 @@ val downloadNativeLibs by tasks.registering {
             logger.lifecycle("Options:")
             logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
             logger.lifecycle("  2. Build locally: ./scripts/download-native-libs.sh")
-            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.native.local=true")
+            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
             throw GradleException("Failed to download native libraries", e)
         }
 
@@ -236,16 +266,13 @@ val downloadNativeLibs by tasks.registering {
         }
 
         // Move libraries to jniLibs directory
-        // ZIP structure: onnx/<abi>/lib*.so -> jniLibs/<abi>/lib*.so
-        val onnxDir = file("$downloadedLibsDir/onnx")
-        if (onnxDir.exists()) {
-            onnxDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
-                val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
-                targetAbiDir.mkdirs()
-                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                    soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
-                    logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
-                }
+        // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
+        downloadedLibsDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+            val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
+            targetAbiDir.mkdirs()
+            abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
+                logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
             }
         }
 
