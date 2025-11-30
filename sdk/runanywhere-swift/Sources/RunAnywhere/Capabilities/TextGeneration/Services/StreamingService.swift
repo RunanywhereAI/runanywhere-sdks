@@ -45,6 +45,11 @@ public class StreamingService {
             // Continuation for result task
             private var resultContinuation: CheckedContinuation<GenerationResult, Error>?
 
+            /// Reset start time to now - call this right before model inference begins
+            func resetStartTime() {
+                startTime = Date()
+            }
+
             func recordToken(_ token: String, isThinking: Bool) {
                 fullText += token
                 tokenCount += 1
@@ -64,12 +69,12 @@ public class StreamingService {
                 thinkingEndTime = Date()
             }
 
-            func recordError(_ err: Error, modelName: String?, prompt: String) {
+            func recordError(_ err: Error, modelName: String?, prompt: String, options: RunAnywhereGenerationOptions) {
                 error = err
                 resultContinuation?.resume(throwing: err)
                 resultContinuation = nil
 
-                // Submit analytics for failed generation (non-blocking, silent failures)
+                // Submit dev analytics for failed generation (non-blocking, silent failures)
                 if let modelName = modelName {
                     Task.detached(priority: .background) {
                         await RunAnywhere.submitGenerationAnalytics(
@@ -82,10 +87,40 @@ public class StreamingService {
                             executionTarget: "unknown"
                         )
                     }
+
+                    // Also submit via AnalyticsQueueManager for production telemetry
+                    let temperature = options.temperature
+                    let maxTokens = options.maxTokens
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = GenerationCompletionData(
+                            modelId: modelName,
+                            modelName: modelName,
+                            framework: nil,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: nil,
+                            success: false,
+                            errorMessage: err.localizedDescription,
+                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                            outputTokens: 0,
+                            totalTokens: RunAnywhere.estimateTokenCount(prompt),
+                            tokensPerSecond: nil,
+                            timeToFirstTokenMs: nil,
+                            generationTimeMs: nil,
+                            temperature: Double(temperature),
+                            maxTokens: maxTokens
+                        )
+                        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
+                    }
                 }
             }
 
-            func recordStreamComplete(modelName: String, framework: LLMFramework?, prompt: String) {
+            func recordStreamComplete(modelName: String, framework: LLMFramework?, prompt: String, options: RunAnywhereGenerationOptions, contextLength: Int?) {
                 self.modelName = modelName
                 self.framework = framework
                 self.isComplete = true
@@ -96,7 +131,7 @@ public class StreamingService {
                     continuation.resume(returning: result)
                     resultContinuation = nil
 
-                    // Submit analytics (non-blocking, silent failures)
+                    // Submit dev analytics (non-blocking, silent failures) - only works in dev mode
                     Task.detached(priority: .background) {
                         await RunAnywhere.submitGenerationAnalytics(
                             generationId: UUID().uuidString,
@@ -107,6 +142,36 @@ public class StreamingService {
                             success: true,
                             executionTarget: result.executionTarget.rawValue
                         )
+                    }
+
+                    // Also submit via AnalyticsQueueManager for production telemetry
+                    let temperature = options.temperature
+                    let maxTokens = options.maxTokens
+                    Task.detached(priority: .background) {
+                        let deviceInfo = TelemetryDeviceInfo.current
+                        let eventData = GenerationCompletionData(
+                            modelId: result.modelUsed,
+                            modelName: modelName,
+                            framework: framework?.rawValue,
+                            device: deviceInfo.device,
+                            osVersion: deviceInfo.osVersion,
+                            platform: deviceInfo.platform,
+                            sdkVersion: SDKConstants.version,
+                            processingTimeMs: result.latencyMs,
+                            success: true,
+                            inputTokens: RunAnywhere.estimateTokenCount(prompt),
+                            outputTokens: result.tokensUsed,
+                            totalTokens: RunAnywhere.estimateTokenCount(prompt) + result.tokensUsed,
+                            tokensPerSecond: result.performanceMetrics.tokensPerSecond,
+                            timeToFirstTokenMs: result.performanceMetrics.timeToFirstTokenMs,
+                            generationTimeMs: result.latencyMs,
+                            contextLength: contextLength,
+                            temperature: Double(temperature),
+                            maxTokens: maxTokens
+                        )
+                        let event = GenerationEvent(type: .generationCompleted, eventData: eventData)
+                        await AnalyticsQueueManager.shared.enqueue(event)
+                        await AnalyticsQueueManager.shared.flush()
                     }
                 }
             }
@@ -215,8 +280,10 @@ public class StreamingService {
                     var inThinkingSection = false
                     var accumulatedThinking = ""
 
-                    // Start timing
-                    await collector.recordToken("", isThinking: false) // Initialize timing
+                    // Reset start time RIGHT before inference begins
+                    // This ensures time-to-first-token only measures model inference time,
+                    // not SDK preparation overhead (config loading, prompt prep, etc.)
+                    await collector.resetStartTime()
 
                     // Use the actual streaming method
                     try await loadedModel.service.streamGenerate(
@@ -270,10 +337,12 @@ public class StreamingService {
                     await collector.recordStreamComplete(
                         modelName: loadedModel.model.name,
                         framework: loadedModel.model.compatibleFrameworks.first,
-                        prompt: prompt
+                        prompt: prompt,
+                        options: resolvedOptions,
+                        contextLength: loadedModel.model.contextLength
                     )
                 } catch {
-                    await collector.recordError(error, modelName: modelName, prompt: prompt)
+                    await collector.recordError(error, modelName: modelName, prompt: prompt, options: options)
                     continuation.finish(throwing: error)
                 }
             }

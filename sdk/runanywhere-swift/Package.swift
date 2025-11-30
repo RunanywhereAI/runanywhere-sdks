@@ -1,12 +1,20 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
+// =============================================================================
+// BINARY TARGET CONFIGURATION
+// =============================================================================
+// Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
+// Set to `false` to use remote XCFramework from GitHub releases (default for production use)
+let testLocal = false
+// =============================================================================
+
 let package = Package(
     name: "RunAnywhere",
     // NOTE: Platform minimums are set to support all modules.
     // Core SDK (RunAnywhere) has availability annotations for iOS 14+ / macOS 12+
     // Optional modules have higher requirements:
-    //   - WhisperKit, LLMSwift: iOS 16+ / macOS 13+
+    //   - WhisperKit, LlamaCPPRuntime: iOS 16+ / macOS 13+
     //   - FluidAudio: iOS 17+ / macOS 14+
     //   - AppleAI: iOS 26+ runtime (builds on iOS 16+)
     platforms: [
@@ -34,19 +42,20 @@ let package = Package(
         ),
 
         // =================================================================
+        // LlamaCPP Backend - adds LLM text generation
+        // Uses GGUF models with Metal acceleration
+        // =================================================================
+        .library(
+            name: "RunAnywhereLlamaCPP",
+            targets: ["LlamaCPPRuntime"]
+        ),
+
+        // =================================================================
         // WhisperKit Backend - CoreML-based STT (iOS 16+)
         // =================================================================
         .library(
             name: "RunAnywhereWhisperKit",
             targets: ["WhisperKitTranscription"]
-        ),
-
-        // =================================================================
-        // LLM.swift Backend - Local LLM inference (iOS 16+)
-        // =================================================================
-        .library(
-            name: "RunAnywhereLLM",
-            targets: ["LLMSwift"]
         ),
 
         // =================================================================
@@ -79,9 +88,6 @@ let package = Package(
         // WhisperKit dependency
         .package(url: "https://github.com/argmaxinc/WhisperKit", exact: "0.13.1"),
 
-        // LLM.swift dependency
-        .package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1"),
-
         // FluidAudio dependency
         .package(url: "https://github.com/FluidInference/FluidAudio.git", branch: "main"),
     ],
@@ -111,6 +117,16 @@ let package = Package(
         ),
 
         // =================================================================
+        // C Bridge Module - Exposes unified xcframework C APIs to Swift
+        // =================================================================
+        .target(
+            name: "CRunAnywhereCore",
+            dependencies: ["RunAnywhereCoreBinary"],
+            path: "Sources/CRunAnywhereCore",
+            publicHeadersPath: "include"
+        ),
+
+        // =================================================================
         // ONNX Runtime Backend
         // Provides: STT (streaming), TTS, VAD, Speaker Diarization
         // =================================================================
@@ -118,8 +134,8 @@ let package = Package(
             name: "ONNXRuntime",
             dependencies: [
                 "RunAnywhere",
-                "CRunAnywhereONNX",
-                "RunAnywhereONNXBinary",
+                "CRunAnywhereCore",
+                "RunAnywhereCoreBinary",
             ],
             path: "Sources/ONNXRuntime",
             linkerSettings: [
@@ -131,23 +147,25 @@ let package = Package(
             ]
         ),
 
-        // C bridge wrapper for ONNX (imports headers from xcframework)
+        // =================================================================
+        // LlamaCPP Runtime Backend
+        // Provides: Text Generation (LLM) with GGUF models
+        // =================================================================
         .target(
-            name: "CRunAnywhereONNX",
-            dependencies: [],
-            path: "Sources/CRunAnywhereONNX",
-            publicHeadersPath: "include",
-            cSettings: [
-                .headerSearchPath("include")
+            name: "LlamaCPPRuntime",
+            dependencies: [
+                "RunAnywhere",
+                "CRunAnywhereCore",
+                "RunAnywhereCoreBinary",
+            ],
+            path: "Sources/LlamaCPPRuntime",
+            linkerSettings: [
+                .linkedLibrary("c++"),
+                .linkedFramework("Accelerate"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit"),
+                .unsafeFlags(["-ObjC", "-all_load"])
             ]
-        ),
-
-        // ONNX Runtime Binary (downloaded from runanywhere-binaries)
-        // Includes: ONNX Runtime + Sherpa-ONNX + Bridge layer
-        .binaryTarget(
-            name: "RunAnywhereONNXBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.27a4832-sherpa/RunAnywhereONNX.xcframework.zip",
-            checksum: "62b2887a6d53360ed8d96a5080a98419d3c486f6be94bfe5e9f82415bb6a1fbe"
         ),
 
         // =================================================================
@@ -161,19 +179,6 @@ let package = Package(
                 "WhisperKit",
             ],
             path: "Sources/WhisperKitTranscription"
-        ),
-
-        // =================================================================
-        // LLM.swift Backend (iOS 16+, macOS 13+)
-        // Provides: Local LLM inference with GGUF models
-        // =================================================================
-        .target(
-            name: "LLMSwift",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "LLM", package: "LLM.swift"),
-            ],
-            path: "Sources/LLMSwift"
         ),
 
         // =================================================================
@@ -200,5 +205,32 @@ let package = Package(
             ],
             path: "Sources/FluidAudioDiarization"
         ),
-    ]
+    ] + binaryTargets()
 )
+
+// =============================================================================
+// BINARY TARGET SELECTION
+// =============================================================================
+// This function returns the appropriate binary target based on testLocal setting
+func binaryTargets() -> [Target] {
+    if testLocal {
+        // Local development mode: Use XCFramework from Binaries/ directory
+        // NOTE: You must manually place RunAnywhereCore.xcframework in Binaries/
+        // to use this mode (download from runanywhere-binaries releases)
+        return [
+            .binaryTarget(
+                name: "RunAnywhereCoreBinary",
+                path: "Binaries/RunAnywhereCore.xcframework"
+            )
+        ]
+    } else {
+        // Production mode (default): Download from GitHub releases
+        return [
+            .binaryTarget(
+                name: "RunAnywhereCoreBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+                checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
+            )
+        ]
+    }
+}
