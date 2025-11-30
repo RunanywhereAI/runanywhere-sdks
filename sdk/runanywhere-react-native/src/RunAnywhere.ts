@@ -181,9 +181,11 @@ export const RunAnywhere = {
 
     const native = requireNativeModule();
 
-    // Create the backend (ONNX by default)
+    // Create the backend
+    // Use llamacpp for LLM text generation (GGUF models), which also supports other capabilities
+    const backendName = 'llamacpp';
     try {
-      const backendCreated = await native.createBackend('onnx');
+      const backendCreated = await native.createBackend(backendName);
       if (!backendCreated) {
         if (__DEV__ || environment === SDKEnvironment.Development) {
           console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
@@ -195,7 +197,7 @@ export const RunAnywhere = {
         }
         throw new Error('Failed to create backend');
       }
-      state.backendType = 'onnx';
+      state.backendType = backendName;
     } catch (error) {
       if (__DEV__ || environment === SDKEnvironment.Development) {
         console.warn('[RunAnywhere] Backend creation error:', error);

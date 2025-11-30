@@ -5,8 +5,10 @@ folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 
 
 # XCFramework configuration
 # Update these values when new versions are released
-ONNX_XCFRAMEWORK_VERSION = "0.0.1-dev.4767337"
-ONNX_XCFRAMEWORK_CHECKSUM = "c054210880498119a7f61ffa2f922effa8e3c92513085f5c495011ea301f776a"
+# Latest unified framework with all backends (ONNX Runtime + LlamaCPP)
+XCFRAMEWORK_VERSION = "0.0.1-dev.1f175bc"
+XCFRAMEWORK_CHECKSUM = "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
+XCFRAMEWORK_NAME = "RunAnywhereCore"
 
 Pod::Spec.new do |s|
   s.name         = "runanywhere-react-native"
@@ -19,7 +21,7 @@ Pod::Spec.new do |s|
   s.platforms    = { :ios => "14.0" }
   s.source       = { :git => "https://github.com/RunanywhereAI/sdks.git", :tag => "#{s.version}" }
 
-  # Source files
+  # Source files (Objective-C++ and C++)
   s.source_files = "ios/**/*.{h,m,mm}", "cpp/**/*.{h,hpp,cpp}"
 
   # Exclude include folder from compilation (headers only)
@@ -76,10 +78,10 @@ Pod::Spec.new do |s|
   # Option 2: Remote XCFramework via prepare_command
   # This downloads the XCFramework during pod install
   s.prepare_command = <<-CMD
-    echo "Downloading RunAnywhereONNX.xcframework..."
+    echo "Downloading #{XCFRAMEWORK_NAME}.xcframework..."
 
     FRAMEWORK_DIR="#{__dir__}/ios/Frameworks"
-    FRAMEWORK_PATH="$FRAMEWORK_DIR/RunAnywhereONNX.xcframework"
+    FRAMEWORK_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework"
 
     # Skip if already exists
     if [ -d "$FRAMEWORK_PATH" ]; then
@@ -89,8 +91,8 @@ Pod::Spec.new do |s|
 
     mkdir -p "$FRAMEWORK_DIR"
 
-    DOWNLOAD_URL="https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v#{ONNX_XCFRAMEWORK_VERSION}/RunAnywhereONNX.xcframework.zip"
-    ZIP_PATH="$FRAMEWORK_DIR/RunAnywhereONNX.xcframework.zip"
+    DOWNLOAD_URL="https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v#{XCFRAMEWORK_VERSION}/#{XCFRAMEWORK_NAME}.xcframework.zip"
+    ZIP_PATH="$FRAMEWORK_DIR/#{XCFRAMEWORK_NAME}.xcframework.zip"
 
     echo "Downloading from: $DOWNLOAD_URL"
     curl -L -o "$ZIP_PATH" "$DOWNLOAD_URL"
@@ -102,7 +104,7 @@ Pod::Spec.new do |s|
 
     # Verify checksum
     ACTUAL_CHECKSUM=$(shasum -a 256 "$ZIP_PATH" | cut -d ' ' -f 1)
-    EXPECTED_CHECKSUM="#{ONNX_XCFRAMEWORK_CHECKSUM}"
+    EXPECTED_CHECKSUM="#{XCFRAMEWORK_CHECKSUM}"
 
     if [ "$ACTUAL_CHECKSUM" != "$EXPECTED_CHECKSUM" ]; then
       echo "ERROR: Checksum mismatch!"
@@ -119,7 +121,7 @@ Pod::Spec.new do |s|
     echo "XCFramework installed successfully!"
   CMD
 
-  s.vendored_frameworks = "ios/Frameworks/RunAnywhereONNX.xcframework"
+  s.vendored_frameworks = "ios/Frameworks/#{XCFRAMEWORK_NAME}.xcframework"
 
   # =============================================================================
   # OPTIONAL: LlamaCpp Subspec for LLM Support

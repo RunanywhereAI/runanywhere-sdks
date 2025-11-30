@@ -3,9 +3,7 @@
  *
  * Reference: iOS Features/Chat/ChatInterfaceView.swift
  *
- * Note: The current model catalog includes STT (Whisper), TTS (Piper), and VAD (Silero).
- * LLM models (GGUF format) need to be downloaded separately and provided via path.
- * Future versions will include LLM models in the catalog.
+ * Now includes LLM models in the catalog (Qwen2, TinyLlama, SmolLM).
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -40,7 +38,7 @@ export const ChatScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
-  const [streamingText, setStreamingText] = useState('');
+  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [backendInfo, setBackendInfo] = useState<Record<string, unknown>>({});
 
   // Refs
@@ -50,7 +48,22 @@ export const ChatScreen: React.FC = () => {
   useEffect(() => {
     checkModelStatus();
     loadBackendInfo();
+    loadAvailableModels();
   }, []);
+
+  /**
+   * Load available LLM models from catalog
+   */
+  const loadAvailableModels = async () => {
+    try {
+      const allModels = await RunAnywhere.getAvailableModels();
+      const llmModels = allModels.filter((m) => m.modality === 'llm');
+      setAvailableModels(llmModels);
+      console.log('[ChatScreen] Available LLM models:', llmModels.map(m => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+    } catch (error) {
+      console.log('[ChatScreen] Error loading models:', error);
+    }
+  };
 
   /**
    * Load backend info
@@ -90,27 +103,40 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Handle model selection
+   * Handle model selection - shows available downloaded LLM models
    */
   const handleSelectModel = useCallback(async () => {
-    // Note: Current catalog doesn't include LLM models yet
-    // Show info dialog explaining current state
-    Alert.alert(
-      'LLM Model Required',
-      'The current SDK version supports LLM inference through the ONNX backend.\n\n' +
-        'To use chat functionality:\n\n' +
-        '1. Download a compatible GGUF model\n' +
-        '2. The model catalog will include LLM models in future versions\n\n' +
-        'For demo purposes, tapping "Try Demo Mode" will simulate a response.',
-      [
-        {
-          text: 'Try Demo Mode',
-          onPress: () => enableDemoMode(),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  }, []);
+    // Get downloaded LLM models
+    const downloadedModels = availableModels.filter((m) => m.isDownloaded);
+
+    if (downloadedModels.length === 0) {
+      // No downloaded LLM models, show info about available models
+      Alert.alert(
+        'Download an LLM Model',
+        'Go to the Settings tab to download a language model.\n\n' +
+          'Available models:\n' +
+          '• SmolLM 135M (~150MB) - Fast responses\n' +
+          '• Qwen2 0.5B (~400MB) - Balanced\n' +
+          '• TinyLlama 1.1B (~670MB) - Best quality\n\n' +
+          'Or use Demo Mode to test the interface.',
+        [
+          { text: 'Try Demo Mode', onPress: () => enableDemoMode() },
+          { text: 'OK' },
+        ]
+      );
+      return;
+    }
+
+    // Show available models
+    const buttons: { text: string; onPress?: () => void; style?: string }[] = downloadedModels.map((model) => ({
+      text: model.name,
+      onPress: () => { loadModel(model); },
+    }));
+    buttons.push({ text: 'Demo Mode', onPress: enableDemoMode });
+    buttons.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Select LLM Model', 'Choose a downloaded language model', buttons as any);
+  }, [availableModels]);
 
   /**
    * Enable demo mode - simulates having a loaded model
@@ -131,17 +157,22 @@ export const ChatScreen: React.FC = () => {
   /**
    * Load a model using the real SDK
    */
-  const loadModel = async (modelPath: string) => {
+  const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.log(`[ChatScreen] Loading model: ${modelPath}`);
+      console.log(`[ChatScreen] Loading model: ${model.id} from ${model.localPath}`);
 
-      const success = await RunAnywhere.loadTextModel(modelPath);
+      if (!model.localPath) {
+        Alert.alert('Error', 'Model path not found. Please re-download the model.');
+        return;
+      }
+
+      const success = await RunAnywhere.loadTextModel(model.localPath);
 
       if (success) {
         setCurrentModel({
-          id: modelPath,
-          name: modelPath.split('/').pop() || 'LLM Model',
+          id: model.id,
+          name: model.name,
           category: ModelCategory.Language,
           compatibleFrameworks: [LLMFramework.LlamaCpp],
           preferredFramework: LLMFramework.LlamaCpp,
