@@ -1,6 +1,14 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
+// =============================================================================
+// BINARY TARGET CONFIGURATION
+// =============================================================================
+// Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
+// Set to `false` to use remote XCFramework from GitHub releases (default for production use)
+let testLocal = false
+// =============================================================================
+
 let package = Package(
     name: "RunAnywhere",
     // NOTE: Platform minimums are set to support all modules.
@@ -160,14 +168,6 @@ let package = Package(
             ]
         ),
 
-        // Unified Binary xcframework (ONNX + LlamaCPP)
-        // Remote distribution from runanywhere-binaries releases
-        .binaryTarget(
-            name: "RunAnywhereCoreBinary",
-            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
-            checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
-        ),
-
         // =================================================================
         // WhisperKit Backend (iOS 16+, macOS 13+)
         // Provides: CoreML-based Speech-to-Text
@@ -205,5 +205,32 @@ let package = Package(
             ],
             path: "Sources/FluidAudioDiarization"
         ),
-    ]
+    ] + binaryTargets()
 )
+
+// =============================================================================
+// BINARY TARGET SELECTION
+// =============================================================================
+// This function returns the appropriate binary target based on testLocal setting
+func binaryTargets() -> [Target] {
+    if testLocal {
+        // Local development mode: Use XCFramework from Binaries/ directory
+        // NOTE: You must manually place RunAnywhereCore.xcframework in Binaries/
+        // to use this mode (download from runanywhere-binaries releases)
+        return [
+            .binaryTarget(
+                name: "RunAnywhereCoreBinary",
+                path: "Binaries/RunAnywhereCore.xcframework"
+            )
+        ]
+    } else {
+        // Production mode (default): Download from GitHub releases
+        return [
+            .binaryTarget(
+                name: "RunAnywhereCoreBinary",
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
+                checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
+            )
+        ]
+    }
+}

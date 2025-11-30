@@ -7,9 +7,9 @@ DerivedData/
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
 
-# Local XCFrameworks (deprecated - now consumed via remote SPM binary targets)
-# The SDK now uses remote XCFramework distribution from runanywhere-binaries releases
-# Local builds in Binaries/ are no longer needed for normal development
+# Local XCFrameworks (excluded from git - use remote distribution by default)
+# Default mode (testLocal = false): SDK downloads XCFrameworks from runanywhere-binaries releases
+# Local mode (testLocal = true): Place XCFrameworks in Binaries/ for local development/testing
 Binaries/*.xcframework/
 XCFrameworks/
 
