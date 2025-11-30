@@ -8,18 +8,33 @@
  */
 
 import { EventBus } from './events';
-import { requireNativeModule, isNativeModuleAvailable } from './native';
-import { SDKEnvironment } from './types';
+import { requireNativeModule, isNativeModuleAvailable, NativeRunAnywhere } from './native';
+import { SDKEnvironment, ExecutionTarget, HardwareAcceleration } from './types';
 import type {
   GenerationOptions,
   GenerationResult,
-  LLMFramework,
-  ModelInfo,
   SDKInitOptions,
   STTOptions,
   STTResult,
   TTSConfiguration,
+  TTSResult,
 } from './types';
+
+// ============================================================================
+// Internal State
+// ============================================================================
+
+interface SDKState {
+  initialized: boolean;
+  environment: SDKEnvironment | null;
+  backendType: string | null;
+}
+
+const state: SDKState = {
+  initialized: false,
+  environment: null,
+  backendType: null,
+};
 
 // ============================================================================
 // Conversation Helper
@@ -80,15 +95,10 @@ export class Conversation {
  * });
  *
  * // Simple chat
- * const response = await RunAnywhere.chat('Hello, how are you?');
+ * const result = await RunAnywhere.generate('Hello, how are you?');
+ * console.log(result.text);
  *
- * // With options
- * const result = await RunAnywhere.generate('Explain quantum computing', {
- *   maxTokens: 200,
- *   temperature: 0.7,
- * });
- *
- * // Subscribe to events
+ * // Subscribe to generation events
  * const unsubscribe = RunAnywhere.events.onGeneration((event) => {
  *   console.log('Generation event:', event);
  * });
@@ -105,6 +115,24 @@ export const RunAnywhere = {
   events: EventBus,
 
   // ============================================================================
+  // SDK State
+  // ============================================================================
+
+  /**
+   * Check if SDK is initialized
+   */
+  get isSDKInitialized(): boolean {
+    return state.initialized;
+  },
+
+  /**
+   * Get current environment
+   */
+  get currentEnvironment(): SDKEnvironment | null {
+    return state.environment;
+  },
+
+  // ============================================================================
   // SDK Initialization
   // ============================================================================
 
@@ -114,14 +142,12 @@ export const RunAnywhere = {
    * This method performs simple, fast initialization:
    *
    * 1. **Validation**: Validate API key and parameters
-   * 2. **Logging**: Initialize logging system based on environment
-   * 3. **Storage**: Store parameters locally
+   * 2. **Backend**: Create the native backend (ONNX by default)
+   * 3. **Configuration**: Pass configuration to native layer
    * 4. **State**: Mark SDK as initialized
    *
-   * Device registration happens lazily on first API call.
-   *
    * @param options - SDK initialization options
-   * @throws SDKError if initialization fails
+   * @throws Error if initialization fails
    *
    * @example
    * ```typescript
@@ -135,178 +161,166 @@ export const RunAnywhere = {
   async initialize(options: SDKInitOptions): Promise<void> {
     const environment = options.environment ?? SDKEnvironment.Production;
 
-    // Check if native module is available and has the initialize method
+    // Publish initialization started event
+    EventBus.publish('Initialization', { type: 'started' });
+
+    // Check if native module is available
     if (!isNativeModuleAvailable()) {
-      // In development mode without native module, just log and continue
-      // This allows the app to run in a limited capacity for development
-      if (__DEV__) {
+      if (__DEV__ || environment === SDKEnvironment.Development) {
         console.warn(
           '[RunAnywhere] Native module not available. ' +
-            'Running in limited development mode. ' +
-            'Build the native module for full functionality.'
-        );
-      }
-      // Store initialization state in JS for development
-      (this as any)._initialized = true;
-      (this as any)._environment = environment;
-      return;
-    }
-
-    // Get native module and check if required methods exist
-    const native = requireNativeModule();
-    if (typeof native.createBackend !== 'function' || typeof native.initialize !== 'function') {
-      // Native module exists but required methods are not available
-      // This can happen with TurboModules that aren't fully set up
-      if (__DEV__) {
-        console.warn(
-          '[RunAnywhere] Native module found but required methods not available. ' +
             'Running in limited development mode.'
         );
+        state.initialized = true;
+        state.environment = environment;
+        EventBus.publish('Initialization', { type: 'completed' });
+        return;
       }
-      (this as any)._initialized = true;
-      (this as any)._environment = environment;
+      throw new Error('Native module not available');
+    }
+
+    const native = requireNativeModule();
+
+    // Create the backend (ONNX by default)
+    try {
+      const backendCreated = await native.createBackend('onnx');
+      if (!backendCreated) {
+        if (__DEV__ || environment === SDKEnvironment.Development) {
+          console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
+          state.initialized = true;
+          state.environment = environment;
+          state.backendType = null;
+          EventBus.publish('Initialization', { type: 'completed' });
+          return;
+        }
+        throw new Error('Failed to create backend');
+      }
+      state.backendType = 'onnx';
+    } catch (error) {
+      if (__DEV__ || environment === SDKEnvironment.Development) {
+        console.warn('[RunAnywhere] Backend creation error:', error);
+        state.initialized = true;
+        state.environment = environment;
+        EventBus.publish('Initialization', { type: 'completed' });
+        return;
+      }
+      throw error;
+    }
+
+    // Initialize with configuration
+    try {
+      const configJson = JSON.stringify({
+        apiKey: options.apiKey,
+        baseURL: options.baseURL,
+        environment: environment,
+      });
+
+      const result = await native.initialize(configJson);
+      if (!result) {
+        if (__DEV__ || environment === SDKEnvironment.Development) {
+          console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');
+          state.initialized = true;
+          state.environment = environment;
+          EventBus.publish('Initialization', { type: 'completed' });
+          return;
+        }
+        throw new Error('Failed to initialize SDK');
+      }
+    } catch (error) {
+      if (__DEV__ || environment === SDKEnvironment.Development) {
+        console.warn('[RunAnywhere] Initialize error:', error);
+        state.initialized = true;
+        state.environment = environment;
+        EventBus.publish('Initialization', { type: 'completed' });
+        return;
+      }
+      throw error;
+    }
+
+    state.initialized = true;
+    state.environment = environment;
+    EventBus.publish('Initialization', { type: 'completed' });
+  },
+
+  /**
+   * Destroy SDK and release resources
+   */
+  async destroy(): Promise<void> {
+    if (!isNativeModuleAvailable()) {
+      state.initialized = false;
+      state.environment = null;
+      state.backendType = null;
       return;
     }
 
-    // First, create the ONNX backend
-    // The native initialize method requires a backend to exist
-    const backendCreated = await native.createBackend('onnx');
-    if (!backendCreated) {
-      if (__DEV__) {
-        console.warn('[RunAnywhere] Failed to create backend, running in limited mode');
-        (this as any)._initialized = true;
-        (this as any)._environment = environment;
-        return;
-      }
-      throw new Error('Failed to create backend');
-    }
-
-    // Native initialize expects JSON config string
-    const configJson = JSON.stringify({
-      apiKey: options.apiKey,
-      baseURL: options.baseURL,
-      environment: environment,
-    });
-
-    const result = await native.initialize(configJson);
-    if (!result) {
-      if (__DEV__) {
-        // In development mode, continue even if initialize returns false
-        // This allows testing without full backend setup
-        console.warn('[RunAnywhere] Native initialize returned false, continuing in dev mode');
-        (this as any)._initialized = true;
-        (this as any)._environment = environment;
-        return;
-      }
-      throw new Error('Failed to initialize SDK');
-    }
-
-    (this as any)._initialized = true;
-    (this as any)._environment = environment;
-  },
-
-  /**
-   * Reset SDK state
-   * Clears all initialization state and cached data
-   */
-  async reset(): Promise<void> {
     const native = requireNativeModule();
-    await native.reset();
+    await native.destroy();
+    state.initialized = false;
+    state.environment = null;
+    state.backendType = null;
   },
 
   /**
-   * Check if SDK is initialized
+   * Check if SDK is initialized (async version for native query)
    */
   async isInitialized(): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
-      return false;
+      return state.initialized;
     }
     const native = requireNativeModule();
     return native.isInitialized();
   },
 
   /**
-   * Check if SDK is active and ready for use
+   * Get SDK version
    */
-  async isActive(): Promise<boolean> {
+  async getVersion(): Promise<string> {
+    if (!isNativeModuleAvailable()) {
+      return '0.1.0-dev';
+    }
+    const native = requireNativeModule();
+    return native.getVersion();
+  },
+
+  // ============================================================================
+  // Text Generation (LLM)
+  // ============================================================================
+
+  /**
+   * Load a text generation model
+   *
+   * @param modelPath - Path to the model file
+   * @param config - Optional configuration
+   */
+  async loadTextModel(modelPath: string, config?: Record<string, unknown>): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      console.warn('[RunAnywhere] Native module not available for loadTextModel');
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.loadTextModel(modelPath, config ? JSON.stringify(config) : undefined);
+  },
+
+  /**
+   * Check if a text model is loaded
+   */
+  async isTextModelLoaded(): Promise<boolean> {
     if (!isNativeModuleAvailable()) {
       return false;
     }
     const native = requireNativeModule();
-    return native.isActive();
-  },
-
-  // ============================================================================
-  // Identity
-  // ============================================================================
-
-  /**
-   * Get current user ID
-   */
-  async getUserId(): Promise<string | null> {
-    const native = requireNativeModule();
-    return native.getUserId();
+    return native.isTextModelLoaded();
   },
 
   /**
-   * Get current organization ID
+   * Unload the current text model
    */
-  async getOrganizationId(): Promise<string | null> {
+  async unloadTextModel(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
     const native = requireNativeModule();
-    return native.getOrganizationId();
-  },
-
-  /**
-   * Get device ID
-   */
-  async getDeviceId(): Promise<string | null> {
-    const native = requireNativeModule();
-    return native.getDeviceId();
-  },
-
-  /**
-   * Get SDK version
-   */
-  async getSDKVersion(): Promise<string> {
-    const native = requireNativeModule();
-    return native.getSDKVersion();
-  },
-
-  /**
-   * Get current environment
-   */
-  async getCurrentEnvironment(): Promise<SDKEnvironment | null> {
-    const native = requireNativeModule();
-    return native.getCurrentEnvironment();
-  },
-
-  /**
-   * Check if device is registered
-   */
-  async isDeviceRegistered(): Promise<boolean> {
-    const native = requireNativeModule();
-    return native.isDeviceRegistered();
-  },
-
-  // ============================================================================
-  // Text Generation
-  // ============================================================================
-
-  /**
-   * Simple text generation
-   *
-   * @param prompt - The text prompt
-   * @returns Generated response (text only)
-   *
-   * @example
-   * ```typescript
-   * const response = await RunAnywhere.chat('Hello, how are you?');
-   * console.log(response);
-   * ```
-   */
-  async chat(prompt: string): Promise<string> {
-    const native = requireNativeModule();
-    return native.chat(prompt);
+    return native.unloadTextModel();
   },
 
   /**
@@ -323,13 +337,61 @@ export const RunAnywhere = {
    *   temperature: 0.7,
    * });
    * console.log('Text:', result.text);
-   * console.log('Tokens:', result.tokensUsed);
-   * console.log('Speed:', result.performanceMetrics.tokensPerSecond, 'tok/s');
    * ```
    */
   async generate(prompt: string, options?: GenerationOptions): Promise<GenerationResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
     const native = requireNativeModule();
-    return native.generate(prompt, options);
+
+    const maxTokens = options?.maxTokens ?? 256;
+    const temperature = options?.temperature ?? 0.7;
+    const systemPrompt = options?.systemPrompt ?? null;
+
+    const resultJson = await native.generate(prompt, systemPrompt, maxTokens, temperature);
+
+    try {
+      const result = JSON.parse(resultJson);
+      return {
+        text: result.text ?? '',
+        thinkingContent: result.thinkingContent,
+        tokensUsed: result.tokensUsed ?? 0,
+        modelUsed: result.modelUsed ?? 'unknown',
+        latencyMs: result.latencyMs ?? 0,
+        executionTarget: result.executionTarget ?? 0,
+        savedAmount: result.savedAmount ?? 0,
+        framework: result.framework,
+        hardwareUsed: result.hardwareUsed ?? 0,
+        memoryUsed: result.memoryUsed ?? 0,
+        performanceMetrics: {
+          timeToFirstTokenMs: result.performanceMetrics?.timeToFirstTokenMs,
+          tokensPerSecond: result.performanceMetrics?.tokensPerSecond,
+          inferenceTimeMs: result.performanceMetrics?.inferenceTimeMs ?? result.latencyMs ?? 0,
+        },
+        thinkingTokens: result.thinkingTokens,
+        responseTokens: result.responseTokens ?? result.tokensUsed ?? 0,
+      };
+    } catch {
+      // If parsing fails, treat as error message
+      if (resultJson.includes('error')) {
+        throw new Error(resultJson);
+      }
+      return {
+        text: resultJson,
+        tokensUsed: 0,
+        modelUsed: 'unknown',
+        latencyMs: 0,
+        executionTarget: ExecutionTarget.OnDevice,
+        savedAmount: 0,
+        hardwareUsed: HardwareAcceleration.CPU,
+        memoryUsed: 0,
+        performanceMetrics: {
+          inferenceTimeMs: 0,
+        },
+        responseTokens: 0,
+      };
+    }
   },
 
   /**
@@ -339,125 +401,102 @@ export const RunAnywhere = {
    *
    * @param prompt - The text prompt
    * @param options - Generation options
-   * @returns Session ID for the stream
+   * @param onToken - Callback for each token
    *
    * @example
    * ```typescript
-   * // Subscribe to token events
-   * const unsubscribe = RunAnywhere.events.onGeneration((event) => {
-   *   if (event.type === 'tokenGenerated') {
-   *     process.stdout.write(event.token);
-   *   }
-   *   if (event.type === 'completed') {
-   *     console.log('\nDone!');
-   *   }
+   * RunAnywhere.generateStream('Tell me a story', {}, (token) => {
+   *   process.stdout.write(token);
    * });
-   *
-   * // Start streaming
-   * const sessionId = await RunAnywhere.generateStream('Tell me a story');
-   *
-   * // Later: cancel if needed
-   * await RunAnywhere.cancelStream(sessionId);
    * ```
    */
-  async generateStream(prompt: string, options?: GenerationOptions): Promise<string> {
+  generateStream(
+    prompt: string,
+    options?: GenerationOptions,
+    onToken?: (token: string) => void
+  ): void {
+    if (!isNativeModuleAvailable()) {
+      EventBus.publish('Generation', { type: 'failed', error: 'Native module not available' });
+      return;
+    }
     const native = requireNativeModule();
-    return native.generateStreamStart(prompt, options);
+
+    const maxTokens = options?.maxTokens ?? 256;
+    const temperature = options?.temperature ?? 0.7;
+    const systemPrompt = options?.systemPrompt ?? null;
+
+    // Subscribe to generation events if callback provided
+    if (onToken) {
+      const unsubscribe = EventBus.onGeneration((event) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const evt = event as any;
+        if (evt.type === 'tokenGenerated' && evt.token) {
+          onToken(evt.token);
+        } else if (evt.type === 'completed' || evt.type === 'failed') {
+          unsubscribe();
+        }
+      });
+    }
+
+    native.generateStream(prompt, systemPrompt, maxTokens, temperature);
   },
 
   /**
-   * Cancel a streaming generation session
+   * Cancel ongoing text generation
    */
-  async cancelStream(sessionId: string): Promise<void> {
+  cancelGeneration(): void {
+    if (!isNativeModuleAvailable()) {
+      return;
+    }
     const native = requireNativeModule();
-    return native.generateStreamCancel(sessionId);
+    native.cancelGeneration();
   },
 
   // ============================================================================
-  // Model Management
+  // Speech-to-Text (STT)
   // ============================================================================
 
   /**
-   * Load a model by ID
+   * Load an STT model
    *
-   * @param modelId - The model identifier
-   *
-   * @example
-   * ```typescript
-   * await RunAnywhere.loadModel('llama-3.2-1b');
-   * ```
+   * @param modelPath - Path to the model file
+   * @param modelType - Model type (e.g., 'whisper', 'sherpa')
+   * @param config - Optional configuration
    */
-  async loadModel(modelId: string): Promise<void> {
+  async loadSTTModel(
+    modelPath: string,
+    modelType: string = 'whisper',
+    config?: Record<string, unknown>
+  ): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      console.warn('[RunAnywhere] Native module not available for loadSTTModel');
+      return false;
+    }
     const native = requireNativeModule();
-    return native.loadModel(modelId);
+    return native.loadSTTModel(modelPath, modelType, config ? JSON.stringify(config) : undefined);
   },
 
   /**
-   * Get available models
-   *
-   * @returns Array of available models
+   * Check if an STT model is loaded
    */
-  async availableModels(): Promise<ModelInfo[]> {
+  async isSTTModelLoaded(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
     const native = requireNativeModule();
-    return native.availableModels();
+    return native.isSTTModelLoaded();
   },
 
   /**
-   * Get currently loaded model
+   * Unload the current STT model
    */
-  async currentModel(): Promise<ModelInfo | null> {
+  async unloadSTTModel(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
     const native = requireNativeModule();
-    return native.currentModel();
+    return native.unloadSTTModel();
   },
-
-  /**
-   * Download a model
-   *
-   * Progress is reported via model events.
-   *
-   * @param modelId - The model identifier
-   *
-   * @example
-   * ```typescript
-   * // Subscribe to download progress
-   * RunAnywhere.events.onModel((event) => {
-   *   if (event.type === 'downloadProgress') {
-   *     console.log(`Downloading: ${event.progress * 100}%`);
-   *   }
-   * });
-   *
-   * await RunAnywhere.downloadModel('llama-3.2-1b');
-   * ```
-   */
-  async downloadModel(modelId: string): Promise<void> {
-    const native = requireNativeModule();
-    return native.downloadModel(modelId);
-  },
-
-  /**
-   * Delete a downloaded model
-   *
-   * @param modelId - The model identifier
-   */
-  async deleteModel(modelId: string): Promise<void> {
-    const native = requireNativeModule();
-    return native.deleteModel(modelId);
-  },
-
-  /**
-   * Get available adapters for a model
-   *
-   * @param modelId - The model identifier
-   * @returns Array of framework types that can handle this model
-   */
-  async availableAdapters(modelId: string): Promise<LLMFramework[]> {
-    const native = requireNativeModule();
-    return native.availableAdapters(modelId);
-  },
-
-  // ============================================================================
-  // Voice Operations
-  // ============================================================================
 
   /**
    * Transcribe audio data
@@ -468,7 +507,7 @@ export const RunAnywhere = {
    *
    * @example
    * ```typescript
-   * const result = await RunAnywhere.transcribe(audioBase64);
+   * const result = await RunAnywhere.transcribe(audioBase64, { language: 'en' });
    * console.log('Transcript:', result.text);
    * ```
    */
@@ -476,6 +515,9 @@ export const RunAnywhere = {
     audioData: string | ArrayBuffer,
     options?: STTOptions
   ): Promise<STTResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
     const native = requireNativeModule();
 
     // Convert ArrayBuffer to base64 if needed
@@ -483,7 +525,6 @@ export const RunAnywhere = {
     if (typeof audioData === 'string') {
       audioBase64 = audioData;
     } else {
-      // Convert ArrayBuffer to base64
       const bytes = new Uint8Array(audioData);
       let binary = '';
       for (let i = 0; i < bytes.byteLength; i++) {
@@ -492,27 +533,79 @@ export const RunAnywhere = {
       audioBase64 = btoa(binary);
     }
 
-    return native.transcribe(audioBase64, options);
+    const sampleRate = options?.sampleRate ?? 16000;
+    const language = options?.language;
+
+    const resultJson = await native.transcribe(audioBase64, sampleRate, language);
+
+    try {
+      const result = JSON.parse(resultJson);
+      return {
+        text: result.text ?? '',
+        segments: result.segments ?? [],
+        language: result.language,
+        confidence: result.confidence ?? 1.0,
+        duration: result.duration ?? 0,
+        alternatives: result.alternatives ?? [],
+      };
+    } catch {
+      if (resultJson.includes('error')) {
+        throw new Error(resultJson);
+      }
+      return {
+        text: resultJson,
+        segments: [],
+        confidence: 1.0,
+        duration: 0,
+        alternatives: [],
+      };
+    }
+  },
+
+  // ============================================================================
+  // Text-to-Speech (TTS)
+  // ============================================================================
+
+  /**
+   * Load a TTS model
+   *
+   * @param modelPath - Path to the model file
+   * @param modelType - Model type (e.g., 'piper', 'vits')
+   * @param config - Optional configuration
+   */
+  async loadTTSModel(
+    modelPath: string,
+    modelType: string = 'piper',
+    config?: Record<string, unknown>
+  ): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      console.warn('[RunAnywhere] Native module not available for loadTTSModel');
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.loadTTSModel(modelPath, modelType, config ? JSON.stringify(config) : undefined);
   },
 
   /**
-   * Load an STT (Speech-to-Text) model
-   *
-   * @param modelId - The model identifier
+   * Check if a TTS model is loaded
    */
-  async loadSTTModel(modelId: string): Promise<void> {
+  async isTTSModelLoaded(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
     const native = requireNativeModule();
-    return native.loadSTTModel(modelId);
+    return native.isTTSModelLoaded();
   },
 
   /**
-   * Load a TTS (Text-to-Speech) model
-   *
-   * @param modelId - The model/voice identifier
+   * Unload the current TTS model
    */
-  async loadTTSModel(modelId: string): Promise<void> {
+  async unloadTTSModel(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
     const native = requireNativeModule();
-    return native.loadTTSModel(modelId);
+    return native.unloadTTSModel();
   },
 
   /**
@@ -520,19 +613,133 @@ export const RunAnywhere = {
    *
    * @param text - Text to synthesize
    * @param configuration - TTS configuration
-   * @returns Base64 encoded audio data
+   * @returns TTS result with audio data
    *
    * @example
    * ```typescript
-   * const audioBase64 = await RunAnywhere.synthesize('Hello, world!', {
+   * const result = await RunAnywhere.synthesize('Hello, world!', {
    *   voice: 'en-US-default',
    *   rate: 1.0,
    * });
+   * // result.audio is base64 encoded audio
    * ```
    */
-  async synthesize(text: string, configuration?: TTSConfiguration): Promise<string> {
+  async synthesize(text: string, configuration?: TTSConfiguration): Promise<TTSResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
     const native = requireNativeModule();
-    return native.synthesize(text, configuration);
+
+    const voiceId = configuration?.voice ?? null;
+    const speedRate = configuration?.rate ?? 1.0;
+    const pitchShift = configuration?.pitch ?? 1.0;
+
+    const resultJson = await native.synthesize(text, voiceId, speedRate, pitchShift);
+
+    try {
+      const result = JSON.parse(resultJson);
+      return {
+        audio: result.audio ?? '',
+        sampleRate: result.sampleRate ?? 22050,
+        numSamples: result.numSamples ?? 0,
+        duration: result.numSamples ? result.numSamples / result.sampleRate : 0,
+      };
+    } catch {
+      if (resultJson.includes('error')) {
+        throw new Error(resultJson);
+      }
+      return {
+        audio: resultJson,
+        sampleRate: 22050,
+        numSamples: 0,
+        duration: 0,
+      };
+    }
+  },
+
+  /**
+   * Get available TTS voices
+   */
+  async getTTSVoices(): Promise<string[]> {
+    if (!isNativeModuleAvailable()) {
+      return [];
+    }
+    const native = requireNativeModule();
+    const voicesJson = await native.getTTSVoices();
+    try {
+      return JSON.parse(voicesJson);
+    } catch {
+      return voicesJson ? [voicesJson] : [];
+    }
+  },
+
+  /**
+   * Cancel ongoing TTS synthesis
+   */
+  cancelTTS(): void {
+    if (!isNativeModuleAvailable()) {
+      return;
+    }
+    const native = requireNativeModule();
+    native.cancelTTS();
+  },
+
+  // ============================================================================
+  // Voice Activity Detection (VAD)
+  // ============================================================================
+
+  /**
+   * Load a VAD model
+   */
+  async loadVADModel(modelPath: string, config?: Record<string, unknown>): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.loadVADModel(modelPath, config ? JSON.stringify(config) : undefined);
+  },
+
+  /**
+   * Check if a VAD model is loaded
+   */
+  async isVADModelLoaded(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.isVADModelLoaded();
+  },
+
+  /**
+   * Process audio for voice activity detection
+   */
+  async processVAD(
+    audioData: string | ArrayBuffer,
+    sampleRate: number = 16000
+  ): Promise<{ isSpeech: boolean; probability: number }> {
+    if (!isNativeModuleAvailable()) {
+      return { isSpeech: false, probability: 0 };
+    }
+    const native = requireNativeModule();
+
+    let audioBase64: string;
+    if (typeof audioData === 'string') {
+      audioBase64 = audioData;
+    } else {
+      const bytes = new Uint8Array(audioData);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]!);
+      }
+      audioBase64 = btoa(binary);
+    }
+
+    const resultJson = await native.processVAD(audioBase64, sampleRate);
+    try {
+      return JSON.parse(resultJson);
+    } catch {
+      return { isSpeech: false, probability: 0 };
+    }
   },
 
   // ============================================================================
@@ -540,20 +747,227 @@ export const RunAnywhere = {
   // ============================================================================
 
   /**
-   * Estimate token count in text
+   * Get last error message from native layer
+   */
+  async getLastError(): Promise<string> {
+    if (!isNativeModuleAvailable()) {
+      return '';
+    }
+    const native = requireNativeModule();
+    return native.getLastError();
+  },
+
+  /**
+   * Get backend info
+   */
+  async getBackendInfo(): Promise<Record<string, unknown>> {
+    if (!isNativeModuleAvailable()) {
+      return {};
+    }
+    const native = requireNativeModule();
+    const infoJson = await native.getBackendInfo();
+    try {
+      return JSON.parse(infoJson);
+    } catch {
+      return {};
+    }
+  },
+
+  /**
+   * Get supported capabilities
+   */
+  async getCapabilities(): Promise<number[]> {
+    if (!isNativeModuleAvailable()) {
+      return [];
+    }
+    const native = requireNativeModule();
+    return native.getCapabilities();
+  },
+
+  /**
+   * Check if a capability is supported
+   */
+  async supportsCapability(capability: number): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.supportsCapability(capability);
+  },
+
+  // ============================================================================
+  // Model Registry
+  // ============================================================================
+
+  /**
+   * Get available models from the catalog
    *
-   * @param text - The text to analyze
-   * @returns Estimated number of tokens
+   * @returns Array of model info objects
    *
    * @example
    * ```typescript
-   * const tokenCount = await RunAnywhere.estimateTokenCount('Hello world');
-   * console.log('Tokens:', tokenCount);
+   * const models = await RunAnywhere.getAvailableModels();
+   * const sttModels = models.filter(m => m.modality === 'stt');
    * ```
    */
-  async estimateTokenCount(text: string): Promise<number> {
+  async getAvailableModels(): Promise<ModelInfo[]> {
+    if (!isNativeModuleAvailable()) {
+      return [];
+    }
     const native = requireNativeModule();
-    return native.estimateTokenCount(text);
+    const modelsJson = await native.getAvailableModels();
+    try {
+      return JSON.parse(modelsJson);
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Get info for a specific model
+   *
+   * @param modelId - Model ID
+   * @returns Model info or null if not found
+   */
+  async getModelInfo(modelId: string): Promise<ModelInfo | null> {
+    if (!isNativeModuleAvailable()) {
+      return null;
+    }
+    const native = requireNativeModule();
+    const infoJson = await native.getModelInfo(modelId);
+    try {
+      const result = JSON.parse(infoJson);
+      return result === 'null' ? null : result;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Check if a model is downloaded
+   *
+   * @param modelId - Model ID
+   */
+  async isModelDownloaded(modelId: string): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.isModelDownloaded(modelId);
+  },
+
+  /**
+   * Get local path for a downloaded model
+   *
+   * @param modelId - Model ID
+   * @returns Path or null if not downloaded
+   */
+  async getModelPath(modelId: string): Promise<string | null> {
+    if (!isNativeModuleAvailable()) {
+      return null;
+    }
+    const native = requireNativeModule();
+    return native.getModelPath(modelId);
+  },
+
+  /**
+   * Get list of downloaded models
+   *
+   * @returns Array of downloaded model info objects
+   */
+  async getDownloadedModels(): Promise<ModelInfo[]> {
+    if (!isNativeModuleAvailable()) {
+      return [];
+    }
+    const native = requireNativeModule();
+    const modelsJson = await native.getDownloadedModels();
+    try {
+      return JSON.parse(modelsJson);
+    } catch {
+      return [];
+    }
+  },
+
+  // ============================================================================
+  // Model Download
+  // ============================================================================
+
+  /**
+   * Download a model
+   *
+   * Progress is delivered via events (onModelDownloadProgress).
+   * Completion via onModelDownloadComplete or onModelDownloadError.
+   *
+   * @param modelId - Model ID to download
+   * @param onProgress - Optional progress callback
+   * @returns Promise that resolves when download starts
+   *
+   * @example
+   * ```typescript
+   * await RunAnywhere.downloadModel('whisper-tiny-en', (progress) => {
+   *   console.log(`Progress: ${(progress.progress * 100).toFixed(1)}%`);
+   * });
+   * ```
+   */
+  async downloadModel(
+    modelId: string,
+    onProgress?: (progress: DownloadProgress) => void
+  ): Promise<string> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+    const native = requireNativeModule();
+
+    // Subscribe to progress events if callback provided
+    let unsubscribe: (() => void) | null = null;
+    if (onProgress) {
+      unsubscribe = EventBus.onModel((event) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const evt = event as any;
+        if (evt.type === 'downloadProgress' && evt.modelId === modelId) {
+          onProgress({
+            modelId: evt.modelId,
+            bytesDownloaded: evt.bytesDownloaded ?? 0,
+            totalBytes: evt.totalBytes ?? 0,
+            progress: evt.progress ?? 0,
+          });
+        }
+        if (
+          (evt.type === 'downloadCompleted' || evt.type === 'downloadFailed') &&
+          evt.modelId === modelId
+        ) {
+          if (unsubscribe) unsubscribe();
+        }
+      });
+    }
+
+    return native.downloadModel(modelId);
+  },
+
+  /**
+   * Cancel an ongoing download
+   *
+   * @param modelId - Model ID being downloaded
+   */
+  async cancelDownload(modelId: string): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.cancelDownload(modelId);
+  },
+
+  /**
+   * Delete a downloaded model
+   *
+   * @param modelId - Model ID to delete
+   */
+  async deleteModel(modelId: string): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.deleteModel(modelId);
   },
 
   // ============================================================================
@@ -576,6 +990,37 @@ export const RunAnywhere = {
     return new Conversation();
   },
 };
+
+// ============================================================================
+// Types for Model Registry/Download
+// ============================================================================
+
+/**
+ * Model information from the catalog
+ */
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  modality: string;
+  size: number;
+  downloadUrl?: string;
+  format: string;
+  modelType: string;
+  isDownloaded: boolean;
+  localPath?: string;
+}
+
+/**
+ * Download progress information
+ */
+export interface DownloadProgress {
+  modelId: string;
+  bytesDownloaded: number;
+  totalBytes: number;
+  progress: number;
+}
 
 // Default export
 export default RunAnywhere;

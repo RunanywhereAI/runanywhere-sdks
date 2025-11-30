@@ -9,7 +9,7 @@
 
 // Main SDK
 import { RunAnywhere as _RunAnywhere } from './RunAnywhere';
-export { RunAnywhere, Conversation } from './RunAnywhere';
+export { RunAnywhere, Conversation, type ModelInfo, type DownloadProgress as ModelDownloadProgress } from './RunAnywhere';
 export default _RunAnywhere;
 
 // Types
@@ -53,23 +53,32 @@ export {
   // STT Component
   STTComponent,
   createSTTComponent,
+  createSTTConfiguration,
   STTMode,
-  DEFAULT_STT_CONFIG,
+  STTServiceWrapper,
+  DEFAULT_STT_CONFIGURATION,
   type STTConfiguration,
   type STTInput,
   type STTOutput,
-  type STTStreamHandle,
+  type STTService,
   type WordTimestamp,
   type TranscriptionAlternative,
   type TranscriptionMetadata,
+  type STTTranscriptionResult,
+  type TimestampInfo,
+  type AlternativeTranscription,
   // TTS Component
   TTSComponent,
   createTTSComponent,
-  DEFAULT_TTS_CONFIG,
-  type TTSComponentConfiguration,
+  createTTSConfiguration,
+  TTSServiceWrapper,
+  DEFAULT_TTS_CONFIGURATION,
+  getAudioFormatSampleRate,
+  type TTSConfiguration,
   type TTSInput,
   type TTSOutput,
   type TTSOptions,
+  type TTSService,
   type PhonemeTimestamp,
   type SynthesisMetadata,
   type VoiceInfo,

@@ -351,6 +351,14 @@ class EventBusImpl {
     this.handleNativeEvent(NativeEventNames.SDK_VOICE, event);
   }
 
+  /**
+   * Emit a component initialization event
+   * Helper method for components to emit initialization-related events
+   */
+  emitComponentInitialization(event: ComponentInitializationEvent): void {
+    this.handleNativeEvent(NativeEventNames.SDK_COMPONENT, event);
+  }
+
   // ============================================================================
   // Cleanup
   // ============================================================================
@@ -372,7 +380,83 @@ class EventBusImpl {
 }
 
 // Singleton instance
-export const EventBus = new EventBusImpl();
+let instance: EventBusImpl | null = null;
+
+/**
+ * Get the singleton instance of EventBus
+ */
+function getInstance(): EventBusImpl {
+  if (!instance) {
+    instance = new EventBusImpl();
+  }
+  return instance;
+}
+
+// Create singleton wrapper with all methods exposed at top level
+const singletonWrapper = {
+  getInstance,
+  // Proxy all methods from getInstance() for backward compatibility
+  get onAllEvents() {
+    return getInstance().onAllEvents.bind(getInstance());
+  },
+  get onInitialization() {
+    return getInstance().onInitialization.bind(getInstance());
+  },
+  get onConfiguration() {
+    return getInstance().onConfiguration.bind(getInstance());
+  },
+  get onGeneration() {
+    return getInstance().onGeneration.bind(getInstance());
+  },
+  get onModel() {
+    return getInstance().onModel.bind(getInstance());
+  },
+  get onVoice() {
+    return getInstance().onVoice.bind(getInstance());
+  },
+  get onPerformance() {
+    return getInstance().onPerformance.bind(getInstance());
+  },
+  get onNetwork() {
+    return getInstance().onNetwork.bind(getInstance());
+  },
+  get onStorage() {
+    return getInstance().onStorage.bind(getInstance());
+  },
+  get onFramework() {
+    return getInstance().onFramework.bind(getInstance());
+  },
+  get onDevice() {
+    return getInstance().onDevice.bind(getInstance());
+  },
+  get onComponentInitialization() {
+    return getInstance().onComponentInitialization.bind(getInstance());
+  },
+  get onComponent() {
+    return getInstance().onComponent.bind(getInstance());
+  },
+  get on() {
+    return getInstance().on.bind(getInstance());
+  },
+  get publish() {
+    return getInstance().publish.bind(getInstance());
+  },
+  get emitModel() {
+    return getInstance().emitModel.bind(getInstance());
+  },
+  get emitVoice() {
+    return getInstance().emitVoice.bind(getInstance());
+  },
+  get emitComponentInitialization() {
+    return getInstance().emitComponentInitialization.bind(getInstance());
+  },
+  get removeAllListeners() {
+    return getInstance().removeAllListeners.bind(getInstance());
+  },
+};
+
+// Export singleton wrapper
+export const EventBus = singletonWrapper;
 
 // Export type for the EventBus
 export type { EventBusImpl };

@@ -27,8 +27,11 @@ import { STTMode, STTResult } from '../types/voice';
 // Import RunAnywhere SDK
 import {
   RunAnywhere,
-  type STTResult as SDKSTTResult,
+  type ModelInfo as SDKModelInfo,
 } from 'runanywhere-react-native';
+
+// STT Model IDs
+const STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
 
 export const STTScreen: React.FC = () => {
   // State
@@ -39,50 +42,89 @@ export const STTScreen: React.FC = () => {
   const [confidence, setConfidence] = useState<number | null>(null);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
 
-  // Check for loaded model on mount
+  // Load available models and check for loaded model on mount
   useEffect(() => {
-    const checkModel = async () => {
+    const initialize = async () => {
       try {
-        const model = await RunAnywhere.currentModel();
-        if (model) {
-          setCurrentModel(model as unknown as ModelInfo);
+        // Get available STT models from catalog
+        const allModels = await RunAnywhere.getAvailableModels();
+        const sttModels = allModels.filter((m) => m.modality === 'stt');
+        setAvailableModels(sttModels);
+        console.log('[STTScreen] Available STT models:', sttModels.map(m => m.id));
+
+        // Check if model is already loaded
+        const isLoaded = await RunAnywhere.isSTTModelLoaded();
+        if (isLoaded) {
+          setCurrentModel({
+            id: 'stt-model',
+            name: 'STT Model (Loaded)',
+          } as ModelInfo);
         }
       } catch (error) {
-        console.log('No STT model loaded yet:', error);
+        console.log('[STTScreen] Error initializing:', error);
       }
     };
-    checkModel();
+    initialize();
   }, []);
 
   /**
-   * Handle model selection
-   * TODO: Open ModelSelectionModal with STT filter
+   * Handle model selection - shows available downloaded models
    */
   const handleSelectModel = useCallback(async () => {
-    Alert.alert(
-      'Select STT Model',
-      'Choose a speech recognition model',
-      [
-        {
-          text: 'Whisper Tiny',
-          onPress: () => loadModel('whisper-tiny'),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  }, []);
+    // Get downloaded STT models
+    const downloadedModels = availableModels.filter((m) => m.isDownloaded);
+
+    if (downloadedModels.length === 0) {
+      Alert.alert(
+        'No Models Downloaded',
+        'Please download a speech recognition model from the Settings tab first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const buttons = downloadedModels.map((model) => ({
+      text: model.name,
+      onPress: () => loadModel(model),
+    }));
+    buttons.push({ text: 'Cancel', onPress: () => {} });
+
+    Alert.alert('Select STT Model', 'Choose a downloaded speech recognition model', buttons as any);
+  }, [availableModels]);
 
   /**
-   * Load a model
+   * Load a model from its info
    */
-  const loadModel = async (modelId: string) => {
+  const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      await RunAnywhere.loadSTTModel(modelId);
-      const model = await RunAnywhere.currentModel();
-      setCurrentModel(model as unknown as ModelInfo);
+      console.log(`[STTScreen] Loading model: ${model.id} from ${model.localPath}`);
+
+      if (!model.localPath) {
+        Alert.alert('Error', 'Model path not found. Please re-download the model.');
+        return;
+      }
+
+      // Load using the actual local path
+      const success = await RunAnywhere.loadSTTModel(model.localPath, model.modelType || 'whisper');
+
+      if (success) {
+        const isLoaded = await RunAnywhere.isSTTModelLoaded();
+        if (isLoaded) {
+          setCurrentModel({
+            id: model.id,
+            name: model.name,
+          } as ModelInfo);
+          console.log(`[STTScreen] Model ${model.name} loaded successfully`);
+        }
+      } else {
+        const error = await RunAnywhere.getLastError();
+        Alert.alert('Error', `Failed to load model: ${error || 'Unknown error'}`);
+      }
     } catch (error) {
+      console.error('[STTScreen] Error loading model:', error);
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
       setIsModelLoading(false);
@@ -90,10 +132,24 @@ export const STTScreen: React.FC = () => {
   };
 
   /**
+   * Refresh available models
+   */
+  const refreshModels = useCallback(async () => {
+    try {
+      const allModels = await RunAnywhere.getAvailableModels();
+      const sttModels = allModels.filter((m) => m.modality === 'stt');
+      setAvailableModels(sttModels);
+    } catch (error) {
+      console.log('[STTScreen] Error refreshing models:', error);
+    }
+  }, []);
+
+  /**
    * Toggle recording
    * Note: In a real app, you would implement actual audio recording
    * using react-native-audio-recorder-player or similar library.
-   * This demo uses mock audio data for demonstration.
+   * For this demo, we show a placeholder message since audio recording
+   * requires additional native dependencies.
    */
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
@@ -102,25 +158,52 @@ export const STTScreen: React.FC = () => {
       setIsProcessing(true);
 
       try {
-        // In a real implementation, audioData would come from actual recording
-        // For now, we'll use a placeholder - the SDK expects base64 audio
-        const audioBase64 = ''; // TODO: Replace with actual recorded audio
-        const result = await RunAnywhere.transcribe(audioBase64);
-        setTranscript(result.text);
-        setConfidence(result.confidence ?? null);
+        // Check if model is loaded
+        const isLoaded = await RunAnywhere.isSTTModelLoaded();
+        if (!isLoaded) {
+          Alert.alert('Model Not Loaded', 'Please load an STT model first.');
+          setIsProcessing(false);
+          return;
+        }
+
+        // In a real implementation, you would:
+        // 1. Use react-native-audio-recorder-player to record audio
+        // 2. Convert the audio file to base64
+        // 3. Pass it to RunAnywhere.transcribe()
+
+        // For now, show a demo message
+        Alert.alert(
+          'Audio Recording Required',
+          'This demo requires audio recording capability.\n\n' +
+            'To enable real transcription:\n' +
+            '1. Add react-native-audio-recorder-player to package.json\n' +
+            '2. Run pod install\n' +
+            '3. Record audio and pass to RunAnywhere.transcribe()\n\n' +
+            'The STT model is loaded and ready to transcribe audio when provided.',
+          [{ text: 'OK' }]
+        );
+
+        // For demo purposes, show the transcription API works by passing empty audio
+        // which will fail gracefully
+        setTranscript('(Audio recording not available in demo)');
+        setConfidence(null);
       } catch (error) {
+        console.error('[STTScreen] Transcription error:', error);
         Alert.alert('Error', `Transcription failed: ${error}`);
       } finally {
         setIsProcessing(false);
       }
     } else {
       // Start recording
-      // TODO: Implement actual audio recording with microphone permissions
+      if (!currentModel) {
+        Alert.alert('Model Required', 'Please select an STT model first.');
+        return;
+      }
       setIsRecording(true);
       setTranscript('');
       setConfidence(null);
     }
-  }, [isRecording]);
+  }, [isRecording, currentModel]);
 
   /**
    * Clear transcript
