@@ -242,9 +242,15 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
     private func downloadFile(from url: URL, to destination: URL, progressHandler: ((Double) -> Void)?) async throws {
         logger.debug("Downloading file from: \(url.absoluteString)")
 
+        // Ensure destination directory exists
+        let destinationDir = destination.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: destinationDir, withIntermediateDirectories: true)
+
         // Download using URLSession with continuation for iOS 14 compatibility
-        let tempURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            let task = URLSession.shared.downloadTask(with: url) { (downloadedURL, response, error) in
+        // IMPORTANT: We must move the file INSIDE the callback because the temp file
+        // is only guaranteed to exist during the callback execution
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let task = URLSession.shared.downloadTask(with: url) { [destination] (downloadedURL, response, error) in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
@@ -261,14 +267,17 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
                     return
                 }
 
-                continuation.resume(returning: downloadedURL)
+                // Move file to destination INSIDE the callback before the temp file is cleaned up
+                do {
+                    try? FileManager.default.removeItem(at: destination)
+                    try FileManager.default.moveItem(at: downloadedURL, to: destination)
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
             task.resume()
         }
-
-        // Move to destination
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: tempURL, to: destination)
 
         progressHandler?(1.0)
     }
@@ -324,8 +333,10 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
         logger.info("Downloading archive to: \(archivePath.path)")
 
         // Download using URLSession with continuation for iOS 14 compatibility
-        let tempURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-            let task = URLSession.shared.downloadTask(with: downloadURL) { (url, response, error) in
+        // IMPORTANT: We must move the file INSIDE the callback because the temp file
+        // is only guaranteed to exist during the callback execution
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            let task = URLSession.shared.downloadTask(with: downloadURL) { [archivePath] (url, response, error) in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
@@ -337,19 +348,22 @@ public class ONNXDownloadStrategy: DownloadStrategy, ModelStorageStrategy {
                     return
                 }
 
-                guard let url = url else {
+                guard let downloadedURL = url else {
                     continuation.resume(throwing: DownloadError.invalidResponse)
                     return
                 }
 
-                continuation.resume(returning: url)
+                // Move file to archive path INSIDE the callback before the temp file is cleaned up
+                do {
+                    try? FileManager.default.removeItem(at: archivePath)
+                    try FileManager.default.moveItem(at: downloadedURL, to: archivePath)
+                    continuation.resume(returning: ())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
             task.resume()
         }
-
-        // Move downloaded file to archive path
-        try? FileManager.default.removeItem(at: archivePath)
-        try FileManager.default.moveItem(at: tempURL, to: archivePath)
 
         // Report download complete (50% - download done, extraction next)
         progressHandler?(0.5)
