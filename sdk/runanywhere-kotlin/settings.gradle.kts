@@ -41,6 +41,11 @@ include(":modules:runanywhere-llm-llamacpp")
 // Note: This module depends on mlc4j (MLC-LLM native library) which is included conditionally
 include(":modules:runanywhere-llm-mlc")
 
+// RunAnywhere Core ONNX module - provides native ONNX Runtime backend via JNI
+// This module wraps runanywhere-core C++ library for Android
+// Similar to CRunAnywhereONNX in the Swift SDK
+include(":modules:runanywhere-core-onnx")
+
 // MLC4J - Native MLC-LLM library (Git submodule inside MLC module)
 // Similar to llama.cpp structure: sdk/runanywhere-kotlin/modules/runanywhere-llm-mlc/mlc-llm
 // Only included if the submodule is initialized
