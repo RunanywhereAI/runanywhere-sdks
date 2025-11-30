@@ -1033,7 +1033,7 @@ public enum RunAnywhere {
                     errorMessage: error.localizedDescription,
                     errorCode: error.localizedDescription
                 )
-                let event = GenerationEvent(type: .modelLoaded, eventData: eventData)
+                let event = GenerationEvent(type: .modelLoadFailed, eventData: eventData)
                 await AnalyticsQueueManager.shared.enqueue(event)
                 await AnalyticsQueueManager.shared.flush()
             } catch {

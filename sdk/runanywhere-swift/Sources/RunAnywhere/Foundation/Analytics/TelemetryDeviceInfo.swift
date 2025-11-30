@@ -46,16 +46,20 @@ public struct TelemetryDeviceInfo: Sendable {
         )
     }
 
+    /// Cached regex for extracting OS version - compiled once for performance
+    private static let versionRegex: NSRegularExpression? = {
+        try? NSRegularExpression(pattern: #"(\d+\.\d+(?:\.\d+)?)"#)
+    }()
+
     /// Extract clean OS version number from full version string
     private static func extractOSVersion(from fullVersion: String) -> String {
         // Try to extract version number like "17.2" from strings like "Version 17.2 (Build 21C52)"
-        let pattern = #"(\d+\.\d+(?:\.\d+)?)"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           let match = regex.firstMatch(in: fullVersion, range: NSRange(fullVersion.startIndex..., in: fullVersion)),
-           let range = Range(match.range(at: 1), in: fullVersion) {
-            return String(fullVersion[range])
+        guard let regex = versionRegex,
+              let match = regex.firstMatch(in: fullVersion, range: NSRange(fullVersion.startIndex..., in: fullVersion)),
+              let range = Range(match.range(at: 1), in: fullVersion) else {
+            return fullVersion
         }
-        return fullVersion
+        return String(fullVersion[range])
     }
 
     private init(device: String, osVersion: String, platform: String) {
