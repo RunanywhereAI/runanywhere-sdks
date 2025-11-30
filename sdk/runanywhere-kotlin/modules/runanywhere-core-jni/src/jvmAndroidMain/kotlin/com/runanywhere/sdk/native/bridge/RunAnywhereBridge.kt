@@ -1,58 +1,109 @@
-package com.runanywhere.sdk.core.onnx
-
-import com.runanywhere.sdk.native.bridge.NativeTTSSynthesisResult
-import com.runanywhere.sdk.native.bridge.NativeVADResult
+package com.runanywhere.sdk.native.bridge
 
 /**
- * ONNX Runtime Native Bridge
+ * Unified RunAnywhere Native Bridge
  *
- * This object provides JNI bindings to the RunAnywhere Core C API (runanywhere_bridge.h)
- * specifically for the ONNX Runtime backend.
+ * This object provides JNI bindings to the RunAnywhere Core C API (runanywhere_bridge.h).
+ * It works with ALL backends (ONNX, LlamaCPP, TFLite, etc.) through a unified interface.
+ *
+ * The package name MUST be `com.runanywhere.sdk.native.bridge` to match the JNI function
+ * registration in the native library (Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_*).
  *
  * Thread Safety:
  * - All methods are thread-safe at the C API level
  * - Handles are opaque pointers managed by native code
  * - Stream handles must be destroyed on the same thread they were created (recommended)
+ *
+ * Usage:
+ * 1. Call loadLibrary() or loadLibraryWithBackend() before any other methods
+ * 2. Create a backend handle with nativeCreateBackend("onnx") or nativeCreateBackend("llamacpp")
+ * 3. Use the handle to call capability-specific methods
+ * 4. Destroy the handle when done with nativeDestroy()
  */
-internal object RunAnywhereBridge {
+object RunAnywhereBridge {
 
     private var isLibraryLoaded = false
+    private val loadedBackends = mutableSetOf<String>()
 
     /**
-     * Load the native library. Must be called before any other methods.
+     * Load the core JNI bridge library. Must be called before any other methods.
      * This is idempotent - calling it multiple times is safe.
+     *
+     * This loads only the JNI and bridge libraries. Backend-specific libraries
+     * should be loaded separately via loadBackend().
      */
     @Synchronized
     fun loadLibrary() {
         if (isLibraryLoaded) return
 
         try {
-            // Try to load the JNI bridge library
+            // Load the JNI bridge library
             System.loadLibrary("runanywhere_jni")
 
-            // Also load dependencies if needed
+            // Load the C API bridge library
             try {
                 System.loadLibrary("runanywhere_bridge")
             } catch (e: UnsatisfiedLinkError) {
                 // May already be loaded or linked statically
             }
 
-            try {
-                System.loadLibrary("onnxruntime")
-            } catch (e: UnsatisfiedLinkError) {
-                // May already be loaded
-            }
-
             isLibraryLoaded = true
         } catch (e: UnsatisfiedLinkError) {
-            throw RuntimeException("Failed to load RunAnywhere native library", e)
+            throw RuntimeException("Failed to load RunAnywhere JNI native library", e)
         }
     }
 
     /**
-     * Check if the native library is loaded.
+     * Load a specific backend's native libraries.
+     *
+     * @param backend The backend name: "onnx", "llamacpp", "tflite"
+     */
+    @Synchronized
+    fun loadBackend(backend: String) {
+        // Ensure JNI is loaded first
+        loadLibrary()
+
+        if (loadedBackends.contains(backend)) return
+
+        when (backend.lowercase()) {
+            "onnx" -> {
+                tryLoadLibrary("runanywhere_onnx")
+                tryLoadLibrary("onnxruntime")
+            }
+            "llamacpp" -> {
+                tryLoadLibrary("runanywhere_llamacpp")
+                tryLoadLibrary("llama")
+                tryLoadLibrary("ggml")
+                tryLoadLibrary("omp")
+            }
+            "tflite" -> {
+                tryLoadLibrary("runanywhere_tflite")
+            }
+            else -> {
+                throw IllegalArgumentException("Unknown backend: $backend")
+            }
+        }
+
+        loadedBackends.add(backend.lowercase())
+    }
+
+    private fun tryLoadLibrary(name: String) {
+        try {
+            System.loadLibrary(name)
+        } catch (e: UnsatisfiedLinkError) {
+            // May already be loaded or linked statically - this is fine
+        }
+    }
+
+    /**
+     * Check if the core JNI library is loaded.
      */
     fun isLoaded(): Boolean = isLibraryLoaded
+
+    /**
+     * Check if a specific backend is loaded.
+     */
+    fun isBackendLoaded(backend: String): Boolean = loadedBackends.contains(backend.lowercase())
 
     // =============================================================================
     // Backend Lifecycle

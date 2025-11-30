@@ -46,8 +46,9 @@ class LlamaCppCoreService {
     private val mutex = Mutex()
 
     init {
-        // Load native library on construction
+        // Load JNI bridge and LlamaCPP backend libraries on construction
         RunAnywhereBridge.loadLibrary()
+        RunAnywhereBridge.loadBackend("llamacpp")
     }
 
     // =============================================================================
@@ -200,8 +201,8 @@ class LlamaCppCoreService {
      * @return JSON string with model info, or empty object if no model loaded
      */
     fun getModelInfo(): String {
-        if (backendHandle == 0L) return "{}"
-        return RunAnywhereBridge.nativeTextGetModelInfo(backendHandle)
+        // TODO: Not yet implemented in native library
+        return "{}"
     }
 
     // =============================================================================
@@ -245,6 +246,9 @@ class LlamaCppCoreService {
     /**
      * Generate text completion with streaming (callback-based).
      *
+     * Note: The current native library doesn't support true streaming, so this
+     * generates the full response and emits it as a single token.
+     *
      * @param prompt The prompt text
      * @param systemPrompt Optional system prompt
      * @param maxTokens Maximum tokens to generate (default: 256)
@@ -259,31 +263,12 @@ class LlamaCppCoreService {
         temperature: Float = 0.8f,  // Match LLM.swift default
         onToken: (String) -> Boolean
     ) {
-        withContext(Dispatchers.IO) {
-            mutex.withLock {
-                ensureInitialized()
-                ensureModelLoaded()
+        // Generate full response (native streaming not yet available)
+        val fullResponse = generate(prompt, systemPrompt, maxTokens, temperature)
 
-                val callback = object : RunAnywhereBridge.TextStreamCallback {
-                    override fun onToken(token: String): Boolean = onToken(token)
-                }
-
-                val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeTextGenerateStream(
-                        backendHandle,
-                        prompt,
-                        systemPrompt,
-                        maxTokens,
-                        temperature,
-                        callback
-                    )
-                )
-
-                if (!result.isSuccess && result != NativeResultCode.ERROR_CANCELLED) {
-                    throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
-                }
-            }
-        }
+        // Emit the full response as a single "token"
+        // TODO: When native streaming is available, use actual streaming
+        onToken(fullResponse)
     }
 
     /**
