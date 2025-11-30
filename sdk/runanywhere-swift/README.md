@@ -47,6 +47,8 @@ Add RunAnywhere to your project directly from GitHub - no package registry neede
 
 > **🏆 Recommended**: Check [releases](https://github.com/RunanywhereAI/runanywhere-sdks/releases) for the most current version.
 
+> **📦 Binary Distribution**: The SDK automatically downloads pre-built native binaries (RunAnywhereCore.xcframework) from [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) releases. No local compilation of C++ code required!
+
 #### Via Xcode (Recommended)
 1. In Xcode, select **File > Add Package Dependencies**
 2. Enter the repository URL: `https://github.com/RunanywhereAI/runanywhere-sdks`

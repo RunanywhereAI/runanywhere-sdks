@@ -54,30 +54,37 @@ Sources/
 
 ### Binary Target in Package.swift
 
+The SDK now uses remote XCFramework distribution from the [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) repository. This eliminates the need for local builds and ensures consistent binary versions across all SDK consumers.
+
 ```swift
 .binaryTarget(
-    name: "RunAnywhereONNXBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.xxx/RunAnywhereONNX.xcframework.zip",
-    checksum: "62b2887a6d53360ed8d96a5080a98419d3c486f6be94bfe5e9f82415bb6a1fbe"
+    name: "RunAnywhereCoreBinary",
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
+    checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
 )
 ```
 
+The unified `RunAnywhereCore.xcframework` includes both ONNX Runtime and LlamaCPP backends. Swift Package Manager automatically downloads and caches the binary during package resolution.
+
 ### C Bridge Layer
 
-The `CRunAnywhereONNX` target provides Swift-compatible headers:
+The `CRunAnywhereCore` target provides Swift-compatible headers for accessing the native C++ library:
 
 ```
-Sources/CRunAnywhereONNX/
-├── module.modulemap        # Swift module definition
-├── onnx_bridge_wrapper.h   # Bridge wrapper
-└── types.h                 # Common types from runanywhere-core
+Sources/CRunAnywhereCore/
+├── include/
+│   ├── module.modulemap        # Swift module definition
+│   ├── ra_core.h               # Core API definitions
+│   ├── ra_types.h              # Common types
+│   ├── ra_onnx_bridge.h        # ONNX Runtime bridge
+│   └── ra_llamacpp_bridge.h    # LlamaCPP bridge
 ```
 
 **module.modulemap:**
 ```modulemap
-module CRunAnywhereONNX {
-    header "onnx_bridge_wrapper.h"
-    header "types.h"
+module CRunAnywhereCore {
+    header "ra_types.h"
+    header "ra_onnx_bridge.h"
     export *
 }
 ```
@@ -86,7 +93,7 @@ module CRunAnywhereONNX {
 
 ```swift
 // Import the C module
-import CRunAnywhereONNX
+import CRunAnywhereCore
 
 class ONNXSTTService: STTService {
     private var backendHandle: ra_backend_handle?

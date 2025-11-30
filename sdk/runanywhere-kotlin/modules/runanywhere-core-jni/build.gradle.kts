@@ -218,14 +218,18 @@ val downloadNativeLibs by tasks.registering {
             }
             logger.lifecycle("Downloaded: ${zipFile.length() / 1024}KB")
         } catch (e: Exception) {
-            logger.error("Failed to download JNI libraries: ${e.message}")
-            logger.error("URL: $downloadUrl")
+            logger.lifecycle("JNI libraries not available in release $nativeLibVersion")
+            logger.lifecycle("This is normal - JNI bridge libraries are bundled with backend modules (ONNX, LlamaCPP)")
             logger.lifecycle("")
-            logger.lifecycle("Options:")
-            logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
+            logger.lifecycle("If you need standalone JNI libraries:")
+            logger.lifecycle("  1. Check that version $nativeLibVersion includes RunAnywhereJNI-android.zip")
             logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android.sh all")
             logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.native.local=true")
-            throw GradleException("Failed to download JNI libraries", e)
+
+            // Create empty version file to mark as "attempted"
+            jniLibsDir.mkdirs()
+            versionFile.writeText(nativeLibVersion)
+            return@doLast
         }
 
         // Clear existing jniLibs

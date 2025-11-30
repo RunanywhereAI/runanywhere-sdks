@@ -94,7 +94,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 // Use shared JNI bridge from the jni module
-                api(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-jni"))
+                api(project(":modules:runanywhere-core-jni"))
             }
         }
 
@@ -246,16 +246,13 @@ val downloadNativeLibs by tasks.registering {
         }
 
         // Move libraries to jniLibs directory
-        // ZIP structure: onnx/<abi>/lib*.so -> jniLibs/<abi>/lib*.so
-        val onnxDir = file("$downloadedLibsDir/onnx")
-        if (onnxDir.exists()) {
-            onnxDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
-                val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
-                targetAbiDir.mkdirs()
-                abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
-                    soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
-                    logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
-                }
+        // ZIP structure: <abi>/lib*.so -> jniLibs/<abi>/lib*.so
+        downloadedLibsDir.listFiles()?.filter { it.isDirectory && it.name != "include" }?.forEach { abiDir ->
+            val targetAbiDir = file("$jniLibsDir/${abiDir.name}")
+            targetAbiDir.mkdirs()
+            abiDir.listFiles()?.filter { it.extension == "so" }?.forEach { soFile ->
+                soFile.copyTo(file("$targetAbiDir/${soFile.name}"), overwrite = true)
+                logger.lifecycle("  Extracted: ${abiDir.name}/${soFile.name}")
             }
         }
 
