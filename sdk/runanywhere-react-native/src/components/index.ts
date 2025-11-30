@@ -7,39 +7,26 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/
  */
 
-// Speech-to-Text
+// Base Component (abstract class and protocols)
 export {
-  STTComponent,
-  createSTTComponent,
-  type STTConfiguration,
-  type STTInput,
-  type STTOutput,
-  type STTStreamHandle,
-  type WordTimestamp,
-  type TranscriptionAlternative,
-  type TranscriptionMetadata,
-  STTMode,
-  DEFAULT_STT_CONFIG,
-} from './STT';
+  BaseComponent,
+  type Component,
+  type ServiceComponent,
+  type ComponentInput,
+  type ComponentOutput,
+  type ComponentConfiguration,
+  type ComponentInitParameters,
+  type ServiceWrapper,
+} from './BaseComponent';
+
+// Speech-to-Text
+export * from './STT';
 
 // Text-to-Speech
-export {
-  TTSComponent,
-  createTTSComponent,
-  type TTSComponentConfiguration,
-  type TTSInput,
-  type TTSOutput,
-  type TTSOptions,
-  type PhonemeTimestamp,
-  type SynthesisMetadata,
-  type VoiceInfo,
-  DEFAULT_TTS_CONFIG,
-} from './TTS';
+export * from './TTS';
 
-// Future components (to be implemented):
-// - VADComponent (Voice Activity Detection)
-// - LLMComponent (Large Language Models)
-// - VLMComponent (Vision Language Models)
-// - SpeakerDiarizationComponent
-// - WakeWordComponent
-// - VoiceAgentComponent
+// Language Models (LLM)
+export * from './LLM';
+
+// Voice Activity Detection (VAD)
+export * from './VAD';

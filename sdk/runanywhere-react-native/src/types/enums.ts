@@ -181,6 +181,18 @@ export enum HardwareAcceleration {
 }
 
 /**
+ * Audio format for STT/TTS
+ */
+export enum AudioFormat {
+  PCM = 'pcm',
+  WAV = 'wav',
+  MP3 = 'mp3',
+  M4A = 'm4a',
+  FLAC = 'flac',
+  OPUS = 'opus',
+}
+
+/**
  * Configuration source
  */
 export enum ConfigurationSource {

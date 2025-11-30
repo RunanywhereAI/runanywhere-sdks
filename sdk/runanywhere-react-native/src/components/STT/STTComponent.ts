@@ -2,15 +2,18 @@
  * STTComponent.ts
  *
  * Speech-to-Text component for RunAnywhere React Native SDK.
- * Follows the same architecture as Swift SDK's STTComponent.swift.
+ * Follows the exact architecture and patterns from Swift SDK's STTComponent.swift.
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/STT/STTComponent.swift
  */
 
-import { NativeEventEmitter, NativeModules } from 'react-native';
+import { NativeModules } from 'react-native';
+import { BaseComponent } from '../BaseComponent';
+import type { ComponentConfiguration, ComponentInput, ComponentOutput } from '../BaseComponent';
 import { EventBus } from '../../events';
 import { SDKError, SDKErrorCode } from '../../errors';
-import type { STTOptions } from '../../types';
+import { AudioFormat, ComponentState, LLMFramework, SDKComponent } from '../../types/enums';
+import type { STTOptions, STTResult } from '../../types';
 
 // ============================================================================
 // STT Configuration
@@ -19,8 +22,13 @@ import type { STTOptions } from '../../types';
 /**
  * Configuration for STT component
  * Reference: STTConfiguration in STTComponent.swift
+ *
+ * Conforms to ComponentConfiguration protocol
  */
-export interface STTConfiguration {
+export interface STTConfiguration extends ComponentConfiguration {
+  /** Component type */
+  readonly componentType: SDKComponent;
+
   /** Model ID for the STT model */
   modelId?: string;
 
@@ -52,7 +60,7 @@ export interface STTConfiguration {
 /**
  * Default STT configuration
  */
-export const DEFAULT_STT_CONFIG: STTConfiguration = {
+export const DEFAULT_STT_CONFIGURATION: Omit<STTConfiguration, 'componentType' | 'validate'> = {
   language: 'en-US',
   sampleRate: 16000,
   enablePunctuation: true,
@@ -63,6 +71,33 @@ export const DEFAULT_STT_CONFIG: STTConfiguration = {
   useGPUIfAvailable: true,
 };
 
+/**
+ * Create STT configuration with defaults
+ */
+export function createSTTConfiguration(
+  config: Partial<Omit<STTConfiguration, 'componentType' | 'validate'>>
+): STTConfiguration {
+  return {
+    componentType: SDKComponent.STT,
+    ...DEFAULT_STT_CONFIGURATION,
+    ...config,
+    validate(): void {
+      if (this.sampleRate <= 0 || this.sampleRate > 48000) {
+        throw new SDKError(
+          SDKErrorCode.ValidationFailed,
+          'Sample rate must be between 1 and 48000 Hz'
+        );
+      }
+      if (this.maxAlternatives <= 0 || this.maxAlternatives > 10) {
+        throw new SDKError(
+          SDKErrorCode.ValidationFailed,
+          'Max alternatives must be between 1 and 10'
+        );
+      }
+    },
+  };
+}
+
 // ============================================================================
 // STT Input/Output Types
 // ============================================================================
@@ -71,25 +106,34 @@ export const DEFAULT_STT_CONFIG: STTConfiguration = {
  * Input for Speech-to-Text
  * Reference: STTInput in STTComponent.swift
  */
-export interface STTInput {
-  /** Audio data (base64 encoded float32 PCM) */
+export interface STTInput extends ComponentInput {
+  /** Audio data (base64 encoded) */
   audioData: string;
 
+  /** Audio buffer (alternative to data - for native buffers) */
+  audioBuffer?: any;
+
   /** Audio format */
-  format: 'pcm' | 'wav' | 'mp3';
+  format: AudioFormat;
 
   /** Language code override */
   language?: string;
 
+  /** VAD output for context (future enhancement) */
+  vadOutput?: any;
+
   /** Custom options override */
   options?: STTOptions;
+
+  /** Validate input */
+  validate(): void;
 }
 
 /**
  * Output from Speech-to-Text
  * Reference: STTOutput in STTComponent.swift
  */
-export interface STTOutput {
+export interface STTOutput extends ComponentOutput {
   /** Transcribed text */
   text: string;
 
@@ -114,6 +158,7 @@ export interface STTOutput {
 
 /**
  * Word timestamp information
+ * Reference: WordTimestamp in STTComponent.swift
  */
 export interface WordTimestamp {
   word: string;
@@ -124,6 +169,7 @@ export interface WordTimestamp {
 
 /**
  * Alternative transcription
+ * Reference: TranscriptionAlternative in STTComponent.swift
  */
 export interface TranscriptionAlternative {
   text: string;
@@ -132,12 +178,37 @@ export interface TranscriptionAlternative {
 
 /**
  * Transcription metadata
+ * Reference: TranscriptionMetadata in STTComponent.swift
  */
 export interface TranscriptionMetadata {
   modelId: string;
   processingTime: number; // milliseconds
   audioLength: number; // seconds
   realTimeFactor: number; // processingTime / audioLength
+}
+
+/**
+ * STT transcription result from service
+ * Reference: STTTranscriptionResult in STTComponent.swift
+ */
+export interface STTTranscriptionResult {
+  transcript: string;
+  confidence?: number;
+  timestamps?: TimestampInfo[];
+  language?: string;
+  alternatives?: AlternativeTranscription[];
+}
+
+export interface TimestampInfo {
+  word: string;
+  startTime: number;
+  endTime: number;
+  confidence?: number;
+}
+
+export interface AlternativeTranscription {
+  transcript: string;
+  confidence: number;
 }
 
 // ============================================================================
@@ -157,105 +228,78 @@ export enum STTMode {
 }
 
 // ============================================================================
-// STT Stream Handle
+// STT Service Protocol
 // ============================================================================
 
 /**
- * Handle for managing STT streaming sessions
+ * Protocol for speech-to-text services
+ * Reference: STTService protocol in STTComponent.swift
  */
-export interface STTStreamHandle {
-  /** Unique stream ID */
-  id: number;
+export interface STTService {
+  /** Initialize the service with optional model path */
+  initialize(modelPath?: string): Promise<void>;
 
-  /** Feed audio data to the stream */
-  feed(audioData: string, sampleRate?: number): Promise<boolean>;
+  /** Transcribe audio data (batch mode) */
+  transcribe(audioData: string, options: STTOptions): Promise<STTTranscriptionResult>;
 
-  /** Decode current buffer and get result */
-  decode(): Promise<string>;
+  /** Stream transcription for real-time processing */
+  streamTranscribe(
+    audioStream: AsyncIterable<string>,
+    options: STTOptions,
+    onPartial: (text: string) => void
+  ): Promise<STTTranscriptionResult>;
 
-  /** Check if stream is ready for decoding */
-  isReady(): Promise<boolean>;
+  /** Check if service is ready */
+  isReady: boolean;
 
-  /** Check if endpoint detected */
-  isEndpoint(): Promise<boolean>;
+  /** Get current model identifier */
+  currentModel: string | null;
 
-  /** Mark input as finished */
-  finish(): Promise<void>;
+  /** Whether this service supports live/streaming transcription */
+  supportsStreaming: boolean;
 
-  /** Reset the stream */
-  reset(): Promise<void>;
+  /** Cleanup resources */
+  cleanup(): Promise<void>;
+}
 
-  /** Destroy the stream */
-  destroy(): Promise<void>;
+/**
+ * Service wrapper for STT service
+ * Reference: STTServiceWrapper in STTComponent.swift
+ */
+export class STTServiceWrapper {
+  public wrappedService: STTService | null = null;
+
+  constructor(service?: STTService) {
+    this.wrappedService = service || null;
+  }
 }
 
 // ============================================================================
-// STT Component
+// Native STT Service Implementation
 // ============================================================================
 
 /**
- * Speech-to-Text component
- *
- * Provides batch and streaming transcription capabilities.
- * Follows the same architecture as Swift SDK's STTComponent.
- *
- * @example
- * ```typescript
- * // Create component with configuration
- * const stt = new STTComponent({
- *   language: 'en-US',
- *   enablePunctuation: true,
- * });
- *
- * // Initialize
- * await stt.initialize();
- *
- * // Batch transcription
- * const result = await stt.transcribe(audioBase64);
- * console.log('Transcript:', result.text);
- *
- * // Streaming transcription
- * const stream = await stt.createStream();
- * stream.feed(audioChunk);
- * const partial = await stream.decode();
- * ```
+ * Native implementation of STTService using NativeRunAnywhere
+ * This bridges to the C++ TurboModule
  */
-export class STTComponent {
-  private configuration: STTConfiguration;
-  private isModelLoaded = false;
-  private modelPath?: string;
+class NativeSTTService implements STTService {
   private nativeModule: any;
-  private eventEmitter?: NativeEventEmitter;
+  private _isReady = false;
+  private _currentModel: string | null = null;
 
-  constructor(configuration: Partial<STTConfiguration> = {}) {
-    this.configuration = { ...DEFAULT_STT_CONFIG, ...configuration };
+  constructor() {
     this.nativeModule = NativeModules.RunAnywhere;
   }
 
-  // ============================================================================
-  // Lifecycle
-  // ============================================================================
-
-  /**
-   * Initialize the STT component
-   */
-  async initialize(): Promise<void> {
+  async initialize(modelPath?: string): Promise<void> {
     if (!this.nativeModule) {
       throw new SDKError(
         SDKErrorCode.ComponentNotInitialized,
-        'Native module not available. Ensure the native module is properly linked.'
+        'Native module not available'
       );
     }
 
-    // Check if createBackend method is available
-    if (typeof this.nativeModule.createBackend !== 'function') {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Native createBackend method not available. Native module may not be properly built.'
-      );
-    }
-
-    // Create backend if not exists
+    // Create backend if needed
     const backendCreated = await this.nativeModule.createBackend('onnx');
     if (!backendCreated) {
       throw new SDKError(
@@ -264,21 +308,10 @@ export class STTComponent {
       );
     }
 
-    // Check if initialize method is available
-    if (typeof this.nativeModule.initialize !== 'function') {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Native initialize method not available. Native module may not be properly built.'
-      );
-    }
-
     // Initialize backend
     const initResult = await this.nativeModule.initialize(
-      JSON.stringify({
-        useGPU: this.configuration.useGPUIfAvailable,
-      })
+      JSON.stringify({ useGPU: true })
     );
-
     if (!initResult) {
       throw new SDKError(
         SDKErrorCode.ComponentNotInitialized,
@@ -286,37 +319,140 @@ export class STTComponent {
       );
     }
 
-    // Set up event emitter
-    this.eventEmitter = new NativeEventEmitter(this.nativeModule);
+    this._isReady = true;
   }
 
-  /**
-   * Load an STT model
-   */
-  async loadModel(
-    modelPath: string,
-    modelType: string = 'sherpa-onnx'
-  ): Promise<void> {
-    if (!this.nativeModule) {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Component not initialized'
-      );
+  async transcribe(audioData: string, options: STTOptions): Promise<STTTranscriptionResult> {
+    if (!this._isReady) {
+      throw new SDKError(SDKErrorCode.ServiceNotInitialized, 'STT service not initialized');
     }
 
-    // Check if loadSTTModel method is available
-    if (typeof this.nativeModule.loadSTTModel !== 'function') {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Native loadSTTModel method not available. Native module may not be properly built.'
-      );
+    const resultJson = await this.nativeModule.transcribe(
+      audioData,
+      options.sampleRate || 16000,
+      options.language || 'en'
+    );
+
+    if (!resultJson) {
+      throw new SDKError(SDKErrorCode.TranscriptionFailed, 'Transcription failed');
     }
 
+    const result = JSON.parse(resultJson);
+
+    return {
+      transcript: result.text || '',
+      confidence: result.confidence,
+      timestamps: result.timestamps,
+      language: result.language,
+      alternatives: result.alternatives,
+    };
+  }
+
+  async streamTranscribe(
+    audioStream: AsyncIterable<string>,
+    options: STTOptions,
+    onPartial: (text: string) => void
+  ): Promise<STTTranscriptionResult> {
+    if (!this.supportsStreaming) {
+      // Fallback to batch mode
+      const chunks: string[] = [];
+      for await (const chunk of audioStream) {
+        chunks.push(chunk);
+      }
+      const combined = chunks.join(''); // Combine base64 chunks
+      return this.transcribe(combined, options);
+    }
+
+    // Create stream
+    const streamId = await this.nativeModule.createSTTStream(
+      JSON.stringify(options)
+    );
+
+    if (streamId < 0) {
+      throw new SDKError(SDKErrorCode.StreamCreationFailed, 'Failed to create STT stream');
+    }
+
+    try {
+      // Feed audio chunks
+      for await (const chunk of audioStream) {
+        await this.nativeModule.feedSTTAudio(
+          streamId,
+          chunk,
+          options.sampleRate || 16000
+        );
+
+        // Check for partial results
+        const isReady = await this.nativeModule.isSTTReady?.(streamId);
+        if (isReady) {
+          const partialJson = await this.nativeModule.decodeSTT(streamId);
+          if (partialJson) {
+            const partial = JSON.parse(partialJson);
+            if (partial.text) {
+              onPartial(partial.text);
+            }
+          }
+        }
+
+        // Check for endpoint
+        const isEndpoint = await this.nativeModule.isSTTEndpoint?.(streamId);
+        if (isEndpoint) {
+          break;
+        }
+      }
+
+      // Signal input finished and get final result
+      await this.nativeModule.finishSTTInput?.(streamId);
+
+      const finalJson = await this.nativeModule.decodeSTT(streamId);
+      if (!finalJson) {
+        throw new SDKError(SDKErrorCode.TranscriptionFailed, 'No transcription result');
+      }
+
+      const result = JSON.parse(finalJson);
+
+      return {
+        transcript: result.text || '',
+        confidence: result.confidence,
+        timestamps: result.timestamps,
+        language: result.language,
+        alternatives: result.alternatives,
+      };
+    } finally {
+      // Cleanup stream
+      await this.nativeModule.destroySTTStream(streamId);
+    }
+  }
+
+  get isReady(): boolean {
+    return this._isReady;
+  }
+
+  get currentModel(): string | null {
+    return this._currentModel;
+  }
+
+  get supportsStreaming(): boolean {
+    // Check if native module has streaming methods
+    return (
+      this.nativeModule?.createSTTStream !== undefined &&
+      this.nativeModule?.feedSTTAudio !== undefined &&
+      this.nativeModule?.decodeSTT !== undefined
+    );
+  }
+
+  async cleanup(): Promise<void> {
+    if (this.nativeModule?.unloadSTTModel) {
+      await this.nativeModule.unloadSTTModel();
+    }
+    this._isReady = false;
+    this._currentModel = null;
+  }
+
+  async loadModel(modelPath: string, modelType: string = 'sherpa-onnx'): Promise<void> {
     const configJson = JSON.stringify({
-      language: this.configuration.language,
-      sampleRate: this.configuration.sampleRate,
-      enablePunctuation: this.configuration.enablePunctuation,
-      enableDiarization: this.configuration.enableDiarization,
+      language: 'en-US',
+      sampleRate: 16000,
+      enablePunctuation: true,
     });
 
     const result = await this.nativeModule.loadSTTModel(
@@ -326,365 +462,408 @@ export class STTComponent {
     );
 
     if (!result) {
-      const error = await this.nativeModule.getLastError?.() ?? 'Unknown error';
-      throw new SDKError(
-        SDKErrorCode.ModelLoadFailed,
-        `Failed to load STT model: ${error}`
-      );
+      const error = await this.nativeModule.getLastError?.() || 'Unknown error';
+      throw new SDKError(SDKErrorCode.ModelLoadFailed, `Failed to load STT model: ${error}`);
     }
 
-    this.isModelLoaded = true;
-    this.modelPath = modelPath;
+    this._currentModel = modelPath;
+  }
+}
 
-    // Emit model loaded event
-    EventBus.emitModel({
-      type: 'loadCompleted',
-      modelId: modelPath,
+// ============================================================================
+// STT Component
+// ============================================================================
+
+/**
+ * Speech-to-Text component following the clean architecture
+ *
+ * Extends BaseComponent to provide STT capabilities with lifecycle management.
+ * Matches the Swift SDK STTComponent implementation exactly.
+ *
+ * Reference: STTComponent in STTComponent.swift
+ *
+ * @example
+ * ```typescript
+ * // Create and initialize component
+ * const config = createSTTConfiguration({
+ *   language: 'en-US',
+ *   enablePunctuation: true,
+ * });
+ *
+ * const stt = new STTComponent(config);
+ * await stt.initialize();
+ *
+ * // Batch transcription
+ * const result = await stt.transcribe(audioDataBase64);
+ * console.log('Transcript:', result.text);
+ *
+ * // Streaming transcription
+ * const stream = stt.liveTranscribe(audioStream);
+ * for await (const text of stream) {
+ *   console.log('Partial:', text);
+ * }
+ * ```
+ */
+export class STTComponent extends BaseComponent<STTServiceWrapper> {
+  // ============================================================================
+  // Static Properties
+  // ============================================================================
+
+  /**
+   * Component type identifier
+   * Reference: componentType in STTComponent.swift
+   */
+  static override componentType = SDKComponent.STT;
+
+  // ============================================================================
+  // Instance Properties
+  // ============================================================================
+
+  private readonly sttConfiguration: STTConfiguration;
+  private isModelLoaded = false;
+  private modelPath?: string;
+
+  // ============================================================================
+  // Constructor
+  // ============================================================================
+
+  constructor(configuration: STTConfiguration) {
+    super(configuration);
+    this.sttConfiguration = configuration;
+  }
+
+  // ============================================================================
+  // Service Creation
+  // ============================================================================
+
+  /**
+   * Create the STT service
+   *
+   * Reference: createService() in STTComponent.swift
+   */
+  protected async createService(): Promise<STTServiceWrapper> {
+    const modelId = this.sttConfiguration.modelId || 'unknown';
+    const modelName = modelId;
+
+    // Notify lifecycle manager (emit event)
+    this.eventBus.emitModel({
+      type: 'loadStarted',
+      modelId: modelId,
     });
-  }
 
-  /**
-   * Unload the STT model
-   */
-  async unloadModel(): Promise<void> {
-    if (!this.nativeModule || !this.isModelLoaded) return;
+    try {
+      // Create native STT service
+      const sttService = new NativeSTTService();
 
-    await this.nativeModule.unloadSTTModel();
-    this.isModelLoaded = false;
-    this.modelPath = undefined;
-  }
+      // Initialize service
+      await sttService.initialize();
 
-  /**
-   * Check if model is loaded
-   */
-  get modelLoaded(): boolean {
-    return this.isModelLoaded;
-  }
+      // Load model if specified
+      if (this.sttConfiguration.modelId) {
+        await sttService.loadModel(this.sttConfiguration.modelId);
+        this.modelPath = this.sttConfiguration.modelId;
+        this.isModelLoaded = true;
+      }
 
-  /**
-   * Check if streaming is supported
-   */
-  async supportsStreaming(): Promise<boolean> {
-    if (!this.nativeModule) return false;
+      // Wrap the service
+      const wrapper = new STTServiceWrapper(sttService);
 
-    // Check with native module
-    // For now, sherpa-onnx supports streaming
-    return true;
-  }
+      // Notify successful load
+      this.eventBus.emitModel({
+        type: 'loadCompleted',
+        modelId: modelId,
+      });
 
-  /**
-   * Get recommended transcription mode
-   */
-  async getRecommendedMode(): Promise<STTMode> {
-    const streaming = await this.supportsStreaming();
-    return streaming ? STTMode.Live : STTMode.Batch;
+      return wrapper;
+    } catch (error) {
+      this.eventBus.emitModel({
+        type: 'loadFailed',
+        modelId: modelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 
   /**
    * Cleanup resources
+   *
+   * Reference: performCleanup() in STTComponent.swift
    */
-  async cleanup(): Promise<void> {
-    await this.unloadModel();
-    if (this.nativeModule) {
-      await this.nativeModule.destroy();
-    }
+  protected async performCleanup(): Promise<void> {
+    await this.service?.wrappedService?.cleanup();
+    this.isModelLoaded = false;
+    this.modelPath = undefined;
   }
 
   // ============================================================================
-  // Batch Transcription
+  // Helper Properties
+  // ============================================================================
+
+  /**
+   * Get wrapped STT service
+   */
+  private get sttService(): STTService | null {
+    return this.service?.wrappedService || null;
+  }
+
+  // ============================================================================
+  // Capabilities
+  // ============================================================================
+
+  /**
+   * Whether the underlying service supports live/streaming transcription
+   *
+   * Reference: supportsStreaming in STTComponent.swift
+   */
+  get supportsStreaming(): boolean {
+    return this.sttService?.supportsStreaming || false;
+  }
+
+  /**
+   * Get the recommended transcription mode based on service capabilities
+   *
+   * Reference: recommendedMode in STTComponent.swift
+   */
+  get recommendedMode(): STTMode {
+    return this.supportsStreaming ? STTMode.Live : STTMode.Batch;
+  }
+
+  // ============================================================================
+  // Batch Transcription API
   // ============================================================================
 
   /**
    * Transcribe audio data in batch mode
    *
-   * @param audioData - Base64 encoded audio data (float32 PCM)
-   * @param options - Optional STT options
-   * @returns Transcription output
+   * Reference: transcribe(_:options:) in STTComponent.swift
+   *
+   * @param audioData - Base64 encoded audio data (Float32 PCM or compatible format)
+   * @param options - Transcription options
+   * @returns Transcription output with text, confidence, and metadata
    */
-  async transcribe(
-    audioData: string,
-    options?: Partial<STTOptions>
-  ): Promise<STTOutput> {
+  async transcribe(audioData: string, options?: Partial<STTOptions>): Promise<STTOutput> {
     this.ensureReady();
 
-    const mergedOptions: STTOptions = {
-      language: options?.language ?? this.configuration.language,
-      punctuation: options?.punctuation ?? this.configuration.enablePunctuation,
-      diarization:
-        options?.diarization ?? this.configuration.enableDiarization,
-      wordTimestamps:
-        options?.wordTimestamps ?? this.configuration.enableTimestamps,
-      sampleRate: options?.sampleRate ?? this.configuration.sampleRate,
+    const input: STTInput = {
+      audioData,
+      format: AudioFormat.WAV,
+      language: options?.language,
+      options: options ? this.mergeOptions(options) : this.createDefaultOptions(),
+      validate: () => {
+        if (!audioData || audioData.length === 0) {
+          throw new SDKError(SDKErrorCode.ValidationFailed, 'Audio data is required');
+        }
+      },
     };
 
-    const startTime = Date.now();
+    return this.process(input);
+  }
 
-    // Check if transcribe method is available
-    if (typeof this.nativeModule.transcribe !== 'function') {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Native transcribe method not available. Native module may not be properly built.'
-      );
+  /**
+   * Process STT input
+   *
+   * Reference: process(_:) in STTComponent.swift
+   *
+   * @param input - STT input with audio data and options
+   * @returns STT output with transcription result
+   */
+  async process(input: STTInput): Promise<STTOutput> {
+    this.ensureReady();
+
+    if (!this.sttService) {
+      throw new SDKError(SDKErrorCode.ComponentNotReady, 'STT service not available');
     }
 
-    // Call native transcribe method
-    const resultJson = await this.nativeModule.transcribe(
-      audioData,
-      mergedOptions.sampleRate,
-      mergedOptions.language
-    );
+    // Validate input
+    input.validate();
+
+    // Create options from input or use defaults
+    const options = input.options || this.createDefaultOptions();
+
+    // Get audio data
+    const audioData = input.audioData;
+    if (!audioData || audioData.length === 0) {
+      throw new SDKError(SDKErrorCode.ValidationFailed, 'No audio data provided');
+    }
+
+    // Track processing time
+    const startTime = Date.now();
+
+    // Perform transcription
+    const result = await this.sttService.transcribe(audioData, options);
 
     const processingTime = Date.now() - startTime;
 
-    // Parse result
-    const result = JSON.parse(resultJson);
+    // Convert to strongly typed output
+    const wordTimestamps = result.timestamps?.map((timestamp) => ({
+      word: timestamp.word,
+      startTime: timestamp.startTime,
+      endTime: timestamp.endTime,
+      confidence: timestamp.confidence || 0.9,
+    }));
 
-    // Estimate audio length from data size
+    const alternatives = result.alternatives?.map((alt) => ({
+      text: alt.transcript,
+      confidence: alt.confidence,
+    }));
+
+    // Calculate audio length (estimate based on data size and format)
     const audioLength = this.estimateAudioLength(audioData);
 
+    const metadata: TranscriptionMetadata = {
+      modelId: this.sttService.currentModel || 'unknown',
+      processingTime,
+      audioLength,
+      realTimeFactor: audioLength > 0 ? processingTime / 1000 / audioLength : 0,
+    };
+
     return {
-      text: result.text || '',
-      confidence: result.confidence ?? 0.9,
-      wordTimestamps: result.timestamps?.map((t: any) => ({
-        word: t.word,
-        startTime: t.startTime,
-        endTime: t.endTime,
-        confidence: t.confidence ?? 0.9,
-      })),
+      text: result.transcript,
+      confidence: result.confidence || 0.9,
+      wordTimestamps,
       detectedLanguage: result.language,
-      alternatives: result.alternatives?.map((a: any) => ({
-        text: a.text,
-        confidence: a.confidence,
-      })),
-      metadata: {
-        modelId: this.modelPath ?? 'unknown',
-        processingTime,
-        audioLength,
-        realTimeFactor: audioLength > 0 ? processingTime / 1000 / audioLength : 0,
-      },
+      alternatives,
+      metadata,
       timestamp: new Date(),
     };
   }
 
-  /**
-   * Transcribe with STTInput
-   */
-  async process(input: STTInput): Promise<STTOutput> {
-    return this.transcribe(input.audioData, input.options);
-  }
-
   // ============================================================================
-  // Streaming Transcription
+  // Live/Streaming Transcription API
   // ============================================================================
-
-  /**
-   * Create a streaming STT session
-   *
-   * @param options - Optional configuration for the stream
-   * @returns Stream handle for feeding audio and getting results
-   */
-  async createStream(options?: Partial<STTOptions>): Promise<STTStreamHandle> {
-    this.ensureReady();
-
-    const configJson = JSON.stringify({
-      language: options?.language ?? this.configuration.language,
-      sampleRate: options?.sampleRate ?? this.configuration.sampleRate,
-    });
-
-    const streamId = await this.nativeModule.createSTTStream(configJson);
-
-    if (streamId < 0) {
-      throw new SDKError(
-        SDKErrorCode.StreamCreationFailed,
-        'Failed to create STT stream'
-      );
-    }
-
-    // Return stream handle
-    const nativeModule = this.nativeModule;
-    const sampleRate = options?.sampleRate ?? this.configuration.sampleRate;
-
-    return {
-      id: streamId,
-
-      async feed(audioData: string, rate?: number): Promise<boolean> {
-        return nativeModule.feedSTTAudio(streamId, audioData, rate ?? sampleRate);
-      },
-
-      async decode(): Promise<string> {
-        return nativeModule.decodeSTT(streamId);
-      },
-
-      async isReady(): Promise<boolean> {
-        // Stream is always ready to accept audio in sherpa-onnx
-        return true;
-      },
-
-      async isEndpoint(): Promise<boolean> {
-        // Check if endpoint detected
-        // For now, return false - would need native method
-        return false;
-      },
-
-      async finish(): Promise<void> {
-        // Signal end of input
-        // Native method: ra_stt_input_finished
-      },
-
-      async reset(): Promise<void> {
-        // Reset stream state
-        // Native method: ra_stt_reset_stream
-      },
-
-      async destroy(): Promise<void> {
-        await nativeModule.destroySTTStream(streamId);
-      },
-    };
-  }
 
   /**
    * Live transcription with real-time partial results
    *
-   * @param audioStream - Async iterator of audio chunks (base64 encoded)
-   * @param options - Optional STT options
-   * @yields Transcription text (partial and final results)
+   * Reference: liveTranscribe(_:options:) in STTComponent.swift
+   *
+   * @param audioStream - Async sequence of audio data chunks (base64 encoded)
+   * @param options - Transcription options
+   * @returns Async stream of transcription text (partial and final results)
    */
   async *liveTranscribe(
     audioStream: AsyncIterable<string>,
     options?: Partial<STTOptions>
   ): AsyncGenerator<string, void, unknown> {
-    const stream = await this.createStream(options);
+    this.ensureReady();
 
-    try {
-      for await (const audioChunk of audioStream) {
-        // Feed audio chunk
-        await stream.feed(audioChunk);
-
-        // Try to decode and yield partial result
-        const partial = await stream.decode();
-        if (partial && partial !== '{}') {
-          const result = JSON.parse(partial);
-          if (result.text) {
-            yield result.text;
-          }
-        }
-      }
-
-      // Final decode
-      await stream.finish();
-      const final = await stream.decode();
-      if (final && final !== '{}') {
-        const result = JSON.parse(final);
-        if (result.text) {
-          yield result.text;
-        }
-      }
-    } finally {
-      await stream.destroy();
+    if (!this.sttService) {
+      throw new SDKError(SDKErrorCode.ComponentNotReady, 'STT service not available');
     }
+
+    const mergedOptions = options ? this.mergeOptions(options) : this.createDefaultOptions();
+
+    // Use service streaming
+    const partials: string[] = [];
+
+    const result = await this.sttService.streamTranscribe(
+      audioStream,
+      mergedOptions,
+      (partial) => {
+        partials.push(partial);
+      }
+    );
+
+    // Yield all partials
+    for (const partial of partials) {
+      yield partial;
+    }
+
+    // Yield final result
+    yield result.transcript;
+  }
+
+  /**
+   * Stream transcription (alias for liveTranscribe)
+   *
+   * Reference: streamTranscribe(_:language:) in STTComponent.swift
+   */
+  streamTranscribe(
+    audioStream: AsyncIterable<string>,
+    language?: string
+  ): AsyncGenerator<string, void, unknown> {
+    return this.liveTranscribe(audioStream, { language });
   }
 
   // ============================================================================
-  // Event Subscriptions
+  // Service Access
   // ============================================================================
 
   /**
-   * Subscribe to partial transcription events
+   * Get service wrapper for compatibility
+   *
+   * Reference: getService() in STTComponent.swift
    */
-  onPartialResult(callback: (text: string) => void): () => void {
-    if (!this.eventEmitter) {
-      return () => {};
-    }
-
-    const subscription = this.eventEmitter.addListener(
-      'onSTTPartial',
-      (event: any) => {
-        callback(event.text);
-      }
-    );
-
-    return () => subscription.remove();
+  override getService(): STTServiceWrapper | null {
+    return this.service;
   }
 
   /**
-   * Subscribe to final transcription events
+   * Get underlying STT service
    */
-  onFinalResult(callback: (result: STTOutput) => void): () => void {
-    if (!this.eventEmitter) {
-      return () => {};
-    }
-
-    const subscription = this.eventEmitter.addListener(
-      'onSTTFinal',
-      (event: any) => {
-        callback({
-          text: event.text,
-          confidence: event.confidence ?? 0.9,
-          metadata: {
-            modelId: this.modelPath ?? 'unknown',
-            processingTime: event.processingTime ?? 0,
-            audioLength: event.audioLength ?? 0,
-            realTimeFactor: event.realTimeFactor ?? 0,
-          },
-          timestamp: new Date(),
-        });
-      }
-    );
-
-    return () => subscription.remove();
-  }
-
-  /**
-   * Subscribe to error events
-   */
-  onError(callback: (error: Error) => void): () => void {
-    if (!this.eventEmitter) {
-      return () => {};
-    }
-
-    const subscription = this.eventEmitter.addListener(
-      'onSTTError',
-      (event: any) => {
-        callback(new SDKError(SDKErrorCode.TranscriptionFailed, event.message));
-      }
-    );
-
-    return () => subscription.remove();
+  getSTTService(): STTService | null {
+    return this.sttService;
   }
 
   // ============================================================================
   // Private Helpers
   // ============================================================================
 
-  private ensureReady(): void {
-    if (!this.nativeModule) {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'STT component not initialized'
-      );
-    }
-
-    if (!this.isModelLoaded) {
-      throw new SDKError(
-        SDKErrorCode.ModelNotLoaded,
-        'STT model not loaded'
-      );
-    }
+  /**
+   * Create default STT options from configuration
+   */
+  private createDefaultOptions(): STTOptions {
+    return {
+      language: this.sttConfiguration.language,
+      punctuation: this.sttConfiguration.enablePunctuation,
+      diarization: this.sttConfiguration.enableDiarization,
+      wordTimestamps: this.sttConfiguration.enableTimestamps,
+      sampleRate: this.sttConfiguration.sampleRate,
+    };
   }
 
+  /**
+   * Merge user options with configuration defaults
+   */
+  private mergeOptions(options: Partial<STTOptions>): STTOptions {
+    return {
+      language: options.language || this.sttConfiguration.language,
+      punctuation: options.punctuation ?? this.sttConfiguration.enablePunctuation,
+      diarization: options.diarization ?? this.sttConfiguration.enableDiarization,
+      wordTimestamps: options.wordTimestamps ?? this.sttConfiguration.enableTimestamps,
+      sampleRate: options.sampleRate || this.sttConfiguration.sampleRate,
+    };
+  }
+
+  /**
+   * Estimate audio length from base64 data
+   *
+   * Reference: estimateAudioLength() in STTComponent.swift
+   */
   private estimateAudioLength(base64Data: string): number {
-    // Estimate audio length from base64 data size
     // Base64 encoding is ~4/3 of original size
-    // Float32 PCM at 16kHz = 4 bytes per sample * 16000 samples/sec = 64000 bytes/sec
+    // Float32 PCM at given sample rate = 4 bytes per sample
     const decodedSize = (base64Data.length * 3) / 4;
-    const bytesPerSecond = 4 * this.configuration.sampleRate;
+    const bytesPerSecond = 4 * this.sttConfiguration.sampleRate;
     return decodedSize / bytesPerSecond;
   }
 }
 
-// Export default instance creator
+// ============================================================================
+// Factory Function
+// ============================================================================
+
+/**
+ * Create an STT component with configuration
+ *
+ * @param config - Partial configuration (merged with defaults)
+ * @returns Configured STT component
+ */
 export function createSTTComponent(
-  configuration?: Partial<STTConfiguration>
+  config?: Partial<Omit<STTConfiguration, 'componentType' | 'validate'>>
 ): STTComponent {
+  const configuration = createSTTConfiguration(config || {});
   return new STTComponent(configuration);
 }
+

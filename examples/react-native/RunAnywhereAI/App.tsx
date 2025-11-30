@@ -87,6 +87,7 @@ const App: React.FC = () => {
     setError(null);
 
     try {
+      console.log('[App] Initializing RunAnywhere SDK...');
       // Initialize RunAnywhere SDK
       // In development mode, authentication is bypassed
       await RunAnywhere.initialize({
@@ -94,8 +95,21 @@ const App: React.FC = () => {
         baseURL: 'https://api.runanywhere.com',
         environment: SDKEnvironment.Development,
       });
+      console.log('[App] SDK initialized successfully');
+
+      // Check if really initialized
+      const isInit = await RunAnywhere.isInitialized();
+      console.log('[App] isInitialized:', isInit);
+
+      const version = await RunAnywhere.getVersion();
+      console.log('[App] SDK version:', version);
+
+      const backendInfo = await RunAnywhere.getBackendInfo();
+      console.log('[App] Backend info:', JSON.stringify(backendInfo));
+
       setInitState('ready');
     } catch (err) {
+      console.error('[App] SDK initialization error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       setInitState('error');

@@ -347,7 +347,7 @@ export interface STTOptions {
  */
 export interface TTSConfiguration {
   /** Voice identifier */
-  voice: string;
+  voice?: string;
 
   /** Speech rate (0.5 - 2.0) */
   rate?: number;
@@ -357,6 +357,23 @@ export interface TTSConfiguration {
 
   /** Volume (0.0 - 1.0) */
   volume?: number;
+}
+
+/**
+ * TTS synthesis result
+ */
+export interface TTSResult {
+  /** Base64 encoded audio data */
+  audio: string;
+
+  /** Sample rate of the audio */
+  sampleRate: number;
+
+  /** Number of samples */
+  numSamples: number;
+
+  /** Duration in seconds */
+  duration: number;
 }
 
 /**

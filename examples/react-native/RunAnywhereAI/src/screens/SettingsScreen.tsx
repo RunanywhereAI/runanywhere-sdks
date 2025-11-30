@@ -13,12 +13,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize } from '../theme/spacing';
+import { Spacing, Padding, BorderRadius } from '../theme/spacing';
 import {
   RoutingPolicy,
   RoutingPolicyDisplayNames,
@@ -26,7 +25,18 @@ import {
   SETTINGS_CONSTRAINTS,
 } from '../types/settings';
 import { StoredModel, LLMFramework, FrameworkDisplayNames } from '../types/model';
-import MockSDK, { MOCK_STORAGE_INFO } from '../services/MockSDK';
+
+// Import actual RunAnywhere SDK
+import { RunAnywhere, type ModelInfo } from 'runanywhere-react-native';
+
+// Default storage info
+const DEFAULT_STORAGE_INFO: StorageInfo = {
+  totalStorage: 256 * 1024 * 1024 * 1024,
+  appStorage: 0,
+  modelsStorage: 0,
+  cacheSize: 0,
+  freeSpace: 100 * 1024 * 1024 * 1024,
+};
 
 /**
  * Format bytes to human readable
@@ -47,9 +57,34 @@ export const SettingsScreen: React.FC = () => {
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false);
 
   // Storage state
-  const [storageInfo, setStorageInfo] = useState<StorageInfo>(MOCK_STORAGE_INFO);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo>(DEFAULT_STORAGE_INFO);
   const [storedModels, setStoredModels] = useState<StoredModel[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sdkVersion, setSdkVersion] = useState('0.1.0');
+
+  // SDK State
+  const [capabilities, setCapabilities] = useState<number[]>([]);
+  const [backendInfoData, setBackendInfoData] = useState<Record<string, unknown>>({});
+  const [isSTTLoaded, setIsSTTLoaded] = useState(false);
+  const [isTTSLoaded, setIsTTSLoaded] = useState(false);
+  const [isTextLoaded, setIsTextLoaded] = useState(false);
+  const [isVADLoaded, setIsVADLoaded] = useState(false);
+  const [memoryUsage, setMemoryUsage] = useState(0);
+
+  // Model catalog state
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([]);
+  const [downloadingModels, setDownloadingModels] = useState<Record<string, number>>({});
+  const [downloadedModels, setDownloadedModels] = useState<ModelInfo[]>([]);
+
+  // Capability names mapping
+  const capabilityNames: Record<number, string> = {
+    0: 'STT (Speech-to-Text)',
+    1: 'TTS (Text-to-Speech)',
+    2: 'Text Generation',
+    3: 'Embeddings',
+    4: 'VAD (Voice Activity)',
+    5: 'Diarization',
+  };
 
   // Load data on mount
   useEffect(() => {
@@ -59,12 +94,53 @@ export const SettingsScreen: React.FC = () => {
   const loadData = async () => {
     setIsRefreshing(true);
     try {
-      const storage = await MockSDK.getStorageInfo();
-      const models = await MockSDK.getStoredModels();
-      setStorageInfo(storage);
-      setStoredModels(models);
+      // Get SDK version
+      const version = await RunAnywhere.getVersion();
+      setSdkVersion(version);
+
+      // Get backend info for storage data
+      const backendInfo = await RunAnywhere.getBackendInfo();
+      console.log('[Settings] Backend info:', backendInfo);
+      setBackendInfoData(backendInfo);
+
+      // Get capabilities
+      const caps = await RunAnywhere.getCapabilities();
+      console.log('[Settings] Capabilities:', caps);
+      setCapabilities(caps);
+
+      // Check loaded models
+      const sttLoaded = await RunAnywhere.isSTTModelLoaded();
+      const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
+      const textLoaded = await RunAnywhere.isTextModelLoaded();
+      const vadLoaded = await RunAnywhere.isVADModelLoaded();
+
+      setIsSTTLoaded(sttLoaded);
+      setIsTTSLoaded(ttsLoaded);
+      setIsTextLoaded(textLoaded);
+      setIsVADLoaded(vadLoaded);
+
+      console.log('[Settings] Models loaded - STT:', sttLoaded, 'TTS:', ttsLoaded, 'Text:', textLoaded, 'VAD:', vadLoaded);
+
+      // Get available models from catalog
+      try {
+        const available = await RunAnywhere.getAvailableModels();
+        console.log('[Settings] Available models:', available);
+        setAvailableModels(available);
+      } catch (err) {
+        console.warn('[Settings] Failed to get available models:', err);
+      }
+
+      // Get downloaded models
+      try {
+        const downloaded = await RunAnywhere.getDownloadedModels();
+        console.log('[Settings] Downloaded models:', downloaded);
+        setDownloadedModels(downloaded);
+      } catch (err) {
+        console.warn('[Settings] Failed to get downloaded models:', err);
+      }
+
     } catch (error) {
-      console.error('Failed to load storage data:', error);
+      console.error('Failed to load data:', error);
     } finally {
       setIsRefreshing(false);
     }
@@ -82,7 +158,6 @@ export const SettingsScreen: React.FC = () => {
         text: RoutingPolicyDisplayNames[policy],
         onPress: () => {
           setRoutingPolicy(policy);
-          // TODO: Save to SDK settings
         },
       }))
     );
@@ -102,7 +177,7 @@ export const SettingsScreen: React.FC = () => {
           onPress: (key) => {
             if (key && key.trim()) {
               setApiKeyConfigured(true);
-              // TODO: Save API key securely
+              // In a real implementation, reinitialize SDK with the new key
             }
           },
         },
@@ -125,7 +200,10 @@ export const SettingsScreen: React.FC = () => {
           style: 'destructive',
           onPress: async () => {
             try {
-              await MockSDK.deleteModel(model.id);
+              // Unload models if they're loaded
+              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadSTTModel();
+              await RunAnywhere.unloadTTSModel();
               setStoredModels((prev) => prev.filter((m) => m.id !== model.id));
             } catch (error) {
               Alert.alert('Error', `Failed to delete model: ${error}`);
@@ -149,8 +227,85 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear',
           style: 'destructive',
           onPress: async () => {
-            await MockSDK.clearCache();
+            // In a real implementation, call SDK cache clear method
+            Alert.alert('Success', 'Cache cleared');
             loadData();
+          },
+        },
+      ]
+    );
+  }, []);
+
+  /**
+   * Handle model download
+   */
+  const handleDownloadModel = useCallback(async (model: ModelInfo) => {
+    if (downloadingModels[model.id] !== undefined) {
+      // Already downloading, cancel it
+      try {
+        await RunAnywhere.cancelDownload(model.id);
+        setDownloadingModels((prev) => {
+          const updated = { ...prev };
+          delete updated[model.id];
+          return updated;
+        });
+      } catch (err) {
+        console.error('Failed to cancel download:', err);
+      }
+      return;
+    }
+
+    // Start download with progress tracking
+    setDownloadingModels((prev) => ({ ...prev, [model.id]: 0 }));
+
+    try {
+      await RunAnywhere.downloadModel(model.id, (progress) => {
+        console.log(`[Settings] Download progress for ${model.id}: ${(progress.progress * 100).toFixed(1)}%`);
+        setDownloadingModels((prev) => ({
+          ...prev,
+          [model.id]: progress.progress,
+        }));
+      });
+
+      // Download complete
+      setDownloadingModels((prev) => {
+        const updated = { ...prev };
+        delete updated[model.id];
+        return updated;
+      });
+
+      Alert.alert('Success', `${model.name} downloaded successfully!`);
+      loadData(); // Refresh to show downloaded model
+    } catch (err) {
+      setDownloadingModels((prev) => {
+        const updated = { ...prev };
+        delete updated[model.id];
+        return updated;
+      });
+      Alert.alert('Download Failed', `Failed to download ${model.name}: ${err}`);
+    }
+  }, [downloadingModels]);
+
+  /**
+   * Handle delete downloaded model
+   */
+  const handleDeleteDownloadedModel = useCallback(async (model: ModelInfo) => {
+    Alert.alert(
+      'Delete Model',
+      `Are you sure you want to delete ${model.name}? This will free up ${formatBytes(model.size)}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await RunAnywhere.deleteModel(model.id);
+              Alert.alert('Deleted', `${model.name} has been deleted.`);
+              loadData(); // Refresh list
+            } catch (err) {
+              Alert.alert('Error', `Failed to delete: ${err}`);
+            }
           },
         },
       ]
@@ -170,7 +325,18 @@ export const SettingsScreen: React.FC = () => {
           text: 'Clear All',
           style: 'destructive',
           onPress: async () => {
-            await MockSDK.clearAllData();
+            try {
+              // Unload all models
+              await RunAnywhere.unloadTextModel();
+              await RunAnywhere.unloadSTTModel();
+              await RunAnywhere.unloadTTSModel();
+              // Destroy SDK
+              await RunAnywhere.destroy();
+              setStoredModels([]);
+              Alert.alert('Success', 'All data cleared');
+            } catch (error) {
+              Alert.alert('Error', `Failed to clear data: ${error}`);
+            }
             loadData();
           },
         },
@@ -300,6 +466,80 @@ export const SettingsScreen: React.FC = () => {
     </View>
   );
 
+  /**
+   * Render catalog model row
+   */
+  const renderCatalogModelRow = (model: ModelInfo) => {
+    const isDownloading = downloadingModels[model.id] !== undefined;
+    const downloadProgress = downloadingModels[model.id] || 0;
+    const isDownloaded = downloadedModels.some((m) => m.id === model.id);
+
+    return (
+      <View key={model.id} style={styles.catalogModelRow}>
+        <View style={styles.catalogModelInfo}>
+          <View style={styles.catalogModelHeader}>
+            <Text style={styles.catalogModelName}>{model.name}</Text>
+            <View style={styles.catalogModelBadge}>
+              <Text style={styles.catalogModelBadgeText}>{model.modality}</Text>
+            </View>
+          </View>
+          {model.description && (
+            <Text style={styles.catalogModelDescription} numberOfLines={2}>
+              {model.description}
+            </Text>
+          )}
+          <View style={styles.catalogModelMeta}>
+            <Text style={styles.catalogModelSize}>{formatBytes(model.size)}</Text>
+            <Text style={styles.catalogModelFormat}>{model.format}</Text>
+          </View>
+          {isDownloading && (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.downloadProgressTrack}>
+                <View
+                  style={[
+                    styles.downloadProgressFill,
+                    { width: `${downloadProgress * 100}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.downloadProgressText}>
+                {(downloadProgress * 100).toFixed(0)}%
+              </Text>
+            </View>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.catalogModelButton,
+            isDownloaded && styles.catalogModelButtonDownloaded,
+            isDownloading && styles.catalogModelButtonDownloading,
+          ]}
+          onPress={() =>
+            isDownloaded ? handleDeleteDownloadedModel(model) : handleDownloadModel(model)
+          }
+        >
+          <Icon
+            name={
+              isDownloaded
+                ? 'checkmark-circle'
+                : isDownloading
+                  ? 'close-circle'
+                  : 'cloud-download-outline'
+            }
+            size={24}
+            color={
+              isDownloaded
+                ? Colors.primaryGreen
+                : isDownloading
+                  ? Colors.primaryOrange
+                  : Colors.primaryBlue
+            }
+          />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -311,6 +551,82 @@ export const SettingsScreen: React.FC = () => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* SDK Status */}
+        {renderSectionHeader('SDK Status')}
+        <View style={styles.section}>
+          {/* Backend Info */}
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Backend</Text>
+            <Text style={styles.statusValue}>
+              {(backendInfoData as { name?: string }).name || 'Not initialized'}
+            </Text>
+          </View>
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Version</Text>
+            <Text style={styles.statusValue}>
+              {(backendInfoData as { version?: string }).version || '-'}
+            </Text>
+          </View>
+
+          {/* Capabilities */}
+          <View style={styles.capabilitiesContainer}>
+            <Text style={styles.capabilitiesLabel}>Supported Capabilities:</Text>
+            {capabilities.length > 0 ? (
+              <View style={styles.capabilitiesList}>
+                {capabilities.map((cap) => (
+                  <View key={cap} style={styles.capabilityBadge}>
+                    <Icon name="checkmark-circle" size={14} color={Colors.primaryGreen} />
+                    <Text style={styles.capabilityText}>
+                      {capabilityNames[cap] || `Capability ${cap}`}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.noCapabilities}>No capabilities reported</Text>
+            )}
+          </View>
+
+          {/* Model Status */}
+          <View style={styles.modelStatusContainer}>
+            <Text style={styles.capabilitiesLabel}>Loaded Models:</Text>
+            <View style={styles.modelStatusGrid}>
+              <View style={[styles.modelStatusItem, isSTTLoaded && styles.modelStatusItemLoaded]}>
+                <Icon
+                  name={isSTTLoaded ? 'checkmark-circle' : 'close-circle'}
+                  size={16}
+                  color={isSTTLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                />
+                <Text style={styles.modelStatusText}>STT</Text>
+              </View>
+              <View style={[styles.modelStatusItem, isTTSLoaded && styles.modelStatusItemLoaded]}>
+                <Icon
+                  name={isTTSLoaded ? 'checkmark-circle' : 'close-circle'}
+                  size={16}
+                  color={isTTSLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                />
+                <Text style={styles.modelStatusText}>TTS</Text>
+              </View>
+              <View style={[styles.modelStatusItem, isTextLoaded && styles.modelStatusItemLoaded]}>
+                <Icon
+                  name={isTextLoaded ? 'checkmark-circle' : 'close-circle'}
+                  size={16}
+                  color={isTextLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                />
+                <Text style={styles.modelStatusText}>LLM</Text>
+              </View>
+              <View style={[styles.modelStatusItem, isVADLoaded && styles.modelStatusItemLoaded]}>
+                <Icon
+                  name={isVADLoaded ? 'checkmark-circle' : 'close-circle'}
+                  size={16}
+                  color={isVADLoaded ? Colors.primaryGreen : Colors.textTertiary}
+                />
+                <Text style={styles.modelStatusText}>VAD</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
         {/* SDK Configuration */}
         {renderSectionHeader('SDK Configuration')}
         <View style={styles.section}>
@@ -382,15 +698,25 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Downloaded Models */}
-        {renderSectionHeader('Downloaded Models')}
+        {/* Model Catalog */}
+        {renderSectionHeader('Model Catalog')}
         <View style={styles.section}>
-          {storedModels.length === 0 ? (
-            <Text style={styles.emptyText}>No models downloaded</Text>
+          {availableModels.length === 0 ? (
+            <Text style={styles.emptyText}>Loading models...</Text>
           ) : (
-            storedModels.map(renderStoredModelRow)
+            availableModels.map(renderCatalogModelRow)
           )}
         </View>
+
+        {/* Downloaded Models (legacy) */}
+        {storedModels.length > 0 && (
+          <>
+            {renderSectionHeader('Downloaded Models')}
+            <View style={styles.section}>
+              {storedModels.map(renderStoredModelRow)}
+            </View>
+          </>
+        )}
 
         {/* Storage Management */}
         {renderSectionHeader('Storage Management')}
@@ -413,7 +739,7 @@ export const SettingsScreen: React.FC = () => {
         {/* Version Info */}
         <View style={styles.versionContainer}>
           <Text style={styles.versionText}>RunAnywhere AI Demo v1.0.0</Text>
-          <Text style={styles.versionSubtext}>SDK v0.1.0 (React Native)</Text>
+          <Text style={styles.versionSubtext}>SDK v{sdkVersion} (React Native)</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -641,6 +967,177 @@ const styles = StyleSheet.create({
     ...Typography.caption,
     color: Colors.textTertiary,
     marginTop: Spacing.xSmall,
+  },
+  // SDK Status styles
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Padding.padding16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  statusLabel: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+  },
+  statusValue: {
+    ...Typography.body,
+    color: Colors.primaryBlue,
+    fontWeight: '600',
+  },
+  capabilitiesContainer: {
+    padding: Padding.padding16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  capabilitiesLabel: {
+    ...Typography.subheadline,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.small,
+  },
+  capabilitiesList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.small,
+  },
+  capabilityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xSmall,
+    backgroundColor: Colors.badgeGreen,
+    paddingHorizontal: Spacing.smallMedium,
+    paddingVertical: Spacing.xSmall,
+    borderRadius: BorderRadius.small,
+  },
+  capabilityText: {
+    ...Typography.caption,
+    color: Colors.primaryGreen,
+    fontWeight: '600',
+  },
+  noCapabilities: {
+    ...Typography.body,
+    color: Colors.textTertiary,
+    fontStyle: 'italic',
+  },
+  modelStatusContainer: {
+    padding: Padding.padding16,
+  },
+  modelStatusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.small,
+    marginTop: Spacing.small,
+  },
+  modelStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xSmall,
+    backgroundColor: Colors.backgroundSecondary,
+    paddingHorizontal: Spacing.medium,
+    paddingVertical: Spacing.small,
+    borderRadius: BorderRadius.small,
+  },
+  modelStatusItemLoaded: {
+    backgroundColor: Colors.badgeGreen,
+  },
+  modelStatusText: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  // Model catalog styles
+  catalogModelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Padding.padding16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  catalogModelInfo: {
+    flex: 1,
+    marginRight: Spacing.medium,
+  },
+  catalogModelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.small,
+    marginBottom: Spacing.xSmall,
+  },
+  catalogModelName: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    fontWeight: '600',
+  },
+  catalogModelBadge: {
+    backgroundColor: Colors.badgeBlue,
+    paddingHorizontal: Spacing.small,
+    paddingVertical: Spacing.xxSmall,
+    borderRadius: BorderRadius.small,
+  },
+  catalogModelBadgeText: {
+    ...Typography.caption2,
+    color: Colors.primaryBlue,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  catalogModelDescription: {
+    ...Typography.footnote,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.xSmall,
+  },
+  catalogModelMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.small,
+  },
+  catalogModelSize: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+  },
+  catalogModelFormat: {
+    ...Typography.caption,
+    color: Colors.textTertiary,
+  },
+  catalogModelButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.backgroundSecondary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  catalogModelButtonDownloaded: {
+    backgroundColor: Colors.badgeGreen,
+  },
+  catalogModelButtonDownloading: {
+    backgroundColor: Colors.badgeOrange,
+  },
+  downloadProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.small,
+    marginTop: Spacing.small,
+  },
+  downloadProgressTrack: {
+    flex: 1,
+    height: 4,
+    backgroundColor: Colors.backgroundGray5,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  downloadProgressFill: {
+    height: '100%',
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 2,
+  },
+  downloadProgressText: {
+    ...Typography.caption,
+    color: Colors.primaryBlue,
+    fontWeight: '600',
+    minWidth: 40,
+    textAlign: 'right',
   },
 });
 

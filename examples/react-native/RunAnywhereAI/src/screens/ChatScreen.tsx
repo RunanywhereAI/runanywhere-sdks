@@ -2,6 +2,10 @@
  * ChatScreen - Tab 0: Language Model Chat
  *
  * Reference: iOS Features/Chat/ChatInterfaceView.swift
+ *
+ * Note: The current model catalog includes STT (Whisper), TTS (Piper), and VAD (Silero).
+ * LLM models (GGUF format) need to be downloaded separately and provided via path.
+ * Future versions will include LLM models in the catalog.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
@@ -22,7 +26,9 @@ import { ModelStatusBanner, ModelRequiredOverlay } from '../components/common';
 import { MessageBubble, TypingIndicator, ChatInput } from '../components/chat';
 import { Message, MessageRole } from '../types/chat';
 import { ModelInfo, ModelModality, LLMFramework, ModelCategory } from '../types/model';
-import MockSDK from '../services/MockSDK';
+
+// Import actual RunAnywhere SDK
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -34,33 +40,72 @@ export const ChatScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [streamingText, setStreamingText] = useState('');
+  const [backendInfo, setBackendInfo] = useState<Record<string, unknown>>({});
 
   // Refs
   const flatListRef = useRef<FlatList>(null);
 
-  // Check for loaded model on mount
+  // Check for loaded model and backend info on mount
   useEffect(() => {
-    const model = MockSDK.getCurrentLLMModel();
-    setCurrentModel(model);
+    checkModelStatus();
+    loadBackendInfo();
   }, []);
 
   /**
+   * Load backend info
+   */
+  const loadBackendInfo = async () => {
+    try {
+      const info = await RunAnywhere.getBackendInfo();
+      setBackendInfo(info);
+      console.log('[ChatScreen] Backend info:', info);
+    } catch (error) {
+      console.log('[ChatScreen] Error getting backend info:', error);
+    }
+  };
+
+  /**
+   * Check if a model is loaded
+   */
+  const checkModelStatus = async () => {
+    try {
+      const isLoaded = await RunAnywhere.isTextModelLoaded();
+      console.log('[ChatScreen] Text model loaded:', isLoaded);
+      if (isLoaded) {
+        // Model is loaded - create a placeholder model info
+        setCurrentModel({
+          id: 'loaded-model',
+          name: 'Loaded Model',
+          category: ModelCategory.Language,
+          compatibleFrameworks: [LLMFramework.LlamaCpp],
+          preferredFramework: LLMFramework.LlamaCpp,
+          isDownloaded: true,
+          isAvailable: true,
+        });
+      }
+    } catch (error) {
+      console.log('[ChatScreen] Error checking model status:', error);
+    }
+  };
+
+  /**
    * Handle model selection
-   * TODO: Open ModelSelectionModal
    */
   const handleSelectModel = useCallback(async () => {
-    // TODO: Replace with actual model selection modal
+    // Note: Current catalog doesn't include LLM models yet
+    // Show info dialog explaining current state
     Alert.alert(
-      'Select Model',
-      'Choose a language model',
+      'LLM Model Required',
+      'The current SDK version supports LLM inference through the ONNX backend.\n\n' +
+        'To use chat functionality:\n\n' +
+        '1. Download a compatible GGUF model\n' +
+        '2. The model catalog will include LLM models in future versions\n\n' +
+        'For demo purposes, tapping "Try Demo Mode" will simulate a response.',
       [
         {
-          text: 'SmolLM2 360M',
-          onPress: () => loadModel('smollm2-360m'),
-        },
-        {
-          text: 'Qwen 2.5 0.5B',
-          onPress: () => loadModel('qwen-2.5-0.5b'),
+          text: 'Try Demo Mode',
+          onPress: () => enableDemoMode(),
         },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -68,16 +113,48 @@ export const ChatScreen: React.FC = () => {
   }, []);
 
   /**
-   * Load a model
-   * TODO: Replace with RunAnywhere.loadModel()
+   * Enable demo mode - simulates having a loaded model
    */
-  const loadModel = async (modelId: string) => {
+  const enableDemoMode = () => {
+    console.log('[ChatScreen] Enabling demo mode');
+    setCurrentModel({
+      id: 'demo-model',
+      name: 'Demo Mode (Simulated)',
+      category: ModelCategory.Language,
+      compatibleFrameworks: [LLMFramework.LlamaCpp],
+      preferredFramework: LLMFramework.LlamaCpp,
+      isDownloaded: true,
+      isAvailable: true,
+    });
+  };
+
+  /**
+   * Load a model using the real SDK
+   */
+  const loadModel = async (modelPath: string) => {
     try {
       setIsModelLoading(true);
-      await MockSDK.loadModel(modelId);
-      const model = MockSDK.getCurrentLLMModel();
-      setCurrentModel(model);
+      console.log(`[ChatScreen] Loading model: ${modelPath}`);
+
+      const success = await RunAnywhere.loadTextModel(modelPath);
+
+      if (success) {
+        setCurrentModel({
+          id: modelPath,
+          name: modelPath.split('/').pop() || 'LLM Model',
+          category: ModelCategory.Language,
+          compatibleFrameworks: [LLMFramework.LlamaCpp],
+          preferredFramework: LLMFramework.LlamaCpp,
+          isDownloaded: true,
+          isAvailable: true,
+        });
+        console.log('[ChatScreen] Model loaded successfully');
+      } else {
+        const lastError = await RunAnywhere.getLastError();
+        Alert.alert('Error', `Failed to load model: ${lastError || 'Unknown error'}`);
+      }
     } catch (error) {
+      console.error('[ChatScreen] Error loading model:', error);
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
       setIsModelLoading(false);
@@ -85,11 +162,10 @@ export const ChatScreen: React.FC = () => {
   };
 
   /**
-   * Send a message
-   * TODO: Replace with RunAnywhere.generate() or RunAnywhere.generateStream()
+   * Send a message using the real SDK
    */
   const handleSend = useCallback(async () => {
-    if (!inputText.trim() || !currentModel) return;
+    if (!inputText.trim()) return;
 
     const userMessage: Message = {
       id: generateId(),
@@ -100,6 +176,7 @@ export const ChatScreen: React.FC = () => {
 
     // Add user message
     setMessages((prev) => [...prev, userMessage]);
+    const prompt = inputText.trim();
     setInputText('');
     setIsLoading(true);
 
@@ -109,50 +186,104 @@ export const ChatScreen: React.FC = () => {
     }, 100);
 
     try {
-      // TODO: Replace with actual SDK call
-      const result = await MockSDK.generate(inputText, {
-        maxTokens: 1000,
-        temperature: 0.7,
-      });
+      console.log('[ChatScreen] Generating response for:', prompt);
 
-      const assistantMessage: Message = {
-        id: generateId(),
-        role: MessageRole.Assistant,
-        content: result.text,
-        timestamp: new Date(),
-        modelInfo: {
-          modelId: currentModel.id,
-          modelName: currentModel.name,
-          framework: currentModel.preferredFramework?.toString() || 'Unknown',
-          frameworkDisplayName:
-            currentModel.preferredFramework
-              ? (require('../types/model').FrameworkDisplayNames[currentModel.preferredFramework] || currentModel.preferredFramework)
-              : 'Unknown',
-        },
-        analytics: {
-          totalGenerationTime: result.latencyMs,
-          inputTokens: inputText.split(' ').length,
-          outputTokens: result.tokensUsed,
-          averageTokensPerSecond: result.tokensPerSecond,
-          completionStatus: 'completed',
-          wasThinkingMode: false,
-          wasInterrupted: false,
-          retryCount: 0,
-        },
-      };
+      // Check if we're in demo mode
+      const isDemoMode = currentModel?.id === 'demo-model';
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (isDemoMode) {
+        // Simulate a delay and provide a demo response
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        const demoResponses = [
+          "I'm running in demo mode! To use real AI generation, you'll need to provide a GGUF model file. The RunAnywhere SDK supports LLM inference through the ONNX backend.",
+          "This is a simulated response. The SDK is fully initialized and ready for real inference once you provide a model. Check the Settings tab for backend info!",
+          "Demo mode is active. The RunAnywhere React Native SDK can perform on-device AI inference for STT, TTS, and LLM when models are available.",
+        ];
+
+        const assistantMessage: Message = {
+          id: generateId(),
+          role: MessageRole.Assistant,
+          content: demoResponses[messages.length % demoResponses.length] || demoResponses[0]!,
+          timestamp: new Date(),
+          modelInfo: {
+            modelId: 'demo',
+            modelName: 'Demo Mode',
+            framework: 'simulated',
+            frameworkDisplayName: 'Simulated',
+          },
+          analytics: {
+            totalGenerationTime: 1000,
+            inputTokens: prompt.split(' ').length,
+            outputTokens: 50,
+            averageTokensPerSecond: 50,
+            completionStatus: 'completed',
+            wasThinkingMode: false,
+            wasInterrupted: false,
+            retryCount: 0,
+          },
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        // Use the real SDK generate method
+        const result = await RunAnywhere.generate(prompt, {
+          maxTokens: 1000,
+          temperature: 0.7,
+        });
+
+        console.log('[ChatScreen] Generation result:', result);
+
+        // Check if there's an error in the result
+        if (result.text?.includes('error')) {
+          throw new Error(result.text);
+        }
+
+        const assistantMessage: Message = {
+          id: generateId(),
+          role: MessageRole.Assistant,
+          content: result.text || '(No response generated)',
+          timestamp: new Date(),
+          modelInfo: {
+            modelId: result.modelUsed || 'unknown',
+            modelName: result.modelUsed || 'Unknown Model',
+            framework: result.framework || 'llama.cpp',
+            frameworkDisplayName: 'llama.cpp',
+          },
+          analytics: {
+            totalGenerationTime: result.latencyMs,
+            inputTokens: prompt.split(' ').length,
+            outputTokens: result.tokensUsed,
+            averageTokensPerSecond: result.performanceMetrics?.tokensPerSecond || 0,
+            completionStatus: 'completed',
+            wasThinkingMode: false,
+            wasInterrupted: false,
+            retryCount: 0,
+          },
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
 
       // Scroll to bottom
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      Alert.alert('Error', `Failed to generate response: ${error}`);
+      console.error('[ChatScreen] Generation error:', error);
+
+      // Add an error message to the chat
+      const errorMessage: Message = {
+        id: generateId(),
+        role: MessageRole.Assistant,
+        content: `Error: ${error}\n\nThis likely means no LLM model is loaded. Use demo mode to test the interface, or provide a GGUF model.`,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, currentModel]);
+  }, [inputText, currentModel, messages.length]);
 
   /**
    * Clear chat

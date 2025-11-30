@@ -26,6 +26,7 @@ import { ModelInfo, ModelModality } from '../types/model';
 import {
   RunAnywhere,
   type TTSConfiguration as SDKTTSConfiguration,
+  type ModelInfo as SDKModelInfo,
 } from 'runanywhere-react-native';
 
 export const TTSScreen: React.FC = () => {
@@ -40,54 +41,94 @@ export const TTSScreen: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
+  const [lastGeneratedAudio, setLastGeneratedAudio] = useState<string | null>(null);
 
   // Character count
   const charCount = text.length;
   const maxChars = 1000;
 
-  // Check for loaded model on mount
+  // Load available models and check for loaded model on mount
   useEffect(() => {
-    const checkModel = async () => {
+    const initialize = async () => {
       try {
-        const model = await RunAnywhere.currentModel();
-        if (model) {
-          setCurrentModel(model as unknown as ModelInfo);
+        // Get available TTS models from catalog
+        const allModels = await RunAnywhere.getAvailableModels();
+        const ttsModels = allModels.filter((m) => m.modality === 'tts');
+        setAvailableModels(ttsModels);
+        console.log('[TTSScreen] Available TTS models:', ttsModels.map(m => m.id));
+
+        // Check if model is already loaded
+        const isLoaded = await RunAnywhere.isTTSModelLoaded();
+        if (isLoaded) {
+          setCurrentModel({
+            id: 'tts-model',
+            name: 'TTS Model (Loaded)',
+          } as ModelInfo);
         }
       } catch (error) {
-        console.log('No TTS model loaded yet:', error);
+        console.log('[TTSScreen] Error initializing:', error);
       }
     };
-    checkModel();
+    initialize();
   }, []);
 
   /**
-   * Handle model selection
-   * TODO: Open ModelSelectionModal with TTS filter
+   * Handle model selection - shows available downloaded models
    */
   const handleSelectModel = useCallback(async () => {
-    Alert.alert(
-      'Select TTS Model',
-      'Choose a text-to-speech model',
-      [
-        {
-          text: 'Piper TTS - US English',
-          onPress: () => loadModel('piper-en-us-lessac'),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
-  }, []);
+    // Get downloaded TTS models
+    const downloadedModels = availableModels.filter((m) => m.isDownloaded);
+
+    if (downloadedModels.length === 0) {
+      Alert.alert(
+        'No Models Downloaded',
+        'Please download a text-to-speech model from the Settings tab first.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    const buttons = downloadedModels.map((model) => ({
+      text: model.name,
+      onPress: () => loadModel(model),
+    }));
+    buttons.push({ text: 'Cancel', onPress: () => {} });
+
+    Alert.alert('Select TTS Model', 'Choose a downloaded text-to-speech model', buttons as any);
+  }, [availableModels]);
 
   /**
-   * Load a model
+   * Load a model from its info
    */
-  const loadModel = async (modelId: string) => {
+  const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      await RunAnywhere.loadTTSModel(modelId);
-      const model = await RunAnywhere.currentModel();
-      setCurrentModel(model as unknown as ModelInfo);
+      console.log(`[TTSScreen] Loading model: ${model.id} from ${model.localPath}`);
+
+      if (!model.localPath) {
+        Alert.alert('Error', 'Model path not found. Please re-download the model.');
+        return;
+      }
+
+      // Load using the actual local path
+      const success = await RunAnywhere.loadTTSModel(model.localPath, model.modelType || 'piper');
+
+      if (success) {
+        const isLoaded = await RunAnywhere.isTTSModelLoaded();
+        if (isLoaded) {
+          setCurrentModel({
+            id: model.id,
+            name: model.name,
+          } as ModelInfo);
+          console.log(`[TTSScreen] Model ${model.name} loaded successfully`);
+        }
+      } else {
+        const error = await RunAnywhere.getLastError();
+        Alert.alert('Error', `Failed to load model: ${error || 'Unknown error'}`);
+      }
     } catch (error) {
+      console.error('[TTSScreen] Error loading model:', error);
       Alert.alert('Error', `Failed to load model: ${error}`);
     } finally {
       setIsModelLoading(false);
@@ -104,6 +145,14 @@ export const TTSScreen: React.FC = () => {
     setAudioGenerated(false);
 
     try {
+      // Check if model is loaded
+      const isLoaded = await RunAnywhere.isTTSModelLoaded();
+      if (!isLoaded) {
+        Alert.alert('Model Not Loaded', 'Please load a TTS model first.');
+        setIsGenerating(false);
+        return;
+      }
+
       const sdkConfig: SDKTTSConfiguration = {
         voice: 'default',
         rate: speed,
@@ -111,18 +160,43 @@ export const TTSScreen: React.FC = () => {
         volume: volume,
       };
 
-      // SDK returns base64 encoded audio
-      const audioBase64 = await RunAnywhere.synthesize(text, sdkConfig);
-      // Estimate duration based on text length (rough estimate)
-      const estimatedDuration = text.length * 0.05; // ~50ms per character
-      setDuration(estimatedDuration);
+      console.log('[TTSScreen] Synthesizing text:', text.substring(0, 50) + '...');
+
+      // SDK returns TTSResult with audio, sampleRate, numSamples, duration
+      const result = await RunAnywhere.synthesize(text, sdkConfig);
+
+      console.log('[TTSScreen] Synthesis result:', {
+        sampleRate: result.sampleRate,
+        numSamples: result.numSamples,
+        duration: result.duration,
+        audioLength: result.audio?.length || 0,
+      });
+
+      // Use actual duration from result, or estimate if not available
+      const audioDuration = result.duration || (result.numSamples / result.sampleRate) || text.length * 0.05;
+      setDuration(audioDuration);
+      setLastGeneratedAudio(result.audio);
       setAudioGenerated(true);
 
-      // Auto-play
-      // TODO: Implement actual audio playback using react-native-sound or similar
-      setIsPlaying(true);
-      setTimeout(() => setIsPlaying(false), estimatedDuration * 1000);
+      // Show info about the audio data
+      Alert.alert(
+        'Audio Generated',
+        `Duration: ${audioDuration.toFixed(2)}s\n` +
+          `Sample Rate: ${result.sampleRate} Hz\n` +
+          `Samples: ${result.numSamples.toLocaleString()}\n\n` +
+          'To enable audio playback:\n' +
+          '1. Add react-native-audio-recorder-player or expo-av\n' +
+          '2. Use the audio data (base64 PCM) for playback',
+        [{ text: 'OK' }]
+      );
+
+      // Note: Actual audio playback would require a library like:
+      // - react-native-audio-recorder-player
+      // - expo-av
+      // - react-native-sound
+      // The audio data is base64 encoded PCM float samples
     } catch (error) {
+      console.error('[TTSScreen] Synthesis error:', error);
       Alert.alert('Error', `Failed to generate speech: ${error}`);
     } finally {
       setIsGenerating(false);

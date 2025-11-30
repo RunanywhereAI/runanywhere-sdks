@@ -4,9 +4,12 @@
  * Multi-modal pipeline: STT + LLM + TTS
  *
  * Reference: iOS Features/Voice/VoiceAssistantView.swift
+ *
+ * Note: This is an experimental feature that demonstrates the pipeline.
+ * Full functionality requires downloaded STT, LLM, and TTS models.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,10 +22,12 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
-import { Spacing, Padding, BorderRadius, IconSize, ButtonHeight } from '../theme/spacing';
-import { ModelInfo, LLMFramework, FrameworkDisplayNames } from '../types/model';
+import { Spacing, Padding, BorderRadius } from '../theme/spacing';
+import { ModelInfo } from '../types/model';
 import { VoicePipelineStatus, VoiceConversationEntry } from '../types/voice';
-import MockSDK from '../services/MockSDK';
+
+// Import actual RunAnywhere SDK
+import { RunAnywhere, type ModelInfo as SDKModelInfo } from 'runanywhere-react-native';
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -32,6 +37,8 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [sttModel, setSTTModel] = useState<ModelInfo | null>(null);
   const [llmModel, setLLMModel] = useState<ModelInfo | null>(null);
   const [ttsModel, setTTSModel] = useState<ModelInfo | null>(null);
+  const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
+  const [demoMode, setDemoMode] = useState(false);
 
   // Pipeline state
   const [status, setStatus] = useState<VoicePipelineStatus>(VoicePipelineStatus.Idle);
@@ -41,72 +48,158 @@ export const VoiceAssistantScreen: React.FC = () => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [showModelInfo, setShowModelInfo] = useState(true);
 
-  // Check if all models are loaded
-  const allModelsLoaded = sttModel && llmModel && ttsModel;
+  // Check if all models are loaded (or demo mode is enabled)
+  const allModelsLoaded = demoMode || (sttModel && llmModel && ttsModel);
+
+  // Check model status on mount
+  useEffect(() => {
+    checkModelStatus();
+    loadAvailableModels();
+  }, []);
+
+  /**
+   * Load available models from catalog
+   */
+  const loadAvailableModels = async () => {
+    try {
+      const models = await RunAnywhere.getAvailableModels();
+      setAvailableModels(models);
+      console.log('[VoiceAssistant] Available models:', models.map(m => `${m.id}(${m.isDownloaded ? 'downloaded' : 'not downloaded'})`));
+    } catch (error) {
+      console.log('[VoiceAssistant] Error loading models:', error);
+    }
+  };
+
+  /**
+   * Check which models are already loaded
+   */
+  const checkModelStatus = async () => {
+    try {
+      const sttLoaded = await RunAnywhere.isSTTModelLoaded();
+      const llmLoaded = await RunAnywhere.isTextModelLoaded();
+      const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
+
+      console.log('[VoiceAssistant] Model status - STT:', sttLoaded, 'LLM:', llmLoaded, 'TTS:', ttsLoaded);
+
+      if (sttLoaded) {
+        setSTTModel({ id: 'stt-loaded', name: 'STT Model (Loaded)' } as ModelInfo);
+      }
+      if (llmLoaded) {
+        setLLMModel({ id: 'llm-loaded', name: 'LLM Model (Loaded)' } as ModelInfo);
+      }
+      if (ttsLoaded) {
+        setTTSModel({ id: 'tts-loaded', name: 'TTS Model (Loaded)' } as ModelInfo);
+      }
+    } catch (error) {
+      console.log('[VoiceAssistant] Error checking model status:', error);
+    }
+  };
+
+  /**
+   * Enable demo mode for testing the UI
+   */
+  const enableDemoMode = () => {
+    setDemoMode(true);
+    setSTTModel({ id: 'demo-stt', name: 'Demo STT' } as ModelInfo);
+    setLLMModel({ id: 'demo-llm', name: 'Demo LLM' } as ModelInfo);
+    setTTSModel({ id: 'demo-tts', name: 'Demo TTS' } as ModelInfo);
+  };
 
   /**
    * Handle model selection
-   * TODO: Open ModelSelectionModal with appropriate filter
    */
   const handleSelectModel = useCallback(
-    (type: 'stt' | 'llm' | 'tts') => {
+    async (type: 'stt' | 'llm' | 'tts') => {
       const titles = {
         stt: 'Select Speech Model',
         llm: 'Select Language Model',
         tts: 'Select Voice Model',
       };
 
-      const models = {
-        stt: [{ id: 'whisper-tiny', name: 'Whisper Tiny' }],
-        llm: [{ id: 'smollm2-360m', name: 'SmolLM2 360M' }],
-        tts: [{ id: 'piper-en-us-lessac', name: 'Piper TTS - US English' }],
-      };
+      // Get downloaded models of this type
+      const downloadedModels = availableModels.filter(
+        (m) => m.modality === type && m.isDownloaded
+      );
 
-      Alert.alert(titles[type], 'Choose a model', [
-        {
-          text: models[type][0].name,
-          onPress: async () => {
-            try {
-              await MockSDK.loadModel(models[type][0].id);
-              switch (type) {
-                case 'stt':
-                  setSTTModel(MockSDK.getCurrentSTTModel());
-                  break;
-                case 'llm':
-                  setLLMModel(MockSDK.getCurrentLLMModel());
-                  break;
-                case 'tts':
-                  setTTSModel(MockSDK.getCurrentTTSModel());
-                  break;
-              }
-            } catch (error) {
-              Alert.alert('Error', `Failed to load model: ${error}`);
+      if (type === 'llm') {
+        // LLM models are not in catalog yet
+        Alert.alert(
+          titles[type],
+          'LLM models are not yet available in the catalog. Use Demo Mode to test the pipeline.',
+          [
+            { text: 'Enable Demo Mode', onPress: enableDemoMode },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+
+      if (downloadedModels.length === 0) {
+        Alert.alert(
+          'No Models Downloaded',
+          `Please download a ${type.toUpperCase()} model from the Settings tab first, or use Demo Mode.`,
+          [
+            { text: 'Enable Demo Mode', onPress: enableDemoMode },
+            { text: 'OK' },
+          ]
+        );
+        return;
+      }
+
+      const buttons = downloadedModels.map((model) => ({
+        text: model.name,
+        onPress: async () => {
+          try {
+            console.log(`[VoiceAssistant] Loading ${type} model:`, model.id, model.localPath);
+
+            switch (type) {
+              case 'stt':
+                const sttSuccess = await RunAnywhere.loadSTTModel(model.localPath!, model.modelType || 'whisper');
+                if (sttSuccess) {
+                  setSTTModel({ id: model.id, name: model.name } as ModelInfo);
+                }
+                break;
+              case 'tts':
+                const ttsSuccess = await RunAnywhere.loadTTSModel(model.localPath!, model.modelType || 'piper');
+                if (ttsSuccess) {
+                  setTTSModel({ id: model.id, name: model.name } as ModelInfo);
+                }
+                break;
             }
-          },
+          } catch (error) {
+            Alert.alert('Error', `Failed to load model: ${error}`);
+          }
         },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      }));
+      buttons.push({ text: 'Cancel', onPress: () => {} });
+
+      Alert.alert(titles[type], 'Choose a downloaded model', buttons as any);
     },
-    []
+    [availableModels]
   );
 
   /**
    * Start/stop recording
-   * TODO: Implement actual voice pipeline
+   * Note: In a real implementation, you would use react-native-audio-recorder-player
+   * or similar library to capture actual audio and pass it to the SDK.
    */
   const handleToggleRecording = useCallback(async () => {
     if (isRecording) {
       // Stop recording
       setIsRecording(false);
       setStatus(VoicePipelineStatus.Processing);
+      setRecordingDuration(0);
 
-      // Simulate pipeline
-      setTimeout(() => {
+      try {
+        // In demo mode or when audio recording is not available,
+        // we simulate the pipeline
+        const mockUserText = currentTranscript || 'Hello, how are you?';
+
         // Add user message
         const userEntry: VoiceConversationEntry = {
           id: generateId(),
           speaker: 'user',
-          text: currentTranscript || 'Hello, how are you?',
+          text: mockUserText,
           timestamp: new Date(),
         };
         setConversation((prev) => [...prev, userEntry]);
@@ -114,45 +207,93 @@ export const VoiceAssistantScreen: React.FC = () => {
 
         setStatus(VoicePipelineStatus.Thinking);
 
-        // Simulate LLM response
+        let responseText: string;
+
+        if (demoMode) {
+          // Simulate LLM response in demo mode
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          const demoResponses = [
+            "Hello! I'm the demo voice assistant. The full pipeline requires STT, LLM, and TTS models to be downloaded and loaded.",
+            "In demo mode, I provide simulated responses. Download models from the Settings tab for real AI responses!",
+            "The RunAnywhere SDK supports on-device STT, LLM, and TTS. This demo shows the pipeline flow.",
+          ];
+          responseText = demoResponses[conversation.length % demoResponses.length] || demoResponses[0]!;
+        } else {
+          // Try real LLM generation
+          try {
+            const result = await RunAnywhere.generate(mockUserText, {
+              maxTokens: 500,
+              temperature: 0.7,
+            });
+            responseText = result.text || '(No response generated)';
+          } catch (err) {
+            console.error('[VoiceAssistant] LLM error:', err);
+            responseText = `Error generating response: ${err}`;
+          }
+        }
+
+        const assistantEntry: VoiceConversationEntry = {
+          id: generateId(),
+          speaker: 'assistant',
+          text: responseText,
+          timestamp: new Date(),
+        };
+        setConversation((prev) => [...prev, assistantEntry]);
+
+        setStatus(VoicePipelineStatus.Speaking);
+
+        // In a real implementation with actual TTS:
+        // 1. Call RunAnywhere.synthesize(responseText)
+        // 2. Play the resulting audio
+        // 3. Set status to Idle when playback completes
+
+        // For now, simulate TTS playback duration
+        const estimatedDuration = Math.min(responseText.length * 50, 3000);
         setTimeout(() => {
-          const assistantEntry: VoiceConversationEntry = {
-            id: generateId(),
-            speaker: 'assistant',
-            text: "I'm doing well, thank you! How can I help you today?",
-            timestamp: new Date(),
-          };
-          setConversation((prev) => [...prev, assistantEntry]);
-
-          setStatus(VoicePipelineStatus.Speaking);
-
-          // Simulate TTS playback
-          setTimeout(() => {
-            setStatus(VoicePipelineStatus.Idle);
-          }, 2000);
-        }, 1500);
-      }, 1000);
+          setStatus(VoicePipelineStatus.Idle);
+        }, estimatedDuration);
+      } catch (error) {
+        console.error('[VoiceAssistant] Pipeline error:', error);
+        Alert.alert('Error', `Pipeline failed: ${error}`);
+        setStatus(VoicePipelineStatus.Error);
+        setTimeout(() => setStatus(VoicePipelineStatus.Idle), 2000);
+      }
     } else {
       // Start recording
       if (!allModelsLoaded) {
-        Alert.alert('Models Required', 'Please load all required models first.');
+        Alert.alert(
+          'Models Required',
+          'Please load all required models first, or enable Demo Mode.',
+          [
+            { text: 'Enable Demo Mode', onPress: enableDemoMode },
+            { text: 'Cancel', style: 'cancel' },
+          ]
+        );
         return;
       }
       setIsRecording(true);
       setStatus(VoicePipelineStatus.Listening);
-      setCurrentTranscript('Hello, how are you?'); // Mock transcript
+
+      // In demo mode, use placeholder transcript
+      // In real mode, audio recording would populate this
+      setCurrentTranscript('Hello, how can you help me today?');
 
       // Start duration timer
       let duration = 0;
-      const timer = setInterval(() => {
+      const timerRef = setInterval(() => {
         duration += 1;
         setRecordingDuration(duration);
       }, 1000);
 
-      // Store timer for cleanup
-      setTimeout(() => clearInterval(timer), 10000);
+      // Auto-stop after 10 seconds in demo mode
+      setTimeout(() => {
+        clearInterval(timerRef);
+        if (demoMode) {
+          // Will trigger processing in demo mode
+        }
+      }, 10000);
     }
-  }, [isRecording, allModelsLoaded, currentTranscript]);
+  }, [isRecording, allModelsLoaded, currentTranscript, demoMode, conversation.length]);
 
   /**
    * Clear conversation

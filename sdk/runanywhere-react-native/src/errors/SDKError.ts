@@ -39,9 +39,13 @@ export enum SDKErrorCode {
   // STT specific errors
   TranscriptionFailed = 'TRANSCRIPTION_FAILED',
   StreamCreationFailed = 'STREAM_CREATION_FAILED',
+  ServiceNotInitialized = 'SERVICE_NOT_INITIALIZED',
   // TTS specific errors
   SynthesisFailed = 'SYNTHESIS_FAILED',
   VoiceNotFound = 'VOICE_NOT_FOUND',
+  // VAD specific errors
+  ProcessingFailed = 'PROCESSING_FAILED',
+  CleanupFailed = 'CLEANUP_FAILED',
   Unknown = 'UNKNOWN',
 }
 

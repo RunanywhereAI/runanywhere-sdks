@@ -5,8 +5,8 @@ folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 
 
 # XCFramework configuration
 # Update these values when new versions are released
-ONNX_XCFRAMEWORK_VERSION = "0.0.1-dev.27a4832-sherpa"
-ONNX_XCFRAMEWORK_CHECKSUM = "62b2887a6d53360ed8d96a5080a98419d3c486f6be94bfe5e9f82415bb6a1fbe"
+ONNX_XCFRAMEWORK_VERSION = "0.0.1-dev.4767337"
+ONNX_XCFRAMEWORK_CHECKSUM = "c054210880498119a7f61ffa2f922effa8e3c92513085f5c495011ea301f776a"
 
 Pod::Spec.new do |s|
   s.name         = "runanywhere-react-native"

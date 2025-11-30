@@ -46,6 +46,7 @@ export type {
   StructuredOutputValidation,
   ThinkingTagPattern,
   TTSConfiguration,
+  TTSResult,
   VADConfiguration,
   VoiceAudioChunk,
 } from './models';
