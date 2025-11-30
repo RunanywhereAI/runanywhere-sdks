@@ -195,6 +195,15 @@ public enum RunAnywhere {
     private static func ensureDeviceRegistered() async throws {
         let logger = SDKLogger(category: "RunAnywhere.DeviceReg")
 
+        // IMPORTANT: Always ensure network services are initialized for production/staging
+        // This is needed for analytics/telemetry to work, even if device is already registered
+        if currentEnvironment != .development, let params = initParams {
+            if serviceContainer.authenticationService == nil {
+                try await serviceContainer.initializeNetworkServices(with: params)
+                logger.debug("Network services initialized")
+            }
+        }
+
         // Check if we have a cached device ID
         let cachedId = await registrationState.getCachedDeviceId()
         if let cachedId = cachedId, !cachedId.isEmpty {
@@ -903,6 +912,8 @@ public enum RunAnywhere {
     public static func loadModel(_ modelId: String) async throws {
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
+        let startTime = Date()
+
         do {
             // Ensure initialized
             guard isInitialized else {
@@ -932,6 +943,9 @@ public enum RunAnywhere {
             // IMPORTANT: Set the loaded model in the generation service
             serviceContainer.generationService.setCurrentModel(loadedModel)
 
+            // Calculate load time
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
             // Notify lifecycle manager of successful load
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
@@ -943,8 +957,89 @@ public enum RunAnywhere {
                 )
             }
 
+            // Track telemetry for LLM model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            do {
+                try await serviceContainer.telemetryService.trackModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    modality: "llm",
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: true,
+                    errorMessage: nil
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: true
+                )
+                let event = GenerationEvent(type: .modelLoaded, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+
+                // Force flush to send immediately
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
+            // Calculate load time even for failures
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
+            // Track telemetry for failed LLM model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .llamaCpp
+            let modelName = modelInfo?.name ?? modelId
+
+            do {
+                try await serviceContainer.telemetryService.trackModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    modality: "llm",
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: false,
+                    errorMessage: error.localizedDescription
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: false,
+                    errorMessage: error.localizedDescription,
+                    errorCode: error.localizedDescription
+                )
+                let event = GenerationEvent(type: .modelLoadFailed, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             // Notify lifecycle manager of failure
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelLoadFailed(
@@ -964,11 +1059,16 @@ public enum RunAnywhere {
     public static func loadSTTModel(_ modelId: String) async throws {
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
+        let startTime = Date()
+
         do {
             // Ensure initialized
             guard isInitialized else {
                 throw SDKError.notInitialized
             }
+
+            // Lazy device registration and network services initialization
+            try await ensureDeviceRegistered()
 
             // Get model info for lifecycle tracking
             let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
@@ -999,6 +1099,9 @@ public enum RunAnywhere {
                 _loadedSTTComponent = sttComponent
             }
 
+            // Calculate load time
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
             // Notify lifecycle manager of successful load
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
@@ -1010,8 +1113,87 @@ public enum RunAnywhere {
                 )
             }
 
+            // Track telemetry for STT model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            do {
+                try await serviceContainer.telemetryService.trackSTTModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: true,
+                    errorMessage: nil
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: true
+                )
+                let event = STTEvent(type: .modelLoaded, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+
+                // Force flush to send immediately
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
+            // Calculate load time even for failures
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
+            // Track telemetry for failed STT model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .whisperKit
+            let modelName = modelInfo?.name ?? modelId
+
+            do {
+                try await serviceContainer.telemetryService.trackSTTModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: false,
+                    errorMessage: error.localizedDescription
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: false,
+                    errorMessage: error.localizedDescription,
+                    errorCode: error.localizedDescription
+                )
+                let event = STTEvent(type: .modelLoadFailed, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             // Notify lifecycle manager of failure
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelLoadFailed(
@@ -1031,11 +1213,16 @@ public enum RunAnywhere {
     public static func loadTTSModel(_ modelId: String) async throws {
         EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId))
 
+        let startTime = Date()
+
         do {
             // Ensure initialized
             guard isInitialized else {
                 throw SDKError.notInitialized
             }
+
+            // Lazy device registration and network services initialization
+            try await ensureDeviceRegistered()
 
             // Get model info for lifecycle tracking
             let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
@@ -1066,6 +1253,9 @@ public enum RunAnywhere {
                 _loadedTTSComponent = ttsComponent
             }
 
+            // Calculate load time
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
             // Notify lifecycle manager of successful load
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelDidLoad(
@@ -1077,8 +1267,87 @@ public enum RunAnywhere {
                 )
             }
 
+            // Track telemetry for TTS model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            do {
+                try await serviceContainer.telemetryService.trackTTSModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: true,
+                    errorMessage: nil
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: true
+                )
+                let event = TTSEvent(type: .modelLoaded, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+
+                // Force flush to send immediately
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId))
         } catch {
+            // Calculate load time even for failures
+            let loadTimeMs = Date().timeIntervalSince(startTime) * 1000.0
+
+            // Track telemetry for failed TTS model load
+            let deviceInfo = TelemetryDeviceInfo.current
+            let modelInfo = serviceContainer.modelRegistry.getModel(by: modelId)
+            let framework = modelInfo?.preferredFramework ?? .onnx
+            let modelName = modelInfo?.name ?? modelId
+
+            do {
+                try await serviceContainer.telemetryService.trackTTSModelLoad(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    loadTimeMs: loadTimeMs,
+                    modelSizeBytes: modelInfo?.downloadSize,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    success: false,
+                    errorMessage: error.localizedDescription
+                )
+
+                // Also enqueue via AnalyticsQueueManager for backend transmission
+                let eventData = ModelLoadingData(
+                    modelId: modelId,
+                    modelName: modelName,
+                    framework: framework.rawValue,
+                    device: deviceInfo.device,
+                    osVersion: deviceInfo.osVersion,
+                    platform: deviceInfo.platform,
+                    sdkVersion: SDKConstants.version,
+                    processingTimeMs: loadTimeMs,
+                    success: false,
+                    errorMessage: error.localizedDescription,
+                    errorCode: error.localizedDescription
+                )
+                let event = TTSEvent(type: .modelLoadFailed, eventData: eventData)
+                await AnalyticsQueueManager.shared.enqueue(event)
+                await AnalyticsQueueManager.shared.flush()
+            } catch {
+                // Telemetry failure is non-critical, continue
+            }
+
             // Notify lifecycle manager of failure
             await MainActor.run {
                 ModelLifecycleTracker.shared.modelLoadFailed(
