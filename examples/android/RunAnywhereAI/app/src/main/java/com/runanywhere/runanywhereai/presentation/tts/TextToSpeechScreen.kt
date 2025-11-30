@@ -611,8 +611,7 @@ private fun ControlsSection(
                 enabled = hasGeneratedAudio && !isSystemTTS,
                 modifier = Modifier
                     .width(140.dp)
-                    .height(50.dp)
-                    .then(if (isSystemTTS) Modifier else Modifier),
+                    .height(50.dp),
                 shape = RoundedCornerShape(25.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (hasGeneratedAudio) AppColors.primaryGreen else Color.Gray,

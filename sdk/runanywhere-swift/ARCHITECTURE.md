@@ -59,8 +59,8 @@ The SDK now uses remote XCFramework distribution from the [runanywhere-binaries]
 ```swift
 .binaryTarget(
     name: "RunAnywhereCoreBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
-    checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+    checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
 )
 ```
 

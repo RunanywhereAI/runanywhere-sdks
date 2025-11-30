@@ -11,8 +11,8 @@ The XCFramework is automatically downloaded from the [runanywhere-binaries](http
 ```swift
 .binaryTarget(
     name: "RunAnywhereCoreBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip",
-    checksum: "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+    checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
 )
 ```
 
@@ -63,11 +63,11 @@ For local testing or development with custom-built XCFrameworks, you can enable 
 ```bash
 # Download the binary
 curl -L -o RunAnywhereCore.xcframework.zip \
-  "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.1f175bc/RunAnywhereCore.xcframework.zip"
+  "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip"
 
 # Verify checksum
 shasum -a 256 RunAnywhereCore.xcframework.zip
-# Should output: 4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94
+# Should output: 644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd
 ```
 
 ## Architecture
