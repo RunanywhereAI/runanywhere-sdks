@@ -20,7 +20,7 @@
  *   - Remote (default): Downloads pre-built native libraries from GitHub releases
  *   - Local: Uses locally built libraries from runanywhere-core/dist/android/llamacpp
  *
- * To use local mode: ./gradlew build -Prunanywhere.native.local=true
+ * To use local mode: ./gradlew build -Prunanywhere.testLocal=true
  */
 
 import java.net.URL
@@ -42,7 +42,7 @@ val nativeLibVersion = project.findProperty("runanywhere.native.version")?.toStr
     ?: "0.0.1-dev"
 
 // Use local build mode (requires runanywhere-core to be built locally)
-val useLocalBuild = project.findProperty("runanywhere.native.local")?.toString()?.toBoolean() ?: false
+val useLocalBuild = project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean() ?: false
 
 // GitHub configuration for downloads
 val githubOrg = project.findProperty("runanywhere.github.org")?.toString() ?: "RunanywhereAI"
@@ -230,7 +230,7 @@ val downloadNativeLibs by tasks.registering {
             logger.lifecycle("Options:")
             logger.lifecycle("  1. Check that version $nativeLibVersion exists in the releases")
             logger.lifecycle("  2. Build locally: cd runanywhere-core && ./scripts/build-android-backend.sh llamacpp")
-            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.native.local=true")
+            logger.lifecycle("  3. Use local mode: ./gradlew build -Prunanywhere.testLocal=true")
             throw GradleException("Failed to download native libraries", e)
         }
 

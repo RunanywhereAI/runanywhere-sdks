@@ -1,12 +1,12 @@
 # Binary Distribution
 
-## Remote Distribution (Current)
+## Remote Distribution (Default)
 
-As of v0.0.1-dev.1f175bc, the RunAnywhere Swift SDK uses **remote XCFramework distribution** via Swift Package Manager binary targets.
+By default, the RunAnywhere Swift SDK uses **remote XCFramework distribution** via Swift Package Manager binary targets.
 
 The XCFramework is automatically downloaded from the [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) repository during package resolution.
 
-### Current Configuration
+### Default Configuration (testLocal = false)
 
 ```swift
 .binaryTarget(
@@ -20,12 +20,35 @@ The XCFramework is automatically downloaded from the [runanywhere-binaries](http
 
 - **No local builds required**: SDK consumers don't need to build runanywhere-core
 - **Consistent versions**: All developers use the same binary version
-- **Reduced repository size**: Large binaries (59.9MB) are not committed to git
+- **Reduced repository size**: Large binaries are not committed to git
 - **Automatic caching**: SPM caches downloaded binaries for faster subsequent builds
 
-## Local Development (Legacy)
+## Local Development Mode (testLocal = true)
 
-Local XCFrameworks in this directory are **deprecated** and no longer used by the SDK. They remain for backward compatibility with older build scripts only.
+For local testing or development with custom-built XCFrameworks, you can enable local mode by changing the `testLocal` flag in `Package.swift`.
+
+### How to Enable Local Mode
+
+1. **Edit Package.swift**: Change the flag at the top of the file
+   ```swift
+   // Set to `true` to use local XCFramework from Binaries/ directory
+   let testLocal = true
+   ```
+
+2. **Place XCFramework**: Put `RunAnywhereCore.xcframework` in this `Binaries/` directory
+   - Download from [runanywhere-binaries releases](https://github.com/RunanywhereAI/runanywhere-binaries/releases)
+   - Or build locally from runanywhere-core
+
+3. **Resolve package**: Run `swift package resolve` to update dependencies
+
+### When to Use Local Mode
+
+- Testing custom-built XCFrameworks before publishing
+- Debugging native C++ code with local symbols
+- Developing offline without network access
+- Validating XCFramework changes before creating a release
+
+**Important**: Local XCFrameworks should NOT be committed to git. The `.gitignore` excludes `*.xcframework` files.
 
 ### To update to a new release:
 
