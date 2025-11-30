@@ -19,7 +19,8 @@ extern "C" {
 #ifdef RCT_NEW_ARCH_ENABLED
     std::shared_ptr<facebook::react::RunAnywhereModule> _nativeModule;
 #endif
-    ra_backend_handle _backend;
+    ra_backend_handle _backend;        // General purpose backend (ONNX for STT/TTS/VAD)
+    ra_backend_handle _llamaBackend;   // LlamaCPP backend for text generation (GGUF models)
     NSMutableDictionary<NSString *, NSURLSessionDownloadTask *> *_downloadTasks;
     NSURLSession *_downloadSession;
 }
@@ -34,6 +35,7 @@ RCT_EXPORT_MODULE()
     self = [super init];
     if (self) {
         _backend = nullptr;
+        _llamaBackend = nullptr;
         _downloadTasks = [NSMutableDictionary new];
 
         NSURLSessionConfiguration *config = [NSURLSessionConfiguration defaultSessionConfiguration];
@@ -47,6 +49,10 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)dealloc {
+    if (_llamaBackend) {
+        ra_destroy(_llamaBackend);
+        _llamaBackend = nullptr;
+    }
     if (_backend) {
         ra_destroy(_backend);
         _backend = nullptr;
@@ -134,6 +140,42 @@ RCT_EXPORT_MODULE()
             @"downloadUrl": @"https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
             @"format": @"sherpa-onnx",
             @"modelType": @"piper"
+        },
+        @"qwen2-0.5b-instruct-q4": @{
+            @"id": @"qwen2-0.5b-instruct-q4",
+            @"name": @"Qwen2 0.5B Instruct (Q4)",
+            @"description": @"Small but capable chat model for on-device inference",
+            @"category": @"llm",
+            @"modality": @"llm",
+            @"size": @(400000000),  // ~400MB
+            @"downloadUrl": @"https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
+            @"format": @"gguf",
+            @"modelType": @"llama",
+            @"contextLength": @(32768)
+        },
+        @"tinyllama-1.1b-chat-q4": @{
+            @"id": @"tinyllama-1.1b-chat-q4",
+            @"name": @"TinyLlama 1.1B Chat (Q4)",
+            @"description": @"Efficient chat model optimized for mobile",
+            @"category": @"llm",
+            @"modality": @"llm",
+            @"size": @(670000000),  // ~670MB
+            @"downloadUrl": @"https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+            @"format": @"gguf",
+            @"modelType": @"llama",
+            @"contextLength": @(2048)
+        },
+        @"smollm-135m-instruct-q8": @{
+            @"id": @"smollm-135m-instruct-q8",
+            @"name": @"SmolLM 135M Instruct (Q8)",
+            @"description": @"Ultra-small model for quick responses",
+            @"category": @"llm",
+            @"modality": @"llm",
+            @"size": @(150000000),  // ~150MB
+            @"downloadUrl": @"https://huggingface.co/HuggingFaceTB/smollm-135M-instruct-v0.2-GGUF/resolve/main/smollm-135m-instruct-v0.2-q8_0.gguf",
+            @"format": @"gguf",
+            @"modelType": @"llama",
+            @"contextLength": @(2048)
         }
     };
 }
@@ -159,24 +201,32 @@ RCT_EXPORT_MODULE()
 RCT_EXPORT_METHOD(createBackend:(NSString *)name
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] createBackend called with name: %@", name);
+
     if (_backend) {
+        NSLog(@"[RunAnywhere] Destroying existing backend");
         ra_destroy(_backend);
         _backend = nullptr;
     }
 
     _backend = ra_create_backend([name UTF8String]);
+    NSLog(@"[RunAnywhere] Backend created: %@", _backend != nullptr ? @"SUCCESS" : @"FAILED");
     resolve(@(_backend != nullptr));
 }
 
 RCT_EXPORT_METHOD(initialize:(NSString *)configJson
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] initialize called");
+
     if (!_backend) {
+        NSLog(@"[RunAnywhere] initialize: No backend available");
         resolve(@NO);
         return;
     }
 
     ra_result_code result = ra_initialize(_backend, configJson ? [configJson UTF8String] : nullptr);
+    NSLog(@"[RunAnywhere] initialize result: %d (0=SUCCESS)", result);
     resolve(@(result == RA_SUCCESS));
 }
 
@@ -200,7 +250,10 @@ RCT_EXPORT_METHOD(isInitialized:(RCTPromiseResolveBlock)resolve
 
 RCT_EXPORT_METHOD(getBackendInfo:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] getBackendInfo called");
+
     if (!_backend) {
+        NSLog(@"[RunAnywhere] getBackendInfo: No backend");
         resolve(@"{}");
         return;
     }
@@ -208,9 +261,11 @@ RCT_EXPORT_METHOD(getBackendInfo:(RCTPromiseResolveBlock)resolve
     char *info = ra_get_backend_info(_backend);
     if (info) {
         NSString *result = [NSString stringWithUTF8String:info];
+        NSLog(@"[RunAnywhere] getBackendInfo: %@", result);
         ra_free_string(info);
         resolve(result);
     } else {
+        NSLog(@"[RunAnywhere] getBackendInfo: No info returned");
         resolve(@"{}");
     }
 }
@@ -223,8 +278,93 @@ RCT_EXPORT_METHOD(loadTextModel:(NSString *)path
                   configJson:(NSString *)configJson
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] loadTextModel called - path: %@", path);
+
+    // Check if path exists
+    BOOL pathExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+    NSLog(@"[RunAnywhere] loadTextModel: Path exists: %@", pathExists ? @"YES" : @"NO");
+
+    if (!pathExists) {
+        NSLog(@"[RunAnywhere] loadTextModel: File does not exist at path");
+        reject(@"FILE_NOT_FOUND", [NSString stringWithFormat:@"Model file not found at path: %@", path], nil);
+        return;
+    }
+
+    // Get file info
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil];
+    NSNumber *fileSize = attrs[NSFileSize];
+    NSLog(@"[RunAnywhere] loadTextModel: File size: %@ bytes", fileSize);
+
+    // Determine backend type based on file extension
+    NSString *ext = [[path pathExtension] lowercaseString];
+    BOOL isGGUF = [ext isEqualToString:@"gguf"] || [ext isEqualToString:@"ggml"];
+    NSLog(@"[RunAnywhere] loadTextModel: Extension: %@, isGGUF: %@", ext, isGGUF ? @"YES" : @"NO");
+
+    // For GGUF models, use the llamacpp backend
+    if (isGGUF) {
+        NSLog(@"[RunAnywhere] loadTextModel: Creating/using LlamaCPP backend for GGUF model");
+
+        // Create llamacpp backend if not already created
+        if (!_llamaBackend) {
+            NSLog(@"[RunAnywhere] loadTextModel: Creating new LlamaCPP backend");
+            _llamaBackend = ra_create_backend("llamacpp");
+
+            if (!_llamaBackend) {
+                NSLog(@"[RunAnywhere] loadTextModel: Failed to create LlamaCPP backend");
+                reject(@"BACKEND_CREATE_FAILED", @"Failed to create LlamaCPP backend for GGUF models", nil);
+                return;
+            }
+
+            // Initialize the backend
+            ra_result_code initResult = ra_initialize(_llamaBackend, nullptr);
+            NSLog(@"[RunAnywhere] loadTextModel: LlamaCPP backend init result: %d (0=SUCCESS)", initResult);
+
+            if (initResult != RA_SUCCESS) {
+                const char *error = ra_get_last_error();
+                NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+                NSLog(@"[RunAnywhere] loadTextModel: LlamaCPP init error: %@", errorMsg);
+
+                ra_destroy(_llamaBackend);
+                _llamaBackend = nullptr;
+
+                reject(@"BACKEND_INIT_FAILED", [NSString stringWithFormat:@"Failed to initialize LlamaCPP backend: %@", errorMsg], nil);
+                return;
+            }
+        }
+
+        // Load model using llamacpp backend
+        ra_result_code result = ra_text_load_model(
+            _llamaBackend,
+            [path UTF8String],
+            configJson ? [configJson UTF8String] : nullptr
+        );
+
+        NSLog(@"[RunAnywhere] loadTextModel result (LlamaCPP): %d (0=SUCCESS)", result);
+
+        if (result != RA_SUCCESS) {
+            const char *error = ra_get_last_error();
+            NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+            NSLog(@"[RunAnywhere] loadTextModel error: %@", errorMsg);
+
+            NSString *userFacingError;
+            if (result == -2) {  // RA_ERROR_MODEL_LOAD_FAILED
+                userFacingError = [NSString stringWithFormat:@"Failed to load GGUF model. This may be due to architecture limitations (e.g., simulator without Metal). Try running on a physical device. Details: %@", errorMsg];
+            } else {
+                userFacingError = errorMsg;
+            }
+
+            reject(@"MODEL_LOAD_FAILED", userFacingError, nil);
+            return;
+        }
+
+        resolve(@YES);
+        return;
+    }
+
+    // For non-GGUF models, use the general backend
     if (!_backend) {
-        resolve(@NO);
+        NSLog(@"[RunAnywhere] loadTextModel: No general backend available for non-GGUF model");
+        reject(@"NO_BACKEND", @"Backend not initialized. Please call createBackend first.", nil);
         return;
     }
 
@@ -233,25 +373,50 @@ RCT_EXPORT_METHOD(loadTextModel:(NSString *)path
         [path UTF8String],
         configJson ? [configJson UTF8String] : nullptr
     );
-    resolve(@(result == RA_SUCCESS));
+
+    NSLog(@"[RunAnywhere] loadTextModel result: %d (0=SUCCESS)", result);
+
+    if (result != RA_SUCCESS) {
+        const char *error = ra_get_last_error();
+        NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+        NSLog(@"[RunAnywhere] loadTextModel error: %@", errorMsg);
+        reject(@"MODEL_LOAD_FAILED", errorMsg, nil);
+        return;
+    }
+
+    resolve(@YES);
 }
 
 RCT_EXPORT_METHOD(isTextModelLoaded:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@NO);
+    // Check llamacpp backend first (GGUF models)
+    if (_llamaBackend && ra_text_is_model_loaded(_llamaBackend)) {
+        resolve(@YES);
         return;
     }
-    resolve(@(ra_text_is_model_loaded(_backend)));
+    // Check general backend
+    if (_backend && ra_text_is_model_loaded(_backend)) {
+        resolve(@YES);
+        return;
+    }
+    resolve(@NO);
 }
 
 RCT_EXPORT_METHOD(unloadTextModel:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@NO);
-        return;
+    BOOL success = YES;
+
+    // Unload from llamacpp backend if loaded
+    if (_llamaBackend && ra_text_is_model_loaded(_llamaBackend)) {
+        success = ra_text_unload_model(_llamaBackend) == RA_SUCCESS;
     }
-    resolve(@(ra_text_unload_model(_backend) == RA_SUCCESS));
+
+    // Unload from general backend if loaded
+    if (_backend && ra_text_is_model_loaded(_backend)) {
+        success = ra_text_unload_model(_backend) == RA_SUCCESS && success;
+    }
+
+    resolve(@(success));
 }
 
 RCT_EXPORT_METHOD(generate:(NSString *)prompt
@@ -260,14 +425,35 @@ RCT_EXPORT_METHOD(generate:(NSString *)prompt
                   temperature:(double)temperature
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
-    if (!_backend) {
-        resolve(@"{\"error\": \"Backend not initialized\"}");
+    NSLog(@"[RunAnywhere] generate called - prompt: %.50s..., maxTokens: %d, temp: %f", [prompt UTF8String], maxTokens, temperature);
+
+    // Determine which backend to use
+    ra_backend_handle activeBackend = nullptr;
+    NSString *backendType = @"none";
+
+    // Check llamacpp backend first (GGUF models)
+    if (_llamaBackend && ra_text_is_model_loaded(_llamaBackend)) {
+        activeBackend = _llamaBackend;
+        backendType = @"llamacpp";
+        NSLog(@"[RunAnywhere] generate: Using LlamaCPP backend");
+    }
+    // Check general backend
+    else if (_backend && ra_text_is_model_loaded(_backend)) {
+        activeBackend = _backend;
+        backendType = @"general";
+        NSLog(@"[RunAnywhere] generate: Using general backend");
+    }
+
+    if (!activeBackend) {
+        NSLog(@"[RunAnywhere] generate: No backend with loaded model available");
+        resolve(@"{\"error\": \"No text model loaded. Please load a model first.\"}");
         return;
     }
 
     char *resultJson = nullptr;
+    NSLog(@"[RunAnywhere] generate: Calling ra_text_generate on %@ backend...", backendType);
     ra_result_code result = ra_text_generate(
-        _backend,
+        activeBackend,
         [prompt UTF8String],
         systemPrompt ? [systemPrompt UTF8String] : nullptr,
         maxTokens,
@@ -275,14 +461,18 @@ RCT_EXPORT_METHOD(generate:(NSString *)prompt
         &resultJson
     );
 
+    NSLog(@"[RunAnywhere] generate: Result code: %d (0=SUCCESS)", result);
+
     if (result != RA_SUCCESS || !resultJson) {
         const char *error = ra_get_last_error();
         NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown error";
+        NSLog(@"[RunAnywhere] generate: Error - %@", errorMsg);
         resolve([NSString stringWithFormat:@"{\"error\": \"%@\"}", errorMsg]);
         return;
     }
 
     NSString *resultStr = [NSString stringWithUTF8String:resultJson];
+    NSLog(@"[RunAnywhere] generate: Success - response length: %lu", (unsigned long)resultStr.length);
     ra_free_string(resultJson);
     resolve(resultStr);
 }
@@ -291,9 +481,21 @@ RCT_EXPORT_METHOD(generateStream:(NSString *)prompt
                   systemPrompt:(NSString *)systemPrompt
                   maxTokens:(int)maxTokens
                   temperature:(double)temperature) {
-    if (!_backend) {
+    // Determine which backend to use
+    ra_backend_handle activeBackend = nullptr;
+
+    // Check llamacpp backend first (GGUF models)
+    if (_llamaBackend && ra_text_is_model_loaded(_llamaBackend)) {
+        activeBackend = _llamaBackend;
+    }
+    // Check general backend
+    else if (_backend && ra_text_is_model_loaded(_backend)) {
+        activeBackend = _backend;
+    }
+
+    if (!activeBackend) {
         [self sendEventWithName:@"onGenerationError"
-                           body:@{@"error": @"Backend not initialized"}];
+                           body:@{@"error": @"No text model loaded"}];
         return;
     }
 
@@ -301,7 +503,7 @@ RCT_EXPORT_METHOD(generateStream:(NSString *)prompt
     // TODO: Implement actual streaming with callback
     char *resultJson = nullptr;
     ra_result_code result = ra_text_generate(
-        _backend,
+        activeBackend,
         [prompt UTF8String],
         systemPrompt ? [systemPrompt UTF8String] : nullptr,
         maxTokens,
@@ -330,6 +532,10 @@ RCT_EXPORT_METHOD(generateStream:(NSString *)prompt
 }
 
 RCT_EXPORT_METHOD(cancelGeneration) {
+    // Cancel on both backends
+    if (_llamaBackend) {
+        ra_text_cancel(_llamaBackend);
+    }
     if (_backend) {
         ra_text_cancel(_backend);
     }
@@ -393,9 +599,29 @@ RCT_EXPORT_METHOD(loadSTTModel:(NSString *)path
                   configJson:(NSString *)configJson
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] loadSTTModel called - path: %@, type: %@", path, modelType);
+
     if (!_backend) {
+        NSLog(@"[RunAnywhere] loadSTTModel: No backend available");
         resolve(@NO);
         return;
+    }
+
+    // Check if path exists
+    BOOL pathExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+    NSLog(@"[RunAnywhere] loadSTTModel: Path exists: %@", pathExists ? @"YES" : @"NO");
+
+    if (!pathExists) {
+        NSLog(@"[RunAnywhere] loadSTTModel: Path does not exist!");
+        // Try to list contents of parent directory
+        NSString *parentDir = [path stringByDeletingLastPathComponent];
+        NSError *listError = nil;
+        NSArray *contents = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:parentDir error:&listError];
+        if (contents) {
+            NSLog(@"[RunAnywhere] loadSTTModel: Parent dir (%@) contents: %@", parentDir, contents);
+        } else {
+            NSLog(@"[RunAnywhere] loadSTTModel: Could not list parent dir: %@", listError);
+        }
     }
 
     ra_result_code result = ra_stt_load_model(
@@ -404,6 +630,14 @@ RCT_EXPORT_METHOD(loadSTTModel:(NSString *)path
         [modelType UTF8String],
         configJson ? [configJson UTF8String] : nullptr
     );
+
+    NSLog(@"[RunAnywhere] loadSTTModel result: %d (0=SUCCESS)", result);
+
+    if (result != RA_SUCCESS) {
+        const char *error = ra_get_last_error();
+        NSLog(@"[RunAnywhere] loadSTTModel error: %s", error ? error : "NULL");
+    }
+
     resolve(@(result == RA_SUCCESS));
 }
 
@@ -474,10 +708,17 @@ RCT_EXPORT_METHOD(loadTTSModel:(NSString *)path
                   configJson:(NSString *)configJson
                   resolver:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] loadTTSModel called - path: %@, type: %@", path, modelType);
+
     if (!_backend) {
+        NSLog(@"[RunAnywhere] loadTTSModel: No backend available");
         resolve(@NO);
         return;
     }
+
+    // Check if path exists
+    BOOL pathExists = [[NSFileManager defaultManager] fileExistsAtPath:path];
+    NSLog(@"[RunAnywhere] loadTTSModel: Path exists: %@", pathExists ? @"YES" : @"NO");
 
     ra_result_code result = ra_tts_load_model(
         _backend,
@@ -485,6 +726,14 @@ RCT_EXPORT_METHOD(loadTTSModel:(NSString *)path
         [modelType UTF8String],
         configJson ? [configJson UTF8String] : nullptr
     );
+
+    NSLog(@"[RunAnywhere] loadTTSModel result: %d (0=SUCCESS)", result);
+
+    if (result != RA_SUCCESS) {
+        const char *error = ra_get_last_error();
+        NSLog(@"[RunAnywhere] loadTTSModel error: %s", error ? error : "NULL");
+    }
+
     resolve(@(result == RA_SUCCESS));
 }
 
@@ -747,18 +996,77 @@ RCT_EXPORT_METHOD(removeListeners:(double)count) {
 
 RCT_EXPORT_METHOD(getAvailableModels:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] getAvailableModels called");
+
     NSDictionary *catalog = [self getModelCatalog];
     NSMutableArray *models = [NSMutableArray new];
+    NSString *modelsDir = [self modelsDirectory];
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    NSLog(@"[RunAnywhere] Models directory: %@", modelsDir);
+
+    // List contents of models directory
+    NSError *listError = nil;
+    NSArray *contents = [fm contentsOfDirectoryAtPath:modelsDir error:&listError];
+    NSLog(@"[RunAnywhere] Models directory contents: %@", contents ?: @"ERROR");
 
     for (NSString *modelId in catalog) {
         NSMutableDictionary *model = [catalog[modelId] mutableCopy];
 
         // Check if model is downloaded
-        NSString *modelPath = [[self modelsDirectory] stringByAppendingPathComponent:modelId];
-        BOOL isDownloaded = [[NSFileManager defaultManager] fileExistsAtPath:modelPath];
+        NSString *modelPath = [modelsDir stringByAppendingPathComponent:modelId];
+        BOOL isDirectory = NO;
+        BOOL isDownloaded = [fm fileExistsAtPath:modelPath isDirectory:&isDirectory];
         model[@"isDownloaded"] = @(isDownloaded);
+
         if (isDownloaded) {
-            model[@"localPath"] = modelPath;
+            NSString *format = model[@"format"];
+            NSString *actualModelPath = modelPath;
+
+            // If it's a directory, find the actual model file
+            if (isDirectory) {
+                NSArray *modelContents = [fm contentsOfDirectoryAtPath:modelPath error:nil];
+                NSLog(@"[RunAnywhere] Model %@ contents: %@", modelId, modelContents);
+
+                // For GGUF models (LLM), look for .gguf file
+                if ([format isEqualToString:@"gguf"]) {
+                    for (NSString *file in modelContents) {
+                        if ([file hasSuffix:@".gguf"]) {
+                            actualModelPath = [modelPath stringByAppendingPathComponent:file];
+                            NSLog(@"[RunAnywhere] Found GGUF file: %@", actualModelPath);
+                            break;
+                        }
+                    }
+                }
+                // For ONNX models (VAD), look for .onnx file
+                else if ([format isEqualToString:@"onnx"]) {
+                    for (NSString *file in modelContents) {
+                        if ([file hasSuffix:@".onnx"]) {
+                            actualModelPath = [modelPath stringByAppendingPathComponent:file];
+                            NSLog(@"[RunAnywhere] Found ONNX file: %@", actualModelPath);
+                            break;
+                        }
+                    }
+                }
+                // For Sherpa-ONNX models (STT/TTS), the directory structure is different
+                // We return the directory and let the loader handle it
+                else if ([format isEqualToString:@"sherpa-onnx"]) {
+                    // Check if there's a subdirectory (extracted archive)
+                    for (NSString *file in modelContents) {
+                        BOOL isSubDir = NO;
+                        NSString *subPath = [modelPath stringByAppendingPathComponent:file];
+                        if ([fm fileExistsAtPath:subPath isDirectory:&isSubDir] && isSubDir) {
+                            // Use the subdirectory as the model path for Sherpa-ONNX
+                            actualModelPath = subPath;
+                            NSLog(@"[RunAnywhere] Found Sherpa-ONNX model directory: %@", actualModelPath);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            model[@"localPath"] = actualModelPath;
+            NSLog(@"[RunAnywhere] Model %@ final path: %@", modelId, actualModelPath);
         }
 
         [models addObject:model];

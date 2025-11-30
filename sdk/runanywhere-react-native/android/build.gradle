@@ -12,11 +12,12 @@ buildscript {
 }
 
 // =============================================================================
-// XCFramework/Native Library Configuration
+// Native Library Configuration
 // =============================================================================
 // Update these values when new versions are released
-def ONNX_NATIVE_VERSION = "0.0.1-dev.e2ac4eb"
-def ONNX_NATIVE_CHECKSUM = "" // TODO: Add checksum verification
+def NATIVE_VERSION = "0.0.1-dev.1f175bc"
+def ONNX_NATIVE_CHECKSUM = "d0f0e0e800bb7acca0e6832ea35070eff1a17b291b14725ebed54b411823f563"
+def LLAMACPP_NATIVE_CHECKSUM = "087e7fdf0ab35577a168bb56a8c56f34e6a4987a7ea57f23255885afbf3e82fe"
 
 def isNewArchitectureEnabled() {
     return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
@@ -48,49 +49,67 @@ def supportsNamespace() {
 // Download Native Libraries Task
 // =============================================================================
 def nativeLibsDir = file("${projectDir}/src/main/jniLibs")
-def nativeLibsZip = file("${buildDir}/tmp/RunAnywhereONNX-android.zip")
+def tmpDir = file("${buildDir}/tmp/native-libs")
 
 task downloadNativeLibs {
-    description = "Downloads RunAnywhere native libraries for Android"
+    description = "Downloads RunAnywhere native libraries for Android (ONNX + LlamaCPP)"
 
     outputs.dir(nativeLibsDir)
 
     doLast {
-        def downloadUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v${ONNX_NATIVE_VERSION}/RunAnywhereONNX-android.zip"
-
         // Check if already downloaded
         if (file("${nativeLibsDir}/arm64-v8a/librunanywhere_jni.so").exists()) {
             println "Native libraries already exist, skipping download."
             return
         }
 
-        println "Downloading RunAnywhere native libraries from: ${downloadUrl}"
-
         // Create directories
-        nativeLibsZip.parentFile.mkdirs()
+        tmpDir.mkdirs()
         nativeLibsDir.mkdirs()
+        file("${nativeLibsDir}/arm64-v8a").mkdirs()
 
-        // Download
-        ant.get(src: downloadUrl, dest: nativeLibsZip, verbose: true)
+        // Download and extract ONNX libraries
+        def onnxUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v${NATIVE_VERSION}/RunAnywhereONNX-android.zip"
+        def onnxZip = file("${tmpDir}/RunAnywhereONNX-android.zip")
 
-        // Extract
-        println "Extracting native libraries..."
-        copy {
-            from zipTree(nativeLibsZip)
-            into nativeLibsDir
-            // The zip contains onnx/<abi>/*.so structure, flatten it
-            eachFile { fcd ->
-                // Path like: onnx/arm64-v8a/libfoo.so -> arm64-v8a/libfoo.so
-                def segments = fcd.relativePath.segments
-                if (segments.length >= 3 && segments[0] == 'onnx') {
-                    fcd.relativePath = new RelativePath(!fcd.isDirectory(), segments.drop(1) as String[])
-                }
+        println "Downloading ONNX native libraries from: ${onnxUrl}"
+        ant.get(src: onnxUrl, dest: onnxZip, verbose: true)
+
+        println "Extracting ONNX native libraries..."
+        ant.unzip(src: onnxZip, dest: tmpDir)
+
+        // Download and extract LlamaCPP libraries
+        def llamaUrl = "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v${NATIVE_VERSION}/RunAnywhereLlamaCPP-android.zip"
+        def llamaZip = file("${tmpDir}/RunAnywhereLlamaCPP-android.zip")
+
+        println "Downloading LlamaCPP native libraries from: ${llamaUrl}"
+        ant.get(src: llamaUrl, dest: llamaZip, verbose: true)
+
+        println "Extracting LlamaCPP native libraries..."
+        ant.unzip(src: llamaZip, dest: tmpDir)
+
+        // Copy all .so files to jniLibs
+        println "Copying native libraries to jniLibs..."
+        fileTree(tmpDir).matching {
+            include "**/*.so"
+        }.each { soFile ->
+            def relativePath = tmpDir.toPath().relativize(soFile.toPath()).toString()
+            // Handle different zip structures: onnx/arm64-v8a/lib.so or arm64-v8a/lib.so
+            def targetPath
+            if (relativePath.contains("arm64-v8a")) {
+                def idx = relativePath.indexOf("arm64-v8a")
+                targetPath = relativePath.substring(idx)
+            } else {
+                targetPath = "arm64-v8a/${soFile.name}"
             }
-            includeEmptyDirs = false
+            def targetFile = file("${nativeLibsDir}/${targetPath}")
+            targetFile.parentFile.mkdirs()
+            ant.copy(file: soFile, tofile: targetFile)
+            println "  Copied: ${soFile.name} -> ${targetPath}"
         }
 
         // Cleanup
-        nativeLibsZip.delete()
+        tmpDir.deleteDir()
 
         println "Native libraries installed successfully!"
     }
