@@ -76,7 +76,8 @@ class MemoryService {
         return LLMFramework.mlx;
       case 'tensorflowlite':
       case 'tensorflow lite':
-        return LLMFramework.tensorFlowLite;
+      case 'tflite':
+        return LLMFramework.tensorflowLite;
       default:
         return LLMFramework.foundationModels;
     }
@@ -113,7 +114,7 @@ class MemoryService {
   int _calculateTargetMemory(MemoryPressureLevel level) {
     final currentUsage = getCurrentMemoryUsage();
     final available = getAvailableMemory();
-    
+
     switch (level) {
       case MemoryPressureLevel.warning:
         final target = _memoryThreshold - available;
@@ -240,4 +241,3 @@ class MemoryLoadedModel {
     required this.framework,
   });
 }
-
