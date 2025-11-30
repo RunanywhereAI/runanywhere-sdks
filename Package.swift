@@ -41,10 +41,18 @@ let package = Package(
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.5.0"),
     ],
     targets: [
+        // RunAnywhereCore binary (C++ core library)
+        .binaryTarget(
+            name: "RunAnywhereCore",
+            url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+            checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
+        ),
+
         // Core SDK target
         .target(
             name: "RunAnywhere",
             dependencies: [
+                "RunAnywhereCore",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Alamofire", package: "Alamofire"),
                 .product(name: "Files", package: "Files"),

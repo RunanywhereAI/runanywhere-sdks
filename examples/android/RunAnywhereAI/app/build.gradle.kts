@@ -122,18 +122,18 @@ android {
         }
 
         jniLibs {
-            useLegacyPackaging = false
-            // Handle duplicate native libraries from runanywhere-core modules
-            // Both llamacpp and onnx modules may include shared core libraries
+            // Use legacy packaging to extract libraries to filesystem
+            // This helps with symbol resolution for transitive dependencies
+            useLegacyPackaging = true
+            // Handle duplicate native libraries when using multiple backend modules
+            // Both llamacpp and onnx modules include shared JNI bridge libs
             pickFirsts += listOf(
                 "lib/arm64-v8a/librunanywhere_bridge.so",
                 "lib/arm64-v8a/librunanywhere_jni.so",
+                "lib/arm64-v8a/libc++_shared.so",
                 "lib/armeabi-v7a/librunanywhere_bridge.so",
                 "lib/armeabi-v7a/librunanywhere_jni.so",
-                "lib/x86/librunanywhere_bridge.so",
-                "lib/x86/librunanywhere_jni.so",
-                "lib/x86_64/librunanywhere_bridge.so",
-                "lib/x86_64/librunanywhere_jni.so"
+                "lib/armeabi-v7a/libc++_shared.so"
             )
         }
     }
@@ -198,12 +198,15 @@ android {
 
 dependencies {
     // ========================================
-    // SDK Dependencies (Local Modules)
+    // SDK Dependencies
     // ========================================
+    // Main SDK - high-level APIs, download, routing (no native libs)
     implementation(project(":sdk:runanywhere-kotlin"))
-    // Using runanywhere-core-llamacpp which includes chat template support (fixes Qwen/LFM2)
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp"))
-    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))
+
+    // Backend modules - each is SELF-CONTAINED with all native libs
+    // Pick the backends you need:
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-llamacpp"))  // ~45MB - LLM text generation
+    implementation(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-onnx"))      // ~30MB - STT, TTS, VAD
 
     // ========================================
     // AndroidX Core & Lifecycle

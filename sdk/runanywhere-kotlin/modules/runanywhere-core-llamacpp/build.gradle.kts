@@ -56,6 +56,26 @@ val jniLibsDir = file("src/main/jniLibs")
 val downloadedLibsDir = file("build/downloaded-libs")
 
 // =============================================================================
+// Project Path Resolution
+// =============================================================================
+// When included as a subproject in composite builds (e.g., from example app),
+// the module path changes. This function resolves the correct path for sibling modules.
+fun resolveModulePath(moduleName: String): String {
+    // Try to find the module with different path prefixes
+    val possiblePaths = listOf(
+        ":modules:$moduleName",                           // When building SDK directly
+        ":sdk:runanywhere-kotlin:modules:$moduleName",    // When included from example app
+    )
+    for (path in possiblePaths) {
+        if (project.findProject(path) != null) {
+            return path
+        }
+    }
+    // Default to the most common path
+    return ":modules:$moduleName"
+}
+
+// =============================================================================
 // Kotlin Multiplatform Configuration
 // =============================================================================
 
@@ -94,7 +114,7 @@ kotlin {
             dependsOn(commonMain)
             dependencies {
                 // Use shared JNI bridge from the jni module
-                api(project(":modules:runanywhere-core-jni"))
+                api(project(resolveModulePath("runanywhere-core-jni")))
             }
         }
 
