@@ -273,11 +273,10 @@ class SettingsViewModel : ViewModel() {
             // await storageViewModel.deleteModel(model.id)
 
             _uiState.update { state ->
+                val filteredModels = state.downloadedModels.filter { it.id != modelId }
                 state.copy(
-                    downloadedModels = state.downloadedModels.filter { it.id != modelId },
-                    modelStorageSize = state.downloadedModels
-                        .filter { it.id != modelId }
-                        .sumOf { it.size }
+                    downloadedModels = filteredModels,
+                    modelStorageSize = filteredModels.sumOf { it.size }
                 )
             }
         }
