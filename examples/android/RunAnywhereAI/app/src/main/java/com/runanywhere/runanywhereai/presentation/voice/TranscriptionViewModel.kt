@@ -122,6 +122,9 @@ class TranscriptionViewModel(application: Application) : AndroidViewModel(applic
                 // Update whisper model display name
                 updateWhisperModelName()
 
+                // Start observing SDK events
+                observeSDKEvents()
+
                 _currentStatus.value = "Ready (FluidAudio)"
                 _isInitialized.value = true
 
