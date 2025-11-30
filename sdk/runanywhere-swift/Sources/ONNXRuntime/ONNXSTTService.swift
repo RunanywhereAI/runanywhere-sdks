@@ -1,6 +1,6 @@
 import Foundation
 import RunAnywhere
-import CRunAnywhereONNX  // C wrapper module
+import CRunAnywhereCore  // C bridge for unified RunAnywhereCore xcframework
 
 /// ONNX Runtime implementation of STTService for speech-to-text
 /// Uses the unified RunAnywhere backend API

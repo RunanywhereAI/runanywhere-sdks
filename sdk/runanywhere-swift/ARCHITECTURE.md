@@ -15,7 +15,7 @@ The RunAnywhere Swift SDK is a modular, multi-backend AI SDK for iOS/macOS that 
 │  RunAnywhere          │ Core SDK (required base)                │
 │  RunAnywhereONNX      │ ONNX Runtime backend (STT, TTS, VAD)    │
 │  RunAnywhereWhisperKit│ CoreML-based STT (WhisperKit)           │
-│  RunAnywhereLLM       │ llama.cpp backend (GGUF models)         │
+│  RunAnywhereLlamaCPP  │ llama.cpp backend (GGUF models)         │
 │  RunAnywhereAppleAI   │ Apple Intelligence (iOS 26+)            │
 │  RunAnywhereFluidAudio│ Speaker diarization                     │
 └─────────────────────────────────────────────────────────────────┘
@@ -44,8 +44,8 @@ Sources/
 │       └── DependencyInjection/      # Service container
 ├── ONNXRuntime/                      # ONNX Backend
 ├── WhisperKitTranscription/          # WhisperKit Backend
-├── LLMSwift/                         # llama.cpp Backend
-└── CRunAnywhereONNX/                 # C Bridge Headers
+├── LlamaCPPRuntime/                  # llama.cpp Backend
+└── CRunAnywhereCore/                 # C Bridge Headers
 ```
 
 ---
@@ -54,30 +54,37 @@ Sources/
 
 ### Binary Target in Package.swift
 
+The SDK now uses remote XCFramework distribution from the [runanywhere-binaries](https://github.com/RunanywhereAI/runanywhere-binaries) repository. This eliminates the need for local builds and ensures consistent binary versions across all SDK consumers.
+
 ```swift
 .binaryTarget(
-    name: "RunAnywhereONNXBinary",
-    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.xxx/RunAnywhereONNX.xcframework.zip",
-    checksum: "62b2887a6d53360ed8d96a5080a98419d3c486f6be94bfe5e9f82415bb6a1fbe"
+    name: "RunAnywhereCoreBinary",
+    url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
+    checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
 )
 ```
 
+The unified `RunAnywhereCore.xcframework` includes both ONNX Runtime and LlamaCPP backends. Swift Package Manager automatically downloads and caches the binary during package resolution.
+
 ### C Bridge Layer
 
-The `CRunAnywhereONNX` target provides Swift-compatible headers:
+The `CRunAnywhereCore` target provides Swift-compatible headers for accessing the native C++ library:
 
 ```
-Sources/CRunAnywhereONNX/
-├── module.modulemap        # Swift module definition
-├── onnx_bridge_wrapper.h   # Bridge wrapper
-└── types.h                 # Common types from runanywhere-core
+Sources/CRunAnywhereCore/
+├── include/
+│   ├── module.modulemap        # Swift module definition
+│   ├── ra_core.h               # Core API definitions
+│   ├── ra_types.h              # Common types
+│   ├── ra_onnx_bridge.h        # ONNX Runtime bridge
+│   └── ra_llamacpp_bridge.h    # LlamaCPP bridge
 ```
 
 **module.modulemap:**
 ```modulemap
-module CRunAnywhereONNX {
-    header "onnx_bridge_wrapper.h"
-    header "types.h"
+module CRunAnywhereCore {
+    header "ra_types.h"
+    header "ra_onnx_bridge.h"
     export *
 }
 ```
@@ -86,7 +93,7 @@ module CRunAnywhereONNX {
 
 ```swift
 // Import the C module
-import CRunAnywhereONNX
+import CRunAnywhereCore
 
 class ONNXSTTService: STTService {
     private var backendHandle: ra_backend_handle?
@@ -447,7 +454,7 @@ public final class VoiceAgentComponent: BaseComponent {
 |--------|-----------|---------|
 | ONNX | `.onnx` | ONNX Runtime |
 | CoreML | `.mlmodel`, `.mlpackage` | WhisperKit, CoreML |
-| GGUF | `.gguf` | LLM.swift (llama.cpp) |
+| GGUF | `.gguf` | LlamaCPP Runtime |
 | TFLite | `.tflite` | TensorFlow Lite |
 
 ### Model Discovery & Loading
@@ -465,25 +472,19 @@ let sttService = ModuleRegistry.shared.sttProvider(for: "whisper-base-onnx")
 
 ---
 
-## LlamaCPP Integration (LLM.swift)
+## LlamaCPP Integration
 
-### Package Dependency
-
-```swift
-.package(url: "https://github.com/eastriverlee/LLM.swift", from: "2.0.1")
-```
-
-### LLMSwift Adapter
+### LlamaCPP Adapter
 
 ```swift
-public final class LLMSwiftAdapter: UnifiedFrameworkAdapter {
+public final class LlamaCPPCoreAdapter: UnifiedFrameworkAdapter {
     public var framework: LLMFramework { .llamaCpp }
     public var supportedModalities: Set<FrameworkModality> { [.textToText] }
     public var supportedFormats: [ModelFormat] { [.gguf, .ggml] }
 
     public func createService(for modality: FrameworkModality) -> Any? {
         guard modality == .textToText else { return nil }
-        return LLMSwiftService()
+        return LlamaCPPService()
     }
 }
 ```
