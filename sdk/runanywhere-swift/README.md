@@ -57,9 +57,9 @@ Add RunAnywhere to your project directly from GitHub - no package registry neede
    - **Specific Version**: Choose **Exact** and enter `0.15.2`
    - **Development Branch**: Choose **Branch** and enter `main`
 4. Select products based on your needs:
-   - `RunAnywhere` - Core SDK (required)
-   - `RunAnywhereLlamaCPP` - GGUF/GGML models (optional, iOS 16+)
-   - `RunAnywhereWhisperKit` - Speech-to-text (optional, iOS 16+)
+   - `RunAnywhere` - Core SDK (required, iOS 17+)
+   - `RunAnywhereLlamaCPP` - GGUF/GGML models (optional, iOS 17+)
+   - `RunAnywhereWhisperKit` - Speech-to-text (optional, iOS 17+)
    - `RunAnywhereFluidAudio` - Speaker diarization (optional, iOS 17+)
 5. Click **Add Package**
 

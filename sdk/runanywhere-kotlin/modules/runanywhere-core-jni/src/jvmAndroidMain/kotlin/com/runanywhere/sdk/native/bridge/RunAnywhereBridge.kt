@@ -103,7 +103,9 @@ object RunAnywhereBridge {
 
     /**
      * Check if a specific backend is loaded.
+     * Thread-safe via @Synchronized to match loadBackend().
      */
+    @Synchronized
     fun isBackendLoaded(backend: String): Boolean = loadedBackends.contains(backend.lowercase())
 
     // =============================================================================

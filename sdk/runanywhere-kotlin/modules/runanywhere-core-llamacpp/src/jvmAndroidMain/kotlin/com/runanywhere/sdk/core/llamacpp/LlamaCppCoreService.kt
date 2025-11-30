@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.channels.awaitClose
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * LlamaCPP implementation of text generation via RunAnywhere Core.
@@ -42,7 +43,11 @@ import kotlinx.coroutines.channels.awaitClose
  * ```
  */
 class LlamaCppCoreService {
-    private var backendHandle: Long = 0
+    /**
+     * Backend handle stored as AtomicLong for thread-safe reads.
+     * Writes are still protected by mutex, but reads can safely happen without locking.
+     */
+    private val backendHandle = AtomicLong(0L)
     private val mutex = Mutex()
 
     init {
@@ -67,28 +72,29 @@ class LlamaCppCoreService {
     suspend fun initialize(configJson: String? = null) {
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                if (backendHandle != 0L) {
+                if (backendHandle.get() != 0L) {
                     // Already initialized
                     return@withContext
                 }
 
                 // Create backend
-                backendHandle = RunAnywhereBridge.nativeCreateBackend("llamacpp")
-                if (backendHandle == 0L) {
+                val handle = RunAnywhereBridge.nativeCreateBackend("llamacpp")
+                if (handle == 0L) {
                     throw NativeBridgeException(
                         NativeResultCode.ERROR_INIT_FAILED,
                         "Failed to create LlamaCPP backend"
                     )
                 }
+                backendHandle.set(handle)
 
                 // Initialize backend
                 val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
+                    RunAnywhereBridge.nativeInitialize(handle, configJson)
                 )
                 if (!result.isSuccess) {
                     val error = RunAnywhereBridge.nativeGetLastError()
-                    RunAnywhereBridge.nativeDestroy(backendHandle)
-                    backendHandle = 0
+                    RunAnywhereBridge.nativeDestroy(handle)
+                    backendHandle.set(0L)
                     throw NativeBridgeException(result, error.ifEmpty { "Initialization failed" })
                 }
             }
@@ -97,45 +103,57 @@ class LlamaCppCoreService {
 
     /**
      * Check if the backend is initialized.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     val isInitialized: Boolean
-        get() = backendHandle != 0L && RunAnywhereBridge.nativeIsInitialized(backendHandle)
+        get() {
+            val handle = backendHandle.get()
+            return handle != 0L && RunAnywhereBridge.nativeIsInitialized(handle)
+        }
 
     /**
      * Get supported capabilities.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     val supportedCapabilities: List<NativeCapability>
         get() {
-            if (backendHandle == 0L) return emptyList()
-            return RunAnywhereBridge.nativeGetCapabilities(backendHandle)
+            val handle = backendHandle.get()
+            if (handle == 0L) return emptyList()
+            return RunAnywhereBridge.nativeGetCapabilities(handle)
                 .toList()
                 .mapNotNull { NativeCapability.fromValue(it) }
         }
 
     /**
      * Check if a specific capability is supported.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     fun supportsCapability(capability: NativeCapability): Boolean {
-        if (backendHandle == 0L) return false
-        return RunAnywhereBridge.nativeSupportsCapability(backendHandle, capability.value)
+        val handle = backendHandle.get()
+        if (handle == 0L) return false
+        return RunAnywhereBridge.nativeSupportsCapability(handle, capability.value)
     }
 
     /**
      * Get device type being used.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     val deviceType: NativeDeviceType
         get() {
-            if (backendHandle == 0L) return NativeDeviceType.CPU
-            return NativeDeviceType.fromValue(RunAnywhereBridge.nativeGetDevice(backendHandle))
+            val handle = backendHandle.get()
+            if (handle == 0L) return NativeDeviceType.CPU
+            return NativeDeviceType.fromValue(RunAnywhereBridge.nativeGetDevice(handle))
         }
 
     /**
      * Get current memory usage in bytes.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     val memoryUsage: Long
         get() {
-            if (backendHandle == 0L) return 0
-            return RunAnywhereBridge.nativeGetMemoryUsage(backendHandle)
+            val handle = backendHandle.get()
+            if (handle == 0L) return 0
+            return RunAnywhereBridge.nativeGetMemoryUsage(handle)
         }
 
     /**
@@ -145,9 +163,10 @@ class LlamaCppCoreService {
     suspend fun destroy() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                if (backendHandle != 0L) {
-                    RunAnywhereBridge.nativeDestroy(backendHandle)
-                    backendHandle = 0L
+                val handle = backendHandle.get()
+                if (handle != 0L) {
+                    RunAnywhereBridge.nativeDestroy(handle)
+                    backendHandle.set(0L)
                 }
             }
         }
@@ -171,8 +190,9 @@ class LlamaCppCoreService {
         withContext(Dispatchers.IO) {
             mutex.withLock {
                 ensureInitialized()
+                val handle = backendHandle.get()
                 val result = NativeResultCode.fromValue(
-                    RunAnywhereBridge.nativeTextLoadModel(backendHandle, modelPath, configJson)
+                    RunAnywhereBridge.nativeTextLoadModel(handle, modelPath, configJson)
                 )
                 if (!result.isSuccess) {
                     throw NativeBridgeException(result, RunAnywhereBridge.nativeGetLastError())
@@ -183,9 +203,13 @@ class LlamaCppCoreService {
 
     /**
      * Check if a model is loaded.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     val isModelLoaded: Boolean
-        get() = backendHandle != 0L && RunAnywhereBridge.nativeTextIsModelLoaded(backendHandle)
+        get() {
+            val handle = backendHandle.get()
+            return handle != 0L && RunAnywhereBridge.nativeTextIsModelLoaded(handle)
+        }
 
     /**
      * Unload the current model.
@@ -193,8 +217,9 @@ class LlamaCppCoreService {
     suspend fun unloadModel() {
         withContext(Dispatchers.IO) {
             mutex.withLock {
-                if (backendHandle != 0L) {
-                    RunAnywhereBridge.nativeTextUnloadModel(backendHandle)
+                val handle = backendHandle.get()
+                if (handle != 0L) {
+                    RunAnywhereBridge.nativeTextUnloadModel(handle)
                 }
             }
         }
@@ -234,8 +259,9 @@ class LlamaCppCoreService {
             mutex.withLock {
                 ensureInitialized()
                 ensureModelLoaded()
+                val handle = backendHandle.get()
                 val jsonResponse = RunAnywhereBridge.nativeTextGenerate(
-                    backendHandle,
+                    handle,
                     prompt,
                     systemPrompt,
                     maxTokens,
@@ -328,15 +354,17 @@ class LlamaCppCoreService {
         } catch (e: Exception) {
             close(e)
         }
-        awaitClose { cancel() }
+        awaitClose { }
     }
 
     /**
      * Cancel ongoing text generation.
+     * Thread-safe: uses AtomicLong for lock-free read.
      */
     fun cancel() {
-        if (backendHandle != 0L) {
-            RunAnywhereBridge.nativeTextCancel(backendHandle)
+        val handle = backendHandle.get()
+        if (handle != 0L) {
+            RunAnywhereBridge.nativeTextCancel(handle)
         }
     }
 
@@ -345,7 +373,7 @@ class LlamaCppCoreService {
     // =============================================================================
 
     private fun ensureInitialized() {
-        if (backendHandle == 0L) {
+        if (backendHandle.get() == 0L) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_HANDLE,
                 "Backend not initialized. Call initialize() first."
@@ -354,7 +382,8 @@ class LlamaCppCoreService {
     }
 
     private fun ensureModelLoaded() {
-        if (!RunAnywhereBridge.nativeTextIsModelLoaded(backendHandle)) {
+        val handle = backendHandle.get()
+        if (!RunAnywhereBridge.nativeTextIsModelLoaded(handle)) {
             throw NativeBridgeException(
                 NativeResultCode.ERROR_INVALID_PARAMS,
                 "No model loaded. Call loadModel() first."

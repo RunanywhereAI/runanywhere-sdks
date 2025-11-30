@@ -198,11 +198,10 @@ class StorageViewModel(application: Application) : AndroidViewModel(application)
                 // iOS equivalent: try await RunAnywhere.deleteStoredModel(modelId)
 
                 _uiState.update { state ->
+                    val filteredModels = state.storedModels.filter { it.id != modelId }
                     state.copy(
-                        storedModels = state.storedModels.filter { it.id != modelId },
-                        modelStorageSize = state.storedModels
-                            .filter { it.id != modelId }
-                            .sumOf { it.size }
+                        storedModels = filteredModels,
+                        modelStorageSize = filteredModels.sumOf { it.size }
                     )
                 }
                 refreshData()
