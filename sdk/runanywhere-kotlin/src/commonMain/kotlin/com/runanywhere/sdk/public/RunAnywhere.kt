@@ -5,6 +5,7 @@ import com.runanywhere.sdk.data.models.SDKEnvironment
 import com.runanywhere.sdk.data.models.SDKError
 import com.runanywhere.sdk.data.models.SDKInitParams
 import com.runanywhere.sdk.events.EventBus
+import com.runanywhere.sdk.events.SDKModelEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.ServiceContainer
 import com.runanywhere.sdk.generation.StructuredOutputHandler
@@ -153,6 +154,40 @@ interface RunAnywhereSDK {
      */
     val currentModel: ModelInfo?
 
+    // MARK: - STT/TTS Model Management (matching iOS)
+
+    /**
+     * Load an STT (Speech-to-Text) model by ID.
+     * This initializes the STT component and loads the model into memory.
+     * Matches iOS: public static func loadSTTModel(_ modelId: String) async throws
+     *
+     * @param modelId The model identifier (e.g., "whisper-base", "whisper-small")
+     */
+    suspend fun loadSTTModel(modelId: String)
+
+    /**
+     * Get the currently loaded STT component.
+     * Returns null if no STT model is loaded.
+     * Matches iOS: public static var loadedSTTComponent: STTComponent?
+     */
+    val loadedSTTComponent: com.runanywhere.sdk.components.stt.STTComponent?
+
+    /**
+     * Load a TTS (Text-to-Speech) model by ID.
+     * This initializes the TTS component and loads the model into memory.
+     * Matches iOS: public static func loadTTSModel(_ modelId: String) async throws
+     *
+     * @param modelId The model identifier (voice name)
+     */
+    suspend fun loadTTSModel(modelId: String)
+
+    /**
+     * Get the currently loaded TTS component.
+     * Returns null if no TTS model is loaded.
+     * Matches iOS: public static var loadedTTSComponent: TTSComponent?
+     */
+    val loadedTTSComponent: com.runanywhere.sdk.components.TTSComponent?
+
     // MARK: - Component Management
 
     /**
@@ -209,6 +244,18 @@ interface RunAnywhereSDK {
      */
     suspend fun updateRoutingPolicy(policy: com.runanywhere.sdk.public.extensions.RoutingPolicy)
 
+    // MARK: - Token Utilities
+
+    /**
+     * Estimate the number of tokens in the given text.
+     * This is a heuristic approach until we integrate actual tokenizers.
+     * Matches iOS: public static func estimateTokenCount(_ text: String) -> Int
+     *
+     * @param text The text to analyze
+     * @return Estimated number of tokens
+     */
+    fun estimateTokenCount(text: String): Int
+
     // MARK: - Lifecycle
 
     suspend fun cleanup()
@@ -238,6 +285,11 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     // MARK: - Current Model Tracking (matches Swift SDK)
 
     private var _currentModel: ModelInfo? = null
+
+    // MARK: - STT/TTS Component Tracking (matches Swift SDK)
+
+    private var _loadedSTTComponent: com.runanywhere.sdk.components.stt.STTComponent? = null
+    private var _loadedTTSComponent: com.runanywhere.sdk.components.TTSComponent? = null
 
     /**
      * Get current device ID (for analytics and tracking)
@@ -1323,6 +1375,100 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
         }
     }
 
+    // MARK: - STT/TTS Model Loading (matching iOS)
+
+    /**
+     * Get the currently loaded STT component
+     * Matches iOS: public static var loadedSTTComponent: STTComponent?
+     */
+    override val loadedSTTComponent: com.runanywhere.sdk.components.stt.STTComponent?
+        get() = _loadedSTTComponent
+
+    /**
+     * Get the currently loaded TTS component
+     * Matches iOS: public static var loadedTTSComponent: TTSComponent?
+     */
+    override val loadedTTSComponent: com.runanywhere.sdk.components.TTSComponent?
+        get() = _loadedTTSComponent
+
+    /**
+     * Load an STT (Speech-to-Text) model by ID.
+     * This initializes the STT component and loads the model into memory.
+     * Matches iOS: public static func loadSTTModel(_ modelId: String) async throws
+     *
+     * @param modelId The model identifier (e.g., "whisper-base", "whisper-small")
+     */
+    override suspend fun loadSTTModel(modelId: String) {
+        requireInitialized()
+
+        EventBus.publish(SDKModelEvent.LoadStarted(modelId))
+
+        try {
+            // Get model info for lifecycle tracking
+            val modelInfo = serviceContainer.modelRegistry?.getModel(modelId)
+            val modelName = modelInfo?.name ?: modelId
+
+            logger.info("Loading STT model: $modelName ($modelId)")
+
+            // Create STT configuration
+            val sttConfig = com.runanywhere.sdk.components.stt.STTConfiguration(modelId = modelId)
+
+            // Create and initialize STT component
+            val sttComponent = com.runanywhere.sdk.components.stt.STTComponent(sttConfig)
+            sttComponent.initialize()
+
+            // Store the component for later use
+            _loadedSTTComponent = sttComponent
+
+            logger.info("✅ STT model loaded successfully: $modelName")
+            EventBus.publish(SDKModelEvent.LoadCompleted(modelId))
+
+        } catch (e: Exception) {
+            logger.error("Failed to load STT model: $modelId", e)
+            EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
+            throw SDKError.ModelLoadingFailed("Failed to load STT model: ${e.message}")
+        }
+    }
+
+    /**
+     * Load a TTS (Text-to-Speech) model by ID.
+     * This initializes the TTS component and loads the model into memory.
+     * Matches iOS: public static func loadTTSModel(_ modelId: String) async throws
+     *
+     * @param modelId The model identifier (voice name)
+     */
+    override suspend fun loadTTSModel(modelId: String) {
+        requireInitialized()
+
+        EventBus.publish(SDKModelEvent.LoadStarted(modelId))
+
+        try {
+            // Get model info for lifecycle tracking
+            val modelInfo = serviceContainer.modelRegistry?.getModel(modelId)
+            val modelName = modelInfo?.name ?: modelId
+
+            logger.info("Loading TTS model: $modelName ($modelId)")
+
+            // Create TTS configuration
+            val ttsConfig = com.runanywhere.sdk.components.TTSConfiguration(modelId = modelId)
+
+            // Create and initialize TTS component
+            val ttsComponent = com.runanywhere.sdk.components.TTSComponent(ttsConfig)
+            ttsComponent.initialize()
+
+            // Store the component for later use
+            _loadedTTSComponent = ttsComponent
+
+            logger.info("✅ TTS model loaded successfully: $modelName")
+            EventBus.publish(SDKModelEvent.LoadCompleted(modelId))
+
+        } catch (e: Exception) {
+            logger.error("Failed to load TTS model: $modelId", e)
+            EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
+            throw SDKError.ModelLoadingFailed("Failed to load TTS model: ${e.message}")
+        }
+    }
+
     /**
      * Initialize components
      */
@@ -1393,6 +1539,20 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
     override suspend fun updateRoutingPolicy(policy: com.runanywhere.sdk.public.extensions.RoutingPolicy) {
         requireInitialized()
         // Extension functions not implemented yet
+    }
+
+    // MARK: - Token Utilities
+
+    /**
+     * Estimate the number of tokens in the given text.
+     * This is a heuristic approach until we integrate actual tokenizers.
+     * Matches iOS: public static func estimateTokenCount(_ text: String) -> Int
+     *
+     * @param text The text to analyze
+     * @return Estimated number of tokens
+     */
+    override fun estimateTokenCount(text: String): Int {
+        return com.runanywhere.sdk.generation.TokenCounter.estimateTokenCount(text)
     }
 
     protected fun requireInitialized() {

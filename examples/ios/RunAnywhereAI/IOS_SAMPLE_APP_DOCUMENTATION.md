@@ -303,7 +303,7 @@ RunAnywhere iOS Sample App is a comprehensive demonstration of the RunAnywhere S
   - Total/available memory
   - Neural Engine indicator
 - Available frameworks section:
-  - LLMSwift (llama.cpp/GGUF)
+  - LlamaCPPRuntime (llama.cpp/GGUF)
   - WhisperKit (Speech-to-Text)
   - Foundation Models (iOS 26+)
   - Framework expansion disclosure
@@ -326,7 +326,7 @@ RunAnywhere iOS Sample App is a comprehensive demonstration of the RunAnywhere S
 
 **User Flow:**
 1. User taps model selection in chat
-2. View available frameworks (LLMSwift, WhisperKit, Foundation)
+2. View available frameworks (LlamaCPPRuntime, WhisperKit, Foundation)
 3. Expand framework to see models
 4. Check device compatibility (memory, chip)
 5. Tap download for desired model
@@ -445,7 +445,7 @@ let model = RunAnywhere.currentModel
 ```swift
 // Register framework with models (in RunAnywhereAIApp.swift)
 try await RunAnywhere.registerFrameworkAdapter(
-    LLMSwiftAdapter(),
+    LlamaCPPCoreAdapter(),
     models: [
         ModelRegistration(
             url: "https://huggingface.co/...",
@@ -474,7 +474,7 @@ try await RunAnywhere.deleteModel(modelId)
 ```
 
 **How It Uses SDK:**
-1. App startup registers adapters (LLMSwift, WhisperKit, Foundation)
+1. App startup registers adapters (LlamaCPPRuntime, WhisperKit, Foundation)
 2. Provides custom model URLs in development mode
 3. Lists available frameworks via `getAvailableFrameworks()`
 4. Lists models per framework via `listAvailableModels()`
@@ -751,7 +751,7 @@ Located in `RunAnywhereAIApp.swift` - `initializeSDK()` method (lines 66-139)
 
 ```swift
 import RunAnywhere
-import LLMSwift
+import LlamaCPPRuntime
 import WhisperKitTranscription
 import FluidAudioDiarization
 
@@ -776,7 +776,7 @@ try RunAnywhere.initialize(
 3. Calls `initializeSDK()` in `.task` modifier
 4. Determines environment (DEBUG = dev, RELEASE = prod)
 5. Initializes RunAnywhere SDK
-6. Registers framework adapters (LLMSwift, WhisperKit, Foundation)
+6. Registers framework adapters (LlamaCPPRuntime, WhisperKit, Foundation)
 7. Registers custom models in dev mode
 8. Sets `isSDKInitialized = true`
 9. Displays `ContentView` when ready
@@ -868,9 +868,9 @@ class KeychainService {
 
 **Model Registration (Development Mode):**
 ```swift
-// Register LLMSwift with custom GGUF models
+// Register LlamaCPP with custom GGUF models
 try await RunAnywhere.registerFrameworkAdapter(
-    LLMSwiftAdapter(),
+    LlamaCPPCoreAdapter(),
     models: [
         // SmolLM2 360M - smallest and fastest
         ModelRegistration(
@@ -923,7 +923,7 @@ try await RunAnywhere.registerFrameworkAdapter(
 ```
 
 **Registered Models in Development:**
-1. **LLMSwift (llama.cpp/GGUF):**
+1. **LlamaCPPRuntime (llama.cpp/GGUF):**
    - SmolLM2 360M Q8_0 (~500MB)
    - Qwen 2.5 0.5B Q6_K (~600MB)
    - Llama 3.2 1B Q6_K (~1.2GB)
@@ -1645,9 +1645,9 @@ idevicesyslog | grep "com.runanywhere"
    - Local package: `../../sdk/runanywhere-swift/`
    - On-device AI platform SDK
 
-2. **LLMSwift** - Language Model Integration
-   - Local package: `../../sdk/llm-swift/`
-   - llama.cpp wrapper for GGUF models
+2. **RunAnywhereLlamaCPP** - Language Model Integration
+   - Local package: `../../sdk/runanywhere-swift/` (product: RunAnywhereLlamaCPP)
+   - llama.cpp wrapper for GGUF models via RunAnywhereCore
 
 3. **WhisperKitTranscription** - Speech-to-Text
    - Local package: `../../sdk/whisperkit-transcription/`
@@ -1667,8 +1667,8 @@ idevicesyslog | grep "com.runanywhere"
    - Multiple backends: CoreML, MPS, XNNPACK
    - Kernels: custom, optimized, quantized
 
-8. **LLM** (from LLMSwift)
-   - Language model interface
+8. **LlamaCPPRuntime** (internal module within RunAnywhere)
+   - Language model interface for GGUF inference
 
 ### CocoaPods Dependencies
 
@@ -1695,7 +1695,7 @@ idevicesyslog | grep "com.runanywhere"
 - os - Unified logging
 
 **Third-Party:**
-- llama.cpp (via LLMSwift) - GGUF model inference
+- RunAnywhereCore (unified C++ backend) - ONNX + LlamaCPP inference
 - WhisperKit - Speech-to-text
 - FluidAudio - Audio processing
 - ExecuTorch - ML backends
@@ -1814,7 +1814,7 @@ open RunAnywhereAI.xcworkspace
 - Fix: Run `./fix_pods_sandbox.sh` after `pod install`
 
 **Swift Macro Fingerprint:**
-- LLMSwift uses macros
+- LlamaCPPRuntime uses macros
 - May need: `defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES`
 
 **CocoaPods Resources:**

@@ -37,7 +37,6 @@ data class ChatUiState(
  * Enhanced ChatViewModel matching iOS ChatViewModel functionality
  * Includes streaming, thinking mode, analytics, and conversation management
  */
-// @HiltViewModel
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as RunAnywhereApplication

@@ -124,7 +124,7 @@ class RunAnywhereApplication : Application() {
     }
 
     /**
-     * Register Service Providers (matches iOS LLMSwiftServiceProvider.register())
+     * Register Service Providers (matches iOS LlamaCPPServiceProvider.register())
      * This is Step 1 of the two-tier registration pattern:
      * 1. Register service providers with ModuleRegistry
      * 2. Register models with their framework associations
@@ -156,7 +156,7 @@ class RunAnywhereApplication : Application() {
         Log.i("RunAnywhereApp", "📦 Registering models for DEVELOPMENT mode")
 
         return try {
-            // Register LLM models (matches iOS LLMSwift models)
+            // Register LLM models (matches iOS LlamaCPPRuntime models)
             // Note: In Kotlin SDK, addModelFromURL automatically registers the model
 
             // SmolLM2 360M - smallest and fastest

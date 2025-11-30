@@ -88,6 +88,7 @@ public struct DeviceRegistrationInfo: Codable {
     let coreCount: Int
     let deviceModel: String
     let deviceName: String?
+    let deviceUUID: String  // Persistent device identifier to prevent duplicate registrations
     let efficiencyCores: Int?
     let formFactor: String
     let gpuFamily: String?
@@ -108,6 +109,7 @@ public struct DeviceRegistrationInfo: Codable {
         case coreCount = "core_count"
         case deviceModel = "device_model"
         case deviceName = "device_name"
+        case deviceUUID = "device_uuid"
         case efficiencyCores = "efficiency_cores"
         case formFactor = "form_factor"
         case gpuFamily = "gpu_family"
