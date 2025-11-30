@@ -229,7 +229,7 @@ class LlamaCppCoreService {
             mutex.withLock {
                 ensureInitialized()
                 ensureModelLoaded()
-                RunAnywhereBridge.nativeTextGenerate(
+                val jsonResponse = RunAnywhereBridge.nativeTextGenerate(
                     backendHandle,
                     prompt,
                     systemPrompt,
@@ -239,7 +239,36 @@ class LlamaCppCoreService {
                     NativeResultCode.ERROR_INFERENCE_FAILED,
                     RunAnywhereBridge.nativeGetLastError()
                 )
+
+                // Parse JSON response and extract text field
+                // Response format: {"finish_reason":"stop","inference_time_ms":256.0,"text":"...","tokens_generated":9}
+                parseTextFromResponse(jsonResponse)
             }
+        }
+    }
+
+    /**
+     * Parse the JSON response from native layer and extract the text field.
+     */
+    private fun parseTextFromResponse(jsonResponse: String): String {
+        return try {
+            // Simple JSON parsing - extract "text" field value
+            val textRegex = """"text"\s*:\s*"((?:[^"\\]|\\.)*)"""".toRegex()
+            val match = textRegex.find(jsonResponse)
+            if (match != null) {
+                // Unescape the JSON string
+                match.groupValues[1]
+                    .replace("\\n", "\n")
+                    .replace("\\t", "\t")
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+            } else {
+                // If parsing fails, return the raw response (backward compatibility)
+                jsonResponse
+            }
+        } catch (e: Exception) {
+            // If any error, return raw response
+            jsonResponse
         }
     }
 

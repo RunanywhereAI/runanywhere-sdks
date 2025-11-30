@@ -29,23 +29,24 @@ object RunAnywhereBridge {
      * Load the core JNI bridge library. Must be called before any other methods.
      * This is idempotent - calling it multiple times is safe.
      *
-     * This loads only the JNI and bridge libraries. Backend-specific libraries
-     * should be loaded separately via loadBackend().
+     * NOTE: The JNI library was built with dependencies on ONNX libraries.
+     * Let Android's linker resolve all dependencies automatically - do NOT
+     * manually pre-load libraries with System.loadLibrary as this creates
+     * namespace isolation issues where transitive dependencies can't find symbols.
+     *
+     * Android's linker will automatically load: libc++_shared.so, libonnxruntime.so,
+     * libsherpa-onnx-c-api.so, librunanywhere_bridge.so, librunanywhere_onnx.so
+     * all from the APK's lib folder when loading librunanywhere_jni.so.
      */
     @Synchronized
     fun loadLibrary() {
         if (isLibraryLoaded) return
 
         try {
-            // Load the JNI bridge library
+            // Load ONLY the JNI library - let Android linker resolve all dependencies
+            // from the APK's lib folder automatically. Do NOT pre-load individual
+            // libraries as this causes namespace isolation issues.
             System.loadLibrary("runanywhere_jni")
-
-            // Load the C API bridge library
-            try {
-                System.loadLibrary("runanywhere_bridge")
-            } catch (e: UnsatisfiedLinkError) {
-                // May already be loaded or linked statically
-            }
 
             isLibraryLoaded = true
         } catch (e: UnsatisfiedLinkError) {
