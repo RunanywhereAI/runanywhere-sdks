@@ -1645,9 +1645,9 @@ idevicesyslog | grep "com.runanywhere"
    - Local package: `../../sdk/runanywhere-swift/`
    - On-device AI platform SDK
 
-2. **LlamaCPPRuntime** - Language Model Integration
-   - Local package: `../../sdk/runanywhere-swift/Sources/LlamaCPPRuntime`
-   - llama.cpp wrapper for GGUF models
+2. **RunAnywhereLlamaCPP** - Language Model Integration
+   - Local package: `../../sdk/runanywhere-swift/` (product: RunAnywhereLlamaCPP)
+   - llama.cpp wrapper for GGUF models via RunAnywhereCore
 
 3. **WhisperKitTranscription** - Speech-to-Text
    - Local package: `../../sdk/whisperkit-transcription/`
@@ -1667,8 +1667,8 @@ idevicesyslog | grep "com.runanywhere"
    - Multiple backends: CoreML, MPS, XNNPACK
    - Kernels: custom, optimized, quantized
 
-8. **LLM** (from LlamaCPPRuntime)
-   - Language model interface
+8. **LlamaCPPRuntime** (internal module within RunAnywhere)
+   - Language model interface for GGUF inference
 
 ### CocoaPods Dependencies
 
@@ -1695,7 +1695,7 @@ idevicesyslog | grep "com.runanywhere"
 - os - Unified logging
 
 **Third-Party:**
-- llama.cpp (via LlamaCPPRuntime) - GGUF model inference
+- RunAnywhereCore (unified C++ backend) - ONNX + LlamaCPP inference
 - WhisperKit - Speech-to-text
 - FluidAudio - Audio processing
 - ExecuTorch - ML backends

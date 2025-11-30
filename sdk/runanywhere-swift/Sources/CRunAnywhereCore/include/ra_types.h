@@ -71,11 +71,11 @@ typedef struct {
     ra_audio_format format;    // Audio format
 } ra_audio_config;
 
-// Default audio config for STT (16kHz mono)
-#define RA_AUDIO_CONFIG_STT_DEFAULT { 16000, 1, 16, RA_AUDIO_FORMAT_PCM_F32 }
+// Default audio config for STT (16kHz mono, 32-bit float)
+#define RA_AUDIO_CONFIG_STT_DEFAULT { 16000, 1, 32, RA_AUDIO_FORMAT_PCM_F32 }
 
-// Default audio config for TTS (22050Hz mono)
-#define RA_AUDIO_CONFIG_TTS_DEFAULT { 22050, 1, 16, RA_AUDIO_FORMAT_PCM_F32 }
+// Default audio config for TTS (22050Hz mono, 32-bit float)
+#define RA_AUDIO_CONFIG_TTS_DEFAULT { 22050, 1, 32, RA_AUDIO_FORMAT_PCM_F32 }
 
 #ifdef __cplusplus
 }

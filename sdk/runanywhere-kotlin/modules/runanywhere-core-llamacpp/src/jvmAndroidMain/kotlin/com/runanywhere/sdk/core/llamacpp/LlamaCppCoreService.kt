@@ -140,11 +140,16 @@ class LlamaCppCoreService {
 
     /**
      * Destroy the backend and release all resources.
+     * Thread-safe via mutex to prevent use-after-free.
      */
-    fun destroy() {
-        if (backendHandle != 0L) {
-            RunAnywhereBridge.nativeDestroy(backendHandle)
-            backendHandle = 0
+    suspend fun destroy() {
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                if (backendHandle != 0L) {
+                    RunAnywhereBridge.nativeDestroy(backendHandle)
+                    backendHandle = 0L
+                }
+            }
         }
     }
 
@@ -319,10 +324,10 @@ class LlamaCppCoreService {
             generateStream(prompt, systemPrompt, maxTokens, temperature) { token ->
                 trySend(token).isSuccess
             }
+            close() // Signal completion after streaming finishes
         } catch (e: Exception) {
             close(e)
         }
-        close()
         awaitClose { cancel() }
     }
 

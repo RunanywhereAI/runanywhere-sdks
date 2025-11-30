@@ -30,13 +30,7 @@ extern "C" {
 // =============================================================================
 
 // Include types from the canonical source
-// Note: When built as xcframework, types.h is in same directory
-//       When building locally, it's in ../capabilities/
-#if __has_include("types.h")
 #include "ra_types.h"
-#else
-#include "ra_types.h"
-#endif
 
 // =============================================================================
 // HANDLE TYPES

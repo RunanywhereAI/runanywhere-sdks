@@ -100,10 +100,10 @@ actual class LlamaCppService actual constructor(private val configuration: LLMCo
         logger.info("streamGenerate completed")
     }
 
-    actual override suspend fun cleanup() = withContext(Dispatchers.IO) {
+    actual override suspend fun cleanup() {
         if (isServiceInitialized) {
             logger.info("Cleaning up LlamaCpp (RunAnywhere Core)")
-            coreService.destroy()
+            coreService.destroy() // suspend fun, handles its own dispatcher and mutex
             isServiceInitialized = false
             modelPath = null
             logger.info("Cleaned up LlamaCpp (RunAnywhere Core)")
