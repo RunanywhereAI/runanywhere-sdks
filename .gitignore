@@ -248,3 +248,7 @@ sdk/runanywhere-kotlin/modules/runanywhere-llm-llamacpp/src/jvmMain/resources/na
 # Backup directories
 examples/android/RunAnywhereAI/app/src/main/cpp/llama.cpp.backup/
 comments/
+
+# Flutter auto-generated files (contain developer-specific local paths)
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
