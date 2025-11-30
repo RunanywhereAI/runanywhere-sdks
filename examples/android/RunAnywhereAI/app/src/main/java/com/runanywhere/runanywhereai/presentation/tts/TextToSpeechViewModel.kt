@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
  */
 data class TTSUiState(
     val inputText: String = "Hello! This is a text to speech test.",
-    val characterCount: Int = 38,
+    val characterCount: Int = "Hello! This is a text to speech test.".length,
     val maxCharacters: Int = 5000,
     val isModelLoaded: Boolean = false,
     val selectedFramework: String? = null,

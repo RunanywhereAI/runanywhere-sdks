@@ -73,7 +73,7 @@ fun SpeechToTextScreen(
             ModelStatusBannerSTT(
                 framework = uiState.selectedFramework,
                 modelName = uiState.selectedModelName,
-                isLoading = uiState.recordingState == RecordingState.PROCESSING && uiState.selectedModelName == null,
+                isLoading = uiState.recordingState == RecordingState.PROCESSING && !uiState.isModelLoaded,
                 onSelectModel = { showModelPicker = true }
             )
 
