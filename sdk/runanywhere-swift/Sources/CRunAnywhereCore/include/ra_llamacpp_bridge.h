@@ -26,57 +26,12 @@ extern "C" {
 #endif
 
 // =============================================================================
-// COMMON TYPES
+// COMMON TYPES - All shared types are now in ra_types.h
 // =============================================================================
 
-// Include types from the canonical source
+// Include types from the canonical source (includes ra_capability_type,
+// ra_backend_handle, ra_stream_handle, and callback typedefs)
 #include "ra_types.h"
-
-// =============================================================================
-// HANDLE TYPES
-// =============================================================================
-
-// Opaque handle to a backend instance
-typedef void* ra_backend_handle;
-
-// Opaque handle to a streaming session (STT, VAD, etc.)
-typedef void* ra_stream_handle;
-
-// =============================================================================
-// CAPABILITY TYPES
-// =============================================================================
-
-typedef enum {
-    RA_CAP_TEXT_GENERATION = 0,
-    RA_CAP_EMBEDDINGS = 1,
-    RA_CAP_STT = 2,
-    RA_CAP_TTS = 3,
-    RA_CAP_VAD = 4,
-    RA_CAP_DIARIZATION = 5
-} ra_capability_type;
-
-// =============================================================================
-// CALLBACKS
-// =============================================================================
-
-// Text generation streaming callback
-// Returns: true to continue, false to cancel
-typedef bool (*ra_text_stream_callback)(const char* token, void* user_data);
-
-// STT streaming callback
-// is_final: true when result is final, false for partial
-// Returns: true to continue, false to cancel
-typedef bool (*ra_stt_stream_callback)(const char* text, bool is_final, void* user_data);
-
-// TTS streaming callback
-// samples: float32 audio samples
-// num_samples: number of samples in this chunk
-// is_final: true when synthesis is complete
-// Returns: true to continue, false to cancel
-typedef bool (*ra_tts_stream_callback)(const float* samples, size_t num_samples, bool is_final, void* user_data);
-
-// VAD streaming callback
-typedef void (*ra_vad_stream_callback)(bool is_speech, float probability, double timestamp_ms, void* user_data);
 
 // =============================================================================
 // BACKEND LIFECYCLE
