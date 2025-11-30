@@ -20,6 +20,7 @@ dependencies:
   logger: ^2.3.0
   collection: ^1.18.0
   json_annotation: ^4.9.0
+  flutter_tts: ^3.8.0
 
 dev_dependencies:
   flutter_test:
@@ -31,4 +32,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-

@@ -24,7 +24,7 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.runanywhere.runanywhere_ai"
-    compileSdkVersion 35
+    compileSdkVersion 36
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -42,7 +42,7 @@ android {
 
     defaultConfig {
         applicationId "com.runanywhere.runanywhere_ai"
-        minSdkVersion 23
+        minSdkVersion flutter.minSdkVersion
         targetSdkVersion 34
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
@@ -60,4 +60,3 @@ flutter {
 }
 
 dependencies {}
-

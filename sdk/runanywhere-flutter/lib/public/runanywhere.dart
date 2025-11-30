@@ -10,21 +10,35 @@ import 'events/event_bus.dart';
 import 'events/sdk_event.dart';
 import 'models/models.dart';
 import '../capabilities/text_generation/generation_service.dart';
-import '../capabilities/model_loading/models/loaded_model.dart';
 import '../capabilities/structured_output/structured_output_handler.dart';
-import '../capabilities/analytics/analytics_service.dart';
 import '../core/module_registry.dart' show STTOptions;
+import '../components/stt/stt_component.dart';
+import '../components/tts/tts_component.dart';
 
 // Export generation options
-export '../capabilities/text_generation/generation_service.dart' show RunAnywhereGenerationOptions, GenerationResult, PerformanceMetrics;
+export '../capabilities/text_generation/generation_service.dart'
+    show RunAnywhereGenerationOptions, GenerationResult;
+
+// Export component types for public use
+export '../components/stt/stt_component.dart'
+    show STTComponent, STTConfiguration, STTOutput, STTMode;
+export '../components/tts/tts_component.dart' show TTSComponent, TTSConfiguration;
+export '../components/tts/tts_output.dart' show TTSOutput, SynthesisMetadata;
+export '../components/llm/llm_component.dart'
+    show LLMComponent, LLMConfiguration, LLMOutput, Message, MessageRole, Context;
 
 /// The clean, event-based RunAnywhere SDK
 /// Single entry point with both event-driven and async/await patterns
+/// Matches iOS RunAnywhere from RunAnywhere.swift
 class RunAnywhere {
   // Internal state management
   static SDKInitParams? _initParams;
   static SDKEnvironment? _currentEnvironment;
   static bool _isInitialized = false;
+
+  // Loaded component storage
+  static STTComponent? _loadedSTTComponent;
+  static TTSComponent? _loadedTTSComponent;
 
   /// Access to service container
   static ServiceContainer get serviceContainer => ServiceContainer.shared;
@@ -34,6 +48,12 @@ class RunAnywhere {
 
   /// Access to all SDK events for subscription-based patterns
   static EventBus get events => EventBus.shared;
+
+  /// Get the currently loaded STT component
+  static STTComponent? get loadedSTTComponent => _loadedSTTComponent;
+
+  /// Get the currently loaded TTS component
+  static TTSComponent? get loadedTTSComponent => _loadedTTSComponent;
 
   /// Initialize the RunAnywhere SDK
   ///
@@ -145,6 +165,8 @@ class RunAnywhere {
     }
   }
 
+  // MARK: - Text Generation
+
   /// Simple text generation with automatic event publishing
   /// [prompt] The text prompt
   /// Returns Generated response (text only)
@@ -224,6 +246,8 @@ class RunAnywhere {
     );
   }
 
+  // MARK: - Voice Operations
+
   /// Simple voice transcription
   /// [audioData] Audio data to transcribe
   /// Returns Transcribed text
@@ -262,7 +286,9 @@ class RunAnywhere {
     }
   }
 
-  /// Load a model by ID
+  // MARK: - Model Management
+
+  /// Load a model by ID (LLM model)
   /// [modelId] The model identifier
   static Future<void> loadModel(String modelId) async {
     EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
@@ -281,6 +307,76 @@ class RunAnywhere {
 
       // IMPORTANT: Set the loaded model in the generation service
       serviceContainer.generationService.setCurrentModel(loadedModel);
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+    } catch (e) {
+      EventBus.shared.publish(
+        SDKModelEvent.loadFailed(modelId: modelId, error: e),
+      );
+      rethrow;
+    }
+  }
+
+  /// Load an STT (Speech-to-Text) model by ID
+  /// This initializes the STT component and loads the model into memory
+  /// [modelId] The model identifier
+  /// Matches iOS loadSTTModel from RunAnywhere.swift
+  static Future<void> loadSTTModel(String modelId) async {
+    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+
+    try {
+      // Ensure initialized
+      if (!_isInitialized) {
+        throw SDKError.notInitialized();
+      }
+
+      // Lazy device registration on first API call
+      await _ensureDeviceRegistered();
+
+      // Create STT configuration
+      final sttConfig = STTConfiguration(modelId: modelId);
+
+      // Create and initialize STT component
+      final sttComponent = STTComponent(sttConfig: sttConfig);
+      await sttComponent.initialize();
+
+      // Store the component for later use
+      _loadedSTTComponent = sttComponent;
+
+      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+    } catch (e) {
+      EventBus.shared.publish(
+        SDKModelEvent.loadFailed(modelId: modelId, error: e),
+      );
+      rethrow;
+    }
+  }
+
+  /// Load a TTS (Text-to-Speech) model by ID
+  /// This initializes the TTS component and loads the model into memory
+  /// [modelId] The model identifier (voice name)
+  /// Matches iOS loadTTSModel from RunAnywhere.swift
+  static Future<void> loadTTSModel(String modelId) async {
+    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+
+    try {
+      // Ensure initialized
+      if (!_isInitialized) {
+        throw SDKError.notInitialized();
+      }
+
+      // Lazy device registration on first API call
+      await _ensureDeviceRegistered();
+
+      // Create TTS configuration
+      final ttsConfig = TTSConfiguration(voice: modelId);
+
+      // Create and initialize TTS component
+      final ttsComponent = TTSComponent(ttsConfiguration: ttsConfig);
+      await ttsComponent.initialize();
+
+      // Store the component for later use
+      _loadedTTSComponent = ttsComponent;
 
       EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
     } catch (e) {
@@ -314,6 +410,8 @@ class RunAnywhere {
     final loadedModel = serviceContainer.generationService.getCurrentModel();
     return loadedModel?.model;
   }
+
+  // MARK: - SDK State Management
 
   /// Get current SDK version
   /// Returns SDK version string
@@ -372,7 +470,17 @@ class RunAnywhere {
     ) as T;
   }
 
+  /// Estimate token count in text
+  /// Uses improved heuristics for accurate token estimation.
+  /// [text] The text to analyze
+  /// Returns Estimated number of tokens
+  static int estimateTokenCount(String text) {
+    // Rough estimation: ~4 characters per token for English text
+    return (text.length / 4).ceil();
+  }
+
   /// Reset SDK state (for testing purposes)
+  /// Clears all initialization state and cached data
   static void reset() {
     final logger = SDKLogger(category: 'RunAnywhere.Reset');
     logger.info('Resetting SDK state...');
@@ -382,10 +490,50 @@ class RunAnywhere {
     _initParams = null;
     _currentEnvironment = null;
 
+    // Clear loaded components
+    _loadedSTTComponent = null;
+    _loadedTTSComponent = null;
+
     // Reset service container if needed
     serviceContainer.reset();
 
     logger.info('SDK state reset completed');
+  }
+
+  // MARK: - Factory Methods
+
+  /// Create a new conversation
+  static Conversation conversation() {
+    return Conversation();
+  }
+}
+
+// MARK: - Conversation Management
+
+/// Simple conversation manager
+/// Matches iOS Conversation class from RunAnywhere.swift
+class Conversation {
+  final List<String> _messages = [];
+
+  Conversation();
+
+  /// Send a message and get response
+  Future<String> send(String message) async {
+    _messages.add('User: $message');
+
+    final contextPrompt = '${_messages.join('\n')}\nAssistant:';
+    final result = await RunAnywhere.generate(contextPrompt);
+
+    _messages.add('Assistant: ${result.text}');
+    return result.text;
+  }
+
+  /// Get conversation history
+  List<String> get history => List.unmodifiable(_messages);
+
+  /// Clear conversation
+  void clear() {
+    _messages.clear();
   }
 }
 
@@ -393,4 +541,3 @@ class RunAnywhere {
 void unawaited(Future<void> future) {
   // Intentionally not awaiting
 }
-

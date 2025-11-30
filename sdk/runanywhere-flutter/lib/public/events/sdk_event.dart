@@ -148,22 +148,109 @@ class SDKModelLoadFailed implements SDKModelEvent {
 
 /// SDK voice events
 abstract class SDKVoiceEvent implements SDKEvent {
+  static SDKVoiceListeningStarted listeningStarted() {
+    return SDKVoiceListeningStarted();
+  }
+
+  static SDKVoiceListeningEnded listeningEnded() {
+    return SDKVoiceListeningEnded();
+  }
+
+  static SDKVoiceSpeechDetected speechDetected() {
+    return SDKVoiceSpeechDetected();
+  }
+
   static SDKVoiceTranscriptionStarted transcriptionStarted() {
     return SDKVoiceTranscriptionStarted();
+  }
+
+  static SDKVoiceTranscriptionPartial transcriptionPartial({required String text}) {
+    return SDKVoiceTranscriptionPartial(text: text);
   }
 
   static SDKVoiceTranscriptionFinal transcriptionFinal({required String text}) {
     return SDKVoiceTranscriptionFinal(text: text);
   }
 
+  static SDKVoiceResponseGenerated responseGenerated({required String text}) {
+    return SDKVoiceResponseGenerated(text: text);
+  }
+
+  static SDKVoiceSynthesisStarted synthesisStarted() {
+    return SDKVoiceSynthesisStarted();
+  }
+
+  static SDKVoiceAudioGenerated audioGenerated({required dynamic data}) {
+    return SDKVoiceAudioGenerated(data: data);
+  }
+
+  static SDKVoiceSynthesisCompleted synthesisCompleted() {
+    return SDKVoiceSynthesisCompleted();
+  }
+
   static SDKVoicePipelineError pipelineError(Object error) {
     return SDKVoicePipelineError(error: error);
   }
+
+  static SDKVoicePipelineStarted pipelineStarted() {
+    return SDKVoicePipelineStarted();
+  }
+
+  static SDKVoicePipelineCompleted pipelineCompleted() {
+    return SDKVoicePipelineCompleted();
+  }
+
+  static SDKVoiceVADStarted vadStarted() {
+    return SDKVoiceVADStarted();
+  }
+
+  static SDKVoiceVADDetected vadDetected() {
+    return SDKVoiceVADDetected();
+  }
+
+  static SDKVoiceVADEnded vadEnded() {
+    return SDKVoiceVADEnded();
+  }
+
+  static SDKVoiceSTTProcessing sttProcessing() {
+    return SDKVoiceSTTProcessing();
+  }
+
+  static SDKVoiceLLMProcessing llmProcessing() {
+    return SDKVoiceLLMProcessing();
+  }
+
+  static SDKVoiceTTSProcessing ttsProcessing() {
+    return SDKVoiceTTSProcessing();
+  }
+}
+
+class SDKVoiceListeningStarted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceListeningEnded implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceSpeechDetected implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
 }
 
 class SDKVoiceTranscriptionStarted implements SDKVoiceEvent {
   @override
   final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceTranscriptionPartial implements SDKVoiceEvent {
+  final String text;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  SDKVoiceTranscriptionPartial({required this.text});
 }
 
 class SDKVoiceTranscriptionFinal implements SDKVoiceEvent {
@@ -174,12 +261,78 @@ class SDKVoiceTranscriptionFinal implements SDKVoiceEvent {
   SDKVoiceTranscriptionFinal({required this.text});
 }
 
+class SDKVoiceResponseGenerated implements SDKVoiceEvent {
+  final String text;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  SDKVoiceResponseGenerated({required this.text});
+}
+
+class SDKVoiceSynthesisStarted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceAudioGenerated implements SDKVoiceEvent {
+  final dynamic data;
+  @override
+  final DateTime timestamp = DateTime.now();
+
+  SDKVoiceAudioGenerated({required this.data});
+}
+
+class SDKVoiceSynthesisCompleted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
 class SDKVoicePipelineError implements SDKVoiceEvent {
   final Object error;
   @override
   final DateTime timestamp = DateTime.now();
 
   SDKVoicePipelineError({required this.error});
+}
+
+class SDKVoicePipelineStarted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoicePipelineCompleted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceVADStarted implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceVADDetected implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceVADEnded implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceSTTProcessing implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceLLMProcessing implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
+}
+
+class SDKVoiceTTSProcessing implements SDKVoiceEvent {
+  @override
+  final DateTime timestamp = DateTime.now();
 }
 
 /// SDK performance events
@@ -193,4 +346,3 @@ abstract class SDKStorageEvent implements SDKEvent {}
 
 /// SDK framework events
 abstract class SDKFrameworkEvent implements SDKEvent {}
-

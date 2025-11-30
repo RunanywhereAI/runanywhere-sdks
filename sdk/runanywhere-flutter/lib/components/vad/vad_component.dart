@@ -1,105 +1,185 @@
+import 'dart:async';
 import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
-import '../../core/protocols/component/component_configuration.dart';
+import '../../core/module_registry.dart';
+import 'vad_configuration.dart';
+import 'simple_energy_vad.dart';
 
-/// VAD (Voice Activity Detection) Component Configuration
-class VADConfiguration implements ComponentConfiguration {
-  final double energyThreshold;
-  final int frameSize;
-  final int sampleRate;
-
-  VADConfiguration({
-    this.energyThreshold = 0.005,
-    this.frameSize = 512,
-    this.sampleRate = 16000,
-  });
-
-  @override
-  void validate() {
-    if (energyThreshold < 0) {
-      throw ArgumentError('Energy threshold must be non-negative');
-    }
-    if (frameSize <= 0) {
-      throw ArgumentError('Frame size must be positive');
-    }
-  }
-}
-
-/// VAD Component Input
-class VADInput implements ComponentInput {
-  final List<int> audioData;
-
-  VADInput({required this.audioData});
-
-  @override
-  void validate() {
-    if (audioData.isEmpty) {
-      throw ArgumentError('Audio data cannot be empty');
-    }
-  }
-}
-
-/// VAD Component Output
-class VADOutput implements ComponentOutput {
-  final bool hasSpeech;
-  final double confidence;
-  @override
-  final DateTime timestamp;
-
-  VADOutput({
-    required this.hasSpeech,
-    required this.confidence,
-    DateTime? timestamp,
-  }) : timestamp = timestamp ?? DateTime.now();
-}
-
-/// VAD Component
+/// Voice Activity Detection component following the clean architecture
 class VADComponent extends BaseComponent<VADService> {
   @override
   SDKComponent get componentType => SDKComponent.vad;
 
-  final VADConfiguration vadConfig;
+  final VADConfiguration vadConfiguration;
 
   VADComponent({
-    required this.vadConfig,
+    required this.vadConfiguration,
     super.serviceContainer,
-  }) : super(configuration: vadConfig);
+  }) : super(configuration: vadConfiguration);
 
   @override
   Future<VADService> createService() async {
-    // Placeholder - to be implemented with actual VAD provider
-    throw UnimplementedError('VAD service creation not yet implemented');
-  }
+    // Try to get a registered VAD provider from central registry
+    final provider = ModuleRegistry.shared.vadProvider(modelId: null);
 
-  /// Detect voice activity
-  Future<VADOutput> detect(VADInput input) async {
-    ensureReady();
-    final service = this.service;
-    if (service == null) {
-      throw StateError('VAD service not initialized');
+    if (provider == null) {
+      throw StateError(
+        'No VAD service provider registered. Please register a VAD provider using ModuleRegistry.shared.registerVAD()',
+      );
     }
 
-    final result = await service.detect(audioData: input.audioData);
+    // Create service through provider
+    final service = await provider.createVADService(vadConfiguration);
+    return service;
+  }
 
-    return VADOutput(
-      hasSpeech: result.hasSpeech,
-      confidence: result.confidence,
-      timestamp: DateTime.now(),
-    );
+  /// Pause VAD processing
+  void pause() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.pause();
+    }
+  }
+
+  /// Resume VAD processing
+  void resume() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.resume();
+    }
+  }
+
+  /// Detect speech in audio buffer (16-bit PCM samples)
+  Future<VADResult> detectSpeech({required List<int> buffer}) async {
+    ensureReady();
+
+    final vadService = service;
+    if (vadService == null) {
+      throw StateError('VAD service not available');
+    }
+
+    // Process using the VADService interface
+    return await vadService.detect(audioData: buffer);
+  }
+
+  /// Detect speech in audio samples (Float32 format)
+  Future<VADResult> detectSpeechFromSamples({
+    required List<double> samples,
+  }) async {
+    ensureReady();
+
+    final vadService = service;
+    if (vadService == null) {
+      throw StateError('VAD service not available');
+    }
+
+    // For SimpleEnergyVAD, use the direct method
+    if (vadService is SimpleEnergyVAD) {
+      final isSpeechDetected = vadService.processAudioData(samples);
+      return VADResult(
+        hasSpeech: isSpeechDetected,
+        confidence: vadService.energyThreshold,
+      );
+    }
+
+    // Convert float samples to 16-bit PCM for generic VADService
+    final pcmSamples = samples.map((s) => (s * 32768.0).toInt()).toList();
+    return await vadService.detect(audioData: pcmSamples);
+  }
+
+  /// Process audio stream
+  Stream<VADResult> processAudioStream(Stream<List<int>> stream) async* {
+    await for (final buffer in stream) {
+      yield await detectSpeech(buffer: buffer);
+    }
+  }
+
+  /// Reset VAD state
+  void reset() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.reset();
+    }
+  }
+
+  /// Set speech activity callback
+  void setSpeechActivityCallback(
+    void Function(SpeechActivityEvent) callback,
+  ) {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.onSpeechActivity = callback;
+    }
+  }
+
+  /// Start VAD processing
+  void start() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.start();
+    }
+  }
+
+  /// Stop VAD processing
+  void stop() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.stop();
+    }
+  }
+
+  /// Get the underlying VAD service
+  VADService? getService() {
+    return service;
+  }
+
+  /// Start calibration of the VAD
+  Future<void> startCalibration() async {
+    ensureReady();
+
+    final vadService = service;
+    if (vadService is! SimpleEnergyVAD) {
+      throw StateError('VAD service does not support calibration');
+    }
+
+    // Start calibration
+    await vadService.startCalibration();
+  }
+
+  /// Get current VAD statistics for debugging
+  Map<String, double>? getStatistics() {
+    final vadService = service;
+    if (vadService is! SimpleEnergyVAD) {
+      return null;
+    }
+
+    return vadService.getStatistics();
+  }
+
+  /// Set calibration parameters
+  void setCalibrationParameters({required double multiplier}) {
+    final vadService = service;
+    if (vadService is! SimpleEnergyVAD) {
+      return;
+    }
+
+    vadService.setCalibrationParameters(multiplier: multiplier);
+  }
+
+  /// Set energy threshold
+  void setEnergyThreshold(double threshold) {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      vadService.energyThreshold = threshold;
+    }
+  }
+
+  /// Get energy threshold
+  double? getEnergyThreshold() {
+    final vadService = service;
+    if (vadService is SimpleEnergyVAD) {
+      return vadService.energyThreshold;
+    }
+    return null;
   }
 }
-
-// Placeholder VAD service
-abstract class VADService {
-  Future<void> initialize({String? modelPath});
-  Future<VADResult> detect({required List<int> audioData});
-  bool get isReady;
-  Future<void> cleanup();
-}
-
-class VADResult {
-  final bool hasSpeech;
-  final double confidence;
-  VADResult({required this.hasSpeech, required this.confidence});
-}
-

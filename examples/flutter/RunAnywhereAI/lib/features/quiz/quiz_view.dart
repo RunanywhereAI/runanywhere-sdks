@@ -151,7 +151,7 @@ Each question should have 4 options and one correct answer.
               child: Container(
                 padding: const EdgeInsets.all(AppSpacing.padding16),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryRed.withOpacity(0.1),
+                  color: AppColors.primaryRed.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppSpacing.cornerRadiusRegular),
                 ),
                 child: Text(
@@ -259,9 +259,9 @@ class _QuizQuestionCardState extends State<_QuizQuestionCard> {
 
               Color? backgroundColor;
               if (_showAnswer && isCorrect) {
-                backgroundColor = AppColors.primaryGreen.withOpacity(0.2);
+                backgroundColor = AppColors.primaryGreen.withValues(alpha: 0.2);
               } else if (isSelected && !isCorrect && _showAnswer) {
-                backgroundColor = AppColors.primaryRed.withOpacity(0.2);
+                backgroundColor = AppColors.primaryRed.withValues(alpha: 0.2);
               }
 
               return Padding(

@@ -1,137 +1,408 @@
+import 'dart:async';
 import '../../core/components/base_component.dart';
 import '../../core/types/sdk_component.dart';
 import '../../core/protocols/component/component_configuration.dart';
-import '../../core/module_registry.dart' as core show ModuleRegistry, LLMService, LLMGenerationOptions;
+import '../../core/module_registry.dart' as core
+    show ModuleRegistry, LLMService, LLMGenerationOptions;
+import '../../core/models/common.dart' show LLMFramework;
+import '../../public/models/conversation.dart';
+
+export '../../public/models/conversation.dart';
+export '../../core/models/common.dart' show LLMFramework;
+
+/// Quantization level for LLM models
+/// Matches iOS QuantizationLevel from LLMComponent.swift
+enum QuantizationLevel {
+  q4v0('Q4_0'),
+  q4KM('Q4_K_M'),
+  q5KM('Q5_K_M'),
+  q6K('Q6_K'),
+  q8v0('Q8_0'),
+  f16('F16'),
+  f32('F32');
+
+  final String value;
+  const QuantizationLevel(this.value);
+
+  static QuantizationLevel? fromString(String? value) {
+    if (value == null) return null;
+    return QuantizationLevel.values.cast<QuantizationLevel?>().firstWhere(
+          (e) => e?.value == value,
+          orElse: () => null,
+        );
+  }
+}
 
 /// LLM (Language Model) Component Configuration
+/// Matches iOS LLMConfiguration from LLMComponent.swift
 class LLMConfiguration implements ComponentConfiguration {
+  /// Model ID
   final String? modelId;
+
+  // Model loading parameters
   final int contextLength;
   final bool useGPUIfAvailable;
-  final String? quantizationLevel;
+  final QuantizationLevel? quantizationLevel;
+  final int cacheSize; // Token cache size in MB
+  final String? preloadContext; // Optional system prompt to preload
+
+  // Default generation parameters
+  final double temperature;
+  final int maxTokens;
+  final String? systemPrompt;
+  final bool streamingEnabled;
+  final LLMFramework? preferredFramework;
 
   LLMConfiguration({
     this.modelId,
     this.contextLength = 2048,
     this.useGPUIfAvailable = true,
     this.quantizationLevel,
-  });
+    this.cacheSize = 100,
+    this.preloadContext,
+    this.temperature = 0.7,
+    this.maxTokens = 100,
+    String? systemPrompt,
+    this.streamingEnabled = true,
+    this.preferredFramework,
+  }) : systemPrompt = systemPrompt ?? preloadContext;
 
   @override
   void validate() {
-    if (contextLength <= 0) {
-      throw ArgumentError('Context length must be positive');
+    if (contextLength <= 0 || contextLength > 32768) {
+      throw ArgumentError('Context length must be between 1 and 32768');
+    }
+    if (cacheSize < 0 || cacheSize > 1000) {
+      throw ArgumentError('Cache size must be between 0 and 1000 MB');
+    }
+    if (temperature < 0 || temperature > 2.0) {
+      throw ArgumentError('Temperature must be between 0 and 2.0');
+    }
+    if (maxTokens <= 0 || maxTokens > contextLength) {
+      throw ArgumentError('Max tokens must be between 1 and context length');
     }
   }
 }
 
 /// LLM Component Input
+/// Matches iOS LLMInput from LLMComponent.swift
 class LLMInput implements ComponentInput {
-  final String prompt;
-  final LLMGenerationOptions options;
+  /// Messages in the conversation
+  final List<Message> messages;
+
+  /// Optional system prompt override
+  final String? systemPrompt;
+
+  /// Optional context for conversation
+  final Context? context;
+
+  /// Optional generation options override
+  final LLMGenerationOptions? options;
 
   LLMInput({
-    required this.prompt,
-    required this.options,
+    required this.messages,
+    this.systemPrompt,
+    this.context,
+    this.options,
   });
+
+  /// Convenience initializer for single prompt
+  factory LLMInput.fromPrompt(String prompt, {String? systemPrompt}) {
+    return LLMInput(
+      messages: [Message.user(prompt)],
+      systemPrompt: systemPrompt,
+    );
+  }
 
   @override
   void validate() {
-    if (prompt.isEmpty) {
-      throw ArgumentError('Prompt cannot be empty');
+    if (messages.isEmpty) {
+      throw ArgumentError('LLMInput must contain at least one message');
     }
   }
 }
 
 /// LLM Component Output
+/// Matches iOS LLMOutput from LLMComponent.swift
 class LLMOutput implements ComponentOutput {
+  /// Generated text
   final String text;
-  final int tokensUsed;
-  final int latencyMs;
+
+  /// Token usage statistics
+  final TokenUsage tokenUsage;
+
+  /// Generation metadata
+  final GenerationMetadata metadata;
+
+  /// Finish reason
+  final FinishReason finishReason;
+
+  /// Timestamp (required by ComponentOutput)
   @override
   final DateTime timestamp;
 
   LLMOutput({
     required this.text,
-    required this.tokensUsed,
-    required this.latencyMs,
+    required this.tokenUsage,
+    required this.metadata,
+    required this.finishReason,
     DateTime? timestamp,
   }) : timestamp = timestamp ?? DateTime.now();
+
+  /// Convenience getters for backward compatibility
+  int get tokensUsed => tokenUsage.totalTokens;
+  int get latencyMs => (metadata.generationTime * 1000).round();
 }
 
 /// LLM Generation Options
+/// Matches iOS RunAnywhereGenerationOptions from GenerationOptions.swift
 class LLMGenerationOptions {
   final int maxTokens;
   final double temperature;
+  final double topP;
+  final bool enableRealTimeTracking;
+  final List<String> stopSequences;
+  final bool streamingEnabled;
   final String? systemPrompt;
+  final LLMFramework? preferredFramework;
 
   LLMGenerationOptions({
-    this.maxTokens = 500,
+    this.maxTokens = 100,
     this.temperature = 0.7,
+    this.topP = 1.0,
+    this.enableRealTimeTracking = true,
+    this.stopSequences = const [],
+    this.streamingEnabled = false,
     this.systemPrompt,
+    this.preferredFramework,
   });
 }
 
+/// Errors for LLM services
+/// Matches iOS LLMServiceError from LLMComponent.swift
+class LLMServiceError implements Exception {
+  final String message;
+  final LLMErrorType type;
+
+  LLMServiceError(this.message, this.type);
+
+  @override
+  String toString() => 'LLMServiceError: $message';
+}
+
+enum LLMErrorType {
+  notInitialized,
+  modelNotFound,
+  generationFailed,
+  streamingNotSupported,
+  contextLengthExceeded,
+  invalidOptions,
+}
+
 /// LLM Component
+/// Matches iOS LLMComponent from LLMComponent.swift
 class LLMComponent extends BaseComponent<core.LLMService> {
   @override
   SDKComponent get componentType => SDKComponent.llm;
 
   final LLMConfiguration llmConfig;
+  Context? _conversationContext;
+  bool _isModelLoaded = false;
+  String? _modelPath;
 
   LLMComponent({
     required this.llmConfig,
     super.serviceContainer,
-  }) : super(configuration: llmConfig);
+  }) : super(configuration: llmConfig) {
+    // Preload context if provided
+    if (llmConfig.preloadContext != null) {
+      _conversationContext = Context(systemPrompt: llmConfig.preloadContext);
+    }
+  }
 
   @override
   Future<core.LLMService> createService() async {
-    final provider = core.ModuleRegistry.shared.llmProvider(modelId: llmConfig.modelId);
+    final provider =
+        core.ModuleRegistry.shared.llmProvider(modelId: llmConfig.modelId);
     if (provider == null) {
-      throw StateError('No LLM provider available');
+      throw LLMServiceError(
+        'No LLM service provider registered. Please add llama.cpp or another LLM implementation as a dependency and register it with ModuleRegistry.shared.registerLLM(provider).',
+        LLMErrorType.notInitialized,
+      );
     }
-    return await provider.createLLMService(llmConfig);
+
+    final service = await provider.createLLMService(llmConfig);
+    await service.initialize(modelPath: _modelPath);
+    _isModelLoaded = true;
+
+    return service;
   }
 
-  /// Generate text
-  Future<LLMOutput> generate(LLMInput input) async {
+  @override
+  Future<void> performCleanup() async {
+    await service?.cleanup();
+    _isModelLoaded = false;
+    _modelPath = null;
+    _conversationContext = null;
+  }
+
+  /// Generate text from a simple prompt
+  Future<LLMOutput> generate(String prompt, {String? systemPrompt}) async {
     ensureReady();
-    final service = this.service;
-    if (service == null) {
-      throw StateError('LLM service not initialized');
+    final input = LLMInput(
+      messages: [Message.user(prompt)],
+      systemPrompt: systemPrompt,
+    );
+    return process(input);
+  }
+
+  /// Generate with conversation history
+  Future<LLMOutput> generateWithHistory(
+    List<Message> messages, {
+    String? systemPrompt,
+  }) async {
+    ensureReady();
+    final input = LLMInput(messages: messages, systemPrompt: systemPrompt);
+    return process(input);
+  }
+
+  /// Process LLM input
+  Future<LLMOutput> process(LLMInput input) async {
+    ensureReady();
+
+    final llmService = service;
+    if (llmService == null) {
+      throw LLMServiceError(
+        'LLM service not available',
+        LLMErrorType.notInitialized,
+      );
     }
 
-    final result = await service.generate(
-      prompt: input.prompt,
+    // Validate input
+    input.validate();
+
+    // Use provided options or create from configuration
+    final options = input.options ??
+        LLMGenerationOptions(
+          maxTokens: llmConfig.maxTokens,
+          temperature: llmConfig.temperature,
+          streamingEnabled: llmConfig.streamingEnabled,
+          preferredFramework: llmConfig.preferredFramework,
+        );
+
+    // Build prompt
+    final prompt = _buildPrompt(
+      input.messages,
+      systemPrompt: input.systemPrompt ?? llmConfig.systemPrompt,
+    );
+
+    // Track generation time
+    final startTime = DateTime.now();
+
+    // Generate response
+    final result = await llmService.generate(
+      prompt: prompt,
       options: core.LLMGenerationOptions(
-        maxTokens: input.options.maxTokens,
-        temperature: input.options.temperature,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
       ),
     );
 
+    final generationTime =
+        DateTime.now().difference(startTime).inMilliseconds / 1000.0;
+
+    // Calculate tokens (rough estimate - real implementation would get from service)
+    final promptTokens = prompt.length ~/ 4;
+    final completionTokens = result.text.length ~/ 4;
+    final tokensPerSecond =
+        generationTime > 0 ? completionTokens / generationTime : 0.0;
+
+    // Create output
     return LLMOutput(
       text: result.text,
-      tokensUsed: 0, // TODO: Get from result
-      latencyMs: 0, // TODO: Get from result
-      timestamp: DateTime.now(),
+      tokenUsage: TokenUsage(
+        promptTokens: promptTokens,
+        completionTokens: completionTokens,
+      ),
+      metadata: GenerationMetadata(
+        modelId: llmConfig.modelId ?? 'unknown',
+        temperature: options.temperature,
+        generationTime: generationTime,
+        tokensPerSecond: tokensPerSecond,
+      ),
+      finishReason: FinishReason.completed,
     );
   }
 
-  /// Generate text stream
-  Stream<String> generateStream(LLMInput input) {
+  /// Stream generation
+  Stream<String> streamGenerate(String prompt, {String? systemPrompt}) {
     ensureReady();
-    final service = this.service;
-    if (service == null) {
-      throw StateError('LLM service not initialized');
+    final llmService = service;
+    if (llmService == null) {
+      throw LLMServiceError(
+        'LLM service not available',
+        LLMErrorType.notInitialized,
+      );
     }
 
-    return service.generateStream(
-      prompt: input.prompt,
+    final options = LLMGenerationOptions(
+      maxTokens: llmConfig.maxTokens,
+      temperature: llmConfig.temperature,
+      streamingEnabled: true,
+      preferredFramework: llmConfig.preferredFramework,
+    );
+
+    final fullPrompt = _buildPrompt(
+      [Message.user(prompt)],
+      systemPrompt: systemPrompt ?? llmConfig.systemPrompt,
+    );
+
+    return llmService.generateStream(
+      prompt: fullPrompt,
       options: core.LLMGenerationOptions(
-        maxTokens: input.options.maxTokens,
-        temperature: input.options.temperature,
+        maxTokens: options.maxTokens,
+        temperature: options.temperature,
       ),
     );
   }
-}
 
+  /// Get current conversation context
+  Context? get conversationContext => _conversationContext;
+
+  /// Update conversation context
+  void updateContext(Context context) {
+    _conversationContext = context;
+  }
+
+  /// Clear conversation context
+  void clearContext() {
+    _conversationContext = _conversationContext?.cleared();
+  }
+
+  /// Get service for compatibility
+  core.LLMService? getService() {
+    return service;
+  }
+
+  /// Check if model is loaded
+  bool get isModelLoaded => _isModelLoaded;
+
+  // MARK: - Private Helpers
+
+  String _buildPrompt(List<Message> messages, {String? systemPrompt}) {
+    final buffer = StringBuffer();
+
+    // Add system prompt first if available
+    if (systemPrompt != null && systemPrompt.isNotEmpty) {
+      buffer.writeln(systemPrompt);
+      buffer.writeln();
+    }
+
+    // Add messages without role markers - let the service handle formatting
+    for (final message in messages) {
+      buffer.writeln(message.content);
+    }
+
+    return buffer.toString().trim();
+  }
+}
