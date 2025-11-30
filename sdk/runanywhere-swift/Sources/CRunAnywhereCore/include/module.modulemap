@@ -1,0 +1,5 @@
+module CRunAnywhereCore {
+    header "ra_types.h"
+    header "ra_onnx_bridge.h"
+    export *
+}

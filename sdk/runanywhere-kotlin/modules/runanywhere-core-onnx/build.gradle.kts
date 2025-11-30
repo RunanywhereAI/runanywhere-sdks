@@ -1,17 +1,23 @@
 /**
  * RunAnywhere Core ONNX Module
  *
- * This module provides JNI bindings to the RunAnywhere Core C++ library with ONNX Runtime backend.
- * It mirrors the architecture of runanywhere-swift's CRunAnywhereONNX module.
+ * This module provides the ONNX Runtime backend for RunAnywhere Core.
+ * It depends on runanywhere-core-jni for the shared JNI bridge.
  *
  * Architecture:
- *   Kotlin Service Layer (ONNXCoreService) -> JNI Bindings (RunAnywhareBridge)
- *     -> Native Library (librunanywhere_jni.so) -> C API (runanywhere_bridge.h)
- *       -> C++ Backend (runanywhere_onnx)
+ *   ONNXCoreService -> RunAnywhereBridge (from jni module)
+ *     -> librunanywhere_jni.so (from jni module)
+ *     -> librunanywhere_bridge.so (from jni module)
+ *     -> librunanywhere_onnx.so (THIS module)
+ *     -> libonnxruntime.so (THIS module)
+ *
+ * This module provides ONLY the ONNX-specific native libraries:
+ *   - librunanywhere_onnx.so (ONNX backend implementation)
+ *   - libonnxruntime.so (ONNX Runtime dependency)
  *
  * Build modes:
  *   - Remote (default): Downloads pre-built native libraries from GitHub releases
- *   - Local: Builds from runanywhere-core source (requires NDK and CMake)
+ *   - Local: Uses locally built libraries from runanywhere-core/dist/android/onnx
  *
  * To use local mode: ./gradlew build -Prunanywhere.native.local=true
  */
@@ -86,6 +92,10 @@ kotlin {
         // Shared JVM/Android code
         val jvmAndroidMain by creating {
             dependsOn(commonMain)
+            dependencies {
+                // Use shared JNI bridge from the jni module
+                api(project(":sdk:runanywhere-kotlin:modules:runanywhere-core-jni"))
+            }
         }
 
         val jvmMain by getting {

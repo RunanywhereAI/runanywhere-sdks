@@ -31,7 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **Critical Platform Requirements**: Updated minimum iOS version to 16.0 to match adapter dependencies
-- All adapter modules (LLMSwift, WhisperKitTranscription, FluidAudioDiarization) require iOS 16+
+- All adapter modules (LlamaCPPRuntime, WhisperKitTranscription, FluidAudioDiarization) require iOS 16+
 - This fixes SPM compilation errors when consuming the package
 
 ### Changed
@@ -50,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Note**: This version was yanked due to SPM resolution issues with FluidAudio dependency. Use 0.15.1 instead.
 
 ### Added
-- **Integrated Adapter Modules**: LLMSwift, WhisperKitTranscription, and FluidAudioDiarization now available as products from main package
+- **Integrated Adapter Modules**: LlamaCPPRuntime, WhisperKitTranscription, and FluidAudioDiarization now available as products from main package
 - Users can add single package dependency and select which adapters they need
 - No external dependencies required - all adapters included in SDK package
 

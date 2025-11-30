@@ -38,8 +38,9 @@ class ONNXCoreService : NativeCoreService {
     private val mutex = Mutex()
 
     init {
-        // Load native library on construction
+        // Load JNI bridge and ONNX backend libraries on construction
         RunAnywhereBridge.loadLibrary()
+        RunAnywhereBridge.loadBackend("onnx")
     }
 
     // =============================================================================

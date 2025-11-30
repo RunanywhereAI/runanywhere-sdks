@@ -65,7 +65,7 @@ public enum SDKConstants {
     /// Default configuration values
     public enum ConfigurationDefaults {
         // Generation settings
-        public static let temperature: Double = 0.7
+        public static let temperature: Double = 0.8  // Match LLM.swift default
         public static let maxTokens: Int = 256
         public static let topP: Double = 0.95
         public static let topK: Int = 40

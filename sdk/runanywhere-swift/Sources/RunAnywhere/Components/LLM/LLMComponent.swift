@@ -520,7 +520,7 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
     // MARK: - Private Helpers
 
     private func buildPrompt(from messages: [Message], systemPrompt: String?) -> String {
-        // For LLMSwiftService, we should NOT add role markers as it handles its own templating
+        // For LLM services, we should NOT add role markers as they handle their own templating
         // Just concatenate the messages with newlines
         var prompt = ""
 
@@ -529,12 +529,12 @@ public final class LLMComponent: BaseComponent<LLMServiceWrapper>, @unchecked Se
             prompt += "\(system)\n\n"
         }
 
-        // Add messages without role markers - let LLMSwiftService handle formatting
+        // Add messages without role markers - let LLM service handle formatting
         for message in messages {
             prompt += "\(message.content)\n"
         }
 
-        // Don't add trailing "Assistant: " - LLMSwiftService handles this
+        // Don't add trailing "Assistant: " - LLM service handles this
         return prompt.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

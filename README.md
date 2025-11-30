@@ -111,7 +111,7 @@ The Android Kotlin Multiplatform SDK provides high-performance on-device text ge
 
 ```swift
 import RunAnywhere
-import LLMSwift
+import LlamaCPPRuntime
 import WhisperKitTranscription
 
 // 1. Initialize the SDK
@@ -122,7 +122,7 @@ try await RunAnywhere.initialize(
 )
 
 // 2. Register framework adapters
-await LLMSwiftServiceProvider.register()
+await LlamaCPPServiceProvider.register()
 
 let options = AdapterRegistrationOptions(
     validateModels: false,
@@ -131,7 +131,7 @@ let options = AdapterRegistrationOptions(
 )
 
 try await RunAnywhere.registerFrameworkAdapter(
-    LLMSwiftAdapter(),
+    LlamaCPPCoreAdapter(),
     models: [
         try! ModelRegistration(
             url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
@@ -267,9 +267,9 @@ Add RunAnywhere to your project:
    - **Development Branch**: Choose **Branch** and enter `main`
 4. Select products based on your needs:
    - `RunAnywhere` - Core SDK (required)
-   - `LLMSwift` - GGUF/GGML models via llama.cpp (optional, iOS 16+)
-   - `WhisperKitTranscription` - Speech-to-text (optional, iOS 16+)
-   - `FluidAudioDiarization` - Speaker diarization (optional, iOS 17+)
+   - `RunAnywhereLlamaCPP` - GGUF/GGML models via llama.cpp (optional, iOS 16+)
+   - `RunAnywhereWhisperKit` - Speech-to-text (optional, iOS 16+)
+   - `RunAnywhereFluidAudio` - Speaker diarization (optional, iOS 17+)
 5. Click **Add Package**
 
 #### Via Package.swift
@@ -283,8 +283,8 @@ targets: [
         name: "YourApp",
         dependencies: [
             .product(name: "RunAnywhere", package: "runanywhere-sdks"),
-            .product(name: "LLMSwift", package: "runanywhere-sdks"),
-            .product(name: "WhisperKitTranscription", package: "runanywhere-sdks")
+            .product(name: "RunAnywhereLlamaCPP", package: "runanywhere-sdks"),
+            .product(name: "RunAnywhereWhisperKit", package: "runanywhere-sdks")
         ]
     )
 ]
