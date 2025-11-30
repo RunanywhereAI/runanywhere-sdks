@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -568,7 +569,7 @@ private fun MainVoiceAssistantUI(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Icon(
-                    imageVector = if (showModelInfo) Icons.Default.Info else Icons.Default.Info,
+                    imageVector = if (showModelInfo) Icons.Filled.Info else Icons.Outlined.Info,
                     contentDescription = if (showModelInfo) "Hide Models" else "Show Models",
                     tint = if (showModelInfo) AppColors.primaryBlue else MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -894,11 +895,13 @@ private fun MicrophoneButton(
     Box(contentAlignment = Alignment.Center) {
         // Pulsing effect when speech detected
         if (isSpeechDetected) {
-            val pulseScale by animateFloatAsState(
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
+            val pulseScale by infiniteTransition.animateFloat(
+                initialValue = 1f,
                 targetValue = 1.3f,
                 animationSpec = infiniteRepeatable(
                     animation = tween(1000),
-                    repeatMode = RepeatMode.Restart
+                    repeatMode = RepeatMode.Reverse
                 ),
                 label = "pulse"
             )
