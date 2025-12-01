@@ -159,6 +159,15 @@ export interface NativeRunAnywhereModule {
   transcribe(audioBase64: string, sampleRate: number, language?: string): Promise<string>;
 
   /**
+   * Transcribe audio from a file path.
+   * Automatically handles format conversion to 16kHz mono PCM.
+   * @param filePath - Path to the audio file
+   * @param language - Optional language code (e.g., "en")
+   * @returns JSON string with transcription result
+   */
+  transcribeFile(filePath: string, language: string | null): Promise<string>;
+
+  /**
    * Check if STT streaming is supported
    */
   supportsSTTStreaming(): Promise<boolean>;
@@ -209,6 +218,32 @@ export interface NativeRunAnywhereModule {
    * Destroy an STT stream
    */
   destroySTTStream(streamHandle: number): void;
+
+  // ============================================================================
+  // Streaming STT (AVAudioEngine-based, matching Swift SDK pattern)
+  // ============================================================================
+
+  /**
+   * Start streaming speech-to-text transcription
+   * Uses AVAudioEngine for real-time audio capture at 16kHz mono
+   * Results are delivered via onSTTPartial and onSTTFinal events
+   * @param language - Language code (e.g., "en")
+   * @returns true if streaming started successfully
+   */
+  startStreamingSTT(language: string): Promise<boolean>;
+
+  /**
+   * Stop streaming speech-to-text transcription
+   * Final transcription result (if any) will be emitted via onSTTFinal event
+   * @returns true if streaming was stopped successfully
+   */
+  stopStreamingSTT(): Promise<boolean>;
+
+  /**
+   * Check if streaming STT is currently active
+   * @returns true if streaming is active
+   */
+  isStreamingSTT(): Promise<boolean>;
 
   // ============================================================================
   // Text-to-Speech (TTS)

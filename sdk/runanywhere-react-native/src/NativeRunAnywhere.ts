@@ -221,6 +221,16 @@ export interface Spec extends TurboModule {
   transcribe(audioBase64: string, sampleRate: number, language: string | null): string;
 
   /**
+   * Transcribe audio from a file path.
+   * Automatically handles format conversion to 16kHz mono PCM.
+   * Supports various audio formats (M4A, AAC, WAV, CAF, etc.)
+   * @param filePath Path to the audio file
+   * @param language Optional language code (e.g., "en")
+   * @returns JSON string with transcription result
+   */
+  transcribeFile(filePath: string, language: string | null): string;
+
+  /**
    * Check if STT supports streaming.
    * @returns true if streaming is supported
    */
