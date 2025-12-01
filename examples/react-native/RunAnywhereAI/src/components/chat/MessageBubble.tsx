@@ -79,7 +79,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         ]}
       >
         {/* Model Info Badge (for assistant messages) */}
-        {isAssistant && message.modelInfo && (
+        {isAssistant && message.modelInfo && message.modelInfo.frameworkDisplayName && (
           <View style={styles.modelBadge}>
             <Icon name="cube-outline" size={10} color={Colors.primaryBlue} />
             <Text style={styles.modelBadgeText}>
@@ -144,13 +144,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
 
           {/* Analytics (for assistant messages) */}
-          {isAssistant && message.analytics && (
+          {isAssistant && message.analytics && message.analytics.averageTokensPerSecond != null && message.analytics.averageTokensPerSecond > 0 && (
             <View style={styles.analytics}>
-              {message.analytics.averageTokensPerSecond && (
-                <Text style={styles.analyticsText}>
-                  {formatTPS(message.analytics.averageTokensPerSecond)}
-                </Text>
-              )}
+              <Text style={styles.analyticsText}>
+                {formatTPS(message.analytics.averageTokensPerSecond)}
+              </Text>
             </View>
           )}
         </View>

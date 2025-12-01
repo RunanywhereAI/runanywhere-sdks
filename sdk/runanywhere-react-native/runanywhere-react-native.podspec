@@ -5,9 +5,9 @@ folly_compiler_flags = '-DFOLLY_NO_CONFIG -DFOLLY_MOBILE=1 -DFOLLY_USE_LIBCPP=1 
 
 # XCFramework configuration
 # Update these values when new versions are released
-# Latest unified framework with all backends (ONNX Runtime + LlamaCPP)
-XCFRAMEWORK_VERSION = "0.0.1-dev.1f175bc"
-XCFRAMEWORK_CHECKSUM = "4207fba7c79dc0586d610e86a08ec731dc7b8a7ae1ca43bddec2a88d59356a94"
+# Latest unified framework with all backends (ONNX Runtime + LlamaCPP + Sherpa-ONNX)
+XCFRAMEWORK_VERSION = "0.0.1-dev.df97abe"
+XCFRAMEWORK_CHECKSUM = "b250a568629ec40b40357b1d50f9b2bc466dafb735636c26ce79c8fcf6bb0b01"
 XCFRAMEWORK_NAME = "RunAnywhereCore"
 
 Pod::Spec.new do |s|

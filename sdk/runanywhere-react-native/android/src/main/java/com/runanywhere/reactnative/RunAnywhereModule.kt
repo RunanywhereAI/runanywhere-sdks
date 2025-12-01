@@ -20,6 +20,10 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * Bridges React Native to the native RunAnywhere C library via JNI.
  * Uses the RunAnywhereBridge JNI wrapper from runanywhere-core.
+ *
+ * IMPORTANT: Dual-backend architecture:
+ * - llamaBackendHandle: Used for LlamaCPP (GGUF models, LLM text generation)
+ * - onnxBackendHandle: Used for ONNX (Sherpa-ONNX STT, TTS, VAD)
  */
 @ReactModule(name = RunAnywhereModule.NAME)
 class RunAnywhereModule(reactContext: ReactApplicationContext) :
@@ -27,21 +31,31 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
 
     companion object {
         const val NAME = "RunAnywhere"
+        private const val TAG = "RunAnywhere"
+        private const val MIN_GGUF_SIZE = 1L * 1024 * 1024 // 1MB minimum for GGUF files
 
         init {
             try {
                 // Load native libraries in order
+                Log.d(TAG, "Loading native libraries...")
                 System.loadLibrary("c++_shared")
                 System.loadLibrary("onnxruntime")
                 System.loadLibrary("runanywhere_bridge")
                 System.loadLibrary("runanywhere_jni")
+                Log.d(TAG, "Native libraries loaded successfully")
             } catch (e: UnsatisfiedLinkError) {
-                android.util.Log.e(NAME, "Failed to load native libraries: ${e.message}")
+                Log.e(TAG, "Failed to load native libraries: ${e.message}")
             }
         }
     }
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    // Dual-backend architecture (matches iOS implementation)
+    private var llamaBackendHandle: Long = 0  // For LlamaCPP (GGUF LLM models)
+    private var onnxBackendHandle: Long = 0   // For ONNX (STT, TTS, VAD via Sherpa-ONNX)
+
+    // Legacy support - maps to appropriate backend based on usage
     private var backendHandle: Long = 0
     private var isInitialized = false
     private val downloadJobs = ConcurrentHashMap<String, Job>()
@@ -134,6 +148,15 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
 
     override fun invalidate() {
         scope.cancel()
+        // Clean up both backends
+        if (llamaBackendHandle != 0L) {
+            RunAnywhereBridge.nativeDestroy(llamaBackendHandle)
+            llamaBackendHandle = 0
+        }
+        if (onnxBackendHandle != 0L) {
+            RunAnywhereBridge.nativeDestroy(onnxBackendHandle)
+            onnxBackendHandle = 0
+        }
         if (backendHandle != 0L) {
             RunAnywhereBridge.nativeDestroy(backendHandle)
             backendHandle = 0
@@ -159,13 +182,30 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun createBackend(name: String, promise: Promise) {
         scope.launch {
             try {
-                backendHandle = RunAnywhereBridge.nativeCreateBackend(name)
-                if (backendHandle != 0L) {
-                    promise.resolve(true)
+                Log.d(TAG, "createBackend called with name: $name")
+                val isLlamaCpp = name == "llamacpp"
+
+                if (isLlamaCpp) {
+                    // LlamaCPP backend for GGUF LLM models
+                    if (llamaBackendHandle != 0L) {
+                        RunAnywhereBridge.nativeDestroy(llamaBackendHandle)
+                    }
+                    llamaBackendHandle = RunAnywhereBridge.nativeCreateBackend(name)
+                    Log.d(TAG, "LlamaCPP backend created: ${if (llamaBackendHandle != 0L) "SUCCESS" else "FAILED"}")
+                    promise.resolve(llamaBackendHandle != 0L)
                 } else {
-                    promise.reject("CREATE_FAILED", "Failed to create backend")
+                    // ONNX backend for STT, TTS, VAD (Sherpa-ONNX)
+                    if (onnxBackendHandle != 0L) {
+                        RunAnywhereBridge.nativeDestroy(onnxBackendHandle)
+                    }
+                    onnxBackendHandle = RunAnywhereBridge.nativeCreateBackend(name)
+                    // Also set legacy backendHandle for compatibility
+                    backendHandle = onnxBackendHandle
+                    Log.d(TAG, "ONNX backend created: ${if (onnxBackendHandle != 0L) "SUCCESS" else "FAILED"}")
+                    promise.resolve(onnxBackendHandle != 0L)
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "createBackend error: ${e.message}", e)
                 promise.reject("CREATE_ERROR", e.message, e)
             }
         }
@@ -175,20 +215,39 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun initialize(configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                if (backendHandle == 0L) {
-                    // Auto-create ONNX backend if not created
-                    backendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
+                Log.d(TAG, "initialize called")
+
+                // Initialize LlamaCPP backend if it exists
+                if (llamaBackendHandle != 0L) {
+                    val llamaResult = RunAnywhereBridge.nativeInitialize(llamaBackendHandle, configJson)
+                    Log.d(TAG, "initialize llamacpp backend result: $llamaResult (0=SUCCESS)")
+                    if (llamaResult != 0) {
+                        val error = RunAnywhereBridge.nativeGetLastError()
+                        Log.e(TAG, "LlamaCPP init failed: $error")
+                    }
                 }
 
-                val result = RunAnywhereBridge.nativeInitialize(backendHandle, configJson)
-                if (result == 0) { // RA_SUCCESS
-                    isInitialized = true
-                    promise.resolve(true)
-                } else {
-                    val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("INIT_FAILED", error)
+                // Initialize ONNX backend if it exists (or auto-create if neither exists)
+                if (onnxBackendHandle == 0L && llamaBackendHandle == 0L) {
+                    // Auto-create ONNX backend if nothing exists
+                    Log.d(TAG, "No backend exists, auto-creating ONNX backend")
+                    onnxBackendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
+                    backendHandle = onnxBackendHandle
                 }
+
+                if (onnxBackendHandle != 0L) {
+                    val onnxResult = RunAnywhereBridge.nativeInitialize(onnxBackendHandle, configJson)
+                    Log.d(TAG, "initialize onnx backend result: $onnxResult (0=SUCCESS)")
+                    if (onnxResult != 0) {
+                        val error = RunAnywhereBridge.nativeGetLastError()
+                        Log.e(TAG, "ONNX init failed: $error")
+                    }
+                }
+
+                isInitialized = true
+                promise.resolve(true)
             } catch (e: Exception) {
+                Log.e(TAG, "initialize error: ${e.message}", e)
                 promise.reject("INIT_ERROR", e.message, e)
             }
         }
@@ -198,11 +257,19 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun destroy(promise: Promise) {
         scope.launch {
             try {
+                if (llamaBackendHandle != 0L) {
+                    RunAnywhereBridge.nativeDestroy(llamaBackendHandle)
+                    llamaBackendHandle = 0
+                }
+                if (onnxBackendHandle != 0L) {
+                    RunAnywhereBridge.nativeDestroy(onnxBackendHandle)
+                    onnxBackendHandle = 0
+                }
                 if (backendHandle != 0L) {
                     RunAnywhereBridge.nativeDestroy(backendHandle)
                     backendHandle = 0
-                    isInitialized = false
                 }
+                isInitialized = false
                 promise.resolve(true)
             } catch (e: Exception) {
                 promise.reject("DESTROY_ERROR", e.message, e)
@@ -212,42 +279,112 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
 
     @ReactMethod
     fun isInitialized(promise: Promise) {
-        promise.resolve(isInitialized && backendHandle != 0L &&
-            RunAnywhereBridge.nativeIsInitialized(backendHandle))
+        val llamaInit = llamaBackendHandle != 0L && RunAnywhereBridge.nativeIsInitialized(llamaBackendHandle)
+        val onnxInit = onnxBackendHandle != 0L && RunAnywhereBridge.nativeIsInitialized(onnxBackendHandle)
+        promise.resolve(isInitialized && (llamaInit || onnxInit))
     }
 
     @ReactMethod
     fun getBackendInfo(promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val info = RunAnywhereBridge.nativeGetBackendInfo(backendHandle)
-                promise.resolve(info)
+                Log.d(TAG, "getBackendInfo called")
+                val result = JSONObject()
+
+                // Get LlamaCPP backend info if available
+                if (llamaBackendHandle != 0L) {
+                    val llamaInfo = RunAnywhereBridge.nativeGetBackendInfo(llamaBackendHandle)
+                    if (llamaInfo != null) {
+                        val llamaJson = JSONObject(llamaInfo)
+                        for (key in llamaJson.keys()) {
+                            result.put(key, llamaJson.get(key))
+                        }
+                    }
+                }
+
+                // Get ONNX backend info if available
+                if (onnxBackendHandle != 0L) {
+                    val onnxInfo = RunAnywhereBridge.nativeGetBackendInfo(onnxBackendHandle)
+                    if (onnxInfo != null) {
+                        val onnxJson = JSONObject(onnxInfo)
+                        for (key in onnxJson.keys()) {
+                            result.put(key, onnxJson.get(key))
+                        }
+                    }
+                }
+
+                Log.d(TAG, "getBackendInfo: $result")
+                promise.resolve(result.toString())
             } catch (e: Exception) {
+                Log.e(TAG, "getBackendInfo error: ${e.message}", e)
                 promise.reject("ERROR", e.message, e)
             }
         }
     }
 
     // =============================================================================
-    // STT (Speech-to-Text)
+    // STT (Speech-to-Text) - Uses ONNX backend (Sherpa-ONNX)
     // =============================================================================
+
+    /**
+     * Ensures ONNX backend is available for STT/TTS/VAD operations
+     */
+    private suspend fun ensureOnnxBackend(): Long {
+        if (onnxBackendHandle == 0L) {
+            Log.d(TAG, "Creating ONNX backend for STT/TTS/VAD")
+            onnxBackendHandle = RunAnywhereBridge.nativeCreateBackend("onnx")
+            val initResult = RunAnywhereBridge.nativeInitialize(onnxBackendHandle, null)
+            Log.d(TAG, "ONNX backend init result: $initResult (0=SUCCESS)")
+            backendHandle = onnxBackendHandle
+        }
+        return onnxBackendHandle
+    }
 
     @ReactMethod
     fun loadSTTModel(modelPath: String, modelType: String, configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                Log.d(TAG, "loadSTTModel called - path: $modelPath, type: $modelType")
+
+                // Ensure ONNX backend is available
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "Failed to create ONNX backend")
+                    return@launch
+                }
+
+                // Check path exists
+                val file = File(modelPath)
+                if (!file.exists()) {
+                    Log.e(TAG, "loadSTTModel: Path does not exist: $modelPath")
+                    promise.reject("FILE_NOT_FOUND", "Model path does not exist: $modelPath")
+                    return@launch
+                }
+
+                // Detect actual model type for Sherpa-ONNX (matching iOS pattern)
+                // For Whisper models, we need to pass "whisper" as the type
+                val actualModelType = when {
+                    modelPath.contains("whisper", ignoreCase = true) -> "whisper"
+                    modelPath.contains("zipformer", ignoreCase = true) -> "zipformer"
+                    modelPath.contains("paraformer", ignoreCase = true) -> "paraformer"
+                    else -> modelType
+                }
+                Log.d(TAG, "loadSTTModel: Using model type '$actualModelType'")
+
                 val result = RunAnywhereBridge.nativeSTTLoadModel(
-                    backendHandle, modelPath, modelType, configJson
+                    handle, modelPath, actualModelType, null // Always pass null for config (per iOS pattern)
                 )
+
+                Log.d(TAG, "loadSTTModel result: $result (0=SUCCESS)")
                 if (result == 0) {
                     promise.resolve(true)
                 } else {
                     val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("STT_LOAD_FAILED", error)
+                    Log.e(TAG, "loadSTTModel failed: $error")
+                    promise.reject("STT_LOAD_FAILED", error ?: "Unknown error (code: $result)")
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadSTTModel error: ${e.message}", e)
                 promise.reject("STT_LOAD_ERROR", e.message, e)
             }
         }
@@ -256,8 +393,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun isSTTModelLoaded(promise: Promise) {
         try {
-            val loaded = backendHandle != 0L &&
-                RunAnywhereBridge.nativeSTTIsModelLoaded(backendHandle)
+            val loaded = onnxBackendHandle != 0L &&
+                RunAnywhereBridge.nativeSTTIsModelLoaded(onnxBackendHandle)
             promise.resolve(loaded)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message, e)
@@ -268,8 +405,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun unloadSTTModel(promise: Promise) {
         scope.launch {
             try {
-                if (backendHandle != 0L) {
-                    RunAnywhereBridge.nativeSTTUnloadModel(backendHandle)
+                if (onnxBackendHandle != 0L) {
+                    RunAnywhereBridge.nativeSTTUnloadModel(onnxBackendHandle)
                 }
                 promise.resolve(true)
             } catch (e: Exception) {
@@ -282,14 +419,18 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun transcribe(audioBase64: String, sampleRate: Int, language: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
 
                 // Decode base64 to float array
                 val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
                 val audioSamples = bytesToFloatArray(audioBytes)
 
                 val resultJson = RunAnywhereBridge.nativeSTTTranscribe(
-                    backendHandle, audioSamples, sampleRate, language
+                    handle, audioSamples, sampleRate, language
                 )
 
                 promise.resolve(resultJson ?: "{}")
@@ -303,8 +444,12 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun createSTTStream(configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val streamHandle = RunAnywhereBridge.nativeSTTCreateStream(backendHandle, configJson)
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
+                val streamHandle = RunAnywhereBridge.nativeSTTCreateStream(handle, configJson)
                 promise.resolve(streamHandle.toDouble())
             } catch (e: Exception) {
                 promise.reject("STREAM_ERROR", e.message, e)
@@ -316,13 +461,17 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun feedSTTAudio(streamId: Double, audioBase64: String, sampleRate: Int, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
                 val streamHandle = streamId.toLong()
                 val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
                 val audioSamples = bytesToFloatArray(audioBytes)
 
                 val result = RunAnywhereBridge.nativeSTTFeedAudio(
-                    backendHandle, streamHandle, audioSamples, sampleRate
+                    handle, streamHandle, audioSamples, sampleRate
                 )
                 promise.resolve(result == 0)
             } catch (e: Exception) {
@@ -335,9 +484,13 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun decodeSTT(streamId: Double, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
                 val streamHandle = streamId.toLong()
-                val result = RunAnywhereBridge.nativeSTTDecode(backendHandle, streamHandle)
+                val result = RunAnywhereBridge.nativeSTTDecode(handle, streamHandle)
                 promise.resolve(result ?: "{}")
             } catch (e: Exception) {
                 promise.reject("DECODE_ERROR", e.message, e)
@@ -349,8 +502,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun destroySTTStream(streamId: Double, promise: Promise) {
         scope.launch {
             try {
-                if (backendHandle != 0L) {
-                    RunAnywhereBridge.nativeSTTDestroyStream(backendHandle, streamId.toLong())
+                if (onnxBackendHandle != 0L) {
+                    RunAnywhereBridge.nativeSTTDestroyStream(onnxBackendHandle, streamId.toLong())
                 }
                 promise.resolve(true)
             } catch (e: Exception) {
@@ -360,24 +513,47 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     }
 
     // =============================================================================
-    // TTS (Text-to-Speech)
+    // TTS (Text-to-Speech) - Uses ONNX backend (Sherpa-ONNX with VITS)
     // =============================================================================
 
     @ReactMethod
     fun loadTTSModel(modelPath: String, modelType: String, configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                Log.d(TAG, "loadTTSModel called - path: $modelPath, type: $modelType")
+
+                // Ensure ONNX backend is available
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "Failed to create ONNX backend")
+                    return@launch
+                }
+
+                // Check path exists
+                val file = File(modelPath)
+                if (!file.exists()) {
+                    Log.e(TAG, "loadTTSModel: Path does not exist: $modelPath")
+                    promise.reject("FILE_NOT_FOUND", "Model path does not exist: $modelPath")
+                    return@launch
+                }
+
+                // IMPORTANT: Always use "vits" model type for Sherpa-ONNX TTS (per Swift SDK pattern)
+                // The Swift SDK hardcodes "vits" for all Piper TTS models
+                Log.d(TAG, "loadTTSModel: Using hardcoded model type 'vits' (Sherpa-ONNX pattern)")
                 val result = RunAnywhereBridge.nativeTTSLoadModel(
-                    backendHandle, modelPath, modelType, configJson
+                    handle, modelPath, "vits", null // Hardcoded "vits" per Swift SDK
                 )
+
+                Log.d(TAG, "loadTTSModel result: $result (0=SUCCESS)")
                 if (result == 0) {
                     promise.resolve(true)
                 } else {
                     val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("TTS_LOAD_FAILED", error)
+                    Log.e(TAG, "loadTTSModel failed: $error")
+                    promise.reject("TTS_LOAD_FAILED", error ?: "Unknown error (code: $result)")
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadTTSModel error: ${e.message}", e)
                 promise.reject("TTS_LOAD_ERROR", e.message, e)
             }
         }
@@ -386,8 +562,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun isTTSModelLoaded(promise: Promise) {
         try {
-            val loaded = backendHandle != 0L &&
-                RunAnywhereBridge.nativeTTSIsModelLoaded(backendHandle)
+            val loaded = onnxBackendHandle != 0L &&
+                RunAnywhereBridge.nativeTTSIsModelLoaded(onnxBackendHandle)
             promise.resolve(loaded)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message, e)
@@ -398,8 +574,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun unloadTTSModel(promise: Promise) {
         scope.launch {
             try {
-                if (backendHandle != 0L) {
-                    RunAnywhereBridge.nativeTTSUnloadModel(backendHandle)
+                if (onnxBackendHandle != 0L) {
+                    RunAnywhereBridge.nativeTTSUnloadModel(onnxBackendHandle)
                 }
                 promise.resolve(true)
             } catch (e: Exception) {
@@ -412,10 +588,14 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun synthesize(text: String, voiceId: String?, speedRate: Double, pitchShift: Double, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
 
                 val result = RunAnywhereBridge.nativeTTSSynthesize(
-                    backendHandle, text, voiceId,
+                    handle, text, voiceId,
                     speedRate.toFloat(), pitchShift.toFloat()
                 )
 
@@ -445,8 +625,12 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun getVoices(promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val voices = RunAnywhereBridge.nativeTTSGetVoices(backendHandle)
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
+                val voices = RunAnywhereBridge.nativeTTSGetVoices(handle)
                 promise.resolve(voices ?: "[]")
             } catch (e: Exception) {
                 promise.reject("ERROR", e.message, e)
@@ -455,22 +639,43 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     }
 
     // =============================================================================
-    // VAD (Voice Activity Detection)
+    // VAD (Voice Activity Detection) - Uses ONNX backend (Sherpa-ONNX Silero VAD)
     // =============================================================================
 
     @ReactMethod
     fun loadVADModel(modelPath: String?, configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val result = RunAnywhereBridge.nativeVADLoadModel(backendHandle, modelPath, configJson)
+                Log.d(TAG, "loadVADModel called - path: $modelPath")
+
+                // Ensure ONNX backend is available
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "Failed to create ONNX backend")
+                    return@launch
+                }
+
+                // Check path exists if provided
+                if (modelPath != null) {
+                    val file = File(modelPath)
+                    if (!file.exists()) {
+                        Log.e(TAG, "loadVADModel: Path does not exist: $modelPath")
+                        promise.reject("FILE_NOT_FOUND", "Model path does not exist: $modelPath")
+                        return@launch
+                    }
+                }
+
+                val result = RunAnywhereBridge.nativeVADLoadModel(handle, modelPath, null)
+                Log.d(TAG, "loadVADModel result: $result (0=SUCCESS)")
                 if (result == 0) {
                     promise.resolve(true)
                 } else {
                     val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("VAD_LOAD_FAILED", error)
+                    Log.e(TAG, "loadVADModel failed: $error")
+                    promise.reject("VAD_LOAD_FAILED", error ?: "Unknown error (code: $result)")
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadVADModel error: ${e.message}", e)
                 promise.reject("VAD_LOAD_ERROR", e.message, e)
             }
         }
@@ -479,8 +684,8 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun isVADModelLoaded(promise: Promise) {
         try {
-            val loaded = backendHandle != 0L &&
-                RunAnywhereBridge.nativeVADIsModelLoaded(backendHandle)
+            val loaded = onnxBackendHandle != 0L &&
+                RunAnywhereBridge.nativeVADIsModelLoaded(onnxBackendHandle)
             promise.resolve(loaded)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message, e)
@@ -491,11 +696,16 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun processVAD(audioBase64: String, sampleRate: Int, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
+
                 val audioBytes = Base64.decode(audioBase64, Base64.DEFAULT)
                 val audioSamples = bytesToFloatArray(audioBytes)
 
-                val result = RunAnywhereBridge.nativeVADProcess(backendHandle, audioSamples, sampleRate)
+                val result = RunAnywhereBridge.nativeVADProcess(handle, audioSamples, sampleRate)
                 if (result != null) {
                     val response = JSONObject().apply {
                         put("isSpeech", result.isSpeech)
@@ -512,22 +722,89 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     }
 
     // =============================================================================
-    // Text Generation (LLM)
+    // Text Generation (LLM) - Uses LlamaCPP backend for GGUF models
     // =============================================================================
+
+    /**
+     * Ensures LlamaCPP backend is available for LLM operations
+     */
+    private suspend fun ensureLlamaCppBackend(): Long {
+        if (llamaBackendHandle == 0L) {
+            Log.d(TAG, "Creating LlamaCPP backend for LLM")
+            llamaBackendHandle = RunAnywhereBridge.nativeCreateBackend("llamacpp")
+            val initResult = RunAnywhereBridge.nativeInitialize(llamaBackendHandle, null)
+            Log.d(TAG, "LlamaCPP backend init result: $initResult (0=SUCCESS)")
+        }
+        return llamaBackendHandle
+    }
 
     @ReactMethod
     fun loadTextModel(modelPath: String, configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val result = RunAnywhereBridge.nativeTextLoadModel(backendHandle, modelPath, configJson)
-                if (result == 0) {
-                    promise.resolve(true)
+                Log.d(TAG, "loadTextModel called - path: $modelPath")
+
+                // Check path exists
+                val file = File(modelPath)
+                if (!file.exists()) {
+                    Log.e(TAG, "loadTextModel: Path does not exist: $modelPath")
+                    promise.reject("FILE_NOT_FOUND", "Model path does not exist: $modelPath")
+                    return@launch
+                }
+
+                val isGGUF = modelPath.endsWith(".gguf", ignoreCase = true)
+                Log.d(TAG, "loadTextModel: File size: ${file.length()} bytes, isGGUF: $isGGUF")
+
+                // Check for corrupted GGUF files (matching iOS pattern)
+                if (isGGUF && file.length() < MIN_GGUF_SIZE) {
+                    Log.e(TAG, "loadTextModel: Model file appears corrupted (size: ${file.length()} bytes)")
+                    promise.reject(
+                        "MODEL_CORRUPTED",
+                        "Model file appears corrupted or incomplete (size: ${file.length()} bytes). " +
+                        "Please delete and re-download the model."
+                    )
+                    return@launch
+                }
+
+                // Use LlamaCPP backend for GGUF models
+                if (isGGUF) {
+                    Log.d(TAG, "loadTextModel: Creating/using LlamaCPP backend for GGUF model")
+                    val handle = ensureLlamaCppBackend()
+                    if (handle == 0L) {
+                        promise.reject("BACKEND_ERROR", "Failed to create LlamaCPP backend")
+                        return@launch
+                    }
+
+                    val result = RunAnywhereBridge.nativeTextLoadModel(handle, modelPath, configJson)
+                    Log.d(TAG, "loadTextModel result (LlamaCPP): $result (0=SUCCESS)")
+                    if (result == 0) {
+                        promise.resolve(true)
+                    } else {
+                        val error = RunAnywhereBridge.nativeGetLastError()
+                        Log.e(TAG, "loadTextModel failed: $error")
+                        promise.reject("TEXT_LOAD_FAILED", error ?: "Unknown error (code: $result)")
+                    }
                 } else {
-                    val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("TEXT_LOAD_FAILED", error)
+                    // Use ONNX backend for non-GGUF models
+                    Log.d(TAG, "loadTextModel: Using ONNX backend for non-GGUF model")
+                    val handle = ensureOnnxBackend()
+                    if (handle == 0L) {
+                        promise.reject("BACKEND_ERROR", "Failed to create ONNX backend")
+                        return@launch
+                    }
+
+                    val result = RunAnywhereBridge.nativeTextLoadModel(handle, modelPath, configJson)
+                    Log.d(TAG, "loadTextModel result (ONNX): $result (0=SUCCESS)")
+                    if (result == 0) {
+                        promise.resolve(true)
+                    } else {
+                        val error = RunAnywhereBridge.nativeGetLastError()
+                        Log.e(TAG, "loadTextModel failed: $error")
+                        promise.reject("TEXT_LOAD_FAILED", error ?: "Unknown error (code: $result)")
+                    }
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadTextModel error: ${e.message}", e)
                 promise.reject("TEXT_LOAD_ERROR", e.message, e)
             }
         }
@@ -536,9 +813,12 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun isTextModelLoaded(promise: Promise) {
         try {
-            val loaded = backendHandle != 0L &&
-                RunAnywhereBridge.nativeTextIsModelLoaded(backendHandle)
-            promise.resolve(loaded)
+            // Check both backends
+            val llamaLoaded = llamaBackendHandle != 0L &&
+                RunAnywhereBridge.nativeTextIsModelLoaded(llamaBackendHandle)
+            val onnxLoaded = onnxBackendHandle != 0L &&
+                RunAnywhereBridge.nativeTextIsModelLoaded(onnxBackendHandle)
+            promise.resolve(llamaLoaded || onnxLoaded)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message, e)
         }
@@ -548,13 +828,32 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun generate(prompt: String, systemPrompt: String?, maxTokens: Int, temperature: Double, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
+                Log.d(TAG, "generate called - prompt: ${prompt.take(50)}..., maxTokens: $maxTokens, temp: $temperature")
+
+                // Try LlamaCPP backend first (for GGUF models)
+                val handle = if (llamaBackendHandle != 0L &&
+                    RunAnywhereBridge.nativeTextIsModelLoaded(llamaBackendHandle)) {
+                    Log.d(TAG, "generate: Using LlamaCPP backend")
+                    llamaBackendHandle
+                } else if (onnxBackendHandle != 0L &&
+                    RunAnywhereBridge.nativeTextIsModelLoaded(onnxBackendHandle)) {
+                    Log.d(TAG, "generate: Using ONNX backend")
+                    onnxBackendHandle
+                } else {
+                    Log.e(TAG, "generate: No model loaded")
+                    promise.reject("NO_MODEL", "No text model is loaded")
+                    return@launch
+                }
+
+                Log.d(TAG, "generate: Calling nativeTextGenerate...")
                 val result = RunAnywhereBridge.nativeTextGenerate(
-                    backendHandle, prompt, systemPrompt,
+                    handle, prompt, systemPrompt,
                     maxTokens, temperature.toFloat()
                 )
+                Log.d(TAG, "generate: Result received, length: ${result?.length ?: 0}")
                 promise.resolve(result ?: "{}")
             } catch (e: Exception) {
+                Log.e(TAG, "generate error: ${e.message}", e)
                 promise.reject("GENERATE_ERROR", e.message, e)
             }
         }
@@ -563,8 +862,11 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun cancelGeneration(promise: Promise) {
         try {
-            if (backendHandle != 0L) {
-                RunAnywhereBridge.nativeTextCancel(backendHandle)
+            if (llamaBackendHandle != 0L) {
+                RunAnywhereBridge.nativeTextCancel(llamaBackendHandle)
+            }
+            if (onnxBackendHandle != 0L) {
+                RunAnywhereBridge.nativeTextCancel(onnxBackendHandle)
             }
             promise.resolve(true)
         } catch (e: Exception) {
@@ -573,22 +875,32 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     }
 
     // =============================================================================
-    // Embeddings
+    // Embeddings - Uses ONNX backend
     // =============================================================================
 
     @ReactMethod
     fun loadEmbeddingModel(modelPath: String, configJson: String?, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val result = RunAnywhereBridge.nativeEmbedLoadModel(backendHandle, modelPath, configJson)
+                Log.d(TAG, "loadEmbeddingModel called - path: $modelPath")
+
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "Failed to create ONNX backend")
+                    return@launch
+                }
+
+                val result = RunAnywhereBridge.nativeEmbedLoadModel(handle, modelPath, configJson)
+                Log.d(TAG, "loadEmbeddingModel result: $result (0=SUCCESS)")
                 if (result == 0) {
                     promise.resolve(true)
                 } else {
                     val error = RunAnywhereBridge.nativeGetLastError()
-                    promise.reject("EMBED_LOAD_FAILED", error)
+                    Log.e(TAG, "loadEmbeddingModel failed: $error")
+                    promise.reject("EMBED_LOAD_FAILED", error ?: "Unknown error (code: $result)")
                 }
             } catch (e: Exception) {
+                Log.e(TAG, "loadEmbeddingModel error: ${e.message}", e)
                 promise.reject("EMBED_LOAD_ERROR", e.message, e)
             }
         }
@@ -598,8 +910,13 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     fun embedText(text: String, promise: Promise) {
         scope.launch {
             try {
-                ensureInitialized()
-                val embedding = RunAnywhereBridge.nativeEmbedText(backendHandle, text)
+                val handle = ensureOnnxBackend()
+                if (handle == 0L) {
+                    promise.reject("BACKEND_ERROR", "ONNX backend not available")
+                    return@launch
+                }
+
+                val embedding = RunAnywhereBridge.nativeEmbedText(handle, text)
                 if (embedding != null) {
                     val array = Arguments.createArray()
                     embedding.forEach { array.pushDouble(it.toDouble()) }
@@ -960,12 +1277,6 @@ class RunAnywhereModule(reactContext: ReactApplicationContext) :
     // =============================================================================
     // Private Helpers
     // =============================================================================
-
-    private fun ensureInitialized() {
-        if (backendHandle == 0L) {
-            throw IllegalStateException("Backend not initialized. Call initialize() first.")
-        }
-    }
 
     private fun bytesToFloatArray(bytes: ByteArray): FloatArray {
         // Assuming bytes are float32 little-endian

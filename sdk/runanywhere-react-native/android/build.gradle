@@ -15,9 +15,10 @@ buildscript {
 // Native Library Configuration
 // =============================================================================
 // Update these values when new versions are released
-def NATIVE_VERSION = "0.0.1-dev.1f175bc"
-def ONNX_NATIVE_CHECKSUM = "d0f0e0e800bb7acca0e6832ea35070eff1a17b291b14725ebed54b411823f563"
-def LLAMACPP_NATIVE_CHECKSUM = "087e7fdf0ab35577a168bb56a8c56f34e6a4987a7ea57f23255885afbf3e82fe"
+// Latest unified release with ONNX Runtime + LlamaCPP + Sherpa-ONNX
+def NATIVE_VERSION = "0.0.1-dev.df97abe"
+def ONNX_NATIVE_CHECKSUM = "484769949a3e16bbee891df800ec037d3c0e0cdbe53154027fddc19c3a2f940c"
+def LLAMACPP_NATIVE_CHECKSUM = "9819f4819eeef979ed592debf85e8f599ad00290151993c15c160547f565d03d"
 
 def isNewArchitectureEnabled() {
     return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
