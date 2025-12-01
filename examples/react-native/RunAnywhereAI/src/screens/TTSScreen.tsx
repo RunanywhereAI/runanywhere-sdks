@@ -17,6 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useFocusEffect } from '@react-navigation/native';
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs';
 import { Colors } from '../theme/colors';
@@ -69,45 +70,58 @@ export const TTSScreen: React.FC = () => {
     };
   }, [audioFilePath]);
 
-  // Load available models and check for loaded model on mount
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        // Get available TTS models from catalog
-        const allModels = await RunAnywhere.getAvailableModels();
-        const ttsModels = allModels.filter((m) => m.modality === 'tts');
-        setAvailableModels(ttsModels);
-        console.log('[TTSScreen] Available TTS models:', ttsModels.map(m => `${m.id} (downloaded: ${m.isDownloaded})`));
+  /**
+   * Load available models and check for loaded model
+   * Called on mount and when screen comes into focus
+   */
+  const loadModels = useCallback(async () => {
+    try {
+      // Get available TTS models from catalog
+      const allModels = await RunAnywhere.getAvailableModels();
+      const ttsModels = allModels.filter((m) => m.modality === 'tts');
+      setAvailableModels(ttsModels);
 
-        // Check if model is already loaded
-        const isLoaded = await RunAnywhere.isTTSModelLoaded();
-        console.log('[TTSScreen] Init - isTTSModelLoaded:', isLoaded, 'currentModel:', currentModel);
-        if (isLoaded && !currentModel) {
-          // Try to find which model is loaded from downloaded models
-          const downloadedTts = ttsModels.filter(m => m.isDownloaded);
-          if (downloadedTts.length > 0) {
-            // Use the first downloaded model as the likely loaded one
-            setCurrentModel({
-              id: downloadedTts[0]!.id,
-              name: downloadedTts[0]!.name,
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
-            console.log('[TTSScreen] Init - Set currentModel from downloaded:', downloadedTts[0]!.name);
-          } else {
-            setCurrentModel({
-              id: 'tts-model',
-              name: 'TTS Model (Loaded)',
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
-            console.log('[TTSScreen] Init - Set currentModel as generic TTS Model');
-          }
+      // Log downloaded status for debugging
+      const downloadedModels = ttsModels.filter(m => m.isDownloaded);
+      console.log('[TTSScreen] Available TTS models:', ttsModels.map(m => `${m.id} (downloaded: ${m.isDownloaded})`));
+      console.log('[TTSScreen] Downloaded TTS models:', downloadedModels.map(m => m.id));
+
+      // Check if model is already loaded
+      const isLoaded = await RunAnywhere.isTTSModelLoaded();
+      console.log('[TTSScreen] isTTSModelLoaded:', isLoaded);
+      if (isLoaded && !currentModel) {
+        // Try to find which model is loaded from downloaded models
+        const downloadedTts = ttsModels.filter(m => m.isDownloaded);
+        if (downloadedTts.length > 0) {
+          // Use the first downloaded model as the likely loaded one
+          setCurrentModel({
+            id: downloadedTts[0]!.id,
+            name: downloadedTts[0]!.name,
+            preferredFramework: LLMFramework.ONNX,
+          } as ModelInfo);
+          console.log('[TTSScreen] Set currentModel from downloaded:', downloadedTts[0]!.name);
+        } else {
+          setCurrentModel({
+            id: 'tts-model',
+            name: 'TTS Model (Loaded)',
+            preferredFramework: LLMFramework.ONNX,
+          } as ModelInfo);
+          console.log('[TTSScreen] Set currentModel as generic TTS Model');
         }
-      } catch (error) {
-        console.log('[TTSScreen] Error initializing:', error);
       }
-    };
-    initialize();
-  }, []);
+    } catch (error) {
+      console.log('[TTSScreen] Error loading models:', error);
+    }
+  }, [currentModel]);
+
+  // Refresh models when screen comes into focus
+  // This ensures we pick up any models downloaded in the Settings tab
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[TTSScreen] Screen focused - refreshing models');
+      loadModels();
+    }, [loadModels])
+  );
 
   /**
    * Handle model selection - shows available downloaded models

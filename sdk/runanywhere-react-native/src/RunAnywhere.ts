@@ -564,6 +564,150 @@ export const RunAnywhere = {
     }
   },
 
+  /**
+   * Transcribe audio from a file path.
+   * Automatically handles format conversion to 16kHz mono PCM.
+   * Supports various audio formats (M4A, AAC, WAV, CAF, etc.)
+   *
+   * @param filePath - Path to the audio file
+   * @param options - STT options (language, etc.)
+   * @returns Transcription result
+   *
+   * @example
+   * ```typescript
+   * const result = await RunAnywhere.transcribeFile('/path/to/audio.m4a', { language: 'en' });
+   * console.log('Transcript:', result.text);
+   * ```
+   */
+  async transcribeFile(
+    filePath: string,
+    options?: STTOptions
+  ): Promise<STTResult> {
+    if (!isNativeModuleAvailable()) {
+      throw new Error('Native module not available');
+    }
+    const native = requireNativeModule();
+
+    const language = options?.language ?? null;
+    const resultJson = await native.transcribeFile(filePath, language);
+
+    try {
+      const result = JSON.parse(resultJson);
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      return {
+        text: result.text ?? '',
+        segments: result.segments ?? [],
+        language: result.language,
+        confidence: result.confidence ?? 1.0,
+        duration: result.duration ?? 0,
+        alternatives: result.alternatives ?? [],
+      };
+    } catch (e) {
+      if (resultJson.includes('error')) {
+        const errorMatch = resultJson.match(/"error":\s*"([^"]+)"/);
+        throw new Error(errorMatch ? errorMatch[1] : resultJson);
+      }
+      return {
+        text: resultJson,
+        segments: [],
+        confidence: 1.0,
+        duration: 0,
+        alternatives: [],
+      };
+    }
+  },
+
+  // ============================================================================
+  // Streaming STT (Real-time transcription with AVAudioEngine)
+  // ============================================================================
+
+  /**
+   * Start streaming speech-to-text transcription
+   *
+   * Uses AVAudioEngine for real-time audio capture at 16kHz mono.
+   * Transcription results are delivered via events:
+   * - onSTTPartial: Partial results as audio is processed
+   * - onSTTFinal: Final result when streaming stops
+   * - onSTTError: Error during transcription
+   *
+   * @param language - Language code (e.g., 'en')
+   * @param onPartial - Callback for partial transcription results
+   * @param onFinal - Callback for final transcription result
+   * @param onError - Callback for errors
+   * @returns true if streaming started successfully
+   *
+   * @example
+   * ```typescript
+   * await RunAnywhere.startStreamingSTT('en',
+   *   (text) => console.log('Partial:', text),
+   *   (text) => console.log('Final:', text),
+   *   (error) => console.error('Error:', error)
+   * );
+   * // ... user speaks ...
+   * await RunAnywhere.stopStreamingSTT();
+   * ```
+   */
+  async startStreamingSTT(
+    language: string = 'en',
+    onPartial?: (text: string, confidence: number) => void,
+    onFinal?: (text: string, confidence: number) => void,
+    onError?: (error: string) => void
+  ): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      console.warn('[RunAnywhere] Native module not available for startStreamingSTT');
+      return false;
+    }
+    const native = requireNativeModule();
+
+    // Subscribe to Voice/STT events
+    if (onPartial || onFinal || onError) {
+      EventBus.onVoice((event) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const evt = event as any;
+        if (evt.type === 'sttPartialResult' && onPartial) {
+          onPartial(evt.text || '', evt.confidence || 0);
+        } else if (evt.type === 'sttCompleted' && onFinal) {
+          onFinal(evt.text || '', evt.confidence || 0);
+        } else if (evt.type === 'sttFailed' && onError) {
+          onError(evt.error || 'Unknown error');
+        }
+      });
+    }
+
+    return native.startStreamingSTT(language);
+  },
+
+  /**
+   * Stop streaming speech-to-text transcription
+   *
+   * Stops audio capture and processing. Any remaining audio will be
+   * transcribed and delivered via the onSTTFinal event.
+   *
+   * @returns true if streaming was stopped successfully
+   */
+  async stopStreamingSTT(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.stopStreamingSTT();
+  },
+
+  /**
+   * Check if streaming STT is currently active
+   *
+   * @returns true if streaming is active
+   */
+  async isStreamingSTT(): Promise<boolean> {
+    if (!isNativeModuleAvailable()) {
+      return false;
+    }
+    const native = requireNativeModule();
+    return native.isStreamingSTT();
+  },
+
   // ============================================================================
   // Text-to-Speech (TTS)
   // ============================================================================

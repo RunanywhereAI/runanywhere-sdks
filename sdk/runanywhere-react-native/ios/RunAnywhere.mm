@@ -1,5 +1,6 @@
 #import "RunAnywhere.h"
 #import <Foundation/Foundation.h>
+#import <AVFoundation/AVFoundation.h>  // For audio file reading and conversion
 #import <bzlib.h>  // For bz2 decompression
 
 #ifdef RCT_NEW_ARCH_ENABLED
@@ -16,6 +17,10 @@ extern "C" {
 #include "../cpp/include/runanywhere_bridge.h"
 }
 
+// Streaming audio constants (following Swift SDK's AudioCapture pattern)
+static const int kMinBufferSize = 1600;  // 100ms at 16kHz
+static const int kTranscriptionBufferSize = 16000;  // 1 second of audio for transcription
+
 @implementation RunAnywhere {
 #ifdef RCT_NEW_ARCH_ENABLED
     std::shared_ptr<facebook::react::RunAnywhereModule> _nativeModule;
@@ -24,6 +29,17 @@ extern "C" {
     ra_backend_handle _llamaBackend;   // LlamaCPP backend for text generation (GGUF models)
     NSMutableDictionary<NSString *, NSURLSessionDownloadTask *> *_downloadTasks;
     NSURLSession *_downloadSession;
+
+    // Streaming audio capture
+    AVAudioEngine *_audioEngine;
+    AVAudioConverter *_audioConverter;
+    NSMutableArray<NSNumber *> *_audioBuffer;
+    BOOL _isStreamingSTT;
+    int _sequenceNumber;
+    NSString *_streamingLanguage;
+    dispatch_queue_t _audioProcessingQueue;
+    NSTimer *_transcriptionTimer;
+    NSTimeInterval _lastTranscriptionTime;
 }
 
 RCT_EXPORT_MODULE()
@@ -45,11 +61,25 @@ RCT_EXPORT_MODULE()
         _downloadSession = [NSURLSession sessionWithConfiguration:config
                                                          delegate:nil
                                                     delegateQueue:[NSOperationQueue mainQueue]];
+
+        // Initialize streaming audio capture state
+        _audioEngine = nil;
+        _audioConverter = nil;
+        _audioBuffer = [NSMutableArray new];
+        _isStreamingSTT = NO;
+        _sequenceNumber = 0;
+        _streamingLanguage = nil;
+        _audioProcessingQueue = dispatch_queue_create("com.runanywhere.audioprocessing", DISPATCH_QUEUE_SERIAL);
+        _transcriptionTimer = nil;
+        _lastTranscriptionTime = 0;
     }
     return self;
 }
 
 - (void)dealloc {
+    // Stop streaming if active
+    [self stopStreamingSTTInternal];
+
     if (_llamaBackend) {
         ra_destroy(_llamaBackend);
         _llamaBackend = nullptr;
@@ -68,6 +98,8 @@ RCT_EXPORT_MODULE()
         @"onSTTPartial",
         @"onSTTFinal",
         @"onSTTError",
+        @"onSTTStreamingStarted",
+        @"onSTTStreamingStopped",
         @"onTTSAudio",
         @"onTTSComplete",
         @"onTTSError",
@@ -1040,6 +1072,481 @@ RCT_EXPORT_METHOD(transcribe:(NSString *)audioBase64
     resolve(resultStr);
 }
 
+RCT_EXPORT_METHOD(transcribeFile:(NSString *)filePath
+                  language:(NSString *)language
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] transcribeFile called with path: %@", filePath);
+
+    if (!_backend) {
+        resolve(@"{\"error\": \"Backend not initialized\"}");
+        return;
+    }
+
+    // Remove file:// prefix if present
+    NSString *cleanPath = filePath;
+    if ([filePath hasPrefix:@"file://"]) {
+        cleanPath = [filePath substringFromIndex:7];
+    }
+
+    // Check file exists
+    if (![[NSFileManager defaultManager] fileExistsAtPath:cleanPath]) {
+        NSLog(@"[RunAnywhere] transcribeFile: File not found at path: %@", cleanPath);
+        resolve(@"{\"error\": \"Audio file not found\"}");
+        return;
+    }
+
+    // Read audio file and convert to float samples
+    NSURL *fileURL = [NSURL fileURLWithPath:cleanPath];
+    NSError *error = nil;
+
+    // Use AVAudioFile to read and convert audio
+    AVAudioFile *audioFile = [[AVAudioFile alloc] initForReading:fileURL error:&error];
+    if (error || !audioFile) {
+        NSLog(@"[RunAnywhere] transcribeFile: Failed to open audio file: %@", error);
+        resolve([NSString stringWithFormat:@"{\"error\": \"Failed to open audio file: %@\"}", error.localizedDescription]);
+        return;
+    }
+
+    AVAudioFormat *inputFormat = audioFile.processingFormat;
+    NSLog(@"[RunAnywhere] transcribeFile: Input format - sampleRate: %.0f, channels: %d",
+          inputFormat.sampleRate, (int)inputFormat.channelCount);
+
+    // Create output format: mono, 16kHz, float32
+    AVAudioFormat *outputFormat = [[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatFloat32
+                                                                   sampleRate:16000
+                                                                     channels:1
+                                                                  interleaved:NO];
+
+    // Create converter
+    AVAudioConverter *converter = [[AVAudioConverter alloc] initFromFormat:inputFormat toFormat:outputFormat];
+    if (!converter) {
+        NSLog(@"[RunAnywhere] transcribeFile: Failed to create audio converter");
+        resolve(@"{\"error\": \"Failed to create audio format converter\"}");
+        return;
+    }
+
+    // Calculate output buffer size
+    AVAudioFrameCount inputFrameCount = (AVAudioFrameCount)audioFile.length;
+    double ratio = 16000.0 / inputFormat.sampleRate;
+    AVAudioFrameCount outputFrameCount = (AVAudioFrameCount)(inputFrameCount * ratio) + 1024;
+
+    // Read input audio
+    AVAudioPCMBuffer *inputBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:inputFormat
+                                                                  frameCapacity:inputFrameCount];
+    if (![audioFile readIntoBuffer:inputBuffer error:&error] || error) {
+        NSLog(@"[RunAnywhere] transcribeFile: Failed to read audio file: %@", error);
+        resolve([NSString stringWithFormat:@"{\"error\": \"Failed to read audio file: %@\"}", error.localizedDescription]);
+        return;
+    }
+
+    // Create output buffer
+    AVAudioPCMBuffer *outputBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:outputFormat
+                                                                   frameCapacity:outputFrameCount];
+
+    // Convert audio
+    __block BOOL inputDone = NO;
+    AVAudioConverterInputBlock inputBlock = ^AVAudioBuffer *(AVAudioPacketCount inNumberOfPackets, AVAudioConverterInputStatus *outStatus) {
+        if (inputDone) {
+            *outStatus = AVAudioConverterInputStatus_EndOfStream;
+            return nil;
+        }
+        inputDone = YES;
+        *outStatus = AVAudioConverterInputStatus_HaveData;
+        return inputBuffer;
+    };
+
+    NSError *convertError = nil;
+    AVAudioConverterOutputStatus status = [converter convertToBuffer:outputBuffer error:&convertError withInputFromBlock:inputBlock];
+
+    if (status == AVAudioConverterOutputStatus_Error || convertError) {
+        NSLog(@"[RunAnywhere] transcribeFile: Audio conversion failed: %@", convertError);
+        resolve([NSString stringWithFormat:@"{\"error\": \"Audio conversion failed: %@\"}", convertError.localizedDescription]);
+        return;
+    }
+
+    // Get float samples
+    const float *samples = outputBuffer.floatChannelData[0];
+    size_t numSamples = outputBuffer.frameLength;
+
+    NSLog(@"[RunAnywhere] transcribeFile: Converted %zu samples at 16kHz (%.2f seconds)",
+          numSamples, (double)numSamples / 16000.0);
+
+    // Perform transcription
+    char *resultJson = nullptr;
+    ra_result_code result = ra_stt_transcribe(
+        _backend,
+        samples,
+        numSamples,
+        16000,
+        language ? [language UTF8String] : nullptr,
+        &resultJson
+    );
+
+    if (result != RA_SUCCESS || !resultJson) {
+        const char *error = ra_get_last_error();
+        NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown transcription error";
+        NSLog(@"[RunAnywhere] transcribeFile: Transcription failed: %@", errorMsg);
+        resolve([NSString stringWithFormat:@"{\"error\": \"Transcription failed: %@\"}", errorMsg]);
+        return;
+    }
+
+    NSString *resultStr = [NSString stringWithUTF8String:resultJson];
+    ra_free_string(resultJson);
+
+    NSLog(@"[RunAnywhere] transcribeFile: Success - result: %@", resultStr);
+    resolve(resultStr);
+}
+
+// ============================================================================
+// Streaming STT Methods (AVAudioEngine-based, matching Swift SDK pattern)
+// ============================================================================
+
+/**
+ * Start streaming speech-to-text transcription using AVAudioEngine
+ * This follows the Swift SDK's AudioCapture pattern for real-time audio capture
+ */
+RCT_EXPORT_METHOD(startStreamingSTT:(NSString *)language
+                  resolver:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] startStreamingSTT called - language: %@", language);
+
+    // Check if STT model is loaded
+    if (!_backend || !ra_stt_is_model_loaded(_backend)) {
+        NSLog(@"[RunAnywhere] startStreamingSTT: STT model not loaded");
+        reject(@"MODEL_NOT_LOADED", @"STT model not loaded. Please load a model first.", nil);
+        return;
+    }
+
+    // Check if already streaming
+    if (_isStreamingSTT) {
+        NSLog(@"[RunAnywhere] startStreamingSTT: Already streaming");
+        reject(@"ALREADY_STREAMING", @"Streaming STT is already active", nil);
+        return;
+    }
+
+    _streamingLanguage = language;
+    _sequenceNumber = 0;
+    [_audioBuffer removeAllObjects];
+    _lastTranscriptionTime = [[NSDate date] timeIntervalSince1970];
+
+    // Start audio engine on main thread
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSError *error = nil;
+        BOOL started = [self startAudioEngineWithError:&error];
+
+        if (!started) {
+            NSLog(@"[RunAnywhere] startStreamingSTT: Failed to start audio engine: %@", error);
+            reject(@"AUDIO_ENGINE_ERROR", error.localizedDescription ?: @"Failed to start audio engine", nil);
+            return;
+        }
+
+        self->_isStreamingSTT = YES;
+        NSLog(@"[RunAnywhere] startStreamingSTT: Audio engine started successfully");
+
+        // Send streaming started event
+        [self sendEventWithName:@"onSTTStreamingStarted" body:@{@"status": @"started"}];
+
+        resolve(@YES);
+    });
+}
+
+/**
+ * Stop streaming speech-to-text transcription
+ */
+RCT_EXPORT_METHOD(stopStreamingSTT:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    NSLog(@"[RunAnywhere] stopStreamingSTT called");
+
+    if (!_isStreamingSTT) {
+        NSLog(@"[RunAnywhere] stopStreamingSTT: Not currently streaming");
+        resolve(@YES);
+        return;
+    }
+
+    // Stop on main thread
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self stopStreamingSTTInternal];
+
+        // Send streaming stopped event
+        [self sendEventWithName:@"onSTTStreamingStopped" body:@{@"status": @"stopped"}];
+
+        resolve(@YES);
+    });
+}
+
+/**
+ * Check if streaming STT is currently active
+ */
+RCT_EXPORT_METHOD(isStreamingSTT:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject) {
+    resolve(@(_isStreamingSTT));
+}
+
+// MARK: - Internal Streaming Methods
+
+- (void)stopStreamingSTTInternal {
+    NSLog(@"[RunAnywhere] stopStreamingSTTInternal");
+
+    _isStreamingSTT = NO;
+
+    // Stop transcription timer
+    if (_transcriptionTimer) {
+        [_transcriptionTimer invalidate];
+        _transcriptionTimer = nil;
+    }
+
+    // Stop audio engine
+    [self stopAudioEngine];
+
+    // Process any remaining audio buffer
+    if (_audioBuffer.count >= kMinBufferSize) {
+        [self transcribeAccumulatedAudio:YES];
+    }
+
+    [_audioBuffer removeAllObjects];
+    _streamingLanguage = nil;
+}
+
+- (BOOL)startAudioEngineWithError:(NSError **)error {
+    NSLog(@"[RunAnywhere] startAudioEngineWithError");
+
+    // Configure audio session for voice assistant (recording + playback)
+    AVAudioSession *audioSession = [AVAudioSession sharedInstance];
+
+    NSError *sessionError = nil;
+    // Use .voiceChat mode with duckOthers for echo cancellation (matching Swift SDK)
+    [audioSession setCategory:AVAudioSessionCategoryPlayAndRecord
+                         mode:AVAudioSessionModeVoiceChat
+                      options:AVAudioSessionCategoryOptionAllowBluetooth |
+                              AVAudioSessionCategoryOptionDuckOthers |
+                              AVAudioSessionCategoryOptionDefaultToSpeaker
+                        error:&sessionError];
+
+    if (sessionError) {
+        NSLog(@"[RunAnywhere] Failed to set audio session category: %@", sessionError);
+        if (error) *error = sessionError;
+        return NO;
+    }
+
+    [audioSession setActive:YES error:&sessionError];
+    if (sessionError) {
+        NSLog(@"[RunAnywhere] Failed to activate audio session: %@", sessionError);
+        if (error) *error = sessionError;
+        return NO;
+    }
+
+    // Create audio engine
+    _audioEngine = [[AVAudioEngine alloc] init];
+    AVAudioInputNode *inputNode = [_audioEngine inputNode];
+    AVAudioFormat *inputFormat = [inputNode outputFormatForBus:0];
+
+    NSLog(@"[RunAnywhere] Input format: sampleRate=%f, channels=%u",
+          inputFormat.sampleRate, (unsigned int)inputFormat.channelCount);
+
+    // Create 16kHz mono format for STT (matching Swift SDK)
+    AVAudioFormat *outputFormat = [[AVAudioFormat alloc] initWithCommonFormat:AVAudioPCMFormatFloat32
+                                                                   sampleRate:16000
+                                                                     channels:1
+                                                                  interleaved:NO];
+
+    // Create converter if needed
+    BOOL needsConversion = inputFormat.sampleRate != outputFormat.sampleRate ||
+                          inputFormat.channelCount != outputFormat.channelCount;
+
+    if (needsConversion) {
+        _audioConverter = [[AVAudioConverter alloc] initFromFormat:inputFormat toFormat:outputFormat];
+        if (!_audioConverter) {
+            NSLog(@"[RunAnywhere] Failed to create audio converter");
+            if (error) {
+                *error = [NSError errorWithDomain:@"RunAnywhere"
+                                             code:-1
+                                         userInfo:@{NSLocalizedDescriptionKey: @"Failed to create audio converter"}];
+            }
+            return NO;
+        }
+    }
+
+    // Install tap on input node
+    __weak RunAnywhere *weakSelf = self;
+    [inputNode installTapOnBus:0
+                    bufferSize:1024
+                        format:inputFormat
+                         block:^(AVAudioPCMBuffer * _Nonnull buffer, AVAudioTime * _Nonnull when) {
+        [weakSelf processAudioBuffer:buffer inputFormat:inputFormat outputFormat:outputFormat];
+    }];
+
+    // Start audio engine
+    NSError *startError = nil;
+    [_audioEngine startAndReturnError:&startError];
+    if (startError) {
+        NSLog(@"[RunAnywhere] Failed to start audio engine: %@", startError);
+        [inputNode removeTapOnBus:0];
+        _audioEngine = nil;
+        _audioConverter = nil;
+        if (error) *error = startError;
+        return NO;
+    }
+
+    // Start transcription timer (transcribe every ~1 second when we have enough audio)
+    _transcriptionTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                           target:self
+                                                         selector:@selector(transcriptionTimerFired:)
+                                                         userInfo:nil
+                                                          repeats:YES];
+
+    NSLog(@"[RunAnywhere] Audio engine started - capturing at 16kHz mono");
+    return YES;
+}
+
+- (void)stopAudioEngine {
+    NSLog(@"[RunAnywhere] stopAudioEngine");
+
+    if (_audioEngine) {
+        AVAudioInputNode *inputNode = [_audioEngine inputNode];
+        [inputNode removeTapOnBus:0];
+        [_audioEngine stop];
+        _audioEngine = nil;
+    }
+
+    _audioConverter = nil;
+
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setActive:NO error:&error];
+    if (error) {
+        NSLog(@"[RunAnywhere] Failed to deactivate audio session: %@", error);
+    }
+}
+
+- (void)processAudioBuffer:(AVAudioPCMBuffer *)buffer
+               inputFormat:(AVAudioFormat *)inputFormat
+              outputFormat:(AVAudioFormat *)outputFormat {
+
+    if (!_isStreamingSTT) return;
+
+    AVAudioPCMBuffer *processedBuffer = buffer;
+
+    // Convert to 16kHz mono if needed
+    if (_audioConverter) {
+        AVAudioFrameCount capacity = (AVAudioFrameCount)(outputFormat.sampleRate * buffer.frameLength / inputFormat.sampleRate);
+        AVAudioPCMBuffer *convertedBuffer = [[AVAudioPCMBuffer alloc] initWithPCMFormat:outputFormat
+                                                                          frameCapacity:capacity];
+        if (!convertedBuffer) return;
+
+        NSError *conversionError = nil;
+        AVAudioConverterInputBlock inputBlock = ^AVAudioBuffer * _Nullable(AVAudioPacketCount inNumberOfPackets, AVAudioConverterInputStatus * _Nonnull outStatus) {
+            *outStatus = AVAudioConverterInputStatus_HaveData;
+            return buffer;
+        };
+
+        [_audioConverter convertToBuffer:convertedBuffer error:&conversionError withInputFromBlock:inputBlock];
+
+        if (conversionError) {
+            NSLog(@"[RunAnywhere] Audio conversion error: %@", conversionError);
+            return;
+        }
+
+        processedBuffer = convertedBuffer;
+    }
+
+    // Convert buffer to float array and add to audio buffer
+    float *channelData = processedBuffer.floatChannelData[0];
+    AVAudioFrameCount frameLength = processedBuffer.frameLength;
+
+    dispatch_async(_audioProcessingQueue, ^{
+        for (AVAudioFrameCount i = 0; i < frameLength; i++) {
+            [self->_audioBuffer addObject:@(channelData[i])];
+        }
+    });
+}
+
+- (void)transcriptionTimerFired:(NSTimer *)timer {
+    if (!_isStreamingSTT) return;
+
+    dispatch_async(_audioProcessingQueue, ^{
+        // Check if we have enough audio (at least 1 second = 16000 samples)
+        if (self->_audioBuffer.count >= kTranscriptionBufferSize) {
+            [self transcribeAccumulatedAudio:NO];
+        }
+    });
+}
+
+- (void)transcribeAccumulatedAudio:(BOOL)isFinal {
+    if (_audioBuffer.count < kMinBufferSize) return;
+
+    NSLog(@"[RunAnywhere] transcribeAccumulatedAudio - samples: %lu, isFinal: %d",
+          (unsigned long)_audioBuffer.count, isFinal);
+
+    // Convert NSArray to float array
+    NSUInteger sampleCount = _audioBuffer.count;
+    float *samples = (float *)malloc(sampleCount * sizeof(float));
+    if (!samples) return;
+
+    for (NSUInteger i = 0; i < sampleCount; i++) {
+        samples[i] = [_audioBuffer[i] floatValue];
+    }
+
+    // Clear buffer
+    [_audioBuffer removeAllObjects];
+
+    // Transcribe on background thread
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        const char *lang = self->_streamingLanguage ? [self->_streamingLanguage UTF8String] : "en";
+
+        // Use ra_stt_transcribe from runanywhere-core bridge API
+        char *resultJson = NULL;
+        ra_result_code result_code = ra_stt_transcribe(
+            self->_backend,
+            samples,
+            sampleCount,
+            16000,  // sample rate
+            lang,
+            &resultJson
+        );
+
+        free(samples);
+
+        if (result_code != RA_SUCCESS || !resultJson) {
+            const char *error = ra_get_last_error();
+            NSString *errorMsg = error ? [NSString stringWithUTF8String:error] : @"Unknown transcription error";
+            NSLog(@"[RunAnywhere] Streaming transcription error: %@", errorMsg);
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self sendEventWithName:@"onSTTError" body:@{@"error": errorMsg}];
+            });
+            return;
+        }
+
+        NSString *resultStr = [NSString stringWithUTF8String:resultJson];
+        ra_free_string(resultJson);
+
+        NSLog(@"[RunAnywhere] Streaming transcription result: %@", resultStr);
+
+        // Parse result and send appropriate event
+        NSData *jsonData = [resultStr dataUsingEncoding:NSUTF8StringEncoding];
+        NSError *parseError = nil;
+        NSDictionary *result = [NSJSONSerialization JSONObjectWithData:jsonData options:0 error:&parseError];
+
+        if (parseError || !result) {
+            NSLog(@"[RunAnywhere] Failed to parse transcription result: %@", parseError);
+            return;
+        }
+
+        NSString *text = result[@"text"];
+        if (text && text.length > 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NSString *eventName = isFinal ? @"onSTTFinal" : @"onSTTPartial";
+                [self sendEventWithName:eventName body:@{
+                    @"text": text,
+                    @"confidence": result[@"confidence"] ?: @(0.0),
+                    @"isFinal": @(isFinal),
+                    @"sequenceNumber": @(self->_sequenceNumber++)
+                }];
+            });
+        }
+    });
+}
+
 // ============================================================================
 // TTS Methods
 // ============================================================================
@@ -1418,17 +1925,22 @@ RCT_EXPORT_METHOD(getAvailableModels:(RCTPromiseResolveBlock)resolve
         // Check if model is downloaded
         NSString *modelPath = [modelsDir stringByAppendingPathComponent:modelId];
         BOOL isDirectory = NO;
-        BOOL isDownloaded = [fm fileExistsAtPath:modelPath isDirectory:&isDirectory];
-        model[@"isDownloaded"] = @(isDownloaded);
+        BOOL pathExists = [fm fileExistsAtPath:modelPath isDirectory:&isDirectory];
+        BOOL isDownloaded = NO;
+        NSString *actualModelPath = modelPath;
 
-        if (isDownloaded) {
-            NSString *format = model[@"format"];
-            NSString *actualModelPath = modelPath;
+        if (pathExists && isDirectory) {
+            NSArray *modelContents = [fm contentsOfDirectoryAtPath:modelPath error:nil];
+            NSLog(@"[RunAnywhere] Model %@ contents: %@", modelId, modelContents);
 
-            // If it's a directory, find the actual model file
-            if (isDirectory) {
-                NSArray *modelContents = [fm contentsOfDirectoryAtPath:modelPath error:nil];
-                NSLog(@"[RunAnywhere] Model %@ contents: %@", modelId, modelContents);
+            // Empty directory means incomplete download/extraction - treat as not downloaded
+            if (modelContents.count == 0) {
+                NSLog(@"[RunAnywhere] Model %@ directory is empty, treating as not downloaded", modelId);
+                // Clean up empty directory
+                [fm removeItemAtPath:modelPath error:nil];
+                isDownloaded = NO;
+            } else {
+                NSString *format = model[@"format"];
 
                 // For GGUF models (LLM), look for .gguf file
                 if ([format isEqualToString:@"gguf"]) {
@@ -1436,6 +1948,7 @@ RCT_EXPORT_METHOD(getAvailableModels:(RCTPromiseResolveBlock)resolve
                         if ([file hasSuffix:@".gguf"]) {
                             actualModelPath = [modelPath stringByAppendingPathComponent:file];
                             NSLog(@"[RunAnywhere] Found GGUF file: %@", actualModelPath);
+                            isDownloaded = YES;
                             break;
                         }
                     }
@@ -1446,6 +1959,7 @@ RCT_EXPORT_METHOD(getAvailableModels:(RCTPromiseResolveBlock)resolve
                         if ([file hasSuffix:@".onnx"]) {
                             actualModelPath = [modelPath stringByAppendingPathComponent:file];
                             NSLog(@"[RunAnywhere] Found ONNX file: %@", actualModelPath);
+                            isDownloaded = YES;
                             break;
                         }
                     }
@@ -1461,12 +1975,30 @@ RCT_EXPORT_METHOD(getAvailableModels:(RCTPromiseResolveBlock)resolve
                             // Use the subdirectory as the model path for Sherpa-ONNX
                             actualModelPath = subPath;
                             NSLog(@"[RunAnywhere] Found Sherpa-ONNX model directory: %@", actualModelPath);
+                            isDownloaded = YES;
                             break;
                         }
                     }
+                    // If no subdirectory found, still consider downloaded if contents exist
+                    // (might be a flat structure)
+                    if (!isDownloaded && modelContents.count > 0) {
+                        isDownloaded = YES;
+                        NSLog(@"[RunAnywhere] Model %@ has contents but no subdirectory, using root path", modelId);
+                    }
+                }
+                else {
+                    // Unknown format with contents, assume downloaded
+                    isDownloaded = YES;
                 }
             }
+        } else if (pathExists && !isDirectory) {
+            // It's a file, not a directory (e.g., single .gguf file)
+            isDownloaded = YES;
+        }
 
+        model[@"isDownloaded"] = @(isDownloaded);
+
+        if (isDownloaded) {
             model[@"localPath"] = actualModelPath;
             NSLog(@"[RunAnywhere] Model %@ final path: %@", modelId, actualModelPath);
         }
