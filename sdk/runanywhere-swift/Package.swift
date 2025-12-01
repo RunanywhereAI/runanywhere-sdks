@@ -6,7 +6,7 @@ import PackageDescription
 // =============================================================================
 // Set to `true` to use local XCFramework from Binaries/ directory (for local development/testing)
 // Set to `false` to use remote XCFramework from GitHub releases (default for production use)
-let testLocal = true
+let testLocal = false
 // =============================================================================
 
 let package = Package(
@@ -228,8 +228,8 @@ func binaryTargets() -> [Target] {
         return [
             .binaryTarget(
                 name: "RunAnywhereCoreBinary",
-                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.8ad8483/RunAnywhereCore.xcframework.zip",
-                checksum: "644eb467d2e0e29d7a1a651882b333210086e9d0298d3d6ad39a2fefb09856fd"
+                url: "https://github.com/RunanywhereAI/runanywhere-binaries/releases/download/v0.0.1-dev.df97abe/RunAnywhereCore.xcframework.zip",
+                checksum: "b250a568629ec40b40357b1d50f9b2bc466dafb735636c26ce79c8fcf6bb0b01"
             )
         ]
     }
