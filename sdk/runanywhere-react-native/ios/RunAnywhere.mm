@@ -1,5 +1,6 @@
 #import "RunAnywhere.h"
 #import <Foundation/Foundation.h>
+#import <bzlib.h>  // For bz2 decompression
 
 #ifdef RCT_NEW_ARCH_ENABLED
 #import <React/RCTBridge+Private.h>
@@ -94,6 +95,228 @@ RCT_EXPORT_MODULE()
     return modelsDir;
 }
 
+// ============================================================================
+// Archive Extraction Methods
+// ============================================================================
+
+/// Extract a tar.bz2 archive to a destination directory
+/// This is a native implementation since ra_extract_archive is not implemented in the XCFramework
+- (BOOL)extractTarBz2:(NSString *)archivePath toDirectory:(NSString *)destDir error:(NSError **)outError {
+    NSLog(@"[RunAnywhere] Extracting tar.bz2 archive: %@ to %@", archivePath, destDir);
+
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    // Create destination directory if it doesn't exist
+    if (![fm fileExistsAtPath:destDir]) {
+        NSError *mkdirError = nil;
+        [fm createDirectoryAtPath:destDir withIntermediateDirectories:YES attributes:nil error:&mkdirError];
+        if (mkdirError) {
+            NSLog(@"[RunAnywhere] Failed to create directory: %@", mkdirError);
+            if (outError) *outError = mkdirError;
+            return NO;
+        }
+    }
+
+    // Read compressed file
+    NSData *compressedData = [NSData dataWithContentsOfFile:archivePath];
+    if (!compressedData || compressedData.length == 0) {
+        NSLog(@"[RunAnywhere] Failed to read archive file");
+        if (outError) *outError = [NSError errorWithDomain:@"RunAnywhere" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Failed to read archive file"}];
+        return NO;
+    }
+
+    NSLog(@"[RunAnywhere] Archive size: %lu bytes", (unsigned long)compressedData.length);
+
+    // Decompress bz2 using bzlib
+    NSData *tarData = [self decompressBz2:compressedData];
+    if (!tarData || tarData.length == 0) {
+        NSLog(@"[RunAnywhere] Failed to decompress bz2");
+        if (outError) *outError = [NSError errorWithDomain:@"RunAnywhere" code:2 userInfo:@{NSLocalizedDescriptionKey: @"Failed to decompress bz2 data"}];
+        return NO;
+    }
+
+    NSLog(@"[RunAnywhere] Decompressed tar size: %lu bytes", (unsigned long)tarData.length);
+
+    // Extract tar archive
+    BOOL success = [self extractTar:tarData toDirectory:destDir error:outError];
+
+    if (success) {
+        // List extracted contents
+        NSArray *contents = [fm contentsOfDirectoryAtPath:destDir error:nil];
+        NSLog(@"[RunAnywhere] Extracted contents: %@", contents);
+    }
+
+    return success;
+}
+
+/// Decompress bz2 data using bzlib
+- (NSData *)decompressBz2:(NSData *)compressedData {
+    if (compressedData.length < 10) {
+        NSLog(@"[RunAnywhere] BZ2 data too small");
+        return nil;
+    }
+
+    // Verify BZ2 header: "BZh"
+    const unsigned char *bytes = (const unsigned char *)compressedData.bytes;
+    if (bytes[0] != 'B' || bytes[1] != 'Z' || bytes[2] != 'h') {
+        NSLog(@"[RunAnywhere] Invalid BZ2 header: %c%c%c", bytes[0], bytes[1], bytes[2]);
+        return nil;
+    }
+
+    NSLog(@"[RunAnywhere] Valid BZ2 header detected");
+
+    // Initialize bz2 stream
+    bz_stream stream;
+    memset(&stream, 0, sizeof(stream));
+
+    int bzError = BZ2_bzDecompressInit(&stream, 0, 0);
+    if (bzError != BZ_OK) {
+        NSLog(@"[RunAnywhere] BZ2_bzDecompressInit failed: %d", bzError);
+        return nil;
+    }
+
+    // Allocate output buffer - start with 10x input size, grow as needed
+    NSMutableData *decompressedData = [NSMutableData dataWithCapacity:compressedData.length * 10];
+    const size_t chunkSize = 1024 * 1024; // 1MB chunks
+    void *outputBuffer = malloc(chunkSize);
+
+    if (!outputBuffer) {
+        BZ2_bzDecompressEnd(&stream);
+        return nil;
+    }
+
+    stream.next_in = (char *)compressedData.bytes;
+    stream.avail_in = (unsigned int)compressedData.length;
+
+    do {
+        stream.next_out = (char *)outputBuffer;
+        stream.avail_out = (unsigned int)chunkSize;
+
+        bzError = BZ2_bzDecompress(&stream);
+
+        if (bzError != BZ_OK && bzError != BZ_STREAM_END) {
+            NSLog(@"[RunAnywhere] BZ2_bzDecompress failed: %d", bzError);
+            free(outputBuffer);
+            BZ2_bzDecompressEnd(&stream);
+            return nil;
+        }
+
+        size_t bytesWritten = chunkSize - stream.avail_out;
+        if (bytesWritten > 0) {
+            [decompressedData appendBytes:outputBuffer length:bytesWritten];
+        }
+
+    } while (bzError != BZ_STREAM_END);
+
+    free(outputBuffer);
+    BZ2_bzDecompressEnd(&stream);
+
+    NSLog(@"[RunAnywhere] BZ2 decompression complete: %lu bytes", (unsigned long)decompressedData.length);
+
+    return decompressedData;
+}
+
+/// Extract tar archive data to a directory
+- (BOOL)extractTar:(NSData *)tarData toDirectory:(NSString *)destDir error:(NSError **)outError {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    const unsigned char *bytes = (const unsigned char *)tarData.bytes;
+    NSUInteger length = tarData.length;
+    NSUInteger offset = 0;
+    const NSUInteger blockSize = 512;
+    int filesExtracted = 0;
+
+    while (offset + blockSize <= length) {
+        // Read 512-byte tar header
+        const unsigned char *header = bytes + offset;
+
+        // Check for end of archive (two zero blocks)
+        BOOL allZero = YES;
+        for (int i = 0; i < blockSize && allZero; i++) {
+            if (header[i] != 0) allZero = NO;
+        }
+        if (allZero) {
+            break;
+        }
+
+        // Parse tar header
+        // Name: bytes 0-99 (null-terminated)
+        char nameBuffer[101];
+        memcpy(nameBuffer, header, 100);
+        nameBuffer[100] = '\0';
+        NSString *name = [NSString stringWithUTF8String:nameBuffer];
+        name = [name stringByTrimmingCharactersInSet:[NSCharacterSet controlCharacterSet]];
+
+        // Check for extended header prefix (for long names)
+        // Prefix: bytes 345-499
+        char prefixBuffer[156];
+        memcpy(prefixBuffer, header + 345, 155);
+        prefixBuffer[155] = '\0';
+        NSString *prefix = [NSString stringWithUTF8String:prefixBuffer];
+        prefix = [prefix stringByTrimmingCharactersInSet:[NSCharacterSet controlCharacterSet]];
+
+        if (prefix.length > 0 && name.length > 0) {
+            name = [NSString stringWithFormat:@"%@/%@", prefix, name];
+        }
+
+        if (name.length == 0) {
+            offset += blockSize;
+            continue;
+        }
+
+        // Size: bytes 124-135 (octal string)
+        char sizeBuffer[13];
+        memcpy(sizeBuffer, header + 124, 12);
+        sizeBuffer[12] = '\0';
+        NSUInteger fileSize = strtoul(sizeBuffer, NULL, 8);
+
+        // Type flag: byte 156
+        char typeFlag = (char)header[156];
+
+        offset += blockSize;
+
+        // Build full path
+        NSString *fullPath = [destDir stringByAppendingPathComponent:name];
+
+        // Handle based on type
+        if (typeFlag == '5' || [name hasSuffix:@"/"]) {
+            // Directory
+            NSError *dirError = nil;
+            [fm createDirectoryAtPath:fullPath withIntermediateDirectories:YES attributes:nil error:&dirError];
+            if (dirError) {
+                NSLog(@"[RunAnywhere] Failed to create directory %@: %@", name, dirError);
+            }
+        } else if (typeFlag == '0' || typeFlag == '\0' || typeFlag == ' ') {
+            // Regular file
+            if (fileSize > 0 && offset + fileSize <= length) {
+                // Create parent directory if needed
+                NSString *parentDir = [fullPath stringByDeletingLastPathComponent];
+                [fm createDirectoryAtPath:parentDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+                // Write file data
+                NSData *fileData = [NSData dataWithBytes:bytes + offset length:fileSize];
+                NSError *writeError = nil;
+                BOOL written = [fileData writeToFile:fullPath options:NSDataWritingAtomic error:&writeError];
+                if (!written) {
+                    NSLog(@"[RunAnywhere] Failed to write file %@: %@", name, writeError);
+                } else {
+                    filesExtracted++;
+                }
+            }
+
+            // Advance to next block boundary
+            NSUInteger blocks = (fileSize + blockSize - 1) / blockSize;
+            offset += blocks * blockSize;
+        } else {
+            // Other types (symlinks, etc.) - skip
+            NSUInteger blocks = (fileSize + blockSize - 1) / blockSize;
+            offset += blocks * blockSize;
+        }
+    }
+
+    NSLog(@"[RunAnywhere] Tar extraction complete: %d files extracted", filesExtracted);
+    return filesExtracted > 0;
+}
+
 - (NSDictionary *)getModelCatalog {
     // Hardcoded model catalog - in production this would be fetched from server
     return @{
@@ -130,14 +353,25 @@ RCT_EXPORT_MODULE()
             @"format": @"onnx",
             @"modelType": @"silero"
         },
-        @"piper-en-us-lessac": @{
-            @"id": @"piper-en-us-lessac",
-            @"name": @"Piper US English (Lessac)",
-            @"description": @"High quality US English TTS",
+        @"piper-en-us-lessac-medium": @{
+            @"id": @"piper-en-us-lessac-medium",
+            @"name": @"Piper TTS (US English - Medium)",
+            @"description": @"High quality US English TTS voice",
             @"category": @"tts",
             @"modality": @"tts",
             @"size": @(65000000),  // ~65MB
             @"downloadUrl": @"https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+            @"format": @"sherpa-onnx",
+            @"modelType": @"piper"
+        },
+        @"piper-en-gb-alba-medium": @{
+            @"id": @"piper-en-gb-alba-medium",
+            @"name": @"Piper TTS (British English)",
+            @"description": @"British English TTS voice",
+            @"category": @"tts",
+            @"modality": @"tts",
+            @"size": @(65000000),  // ~65MB
+            @"downloadUrl": @"https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
             @"format": @"sherpa-onnx",
             @"modelType": @"piper"
         },
@@ -1366,21 +1600,49 @@ RCT_EXPORT_METHOD(downloadModel:(NSString *)modelId
             }
 
             // Extract if it's an archive
-            NSString *extension = [fileName pathExtension];
-            if ([extension isEqualToString:@"bz2"] || [extension isEqualToString:@"gz"] ||
-                [extension isEqualToString:@"zip"] || [extension isEqualToString:@"tar"]) {
+            NSString *lowerPath = [downloadPath lowercaseString];
+            BOOL isTarBz2 = [lowerPath hasSuffix:@".tar.bz2"] || [lowerPath hasSuffix:@".tbz2"];
+            BOOL isTarGz = [lowerPath hasSuffix:@".tar.gz"] || [lowerPath hasSuffix:@".tgz"];
+            BOOL isZip = [lowerPath hasSuffix:@".zip"];
 
-                ra_result_code extractResult = ra_extract_archive([downloadPath UTF8String], [modelDir UTF8String]);
+            if (isTarBz2 || isTarGz || isZip) {
+                NSLog(@"[RunAnywhere] Extracting archive: %@", downloadPath);
 
-                if (extractResult == RA_SUCCESS) {
+                // Clear the model directory before extraction to remove any stale contents
+                [fm removeItemAtPath:modelDir error:nil];
+                [fm createDirectoryAtPath:modelDir withIntermediateDirectories:YES attributes:nil error:nil];
+
+                NSError *extractError = nil;
+                BOOL extractSuccess = NO;
+
+                if (isTarBz2) {
+                    // Use our native tar.bz2 extraction (matching Swift SDK's ArchiveUtility)
+                    extractSuccess = [strongSelf extractTarBz2:downloadPath toDirectory:modelDir error:&extractError];
+                } else if (isTarGz) {
+                    // TODO: Implement tar.gz extraction if needed
+                    NSLog(@"[RunAnywhere] tar.gz extraction not yet implemented");
+                    extractSuccess = NO;
+                } else if (isZip) {
+                    // TODO: Use ZIPFoundation equivalent if needed
+                    NSLog(@"[RunAnywhere] zip extraction not yet implemented");
+                    extractSuccess = NO;
+                }
+
+                if (extractSuccess) {
                     // Remove the archive after extraction
                     [fm removeItemAtPath:downloadPath error:nil];
+
+                    // List extracted contents for debugging
+                    NSArray *contents = [fm contentsOfDirectoryAtPath:modelDir error:nil];
+                    NSLog(@"[RunAnywhere] Model %@ extracted contents: %@", modelId, contents);
 
                     [strongSelf sendEventWithName:@"onModelDownloadComplete"
                                             body:@{@"modelId": modelId, @"localPath": modelDir}];
                 } else {
+                    NSString *errorMsg = extractError ? extractError.localizedDescription : @"Failed to extract archive";
+                    NSLog(@"[RunAnywhere] Extraction failed: %@", errorMsg);
                     [strongSelf sendEventWithName:@"onModelDownloadError"
-                                            body:@{@"modelId": modelId, @"error": @"Failed to extract archive"}];
+                                            body:@{@"modelId": modelId, @"error": errorMsg}];
                 }
             } else {
                 // Not an archive, move directly to model dir

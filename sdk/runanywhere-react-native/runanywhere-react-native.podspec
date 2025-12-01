@@ -49,7 +49,7 @@ Pod::Spec.new do |s|
   }
 
   # Required system libraries and frameworks
-  s.libraries = "c++", "archive"
+  s.libraries = "c++", "archive", "bz2"
   s.frameworks = "Accelerate", "Foundation", "CoreML"
 
   # React Native dependencies
