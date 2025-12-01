@@ -6,7 +6,11 @@ import com.runanywhere.sdk.components.stt.STTConfiguration
 import com.runanywhere.sdk.components.stt.STTService
 import com.runanywhere.sdk.components.vad.VADConfiguration
 import com.runanywhere.sdk.components.vad.VADService
+import com.runanywhere.sdk.core.frameworks.UnifiedFrameworkAdapter
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.currentTimeMillis
+import com.runanywhere.sdk.models.ModelInfo
+import com.runanywhere.sdk.models.enums.FrameworkModality
 import com.runanywhere.sdk.models.enums.LLMFramework
 
 /**
@@ -21,15 +25,35 @@ import com.runanywhere.sdk.models.enums.LLMFramework
  * // In your app initialization:
  * ModuleRegistry.shared.registerSTT(WhisperSTTProvider())
  * ModuleRegistry.shared.registerLLM(LlamaProvider())
+ *
+ * // Or register a full framework adapter:
+ * ModuleRegistry.shared.registerFrameworkAdapter(ONNXAdapter())
  * ```
  *
  * Thread Safety:
  * All operations are synchronized using a mutex to prevent race conditions
  * during concurrent access. Registration can safely happen from multiple threads.
+ *
+ * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/ModuleRegistry.swift
  */
 object ModuleRegistry {
 
     private val logger = SDKLogger("ModuleRegistry")
+
+    /**
+     * Wrapper for registered adapters with priority and registration time
+     * Matches iOS PrioritizedProvider pattern
+     */
+    private data class RegisteredAdapter(
+        val adapter: UnifiedFrameworkAdapter,
+        val priority: Int,
+        val registrationTime: Long = currentTimeMillis()
+    )
+
+    // Framework adapter storage - protected by synchronized blocks
+    private val _frameworkAdapters = mutableListOf<RegisteredAdapter>()
+    private val _adaptersByFramework = mutableMapOf<LLMFramework, UnifiedFrameworkAdapter>()
+    private val _adaptersByModality = mutableMapOf<FrameworkModality, MutableList<RegisteredAdapter>>()
 
     // Provider lists - protected by synchronized blocks for thread safety
     // Matches iOS @MainActor pattern but using Kotlin's synchronized for cross-platform support
@@ -118,6 +142,139 @@ object ModuleRegistry {
             _speakerDiarizationProviders.add(provider)
         }
         logger.info("Registered Speaker Diarization provider: ${provider.name}")
+    }
+
+    // MARK: - Framework Adapter Registration
+
+    /**
+     * Register a unified framework adapter with priority
+     * The adapter's onRegistration() callback will be invoked to register service providers
+     *
+     * @param adapter The framework adapter to register
+     * @param priority Priority for selection (higher = selected first). Default is 100.
+     */
+    fun registerFrameworkAdapter(adapter: UnifiedFrameworkAdapter, priority: Int = 100) {
+        synchronized(_frameworkAdapters) {
+            val registered = RegisteredAdapter(adapter, priority)
+
+            // Add to main list
+            _frameworkAdapters.add(registered)
+
+            // Index by framework
+            _adaptersByFramework[adapter.framework] = adapter
+
+            // Index by each supported modality
+            for (modality in adapter.supportedModalities) {
+                val modalityList = _adaptersByModality.getOrPut(modality) { mutableListOf() }
+                modalityList.add(registered)
+                // Sort by priority (descending) then registration time (ascending)
+                modalityList.sortWith(compareByDescending<RegisteredAdapter> { it.priority }
+                    .thenBy { it.registrationTime })
+            }
+        }
+
+        // Call the adapter's registration callback to register its service providers
+        adapter.onRegistration()
+
+        logger.info("Registered framework adapter: ${adapter.framework.displayName} with priority $priority")
+    }
+
+    /**
+     * Get adapter for a specific framework
+     * @param framework The framework to get adapter for
+     * @return The adapter or null if not registered
+     */
+    fun adapterForFramework(framework: LLMFramework): UnifiedFrameworkAdapter? {
+        return synchronized(_adaptersByFramework) {
+            _adaptersByFramework[framework]
+        }
+    }
+
+    /**
+     * Get all adapters that support a specific modality, sorted by priority
+     * @param modality The modality to filter by
+     * @return List of adapters supporting the modality
+     */
+    fun adaptersForModality(modality: FrameworkModality): List<UnifiedFrameworkAdapter> {
+        return synchronized(_adaptersByModality) {
+            _adaptersByModality[modality]?.map { it.adapter } ?: emptyList()
+        }
+    }
+
+    /**
+     * Find adapters that can handle a specific model for a modality
+     * @param model The model to check
+     * @param modality The modality to use
+     * @return List of compatible adapters, sorted by priority
+     */
+    fun findAdapters(model: ModelInfo, modality: FrameworkModality): List<UnifiedFrameworkAdapter> {
+        return synchronized(_adaptersByModality) {
+            _adaptersByModality[modality]
+                ?.filter { it.adapter.canHandle(model) }
+                ?.map { it.adapter }
+                ?: emptyList()
+        }
+    }
+
+    /**
+     * Find the best adapter for a model and modality
+     * Selection strategy:
+     * 1. Model's preferred framework (if set and available)
+     * 2. First compatible framework from model's compatibleFrameworks
+     * 3. First compatible adapter by priority
+     *
+     * @param model The model to check
+     * @param modality The modality to use
+     * @return Best matching adapter or null
+     */
+    fun findBestAdapter(model: ModelInfo, modality: FrameworkModality): UnifiedFrameworkAdapter? {
+        return synchronized(_adaptersByModality) {
+            val compatibleAdapters = _adaptersByModality[modality]
+                ?.filter { it.adapter.canHandle(model) }
+                ?: return null
+
+            if (compatibleAdapters.isEmpty()) return null
+
+            // Strategy 1: Check model's preferred framework
+            model.preferredFramework?.let { preferred ->
+                compatibleAdapters.find { it.adapter.framework == preferred }?.let {
+                    return it.adapter
+                }
+            }
+
+            // Strategy 2: Check model's compatible frameworks in order
+            for (framework in model.compatibleFrameworks) {
+                compatibleAdapters.find { it.adapter.framework == framework }?.let {
+                    return it.adapter
+                }
+            }
+
+            // Strategy 3: Return highest priority adapter
+            compatibleAdapters.firstOrNull()?.adapter
+        }
+    }
+
+    /**
+     * Get all registered framework adapters
+     * @return List of all adapters
+     */
+    val allFrameworkAdapters: List<UnifiedFrameworkAdapter>
+        get() = synchronized(_frameworkAdapters) { _frameworkAdapters.map { it.adapter } }
+
+    /**
+     * Get all registered frameworks
+     * @return Set of frameworks that have adapters registered
+     */
+    val registeredFrameworks: Set<LLMFramework>
+        get() = synchronized(_adaptersByFramework) { _adaptersByFramework.keys.toSet() }
+
+    /**
+     * Check if a framework has a registered adapter
+     * @param framework The framework to check
+     * @return True if an adapter is registered
+     */
+    fun hasFramework(framework: LLMFramework): Boolean {
+        return synchronized(_adaptersByFramework) { _adaptersByFramework.containsKey(framework) }
     }
 
     // MARK: - Provider Access
@@ -353,6 +510,8 @@ interface TTSServiceProvider {
     fun synthesizeStream(text: String, options: com.runanywhere.sdk.components.TTSOptions): kotlinx.coroutines.flow.Flow<ByteArray>
     fun canHandle(modelId: String): Boolean = true
     val name: String
+    /** Framework this provider supports */
+    val framework: LLMFramework
 }
 
 /**

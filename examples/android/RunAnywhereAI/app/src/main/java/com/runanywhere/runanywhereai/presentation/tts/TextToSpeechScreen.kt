@@ -23,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
+import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import kotlinx.coroutines.launch
 
 /**
  * Text to Speech Screen - Matching iOS TextToSpeechView.swift exactly
@@ -44,6 +47,7 @@ fun TextToSpeechScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -148,66 +152,17 @@ fun TextToSpeechScreen(
             )
         }
 
-        // Model picker dialog
-        // TODO: Implement ModelSelectionSheet when SDK integration is ready
+        // Model picker bottom sheet - Full-screen with framework/model hierarchy
         // iOS Reference: ModelSelectionSheet(context: .tts)
         if (showModelPicker) {
-            AlertDialog(
-                onDismissRequest = { showModelPicker = false },
-                title = { Text("Select TTS Voice") },
-                text = {
-                    Column {
-                        Text(
-                            "TODO: Integrate with RunAnywhere SDK",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        // Mock voice options
-                        listOf(
-                            Triple("System TTS", "system-tts", true),
-                            Triple("Piper - Amy", "piper-amy", false),
-                            Triple("Piper - Jenny", "piper-jenny", false)
-                        ).forEach { (name, id, isSystem) ->
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        viewModel.loadModel(name, id, isSystem)
-                                        showModelPicker = false
-                                    },
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.VolumeUp,
-                                        contentDescription = null,
-                                        tint = AppColors.primaryPurple
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column {
-                                        Text(name)
-                                        if (isSystem) {
-                                            Text(
-                                                "Plays directly",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showModelPicker = false }) {
-                        Text("Cancel")
+            ModelSelectionBottomSheet(
+                context = ModelSelectionContext.TTS,
+                onDismiss = { showModelPicker = false },
+                onModelSelected = { model ->
+                    scope.launch {
+                        // Model loaded via ModelSelectionBottomSheet,
+                        // ViewModel will update via lifecycle tracker
+                        android.util.Log.d("TextToSpeechScreen", "TTS model selected: ${model.name}")
                     }
                 }
             )

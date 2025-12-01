@@ -478,4 +478,7 @@ class JvmTTSServiceProvider : com.runanywhere.sdk.core.TTSServiceProvider {
     }
 
     override val name: String = "JvmTTSProvider"
+
+    override val framework: com.runanywhere.sdk.models.enums.LLMFramework =
+        com.runanywhere.sdk.models.enums.LLMFramework.SYSTEM_TTS
 }

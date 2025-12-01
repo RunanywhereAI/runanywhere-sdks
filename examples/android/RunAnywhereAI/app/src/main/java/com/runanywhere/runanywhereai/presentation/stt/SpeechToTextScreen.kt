@@ -27,6 +27,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
+import com.runanywhere.sdk.models.enums.ModelSelectionContext
+import kotlinx.coroutines.launch
 
 /**
  * Speech to Text Screen - Matching iOS SpeechToTextView.swift exactly
@@ -47,6 +50,7 @@ fun SpeechToTextScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showModelPicker by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -158,58 +162,17 @@ fun SpeechToTextScreen(
             )
         }
 
-        // Model picker bottom sheet
-        // TODO: Implement ModelSelectionSheet when SDK integration is ready
+        // Model picker bottom sheet - Full-screen with framework/model hierarchy
         // iOS Reference: ModelSelectionSheet(context: .stt)
         if (showModelPicker) {
-            // Mock model selection for now
-            AlertDialog(
-                onDismissRequest = { showModelPicker = false },
-                title = { Text("Select STT Model") },
-                text = {
-                    Column {
-                        Text(
-                            "TODO: Integrate with RunAnywhere SDK",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        // Mock model options
-                        listOf(
-                            "WhisperKit Tiny" to "whisperkit-tiny",
-                            "WhisperKit Base" to "whisperkit-base",
-                            "WhisperKit Small" to "whisperkit-small"
-                        ).forEach { (name, id) ->
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
-                                    .clickable {
-                                        viewModel.loadModel(name, id)
-                                        showModelPicker = false
-                                    },
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.GraphicEq,
-                                        contentDescription = null,
-                                        tint = AppColors.primaryGreen
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(name)
-                                }
-                            }
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { showModelPicker = false }) {
-                        Text("Cancel")
+            ModelSelectionBottomSheet(
+                context = ModelSelectionContext.STT,
+                onDismiss = { showModelPicker = false },
+                onModelSelected = { model ->
+                    scope.launch {
+                        // Model loaded via ModelSelectionBottomSheet,
+                        // ViewModel will update via lifecycle tracker
+                        android.util.Log.d("SpeechToTextScreen", "STT model selected: ${model.name}")
                     }
                 }
             )

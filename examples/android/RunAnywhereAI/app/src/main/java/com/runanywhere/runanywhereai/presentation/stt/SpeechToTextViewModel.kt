@@ -1,7 +1,10 @@
 package com.runanywhere.runanywhereai.presentation.stt
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.models.lifecycle.Modality
+import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +66,27 @@ class SpeechToTextViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(STTUiState())
     val uiState: StateFlow<STTUiState> = _uiState.asStateFlow()
+
+    init {
+        // Subscribe to model lifecycle tracker for STT modality
+        viewModelScope.launch {
+            ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
+                val sttState = modelsByModality[Modality.STT]
+                val isNowLoaded = sttState?.state?.isLoaded == true
+
+                _uiState.update {
+                    it.copy(
+                        isModelLoaded = isNowLoaded,
+                        selectedModelName = if (isNowLoaded) sttState?.modelName else it.selectedModelName,
+                        selectedModelId = if (isNowLoaded) sttState?.modelId else it.selectedModelId,
+                        selectedFramework = if (isNowLoaded) sttState?.framework?.displayName else it.selectedFramework
+                    )
+                }
+
+                Log.d("STTViewModel", "📊 STT lifecycle state updated: loaded=$isNowLoaded, model=${sttState?.modelName}")
+            }
+        }
+    }
 
     /**
      * Initialize the STT ViewModel
