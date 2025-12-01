@@ -1407,8 +1407,18 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // Get model info for lifecycle tracking
             val modelInfo = serviceContainer.modelRegistry?.getModel(modelId)
             val modelName = modelInfo?.name ?: modelId
+            val framework = modelInfo?.preferredFramework
+                ?: com.runanywhere.sdk.models.enums.LLMFramework.WHISPER_CPP
 
             logger.info("Loading STT model: $modelName ($modelId)")
+
+            // Notify lifecycle: model will load
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelWillLoad(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.STT
+            )
 
             // Create STT configuration
             val sttConfig = com.runanywhere.sdk.components.stt.STTConfiguration(modelId = modelId)
@@ -1420,10 +1430,25 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // Store the component for later use
             _loadedSTTComponent = sttComponent
 
+            // Notify lifecycle: model loaded successfully
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelDidLoad(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.STT,
+                memoryUsage = modelInfo?.memoryRequired
+            )
+
             logger.info("✅ STT model loaded successfully: $modelName")
             EventBus.publish(SDKModelEvent.LoadCompleted(modelId))
 
         } catch (e: Exception) {
+            // Notify lifecycle: model load failed
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelLoadFailed(
+                modelId = modelId,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.STT,
+                error = e.message ?: "Unknown error"
+            )
             logger.error("Failed to load STT model: $modelId", e)
             EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
             throw SDKError.ModelLoadingFailed("Failed to load STT model: ${e.message}")
@@ -1446,8 +1471,18 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // Get model info for lifecycle tracking
             val modelInfo = serviceContainer.modelRegistry?.getModel(modelId)
             val modelName = modelInfo?.name ?: modelId
+            val framework = modelInfo?.preferredFramework
+                ?: com.runanywhere.sdk.models.enums.LLMFramework.SYSTEM_TTS
 
             logger.info("Loading TTS model: $modelName ($modelId)")
+
+            // Notify lifecycle: model will load
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelWillLoad(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.TTS
+            )
 
             // Create TTS configuration
             val ttsConfig = com.runanywhere.sdk.components.TTSConfiguration(modelId = modelId)
@@ -1459,10 +1494,25 @@ abstract class BaseRunAnywhereSDK : RunAnywhereSDK {
             // Store the component for later use
             _loadedTTSComponent = ttsComponent
 
+            // Notify lifecycle: model loaded successfully
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelDidLoad(
+                modelId = modelId,
+                modelName = modelName,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.TTS,
+                memoryUsage = modelInfo?.memoryRequired
+            )
+
             logger.info("✅ TTS model loaded successfully: $modelName")
             EventBus.publish(SDKModelEvent.LoadCompleted(modelId))
 
         } catch (e: Exception) {
+            // Notify lifecycle: model load failed
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelLoadFailed(
+                modelId = modelId,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.TTS,
+                error = e.message ?: "Unknown error"
+            )
             logger.error("Failed to load TTS model: $modelId", e)
             EventBus.publish(SDKModelEvent.LoadFailed(modelId, e))
             throw SDKError.ModelLoadingFailed("Failed to load TTS model: ${e.message}")

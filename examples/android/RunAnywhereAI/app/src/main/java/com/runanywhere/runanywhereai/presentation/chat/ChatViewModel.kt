@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.*
+import com.runanywhere.sdk.models.lifecycle.Modality
+import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
@@ -52,6 +54,27 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Always start with a new conversation for a fresh chat experience
         val conversation = conversationStore.createConversation()
         _uiState.value = _uiState.value.copy(currentConversation = conversation)
+
+        // Subscribe to model lifecycle tracker for LLM modality
+        viewModelScope.launch {
+            ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
+                val llmState = modelsByModality[Modality.LLM]
+                val wasLoaded = _uiState.value.isModelLoaded
+                val isNowLoaded = llmState?.state?.isLoaded == true
+
+                _uiState.value = _uiState.value.copy(
+                    isModelLoaded = isNowLoaded,
+                    loadedModelName = if (isNowLoaded) llmState?.modelName else null
+                )
+
+                // Add system message when model becomes loaded
+                if (!wasLoaded && isNowLoaded) {
+                    addSystemMessage()
+                }
+
+                Log.d("ChatViewModel", "📊 LLM lifecycle state updated: loaded=$isNowLoaded, model=${llmState?.modelName}")
+            }
+        }
 
         // Initialize with system message if model is already loaded
         viewModelScope.launch {

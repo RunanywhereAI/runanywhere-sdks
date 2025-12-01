@@ -1,7 +1,10 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.runanywhere.sdk.models.lifecycle.Modality
+import com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,6 +59,27 @@ class TextToSpeechViewModel : ViewModel() {
     val uiState: StateFlow<TTSUiState> = _uiState.asStateFlow()
 
     private var playbackJob: Job? = null
+
+    init {
+        // Subscribe to model lifecycle tracker for TTS modality
+        viewModelScope.launch {
+            ModelLifecycleTracker.modelsByModality.collect { modelsByModality ->
+                val ttsState = modelsByModality[Modality.TTS]
+                val isNowLoaded = ttsState?.state?.isLoaded == true
+
+                _uiState.update {
+                    it.copy(
+                        isModelLoaded = isNowLoaded,
+                        selectedModelName = if (isNowLoaded) ttsState?.modelName else it.selectedModelName,
+                        selectedModelId = if (isNowLoaded) ttsState?.modelId else it.selectedModelId,
+                        selectedFramework = if (isNowLoaded) ttsState?.framework?.displayName else it.selectedFramework
+                    )
+                }
+
+                Log.d("TTSViewModel", "📊 TTS lifecycle state updated: loaded=$isNowLoaded, model=${ttsState?.modelName}")
+            }
+        }
+    }
 
     /**
      * Initialize the TTS ViewModel

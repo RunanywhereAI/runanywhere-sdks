@@ -454,4 +454,7 @@ class AndroidTTSServiceProvider(private val context: Context) :
     }
 
     override val name: String = "AndroidTTSProvider"
+
+    override val framework: com.runanywhere.sdk.models.enums.LLMFramework =
+        com.runanywhere.sdk.models.enums.LLMFramework.SYSTEM_TTS
 }

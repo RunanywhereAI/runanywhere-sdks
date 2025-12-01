@@ -221,6 +221,16 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
         val model = serviceContainer.modelInfoService.getModel(modelId)
             ?: throw IllegalArgumentException("Model not found: $modelId")
 
+        val framework = model.preferredFramework ?: com.runanywhere.sdk.models.enums.LLMFramework.LLAMA_CPP
+
+        // Notify lifecycle: model will load
+        com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelWillLoad(
+            modelId = modelId,
+            modelName = model.name,
+            framework = framework,
+            modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM
+        )
+
         // Ensure model file is available (download if needed)
         return try {
             serviceContainer.modelManager.loadModel(model)
@@ -233,9 +243,24 @@ actual object RunAnywhere : BaseRunAnywhereSDK() {
             // Set the loaded model in the generation service
             serviceContainer.generationService.setCurrentModel(loadedModel)
 
+            // Notify lifecycle: model loaded successfully
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelDidLoad(
+                modelId = modelId,
+                modelName = model.name,
+                framework = framework,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM,
+                memoryUsage = model.memoryRequired
+            )
+
             androidLogger.info("Model $modelId loaded successfully into LLM service")
             true
         } catch (e: Exception) {
+            // Notify lifecycle: model load failed
+            com.runanywhere.sdk.models.lifecycle.ModelLifecycleTracker.modelLoadFailed(
+                modelId = modelId,
+                modality = com.runanywhere.sdk.models.lifecycle.Modality.LLM,
+                error = e.message ?: "Unknown error"
+            )
             androidLogger.error("Failed to load model $modelId: ${e.message}", e)
             false
         }

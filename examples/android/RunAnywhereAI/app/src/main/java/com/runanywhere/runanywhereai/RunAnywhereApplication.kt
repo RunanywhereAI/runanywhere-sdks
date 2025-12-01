@@ -4,17 +4,26 @@ import android.app.Application
 import android.util.Log
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.data.models.SDKEnvironment
-import com.runanywhere.sdk.public.extensions.addModelFromURL
-import com.runanywhere.sdk.public.extensions.listAvailableModels
-import com.runanywhere.sdk.public.extensions.loadModelWithInfo
-import com.runanywhere.sdk.llm.llamacpp.LlamaCppServiceProvider
+import com.runanywhere.sdk.public.extensions.registerFramework
+import com.runanywhere.sdk.public.models.ModelRegistration
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.FrameworkModality
+import com.runanywhere.sdk.models.enums.ModelFormat
+import com.runanywhere.sdk.llm.llamacpp.LlamaCppAdapter
+import com.runanywhere.sdk.core.onnx.ONNXAdapter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * Application class for RunAnywhere AI sample app
- * Matches iOS RunAnywhereAIApp.swift initialization pattern
+ * Matches iOS RunAnywhereAIApp.swift initialization pattern exactly.
+ *
+ * Uses strongly-typed enums for all framework and modality parameters:
+ * - LLMFramework enum for framework specification
+ * - FrameworkModality enum for modality specification
+ * - ModelFormat enum for format specification
+ * - ModelRegistration data class for model registration
  */
 class RunAnywhereApplication : Application() {
 
@@ -54,28 +63,16 @@ class RunAnywhereApplication : Application() {
             // Initialize SDK based on environment (matches iOS pattern)
             if (environment == SDKEnvironment.DEVELOPMENT) {
                 // Development Mode - No API key needed!
-                // Supabase analytics are automatically configured for development mode
                 RunAnywhere.initialize(
                     context = this@RunAnywhereApplication,
-                    apiKey = "dev",  // Any string works in dev mode
-                    baseURL = "localhost",  // Not used in dev mode
+                    apiKey = "dev",
+                    baseURL = "localhost",
                     environment = SDKEnvironment.DEVELOPMENT
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in DEVELOPMENT mode")
-                Log.i("RunAnywhereApp", "📊 Analytics: Automatically enabled (RunAnywhere Supabase)")
-                Log.i("RunAnywhereApp", "🔒 No Supabase credentials needed - handled by SDK!")
 
-                // STEP 1: Register Service Providers (matches iOS pattern)
-                val providersRegistered = registerServiceProvidersForDevelopment()
-                if (!providersRegistered) {
-                    throw IllegalStateException("Failed to register service providers")
-                }
-
-                // STEP 2: Register models for development
-                val modelsRegistered = registerModelsForDevelopment()
-                if (!modelsRegistered) {
-                    throw IllegalStateException("Failed to register models")
-                }
+                // Register frameworks and models using iOS-matching pattern
+                registerAdaptersForDevelopment()
 
             } else {
                 // Production Mode - Real API key required
@@ -90,182 +87,225 @@ class RunAnywhereApplication : Application() {
                 )
                 Log.i("RunAnywhereApp", "✅ SDK initialized in PRODUCTION mode")
 
-                // In production, models come from backend console
-                Log.i("RunAnywhereApp", "📡 Models will be fetched from backend console via API")
+                // In production, register adapters only (models come from backend)
+                registerAdaptersForProduction()
             }
 
             val initTime = System.currentTimeMillis() - startTime
-            Log.i("RunAnywhereApp", "✅ SDK successfully initialized!")
-            Log.i("RunAnywhereApp", "⏱️  Initialization time: ${initTime}ms")
+            Log.i("RunAnywhereApp", "✅ SDK successfully initialized in ${initTime}ms")
             Log.i("RunAnywhereApp", "🎯 SDK Status: Active=${RunAnywhere.isInitialized}")
-            Log.i("RunAnywhereApp", "🔧 Environment: ${environment.name}")
-            Log.i(
-                "RunAnywhereApp",
-                "📱 Device registration: Will happen on first API call (lazy loading)"
-            )
-            Log.i(
-                "RunAnywhereApp",
-                "🚀 Ready for on-device AI inference with lazy device registration!"
-            )
 
             isSDKInitialized = true
 
-            // Note: Models registered, user can now download and select models
-            Log.i("RunAnywhereApp", "💡 Models registered, user can now download and select models")
-
         } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ SDK initialization failed!")
-            Log.e("RunAnywhereApp", "🔍 Error: ${e.message}")
-            Log.e("RunAnywhereApp", "💡 Tip: Check your API key and network connection")
-
+            Log.e("RunAnywhereApp", "❌ SDK initialization failed: ${e.message}")
+            e.printStackTrace()
             initializationError = e
             isSDKInitialized = false
         }
     }
 
     /**
-     * Register Service Providers (matches iOS LlamaCPPServiceProvider.register())
-     * This is Step 1 of the two-tier registration pattern:
-     * 1. Register service providers with ModuleRegistry
-     * 2. Register models with their framework associations
+     * Register framework adapters with models for DEVELOPMENT mode.
+     * Matches iOS RunAnywhereAIApp.swift registerAdaptersForDevelopment() exactly.
+     *
+     * All parameters use strongly-typed enums:
+     * - LLMFramework.LLAMA_CPP, LLMFramework.ONNX
+     * - FrameworkModality.TEXT_TO_TEXT, VOICE_TO_TEXT, TEXT_TO_VOICE
+     * - ModelFormat.GGUF, ModelFormat.ONNX
      */
-    private fun registerServiceProvidersForDevelopment(): Boolean {
-        Log.i("RunAnywhereApp", "🔧 Registering Service Providers for DEVELOPMENT mode")
+    private suspend fun registerAdaptersForDevelopment() {
+        Log.i("RunAnywhereApp", "🔧 Registering Framework Adapters for DEVELOPMENT mode")
 
-        return try {
-            // Register Llama.cpp service provider from SDK module
-            LlamaCppServiceProvider.register()
-            Log.i("RunAnywhereApp", "✅ Registered LlamaCppServiceProvider")
+        // =====================================================
+        // 1. LlamaCPP Framework (TEXT_TO_TEXT modality)
+        // Matches iOS: RunAnywhere.registerFramework(LlamaCPPCoreAdapter(), models: [...])
+        // =====================================================
+        Log.i("RunAnywhereApp", "📝 Registering LlamaCPP adapter with LLM models...")
 
-            // TODO: Register WhisperKit/STT provider when available
-            // TODO: Register TTS provider when available
+        RunAnywhere.registerFramework(
+            adapter = LlamaCppAdapter.shared,
+            models = listOf(
+                // SmolLM2 360M - smallest and fastest (~500MB)
+                ModelRegistration(
+                    id = "smollm2-360m-q8-0",
+                    name = "SmolLM2 360M Q8_0",
+                    url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 500_000_000L
+                ),
+                // Qwen 2.5 0.5B - small but capable (~600MB)
+                ModelRegistration(
+                    id = "qwen-2.5-0.5b-instruct-q6-k",
+                    name = "Qwen 2.5 0.5B Instruct Q6_K",
+                    url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 600_000_000L
+                ),
+                // Llama 3.2 1B - good quality
+                ModelRegistration(
+                    id = "llama-3.2-1b-instruct-q6-k",
+                    name = "Llama 3.2 1B Instruct Q6_K",
+                    url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 1_000_000_000L
+                ),
+                // QWEN 2 0.5B - compact model
+                ModelRegistration(
+                    id = "qwen2-0.5b-instruct-q4-0",
+                    name = "QWEN 2 0.5B Q4_0 Instruct",
+                    url = "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 400_000_000L
+                ),
+                // SmolLM2 1.7B - larger but capable
+                ModelRegistration(
+                    id = "smollm2-1.7b-instruct-q6-k-l",
+                    name = "SmolLM2 1.7B Instruct Q6_K_L",
+                    url = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 1_700_000_000L
+                ),
+                // Qwen 2.5 1.5B - good for longer context
+                ModelRegistration(
+                    id = "qwen-2.5-1.5b-instruct-q6-k",
+                    name = "Qwen 2.5 1.5B Instruct Q6_K",
+                    url = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 1_500_000_000L
+                ),
+                // LiquidAI LFM2 350M Q4_K_M - smallest and fastest (~250MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q4-k-m",
+                    name = "LiquidAI LFM2 350M Q4_K_M",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 250_000_000L
+                ),
+                // LiquidAI LFM2 350M Q8_0 - highest quality (~400MB)
+                ModelRegistration(
+                    id = "lfm2-350m-q8-0",
+                    name = "LiquidAI LFM2 350M Q8_0",
+                    url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+                    framework = LLMFramework.LLAMA_CPP,
+                    modality = FrameworkModality.TEXT_TO_TEXT,
+                    format = ModelFormat.GGUF,
+                    memoryRequirement = 400_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ Registered LlamaCPP adapter with 8 LLM models")
 
-            Log.i("RunAnywhereApp", "🎉 All service providers registered successfully")
-            true
-        } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ Failed to register service providers: ${e.message}")
-            false
-        }
+        // =====================================================
+        // 2. ONNX Runtime Framework (VOICE_TO_TEXT, TEXT_TO_VOICE modalities)
+        // Matches iOS: RunAnywhere.registerFramework(ONNXAdapter.shared, models: [...])
+        // Note: On Android we use ONNX Sherpa models (WhisperKit is iOS-only CoreML)
+        // =====================================================
+        Log.i("RunAnywhereApp", "🎤🔊 Registering ONNX adapter with STT and TTS models...")
+
+        RunAnywhere.registerFramework(
+            adapter = ONNXAdapter.shared,
+            models = listOf(
+                // STT Models (VOICE_TO_TEXT modality)
+                // Sherpa ONNX Whisper Tiny English (~75MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-tiny-onnx",
+                    name = "Sherpa Whisper Tiny (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 75_000_000L
+                ),
+                // Sherpa ONNX Whisper Small (~250MB)
+                ModelRegistration(
+                    id = "sherpa-whisper-small-onnx",
+                    name = "Sherpa Whisper Small (ONNX)",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.en.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.VOICE_TO_TEXT,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 250_000_000L
+                ),
+
+                // TTS Models (TEXT_TO_VOICE modality)
+                // Piper TTS - US English Lessac Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-us-lessac-medium",
+                    name = "Piper TTS US English Medium",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_US-lessac-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                ),
+                // Piper TTS - British English Alba Medium (~65MB)
+                ModelRegistration(
+                    id = "piper-en-gb-alba-medium",
+                    name = "Piper TTS British English Medium",
+                    url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-piper-en_GB-alba-medium.tar.bz2",
+                    framework = LLMFramework.ONNX,
+                    modality = FrameworkModality.TEXT_TO_VOICE,
+                    format = ModelFormat.ONNX,
+                    memoryRequirement = 65_000_000L
+                )
+            )
+        )
+        Log.i("RunAnywhereApp", "✅ Registered ONNX adapter with 2 STT + 2 TTS models")
+
+        // Note: WhisperKit is iOS-only (uses CoreML), ONNX serves the same purpose on Android
+        // Note: FluidAudioDiarization registration can be added when the module is available
+        // Note: FoundationModels is iOS 26+ only, not applicable to Android
+
+        // Scan file system for already downloaded models
+        Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
+        RunAnywhere.scanForDownloadedModels()
+        Log.i("RunAnywhereApp", "✅ File system scan complete")
+
+        Log.i("RunAnywhereApp", "🎉 All frameworks registered for development:")
+        Log.i("RunAnywhereApp", "   📝 LLM: 8 models (LLAMA_CPP, TEXT_TO_TEXT)")
+        Log.i("RunAnywhereApp", "   🎤 STT: 2 models (ONNX, VOICE_TO_TEXT)")
+        Log.i("RunAnywhereApp", "   🔊 TTS: 2 models (ONNX, TEXT_TO_VOICE)")
+        Log.i("RunAnywhereApp", "   📦 Total: 12 models")
     }
 
     /**
-     * Register models for development mode (matches iOS registerAdaptersForDevelopment)
-     * This is Step 2 - models are associated with frameworks via compatibleFrameworks field
+     * Register framework adapters only for PRODUCTION mode.
+     * Models will be fetched from backend console.
+     * Matches iOS registerAdaptersForProduction() pattern.
      */
-    private suspend fun registerModelsForDevelopment(): Boolean {
-        Log.i("RunAnywhereApp", "📦 Registering models for DEVELOPMENT mode")
+    private suspend fun registerAdaptersForProduction() {
+        Log.i("RunAnywhereApp", "🔧 Registering Framework Adapters for PRODUCTION mode")
 
-        return try {
-            // Register LLM models (matches iOS LlamaCPPRuntime models)
-            // Note: In Kotlin SDK, addModelFromURL automatically registers the model
+        // Register adapters without hardcoded models (models come from backend)
+        RunAnywhere.registerFramework(adapter = LlamaCppAdapter.shared)
+        Log.i("RunAnywhereApp", "✅ Registered LlamaCPP adapter")
 
-            // SmolLM2 360M - smallest and fastest
-            addModelFromURL(
-                url = "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
-                name = "SmolLM2 360M Q8_0",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: SmolLM2 360M Q8_0")
+        RunAnywhere.registerFramework(adapter = ONNXAdapter.shared)
+        Log.i("RunAnywhereApp", "✅ Registered ONNX adapter")
 
-            // Qwen 2.5 0.5B - small but capable
-            addModelFromURL(
-                url = "https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
-                name = "Qwen 2.5 0.5B Instruct Q6_K",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: Qwen 2.5 0.5B Instruct Q6_K")
-
-            // Llama 3.2 1B - good quality
-            addModelFromURL(
-                url = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q6_K.gguf",
-                name = "Llama 3.2 1B Instruct Q6_K",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: Llama 3.2 1B Instruct Q6_K")
-
-
-            // Llama 3.2 1B - good quality
-            addModelFromURL(
-                url = "https://huggingface.co/Qwen/Qwen2-0.5B-Instruct-GGUF/resolve/main/qwen2-0_5b-instruct-q4_0.gguf",
-                name = "QWEN 2 0.5B Q4_0 Instruct",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: QWEN 2 0.5B Instruct Q6_K Q4_0")
-
-            // SmolLM2 1.7B - larger but capable
-            addModelFromURL(
-                url = "https://huggingface.co/bartowski/SmolLM2-1.7B-Instruct-GGUF/resolve/main/SmolLM2-1.7B-Instruct-Q6_K_L.gguf",
-                name = "SmolLM2 1.7B Instruct Q6_K_L",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: SmolLM2 1.7B Instruct Q6_K_L")
-
-            // Qwen 2.5 1.5B - good for longer context
-            addModelFromURL(
-                url = "https://huggingface.co/ZeroWw/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/Qwen2.5-1.5B-Instruct.q6_k.gguf",
-                name = "Qwen 2.5 1.5B Instruct Q6_K",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: Qwen 2.5 1.5B Instruct Q6_K")
-
-            // LiquidAI LFM2 350M Q4_K_M - smallest and fastest
-            addModelFromURL(
-                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
-                name = "LiquidAI LFM2 350M Q4_K_M",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: LiquidAI LFM2 350M Q4_K_M")
-
-            // LiquidAI LFM2 350M Q8_0 - highest quality
-            addModelFromURL(
-                url = "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
-                name = "LiquidAI LFM2 350M Q8_0",
-                type = "LLM"
-            )
-            Log.i("RunAnywhereApp", "✅ Registered: LiquidAI LFM2 350M Q8_0")
-
-            Log.i(
-                "RunAnywhereApp",
-                "🎉 All models registered for development (lazy loading enabled)"
-            )
-
-            // Scan file system for already downloaded models
-            Log.i("RunAnywhereApp", "🔍 Scanning for previously downloaded models...")
-            RunAnywhere.scanForDownloadedModels()
-            Log.i("RunAnywhereApp", "✅ File system scan complete")
-
-            // Note: In Kotlin SDK, we don't register STT/TTS adapters during app initialization
-            // They are registered when needed by the SDK's service container
-            // WhisperKit and other framework adapters are handled internally by the SDK
-
-            true
-        } catch (e: Exception) {
-            Log.e("RunAnywhereApp", "❌ Failed to register models: ${e.message}")
-            false
-        }
+        Log.i("RunAnywhereApp", "📡 Models will be fetched from backend console via API")
     }
 
     /**
      * Retrieves API key from secure storage.
-     * In production, this should:
-     * 1. Read from Android EncryptedSharedPreferences or Keystore
-     * 2. Or read from BuildConfig (populated from environment variables in CI/CD)
-     * 3. Never hard-code the key in source code
-     *
-     * For development/demo purposes, we use BuildConfig which can be set via:
-     * - gradle.properties (not committed to version control)
-     * - Environment variables in CI/CD
-     * - Or throw an error to force proper configuration
      */
     private fun getSecureApiKey(): String {
         // TODO: Implement secure API key retrieval before production deployment
-        // Option 1: Read from EncryptedSharedPreferences
-        // Option 2: Read from Android Keystore
-        // Option 3: Read from BuildConfig (populated from environment variables)
-        // Example: return BuildConfig.RUNANYWHERE_API_KEY
-
-        // For now, return a placeholder to allow development/testing
-        // WARNING: This must be replaced with actual secure key retrieval before production
         return "dev-placeholder-key"
     }
 

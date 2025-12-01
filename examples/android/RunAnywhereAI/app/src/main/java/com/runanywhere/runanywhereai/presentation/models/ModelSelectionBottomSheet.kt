@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -21,35 +22,36 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import com.runanywhere.sdk.models.DeviceInfo
-import kotlin.collections.filter
-import kotlin.collections.find
+import com.runanywhere.sdk.models.enums.LLMFramework
+import com.runanywhere.sdk.models.enums.ModelSelectionContext
 
 /**
- * Model Selection Bottom Sheet - EXACT iOS Implementation
+ * Model Selection Bottom Sheet - Context-Aware Implementation
  * Reference: iOS ModelSelectionSheet.swift
+ *
+ * Now supports context-based filtering:
+ * - LLM: Shows text generation frameworks (llama.cpp, etc.)
+ * - STT: Shows speech recognition frameworks (WhisperKit, etc.)
+ * - TTS: Shows text-to-speech frameworks (System TTS, etc.)
+ * - VOICE: Shows all voice-related frameworks
  *
  * UI Hierarchy:
  * 1. Navigation Bar (Title + Cancel/Add Model buttons)
  * 2. Main Content List:
  *    - Section 1: Device Status
- *    - Section 2: Available Frameworks (expandable)
- *    - Section 3: Models for [Framework] (conditional - when framework expanded)
+ *    - Section 2: Available Frameworks (filtered by context)
+ *    - Section 3: Models for [Framework] (conditional)
  * 3. Loading Overlay (when loading model)
- *
- * Flow:
- * - User taps "Select Model" from chat screen
- * - Sheet shows device info + available frameworks
- * - User taps framework → expands to show models
- * - User can download (if not downloaded) or select (if downloaded/built-in)
- * - On select: model loads with progress overlay
- * - On success: sheet dismisses, chat updates
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelSelectionBottomSheet(
+    context: ModelSelectionContext = ModelSelectionContext.LLM,
     onDismiss: () -> Unit,
     onModelSelected: suspend (com.runanywhere.sdk.models.ModelInfo) -> Unit,
-    viewModel: ModelSelectionViewModel = viewModel()
+    viewModel: ModelSelectionViewModel = viewModel(
+        factory = ModelSelectionViewModel.Factory(context)
+    )
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -71,7 +73,7 @@ fun ModelSelectionBottomSheet(
                 contentPadding = PaddingValues(Dimensions.large),
                 verticalArrangement = Arrangement.spacedBy(Dimensions.large)
             ) {
-                // HEADER - "Select Model"
+                // HEADER - Context-aware title
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -86,9 +88,9 @@ fun ModelSelectionBottomSheet(
                             Text("Cancel")
                         }
 
-                        // Title
+                        // Title - uses context title
                         Text(
-                            text = "Select Model",
+                            text = uiState.context.title,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -108,7 +110,7 @@ fun ModelSelectionBottomSheet(
                     DeviceStatusSection(deviceInfo = uiState.deviceInfo)
                 }
 
-                // SECTION 2: AVAILABLE FRAMEWORKS
+                // SECTION 2: AVAILABLE FRAMEWORKS (Context-filtered)
                 item {
                     AvailableFrameworksSection(
                         frameworks = uiState.frameworks,
@@ -120,41 +122,36 @@ fun ModelSelectionBottomSheet(
 
                 // SECTION 3: MODELS FOR [FRAMEWORK] (Conditional)
                 if (uiState.expandedFramework != null) {
+                    val expandedFw = uiState.expandedFramework!!
+
                     item {
                         Text(
-                            text = "Models for ${uiState.expandedFramework}",
+                            text = "Models for ${expandedFw.displayName}",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = Dimensions.small)
                         )
                     }
 
-                    // Filter models by expanded framework
-                    // CRITICAL: Use displayName to match framework names from ViewModel
-                    val filteredModels = uiState.models.filter { model ->
-                        model.compatibleFrameworks.map { it.displayName }
-                            .contains(uiState.expandedFramework)
-                    }
+                    // Filter models by expanded framework using enum
+                    val filteredModels = viewModel.getModelsForFramework(expandedFw)
 
                     // Debug logging
-                    android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${uiState.expandedFramework}")
+                    android.util.Log.d("ModelSelectionSheet", "🔍 Filtering models for framework: ${expandedFw.displayName}")
                     android.util.Log.d("ModelSelectionSheet", "📦 Total models: ${uiState.models.size}")
                     android.util.Log.d("ModelSelectionSheet", "✅ Filtered models: ${filteredModels.size}")
-                    filteredModels.forEach { model ->
-                        android.util.Log.d("ModelSelectionSheet", "   - ${model.name} (${model.compatibleFrameworks.map { it.displayName }})")
-                    }
 
                     if (filteredModels.isEmpty()) {
                         // Empty state
                         item {
-                            EmptyModelsMessage(framework = uiState.expandedFramework!!)
+                            EmptyModelsMessage(framework = expandedFw)
                         }
                     } else {
                         // Model rows
                         items(filteredModels, key = { it.id }) { model ->
                             SelectableModelRow(
                                 model = model,
-                                isSelected = uiState.currentModel?.id == model.id,  // Track if this model is loaded
+                                isSelected = uiState.currentModel?.id == model.id,
                                 isLoading = uiState.isLoadingModel && uiState.selectedModelId == model.id,
                                 onDownloadModel = {
                                     viewModel.downloadModel(model.id)
@@ -162,7 +159,6 @@ fun ModelSelectionBottomSheet(
                                 onSelectModel = {
                                     scope.launch {
                                         viewModel.selectModel(model.id)
-                                        // Wait a bit to show success message
                                         kotlinx.coroutines.delay(500)
                                         onModelSelected(model)
                                         onDismiss()
@@ -174,7 +170,7 @@ fun ModelSelectionBottomSheet(
                 }
             }
 
-            // LOADING OVERLAY - Matches iOS exactly
+            // LOADING OVERLAY
             if (uiState.isLoadingModel) {
                 LoadingOverlay(
                     modelName = uiState.models.find { it.id == uiState.selectedModelId }?.name ?: "Model",
@@ -251,7 +247,7 @@ private fun DeviceStatusSection(deviceInfo: DeviceInfo?) {
 @Composable
 private fun DeviceInfoRowItem(
     label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     value: String
 ) {
     Row(
@@ -281,10 +277,10 @@ private fun DeviceInfoRowItem(
 
 @Composable
 private fun AvailableFrameworksSection(
-    frameworks: List<String>,
-    expandedFramework: String?,
+    frameworks: List<LLMFramework>,
+    expandedFramework: LLMFramework?,
     isLoading: Boolean,
-    onToggleFramework: (String) -> Unit
+    onToggleFramework: (LLMFramework) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -344,7 +340,7 @@ private fun AvailableFrameworksSection(
 
 @Composable
 private fun FrameworkRow(
-    framework: String,
+    framework: LLMFramework,
     isExpanded: Boolean,
     onTap: () -> Unit
 ) {
@@ -360,13 +356,9 @@ private fun FrameworkRow(
             horizontalArrangement = Arrangement.spacedBy(Dimensions.small),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Framework icon
+            // Framework icon - context-aware
             Icon(
-                imageVector = when (framework.uppercase()) {
-                    "LLAMACPP", "LLAMA_CPP" -> Icons.Default.Memory
-                    "MEDIAPIPE" -> Icons.Default.Psychology
-                    else -> Icons.Default.Settings
-                },
+                imageVector = getFrameworkIcon(framework),
                 contentDescription = null,
                 modifier = Modifier.size(Dimensions.iconRegular),
                 tint = MaterialTheme.colorScheme.primary
@@ -374,12 +366,12 @@ private fun FrameworkRow(
 
             Column {
                 Text(
-                    framework,
+                    framework.displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    "High-performance inference",
+                    getFrameworkDescription(framework),
                     style = AppTypography.caption2,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -394,18 +386,59 @@ private fun FrameworkRow(
     }
 }
 
+/**
+ * Get icon for framework - matches iOS iconForFramework
+ */
+private fun getFrameworkIcon(framework: LLMFramework): ImageVector {
+    return when (framework) {
+        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP -> Icons.Default.Memory
+        LLMFramework.MEDIA_PIPE -> Icons.Default.Psychology
+        LLMFramework.WHISPER_KIT, LLMFramework.WHISPER_CPP, LLMFramework.OPEN_AI_WHISPER -> Icons.Default.Mic
+        LLMFramework.SYSTEM_TTS -> Icons.Default.VolumeUp
+        LLMFramework.FOUNDATION_MODELS -> Icons.Default.AutoAwesome
+        LLMFramework.CORE_ML -> Icons.Default.Memory
+        LLMFramework.TENSOR_FLOW_LITE -> Icons.Default.Analytics
+        LLMFramework.ONNX -> Icons.Default.Hub
+        LLMFramework.MLX, LLMFramework.MLC -> Icons.Default.Speed
+        else -> Icons.Default.Settings
+    }
+}
+
+/**
+ * Get description for framework - matches iOS
+ */
+private fun getFrameworkDescription(framework: LLMFramework): String {
+    return when (framework) {
+        LLMFramework.LLAMA_CPP, LLMFramework.LLAMACPP -> "High-performance LLM inference"
+        LLMFramework.MEDIA_PIPE -> "Multi-task AI inference"
+        LLMFramework.WHISPER_KIT -> "Optimized speech recognition"
+        LLMFramework.WHISPER_CPP -> "C++ speech recognition"
+        LLMFramework.OPEN_AI_WHISPER -> "OpenAI Whisper models"
+        LLMFramework.SYSTEM_TTS -> "Built-in text-to-speech"
+        LLMFramework.FOUNDATION_MODELS -> "Apple Intelligence models"
+        LLMFramework.CORE_ML -> "Apple Neural Engine"
+        LLMFramework.TENSOR_FLOW_LITE -> "TensorFlow Lite models"
+        LLMFramework.ONNX -> "ONNX Runtime inference"
+        LLMFramework.MLX -> "Apple Silicon optimized"
+        LLMFramework.MLC -> "Machine Learning Compilation"
+        LLMFramework.EXECU_TORCH -> "PyTorch mobile inference"
+        LLMFramework.PICO_LLM -> "Embedded LLM inference"
+        LLMFramework.SWIFT_TRANSFORMERS -> "HuggingFace Transformers"
+    }
+}
+
 // ====================
 // SECTION 3: MODELS LIST
 // ====================
 
 @Composable
-private fun EmptyModelsMessage(framework: String) {
+private fun EmptyModelsMessage(framework: LLMFramework) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Dimensions.small),
         modifier = Modifier.padding(vertical = Dimensions.small)
     ) {
         Text(
-            text = "No models available for this framework",
+            text = "No models available for ${framework.displayName}",
             style = AppTypography.caption,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -420,12 +453,12 @@ private fun EmptyModelsMessage(framework: String) {
 @Composable
 private fun SelectableModelRow(
     model: com.runanywhere.sdk.models.ModelInfo,
-    isSelected: Boolean,  // Matches iOS - is this the currently loaded model?
+    isSelected: Boolean,
     isLoading: Boolean,
     onDownloadModel: () -> Unit,
     onSelectModel: () -> Unit
 ) {
-    // State detection - EXACT iOS logic
+    // State detection - matches iOS logic
     val isDownloaded = model.localPath != null
     val canDownload = model.downloadURL != null
 
@@ -482,19 +515,18 @@ private fun SelectableModelRow(
                     }
                 }
 
-                // Status indicator - EXACT iOS logic
+                // Status indicator
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     when {
                         isSelected -> {
-                            // Model is loaded - show green checkmark
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Loaded",
                                 modifier = Modifier.size(12.dp),
-                                tint = Color(0xFF4CAF50)  // Green
+                                tint = Color(0xFF4CAF50)
                             )
                             Text(
                                 text = "Loaded",
@@ -503,7 +535,6 @@ private fun SelectableModelRow(
                             )
                         }
                         isDownloaded -> {
-                            // Model is downloaded but not loaded
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = "Downloaded",
@@ -529,13 +560,12 @@ private fun SelectableModelRow(
 
             Spacer(modifier = Modifier.width(Dimensions.smallMedium))
 
-            // RIGHT: Action button - EXACT iOS logic
+            // RIGHT: Action button
             when {
                 isLoading -> {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                 }
                 isSelected -> {
-                    // Model is loaded - show "Loaded" status (matches iOS)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(Dimensions.xSmall),
                         verticalAlignment = Alignment.CenterVertically
@@ -555,7 +585,6 @@ private fun SelectableModelRow(
                     }
                 }
                 isDownloaded -> {
-                    // Model is downloaded - show "Load" button (matches iOS)
                     Button(
                         onClick = onSelectModel,
                         enabled = !isLoading,
@@ -567,7 +596,6 @@ private fun SelectableModelRow(
                     }
                 }
                 canDownload -> {
-                    // Model is not downloaded - show "Download" button (matches iOS)
                     Button(
                         onClick = onDownloadModel,
                         enabled = !isLoading,
@@ -586,7 +614,7 @@ private fun SelectableModelRow(
 @Composable
 private fun ModelBadge(
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    icon: ImageVector? = null,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     textColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
@@ -614,7 +642,7 @@ private fun ModelBadge(
 }
 
 // ====================
-// LOADING OVERLAY - Matches iOS
+// LOADING OVERLAY
 // ====================
 
 @Composable
