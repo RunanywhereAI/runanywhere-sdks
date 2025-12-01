@@ -8,18 +8,18 @@
  */
 
 // Main SDK
-import { RunAnywhere as _RunAnywhere } from './RunAnywhere';
-export { RunAnywhere, Conversation, type ModelInfo, type DownloadProgress as ModelDownloadProgress } from './RunAnywhere';
+import { RunAnywhere as _RunAnywhere } from './Public/RunAnywhere';
+export { RunAnywhere, Conversation, type ModelInfo, type DownloadProgress as ModelDownloadProgress } from './Public/RunAnywhere';
 export default _RunAnywhere;
 
 // Types
 export * from './types';
 
 // Errors
-export { SDKError, SDKErrorCode, ErrorCode } from './errors';
+export { SDKError, SDKErrorCode } from './Public/Errors/SDKError';
 
 // Events
-export { EventBus, NativeEventNames } from './events';
+export { EventBus, NativeEventNames } from './Public/Events';
 
 // Services
 export {

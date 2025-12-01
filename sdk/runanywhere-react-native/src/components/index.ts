@@ -30,3 +30,15 @@ export * from './LLM';
 
 // Voice Activity Detection (VAD)
 export * from './VAD';
+
+// Wake Word Detection
+export * from './WakeWord';
+
+// Speaker Diarization
+export * from './SpeakerDiarization';
+
+// Vision Language Model (VLM)
+export * from './VLM';
+
+// Voice Agent (orchestrates VAD, STT, LLM, TTS)
+export * from './VoiceAgent';

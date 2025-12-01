@@ -10,8 +10,8 @@
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import { BaseComponent, ComponentConfiguration, ComponentInput, ComponentOutput } from '../BaseComponent';
 import { requireNativeModule } from '../../native/NativeRunAnywhere';
-import { EventBus } from '../../events';
-import { SDKError, SDKErrorCode } from '../../errors';
+import { EventBus } from '../../Public/Events';
+import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
 import { SDKComponent } from '../../types/enums';
 
 // ============================================================================

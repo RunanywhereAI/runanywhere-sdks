@@ -1,750 +1,225 @@
 /**
  * TTSComponent.ts
  *
- * Text-to-Speech component for RunAnywhere React Native SDK.
- * Follows the exact architecture and patterns from Swift SDK's TTSComponent.swift.
+ * Text-to-Speech component following the clean architecture
  *
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Components/TTS/TTSComponent.swift
  */
 
-import { BaseComponent } from '../BaseComponent';
-import type { ComponentConfiguration, ComponentInput, ComponentOutput } from '../BaseComponent';
-import { requireNativeModule } from '../../native/NativeRunAnywhere';
-import { SDKError, SDKErrorCode } from '../../errors';
-import { AudioFormat, SDKComponent } from '../../types/enums';
+import { BaseComponent } from '../../Core/Components/BaseComponent';
+import { SDKComponent } from '../../Core/Models/Common/SDKComponent';
+import { ModuleRegistry } from '../../Core/ModuleRegistry';
+import { SDKError, SDKErrorCode } from '../../Public/Errors/SDKError';
+import type { TTSConfiguration } from './TTSConfiguration';
+import type { TTSInput, TTSOutput, TTSOptions } from './TTSModels';
+import type { TTSService } from '../../Core/Protocols/Voice/TTSService';
+import type { TTSServiceProvider } from '../../Core/Protocols/Voice/TTSServiceProvider';
+import type { TTSResult } from '../../Core/Models/TTS/TTSResult';
+import type { TTSConfiguration as CoreTTSConfiguration } from '../../Core/Models/Configuration/TTSConfiguration';
+import { AnyServiceWrapper } from '../../Core/Components/BaseComponent';
 
 /**
- * Get default sample rate for audio format
+ * TTS Service Wrapper
+ * Wrapper class to allow protocol-based TTS service to work with BaseComponent
  */
-export function getAudioFormatSampleRate(format: AudioFormat): number {
-  switch (format) {
-    case AudioFormat.WAV:
-    case AudioFormat.PCM:
-    case AudioFormat.FLAC:
-      return 16000;
-    case AudioFormat.MP3:
-    case AudioFormat.M4A:
-      return 44100;
-    case AudioFormat.OPUS:
-      return 48000;
-    default:
-      return 16000;
+export class TTSServiceWrapper extends AnyServiceWrapper<TTSService> {
+  constructor(service: TTSService | null = null) {
+    super(service);
   }
 }
 
-// ============================================================================
-// TTS Configuration
-// ============================================================================
-
 /**
- * Configuration for TTS component
- * Reference: TTSConfiguration in TTSComponent.swift
- *
- * Conforms to ComponentConfiguration and ComponentInitParameters protocols
- */
-export interface TTSConfiguration extends ComponentConfiguration {
-  /** Component type */
-  readonly componentType: SDKComponent;
-
-  /** Model ID (not typically used for TTS) */
-  readonly modelId?: string | null;
-
-  /** Voice identifier */
-  voice: string;
-
-  /** Language code */
-  language: string;
-
-  /** Speaking rate (0.5 to 2.0) */
-  speakingRate: number;
-
-  /** Pitch (0.5 to 2.0) */
-  pitch: number;
-
-  /** Volume (0.0 to 1.0) */
-  volume: number;
-
-  /** Audio format */
-  audioFormat: AudioFormat;
-
-  /** Use neural voice (if available) */
-  useNeuralVoice: boolean;
-
-  /** Enable SSML */
-  enableSSML: boolean;
-
-  /** Validate configuration */
-  validate(): void;
-}
-
-/**
- * Default TTS configuration
- */
-export const DEFAULT_TTS_CONFIGURATION: Omit<TTSConfiguration, 'componentType' | 'validate'> = {
-  modelId: undefined,
-  voice: 'com.apple.ttsbundle.siri_female_en-US_compact',
-  language: 'en-US',
-  speakingRate: 1.0,
-  pitch: 1.0,
-  volume: 1.0,
-  audioFormat: AudioFormat.PCM,
-  useNeuralVoice: true,
-  enableSSML: false,
-};
-
-/**
- * Create TTS configuration with defaults
- */
-export function createTTSConfiguration(
-  config: Partial<Omit<TTSConfiguration, 'componentType' | 'validate'>>
-): TTSConfiguration {
-  return {
-    componentType: SDKComponent.TTS,
-    ...DEFAULT_TTS_CONFIGURATION,
-    ...config,
-    validate(): void {
-      if (this.speakingRate < 0.5 || this.speakingRate > 2.0) {
-        throw new SDKError(
-          SDKErrorCode.ValidationFailed,
-          'Speaking rate must be between 0.5 and 2.0'
-        );
-      }
-      if (this.pitch < 0.5 || this.pitch > 2.0) {
-        throw new SDKError(
-          SDKErrorCode.ValidationFailed,
-          'Pitch must be between 0.5 and 2.0'
-        );
-      }
-      if (this.volume < 0.0 || this.volume > 1.0) {
-        throw new SDKError(
-          SDKErrorCode.ValidationFailed,
-          'Volume must be between 0.0 and 1.0'
-        );
-      }
-    },
-  };
-}
-
-// ============================================================================
-// TTS Options
-// ============================================================================
-
-/**
- * Options for text-to-speech synthesis
- * Reference: TTSOptions in TTSComponent.swift
- */
-export interface TTSOptions {
-  /** Voice to use for synthesis */
-  voice?: string | null;
-
-  /** Language for synthesis */
-  language: string;
-
-  /** Speech rate (0.0 to 2.0, 1.0 is normal) */
-  rate: number;
-
-  /** Speech pitch (0.0 to 2.0, 1.0 is normal) */
-  pitch: number;
-
-  /** Speech volume (0.0 to 1.0) */
-  volume: number;
-
-  /** Audio format for output */
-  audioFormat: AudioFormat;
-
-  /** Sample rate for output audio */
-  sampleRate: number;
-
-  /** Whether to use SSML markup */
-  useSSML: boolean;
-}
-
-// ============================================================================
-// TTS Input/Output Models
-// ============================================================================
-
-/**
- * Input for Text-to-Speech
- * Reference: TTSInput in TTSComponent.swift
- */
-export interface TTSInput extends ComponentInput {
-  /** Text to synthesize */
-  text: string;
-
-  /** Optional SSML markup (overrides text if provided) */
-  ssml?: string | null;
-
-  /** Voice ID override */
-  voiceId?: string | null;
-
-  /** Language override */
-  language?: string | null;
-
-  /** Custom options override */
-  options?: TTSOptions | null;
-
-  /** Validate input */
-  validate(): void;
-}
-
-/**
- * Phoneme timestamp information
- * Reference: PhonemeTimestamp in TTSComponent.swift
- */
-export interface PhonemeTimestamp {
-  phoneme: string;
-  startTime: number;
-  endTime: number;
-}
-
-/**
- * Synthesis metadata
- * Reference: SynthesisMetadata in TTSComponent.swift
- */
-export interface SynthesisMetadata {
-  voice: string;
-  language: string;
-  processingTime: number;
-  characterCount: number;
-  charactersPerSecond: number;
-}
-
-/**
- * Output from Text-to-Speech
- * Reference: TTSOutput in TTSComponent.swift
- */
-export interface TTSOutput extends ComponentOutput {
-  /** Synthesized audio data (base64 encoded) */
-  audioData: string;
-
-  /** Audio format of the output */
-  format: AudioFormat;
-
-  /** Duration of the audio in seconds */
-  duration: number;
-
-  /** Sample rate of the audio */
-  sampleRate: number;
-
-  /** Number of samples */
-  numSamples: number;
-
-  /** Phoneme timestamps if available */
-  phonemeTimestamps?: PhonemeTimestamp[] | null;
-
-  /** Processing metadata */
-  metadata: SynthesisMetadata;
-
-  /** Timestamp (required by ComponentOutput) */
-  timestamp: Date;
-}
-
-/**
- * Voice information
- */
-export interface VoiceInfo {
-  id: string;
-  name: string;
-  language: string;
-  isNeural?: boolean;
-}
-
-// ============================================================================
-// TTS Service Protocol
-// ============================================================================
-
-/**
- * Protocol for text-to-speech services
- * Reference: TTSService protocol in TTSComponent.swift
- */
-export interface TTSService {
-  /** Initialize the TTS service */
-  initialize(): Promise<void>;
-
-  /** Synthesize text to audio */
-  synthesize(text: string, options: TTSOptions): Promise<string>;
-
-  /** Stream synthesis for long text */
-  synthesizeStream(
-    text: string,
-    options: TTSOptions,
-    onChunk: (chunk: string) => void
-  ): Promise<void>;
-
-  /** Stop current synthesis */
-  stop(): void;
-
-  /** Check if currently synthesizing */
-  readonly isSynthesizing: boolean;
-
-  /** Get available voices */
-  readonly availableVoices: string[];
-
-  /** Cleanup resources */
-  cleanup(): Promise<void>;
-}
-
-/**
- * Service wrapper for TTS service
- * Reference: TTSServiceWrapper in TTSComponent.swift
- */
-export class TTSServiceWrapper {
-  public wrappedService: TTSService | null = null;
-
-  constructor(service?: TTSService) {
-    this.wrappedService = service || null;
-  }
-}
-
-// ============================================================================
-// Native TTS Service Implementation
-// ============================================================================
-
-/**
- * Native implementation of TTSService using NativeRunAnywhere
- * This bridges to the native TTS implementation
- */
-class NativeTTSService implements TTSService {
-  private nativeModule: any;
-  private _isSynthesizing = false;
-  private _isInitialized = false;
-
-  constructor() {
-    this.nativeModule = requireNativeModule();
-  }
-
-  async initialize(): Promise<void> {
-    if (this._isInitialized) {
-      return;
-    }
-
-    // System TTS doesn't require explicit initialization
-    // Just verify the module is available
-    if (!this.nativeModule) {
-      throw new SDKError(
-        SDKErrorCode.ComponentNotInitialized,
-        'Native module not available'
-      );
-    }
-
-    this._isInitialized = true;
-  }
-
-  async synthesize(text: string, options: TTSOptions): Promise<string> {
-    if (!this._isInitialized) {
-      throw new SDKError(SDKErrorCode.NotInitialized, 'TTS service not initialized');
-    }
-
-    this._isSynthesizing = true;
-
-    try {
-      // Call native synthesize method
-      const resultJson = await this.nativeModule.synthesize(
-        text,
-        options.voice || null,
-        options.rate,
-        options.pitch
-      );
-
-      if (!resultJson) {
-        throw new SDKError(SDKErrorCode.SynthesisFailed, 'Synthesis failed');
-      }
-
-      return resultJson;
-    } finally {
-      this._isSynthesizing = false;
-    }
-  }
-
-  async synthesizeStream(
-    text: string,
-    options: TTSOptions,
-    onChunk: (chunk: string) => void
-  ): Promise<void> {
-    // System TTS doesn't support true streaming
-    // Just synthesize the complete text
-    const result = await this.synthesize(text, options);
-    onChunk(result); // Signal completion with result
-  }
-
-  stop(): void {
-    if (this.nativeModule?.cancelTTS) {
-      this.nativeModule.cancelTTS();
-    }
-    this._isSynthesizing = false;
-  }
-
-  get isSynthesizing(): boolean {
-    return this._isSynthesizing;
-  }
-
-  get availableVoices(): string[] {
-    // Would call native to get voices
-    // For now return empty - native implementation needs to provide this
-    return [];
-  }
-
-  async cleanup(): Promise<void> {
-    this.stop();
-    this._isInitialized = false;
-  }
-}
-
-// ============================================================================
-// TTS Component
-// ============================================================================
-
-/**
- * Text-to-Speech component following the clean architecture
- *
- * Extends BaseComponent to provide TTS capabilities with lifecycle management.
- * Matches the Swift SDK TTSComponent implementation exactly.
- *
- * Reference: TTSComponent in TTSComponent.swift
- *
- * @example
- * ```typescript
- * // Create and initialize component
- * const config = createTTSConfiguration({
- *   voice: 'en-US-default',
- *   speakingRate: 1.0,
- *   pitch: 1.0,
- * });
- *
- * const tts = new TTSComponent(config);
- * await tts.initialize();
- *
- * // Synthesize speech
- * const result = await tts.synthesize('Hello, world!');
- * console.log('Audio duration:', result.duration, 'seconds');
- *
- * // Synthesize with SSML
- * const ssmlResult = await tts.synthesizeSSML('<speak>Hello!</speak>');
- * ```
+ * Text-to-Speech component
  */
 export class TTSComponent extends BaseComponent<TTSServiceWrapper> {
-  // ============================================================================
-  // Static Properties
-  // ============================================================================
+  // MARK: - Properties
 
-  /**
-   * Component type identifier
-   * Reference: componentType in TTSComponent.swift
-   */
-  static override componentType = SDKComponent.TTS;
-
-  // ============================================================================
-  // Instance Properties
-  // ============================================================================
+  public static override componentType: SDKComponent = SDKComponent.TTS;
 
   private readonly ttsConfiguration: TTSConfiguration;
+  private currentVoice: string | null = null;
 
-  // ============================================================================
-  // Constructor
-  // ============================================================================
+  // MARK: - Initialization
 
   constructor(configuration: TTSConfiguration) {
     super(configuration);
     this.ttsConfiguration = configuration;
+    this.currentVoice = configuration.voice;
   }
 
-  // ============================================================================
-  // Service Creation
-  // ============================================================================
+  // MARK: - Service Creation
 
-  /**
-   * Create the TTS service
-   *
-   * Reference: createService() in TTSComponent.swift
-   */
-  protected async createService(): Promise<TTSServiceWrapper> {
+  protected override async createService(): Promise<TTSServiceWrapper> {
     const modelId = this.ttsConfiguration.voice;
+    const modelName = modelId;
 
-    // Emit checking event
-    this.eventBus.emitComponentInitialization({
-      type: 'componentChecking',
-      component: TTSComponent.componentType,
-      modelId: modelId,
-    });
+    // Try to get a registered TTS provider from central registry
+    const provider = ModuleRegistry.shared.ttsProvider(modelId);
 
     try {
-      // Create native TTS service (System TTS fallback)
-      const ttsService = new NativeTTSService();
-      await ttsService.initialize();
+      let ttsService: TTSService;
+
+      if (provider) {
+        // Use registered provider (e.g., ONNXTTSServiceProvider)
+        ttsService = await provider.createTTSService(this.ttsConfiguration);
+      } else {
+        // Fallback to default adapter (system TTS)
+        // For React Native, we'll need to implement a default TTS service
+        throw new SDKError(
+          SDKErrorCode.ComponentNotInitialized,
+          'No TTS service provider registered. Please register a TTS provider with ModuleRegistry.shared.registerTTS(provider).'
+        );
+      }
 
       // Wrap the service
       const wrapper = new TTSServiceWrapper(ttsService);
 
       return wrapper;
     } catch (error) {
-      throw error;
+      throw new SDKError(
+        SDKErrorCode.ComponentNotInitialized,
+        `Failed to create TTS service: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
 
-  protected async initializeService(): Promise<void> {
-    const wrappedService = this.service?.wrappedService;
-    if (!wrappedService) {
-      return;
+  protected override async performCleanup(): Promise<void> {
+    if (this.service?.wrappedService) {
+      await this.service.wrappedService.cleanup();
     }
-
-    // Track initialization
-    this.eventBus.emitComponentInitialization({
-      type: 'componentInitializing',
-      component: TTSComponent.componentType,
-      modelId: undefined,
-    });
-
-    await wrappedService.initialize();
   }
 
-  // ============================================================================
-  // Public API
-  // ============================================================================
+  // MARK: - Public API
 
   /**
-   * Synthesize speech from text
-   *
-   * Reference: synthesize(_:voice:language:) in TTSComponent.swift
-   *
-   * @param text - Text to synthesize
-   * @param voice - Voice override
-   * @param language - Language override
-   * @returns TTS output with audio data
+   * Synthesize text to audio
    */
-  async synthesize(text: string, voice?: string | null, language?: string | null): Promise<TTSOutput> {
+  public async synthesize(text: string, options?: Partial<TTSOptions>): Promise<TTSOutput> {
     this.ensureReady();
 
     const input: TTSInput = {
       text,
-      voiceId: voice,
-      language: language,
+      ssml: null,
+      voiceId: options?.voice ?? null,
+      language: options?.language ?? null,
+      options: options as TTSOptions | null,
       validate: () => {
-        if (!text || text.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'Text is required');
+        if (!text || text.trim().length === 0) {
+          throw new SDKError(SDKErrorCode.ValidationFailed, 'TTSInput must contain text');
         }
       },
+      timestamp: new Date(),
     };
 
-    return this.process(input);
-  }
-
-  /**
-   * Synthesize with SSML markup
-   *
-   * Reference: synthesizeSSML(_:voice:language:) in TTSComponent.swift
-   *
-   * @param ssml - SSML markup
-   * @param voice - Voice override
-   * @param language - Language override
-   * @returns TTS output with audio data
-   */
-  async synthesizeSSML(ssml: string, voice?: string | null, language?: string | null): Promise<TTSOutput> {
-    this.ensureReady();
-
-    const input: TTSInput = {
-      text: '',
-      ssml: ssml,
-      voiceId: voice,
-      language: language,
-      validate: () => {
-        if (!ssml || ssml.length === 0) {
-          throw new SDKError(SDKErrorCode.ValidationFailed, 'SSML is required');
-        }
-      },
-    };
-
-    return this.process(input);
+    return await this.process(input);
   }
 
   /**
    * Process TTS input
-   *
-   * Reference: process(_:) in TTSComponent.swift
-   *
-   * @param input - TTS input with text/SSML and options
-   * @returns TTS output with audio data
    */
-  async process(input: TTSInput): Promise<TTSOutput> {
+  public async process(input: TTSInput): Promise<TTSOutput> {
     this.ensureReady();
 
-    const ttsService = this.service?.wrappedService;
-    if (!ttsService) {
+    if (!this.service?.wrappedService) {
       throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
     }
 
     // Validate input
     input.validate();
 
-    // Get text to synthesize
-    const textToSynthesize = input.ssml || input.text;
-
-    // Create options from input or use defaults
-    const options: TTSOptions = input.options || {
-      voice: input.voiceId || this.ttsConfiguration.voice,
-      language: input.language || this.ttsConfiguration.language,
+    // Build options
+    const options: TTSOptions = input.options ?? {
+      voice: this.ttsConfiguration.voice,
+      language: this.ttsConfiguration.language,
       rate: this.ttsConfiguration.speakingRate,
       pitch: this.ttsConfiguration.pitch,
       volume: this.ttsConfiguration.volume,
       audioFormat: this.ttsConfiguration.audioFormat,
-      sampleRate: getAudioFormatSampleRate(this.ttsConfiguration.audioFormat),
-      useSSML: input.ssml !== null && input.ssml !== undefined,
+      sampleRate: 16000, // Default sample rate
+      useSSML: this.ttsConfiguration.enableSSML,
     };
 
     // Track processing time
     const startTime = Date.now();
 
-    // Perform synthesis
-    const resultJson = await ttsService.synthesize(textToSynthesize, options);
-
-    const processingTime = Date.now() - startTime;
-
-    // Parse result
-    const result = JSON.parse(resultJson);
-
-    if (result.error) {
-      throw new SDKError(SDKErrorCode.SynthesisFailed, result.error);
-    }
-
-    // Calculate duration from samples and sample rate
-    const duration = result.sampleRate > 0 ? result.numSamples / result.sampleRate : 0;
-
-    const metadata: SynthesisMetadata = {
-      voice: options.voice || this.ttsConfiguration.voice,
-      language: options.language,
-      processingTime,
-      characterCount: textToSynthesize.length,
-      charactersPerSecond: processingTime > 0 ? (textToSynthesize.length / processingTime) * 1000 : 0,
+    // Convert TTSOptions to TTSConfiguration for service
+    const ttsConfig: CoreTTSConfiguration = {
+      componentType: this.ttsConfiguration.componentType,
+      modelId: this.ttsConfiguration.modelId,
+      voice: options.voice ?? this.ttsConfiguration.voice,
+      language: options.language ?? this.ttsConfiguration.language,
+      speakingRate: options.rate ?? this.ttsConfiguration.speakingRate,
+      pitch: options.pitch ?? this.ttsConfiguration.pitch,
+      volume: options.volume ?? this.ttsConfiguration.volume,
+      audioFormat: options.audioFormat ?? this.ttsConfiguration.audioFormat,
+      useNeuralVoice: this.ttsConfiguration.useNeuralVoice,
+      enableSSML: options.useSSML ?? this.ttsConfiguration.enableSSML,
+      validate: () => {},
     };
 
+    // Synthesize
+    const result: TTSResult = await this.service.wrappedService.synthesize(
+      input.ssml ?? input.text,
+      ttsConfig
+    );
+
+    const processingTime = (Date.now() - startTime) / 1000; // seconds
+    const characterCount = (input.ssml ?? input.text).length;
+    const charactersPerSecond = processingTime > 0 ? characterCount / processingTime : 0;
+
+    // Decode base64 audio data
+    const audioData = Buffer.from(result.audio, 'base64');
+
+    // Create output
     return {
-      audioData: result.audio,
-      format: this.ttsConfiguration.audioFormat,
-      duration,
-      sampleRate: result.sampleRate,
-      numSamples: result.numSamples,
-      phonemeTimestamps: null, // Would be extracted from service if available
-      metadata,
+      audioData,
+      format: options.audioFormat ?? this.ttsConfiguration.audioFormat,
+      duration: result.duration,
+      phonemeTimestamps: null, // Not typically available
+      metadata: {
+        voice: options.voice ?? this.ttsConfiguration.voice,
+        language: options.language ?? this.ttsConfiguration.language,
+        processingTime,
+        characterCount,
+        charactersPerSecond,
+      },
       timestamp: new Date(),
     };
   }
 
   /**
    * Stream synthesis for long text
-   *
-   * Reference: streamSynthesize(_:voice:language:) in TTSComponent.swift
-   *
-   * @param text - Text to synthesize
-   * @param voice - Voice override
-   * @param language - Language override
-   * @returns Async stream of audio chunks (base64 encoded)
+   * Note: Most TTS services don't support true streaming, so this falls back to batch mode
    */
-  async *streamSynthesize(
+  public async synthesizeStream(
     text: string,
-    voice?: string | null,
-    language?: string | null
-  ): AsyncGenerator<string, void, unknown> {
+    options?: Partial<TTSOptions>,
+    onChunk?: (chunk: Buffer | Uint8Array) => void
+  ): Promise<void> {
     this.ensureReady();
 
-    const ttsService = this.service?.wrappedService;
-    if (!ttsService) {
+    if (!this.service?.wrappedService) {
       throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
     }
 
-    const options: TTSOptions = {
-      voice: voice || this.ttsConfiguration.voice,
-      language: language || this.ttsConfiguration.language,
-      rate: this.ttsConfiguration.speakingRate,
-      pitch: this.ttsConfiguration.pitch,
-      volume: this.ttsConfiguration.volume,
-      audioFormat: this.ttsConfiguration.audioFormat,
-      sampleRate: getAudioFormatSampleRate(this.ttsConfiguration.audioFormat),
-      useSSML: false,
-    };
-
-    const chunks: string[] = [];
-
-    await ttsService.synthesizeStream(text, options, (chunk) => {
-      chunks.push(chunk);
-    });
-
-    // Yield all chunks
-    for (const chunk of chunks) {
-      yield chunk;
+    // For now, TTS services typically don't support streaming
+    // So we just synthesize the full text and call onChunk once
+    const output = await this.synthesize(text, options);
+    if (onChunk) {
+      onChunk(output.audioData);
     }
   }
 
   /**
    * Get available voices
-   *
-   * Reference: getAvailableVoices() in TTSComponent.swift
-   *
-   * @returns Array of available voice identifiers
    */
-  getAvailableVoices(): string[] {
-    return this.service?.wrappedService?.availableVoices || [];
-  }
+  public async getAvailableVoices(): Promise<string[]> {
+    this.ensureReady();
 
-  /**
-   * Stop current synthesis
-   *
-   * Reference: stopSynthesis() in TTSComponent.swift
-   */
-  stopSynthesis(): void {
-    this.service?.wrappedService?.stop();
-  }
+    if (!this.service?.wrappedService) {
+      throw new SDKError(SDKErrorCode.ComponentNotReady, 'TTS service not available');
+    }
 
-  /**
-   * Check if currently synthesizing
-   *
-   * Reference: isSynthesizing in TTSComponent.swift
-   */
-  get isSynthesizing(): boolean {
-    return this.service?.wrappedService?.isSynthesizing || false;
-  }
-
-  /**
-   * Get wrapped TTS service
-   *
-   * @returns The wrapped TTS service instance
-   */
-  getTTSService(): TTSService | null {
-    return this.service?.wrappedService || null;
-  }
-
-  // ============================================================================
-  // Cleanup
-  // ============================================================================
-
-  /**
-   * Cleanup resources
-   *
-   * Reference: performCleanup() in TTSComponent.swift
-   */
-  protected async performCleanup(): Promise<void> {
-    this.service?.wrappedService?.stop();
-    await this.service?.wrappedService?.cleanup();
+    return await this.service.wrappedService.getAvailableVoices();
   }
 }
-
-// ============================================================================
-// Factory Function
-// ============================================================================
-
-/**
- * Create a TTS component with configuration
- *
- * @param config - Partial configuration (merged with defaults)
- * @returns Configured TTS component
- */
-export function createTTSComponent(
-  config?: Partial<Omit<TTSConfiguration, 'componentType' | 'validate'>>
-): TTSComponent {
-  const configuration = createTTSConfiguration(config || {});
-  return new TTSComponent(configuration);
-}
-
-// ============================================================================
-// Exports
-// ============================================================================
-// All exports are already declared above as `export interface` or `export class`
-// No need for additional export statements
