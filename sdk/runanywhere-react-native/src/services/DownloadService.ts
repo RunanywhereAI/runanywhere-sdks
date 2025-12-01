@@ -8,7 +8,7 @@
  */
 
 import { requireNativeModule } from '../native';
-import { EventBus } from '../events';
+import { EventBus } from '../Public/Events';
 import type { ModelInfo } from '../types';
 
 /**

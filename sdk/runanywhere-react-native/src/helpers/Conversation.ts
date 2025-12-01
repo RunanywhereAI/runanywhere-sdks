@@ -4,4 +4,4 @@
  * Re-export from main module for direct import.
  */
 
-export { Conversation } from '../RunAnywhere';
+export { Conversation } from '../Public/RunAnywhere';

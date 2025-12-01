@@ -7,8 +7,8 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Core/Components/BaseComponent.swift
  */
 
-import { EventBus, type EventBusImpl } from '../events';
-import { SDKError, SDKErrorCode } from '../errors';
+import { EventBus, type EventBusImpl } from '../Public/Events';
+import { SDKError, SDKErrorCode } from '../Public/Errors/SDKError';
 import { ComponentState, SDKComponent } from '../types/enums';
 import type { ComponentInitializationEvent } from '../types/events';
 
